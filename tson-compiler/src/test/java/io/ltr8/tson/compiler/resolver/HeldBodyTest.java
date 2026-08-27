@@ -62,10 +62,11 @@ class HeldBodyTest {
     }
 
     /**
-     * A held body writes as the application it holds, because the AST is written as syntax rather than bound
-     * as a value ({@code AstWriter}). Bound, it would render a faithful description of the wrong thing --
-     * {@code !recordvalue { fields: [ ... ] }} -- and the token forms an author chose would be decided again
-     * rather than put back.
+     * A held body writes as the application it holds and <b>nothing else</b>: the carrier is {@code
+     * @Transparent}, so it contributes neither a type-ref nor a field name, and the AST inside is written as
+     * syntax rather than bound as a value ({@code AstWriter}). Bound, it would render a faithful description
+     * of the wrong thing -- {@code !recordvalue { fields: [ ... ] }} -- and the token forms an author chose
+     * would be decided again rather than put back.
      */
     @Test
     void aHeldBodyWritesAsTheApplicationItHolds() {
@@ -74,12 +75,14 @@ class HeldBodyTest {
                         scoped(new TokenValue("T", TokenForm.UNQUOTED)),
                         scoped(new TokenValue("error", TokenForm.UNQUOTED))))))))));
 
-        // Written on its own, so no discriminating type-ref: `!template` is emitted where a held body sits
-        // in a `Top` position and something has to say which branch it is.
-        assertEquals("{ application: !choice { variants: [ T error ] } }", new TsonObjectWriter().toTson(held));
+        assertEquals("!choice { variants: [ T error ] }", new TsonObjectWriter().toTson(held));
     }
 
-    /** What it writes reads back, which is the point of writing the source rather than a description of it. */
+    /**
+     * What it writes reads back <em>whole</em>, which is the point of writing the source rather than a
+     * description of it -- and, with the carrier transparent, needs no unwrapping step on the way: the
+     * document a held body writes is the application, so parsing it yields the very value that was held.
+     */
     @Test
     void whatAHeldBodyWritesParsesAgain() {
         DataValue application = new DataValue(List.of(), Optional.of("array"),
@@ -87,10 +90,8 @@ class HeldBodyTest {
                         scoped(new TokenValue("T", TokenForm.UNQUOTED))))));
 
         String written = new TsonObjectWriter().toTson(new HeldBody(application));
-        String payload = written.substring(written.indexOf("application: ") + "application: ".length(),
-                written.lastIndexOf(" }"));
 
-        assertEquals(application, new TsonDataParser(payload).parseDocument().root());
+        assertEquals(application, new TsonDataParser(written).parseDocument().root());
     }
 
     private static ScopedValue scoped(CoreValue value) {

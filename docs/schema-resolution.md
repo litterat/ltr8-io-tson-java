@@ -278,6 +278,17 @@ recorded open form, and replacing the application with a reference to the entry 
     — it cannot close until `vip` itself materialises, and deferring composition that far is a different
     feature. Before this, refinement did not refuse: it copied the template's body with parameters unbound
     and reported an unresolved reference to a parameter the author never wrote.
+- **A held body writes as the application it holds, and names its carrier nowhere.** `HeldBody` is
+  `@Transparent` (`io.ltr8.annotation.Transparent`), so `tson-bind` resolves it to the held `DataValue`'s own
+  descriptor with a bridge and `TsonObjectWriter` writes no type-ref for it at a `Top` position: a template's
+  body renders `!choice { variants: [T error] }`, not a wrapper naming a type nothing declares. Two things
+  make that work and neither is incidental — the writer asks `value instanceof DataValue` *after* unwrapping a
+  bridge, so a transparent wrapper over a parsed value still reaches `AstWriter` instead of being written as a
+  faithful description of the AST; and `writeUnion` treats a transparent member as contributing no tag.
+  - **Which costs the tag a reader would dispatch on**, deliberately. A transparent union member is selectable
+    only where a position declares it, never by tag. Nothing depends on that here: an open entry's resolved
+    form is its declaration round-tripped, no binder reads one back, and `TypeDefinition.parameters` being
+    non-empty already says the body is held.
 - **A held body closes by one process, whatever wrote it** (`closeHeld`). `<T> [T]` and `<T> { x: T }` are both
   an application with a parameter standing in a slot — `!array { element_type: T }` and
   `!record { fields: [ { name: x  type: T } ] }` — so both substitute by the same walk and are then bound

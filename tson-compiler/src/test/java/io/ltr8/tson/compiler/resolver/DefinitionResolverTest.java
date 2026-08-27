@@ -529,8 +529,8 @@ class DefinitionResolverTest {
         assertEquals(List.of("A", "B"), pair.parameters());
         assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" "
                         + "parameters: [ \"A\" \"B\" ] constructor: false supertypes: [] subtypes: [] "
-                        + "body: !template { application: !record { fields: [ "
-                        + "{ name: first type: A } { name: second type: B } ] } } }",
+                        + "body: !record { fields: [ "
+                        + "{ name: first type: A } { name: second type: B } ] } }",
                 write(pair));
     }
 
@@ -569,8 +569,8 @@ class DefinitionResolverTest {
         assertTrue(box.constructor());
         assertEquals(List.of("base"), box.supertypes());
         assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: true supertypes: [ \"base\" ] "
-                        + "subtypes: [] body: !template { application: !record { supertypes: [ base ] "
-                        + "fields: [ { name: value type: T } ] } } }",
+                        + "subtypes: [] body: !record { supertypes: [ base ] "
+                        + "fields: [ { name: value type: T } ] } }",
                 write(box));
     }
 
@@ -589,8 +589,8 @@ class DefinitionResolverTest {
                 """);
 
         assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] constructor: false supertypes: [ \"base\" ] "
-                        + "subtypes: [] body: !template { application: !record { supertypes: [ base ] "
-                        + "fields: [ { name: id type: text } { name: value type: T } ] } } }",
+                        + "subtypes: [] body: !record { supertypes: [ base ] "
+                        + "fields: [ { name: id type: text } { name: value type: T } ] } }",
                 write(entries.get("box")));
     }
 
@@ -664,8 +664,8 @@ class DefinitionResolverTest {
         assertEquals(List.of("T"), sized.parameters());
         assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" parameters: [ \"T\" ] "
                         + "constructor: false supertypes: [] subtypes: [] "
-                        + "body: !template { application: !record { fields: [ "
-                        + "{ name: value type: type_ref value: T } ] } } }",
+                        + "body: !record { fields: [ "
+                        + "{ name: value type: type_ref value: T } ] } }",
                 write(sized));
     }
 
@@ -679,8 +679,8 @@ class DefinitionResolverTest {
 
         assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" parameters: [ \"N\" ] "
                         + "constructor: false supertypes: [] subtypes: [] "
-                        + "body: !template { application: !record { fields: [ "
-                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] } } }",
+                        + "body: !record { fields: [ "
+                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] } }",
                 write(retry));
     }
 

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.annotation.Transparent;
 import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -205,15 +206,6 @@ public final class TsonObjectWriter {
                 writer.nullValue();
                 return;
             }
-            if (value instanceof DataValue ast) {
-                // The AST is source, not a value: it records what an author wrote, including which token was
-                // quoted and in what order a record's fields stood. Bound like anything else it would write as
-                // a faithful description of the wrong thing -- `!recordvalue { fields: [ ... ] }` -- so it is
-                // written as the syntax it is (AstWriter). The rule is about the AST rather than about the one
-                // body that holds one, so anything carrying a parsed value writes correctly.
-                AstWriter.write(ast, writer);
-                return;
-            }
             if (dataClass instanceof DataClassAnnotated boxed) {
                 // The box is framing, not a value shape: its annotations precede the value it wraps, exactly
                 // as a record carrier's precede the record (§7.4). Taken apart through its own handles, so
@@ -224,6 +216,20 @@ public final class TsonObjectWriter {
             }
             if (dataClass.bridge().isPresent()) {
                 value = dataClass.bridge().get().toData().invoke(value);
+            }
+            if (value instanceof DataValue ast) {
+                // The AST is source, not a value: it records what an author wrote, including which token was
+                // quoted and in what order a record's fields stood. Bound like anything else it would write as
+                // a faithful description of the wrong thing -- `!recordvalue { fields: [ ... ] }` -- so it is
+                // written as the syntax it is (AstWriter). The rule is about the AST rather than about the one
+                // body that holds one, so anything carrying a parsed value writes correctly.
+                //
+                // Asked *after* the bridge, so an `@Transparent` wrapper over a parsed value reaches it: a
+                // held template body is exactly that, and unwrapping into the ordinary record path instead
+                // would write the description this branch exists to prevent. No other bridge produces one, so
+                // nothing else observes the order.
+                AstWriter.write(ast, writer);
+                return;
             }
             writeAnnotations(value, dataClass, writer);
             writeCore(value, dataClass, writer);
@@ -418,6 +424,17 @@ public final class TsonObjectWriter {
                     "value of type " + memberClass + " is not a member of union " + dataClass.typeClass());
         }
         DataClass memberDataClass = context.getDescriptor(memberClass);
+        if (memberClass.isAnnotationPresent(Transparent.class)) {
+            // Framing, not shape (io.ltr8.annotation.Transparent): the wrapper contributes no type-ref of its
+            // own, so the value it wraps writes whatever head that value has and this position writes none.
+            // Routed through write() rather than the unwrap-and-writeCore below, so the wrapped value meets
+            // the ordinary dispatch -- which is what a held body needs to reach AstWriter.
+            //
+            // The cost is stated on the annotation: with no tag written, nothing selects a transparent member
+            // by tag on the way back in, so it round-trips only where a position declares it.
+            write(value, memberDataClass, writer);
+            return;
+        }
         Object member = memberDataClass.bridge().isPresent()
                 ? memberDataClass.bridge().get().toData().invoke(value)
                 : value;
