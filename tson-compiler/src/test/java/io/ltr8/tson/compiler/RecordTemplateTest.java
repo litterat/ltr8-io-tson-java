@@ -425,19 +425,23 @@ class RecordTemplateTest {
     }
 
     /**
-     * An application still referencing the declaration's own parameters cannot close: deferring composition
-     * itself until the enclosing template materialises is a different feature. The message says that rather
-     * than blaming missing substitution, which now exists.
+     * An application still referencing the declaration's own parameters absorbs without closing: the operand's
+     * body is held, so its field set is known while the application is open, and substituting its parameters
+     * with the arguments as written leaves the absorbed field carrying {@code T}. {@code
+     * OpenOperandCompositionTest} carries the rest, including what such an operand does <em>not</em>
+     * contribute -- its own name, a template being no type.
      */
     @Test
-    void composingWithAnApplicationThatIsStillOpenIsRefusedForWhatItActuallyNeeds() {
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> compile("""
-                          box => <T> { v: T }
-                          vip => <T> box<T> & { extra: text }"""));
+    void composingWithAnApplicationThatIsStillOpenAbsorbsItsFieldsAndKeepsTheParameter() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  vip => <T> box<T> & { extra: text }
+                  holder => { u: vip<text> }""");
 
-        assertTrue(thrown.getMessage().contains("is still open"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("this declaration's own parameter 'T'"), thrown.getMessage());
+        String use = fieldType(compiled, "holder", "u");
+        assertEquals(TypeRef.of("text"), fieldOf(compiled, use, "v").type(),
+                "absorbed from box<T> while open, closed with vip");
+        assertEquals(TypeRef.of("text"), fieldOf(compiled, use, "extra").type());
     }
 
     /**

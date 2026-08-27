@@ -956,9 +956,20 @@ final class DefinitionResolver {
         Map<String, Integer> inheritedFieldIndex = new LinkedHashMap<>();
 
         for (TypeRef supertypeRef : construction.supertypes()) {
+            if (supertypeRef instanceof GenericRef generic && namesOwnParameter(generic, parameters)) {
+                // §5.8's "Parameterized references" at their open end: the operand is applied to this
+                // declaration's own parameter, so it denotes no entry and contributes no name. Its fields
+                // come through all the same, and its own supertypes with them -- see openOperand.
+                OpenOperand operand = openOperand(name, generic, parameters, "supertype");
+                for (String ancestor : operand.ancestors()) {
+                    addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
+                }
+                absorb(name, operand.body(), fields, groups, seenFieldNames, inheritedFieldIndex);
+                continue;
+            }
             if (supertypeRef instanceof GenericRef generic) {
-                // §5.8's "Parameterized references". Composition copies the supertype's own fields, so the
-                // application has to be *closed* here rather than carried -- an open one has no fields yet.
+                // A fully-bound application: closed to the entry it denotes, which is a real name this can
+                // index against. Closing is also what gives it a field set to absorb.
                 supertypeRef = new SimpleRef(closedApplication(name, generic, parameters, "supertype"));
             }
             if (!(supertypeRef instanceof SimpleRef simple)) {
@@ -995,13 +1006,7 @@ final class DefinitionResolver {
                 addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
             }
 
-            for (RecordField field : supertypeBody.fields()) {
-                requireFieldNameNotSeen(name, field.name(), seenFieldNames, FieldOrigin.SUPERTYPE);
-                seenFieldNames.add(field.name());
-                inheritedFieldIndex.put(field.name(), fields.size());
-                fields.add(field);
-            }
-            groups.addAll(supertypeBody.groups());
+            absorb(name, supertypeBody, fields, groups, seenFieldNames, inheritedFieldIndex);
         }
 
         if (construction.body().isPresent()) {
@@ -1176,6 +1181,14 @@ final class DefinitionResolver {
      */
     private TypeDefinition resolveRefinement(String name, RefinedDef refined, boolean constructor,
                                               List<String> parameters) {
+        if (refined.target() instanceof GenericRef generic && namesOwnParameter(generic, parameters)) {
+            // §5.7 against an open source: the same absorption composition does, and the same two omissions.
+            // The source names no entry, so it is neither `source` nor a supertype -- but its own ancestors
+            // are types and its whole field set arrives, which is what `^` re-emits and then tightens.
+            OpenOperand operand = openOperand(name, generic, parameters, "refinement source");
+            return refineOnto(name, refined, constructor, parameters, Optional.empty(),
+                    new ArrayList<>(operand.ancestors()), operand.body());
+        }
         io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target(), parameters);
         String sourceName = sourceRef.name();
         TypeDefinition sourceDef = namespaceDefinitions.getTypeDefinition(sourceName);
@@ -1201,7 +1214,20 @@ final class DefinitionResolver {
         for (String ancestor : sourceDef.supertypes()) {
             addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
         }
+        return refineOnto(name, refined, constructor, parameters, Optional.of(sourceRef), transitiveSupertypes,
+                sourceBody);
+    }
 
+    /**
+     * §5.7's tightening, over a field set already obtained. The two callers differ only in where that field
+     * set came from and in what the source can be named: a closed source is an entry, so it is the refinement's
+     * {@code source} and heads its supertype chain; an open one names no entry, so it is neither and only its
+     * own ancestors survive. Everything after that -- restating groups, tightening fields, the presence check,
+     * the kind -- is one rule and lives here once.
+     */
+    private TypeDefinition refineOnto(String name, RefinedDef refined, boolean constructor,
+            List<String> parameters, Optional<io.ltr8.tson.schema.meta.TypeRef> source,
+            List<String> transitiveSupertypes, RecordBody sourceBody) {
         List<RecordField> fields = new ArrayList<>(sourceBody.fields());
         List<FieldGroup> groups = new ArrayList<>(sourceBody.groups());
         Map<String, Integer> inheritedFieldIndex = new LinkedHashMap<>();
@@ -1232,7 +1258,7 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups);
-        return new TypeDefinition(Optional.of(sourceRef), kind, parameters, constructor, transitiveSupertypes,
+        return new TypeDefinition(source, kind, parameters, constructor, transitiveSupertypes,
                 List.of(), Optional.empty(), body);
     }
 
@@ -1250,9 +1276,9 @@ final class DefinitionResolver {
         }
         if (target instanceof GenericRef generic) {
             // Closed, not carried, for the reason composition closes its supertypes: §5.7 re-emits the
-            // source's whole field set, and an open application has no field set. Carrying it instead copied
-            // the template's body with its parameters unbound, and the author was told about an unresolved
-            // reference to a parameter they never wrote.
+            // source's whole field set, and this phase needs that field set to flatten. Carrying the
+            // application instead copied the template's body with its parameters unbound, and the author was
+            // told about an unresolved reference to a parameter they never wrote.
             return io.ltr8.tson.schema.meta.TypeRef.of(closedApplication(name, generic, typeParams, "refinement source"));
         }
         throw new UnsupportedOperationException(
@@ -1260,23 +1286,120 @@ final class DefinitionResolver {
     }
 
     /**
-     * A fully-bound application at one of the two field-absorbing positions, closed to the entry it denotes.
+     * One source's fields and groups copied into the record being built. Shared by the two composition paths
+     * -- a closed supertype's own {@code RecordBody} and an open operand's substituted one -- so an operand
+     * that contributes no name still contributes its fields on exactly the terms one that does would.
+     */
+    private void absorb(String name, RecordBody source, List<RecordField> fields, List<FieldGroup> groups,
+            Set<String> seenFieldNames, Map<String, Integer> inheritedFieldIndex) {
+        for (RecordField field : source.fields()) {
+            requireFieldNameNotSeen(name, field.name(), seenFieldNames, FieldOrigin.SUPERTYPE);
+            seenFieldNames.add(field.name());
+            inheritedFieldIndex.put(field.name(), fields.size());
+            fields.add(field);
+        }
+        groups.addAll(source.groups());
+    }
+
+    /**
+     * Whether an application is applied to a parameter of the declaration that writes it, and so still open.
+     * <b>Through nesting</b>: {@code box<inner<T>>} is as open as {@code box<T>} is, and reading only the top
+     * level sent it down the closing path, where materialisation reported the author's own parameter as an
+     * unresolved reference -- a wrong verdict on a schema that is not wrong.
+     */
+    private static boolean namesOwnParameter(GenericRef application, List<String> typeParams) {
+        return application.args().stream().anyMatch(arg -> arg instanceof TypeArg.Ref(TypeRef ref)
+                && (ref instanceof SimpleRef simple && typeParams.contains(simple.name())
+                        || ref instanceof GenericRef nested && namesOwnParameter(nested, typeParams)));
+    }
+
+    /**
+     * What an operand still open contributes to the declaration absorbing it: a field set, and the operand's
+     * own supertypes. Not the operand itself -- {@code box} is a template, and §5.10 makes a template no type,
+     * so nothing can be IS-A one. Its <em>ancestors</em> are types, and the fields arriving here came with
+     * them, so a declaration composing {@code box&lt;T&gt;} stands where {@code box}'s own {@code base} is
+     * expected.
      *
-     * <p><b>An application that still references the declaration's own parameters is refused.</b>
-     * {@code vip => <T> customer & box<T>} cannot close while {@code T} is unbound, and deferring composition
-     * itself until {@code vip} is materialised is a different feature from closing an application. Refusing
-     * says which of the two is missing; the message this replaces blamed substitution, which now exists.
+     * <p><b>Absorbing needs no closure, which is the whole of why this works.</b> The operand's body is held,
+     * so its field set is known while the application is open: substituting its parameters with the arguments
+     * <em>as written</em> -- which here are the absorbing declaration's own parameters -- is the same token
+     * walk {@link TemplateMaterialiser#substitute} performs when the arguments are concrete, and it yields a
+     * held record still carrying them. Read back through the {@code record} constructor, that is an ordinary
+     * field set whose types mention a parameter, which is exactly what a template's fields are anyway.
+     *
+     * <p><b>Inner applications are deliberately left unclosed.</b> {@code closeApplications} is
+     * materialisation's step, not this one: an operand body holding {@code inner&lt;T&gt;} cannot close while
+     * {@code T} is open, and one holding a concrete {@code pair&lt;text, text&gt;} must close at the same
+     * moment every other application in the absorbing declaration's body does. Both are the absorbing
+     * declaration's own materialisation, one pass later.
+     *
+     * <p><b>What this cannot give back is one IS-A edge</b>, and it is structural rather than a choice
+     * deferred: the application is flattened away here, so when the absorbing declaration is closed nothing
+     * remains that says "close {@code box&lt;text&gt;} too, and index against the entry that mints". So
+     * {@code vip&lt;text&gt;} stands where {@code customer} and {@code base} are expected and not where
+     * {@code box&lt;text&gt;} is, though the hand-written {@code customer & box&lt;text&gt;} does. Accepted:
+     * {@code box&lt;T&gt;} was never a type in that declaration, so it claimed IS-A with no instantiation of
+     * it in particular.
+     */
+    private OpenOperand openOperand(String name, GenericRef application, List<String> typeParams, String position) {
+        String head = application.name();
+        TypeDefinition template = namespaceDefinitions.getTypeDefinition(head);
+        if (template == null) {
+            throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
+                    + "' names no type this schema declares or imports");
+        }
+        if (!(template.body() instanceof HeldBody held)) {
+            // Applied to this declaration's own parameter, so the author wrote arguments; the head takes none.
+            throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
+                    + "' declares no type parameters, so it cannot be applied to '"
+                    + String.join(", ", typeParams) + "' (§5.10)");
+        }
+        if (template.parameters().size() != application.args().size()) {
+            throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head + "' declares "
+                    + template.parameters().size() + " type parameter(s) and is applied to "
+                    + application.args().size() + " (§5.10)");
+        }
+        Map<String, TypeArgument> bindings = new LinkedHashMap<>();
+        for (int i = 0; i < template.parameters().size(); i++) {
+            TypeArg arg = application.args().get(i);
+            if (arg instanceof TypeArg.Ref(GenericRef nested)) {
+                // An argument that is itself an application. Substitution writes a binding as one token, so
+                // `box<inner<T>>` would put `inner` where `inner<T>` belongs and silently drop the argument
+                // list. A gap and reported as one: the schema is well-formed and this cannot yet close it.
+                throw new UnsupportedOperationException("'" + name + "': the " + position + " '" + head
+                        + "<" + nested.name() + "<...>>' applies one template to another, and substituting an "
+                        + "application into an operand still open is not implemented (§5.8, §5.10). Name the "
+                        + "inner application in a declaration of its own and apply that");
+            }
+            bindings.put(template.parameters().get(i), typeArgument(arg));
+        }
+        DataValue body = held.application();
+        CoreValue substituted = TemplateMaterialiser.substitute(body.coreValue(), head,
+                template.parameters(), bindings);
+        Top absorbed = bindAtomInstance(name, new DataValue(body.annotations(), body.typeRef(), substituted));
+        if (!(absorbed instanceof RecordBody record)) {
+            // An open instance rather than a record template -- `<T> [T]` has elements, not fields, so there
+            // is nothing for `&` or `^` to take. The same verdict its closed spelling gets, one phase earlier.
+            throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
+                    + "<...>' has no fields to contribute -- it is a binding record, not a vocabulary, so "
+                    + "there is nothing to compose with (§5.8, and §5.7's vocabulary-body rule read across)");
+        }
+        return new OpenOperand(template.supertypes(), record);
+    }
+
+    /** What an open operand hands its absorber: the ancestors it can still be indexed under, and its fields. */
+    private record OpenOperand(List<String> ancestors, RecordBody body) {
+    }
+
+    /**
+     * A fully-bound application at one of the two field-absorbing positions, closed to the entry it denotes.
+     * Closing is what gives it both a name to index under and a field set to absorb.
+     *
+     * <p>Only reached once {@link #namesOwnParameter} has said the application is closed: one still open
+     * denotes no entry and goes to {@link #openOperand} instead, which absorbs its fields without closing
+     * anything.
      */
     private String closedApplication(String name, GenericRef application, List<String> typeParams, String position) {
-        for (TypeArg arg : application.args()) {
-            if (arg instanceof TypeArg.Ref(SimpleRef simple) && typeParams.contains(simple.name())) {
-                throw new UnsupportedOperationException("'" + name + "': the " + position + " '"
-                        + application.name() + "<" + simple.name() + ", ...>' is still open -- it is applied to "
-                        + "this declaration's own parameter '" + simple.name() + "', so it cannot be closed "
-                        + "until '" + name + "' is itself materialised, and composing or refining against an "
-                        + "unclosed application is not implemented (§5.8, §5.10)");
-            }
-        }
         if (applicationCloser == null) {
             throw new UnsupportedOperationException("'" + name + "': closing the " + position + " '"
                     + application.name() + "<...>' needs a whole-schema materialiser, and this resolver was "
@@ -1434,17 +1557,20 @@ final class DefinitionResolver {
     }
 
     /**
-     * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2, §5.10) resolves
-     * one of two ways: when the modifier's token names one of the *declaration's own* type
-     * parameters (e.g. {@code array}'s {@code element_type: type_ref = T}, {@code T} declared by
-     * {@code array => <T> ...}), it is a parameter reference, not a literal -- recorded as {@code
-     * value_param} rather than {@code value} (§5.10's "labelled form", used uniformly whether the
-     * routed field is a scalar or {@code type_ref}-typed). A parametric {@code =} leaves the field's
-     * state at its unmarked {@code REQUIRED} (nothing is actually fixed at declaration -- the
-     * argument arrives at application, §5.10 -- so {@code array}'s own {@code element_type} omits
-     * {@code state} entirely in output); a parametric {@code ~} still promotes to {@link
-     * FieldState#REQUIRED_DEFAULT}, identically to a literal default. Any other modifier token is an
-     * ordinary literal, recorded as {@code value} with {@code state} promoted to {@link
+     * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2, §5.10) is recorded in
+     * {@code value} whether it is a literal or a parameter reference -- a parameter and a literal share
+     * the one slot, and §8.1's shadowing rule tells them apart: a token is a parameter exactly when its
+     * text resolves into the enclosing entry's own {@code parameters}. There is no separate
+     * {@code value_param} channel; the kernel no longer declares one, a held body being unread until
+     * its parameters are gone.
+     *
+     * <p>What a parametric modifier still changes is the field's <b>state</b>. A parametric {@code =}
+     * (e.g. {@code array}'s {@code element_type: type_ref = T}, {@code T} declared by {@code array =>
+     * <T> ...}) leaves the field at its unmarked {@code REQUIRED} -- nothing is actually fixed at
+     * declaration, the argument arriving at application (§5.10), so {@code array}'s own {@code
+     * element_type} omits {@code state} entirely in output -- and fixation happens at materialisation
+     * (§5.7). A parametric {@code ~} still promotes to {@link FieldState#REQUIRED_DEFAULT}, identically
+     * to a literal default. A literal modifier promotes {@code state} to {@link
      * FieldState#REQUIRED_DEFAULT} ({@code ~}) or {@link FieldState#REQUIRED_FIXED} ({@code =}) -- or, on
      * an optional field, to {@link FieldState#OPTIONAL_FIXED}. The absent sentinel ({@code = _}) is §5.2's
      * sixth spelling: {@code OPTIONAL_FIXED} carrying no value, forbidding the field's value while keeping

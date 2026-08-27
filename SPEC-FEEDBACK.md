@@ -12,12 +12,14 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The six below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+The seven below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
 it resolved are gone from here, because the spec now carries their rules and that is where the answer
-belongs. **Cite the spec, not the argument that got it there:** `docs/` and the Javadoc name the section
-that requires a behaviour, and a `SPEC-FEEDBACK.md #N` citation is for an entry below, where there is no
-section to point at yet. When an entry closes, its citations become spec citations and the entry is deleted
-— nothing here is an archive.
+belongs. **This file is the as-built record**, not a pointer to one: where an entry proposes a design this
+implementation has built, the entry states the design, what is running, and what is not, so that a reviewer
+editing the spec needs nothing beside it. **Cite the spec, not the argument that got it there:** `docs/` and
+the Javadoc name the section that requires a behaviour, and a `SPEC-FEEDBACK.md #N` citation is for an entry
+below, where there is no section to point at yet. When an entry closes, its citations become spec citations
+and the entry is deleted — nothing here is an archive.
 
 ---
 
@@ -291,9 +293,9 @@ keys identity on the spelling, so this implementation has two.
 
 **Section:** Part 2 §5.10 (the two parameter kinds, and the collection boundary), §8.1 (`template_argument`,
 `type_ref`, `record_field.value_param`), §5.3 (the lift rule), §5.10.1 (regularity), §12.1
-(`instance-template`). Supersedes the item declined at Revision 33 as #53. A longer treatment, including the
-designs weighed and rejected, is in `spec/tson-cr-structure-templates-addendum.md`; nothing below depends on
-reading it.
+(`instance-template`). Supersedes the item declined at Revision 33 as #53. **Read with #7**, which widens
+`reference.target` — the one open body this design could not otherwise spell, and what makes its
+"every open entry is a constructor application" true rather than nearly true.
 
 **Problem:** §5.10 says, plainly:
 
@@ -342,6 +344,16 @@ by the design below, built here and running: `result => <T> ( T | error )` resol
 `choice` body over `[text, error]`. This is a deliberate divergence from Revision 33, offered as evidence
 rather than as a conformance claim.
 
+**The alternative weighed and rejected** was the other coherent completion: grow the typed quotation until it
+covers what the constructors can express — a collection case on `template_argument`, and a shadow spelling for
+every slot kind a parameter can reach. It is rejected on proportionality, and the reason generalises: every
+per-channel mechanism in the shipped design is compensation for binding too early, so completing the quotation
+adds a spelling per constructor form in perpetuity, where holding removes the need for any. The one property
+uniform quotation buys — body identity not depending on which spelling an author chose (§8.1's stated
+rationale) — is obtainable by construction instead: make the body form a function of the body, and no entry
+has two spellings. What that obligation becomes under holding is the one-spelling rule stated near the end of
+this entry, which is a requirement on producers rather than a vocabulary.
+
 **Suggested resolution: hold an open body rather than quoting it.** What follows is the design as built, so
 that what is proposed and what is known to work are the same thing.
 
@@ -379,6 +391,16 @@ that what is proposed and what is known to work are the same thing.
    - **Applications inside a held body close before its entry is named.** Desugar lifts innermost-first, so a
      form it writes already names the entry its inner form became; a form closed at materialisation must
      agree, or `[[pixel; 3]; 3]` written out and `grid<pixel, 3>` closed land on two entries for one type.
+   - **Not built here, and a spec question rather than an oversight.** The two lift channels hash different
+     things: a closed lift hashes the binding record at desugar, before its inner applications are rewritten,
+     where the open lift hashes the closed record at materialisation. So `[box<text>]` written directly and
+     `[box<T>]` closed with `T := text` land on two entries for one type in this implementation. The
+     resolution is already in §8.2's own D6 — "eagerly-lifted synthetics that become structurally identical
+     under resolution merge into one entry" — a merge pass at the end of resolution that re-derives each
+     synthetic's name from its resolved record. It was never needed before, every form lifted closed having
+     been concrete at desugar, and holding is what makes it reachable. §5.10 should say that the merge is
+     required rather than incidental, because an implementation reading D6 as an optimisation will skip it and
+     get a second entry for the same type.
 4. **The resolved form of an open entry is its declaration**, not a `type_definition` value — which could not
    carry it in any case, the kernel declaring `body: top` REQUIRED with no `top` an open body could be. This
    keeps resolved output a valid schema document under §12.1, so it stays re-resolvable, and it **needs no
@@ -402,6 +424,14 @@ that what is proposed and what is known to work are the same thing.
      3 }` is correct for every argument anyone passes and fails under a stand-in of 10.
    - A materialisation diagnostic must be **located at the template's own declaration**, with the application
      as context. Deferred checking is survivable only if the author is sent to the line they can edit.
+     - **This is the one recommendation here that is a requirement rather than a report.** It is what the
+       design owes an author in exchange for deferring the checks, and it is not yet met: this implementation
+       locates a defect inside a held body at the *application*, `box => <T> !array { element_type: some_typo
+       }` applied by `use` reporting at `/use` rather than `/box`, because the walk back to a positioned entry
+       finds the application first. Reaching the declaration needs the minting phase to record which
+       declaration each derived entry came from — a bookkeeping change, not a design one, which is why it is
+       offered as a rule the spec should state rather than a cost of holding. Stated here rather than
+       discovered later, since the rest of this entry is reporting what runs.
 
 **What holding costs, and where §5.10 should say so.** A held body has no slot types — that is what it is for
 — so every check keyed on which slot a thing sits in waits for materialisation, and one of them does not
@@ -429,12 +459,37 @@ find a home for the slot's expectation**, and to state the value-conformance dep
 describes as inexpressible. That removes the one check holding cannot carry, and removes it by strengthening a
 rule the format wanted anyway.
 
+- **The value-conformance rule is a recommendation, not a report: it is not built here.** `{ first: int32 ~
+  "nope" }` resolves, links and compiles clean, and the first read of that type fails inside the compiled
+  reader. So the substitute this entry offers for the argument-kind rule is proposed on its merits rather
+  than demonstrated, and §5.10 should not drop the kind rule without stating the replacement normatively in
+  §5.2 — a resolver that drops the one and does not add the other loses both.
+
+**One position the loss does reach, and §5.10 should decide it.** §5.10 settles a parameter's kind from its
+*use*, and there is a use no channel recognises: an **enum member**. `e => <M> !enum { members: [a b M] }`
+applied as `e<c>` fails, because §12.1's `type-arg` rule sends an unquoted non-numeric argument down the
+reference channel and `c` is a member name, not a type. It is the same root as the argument-kind loss above —
+a held body has no slot types, so nothing says `members` is a value channel — but it is the case where the
+loss produces a *wrong* verdict rather than a late one: the author is told `c` is an unresolved reference when
+`c` is not meant to be a reference at all. The two want settling together, and the choice is between naming
+`enum.members` a value channel in §5.10's own kind table (so an argument reaching it is read as a literal), or
+saying that a parameter in a member list requires the quoted spelling `e<"c">`. Either is a sentence; leaving
+it unsaid means every implementation that adopts holding hits this on its first parametric enum.
+
 **Scope of what is built.** **Every** template shape holds its body, and one process closes them all: the sugar
 forms, the explicit `<T> !C { … }`, record templates, and composition and refinement templates. §5.2 already
 says a bare record body denotes `!record { fields: [ … ] }`, so `<T> { x: T }` is normalised to that and closes
 the way `<T> [T]` does. A composition or refinement is resolved against its namespace first and the *flattened*
 record is held — a §5.7 tightening entry states a modifier and no type-ref, so it is not a `record_field` until
 the inherited field supplies one — which is the one reason those two are normalised a phase later than the rest.
+
+**And what is not built**, gathered here so a reviewer has the boundary in one place rather than in footnotes:
+a parametric enum member (above), value conformance of a field's `~`/`=` against its declared type (above),
+locating a held-body defect at the template's declaration (above), and the D6 merge that would make the two
+lift channels agree (above). A parameterized `atom-refinement` is *deliberately* not on that list: it remains
+no form at all, as §12.1 already has it, and holding does not change that. Nothing on the list is load-bearing
+for the design — each is a check or a location, not a shape the held form cannot express — but a reviewer
+adopting this should know which claims here are running code and which are recommendations.
 
 **So `record_field.value_param` has no producer left**, and §5.10 can retire the channel along with
 `instance_template` and `template_argument`. A routed parameter rides the ordinary `value` slot with §8.1's
@@ -467,7 +522,8 @@ as #53 and declined, §5.10 gaining the explicit boundary sentence and §8.1 the
 response. The design above is implemented here and passing: the flagship `result => <T> ( T | error )`,
 `<T> [T, text]`, `<T> { v: (T | text) }` and nested sized forms all resolve, every template shape holds its
 body, `value_param` has no producer left, and every schema that resolved before produces the same entries it
-did.
+did. What is *not* built is listed under "And what is not built" above, and every recommendation this entry
+makes that is a proposal rather than a report is marked as one where it is made.
 
 ---
 
@@ -526,7 +582,9 @@ them, which is the layer a user's own `box => <T> { ... }` lives in.
 ## 7. An alias to an application cannot state the arguments it binds, so `reference` is the one open body that is not a constructor application
 
 **Section:** Part 2 §8.1 (`reference`), §5.10 (partial application), §8.2 (identity keyed on `source`), §8.3
-(use-site flattening), §9 (a slot holding a type reference).
+(use-site flattening), §9 (a slot holding a type reference). **Read with #5**, whose held-body design this
+completes: an alias is the one open entry that could not be written as a constructor application until
+`target` widened, so #5's uniformity claim rests on this entry being adopted with it.
 
 **Problem:** §5.10's partial application is an alias *to an application*:
 

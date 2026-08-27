@@ -90,6 +90,13 @@ there.** Prose and Javadoc state the rule as built and name the current section 
 an entry closes, the citations to it become spec citations — the reasoning has served its purpose and the
 spec now carries the rule.
 
+**The register is the as-built record, and it is self-contained.** It is what goes to the spec reviewer, so
+an entry proposing a design this implementation has built states the design, what is running, and what is
+not, rather than pointing at a design document beside it. Where an entry's recommendation is a proposal
+rather than a report, it says so at the point it makes it — a reviewer adopting a rule needs to know which
+claims are running code. Working design documents are not kept in `spec/`: once a design lands, the entry
+absorbs what survives of the argument and the document goes, git history keeping it.
+
 ## Conventions
 
 **Javadoc documents current contract only, no change history.** Java source Javadoc describes an element's
@@ -681,10 +688,12 @@ compatibility).
 
 ## Not yet implemented
 
-- **Part 2 resolution gaps** — the identity-diagonal FIXED-value invariant, plus a small set that are all
-  one job: a generic type-ref whose argument is nested or a value rather than a plain name, a parameterized
-  supertype (`customer & box<T>`), and a field/element type that is none of the shapes the resolver handles
-  — each reachable only inside a template, and each blocked on §5.10 substitution (the item below).
+- **Part 2 resolution gaps** — the identity-diagonal FIXED-value invariant, plus a generic type-ref whose
+  argument is itself an application (`plain & box<inner<T>>`), which is the last schema-reachable
+  `NOT_IMPLEMENTED` in the resolver: substitution writes a binding as one token, so the inner argument list
+  would be dropped. A **parameterized supertype** is no longer among them — `vip => <T> customer & box<T>`
+  absorbs the operand's fields while the application is open (`OpenOperandCompositionTest`), the operand
+  contributing its own supertypes but not its name, a template being no type.
   `DefinitionResolver`'s Javadoc is the exact current boundary and `BACKLOG.md` carries the detail. Only
   about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.

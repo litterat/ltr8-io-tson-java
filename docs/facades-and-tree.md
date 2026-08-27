@@ -345,6 +345,13 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
   reason the convenience earns its place. **The map authors the failure**: a name outside it reports
   `bindings(...) maps [...]` with the kernel's own account as the cause, because the chain is a backstop and
   letting the backstop speak reports a missing line of the caller's configuration as "not kernel vocabulary".
+- **A `Tson` is one profile, and the schema being read never picks it.** Routing a document to the right
+  profile stays the application's job. The alternative — the schema declaring its own profile through a
+  meta-layer annotation — links a *coding* decision to a *format* one and buys less flexibility than it
+  costs, since the application then cannot bind one schema two ways. Selection is by an opaque label for the
+  same reason it is not by matching the schema's field set: no serialization library does that, and the
+  parameter names it would need are not retained for a secondary constructor. Reconsider only if something
+  needs to re-derive the binding without the application in between.
 - **Two binding seams, never merged.** `TsonConfig.dataBindContext` binds the *data* a schema describes
   (`order` → `Order`); `TsonConfig.metaNameBinder` binds a governing meta's own *vocabulary*
   (`operation` → `Operation`, the `data` base kind's case — `docs/linking-and-compilation.md`). One

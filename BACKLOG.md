@@ -7,6 +7,12 @@ for the target-use-case plan (LLM structured output validation, JSON compatibili
 separately since it's a vision/plan document, not a plain punch list — and `CLAUDE.md`'s own "Not
 yet implemented" section for the technical detail behind several of these items.
 
+**This file holds only work still to do.** An item that ships, and an item decided against, come out
+entirely — neither is something to do, and an annotated corpse makes the list longer without making it more
+useful. Where a decision has to survive its item (a won't-do someone would otherwise re-propose, or the why
+behind a shipped design), it goes to the `docs/` note or the Javadoc that owns the area, which is where a
+reader looking at that code will find it. Git history keeps the rest.
+
 ---
 
 ## Resolution & linking generality
@@ -23,11 +29,8 @@ own prose (which had gone stale on at least one of them):
   already know and hand-sequence the correct registration order itself. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-    - **Cycle detection is done** and was the more urgent half: a cycle is not the "opaque *not registered*
-      error" this entry used to claim — it was a `StackOverflowError`, since a schema is registered only
-      once it has linked and so is invisible to every cache while it resolves. `resolveLinked` now holds a
-      per-thread in-flight set and reports §2.2.3's cycle naming the path that closes it. The ordering work
-      still needs it (a topological sort has to detect cycles to terminate), so that dependency is met.
+    - Its one prerequisite is met: a topological sort has to detect cycles to terminate, and `resolveLinked`
+      already holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
@@ -40,39 +43,29 @@ own prose (which had gone stale on at least one of them):
   means the check moves out of the desugarer entirely and `checkBounds` goes with it. Distinct from the
   atom-body self-coherence item below, which shares that destination but has no parameter or
   materialisation dimension at all.
-- [ ] **Resolved-form ingest** ([TSON-SCHEMA] §8.1/§10.1) — bringing an already-resolved
-  `!type_definition` document into the library (not source text), with its own integrity checks:
-  `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
-  instantiation entry checked against its own `source` by recomputation, a construction's binding
-  record checked for parameter-slot agreement with its `source` application. Entirely unimplemented
-  — "ingest" doesn't appear anywhere in the codebase. §5.10 extends what ingest must reverify: the
-  closed-entry rule, which makes open and closed entries tell apart by inspection, and synthetic entries,
-  which must pass under the existing integrity checks. Note that an open entry has no ingest story here at
-  all — a held body never serialises as a `type_definition` (`SPEC-FEEDBACK.md` #5), so a resolved document
-  either carries only closed entries or carries open ones as declarations, and ingest would have to say
-  which. Note it would introduce a *second* way to build a
-  `TsonSchema` — bound from a document rather than resolved from source — and the two would have to agree,
-  including on where a declaration's annotations land (the name's on the map key, the definition's on the
-  entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
-  ("MAY implement ingest"), not a MUST.
 
 ## Remaining Part 2 resolution gaps
 
-Two are left. `DefinitionResolver.resolveTypeRef`'s catch-all, which used to head this section, is now
-unreachable from a desugared document — every shape it named resolves or is refused where it is written —
-and survives only as a guard against a caller resolving raw AST with the desugar phase skipped.
+Two are left. `DefinitionResolver.resolveTypeRef`'s catch-all is unreachable from a desugared document —
+every shape it named resolves or is refused where it is written — and survives only as a guard against a
+caller resolving raw AST with the desugar phase skipped.
 
 Only genuine gaps are listed here — a throw that means "your schema is wrong" is not one. Classifying the
 throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
 again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale
 by a factor of six.
 
-- [ ] **Composing or refining against a template application that is still open** (`vip => <T> customer &
-  box<T>`, §5.8's "Parameterized references"). The *fully-bound* case closes on demand now, at both
-  absorbing positions. What is left is the case where the application names the enclosing declaration's own
-  parameters, which cannot close until that declaration itself materialises — so composition would have to
-  be deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
-  feature from closing an application, and the diagnostic now says so rather than blaming substitution.
+- [ ] **One template applied to another at an absorbing position** (`vip => <T> plain & box<inner<T>>`).
+  Composing or refining against an application applied to the declaration's own parameter works now
+  (`OpenOperandCompositionTest`) — the operand's held body is substituted parameter-for-parameter and its
+  fields absorbed, no closure involved. What is left is an argument that is itself an application:
+  substitution writes a binding as one token, so `inner<T>` would land as `inner` and the argument list would
+  be dropped silently. Reported as the gap it is rather than closed wrongly, and it is the last
+  schema-reachable `NOT_IMPLEMENTED` in the resolver — `TsonValidateSchemaTest` and `TsonCliTest` both use it
+  as their gap fixture, so closing it means finding them another one.
+  - Fixing it properly means a binding that can carry an application rather than a token, which is the same
+    shape `SPEC-FEEDBACK.md` #4's identity question sits on: what a type argument *is*. Worth doing after that
+    settles, not before.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
@@ -111,6 +104,9 @@ application alike. What is left are consequences of holding rather than shapes s
     hole rather than opening one, which is also why §5.10's argument-kind rule is the wrong instrument --
     both sides there are correctly kinded (a value argument bound to a value parameter) and the kind rule has
     nothing to say, where value-conformance catches it. `SPEC-FEEDBACK.md` #5 carries the recommendation.
+  - **`SPEC-FEEDBACK.md` #5 offers this check to the spec as the replacement for §5.10's argument-kind rule**,
+    and marks it there as a recommendation rather than a report. Building it is what would let that
+    recommendation stand on the same evidence as the rest of the entry.
   - **The exception classification is wrong today**, which is the part that is a defect rather than a gap. A
     default that is not valid for its field's type is an author error whose verdict does not change as this
     library improves, so it belongs in `TsonSchemaValidationException` at the declaration -- not in the
@@ -122,9 +118,15 @@ application alike. What is left are consequences of holding rather than shapes s
   non-numeric argument rides the reference channel (§12.1's own `type-arg` rule) and `c` is an enum member,
   not a type. §5.10 settles a parameter's kind from its *use*, and an enum member position is a use nothing
   recognises as a value channel. Same root as the argument-kind finding above — a held body has no slot
-  types — so the two want settling together.
+  types — so the two want settling together. `SPEC-FEEDBACK.md` #5 now carries it as the one position where
+  holding gives a *wrong* verdict rather than a late one, and names the two spec-side answers: make
+  `enum.members` a value channel in §5.10's kind table, or require the quoted spelling `e<"c">`. Which one
+  lands decides what is built here, so this waits on the revision rather than on effort.
 
-- [ ] **A derived entry's failure could name the declaration that minted it, not the one that applied it.**
+- [ ] **A derived entry's failure must name the declaration that minted it, not the one that applied it.**
+  `SPEC-FEEDBACK.md` #5 asks the spec to *require* this — deferred checking is what holding buys, and it is
+  survivable only if the author is sent to the line they can edit — so this is the one item in this section
+  the register states as an obligation rather than a nicety.
   A defect inside a held body reports at the application (`/use`) rather than the template (`/box`), because
   the walk back to a positioned entry finds the application first. Recording which declaration each derived
   entry was minted for would fix it: message text is unchanged, only the location moves — from the line that
@@ -148,19 +150,6 @@ rules and `CLAUDE.md` the summary; what is left here is one modelling gap the ch
   (exact vs. maximum fractional-digit count) are not settled by the spec and want a `SPEC-FEEDBACK.md` entry,
   and `require_timezone: false` needs an offset-less parse path neither parser has (`true` is already the
   behaviour, RFC 3339 requiring an offset on every value these atoms accept).
-
-## Binding profiles
-
-`DataBindContext.Builder.profile` plus `@Profile` on a constructor lets one class bind several versions of a
-schema, and `TsonConfig.bindings`/`profile` configure it in one call. Selection is by an opaque label, never
-by matching the schema's field set — no serialization library does that, and the parameter names it would
-need are not retained for a secondary constructor.
-
-- **Deriving the profile from the schema being read is deliberately not done.** A `Tson` is one profile, and
-  routing a document to the right one stays the application's job. The alternative — the schema declaring its
-  own profile through a meta-layer annotation — links a *coding* decision to a *format* one and buys less
-  flexibility than it costs. Recorded so it is not re-opened as an oversight; reconsider only if something
-  needs to re-derive the binding without the application in between.
 
 ## Remaining built-in types
 
@@ -201,9 +190,11 @@ need are not retained for a secondary constructor.
   — the Revision 33 fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
   renders none of them, so the entries would compare equal for the wrong reason;
   `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side is what
-  lets that test read those keys like anything else, and the emit side has the same blind spot waiting behind
-  it — [TSON-SCHEMA] §8.1's ingest rule is the consumer of both halves: derived markers are discarded and
-  recomputed, author-written key annotations are preserved as data.
+  lets that test read those keys like anything else, which is now the whole of why it is worth doing: with
+  ingest recorded above as won't-do, `ResolvedFixtureTest` is the only consumer, and the emit side behind it
+  has no consumer at all. §8.1's rule still says what a reader would owe if one existed — derived markers
+  discarded and recomputed, author-written key annotations preserved as data — so the shape is settled if
+  this is ever picked up.
 
 - [ ] **Two entries for one type, where the argument is one number spelled two ways.** `vector<float32, 255>`
   and `vector<float32, 0xFF>` produce entries with byte-identical bodies, because identity derives from the
@@ -221,7 +212,21 @@ need are not retained for a secondary constructor.
   on the spec author's own call: two entries are easier to debug than a merge firing at the wrong moment, and
   it is reachable only when both spellings appear in one schema. Doing it properly means a pass at the end of
   resolution that re-derives each synthetic's name from its resolved record and merges collisions — not a
-  patch to naming.
+  patch to naming. **Disclosed in `SPEC-FEEDBACK.md` #5**, which asks Revision 34 to say whether D6's merge
+  is required or incidental — an implementation reading it as an optimisation skips it and gets the second
+  entry. The simple case does agree and is pinned
+  (`ContainerSugarEndToEndTest.aFormClosedFromATemplateIsTheSameEntryADirectOneProduces`): only an element
+  that is itself an application splits, the closed lift hashing the binding record before its inner
+  application is rewritten.
+
+## Retired vocabulary, residue
+
+- [ ] **`FieldModifiers.Resolved.parametric` is written and never read.** Its only consumer was the
+  `value_param` routing, which the kernel no longer declares: both callers now put a parametric modifier
+  token in `value` and lean on §8.1's shadowing rule. The state distinction §5.7 needs is decided inside
+  `FieldModifiers.of` and rides `state`, so the component carries nothing. Delete it and the record narrows
+  to `(state, value)`. Trivial, and worth doing while `SPEC-FEEDBACK.md` #5's headline subtraction to the
+  spec — "`record_field.value_param` has no producer left" — is in front of a reviewer.
 
 ## Schema-side diagnostics
 
