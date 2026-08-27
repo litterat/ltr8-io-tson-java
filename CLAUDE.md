@@ -106,6 +106,17 @@ directly. When you edit a class, clean up its Javadoc in the same edit — remov
 you didn't write it), fix anything that no longer matches the code, tighten what's left. The `docs/` notes
 and this file follow the same no-history rule; the dated log lives in git.
 
+**`BACKLOG.md` is a clean list of outstanding work and nothing else.** Every entry names something someone
+could pick up and do. Three things are therefore not entries, however true: **what was done** (an item that
+ships comes out entirely — not annotated as complete, not kept as a record of how it was solved), **what was
+decided against** (a won't-do is not work), and **what might become work later** (a standing note to revisit
+something if conditions change is not actionable today, and sits in the list forever looking like a task).
+Prose inside a live entry follows the same rule — say what is left and what constrains it; recounting which
+halves already work turns an item into a status report that goes stale silently. Where one of those facts has
+to survive its entry, it belongs in the `docs/` note, the Javadoc, or the test that owns the area, where the
+person who trips over it will be looking. Git history is the log. Same rule for the "Not yet implemented"
+section of this file.
+
 **Keep the `docs/` note current in the same session as the change.** When work alters behavior an area's
 design note describes, update that note the way you'd update the class's Javadoc — same edit, not a
 follow-up. A note that silently drifts is worse than no note.

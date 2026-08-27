@@ -7,11 +7,21 @@ for the target-use-case plan (LLM structured output validation, JSON compatibili
 separately since it's a vision/plan document, not a plain punch list — and `CLAUDE.md`'s own "Not
 yet implemented" section for the technical detail behind several of these items.
 
-**This file holds only work still to do.** An item that ships, and an item decided against, come out
-entirely — neither is something to do, and an annotated corpse makes the list longer without making it more
-useful. Where a decision has to survive its item (a won't-do someone would otherwise re-propose, or the why
-behind a shipped design), it goes to the `docs/` note or the Javadoc that owns the area, which is where a
-reader looking at that code will find it. Git history keeps the rest.
+**This file is a clean list of outstanding work and nothing else.** Every entry must name something someone
+could pick up and do. Three things are therefore not entries, however true they are:
+
+- **What was done.** An item that ships comes out entirely — not annotated as complete, not kept as a record
+  of how it was solved. Git history is the log.
+- **What was decided against.** A won't-do is not work. It comes out too.
+- **What might become work later.** A standing note to revisit something if conditions change is not an
+  outstanding item; nobody can act on it today, and it sits in the list forever looking like a task.
+
+Where any of those has to survive its entry — a won't-do someone would otherwise re-propose, the why behind
+a shipped design, a condition that should trigger future work — it belongs in the `docs/` note, the Javadoc,
+or the test that owns the area, where the person who trips over it will actually be looking. Not here.
+
+Prose inside a live entry follows the same rule: say what is left to do and what constrains it. Recounting
+which halves already work turns an item into a status report, and it goes stale silently.
 
 ---
 
@@ -28,43 +38,21 @@ own prose (which had gone stale on at least one of them):
   dependencies-first; every caller (including this session's own `TinySchemaImportsCoreTn1Test`) has to
   already know and hand-sequence the correct registration order itself. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
-  schemas in a known order, not a general algorithm.
-    - Its one prerequisite is met: a topological sort has to detect cycles to terminate, and `resolveLinked`
-      already holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
+  schemas in a known order, not a general algorithm. Cycle detection is available to build on:
+  `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
-  `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
-  the bounds are literal at schema load, at materialisation where parameter-bound. The literal half is done
-  for both tiers (`SchemaDesugarer.checkBounds`); the parameter-bound half now has a home too — a
-  parameter-bound `min_items` reaches the target constructor's own reader when the template closes, which is
-  where `<"two">` is rejected, though nothing yet compares a *pair* of bounds once both go concrete. The
-  kin §8.2 gestures at — "bounds within a width-derived range, and their kin" — belong with the constraint
-  families that own them, next to `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
+  `min_items <= max_items` is one rule over the binding pair for arrays *and maps*, and nothing compares a
+  *pair* of bounds once both go concrete at materialisation. The kin §8.2 gestures at — "bounds within a
+  width-derived range, and their kin" — belong with the constraint families that own them, next to
+  `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
   means the check moves out of the desugarer entirely and `checkBounds` goes with it. Distinct from the
   atom-body self-coherence item below, which shares that destination but has no parameter or
   materialisation dimension at all.
 
 ## Remaining Part 2 resolution gaps
 
-Two are left. `DefinitionResolver.resolveTypeRef`'s catch-all is unreachable from a desugared document —
-every shape it named resolves or is refused where it is written — and survives only as a guard against a
-caller resolving raw AST with the desugar phase skipped.
-
-Only genuine gaps are listed here — a throw that means "your schema is wrong" is not one. Classifying the
-throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
-again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale
-by a factor of six.
-
-- [ ] **No schema-side gap is reachable, so two tests state a rule where they used to show a case.** The
-  schema pipeline reports `SCHEMA_ERROR` for everything it refuses today: the last `NOT_IMPLEMENTED` in it
-  closed with substitution keeping an application whole. `TsonValidateSchemaTest`'s
-  `everyBrokenDeclarationIsReportedInOnePass` and `TsonCliTest`'s
-  `aRunHoldingBothAGapAndAnOrdinaryErrorIsSeventyRatherThanOne` carry the note. The machinery is untouched
-  — `SchemaResolver` still routes an `UnsupportedOperationException`
-  through the receiver — so **the day a gap reappears, restore an end-to-end fixture** rather than leaving
-  both as rules. Not work in itself; a standing instruction attached to the next gap.
-  - The read side still has one (`extern`, and `unknown`), but it escapes as an exception rather than riding
-    in a report, so it does not exercise the same path.
+Only genuine gaps belong here — a throw that means "your schema is wrong" is not one.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
@@ -83,14 +71,8 @@ by a factor of six.
 ## Open form: the held template body
 
 An open entry's body is the constructor application as written, held unread until materialisation
-substitutes its parameters away (`TemplateBody`/`HeldBody`, `docs/schema-resolution.md`), which is what
-removes Revision 33's collection-slot boundary — `result => <T> ( T | error )` resolves here and §5.10
-refuses it. `SPEC-FEEDBACK.md` #5 is the proposal, written as the design that works; #7 is the `reference`
-widening the last shape needed.
-
-**Every shape now holds**, so §12.1's `[type-params] "!" type-name ws core-value` covers every open entry and
-one walk closes them all — records, compositions, refinements, container sugar and §5.10's partial
-application alike. What is left are consequences of holding rather than shapes still outside it:
+substitutes its parameters away — `docs/schema-resolution.md` describes it, `SPEC-FEEDBACK.md` #5 and #7 are
+the proposals it answers. What is left below are consequences of holding, not shapes outside it.
 
 - [ ] **A field's `~`/`=` value is never checked against the field's own declared type, and the failure wears
   the wrong clothes.** meta-kernel's `@doc` on `value` states the dependency outright -- `record_field.value`
@@ -103,9 +85,8 @@ application alike. What is left are consequences of holding rather than shapes s
     hole rather than opening one, which is also why §5.10's argument-kind rule is the wrong instrument --
     both sides there are correctly kinded (a value argument bound to a value parameter) and the kind rule has
     nothing to say, where value-conformance catches it. `SPEC-FEEDBACK.md` #5 carries the recommendation.
-  - **`SPEC-FEEDBACK.md` #5 offers this check to the spec as the replacement for §5.10's argument-kind rule**,
-    and marks it there as a recommendation rather than a report. Building it is what would let that
-    recommendation stand on the same evidence as the rest of the entry.
+  - `SPEC-FEEDBACK.md` #5 offers this check to the spec as the replacement for §5.10's argument-kind rule,
+    where it is marked a recommendation rather than a report — building it is what would change that.
   - **The exception classification is wrong today**, which is the part that is a defect rather than a gap. A
     default that is not valid for its field's type is an author error whose verdict does not change as this
     library improves, so it belongs in `TsonSchemaValidationException` at the declaration -- not in the
@@ -188,12 +169,10 @@ rules and `CLAUDE.md` the summary; what is left here is one modelling gap the ch
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
   — the Revision 33 fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
   renders none of them, so the entries would compare equal for the wrong reason;
-  `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side is what
-  lets that test read those keys like anything else, which is now the whole of why it is worth doing: with
-  ingest recorded above as won't-do, `ResolvedFixtureTest` is the only consumer, and the emit side behind it
-  has no consumer at all. §8.1's rule still says what a reader would owe if one existed — derived markers
-  discarded and recomputed, author-written key annotations preserved as data — so the shape is settled if
-  this is ever picked up.
+  `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
+  test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
+  only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers
+  discarded and recomputed, author-written key annotations preserved as data.
 
 - [ ] **Two entries for one type, where the argument is one number spelled two ways.** `vector<float32, 255>`
   and `vector<float32, 0xFF>` produce entries with byte-identical bodies, because identity derives from the
@@ -233,12 +212,11 @@ Parsing, desugaring, resolution and linking all report every independent problem
 `TsonDiagnosticsReceiver` (issues #3/#28/#29), whether reached by `tson compile`/`Tson.validateSchema` or by
 a *data* read whose `!!schema` names a schema that doesn't resolve — both give the same account of the same
 broken schema. `docs/readers-and-diagnostics.md`'s "Schema-side diagnostics" section describes the shape and
-the decisions behind it. **What has shipped is good enough for now**, which is why this whole section sits
-here: the two items below are refinements of a working two-ended diagnostic — how finely it locates itself,
-and whether it should carry more than one location at all — not gaps in what it reports. The *floor* under
-all of it — the lexer being fail-fast, so a token that will not lex aborts the pass that would have reported
-past it — is deliberately not an item in this list, because there is no work to do until someone decides
-whether lexer errors feed the `Diagnostic` model at all. `STRUCTURED-OUTPUT.md` holds that question.
+the decisions behind it. The items below are refinements of a working two-ended diagnostic — how finely it
+locates itself, and whether it should carry more than one location at all — not gaps in what it reports,
+which is why they sit low. The lexer's fail-fast floor is not among them: nothing is actionable there until
+someone decides whether lexer errors feed the `Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds
+that question.
 
 - [ ] **`schemaPosition` is one level coarser than the pointer beside it.** A read diagnostic locates
   `/person/age` but positions it at `person`'s own declaration line, because positions are per declaration
@@ -289,9 +267,7 @@ whether lexer errors feed the `Diagnostic` model at all. `STRUCTURED-OUTPUT.md` 
 The read/write matrix in the README makes the asymmetry plain: the read side has a schemaless→object
 reader, a schemaless→tree reader, a schema-driven *validating* reader, a pull-event stream, and both
 fail-fast and collecting/diagnostics modes; the write side has only the two schemaless writers and is
-missing most of the mirror. Two pieces of it are now there — both writers take an `OutputStream`/`Appendable`
-sink (`toTson` being the wrapper), and both can emit a document header (`describing(…)`), so what they write
-can say what governs it. What is left below is the schema-aware writer, diagnostics, and a public event
+missing most of the mirror. What is left below is the schema-aware writer, diagnostics, and a public event
 surface.
 
 - [ ] **No schema-aware (Class 2) writer — `TsonValueWriter`.** Only the schemaless `TsonObjectWriter`
@@ -381,10 +357,9 @@ surface.
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
   session-oriented internal narrative exists.
 - [ ] AI skills for using the library.
-- [ ] `@doc`-driven documentation generation (render a schema's own `@doc` annotations). **Unblocked**:
-  every `@doc` string across the three bundled schemas survives resolution and linking, reachable as
-  `schema.entries().getAnnotations(name).value("doc", String.class)`, and core.tn documents every one of its
-  declarations. What's missing is the renderer, not the data.
+- [ ] `@doc`-driven documentation generation (render a schema's own `@doc` annotations). The renderer is the
+  whole of it — the data is reachable as
+  `schema.entries().getAnnotations(name).value("doc", String.class)`, and core.tn documents every declaration.
 
 ## Front door / ergonomics
 
