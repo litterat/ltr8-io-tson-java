@@ -280,8 +280,11 @@ rebuilt and called a cache.
       `type_argument` is (`docs/linking-and-compilation.md`).
     - **A *value* argument makes the trip intact.** `type_argument`'s value channel binds a raw `Token` —
       §5.10 calls a type argument's literal a bare token rather than the value it denotes — so the slot reads
-      the token rather than decoding it (`RawTokenParser`). What that costs, identity keyed on the spelling
-      so `<255>` and `<0xFF>` are two applications, is `SPEC-FEEDBACK.md` #4.
+      the token rather than decoding it (`RawTokenParser`). The spelling is therefore what reaches identity,
+      and `NumericIdentity` applies [TSON-DATA] §4.3's equivalence there, so `<255>` and `<0xFF>` are one
+      application — radix, digit separators and a redundant sign falling away, and a float's written scale
+      with them, while the base-type line does not (`1` is an integer and `1.0` a float under §4, so those
+      stay two). `SPEC-FEEDBACK.md` #4 carries the question to the spec, which has not settled it.
   - **All four sugar forms lift open, collections included.** `tuple` and `choice` bind a collection
     (`elements`, `variants`), which Revision 33 could not represent: its `template_argument` was
     `param | value | type_ref` with no collection case, so `<T> { v: (T | text) }` was refused at the

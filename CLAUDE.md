@@ -725,8 +725,9 @@ compatibility).
   materialisation rewrites it to the instantiation entry one pass later, which needed `type_argument` — an
   untagged labelled choice — to become readable (`GroupUnionBindReader`). What remains is narrower: a *value*
   argument keeps its token, so `[vector<float32, 3>]` closes to a nested array with both bounds at 3
-  (`RawTokenParser`) — at the cost of identity being keyed on the spelling, so `<255>` and `<0xFF>` are two
-  applications (`SPEC-FEEDBACK.md` #4). **Every template holds its body**, so one process closes them all.
+  (`RawTokenParser`); §4.3's equivalence is applied where identity is derived (`NumericIdentity`), so `<255>`
+  and `<0xFF>` are one application while `1` and `1.0` stay two, §4 resolving them to different base types
+  (`SPEC-FEEDBACK.md` #4). **Every template holds its body**, so one process closes them all.
   §5.2 says `{ x: T }` denotes `!record { fields: [ { name: x  type: T } ] }`, and `SchemaDesugarer` rewrites
   it there, where the body is written; a **composition or refinement** template is held one phase later
   (`DefinitionResolver.holdIfOpen`), because both absorb fields from a source and the form to hold is the

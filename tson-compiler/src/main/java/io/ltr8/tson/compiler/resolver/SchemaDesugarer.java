@@ -594,8 +594,9 @@ final class SchemaDesugarer {
      * <p>A <em>value</em> argument makes the trip intact: {@code type_argument}'s value channel binds a raw
      * {@code Token}, §5.10 describing a type argument's literal as a bare token rather than as the value it
      * denotes, so the reader that fills it preserves the token instead of decoding it ({@code
-     * RawTokenParser}). What that costs -- identity keyed on the spelling, so {@code <255>} and {@code
-     * <0xFF>} are two applications -- is {@code SPEC-FEEDBACK.md} #4.
+     * RawTokenParser}). The spelling is therefore what reaches identity, and {@link NumericIdentity} applies
+     * [TSON-DATA] §4.3's equivalence there so {@code <255>} and {@code <0xFF>} are one application
+     * ({@code SPEC-FEEDBACK.md} #4).
      */
     private static RecordValue refRecord(GenericRef generic) {
         List<ScopedValue> arguments = new ArrayList<>();
@@ -1326,7 +1327,8 @@ final class SchemaDesugarer {
     /** The readable half of a derived name: every scalar the binding record holds, in order, under {@code _}. */
     private static void appendReadable(StringBuilder out, CoreValue value) {
         switch (value) {
-            case TokenValue token -> out.append('_').append(token.text());
+            case TokenValue token -> out.append('_')
+                    .append(NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED));
             case RecordValue record -> record.fields()
                     .forEach(field -> appendReadable(out, field.value().value().coreValue()));
             case ArrayValue array -> array.elements()
@@ -1363,7 +1365,7 @@ final class SchemaDesugarer {
                 // The form by name, not ordinal: inserting a TokenForm constant would renumber every ordinal
                 // invisibly, which is the same hazard as hashing a record's toString.
                 appendText(out.append('v'), token.form().name());
-                appendText(out, token.text());
+                appendNumberAware(out, token.text(), token.form() == TokenForm.UNQUOTED);
             }
             case RecordValue record -> appendFields(out.append('r'), record.fields());
             case ArrayValue array -> {
@@ -1378,6 +1380,20 @@ final class SchemaDesugarer {
     /** Length-first, so concatenation stays unambiguous whatever the text contains. */
     private static void appendText(StringBuilder out, String text) {
         out.append(text.length()).append(':').append(text);
+    }
+
+    /**
+     * A token's contribution to the hashed rendering, with §4.3's numeric equivalence applied
+     * ({@link NumericIdentity}). A number writes its base-type kind and its canonical magnitude as two
+     * fields where anything else writes its text as one; every field being length-prefixed, no token's own
+     * text can be mistaken for a tagged number.
+     */
+    private static void appendNumberAware(StringBuilder out, String text, boolean unquoted) {
+        NumericIdentity.Canonical canonical = NumericIdentity.of(text, unquoted);
+        if (canonical != null) {
+            appendText(out, canonical.kind());
+        }
+        appendText(out, canonical == null ? text : canonical.text());
     }
 
     /**

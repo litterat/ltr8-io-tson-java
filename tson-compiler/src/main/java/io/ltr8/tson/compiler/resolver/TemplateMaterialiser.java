@@ -813,10 +813,10 @@ final class TemplateMaterialiser {
                     appendRef(canonical.append('r'), ref.ref());
                 }
                 case TypeArgument.Value value -> {
-                    readable.append('_').append(value.value().text());
+                    readable.append('_').append(canonicalText(value.value()));
                     // The form by name, not ordinal: inserting a constant would renumber every ordinal.
                     appendText(canonical.append('v'), value.value().form().name());
-                    appendText(canonical, value.value().text());
+                    appendNumberAware(canonical, value.value());
                 }
             }
         }
@@ -832,7 +832,7 @@ final class TemplateMaterialiser {
                 case TypeArgument.Ref nested -> appendRef(out.append('r'), nested.ref());
                 case TypeArgument.Value value -> {
                     appendText(out.append('v'), value.value().form().name());
-                    appendText(out, value.value().text());
+                    appendNumberAware(out, value.value());
                 }
             }
         }
@@ -842,5 +842,24 @@ final class TemplateMaterialiser {
     /** Length-first, so concatenation stays unambiguous whatever the text contains. */
     private static void appendText(StringBuilder out, String text) {
         out.append(text.length()).append(':').append(text);
+    }
+
+    /** A value argument's readable segment, with §4.3's numeric equivalence applied ({@link NumericIdentity}). */
+    private static String canonicalText(Token token) {
+        return NumericIdentity.textOf(token.text(), token.form() == Token.Form.UNQUOTED);
+    }
+
+    /**
+     * A value argument's contribution to the hashed rendering. A number writes its base-type kind and its
+     * canonical magnitude as two fields where anything else writes its text as one; every field being
+     * length-prefixed, no token's own text can be mistaken for a tagged number.
+     */
+    private static void appendNumberAware(StringBuilder out, Token token) {
+        NumericIdentity.Canonical canonical =
+                NumericIdentity.of(token.text(), token.form() == Token.Form.UNQUOTED);
+        if (canonical != null) {
+            appendText(out, canonical.kind());
+        }
+        appendText(out, canonical == null ? token.text() : canonical.text());
     }
 }
