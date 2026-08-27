@@ -723,7 +723,9 @@ compatibility).
   [tree<T>; 1..] }` ties its knot through the lifted synthetic. A *closed* container position takes one as
   well (`[box<text>]`, nested arguments included): the slot is written in `type_ref`'s record form and
   materialisation rewrites it to the instantiation entry one pass later, which needed `type_argument` — an
-  untagged labelled choice — to become readable (`GroupUnionBindReader`). What remains is narrower: a *value*
+  untagged labelled choice — to become readable (`GroupUnionBindReader`). **A collection-valued position is
+  no different** — `( box<text> | int32 )` and `[text, box<text>]` write the same record form into
+  `variants`/`elements`, closed or open, because a `[type_ref]` holds what a `type_ref` holds. What remains is narrower: a *value*
   argument keeps its token, so `[vector<float32, 3>]` closes to a nested array with both bounds at 3
   (`RawTokenParser`); §4.3's equivalence is applied where identity is derived (`NumericIdentity`), so `<255>`
   and `<0xFF>` are one application while `1` and `1.0` stay two, §4 resolving them to different base types
