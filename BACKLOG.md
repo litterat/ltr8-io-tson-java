@@ -61,9 +61,18 @@ by a factor of six.
   T }` resolves, its body held and closed like any other), and a **fully-bound** application in either
   absorbing position closes on demand (`vip => customer & box<text>`). What is left is only an application
   naming the enclosing declaration's own parameters — `<T> customer & box<T>`, and the same as a refinement
-  source — which cannot close until that declaration itself materialises, so composition would have to be
-  deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
-  feature from closing an application, and the diagnostic says so rather than blaming substitution.
+  source.
+  - **Blocked on a kernel slot, not on materialisation** (`SPEC-FEEDBACK.md` #8). The composition itself
+    needs no closure: the source's field set is known while the application is open, `box`'s held record
+    substituted parameter-for-parameter, giving `vip => <T> !record { fields: [ { name: id type: text }
+    { name: v type: T } ] }` — the shape a composition template already resolves to when its parameter sits
+    in its own body. What has nowhere to go is the composition's other half: §5.8 makes `vip` a subtype of
+    both operands, and `type_definition.supertypes`/`record.supertypes` are `[type_name]`, which `box<T>` is
+    not. So this waits on `supertypes: [type_ref]` landing in the kernel — building it first would mean
+    inventing a representation the spec does not have.
+  - The field-set half is then a token rewrite this codebase already performs, so the work after the slot
+    widens is small: substitute the source's held body with the arguments as written, read it as a record,
+    absorb, and leave the result open.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
