@@ -709,8 +709,11 @@ compatibility).
   edges an open operand does and does not give. `DefinitionResolver`'s Javadoc is the exact current boundary.
   Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
-  **A gap reaching a read still exists** (`extern`, `unknown` — below), and two tests carry a standing note to
-  restore an end-to-end schema-side fixture if one ever reappears (`BACKLOG.md`).
+  **Gaps reaching a read still exist**, six of them, all through `ErrorReader` and all on a schema that
+  loaded clean: `unknown` and `extern` (below), and `datetime`/`time` with `precision` or `require_timezone`
+  set (`BACKLOG.md`). A read gap **escapes as an exception rather than riding in the report**, which is the
+  one place the pre-diagnostic failure mode survives — in a multi-document `tson validate` it destroys the
+  whole envelope, so the other documents get no verdict (`BACKLOG.md`).
 - **A container position that is an application, and what a held open body still cannot say.** §5.10
   substitution works for both template shapes: a **record** template (parameters occupying field types and
   values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T
@@ -743,8 +746,9 @@ compatibility).
   routed parameter rides `value` with §8.1's shadowing rule to tell it from a literal, and §5.7's fixation
   moves to materialisation. What a held body cannot enforce is half of §5.10's argument-kind rule — see
   "Not yet implemented".
-- **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration) has no
-  compiled-parser factory, so it compiles to `ErrorReader` (a schema merely *declaring* one still compiles).
+- **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration, so it is
+  spellable only as `!extern { schema: … }` and never as a bare name) has no compiled-parser factory, so it
+  compiles to `ErrorReader` (a schema merely *declaring* one still compiles; the first read of one fails).
   Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`
   is the universe of types, not a token shape. `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` do have
   parsers — the CIDR pair reusing the two address grammars, and validating §5.5's family-range and

@@ -238,8 +238,12 @@ class TsonValidateSchemaTest {
      * parameter in a collection-valued slot (the author's error now), a parameterized supertype, and one
      * template applied to another. The machinery is untouched -- {@code SchemaResolver} still routes an
      * {@code UnsupportedOperationException} through the receiver, in the catch inside its memoized getter --
-     * so the day a gap reappears this should become a fixture again. {@code BACKLOG.md} carries that note,
-     * and {@code TsonCliTest} pins the exit-code rule the split rides on.
+     * so the day a schema-side gap reappears this should become a fixture again.
+     *
+     * <p><b>The read side does have reachable gaps, and they cannot serve as a fixture here</b>: a read gap
+     * escapes as an exception instead of reaching a receiver, so it never becomes a {@code Diagnostic} at
+     * all. {@code TsonCliTest} pins both halves end to end -- that such a run exits 70 with the right
+     * framing, and that it currently loses every other document's verdict on the way.
      */
     @Test
     void everyBrokenDeclarationIsReportedInOnePass() {
