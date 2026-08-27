@@ -7,16 +7,21 @@ for the target-use-case plan (LLM structured output validation, JSON compatibili
 separately since it's a vision/plan document, not a plain punch list — and `CLAUDE.md`'s own "Not
 yet implemented" section for the technical detail behind several of these items.
 
+**This file holds only work still to do.** An item that ships, and an item decided against, come out
+entirely — neither is something to do, and an annotated corpse makes the list longer without making it more
+useful. Where a decision has to survive its item (a won't-do someone would otherwise re-propose, or the why
+behind a shipped design), it goes to the `docs/` note or the Javadoc that owns the area, which is where a
+reader looking at that code will find it. Git history keeps the rest.
+
 ---
 
 ## Resolution & linking generality
 
 Every real schema resolved so far (meta-kernel, meta.tn, core.tn, and hand-built test fixtures)
 happens to fit a narrow shape this pipeline already handles — declared in dependency order, with
-callers hand-sequencing registration themselves. The checked items are what's missing for the *general*,
+callers hand-sequencing registration themselves. These items are what's missing for the *general*,
 spec-required case, found by re-auditing Part 2 against the current source rather than CLAUDE.md's
-own prose (which had gone stale on at least one of them); the last entry is a recorded decision not to
-build an optional path, kept here so it is not re-proposed as a gap.
+own prose (which had gone stale on at least one of them):
 
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
@@ -24,11 +29,8 @@ build an optional path, kept here so it is not re-proposed as a gap.
   already know and hand-sequence the correct registration order itself. Distinct from what
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm.
-    - **Cycle detection is done** and was the more urgent half: a cycle is not the "opaque *not registered*
-      error" this entry used to claim — it was a `StackOverflowError`, since a schema is registered only
-      once it has linked and so is invisible to every cache while it resolves. `resolveLinked` now holds a
-      per-thread in-flight set and reports §2.2.3's cycle naming the path that closes it. The ordering work
-      still needs it (a topological sort has to detect cycles to terminate), so that dependency is met.
+    - Its one prerequisite is met: a topological sort has to detect cycles to terminate, and `resolveLinked`
+      already holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 - [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
   open bounds deferred: family coherence rules whose operands were parameters". The array family's
   `min_items <= max_items` is one rule over the binding pair for arrays *and maps*: a resolver error where
@@ -41,29 +43,12 @@ build an optional path, kept here so it is not re-proposed as a gap.
   means the check moves out of the desugarer entirely and `checkBounds` goes with it. Distinct from the
   atom-body self-coherence item below, which shares that destination but has no parameter or
   materialisation dimension at all.
-- **Resolved-form ingest is deliberately not done** ([TSON-SCHEMA] §8.1/§10.1) — bringing an
-  already-resolved `!type_definition` document into the library as an input, rather than source text.
-  Recorded here so it is not re-opened as an oversight; the spec marks the path explicitly **optional**
-  ("MAY implement ingest"), not a MUST.
-    - **Resolved form is an output here, not an input.** It is what the resolver produces so a human or a
-      test can see what a schema became — `spec/m/*-resolved.tn` and `ResolvedFixtureTest` are its whole
-      consumer set. Nothing in the pipeline wants to read one back, and a schema's source text is always
-      available where its resolved form is.
-    - **An open entry has no resolved form to ingest**, which is what settles it rather than merely arguing
-      cost. A held body never serialises as a `type_definition` (`SPEC-FEEDBACK.md` #5): an open entry's
-      resolved form *is* its declaration, so a resolved document carrying one is a schema document that
-      re-resolves through the ordinary path. Ingest could therefore only ever cover the closed half of a
-      schema, and a mechanism that reads some of a document is worse than one that reads none of it.
-    - It would also introduce a *second* way to build a `TsonSchema` — bound from a document rather than
-      resolved from source — and the two would have to agree, including on where a declaration's annotations
-      land (the name's on the map key, the definition's on the entry). Reconsider only if a resolved document
-      ever becomes something this library is handed rather than something it prints.
 
 ## Remaining Part 2 resolution gaps
 
-Two are left. `DefinitionResolver.resolveTypeRef`'s catch-all, which used to head this section, is now
-unreachable from a desugared document — every shape it named resolves or is refused where it is written —
-and survives only as a guard against a caller resolving raw AST with the desugar phase skipped.
+Two are left. `DefinitionResolver.resolveTypeRef`'s catch-all is unreachable from a desugared document —
+every shape it named resolves or is refused where it is written — and survives only as a guard against a
+caller resolving raw AST with the desugar phase skipped.
 
 Only genuine gaps are listed here — a throw that means "your schema is wrong" is not one. Classifying the
 throw sites by that test is done across the whole schema pipeline (issue #26); if a census is ever wanted
@@ -71,11 +56,14 @@ again, take it fresh rather than trusting a recorded one, since the last recorde
 by a factor of six.
 
 - [ ] **Composing or refining against a template application that is still open** (`vip => <T> customer &
-  box<T>`, §5.8's "Parameterized references"). The *fully-bound* case closes on demand now, at both
-  absorbing positions. What is left is the case where the application names the enclosing declaration's own
-  parameters, which cannot close until that declaration itself materialises — so composition would have to
-  be deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
-  feature from closing an application, and the diagnostic now says so rather than blaming substitution.
+  box<T>`, §5.8's "Parameterized references"). Narrower than the heading sounds, so what already works is
+  worth stating first: a composition or refinement **template** is ordinary (`vip => <T> customer & { extra:
+  T }` resolves, its body held and closed like any other), and a **fully-bound** application in either
+  absorbing position closes on demand (`vip => customer & box<text>`). What is left is only an application
+  naming the enclosing declaration's own parameters — `<T> customer & box<T>`, and the same as a refinement
+  source — which cannot close until that declaration itself materialises, so composition would have to be
+  deferred to materialisation too, absorbing fields into an entry that does not exist yet. A different
+  feature from closing an application, and the diagnostic says so rather than blaming substitution.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
@@ -160,19 +148,6 @@ rules and `CLAUDE.md` the summary; what is left here is one modelling gap the ch
   (exact vs. maximum fractional-digit count) are not settled by the spec and want a `SPEC-FEEDBACK.md` entry,
   and `require_timezone: false` needs an offset-less parse path neither parser has (`true` is already the
   behaviour, RFC 3339 requiring an offset on every value these atoms accept).
-
-## Binding profiles
-
-`DataBindContext.Builder.profile` plus `@Profile` on a constructor lets one class bind several versions of a
-schema, and `TsonConfig.bindings`/`profile` configure it in one call. Selection is by an opaque label, never
-by matching the schema's field set — no serialization library does that, and the parameter names it would
-need are not retained for a secondary constructor.
-
-- **Deriving the profile from the schema being read is deliberately not done.** A `Tson` is one profile, and
-  routing a document to the right one stays the application's job. The alternative — the schema declaring its
-  own profile through a meta-layer annotation — links a *coding* decision to a *format* one and buys less
-  flexibility than it costs. Recorded so it is not re-opened as an oversight; reconsider only if something
-  needs to re-derive the binding without the application in between.
 
 ## Remaining built-in types
 
