@@ -183,15 +183,6 @@ rules and `CLAUDE.md` the summary; what is left here is one modelling gap the ch
   that is itself an application splits, the closed lift hashing the binding record before its inner
   application is rewritten.
 
-## Retired vocabulary, residue
-
-- [ ] **`FieldModifiers.Resolved.parametric` is written and never read.** Its only consumer was the
-  `value_param` routing, which the kernel no longer declares: both callers now put a parametric modifier
-  token in `value` and lean on §8.1's shadowing rule. The state distinction §5.7 needs is decided inside
-  `FieldModifiers.of` and rides `state`, so the component carries nothing. Delete it and the record narrows
-  to `(state, value)`. Trivial, and worth doing while `SPEC-FEEDBACK.md` #5's headline subtraction to the
-  spec — "`record_field.value_param` has no producer left" — is in front of a reviewer.
-
 ## Schema-side diagnostics
 
 Parsing, desugaring, resolution and linking all report every independent problem in one pass through a
