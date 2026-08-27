@@ -201,6 +201,26 @@ public final class TsonObjectWriter {
      * {@code dataClass}'s own kind.
      */
     private void write(Object value, DataClass dataClass, TsonDataEmitter writer) throws DataBindException {
+        write(value, dataClass, writer, null);
+    }
+
+    /**
+     * {@link #write(Object, DataClass, TsonDataEmitter)} with a type-ref to emit at this value's own
+     * position, or {@code null} for none.
+     *
+     * <p><b>The parameter is a seam, and exists so that there is one prologue rather than two.</b> §7.4 orders
+     * a data value {@code *annotation [type-ref] core-value}, so a caller with a type-ref of its own -- {@link
+     * #writeUnion}, naming the member it dispatched to -- has to place it between the annotations and the
+     * core. Without somewhere to hand it in, such a caller must emit the annotations, the type-ref and the
+     * core itself, which means reproducing everything above them: the bridge unwrap, the annotated box, the
+     * parsed-value case. Reproducing part of it is the failure that shape invites, and it is not hypothetical
+     * -- a held template body unwrapped by a caller's own copy of the bridge step reaches {@link #writeCore}
+     * as an ordinary record and renders {@code !recordvalue { fields: [ ... ] }}, the description the branch
+     * below exists to prevent. With the seam there is nothing to reproduce, and a branch added here is seen by
+     * every caller.
+     */
+    private void write(Object value, DataClass dataClass, TsonDataEmitter writer, String typeRef)
+            throws DataBindException {
         try {
             if (value == null) {
                 writer.nullValue();
@@ -211,7 +231,7 @@ public final class TsonObjectWriter {
                 // as a record carrier's precede the record (§7.4). Taken apart through its own handles, so
                 // nothing here names the carrier class.
                 writeAnnotations((Annotations) boxed.annotations().invoke(value), writer);
-                write(boxed.value().invoke(value), boxed.valueClass(), writer);
+                write(boxed.value().invoke(value), boxed.valueClass(), writer, typeRef);
                 return;
             }
             if (dataClass.bridge().isPresent()) {
@@ -228,10 +248,20 @@ public final class TsonObjectWriter {
                 // held template body is exactly that, and unwrapping into the ordinary record path instead
                 // would write the description this branch exists to prevent. No other bridge produces one, so
                 // nothing else observes the order.
+                //
+                // A type-ref here is written rather than dropped, so that a caller offering one against a
+                // value that already carries its own head meets the emitter's at-most-one refusal instead of
+                // silence. Nothing reaches it today: the one transparent member offers none, by definition.
+                if (typeRef != null) {
+                    writer.typeRef(typeRef);
+                }
                 AstWriter.write(ast, writer);
                 return;
             }
             writeAnnotations(value, dataClass, writer);
+            if (typeRef != null) {
+                writer.typeRef(typeRef);
+            }
             writeCore(value, dataClass, writer);
         } catch (DataBindException | UncheckedIOException | TsonWriteException e) {
             // Both of the non-binding failures pass through rather than being wrapped as "cannot write
@@ -245,10 +275,10 @@ public final class TsonObjectWriter {
     }
 
     /**
-     * The value itself, with its annotations already emitted and any bridge already applied. Split out
-     * because §7.4 orders a data-value {@code *annotation [type-ref] core-value}, and {@link #writeUnion}
-     * writes a type-ref of its own -- so it has to emit the member's annotations *before* that type-ref and
-     * then come straight here, rather than recursing through {@link #write} and emitting them after it.
+     * The value itself, with its annotations and any type-ref already emitted and any bridge already applied
+     * -- everything §7.4's {@code *annotation [type-ref] core-value} puts before the core value. Reached only
+     * from {@link #write}, which owns that prologue; a caller wanting a type-ref of its own hands it to the
+     * seam there rather than emitting it and coming here directly.
      */
     private void writeCore(Object value, DataClass dataClass, TsonDataEmitter writer) throws DataBindException {
         try {
@@ -410,12 +440,11 @@ public final class TsonObjectWriter {
     // ── Unions ───────────────────────────────────────────────────────────
 
     /**
-     * The reverse of {@code TsonObjectReader}'s own union-member resolution: given the value's own
-     * runtime class (necessarily one specific member, not the union type itself), picks one
-     * canonical type-ref name for it -- {@link Typename} if present, else the simple class name --
-     * rather than accepting either form the way the read side does. Read/write asymmetry is fine
-     * here; a reader benefiting from flexibility doesn't obligate a writer to be equally flexible
-     * about its own single output.
+     * The reverse of {@code TsonObjectReader}'s own union-member resolution: given the value's own runtime
+     * class (necessarily one specific member, not the union type itself), names that member and writes it
+     * like any other value. The name is one canonical choice ({@link #memberTypeRef}) rather than either of
+     * the forms the read side accepts -- read/write asymmetry is fine here; a reader benefiting from
+     * flexibility doesn't obligate a writer to be equally flexible about its own single output.
      */
     private void writeUnion(Object value, DataClassUnion dataClass, TsonDataEmitter writer) throws Throwable {
         Class<?> memberClass = value.getClass();
@@ -423,29 +452,29 @@ public final class TsonObjectWriter {
             throw new DataBindException(
                     "value of type " + memberClass + " is not a member of union " + dataClass.typeClass());
         }
-        DataClass memberDataClass = context.getDescriptor(memberClass);
+        // Naming the member is the whole of this method's own business; the tag goes to write()'s seam so
+        // that the prologue around it -- bridge, annotated box, parsed value -- is the one every other
+        // position gets, rather than a copy of part of it maintained here.
+        write(value, context.getDescriptor(memberClass), writer, memberTypeRef(memberClass));
+    }
+
+    /**
+     * The type-ref a union member writes for itself, or {@code null} for none.
+     *
+     * <p>{@link Typename} if present, else the simple class name lowercased (not the {@code @Typename} value,
+     * which is used verbatim) -- matching this codebase's own convention of lowercase type-refs, and the read
+     * side's case-insensitive fallback means either case reads back regardless.
+     *
+     * <p><b>A {@link Transparent} member writes none</b>, being framing rather than shape: it contributes no
+     * type-ref of its own and the value it wraps writes whatever head that value has. The cost is stated on
+     * the annotation -- with no tag written nothing selects such a member by tag on the way back in, so it
+     * round-trips only where a position declares it.
+     */
+    private static String memberTypeRef(Class<?> memberClass) {
         if (memberClass.isAnnotationPresent(Transparent.class)) {
-            // Framing, not shape (io.ltr8.annotation.Transparent): the wrapper contributes no type-ref of its
-            // own, so the value it wraps writes whatever head that value has and this position writes none.
-            // Routed through write() rather than the unwrap-and-writeCore below, so the wrapped value meets
-            // the ordinary dispatch -- which is what a held body needs to reach AstWriter.
-            //
-            // The cost is stated on the annotation: with no tag written, nothing selects a transparent member
-            // by tag on the way back in, so it round-trips only where a position declares it.
-            write(value, memberDataClass, writer);
-            return;
+            return null;
         }
-        Object member = memberDataClass.bridge().isPresent()
-                ? memberDataClass.bridge().get().toData().invoke(value)
-                : value;
-        // The member's own annotations precede the type-ref this is about to write (§7.4), so they are
-        // emitted here rather than left to the recursion below, which starts after it.
-        writeAnnotations(member, memberDataClass, writer);
-        // Lowercased when falling back to the simple class name (not the @Typename value, used
-        // verbatim) -- matches this codebase's own convention of lowercase type-refs, and the read
-        // side's case-insensitive fallback match means either case reads back correctly regardless.
         Typename tn = memberClass.getAnnotation(Typename.class);
-        writer.typeRef(tn != null ? tn.name() : memberClass.getSimpleName().toLowerCase(Locale.ROOT));
-        writeCore(member, memberDataClass, writer);
+        return tn != null ? tn.name() : memberClass.getSimpleName().toLowerCase(Locale.ROOT);
     }
 }
