@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.tree.*;
+import io.ltr8.tson.tree.TsonDocument;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.io.IOException;
@@ -79,6 +80,46 @@ public final class TsonTreeWriter {
      */
     public TsonTreeWriter identifiedBy(String documentId) {
         return new TsonTreeWriter(header.identifiedBy(documentId));
+    }
+
+    /**
+     * Writes {@code document} back as TSON, header and all -- the round trip {@link
+     * TsonTreeReader#readDocument} exists for, in one call.
+     *
+     * <p><b>The document's own header wins over this writer's</b>, component by component, and only where it
+     * has one: a {@code TsonDocument} carrying a {@code !!schema} is written with that schema whatever
+     * {@link #describing} was set to, and one carrying none keeps whatever this writer already had. Reading
+     * a document and writing it back therefore reproduces it, which is the point, while a writer configured
+     * for something the document does not state still contributes it.
+     *
+     * <p>Equivalent to {@code describing(...)}/{@code identifiedBy(...)} applied by hand and then
+     * {@link #toTson(TsonValue)} -- which is four lines and two {@link java.util.Optional}s at every call
+     * site, and gets the precedence question wrong about as often as not.
+     */
+    public String toTson(TsonDocument document) {
+        return forDocument(document).toTson(document.root());
+    }
+
+    /** {@link #toTson(TsonDocument)} into a stream -- UTF-8, flushed and not closed. */
+    public void write(TsonDocument document, OutputStream out) {
+        forDocument(document).write(document.root(), out);
+    }
+
+    /** {@link #toTson(TsonDocument)} into any {@link Appendable}. */
+    public void write(TsonDocument document, Appendable out) {
+        forDocument(document).write(document.root(), out);
+    }
+
+    /** This writer with {@code document}'s own directives applied over its own. */
+    private TsonTreeWriter forDocument(TsonDocument document) {
+        TsonTreeWriter writer = this;
+        if (document.schema().isPresent()) {
+            writer = writer.describing(document.schema().get());
+        }
+        if (document.id().isPresent()) {
+            writer = writer.identifiedBy(document.id().get());
+        }
+        return writer;
     }
 
     /** Writes {@code node} as TSON text -- {@link #write(TsonValue, Appendable)} into a fresh buffer. */

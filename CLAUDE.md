@@ -550,6 +550,13 @@ Two accessor families with different questions: `as(Class)`/`asString`/…
 **cast** ("what host type did the read produce?"), `asInt`/`asLong`/`asDouble` **convert** ("what number is
 this?") — a test asserting which host type a reader produced must use `as(Class)`. Read-side only; no
 builders or transforms yet.
+**`TsonDocument(id, schema, root)` is the model's document** — the counterpart of `ast.Document`, since §2.2
+makes a header a property of the document and not of its root value. No `meta` component: that would be a
+*schema* document, whose model is `schema.meta`, and `TsonDocumentHeader` (which carries all three) answers
+the different question of classifying a document before reading it. `treeReader().readDocument(...)` returns
+one and `read` is unchanged beside it; `TsonTreeWriter.toTson(TsonDocument)` writes it back, the document's
+own directives beating the writer's where it has them. The object side still carries neither its schema nor
+its root type (`BACKLOG.md`).
 
 ### Front door: `Tson`/`TsonConfig` (`tson` module) — `docs/facades-and-tree.md`
 

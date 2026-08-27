@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TypeRef;
 import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonRecord;
+import io.ltr8.tson.tree.TsonDocument;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.io.InputStream;
@@ -170,22 +171,49 @@ public final class TsonTreeReader {
 
     /** Reads {@code source}'s whole document into a {@link TsonValue} tree, fail-fast -- validated against its {@code !!schema} if this reader is schema-aware and the document declares one, schemaless otherwise. */
     public TsonValue read(String source) {
-        return readDocument(new TsonDataStream(source), false);
+        return readRoot(new TsonDataStream(source), false);
     }
 
     /** {@link #read(String)} straight off a stream -- reads {@code source}'s bytes (UTF-8) incrementally, never buffering the whole document into a {@code String} first; {@code source} is not closed here. */
     public TsonValue read(InputStream source) {
-        return readDocument(new TsonDataStream(source), false);
+        return readRoot(new TsonDataStream(source), false);
+    }
+
+    /**
+     * Reads {@code source} into a {@link TsonDocument} -- the value <b>and</b> the header directives that
+     * govern it, where {@link #read} keeps only the value.
+     *
+     * <p><b>For a caller who must reproduce or re-route the document without having held its URI.</b> A
+     * schema-driven read already records each node's type, which is what lets a writer put the root's
+     * {@code !typeName} back; what it discarded was the document's own {@code !!schema} and {@code !!id},
+     * so round-tripping worked only for a caller who still remembered what governed it. That is fine when
+     * the reader and the writer are the same code and a nuisance the moment a tree is handed on -- a server
+     * routing a body it has parsed cannot ask the sender again.
+     *
+     * <p>Reads exactly as {@link #read} does, validating against the document's {@code !!schema} where this
+     * reader is schema-aware and one is declared. A document declaring no directives is not an error: its
+     * header components come back empty.
+     *
+     * @return the document, or {@code null} where {@link #read} would also return nothing -- a document that
+     *         will not lex or parse, reported through this read's receiver rather than thrown past it
+     */
+    public TsonDocument readDocument(String source) {
+        return readDocument(new TsonDataStream(source));
+    }
+
+    /** {@link #readDocument(String)} straight off a stream; {@code source} is not closed here. */
+    public TsonDocument readDocument(InputStream source) {
+        return readDocument(new TsonDataStream(source));
     }
 
     /** Like {@link #read(String)} but always schemaless -- reads the wire structure, even when the document declares a {@code !!schema}. (A schemaless reader's {@link #read} already does this.) */
     public TsonValue readWithoutSchema(String source) {
-        return readDocument(new TsonDataStream(source), true);
+        return readRoot(new TsonDataStream(source), true);
     }
 
     /** {@link #readWithoutSchema(String)} straight off a stream. */
     public TsonValue readWithoutSchema(InputStream source) {
-        return readDocument(new TsonDataStream(source), true);
+        return readRoot(new TsonDataStream(source), true);
     }
 
     /**
@@ -195,12 +223,12 @@ public final class TsonTreeReader {
      * type-ref the data does carry is read as part of the value, not used to select the type.
      */
     public TsonValue readAs(String source, String typeName) {
-        return readDocumentAs(new TsonDataStream(source), typeName);
+        return readRootAs(new TsonDataStream(source), typeName);
     }
 
     /** {@link #readAs(String, String)} straight off a stream. */
     public TsonValue readAs(InputStream source, String typeName) {
-        return readDocumentAs(new TsonDataStream(source), typeName);
+        return readRootAs(new TsonDataStream(source), typeName);
     }
 
     /**
@@ -215,7 +243,27 @@ public final class TsonTreeReader {
 
     // ── Internals ────────────────────────────────────────────────────────
 
-    private TsonValue readDocument(TsonDataStream stream, boolean ignoreSchema) {
+    /**
+     * The whole document, header included. Structured as {@link #readRoot} is and for the same reason -- the
+     * {@code DocumentStart} event already carries both directives, so keeping them costs a field read rather
+     * than a second pass over the source.
+     */
+    private TsonDocument readDocument(TsonDataStream stream) {
+        try {
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            DocumentStart start = (DocumentStart) ctx.next();
+            TsonValue root = (tree == null || start.schema().isEmpty())
+                    ? schemaless.read(ctx)
+                    : readAgainstSchema(start.schema().get(), ctx, null);
+            requireDocumentEnd(ctx);
+            return new TsonDocument(start.id(), start.schema(), root);
+        } catch (RuntimeException e) {
+            baseSyntaxFailure(e);
+            return null;
+        }
+    }
+
+    private TsonValue readRoot(TsonDataStream stream, boolean ignoreSchema) {
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver);
             DocumentStart start = (DocumentStart) ctx.next();
@@ -229,7 +277,7 @@ public final class TsonTreeReader {
         }
     }
 
-    private TsonValue readDocumentAs(TsonDataStream stream, String typeName) {
+    private TsonValue readRootAs(TsonDataStream stream, String typeName) {
         if (schemaUri == null) {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
