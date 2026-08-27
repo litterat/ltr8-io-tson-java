@@ -29,15 +29,13 @@ final class FieldModifiers {
      * plain {@code REQUIRED}/{@code OPTIONAL}, and {@code OPTIONAL_FIXED}'s {@code = _} spelling, whose
      * output encoding is a {@code record_field} without a {@code value} member (§8.1).
      *
-     * <p>{@code parametric} says the token names a type parameter of the enclosing declaration rather than a
-     * literal (§5.7's "Open modifiers"). It decides nothing about <em>where</em> the token is written: both
-     * callers put it in {@code value} like any other token, and §8.1's shadowing rule -- a token is a
-     * parameter exactly when its text resolves into the enclosing entry's own {@code parameters} -- is what
-     * tells the two apart downstream. The distinction the flag does carry is the {@code state} this record
-     * already holds: §5.7 leaves a parametric {@code = P} in a REQUIRED-family state, nothing being fixed
-     * until the argument arrives.
+     * <p><b>A token naming a type parameter rides {@code value} like any other</b> (§5.7's "Open modifiers"),
+     * and nothing here labels it as one: §8.1's shadowing rule -- a token is a parameter exactly when its
+     * text resolves into the enclosing entry's own {@code parameters} -- is what tells the two apart wherever
+     * the question is asked. What a parametric modifier does decide is the {@code state} beside it, and
+     * {@link #of} decides it there.
      */
-    record Resolved(FieldState state, Optional<TokenValue> value, boolean parametric) {
+    record Resolved(FieldState state, Optional<TokenValue> value) {
     }
 
     /**
@@ -51,7 +49,7 @@ final class FieldModifiers {
     static Resolved of(String fieldName, boolean optional, Optional<FieldDef.Modifier> modifier,
             List<String> parameters) {
         if (modifier.isEmpty()) {
-            return new Resolved(optional ? FieldState.OPTIONAL : FieldState.REQUIRED, Optional.empty(), false);
+            return new Resolved(optional ? FieldState.OPTIONAL : FieldState.REQUIRED, Optional.empty());
         }
         boolean fixed = modifier.get().kind() == FieldDef.Modifier.Kind.FIXED;
 
@@ -69,7 +67,7 @@ final class FieldModifiers {
                         + "(§5.2). Make it optional ('" + fieldName + ": type? = _') to forbid its value "
                         + "while keeping it in the contract");
             }
-            return new Resolved(FieldState.OPTIONAL_FIXED, Optional.empty(), false);
+            return new Resolved(FieldState.OPTIONAL_FIXED, Optional.empty());
         }
 
         TokenValue token = ((FieldDef.Modifier.Value.Literal) modifier.get().value()).token();
@@ -83,11 +81,10 @@ final class FieldModifiers {
         // presence axis says, because nothing is fixed at declaration -- the value arrives at application,
         // and every application MUST bind every parameter.
         if (parameters.contains(token.text())) {
-            return new Resolved(fixed ? FieldState.REQUIRED : FieldState.REQUIRED_DEFAULT,
-                    Optional.of(token), true);
+            return new Resolved(fixed ? FieldState.REQUIRED : FieldState.REQUIRED_DEFAULT, Optional.of(token));
         }
         FieldState state = optional ? FieldState.OPTIONAL_FIXED
                 : (fixed ? FieldState.REQUIRED_FIXED : FieldState.REQUIRED_DEFAULT);
-        return new Resolved(state, Optional.of(token), false);
+        return new Resolved(state, Optional.of(token));
     }
 }
