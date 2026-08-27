@@ -726,7 +726,7 @@ compatibility).
 
 ## Not yet implemented
 
-- **Part 2 resolution gaps** — the identity-diagonal FIXED-value invariant. Otherwise **none: no
+- **Part 2 resolution gaps** — **none: no
   `NOT_IMPLEMENTED` is reachable from a schema any more**, the pipeline reporting `SCHEMA_ERROR` for
   everything it refuses. A parameterized supertype resolves (`vip => <T> customer & box<T>` absorbs the
   operand's fields while the application is open, the operand contributing its own supertypes but not its
@@ -790,15 +790,23 @@ compatibility).
   declaration**, one level coarser than the pointer beside it — `/person/age` carries `person`'s own line,
   because `RecordField` has no position. A `caused by` frame chaining the author's location to the leaf
   constraint's is the other open shape (`BACKLOG.md`).
-- **Half of §5.10's argument-kind rule, on a held record body.** A held body has no slot types — that is what
-  it is for — so it cannot say *this slot expected a value*. A literal applied where the body uses the
-  parameter as a type is still refused (nothing declares a type called `3`, so the verdict arrives as an
-  unresolved reference); its converse, a type name applied into a field's `value`, is accepted, `value` being
-  §4's escape-hatch atom. **What closes it is not the kind rule** but §5.2's own dependency —
-  `record_field.value` must be the field's declared type — which catches `int32 ~ text` whether a parameter
-  put it there or the author wrote it literally, and is the FIXED/DEFAULT value validation listed below.
+- **§5.10's argument-kind rule is answered by two other rules, not by the kind rule.** A held body has no
+  slot types — that is what it is for — so it can never say *this slot expected a value*. Neither half needs
+  it to: a literal applied where the body uses the parameter as a **type** is refused because nothing
+  declares a type called `3` (an unresolved reference), and a type name routed into a field's **value** is
+  refused because §5.2 makes `record_field.value` a value of the field's declared type — which catches
+  `int32 ~ text` whether a parameter put it there or the author wrote it literally (`TsonSchemaLinker`'s
+  `checkFieldValue`, `FieldValueConformanceTest`). What is left is that check's own boundary, below.
   `SPEC-FEEDBACK.md` #5 carries the spec-side question.
-- **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation. **Routed-value
+- **A field's `~`/`=` value is checked only where its type is an atom or an enum.** `TsonSchemaLinker`
+  runs the field's own resolved body over the token, so the check accepts a default exactly when a read
+  would accept the same token in the same position, and a failure is the author's error against their own
+  declaration (`SCHEMA_ERROR`, exit 1) rather than a gap reaching a data sender. A field typed by a record,
+  container, tuple or choice needs a compiled reader to check against and compilation runs after linking,
+  so those keep the old path — the value is decoded when the reader is built and a bad one is still an
+  `ErrorReader`. Not simply "reject a bare token at a composite type": §5.6's positional form lets a record
+  with one bare `REQUIRED` field take a bare value legitimately, and a choice variant may be an atom.
+- **Deferred design questions** — the identity-diagonal FIXED-value invariant. **Routed-value
   substitution is
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →
   `REQUIRED_FIXED`, `~` staying a default), which is §5.7's "fixation happens downstream" applied to the

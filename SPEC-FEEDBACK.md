@@ -498,11 +498,19 @@ find a home for the slot's expectation**, and to state the value-conformance dep
 describes as inexpressible. That removes the one check holding cannot carry, and removes it by strengthening a
 rule the format wanted anyway.
 
-- **The value-conformance rule is a recommendation, not a report: it is not built here.** `{ first: int32 ~
-  "nope" }` resolves, links and compiles clean, and the first read of that type fails inside the compiled
-  reader. So the substitute this entry offers for the argument-kind rule is proposed on its merits rather
-  than demonstrated, and §5.10 should not drop the kind rule without stating the replacement normatively in
-  §5.2 — a resolver that drops the one and does not add the other loses both.
+- **The value-conformance rule is a report, not a recommendation: it is built and running here.** The
+  linker checks a field's `~`/`=` value against the field's own resolved type, so `{ first: int32 ~ "nope" }`
+  is refused at the declaration that wrote it, and `retry => <N> { attempts: int32 ~ N }` applied as
+  `retry<text>` is refused identically — one rule, no notion of a parameter's kind, the same verdict whether
+  a parameter or the author put the value there. The check runs the field's own reader parser, so it accepts
+  a value exactly when a read would accept the same token in that position and cannot drift from the atom
+  contracts §5 defines.
+  - **Its boundary today is the field's type kind, not the parameter.** A field typed by an atom or an enum
+    is checked; one typed by a record, container, tuple or choice is not, because checking a value against
+    those needs the compiled reader and compilation runs after linking. That boundary is this
+    implementation's, not the rule's: nothing in §5.2's dependency is atom-specific.
+  - So §5.10 can drop the argument-kind rule, provided §5.2 states the value-conformance dependency
+    normatively — a resolver that drops the one and does not add the other loses both.
 
 **One position the loss does reach, and §5.10 should decide it.** §5.10 settles a parameter's kind from its
 *use*, and there is a use no channel recognises: an **enum member**. `e => <M> !enum { members: [a b M] }`

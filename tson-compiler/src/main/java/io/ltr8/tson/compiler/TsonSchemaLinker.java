@@ -1,6 +1,11 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.*;
+import io.ltr8.tson.compiler.ast.TokenForm;
+import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.atom.AtomParsers;
+import io.ltr8.tson.compiler.atom.AtomType;
+import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.BinaryType;
@@ -17,6 +22,7 @@ import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.FieldGroup;
+import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
@@ -864,6 +870,7 @@ public final class TsonSchemaLinker {
                 for (RecordField field : r.fields()) {
                     validateTypeRef(field.type(), namespace, ownParameters, entryName,
                             " field '" + field.name() + "'");
+                    checkFieldValue(entryName, field, namespace, ownParameters);
                 }
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.members()) {
@@ -1129,6 +1136,65 @@ public final class TsonSchemaLinker {
                 collectNames(nested.ref(), into);
             }
         }
+    }
+
+    /**
+     * [TSON-SCHEMA] §5.2's dependency between a field's two halves: a {@code ~}/{@code =} value must be a
+     * value of the field's own declared type. meta-kernel states it on {@code record_field.value} -- "the
+     * type of fixed/default values, which must be the field's declared type" -- and calls it "a dependency
+     * the schema language does not express directly", which is what leaves it to a check like this one.
+     *
+     * <p><b>Here rather than at compile, because of who the verdict belongs to.</b> The same check runs
+     * today as a side effect of building the record's reader ({@code RecordAbstractReader} decodes every
+     * FIXED/DEFAULT value once, at construction), and a failure there becomes an {@code ErrorReader} -- so
+     * the author's own {@code tson compile} passes, and the mistake surfaces to whoever later sends data,
+     * coded as a gap in this library. The verdict does not change as this library improves, so by the
+     * project's own classification test it is the author's error, and this phase is where an author error
+     * against one declaration is already reported with the declaration's own name and line.
+     *
+     * <p><b>Atoms and enums only, and the rest is not silently blessed.</b> A field typed by a record,
+     * container or choice needs a compiled reader to check a value against, and compilation happens after
+     * linking; those keep the existing path. A field whose type is a parameter is skipped by construction --
+     * a held body is not read as this vocabulary at all, so the only parametric field reaching here has
+     * already been substituted by materialisation, and is checked against the argument it was closed with.
+     */
+    private static void checkFieldValue(String entryName, RecordField field,
+                                         Map<String, TypeDefinition> namespace, List<String> ownParameters) {
+        if (field.value().isEmpty() || ownParameters.contains(field.type().name())) {
+            return;
+        }
+        TypeDefinition target = namespace.get(field.type().name());
+        // An unresolved reference is already reported by validateTypeRef; a target that is still open (or an
+        // application of one) has no single body to check against until materialisation closes it. A
+        // REFERENCE target should not occur -- §8.3 flattens a type position past one -- and skipping is the
+        // right answer if it ever does: the chain end is what would have to be checked, not the hop.
+        if (target == null || !target.parameters().isEmpty() || !field.type().arguments().isEmpty()
+                || target.body() instanceof Reference) {
+            return;
+        }
+        Optional<AtomType<?>> parser = AtomParsers.forBody(target.body());
+        if (parser.isEmpty()) {
+            return;
+        }
+        Token value = field.value().get();
+        try {
+            parser.get().read(new TokenValue(value.text(), TokenForm.valueOf(value.form().name())));
+        } catch (AtomTypeException e) {
+            // The field's two halves are what the author has to reconcile, so both are named, in the order
+            // they are written, and the value is echoed as the schema spells it -- quoted if it was quoted,
+            // so the author reads back their own line rather than a normalisation of it. The atom's own
+            // message follows: it already states the rule and cites the section, so nothing here restates it.
+            throw new TsonSchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
+                    + "declared '" + field.type().name() + "', but its "
+                    + (field.state() == FieldState.REQUIRED_DEFAULT ? "default" : "fixed value") + " "
+                    + asWritten(value) + " is not a value of that type -- " + e.getMessage() + ". §5.2 makes "
+                    + "a field's fixed or default value a value of the field's own declared type");
+        }
+    }
+
+    /** A token echoed the way the schema spells it, so a quoted value is visibly quoted in the message. */
+    private static String asWritten(Token token) {
+        return token.form() == Token.Form.UNQUOTED ? token.text() : "\"" + token.text() + "\"";
     }
 
     /**

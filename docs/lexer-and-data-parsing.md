@@ -137,6 +137,15 @@ Key points:
     longer ones, comparing whole `NumberForm`s rather than match/no-match.
 - **Quoted tokens always resolve to `StringValue`** regardless of content (§4.4) — form is consulted once,
   here. `"42"` and unquoted `42` differ even though their text is identical.
+    - **And exactly once, which is the half that keeps getting re-derived backwards.** §7.4: "a token's form
+      is consulted exactly once: by base type resolution (§4) … Everywhere else only the text matters. Type
+      contracts operate on text — `!number 10.2` and `!number "10.2"` are the same value". So a quoted token
+      at a *typed* position — a field declared `int32`, an `array`'s own `min_items`, a `~`/`=` value — is
+      that type's value if its text is, and no atom parser consults `TokenForm`. Reading §4.4 as a general
+      rule about quoting rather than a rule about *untyped* tokens makes an implementation reject documents
+      the spec requires it to accept; it was written down here as a defect once, before being checked
+      against §7.4.
+      `FieldValueConformanceTest.aQuotedNumericIsAValueOfAnIntegerFieldBecauseFormIsNotMeaning` pins it.
 - **§4's applicability clause is load-bearing, and `BaseValue.NullValue` is where it shows.** Base
   resolution runs only where no declared type is in scope, so the `null` token identifies as a value on
   exactly one path: schemaless data, plus `value`-typed positions, whose atom contract *is* "run base
