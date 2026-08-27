@@ -13,9 +13,10 @@ yet implemented" section for the technical detail behind several of these items.
 
 Every real schema resolved so far (meta-kernel, meta.tn, core.tn, and hand-built test fixtures)
 happens to fit a narrow shape this pipeline already handles — declared in dependency order, with
-callers hand-sequencing registration themselves. These items are what's missing for the *general*,
+callers hand-sequencing registration themselves. The checked items are what's missing for the *general*,
 spec-required case, found by re-auditing Part 2 against the current source rather than CLAUDE.md's
-own prose (which had gone stale on at least one of them):
+own prose (which had gone stale on at least one of them); the last entry is a recorded decision not to
+build an optional path, kept here so it is not re-proposed as a gap.
 
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
@@ -40,21 +41,23 @@ own prose (which had gone stale on at least one of them):
   means the check moves out of the desugarer entirely and `checkBounds` goes with it. Distinct from the
   atom-body self-coherence item below, which shares that destination but has no parameter or
   materialisation dimension at all.
-- [ ] **Resolved-form ingest** ([TSON-SCHEMA] §8.1/§10.1) — bringing an already-resolved
-  `!type_definition` document into the library (not source text), with its own integrity checks:
-  `subtypes`/`disjoint` recomputed and verified, the closed-entry parameter-free rule reverified, an
-  instantiation entry checked against its own `source` by recomputation, a construction's binding
-  record checked for parameter-slot agreement with its `source` application. Entirely unimplemented
-  — "ingest" doesn't appear anywhere in the codebase. §5.10 extends what ingest must reverify: the
-  closed-entry rule, which makes open and closed entries tell apart by inspection, and synthetic entries,
-  which must pass under the existing integrity checks. Note that an open entry has no ingest story here at
-  all — a held body never serialises as a `type_definition` (`SPEC-FEEDBACK.md` #5), so a resolved document
-  either carries only closed entries or carries open ones as declarations, and ingest would have to say
-  which. Note it would introduce a *second* way to build a
-  `TsonSchema` — bound from a document rather than resolved from source — and the two would have to agree,
-  including on where a declaration's annotations land (the name's on the map key, the definition's on the
-  entry). Lower priority than the rest of this section: the spec marks this path explicitly **optional**
+- **Resolved-form ingest is deliberately not done** ([TSON-SCHEMA] §8.1/§10.1) — bringing an
+  already-resolved `!type_definition` document into the library as an input, rather than source text.
+  Recorded here so it is not re-opened as an oversight; the spec marks the path explicitly **optional**
   ("MAY implement ingest"), not a MUST.
+    - **Resolved form is an output here, not an input.** It is what the resolver produces so a human or a
+      test can see what a schema became — `spec/m/*-resolved.tn` and `ResolvedFixtureTest` are its whole
+      consumer set. Nothing in the pipeline wants to read one back, and a schema's source text is always
+      available where its resolved form is.
+    - **An open entry has no resolved form to ingest**, which is what settles it rather than merely arguing
+      cost. A held body never serialises as a `type_definition` (`SPEC-FEEDBACK.md` #5): an open entry's
+      resolved form *is* its declaration, so a resolved document carrying one is a schema document that
+      re-resolves through the ordinary path. Ingest could therefore only ever cover the closed half of a
+      schema, and a mechanism that reads some of a document is worse than one that reads none of it.
+    - It would also introduce a *second* way to build a `TsonSchema` — bound from a document rather than
+      resolved from source — and the two would have to agree, including on where a declaration's annotations
+      land (the name's on the map key, the definition's on the entry). Reconsider only if a resolved document
+      ever becomes something this library is handed rather than something it prints.
 
 ## Remaining Part 2 resolution gaps
 
@@ -210,9 +213,11 @@ need are not retained for a secondary constructor.
   — the Revision 33 fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
   renders none of them, so the entries would compare equal for the wrong reason;
   `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side is what
-  lets that test read those keys like anything else, and the emit side has the same blind spot waiting behind
-  it — [TSON-SCHEMA] §8.1's ingest rule is the consumer of both halves: derived markers are discarded and
-  recomputed, author-written key annotations are preserved as data.
+  lets that test read those keys like anything else, which is now the whole of why it is worth doing: with
+  ingest recorded above as won't-do, `ResolvedFixtureTest` is the only consumer, and the emit side behind it
+  has no consumer at all. §8.1's rule still says what a reader would owe if one existed — derived markers
+  discarded and recomputed, author-written key annotations preserved as data — so the shape is settled if
+  this is ever picked up.
 
 - [ ] **Two entries for one type, where the argument is one number spelled two ways.** `vector<float32, 255>`
   and `vector<float32, 0xFF>` produce entries with byte-identical bodies, because identity derives from the
