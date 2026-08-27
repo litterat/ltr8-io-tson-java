@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
@@ -94,9 +95,12 @@ class TsonSchemaCompilerTest {
         assertTrue(used.isEmpty());
 
         // Compiling/getting "orphan" itself succeeds -- only reading an actual value against it fails.
+        // Fail-fast, so the report raises: the gap is in `diagnostic().code()`, never in the exception type,
+        // which is the same rule the schema pipeline follows (`Diagnostic.Code.NOT_IMPLEMENTED`).
         TsonTypeReader<?> orphan = compiled.get("orphan");
-        UnsupportedOperationException thrown =
-                assertThrows(UnsupportedOperationException.class, () -> orphan.read(TestDocuments.document("{}")));
+        TsonReadException thrown =
+                assertThrows(TsonReadException.class, () -> orphan.read(TestDocuments.document("{}")));
+        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, thrown.diagnostic().code());
         assertTrue(thrown.getMessage().contains("orphan"), thrown.getMessage());
     }
 

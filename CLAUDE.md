@@ -427,8 +427,9 @@ in full, and an unresolvable class is an error where the constructor is applied.
 `compile` turns a `TsonLinkedSchema` into a `TsonCompiledSchema` — one `TsonTypeReader` per entry, wired as
 real Java references, **eager** so a broken entry surfaces at compile time. `TsonTypeReader<T>` is strictly
 one method, `T read(TsonReadContext)`; framing and error policy live elsewhere. A `RuntimeException` while
-building one entry becomes an `ErrorReader` (the schema compiles; reading that entry fails — a library-gap
-marker, distinct from author errors), with two deliberate exceptions: a `TsonBindMismatchException` is
+building one entry becomes an `ErrorReader` (the schema compiles; reading that entry reports
+`NOT_IMPLEMENTED` and skips the value, so a gap costs that value a verdict and nothing else's — the code,
+not the channel, being what keeps it apart from an author error), with two deliberate exceptions: a `TsonBindMismatchException` is
 rethrown so a schema and a class that disagree fail the compile rather than the first read, and its
 `TsonMissingBindingException` subclass rides an `ErrorReader` but is thrown from it **unwrapped**, being a
 misconfiguration rather than a gap. An entry declaring type parameters becomes an
@@ -711,9 +712,9 @@ compatibility).
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
   **Gaps reaching a read still exist**, six of them, all through `ErrorReader` and all on a schema that
   loaded clean: `unknown` and `extern` (below), and `datetime`/`time` with `precision` or `require_timezone`
-  set (`BACKLOG.md`). A read gap **escapes as an exception rather than riding in the report**, which is the
-  one place the pre-diagnostic failure mode survives — in a multi-document `tson validate` it destroys the
-  whole envelope, so the other documents get no verdict (`BACKLOG.md`).
+  set. Each **rides in the report as `NOT_IMPLEMENTED`**, located at the value it could not read, and costs
+  that value a verdict and nothing else's — so a gap and an ordinary error in one document both get
+  reported, and `TsonCli.exitCodeFor` lifts the run to 70.
 - **A container position that is an application, and what a held open body still cannot say.** §5.10
   substitution works for both template shapes: a **record** template (parameters occupying field types and
   values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T

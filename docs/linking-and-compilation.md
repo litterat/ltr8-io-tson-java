@@ -305,10 +305,21 @@ keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
 - **`ErrorReader` makes eager building survive coverage gaps.** A `RuntimeException` while building one
   entry is caught and substituted with an `ErrorReader` wrapping it — the schema still compiles, only
   *reading* that entry fails, with the original message preserved. Real causes: a constructor with no
-  registered factory (the undocumented atom families), or a factory that rejects one entry. `ErrorReader`
-  throws unconditionally even in collecting mode (it's a library/schema-compile gap a caller can't fix by
-  correcting data). A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and
-  propagates uncaught.
+  registered factory (the undocumented atom families), or a factory that rejects one entry.
+    - **It reports `NOT_IMPLEMENTED` and skips the value**, exactly as `OpenTemplateReader` does for the
+      entry it refuses — report before consuming so the position names the value, then `EventSkip.dataValue`
+      so the stream stays in step. The code, not the channel, is what says this is a gap rather than a
+      verdict, which is the same rule the schema pipeline settled on: throwing instead cost the whole read,
+      and in a multi-document `tson validate` the whole envelope, for one unreadable field. `SchemaFailure`
+      already classified a *compile* gap met during a read this way, so this was the last one travelling by
+      channel. Fail-fast loses nothing — `report` raises `TsonReadException`, which carries the same
+      `Diagnostic`, so `e.diagnostic().code()` is the question rather than the exception type.
+    - **`TsonMissingBindingException` is the one cause that still throws, unwrapped and in every mode.** It
+      is the reading application's own wiring — neither this library's gap nor a problem with the document —
+      so it reaches that application as itself. Wrapping it once sent a service's missing configuration out
+      as a 501.
+  - A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and propagates
+    uncaught.
 - **An open entry compiles to `OpenTemplateReader`, before its body is looked at at all.** An entry
   declaring type parameters is a template, not a type (§5.10), so there is nothing a value could validate
   against; the reader reports `UNKNOWN_TYPE_REF` against the data and skips the value, like any other reader
