@@ -140,16 +140,6 @@ the proposals it answers. What is left below are consequences of holding, not sh
       family has no CIDR parser.
     - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
       than moving the value model's dependencies.
-- [ ] **A read-time gap escapes as an exception and takes the whole report with it.** Every remaining gap
-  is at read (`unknown`, `extern`, and `datetime`/`time` with `precision` or `require_timezone`), and
-  `ErrorReader` throws where the schema pipeline reports: the `UnsupportedOperationException` is caught at
-  the top of `TsonCli.run`, not per document, so `tson validate schema.tn gap.tn invalid.tn` prints nothing
-  on stdout and the invalid document is never judged — in either order. That is the failure the schema
-  pipeline gave up throwing gaps to avoid, still present on the read side; the exit code is already right, so
-  what is missing is reach, not classification. Routing `ErrorReader`'s gap through the read's
-  `TsonDiagnosticsReceiver` as `Diagnostic.Code.NOT_IMPLEMENTED` is the shape — the code and
-  `TsonCli.exitCodeFor` already exist and are unreachable end to end without it. Pinned as it stands by
-  `TsonCliTest.aReadGapCurrentlyTakesEveryOtherDocumentsVerdictWithIt`, which inverts when this lands.
 - [ ] **A quoted numeric is accepted where an integer is declared.** `xs => !array { element_type: float32
   min_items: "3" }` resolves with `min_items` 3, and so does every other integer-typed constraint slot: the
   family's parser reads the token's text and never consults its form, where §4 base resolution makes a quoted

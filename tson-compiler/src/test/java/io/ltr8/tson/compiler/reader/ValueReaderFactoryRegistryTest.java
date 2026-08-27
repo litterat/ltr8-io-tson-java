@@ -1,6 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TestDocuments;
+import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -69,8 +71,11 @@ class ValueReaderFactoryRegistryTest {
 
         TsonTypeReader<?> reader = registry.resolve("unknown_type").create("unknown", entry, CONTEXT);
 
-        UnsupportedOperationException thrown =
-                assertThrows(UnsupportedOperationException.class, () -> reader.read((TsonReadContext) null));
+        // A real context, because the reader reports through it now rather than throwing past it -- the gap
+        // rides in `diagnostic().code()` so it can join a collecting read instead of ending it.
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> reader.read(TestDocuments.document("{}")));
+        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, thrown.diagnostic().code());
         assertEquals(true, thrown.getMessage().contains("unknown"));
     }
 
