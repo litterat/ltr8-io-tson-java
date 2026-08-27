@@ -36,6 +36,9 @@ public final class TsonConfig {
     private Map<String, Class<?>> bindings;
     private String profile;
     private boolean dataBindContextSupplied;
+    private boolean schemaSourceSupplied;
+    private TsonHttpSchemaSource.Builder httpSchemas;
+    private TsonFileSchemaSource.Builder fileSchemas;
 
     TsonConfig() {
     }
@@ -46,12 +49,84 @@ public final class TsonConfig {
      * doesn't already have registered. The bundled meta-kernel/meta.tn/core.tn are always served
      * first, so this source only needs to know its own URIs; it is a fallback, never an override of
      * the standard library. Defaults to {@link TsonSchemaSource#registeredOnly()} (nothing extra
-     * fetchable). This is the seam for loading schemas from local files, or later from a whitelist of
-     * allowed hosts/URIs.
+     * fetchable).
+     *
+     * <p>{@link #httpSchemas} and {@link #fileSchemas} are the short forms of the two sources this library
+     * ships, and are what most callers want; this is the general seam -- a source of your own, or the two
+     * shipped ones composed, which is the one thing the short forms cannot express.
      */
     public TsonConfig schemaSource(TsonSchemaSource schemaSource) {
+        if (httpSchemas != null || fileSchemas != null) {
+            throw new IllegalStateException("supply either schemaSource or httpSchemas/fileSchemas, not both "
+                    + "-- the short forms build a source, so passing one as well would silently discard it");
+        }
         this.schemaSource = schemaSource;
+        this.schemaSourceSupplied = true;
         return this;
+    }
+
+    /**
+     * Fetches schemas identified by any of {@code hosts} over {@code https} from that same host -- the short
+     * form of {@link TsonHttpSchemaSource}, which is where the policy is documented and which every default
+     * here comes from. Repeatable: each call adds hosts.
+     *
+     * <p><b>Deny by default is the property worth knowing.</b> A host not named here is not fetched, and a
+     * host is matched exactly -- naming {@code example.com} permits nothing on a subdomain. In a server the
+     * reference comes out of a request body, so this list is a security boundary rather than a convenience.
+     *
+     * <p>Reach for {@link TsonHttpSchemaSource#builder()} and {@link #schemaSource} instead when you need a
+     * mirror or a non-default port ({@code mapHost}), different caps, a required {@code ?sha256=} pin, your
+     * own {@link java.net.http.HttpClient} -- or the source itself, since a source built here is owned by the
+     * {@link Tson} and there is no handle to {@code close()} it through.
+     */
+    public TsonConfig httpSchemas(String... hosts) {
+        rejectMixedSchemaSources("httpSchemas");
+        if (httpSchemas == null) {
+            httpSchemas = TsonHttpSchemaSource.builder();
+        }
+        for (String host : hosts) {
+            httpSchemas.allowHost(host);
+        }
+        return this;
+    }
+
+    /**
+     * Serves schemas identified by {@code host} from {@code directory} -- the short form of
+     * {@link TsonFileSchemaSource}, which is where the policy is documented. Repeatable: each call maps
+     * another host.
+     *
+     * <p>Nothing outside {@code directory} is ever read, symlinks included, and no host but the ones named
+     * here is served at all. [TSON-DATA] §2.2.1 is what makes this legitimate rather than a hack: an identity
+     * names a document independently of where it is stored, so {@code https://schemas.example.com/order-1.tn}
+     * may perfectly well live in a directory.
+     *
+     * <p>Reach for {@link TsonFileSchemaSource#builder()} and {@link #schemaSource} instead when you need
+     * different caps or a required {@code ?sha256=} pin.
+     */
+    public TsonConfig fileSchemas(String host, java.nio.file.Path directory) {
+        rejectMixedSchemaSources("fileSchemas");
+        if (fileSchemas == null) {
+            fileSchemas = TsonFileSchemaSource.builder();
+        }
+        fileSchemas.mapHost(host, directory);
+        return this;
+    }
+
+    /**
+     * The two short forms build one source each, and {@code schemaSource} holds one, so mixing them would
+     * mean silently dropping one. A deployment that really needs both writes the composition itself and
+     * passes it to {@link #schemaSource}, where the order it tries them in is its own to state.
+     */
+    private void rejectMixedSchemaSources(String called) {
+        if (schemaSourceSupplied) {
+            throw new IllegalStateException("supply either schemaSource or " + called + ", not both");
+        }
+        if ("httpSchemas".equals(called) ? fileSchemas != null : httpSchemas != null) {
+            throw new IllegalStateException("supply either httpSchemas or fileSchemas, not both -- for a "
+                    + "deployment needing each for different hosts, compose the two sources yourself and "
+                    + "pass the result to schemaSource, so which one is tried first is stated rather than "
+                    + "assumed");
+        }
     }
 
     /**
@@ -184,7 +259,11 @@ public final class TsonConfig {
         DataBindContext schemaContext = metaNameBinder == null
                 ? SchemaMetaNameBinder.defaultContext()
                 : SchemaMetaNameBinder.contextExtendedWith(metaNameBinder);
-        TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(schemaContext, schemaSource);
+        // The short forms are built here rather than at the call that named them, so that repeated calls
+        // accumulate hosts into one source instead of each replacing the last.
+        TsonSchemaSource source = httpSchemas != null ? httpSchemas.build()
+                : fileSchemas != null ? fileSchemas.build() : schemaSource;
+        TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(schemaContext, source);
         return new Tson(core, dataBindContext, strictBinding);
     }
 

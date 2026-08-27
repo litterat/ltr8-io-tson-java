@@ -562,6 +562,14 @@ over the kernel's vocabulary, plus `TsonAtomContext.registerDefaults` — and ar
 facades sharing this instance's registries, so a schema compiles once per `Tson`.
 `validate(String|InputStream)` *is* `treeReader()` with a collecting receiver — returns `List<Diagnostic>`
 (empty = valid) and never throws for a bad input document (a library fault still throws, deliberately).
+**Two schema sources ship** — `TsonHttpSchemaSource` (HTTPS, host allow-list) and `TsonFileSchemaSource` (a
+directory) — with `httpSchemas(…)`/`fileSchemas(host, dir)` as their one-call forms, repeatable and mutually
+exclusive with each other and with `schemaSource(…)`, the general seam. Both **deny by default**, match a host
+exactly, and share `SchemaReference` for §2.2.1's rules on what an identity may be, since the reference comes
+out of a document and in a server that means a request body: the HTTP one guards SSRF (no redirects ever, size
+capped against bytes delivered), the file one arbitrary reads (containment checked *after* `toRealPath`, so
+`..` and symlink escape fall together). Neither verifies the `?sha256=` pin or the fetched `!!id` — the loader
+does both; `requireContentHashPin` adds the one thing it cannot, that a pin be present.
 
 ```java
 Tson tson = Tson.builder().build();
