@@ -98,7 +98,7 @@ class TsonReadTest {
         TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }"""));
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, thrown.diagnostic().code());
+        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, thrown.diagnostic().code());
     }
 
     @Test
@@ -227,7 +227,7 @@ class TsonReadTest {
         List<Case> cases = List.of(
                 new Case("""
                         !!schema:"https://example.test/not-there.tn"
-                        !point { x: 3  y: 4 }""", Diagnostic.Code.SCHEMA_ERROR),
+                        !point { x: 3  y: 4 }""", Diagnostic.Code.SCHEMA_UNAVAILABLE),
                 new Case("""
                         !!schema:"https://example.test/point-1.tn"
                         { x: 3  y: 4 }""", Diagnostic.Code.VALIDATION_ERROR),

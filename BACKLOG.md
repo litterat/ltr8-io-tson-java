@@ -185,30 +185,12 @@ that question.
   - **Which suggests an extended output mode**, rather than making every diagnostic bigger: the default stays
     one frame, and a caller that finds an error confusing asks for the chain. That is a CLI surface question
     (`--explain`? a verbosity flag?) as much as a model one, and it interacts with `diagnostics.tn` being a
-    versioned schema — a new frame list is a shape change, so §10's immutability rule means `diagnostics-2.tn`.
+    versioned schema — a new frame list is a shape change, so §10's immutability rule means the next version
+    under a new name, never an edit in place.
   - **The input already exists and is deliberately kept for this.** `TsonLinkedSchema.entryOrigins` answers
     "which document declared this entry", and every reader is already handed its own declaration's location
     (`ValueReaderContext.locationOf`) — today only used as the seed for a value nothing encloses. A caused-by
     frame is what would consume it in the ordinary nested case.
-- [ ] **An unfetchable schema is coded `SCHEMA_ERROR`, which says the schema is at fault when it is not.**
-  `SchemaFailure` classifies a failure to obtain a compiled schema, and `TsonSchemaFetchException` now
-  arrives on a branch of its own — but lands on the same code as a schema that would not resolve. A host
-  that is down, a reference no configured source will serve, a document a deployment's policy refuses:
-  nobody's document is wrong in any of them. `Diagnostic.Code`'s own Javadoc already promises otherwise
-  ("a failure obtaining a schema that is *not* the schema's fault carries its own code"), and today only
-  `NOT_IMPLEMENTED` and `BIND_MISMATCH` make good on it. The `expected` half tells the two apart already
-  ("a schema that can be obtained" against "a resolvable schema"); the code does not.
-  - **The cost is a schema version.** `diagnostics.tn` copies `Diagnostic.Code` wholesale, on purpose, so a
-    new member means `diagnostics-9.tn` under §10's immutability rule — the same bump `NOT_IMPLEMENTED` and
-    `BIND_MISMATCH` each cost. That is the whole reason this is a decision rather than an edit.
-  - **And an exit code.** A third "not a verdict on the document" code is a third thing `TsonCli.exitCodeFor`
-    must place. Exit 1 says the document was judged and rejected, which a run that never obtained the schema
-    cannot claim; 70 says a gap or a fault in this library, which an unreachable host is not either. Whether
-    the CLI grows a code or reuses 70 is part of the same decision.
-  - **`TsonSchemaFetchException.Reason` may not want one verdict.** `NOT_PERMITTED` is a deployment's policy
-    refusing a reference and no retry helps; `TIMEOUT`/`TRANSPORT` say the reference was fine and the world
-    was not. A server picking an HTTP status wants 4xx for the first and 5xx for the second, which one code
-    cannot give it either.
 
 ## Write side
 

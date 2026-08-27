@@ -47,8 +47,8 @@ final class ValidateCommand {
 
     /**
      * @return exit code: 0 every data file valid, 1 at least one invalid, 2 a usage/classification failure,
-     *         70 a document that could not be checked at all because a construct in its schema is a gap in
-     *         this library ({@link TsonCli#exitCodeFor})
+     *         69 a document whose schema no file here declares, 70 a document that could not be checked at
+     *         all because a construct in its schema is a gap in this library ({@link TsonCli#exitCodeFor})
      */
     static int run(List<ValidateInput> inputs, OutputFormat format) {
         Map<String, String> schemas = new HashMap<>();

@@ -56,17 +56,31 @@ class SchemaFailureTest {
     }
 
     /**
-     * The environment's: no source could supply the schema the document names. Coded like the author's for
-     * now -- the two differ in {@code expected}, and a code of their own is a {@code diagnostics.tn} version
-     * -- but classified by its own branch, so it is a verdict rather than the residue of the default.
+     * Nobody's: no source would supply the schema the document names, so it was never read. <b>Not {@code
+     * SCHEMA_ERROR}</b> -- that is a verdict, and this run has no grounds for one about a schema it never
+     * saw. Whether that schema would even have resolved is unknown.
      */
     @Test
-    void anUnfetchableSchemaIsClassifiedByItsOwnBranch() {
+    void anUnfetchableSchemaIsNotAVerdictOnTheSchema() {
         TsonSchemaFetchException unfetchable = new TsonSchemaFetchException("https://example.test/x.tn",
                 TsonSchemaFetchException.Reason.TIMEOUT, "no answer in 5s", null);
 
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, SchemaFailure.of(unfetchable).code());
+        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, SchemaFailure.of(unfetchable).code());
         assertEquals("a schema that can be obtained", SchemaFailure.of(unfetchable).expected());
+    }
+
+    /**
+     * A pinned reference whose bytes do not match its digest stays a verdict, and stays {@code
+     * SCHEMA_ERROR}: something <em>was</em> obtained, and it is not what the reference named
+     * ([TSON-DATA] §2.2.1). The line between the two schema codes is whether a document arrived, not
+     * whether it was usable.
+     */
+    @Test
+    void aPinMismatchIsAVerdictOnTheReference() {
+        SchemaFailure failure = SchemaFailure.of(new TsonContentHashMismatchException("digest differs"));
+
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, failure.code());
+        assertEquals("a schema matching its ?sha256= pin", failure.expected());
     }
 
     /**

@@ -48,6 +48,29 @@ class CompileCommandTest {
     }
 
     /**
+     * <b>69, not 1.</b> The CLI serves only the bundled standard library, so an {@code !!import} naming
+     * anything else cannot be obtained -- and a schema whose imports never arrived was not checked, so
+     * calling it invalid claims a verdict this run did not reach. The distinction is the whole of the
+     * difference between "your schema is wrong" and "I could not get the other half of it".
+     */
+    @Test
+    void aSchemaWhoseImportCannotBeObtainedExitsSixtyNine(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "needs-import.tn1", """
+                !!id:"https://example.test/cli-compile-import.tn1"
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!import:"https://example.test/nobody-serves-this.tn"
+                {
+                  my_int => int32
+                }
+                """);
+
+        String output = captureStdout(() -> assertEquals(69, CompileCommand.run(schema, OutputFormat.TEXT)));
+
+        assertTrue(output.contains("[SCHEMA_UNAVAILABLE]"), output);
+        assertTrue(output.contains("nobody-serves-this"), output);
+    }
+
+    /**
      * The whole reason this issue was worth doing, end to end: a JSON-Schema-shaped refinement used to
      * print {@code OK} and then enforce nothing. Exit 1 (the author's schema is wrong), not exit 70 (a
      * fault in this library) -- {@code TsonCli} keeps those apart, and a body error wore the wrong

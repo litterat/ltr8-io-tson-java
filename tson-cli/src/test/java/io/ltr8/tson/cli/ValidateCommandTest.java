@@ -95,17 +95,25 @@ class ValidateCommandTest {
         assertTrue(output.contains("(a | b)"), output);
     }
 
+    /**
+     * <b>69, not 1.</b> The data names a schema URI and no file for it was given, so this run never read
+     * that schema -- it is in no position to say the document is invalid, and a script reading exit 1
+     * would be told it had been judged and rejected. The forgotten file is the commonest way to reach
+     * this, and it is the caller's setup at fault rather than either document.
+     */
     @Test
-    void aDeclaredSchemaThatWasNotProvidedIsASchemaError(@TempDir Path dir) throws IOException {
-        // The data names a schema URI, but no schema file for it was given.
+    void aDeclaredSchemaThatWasNotProvidedIsUnavailableRatherThanAVerdict(@TempDir Path dir) throws IOException {
         Path data = writeFile(dir, "data.tson",
                 "!!schema:\"https://example.test/not-provided.tn1\"\n!my_record { a: 1  b: 2 }\n");
 
-        String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
+        String err = captureStderr(() -> {
+            String output = captureStdout(() ->
+                    assertEquals(69, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
+            assertTrue(output.contains("[SCHEMA_UNAVAILABLE]"), output);
+            assertTrue(output.contains("not-provided"), output);
+        });
 
-        assertTrue(output.contains("[SCHEMA_ERROR]"), output);
-        assertTrue(output.contains("not-provided"), output);
+        assertTrue(err.contains("could not be obtained"), err);
     }
 
     /**
@@ -121,7 +129,7 @@ class ValidateCommandTest {
                 "!!schema:\"https://example.test/typo.tn1\"\n!my_record { a: 1  b: 2 }\n");
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
+                assertEquals(69, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
 
         assertTrue(output.contains("cannot fetch schema 'https://example.test/typo.tn1'"), output);
         assertTrue(output.contains("no schema file on the command line declares that !!id"), output);
@@ -136,7 +144,7 @@ class ValidateCommandTest {
                 "!!schema:\"https://example.test/absent.tn1\"\n!my_record { a: 1 }\n");
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
+                assertEquals(69, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
 
         assertTrue(output.contains("no schema files were given"), output);
     }

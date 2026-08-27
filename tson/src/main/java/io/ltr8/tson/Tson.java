@@ -218,12 +218,16 @@ public final class Tson {
                 return problems.diagnostics();
             }
             treeRegistry().compile(core.schemaRegistry().register(linked));
-        } catch (TsonSchemaValidationException | TsonSchemaFetchException e) {
+        } catch (TsonSchemaFetchException e) {
+            // An !!import or !!meta naming an identity no configured source will serve. The document fails
+            // either way, but it was never checked: nothing here saw the imported schema, so "this schema
+            // is wrong" is a verdict this call has no grounds for. Same root pointer as the rest -- what
+            // differs is the code, which is the one thing a caller can route on.
+            problems.report(Diagnostic.ofSchemaUnavailable("", "", e.getMessage(), Optional.empty()));
+        } catch (TsonSchemaValidationException e) {
             // Whatever the phases still raise rather than report: a document with no !!id, an !!import that
-            // will not load, a !!meta that may not govern. Problems with the document as a whole, so they
-            // carry the root pointer rather than naming a declaration. The fetch half is here because an
-            // !!import naming something no source can supply fails the document exactly as the rest do --
-            // what differs is only whose fault it is, and that is SchemaFailure's question, not this one's.
+            // loaded and would not link, a !!meta that may not govern. Author errors about the document as
+            // a whole, so they carry the root pointer rather than naming a declaration.
             problems.report(Diagnostic.ofSchemaError("", "", e.getMessage(), Optional.empty()));
         } catch (RuntimeException e) {
             // Base syntax is this document's problem; anything else is a fault in this library and rethrows

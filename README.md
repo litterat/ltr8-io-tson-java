@@ -646,19 +646,21 @@ OK
   DELIVERED)`, `at most 10 characters`, `an RFC 3339 date-time` — so a consumer building its own message
   (an LLM repair loop, say) never has to parse `message` to recover a bound or a member list.
 - **Schema selection** is entirely the data's own doing: its `!!schema` names the schema and its root
-  type-ref (`!person`) names the type. If a data file's `!!schema` names a schema you didn't pass,
-  that's a `SCHEMA_ERROR`. There's no URL *fetching* — schemas come from the files you list (a
-  whitelisted-URI source is future work).
+  type-ref (`!person`) names the type. The CLI itself does no URL *fetching* — schemas come from the files
+  you list, and one it can't match is `SCHEMA_UNAVAILABLE` (exit 69), not a verdict on your data. The
+  library has fetching sources (`TsonHttpSchemaSource`, `TsonFileSchemaSource`); wiring one into the CLI is
+  separate.
 - **`--output`**: `text` (default, human-readable), `json` (for scripts/agents — the shape aligns with
   Pydantic's own `errors()`), or `tson` (the diagnostics rendered as a real, schema-validated TSON
   document — the CLI dogfooding the library).
 - **Exit codes** are Unix-conventional: `0` valid/compiled, `1` a real validation/compile failure,
-  `2` a usage error (bad arguments, an unreadable file), and `70` (`EX_SOFTWARE`) `tson` failing to reach a
-  verdict at all — either a gap (`not implemented yet: …`, whose message usually names the way to write the
-  thing today) or a bug, which prints its stack trace and asks for a report. That fourth code is
-  deliberately kept distinct so a script never reads a crash as "your document is invalid" — so a script
-  gets a clean pass/fail without parsing prose. `validate` collects *every* problem in a file in one pass,
-  not just the first.
+  `2` a usage error (bad arguments, an unreadable file), `69` (`EX_UNAVAILABLE`) a schema nothing would
+  supply (you didn't pass the schema file, or a host didn't answer), and `70` (`EX_SOFTWARE`) `tson` failing
+  to reach a verdict at all — either a gap (`not implemented yet: …`, whose message usually names the way to
+  write the thing today) or a bug, which prints its stack trace and asks for a report. The last two are
+  deliberately kept distinct from `1` so a script never reads a crash, or a schema it never fetched, as
+  "your document is invalid" — so a script gets a clean pass/fail without parsing prose. `validate` collects
+  *every* problem in a file in one pass, not just the first.
 
 ## Use it from another project
 

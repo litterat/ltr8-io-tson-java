@@ -24,11 +24,11 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
  * indistinguishable by type here, and either every fault reads as a bad schema or every source that spells
  * a miss with an {@code IllegalStateException} crashes the read.
  *
- * <p><b>A fetch failure is still coded {@code SCHEMA_ERROR}</b>, alongside a schema that would not resolve,
- * which is not quite what it is: a host being down is nobody's document being wrong. Telling the two apart
- * needs a code of its own, which {@code diagnostics.tn} copies wholesale and so costs a schema version;
- * that decision is tracked in {@code BACKLOG.md}. What it does not cost is the {@code expected} half, which
- * is free text and says which of the two happened.
+ * <p><b>Not obtaining a schema and not resolving one are two codes</b>, {@code SCHEMA_UNAVAILABLE} and
+ * {@code SCHEMA_ERROR}. The first is not a verdict on anything: no source would supply the schema, so it was
+ * never read, and whether it would have resolved is unknown. The second is a verdict -- the schema arrived
+ * and is wrong. A pinned reference whose bytes do not match its digest is the second: something was
+ * obtained, and it is not what the reference named.
  *
  * @param code     what to report the failure as
  * @param expected what the read needed, for the diagnostic's {@code expected} half; its {@code actual} is
@@ -53,7 +53,7 @@ record SchemaFailure(Diagnostic.Code code, String expected) {
             // The contract exception of TsonSchemaSource.fetch, so this branch is every source's miss and
             // no source's bug: the reference named something this deployment could not obtain.
             case TsonSchemaFetchException ignored ->
-                    new SchemaFailure(Diagnostic.Code.SCHEMA_ERROR, "a schema that can be obtained");
+                    new SchemaFailure(Diagnostic.Code.SCHEMA_UNAVAILABLE, "a schema that can be obtained");
             case TsonSchemaValidationException ignored ->
                     new SchemaFailure(Diagnostic.Code.SCHEMA_ERROR, "a resolvable schema");
             // [TSON-DATA] §2.2.1's integrity failure: the bytes a source returned are not the bytes the

@@ -73,13 +73,17 @@ class TsonValidateTest {
                 problems.stream().map(Diagnostic::code).toList(), problems.toString());
     }
 
+    /**
+     * <b>Not {@code SCHEMA_ERROR}</b>: nothing here has seen the schema, so nothing here can say it is
+     * wrong. The document may be perfect and the schema may be perfect -- no source would supply it.
+     */
     @Test
-    void aSchemaTheSourceCannotProvideIsASchemaError() {
+    void aSchemaTheSourceCannotProvideIsUnavailableRatherThanWrong() {
         List<Diagnostic> problems = tsonWithPoint().validate("""
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }""");
         assertEquals(1, problems.size(), problems.toString());
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
+        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, problems.getFirst().code());
     }
 
     @Test
