@@ -184,6 +184,30 @@ public final class TsonObjectReader {
         return readDocument(new TsonDataStream(source), targetClass, false);
     }
 
+    /**
+     * Reads {@code source} into a {@link TsonObjectDocument} -- the object <b>and</b> what the read
+     * established about the document, where {@link #read} keeps only the object.
+     *
+     * <p><b>For a caller who must reproduce or route the document, not only consume it.</b> A bound object
+     * carries neither the document's {@code !!id} nor the schema type it was read as; the first is
+     * per-document data no class can hold (§2.2), the second is a name a {@code DataNameBinder} cannot hand
+     * back, mapping name to class and not the reverse. Both are known here and were being dropped, so
+     * writing a document back meant supplying by hand what the read had just worked out.
+     *
+     * <p>Reads exactly as {@link #read} does. {@code rootType} is filled by a schema-driven read and left
+     * empty by a schemaless one, which resolves no type.
+     *
+     * @return the document, or {@code null} where {@link #read} would also yield nothing
+     */
+    public <T> TsonObjectDocument<T> readDocument(String source, Class<T> targetClass) {
+        return readDocument(new TsonDataStream(source), targetClass);
+    }
+
+    /** {@link #readDocument(String, Class)} straight off a stream; {@code source} is not closed here. */
+    public <T> TsonObjectDocument<T> readDocument(InputStream source, Class<T> targetClass) {
+        return readDocument(new TsonDataStream(source), targetClass);
+    }
+
     /** Like {@link #read(String, Class)} but always schemaless -- binds to {@code targetClass} without validating, even when the document declares a {@code !!schema}. (A schemaless reader's {@link #read} already does this.) */
     public <T> T readWithoutSchema(String source, Class<T> targetClass) {
         return readDocument(new TsonDataStream(source), targetClass, true);
@@ -223,6 +247,40 @@ public final class TsonObjectReader {
 
     // ── Internals ────────────────────────────────────────────────────────
 
+    /** A {@link Bound}'s value, or none -- the shape the two object-only entry points want. */
+    private static <T> T valueOf(Bound<T> bound) {
+        return bound == null ? null : bound.value();
+    }
+
+    /**
+     * The whole document, header and resolved type included. Structured as its object-only sibling is: the
+     * {@code DocumentStart} event already carries both directives, and the schema path already knows the
+     * type it selected, so keeping them costs a field read rather than a second pass.
+     */
+    private <T> TsonObjectDocument<T> readDocument(TsonDataStream stream, Class<T> type) {
+        Objects.requireNonNull(type, "type");
+        try {
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            DocumentStart start = (DocumentStart) ctx.next();
+            T value;
+            Optional<String> rootType = Optional.empty();
+            if (bind == null || start.schema().isEmpty()) {
+                value = schemaless.read(ctx, type);
+            } else {
+                Bound<T> bound = readAgainstSchema(start.schema().get(), ctx, type, null);
+                value = valueOf(bound);
+                rootType = bound == null ? Optional.empty() : Optional.of(bound.typeName());
+            }
+            requireDocumentEnd(ctx);
+            T checked = valid(ctx, value);
+            return checked == null ? null
+                    : new TsonObjectDocument<>(start.id(), start.schema(), rootType, checked);
+        } catch (RuntimeException e) {
+            baseSyntaxFailure(e);
+            return null;
+        }
+    }
+
     private <T> T readDocument(TsonDataStream stream, Class<T> type, boolean ignoreSchema) {
         Objects.requireNonNull(type, "type");
         try {
@@ -230,7 +288,7 @@ public final class TsonObjectReader {
             DocumentStart start = (DocumentStart) ctx.next();
             T result = (ignoreSchema || bind == null || start.schema().isEmpty())
                     ? schemaless.read(ctx, type)
-                    : readAgainstSchema(start.schema().get(), ctx, type, null);
+                    : valueOf(readAgainstSchema(start.schema().get(), ctx, type, null));
             requireDocumentEnd(ctx);
             return valid(ctx, result);
         } catch (RuntimeException e) {
@@ -246,7 +304,7 @@ public final class TsonObjectReader {
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver);
             ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
-            T result = readAgainstSchema(schemaUri, ctx, type, typeName);
+            T result = valueOf(readAgainstSchema(schemaUri, ctx, type, typeName));
             requireDocumentEnd(ctx);
             return valid(ctx, result);
         } catch (RuntimeException e) {
@@ -310,7 +368,15 @@ public final class TsonObjectReader {
      * Diagnostic}, the same promise {@code Tson#validate} makes. Where the failure is noticed before the value
      * is read, the value is skipped so the stream still lands on {@code DocumentEnd}.
      */
-    private <T> T readAgainstSchema(String schemaUri, TsonReadContext ctx, Class<T> type, String typeName) {
+    /**
+     * The value, and the type it was read as. The name is not an aside: it is the one thing a bound object
+     * cannot supply afterwards -- a {@code DataNameBinder} maps name to class, and a binding profile lets one
+     * class serve several shapes, so class to name does not invert. {@link TsonObjectDocument} records it.
+     */
+    private record Bound<T>(T value, String typeName) {
+    }
+
+    private <T> Bound<T> readAgainstSchema(String schemaUri, TsonReadContext ctx, Class<T> type, String typeName) {
         RootReader root = select(schemaUri, ctx, typeName);
         if (root == null) {
             return null;
@@ -334,7 +400,7 @@ public final class TsonObjectReader {
                             + ", not the requested " + type.getName(), type.getName(), value.getClass().getName());
             return null;
         }
-        return type.cast(value);
+        return new Bound<>(type.cast(value), root.typeName());
     }
 
     /**
