@@ -4,6 +4,7 @@ import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonDocumentHeader;
 import io.ltr8.tson.compiler.TsonSchemaParser;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
@@ -46,8 +47,8 @@ final class ValidateCommand {
 
     /**
      * @return exit code: 0 every data file valid, 1 at least one invalid, 2 a usage/classification failure,
-     *         70 a document that could not be checked at all because a construct in its schema is a gap in
-     *         this library ({@link TsonCli#exitCodeFor})
+     *         69 a document whose schema no file here declares, 70 a document that could not be checked at
+     *         all because a construct in its schema is a gap in this library ({@link TsonCli#exitCodeFor})
      */
     static int run(List<ValidateInput> inputs, OutputFormat format) {
         Map<String, String> schemas = new HashMap<>();
@@ -106,8 +107,11 @@ final class ValidateCommand {
         TsonSchemaSource source = uri -> {
             String text = schemas.get(TsonCanonicalIdentity.canonicalize(uri));
             if (text == null) {
-                throw new IllegalStateException("no schema file provided for !!schema \"" + uri + "\""
-                        + supplied(declaredIds));
+                // TsonSchemaFetchException, not an IllegalStateException: this is a source saying it cannot
+                // supply a schema, which is the one thing the fetch contract names a type for. Anything else
+                // thrown from here would be classified as a fault in this command and rethrown as one.
+                throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+                        "no schema file on the command line declares that !!id" + supplied(declaredIds), null);
             }
             return text;
         };
@@ -143,9 +147,9 @@ final class ValidateCommand {
      *
      * <p>A schema file is matched by the {@code !!id} inside it, never by its filename ([TSON-DATA]
      * §2.2.1), so the mismatch an author hits most is passing the right file with the wrong identity in
-     * it -- and the bare "no schema file provided" then reads as though the file were missing, while they
-     * are looking straight at it. Listing the identities puts the two strings side by side, which is
-     * usually the whole diagnosis.
+     * it -- and a bare "not found" then reads as though the file were missing, while they are looking
+     * straight at it. Listing the identities puts the two strings side by side, which is usually the whole
+     * diagnosis.
      */
     private static String supplied(List<String> declaredIds) {
         if (declaredIds.isEmpty()) {

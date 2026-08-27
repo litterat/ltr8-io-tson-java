@@ -5,6 +5,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -184,8 +185,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         // meta.tn isn't meta-kernel's own well-known bootstrap case, and the default TsonSchemaSource
         // fetches nothing -- so this is exactly TsonSchemaSource.registeredOnly()'s own rejection.
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        TsonSchemaFetchException thrown = assertThrows(TsonSchemaFetchException.class,
                 () -> loader.loadMeta(coreDocument.meta()));
+        assertEquals(TsonSchemaFetchException.Reason.NOT_PERMITTED, thrown.reason());
         assertTrue(thrown.getMessage().contains("meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
@@ -220,7 +222,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(registry);
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        // The default source fetches nothing, so what fails is obtaining !!meta, not resolving it -- and
+        // TsonSchemaSource.fetch names the type that says so.
+        TsonSchemaFetchException thrown = assertThrows(TsonSchemaFetchException.class,
                 () -> resolver.resolveSchema(miniDocument));
         assertTrue(thrown.getMessage().contains("meta.tn"));
     }
@@ -405,7 +409,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext());
         TsonCompiledSchemaLoader loader = registry;
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        TsonSchemaFetchException thrown = assertThrows(TsonSchemaFetchException.class,
                 () -> loader.loadMeta("https://tson.io/2026/33/m/meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }

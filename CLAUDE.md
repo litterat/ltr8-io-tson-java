@@ -580,7 +580,12 @@ exactly, and share `SchemaReference` for §2.2.1's rules on what an identity may
 out of a document and in a server that means a request body: the HTTP one guards SSRF (no redirects ever, size
 capped against bytes delivered), the file one arbitrary reads (containment checked *after* `toRealPath`, so
 `..` and symlink escape fall together). Neither verifies the `?sha256=` pin or the fetched `!!id` — the loader
-does both; `requireContentHashPin` adds the one thing it cannot, that a pin be present.
+does both; `requireContentHashPin` adds the one thing it cannot, that a pin be present. **`TsonSchemaSource`
+names its own failure exception** — a source says "cannot supply this" with `TsonSchemaFetchException` and
+nothing else, which is what lets `SchemaFailure` classify every branch positively and rethrow a fault as
+itself; the exception lives in `tson-compiler` beside the interface, since the classification cannot see a
+type declared in `tson`. A schema no source would supply is `SCHEMA_UNAVAILABLE`, never `SCHEMA_ERROR`: it
+was never read, so nothing about it has been judged.
 
 ```java
 Tson tson = Tson.builder().build();
@@ -593,11 +598,13 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
 `tson validate [--output text|json|tson] <file|->...` auto-classifies a flat file list into schemas (by
 embedded `!!id`, never filename) and data, and validates each data document via `Tson.validate` — fully
 self-describing, no `--type`; `-` is stdin, at most once, always data. One `ValidationRun` envelope per
-invocation. **Exit codes: 0 all valid, 1 any data file invalid, 2 usage/classification, 70 a library gap or
-fault** — the 1/2/70 split is load-bearing and rides on the exception-classification policy. 70's halves
-print differently: a *reported* gap rides in the report as `NOT_IMPLEMENTED` with a stderr note and
-`TsonCli.exitCodeFor` lifts the run to 70 (a mixed run is 70, not 1 — something went unchecked, so
-"invalid" is not a verdict the run can give); a gap that still escapes as an exception prints
+invocation. **Exit codes: 0 all valid, 1 any data file invalid, 2 usage/classification, 69 a schema nothing
+would supply, 70 a library gap or fault** — the split is load-bearing and rides on the exception-classification
+policy. 1 is a verdict on the document; **69 and 70 are the absence of one**, naming who could not give it
+(whoever was to serve the schema; this library), and `TsonCli.exitCodeFor` lifts a run to whichever of the
+three is most permanent — 70 over 69 over 1, since retrying reaches a gap again. Both non-verdicts ride in
+the report as codes (`NOT_IMPLEMENTED`, `SCHEMA_UNAVAILABLE`) with a stderr note, the report on stdout
+unchanged. 70's halves print differently: a gap that escapes as an exception prints
 `not implemented yet: <message>`, whose text usually names the workaround; a fault gets the please-report-it
 banner and its stack trace. Also `tson compile`, `tson hash` (stamps a
 `?sha256=` pin idempotently), `tson init-example`.
@@ -791,8 +798,8 @@ compatibility).
   `record_field.value` must be the field's declared type — which catches `int32 ~ text` whether a parameter
   put it there or the author wrote it literally, and is the FIXED/DEFAULT value validation listed below.
   `SPEC-FEEDBACK.md` #5 carries the spec-side question.
-- **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation and a general
-  disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist policy). **Routed-value substitution is
+- **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation. **Routed-value
+  substitution is
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →
   `REQUIRED_FIXED`, `~` staying a default), which is §5.7's "fixation happens downstream" applied to the
   downstream §5.7 now names ("fixation happens at materialisation"). **Thread-safety is no longer wholly

@@ -43,10 +43,10 @@ import java.util.Optional;
  * operation => ~data & { ... }}), and {@link TsonConfig#metaNameBinder} adds the classes those bind to --
  * composed over the library's binder, so the mode and every kernel name stand.
  *
- * <p>Only supports a schema governed by (and importing only from) meta-kernel/meta.tn/core.tn --
- * a real, disk/HTTP-backed {@link TsonSchemaSource} for arbitrary other
- * governing chains is its own, separately tracked backlog item; {@link TsonConfig} is the natural
- * place for that to plug in once it exists.
+ * <p>Out of the box this serves only meta-kernel/meta.tn/core.tn: {@link TsonSchemaSource#registeredOnly()}
+ * is the default source, so a schema governed by or importing anything else has to be registered first, or
+ * reachable through a source configured on {@link TsonConfig} -- {@link TsonHttpSchemaSource} and {@link
+ * TsonFileSchemaSource} ship, and both deny by default.
  *
  * <p>{@link TsonObjectReader}/{@link TsonObjectWriter} live in {@code tson-compiler}'s own root
  * package, alongside the other read-side front doors -- {@code DefinitionResolver}, part of that
@@ -218,10 +218,16 @@ public final class Tson {
                 return problems.diagnostics();
             }
             treeRegistry().compile(core.schemaRegistry().register(linked));
+        } catch (TsonSchemaFetchException e) {
+            // An !!import or !!meta naming an identity no configured source will serve. The document fails
+            // either way, but it was never checked: nothing here saw the imported schema, so "this schema
+            // is wrong" is a verdict this call has no grounds for. Same root pointer as the rest -- what
+            // differs is the code, which is the one thing a caller can route on.
+            problems.report(Diagnostic.ofSchemaUnavailable("", "", e.getMessage(), Optional.empty()));
         } catch (TsonSchemaValidationException e) {
             // Whatever the phases still raise rather than report: a document with no !!id, an !!import that
-            // will not load, a !!meta that may not govern. Author errors about the document as a whole, so
-            // they carry the root pointer rather than naming a declaration.
+            // loaded and would not link, a !!meta that may not govern. Author errors about the document as
+            // a whole, so they carry the root pointer rather than naming a declaration.
             problems.report(Diagnostic.ofSchemaError("", "", e.getMessage(), Optional.empty()));
         } catch (RuntimeException e) {
             // Base syntax is this document's problem; anything else is a fault in this library and rethrows

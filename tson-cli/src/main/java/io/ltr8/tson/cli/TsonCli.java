@@ -49,7 +49,8 @@ public final class TsonCli {
               --output text|json|tson    output format (default: text)
               --help, -h                 print this help
 
-            exit codes: 0 ok, 1 validation/compile failure, 2 usage error, 70 not implemented / internal error""";
+            exit codes: 0 ok, 1 validation/compile failure, 2 usage error,
+                        69 a schema could not be obtained, 70 not implemented / internal error""";
 
     private static final String VALIDATE_USAGE =
             "usage: tson validate [--output text|json|tson] <file|->...   (`-` reads one data document from stdin)";
@@ -127,26 +128,33 @@ public final class TsonCli {
     }
 
     /**
-     * The exit code for a run that produced problems: <b>70 if any of them is a gap in this library, 1
-     * otherwise</b>. The 1-vs-70 split has not changed meaning -- 1 is a verdict on the document, 70 is the
-     * absence of one -- only how it is decided. It used to ride on catching {@link
-     * UnsupportedOperationException}, which meant a gap could only ever arrive by destroying the pass that
-     * found it; now a gap travels as {@link Diagnostic.Code#NOT_IMPLEMENTED} beside the ordinary problems,
-     * and the code carries the same information the exception type used to.
+     * The exit code for a run that produced problems: <b>70 if any of them is a gap in this library, 69 if
+     * any is a schema nothing would supply, 1 otherwise</b>. One is a verdict on the document; the other two
+     * are the absence of one, and they say who could not give it -- this library, or whoever was to serve
+     * the schema. A script that sees 1 fixes the document, 70 files a bug, 69 checks its own configuration
+     * or tries again later, and none of the three has to parse prose to find that out.
      *
-     * <p><b>A mixed run is 70, not 1</b>, and deliberately: the ordinary problems are still printed and are
-     * still real, but something in the document was not checked at all, so "invalid" is a claim this run
-     * cannot make. Exit 1 would tell a script the document was judged and rejected. The note goes to stderr
-     * so the report on stdout stays exactly what {@code --output json|tson} promises.
+     * <p><b>A mixed run takes the most permanent code</b>, which is why 70 outranks 69 and both outrank 1:
+     * a gap is not fixed by retrying, and retrying a run that also holds one would just reach the gap
+     * again. The ordinary problems are still printed and still real either way, but something in the
+     * document was not checked at all, so "invalid" is a claim the run cannot make -- exit 1 would tell a
+     * script the document was judged and rejected. Each note goes to stderr so the report on stdout stays
+     * exactly what {@code --output json|tson} promises.
      */
     static int exitCodeFor(Collection<Diagnostic.Code> codes) {
-        if (!codes.contains(Diagnostic.Code.NOT_IMPLEMENTED)) {
-            return 1;
+        if (codes.contains(Diagnostic.Code.NOT_IMPLEMENTED)) {
+            System.err.println("note: some of this could not be checked -- a construct is not implemented yet"
+                    + " (see the NOT_IMPLEMENTED entries above). That is a gap in tson, not a problem with your"
+                    + " document.");
+            return 70;
         }
-        System.err.println("note: some of this could not be checked -- a construct is not implemented yet"
-                + " (see the NOT_IMPLEMENTED entries above). That is a gap in tson, not a problem with your"
-                + " document.");
-        return 70;
+        if (codes.contains(Diagnostic.Code.SCHEMA_UNAVAILABLE)) {
+            System.err.println("note: some of this could not be checked -- a schema could not be obtained"
+                    + " (see the SCHEMA_UNAVAILABLE entries above). Nothing here has read that schema, so"
+                    + " nothing here is saying your document, or that schema, is wrong.");
+            return 69;
+        }
+        return 1;
     }
 
     /**

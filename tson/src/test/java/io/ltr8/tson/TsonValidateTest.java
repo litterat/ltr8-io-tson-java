@@ -2,6 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.TsonContentHash;
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +35,8 @@ class TsonValidateTest {
             if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;
             }
-            throw new IllegalStateException("no schema for " + uri);
+            throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+                    "this fixture serves only " + POINT_ID, null);
         };
         return Tson.builder().schemaSource(source).build();
     }
@@ -71,13 +73,17 @@ class TsonValidateTest {
                 problems.stream().map(Diagnostic::code).toList(), problems.toString());
     }
 
+    /**
+     * <b>Not {@code SCHEMA_ERROR}</b>: nothing here has seen the schema, so nothing here can say it is
+     * wrong. The document may be perfect and the schema may be perfect -- no source would supply it.
+     */
     @Test
-    void aSchemaTheSourceCannotProvideIsASchemaError() {
+    void aSchemaTheSourceCannotProvideIsUnavailableRatherThanWrong() {
         List<Diagnostic> problems = tsonWithPoint().validate("""
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }""");
         assertEquals(1, problems.size(), problems.toString());
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
+        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, problems.getFirst().code());
     }
 
     @Test
@@ -398,7 +404,9 @@ class TsonValidateTest {
         Diagnostic unreachable = only(tsonWithPoint(), """
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }""");
-        assertEquals("a resolvable schema", unreachable.expected());
+        // Not "a resolvable schema": nothing was resolved, because nothing was obtained. The two share a
+        // code and are told apart here, which is the half of the distinction that costs no schema version.
+        assertEquals("a schema that can be obtained", unreachable.expected());
         assertEquals("https://example.test/not-there.tn", unreachable.actual(), "which schema could not be had");
 
         Diagnostic noRootRef = only(tsonWithPoint(), """

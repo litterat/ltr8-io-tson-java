@@ -1,5 +1,7 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
+
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Locale;

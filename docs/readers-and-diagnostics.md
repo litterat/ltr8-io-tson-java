@@ -229,7 +229,8 @@ one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`FIELD_FIXED`/`TYPE_MISMA
 `UNKNOWN_TYPE_REF`/`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY`/`DUPLICATE_FIELD`
 from readers;
 `SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for infrastructure-level failures, plus
-`NOT_IMPLEMENTED`/`BIND_MISMATCH` — the two that are not a verdict on the document at all),
+`NOT_IMPLEMENTED`/`BIND_MISMATCH`/`SCHEMA_UNAVAILABLE` — the three that are not a verdict on the document
+at all),
 `message` (hand-composed per call site), `expected`/`actual` (machine-parseable), and **four location
 components covering two ends** — the value in the data, and the rule in the schema.
 
@@ -551,20 +552,28 @@ error* category, so this is the same layer, not a new one.
   `TsonMissingBindingException` subclass included) is `BIND_MISMATCH`: the schema is fine, the class is
   fine, and the reading application pointed them at each other by mistake, so the message names one of
   *its* classes and the document may be perfectly valid. An `UnsupportedOperationException` is
-  `NOT_IMPLEMENTED`, the same code a gap gets everywhere else. Everything else is `SCHEMA_ERROR`, and each
-  branch carries the `expected` that matches its code.
+  `NOT_IMPLEMENTED`, the same code a gap gets everywhere else. A `TsonSchemaFetchException` is
+  `SCHEMA_UNAVAILABLE`: no source would supply the schema, so it was never read, and whether it would even
+  have resolved is unknown — `SCHEMA_ERROR` would claim a verdict on a document nothing here has seen. A
+  `TsonContentHashMismatchException` *is* `SCHEMA_ERROR`, and the pair marks the line: something arrived,
+  and it is not what the reference named. Each branch carries the `expected` that matches its code ("a
+  schema that can be obtained", "a schema matching its `?sha256=` pin", "a resolvable schema").
     - **This is `NOT_IMPLEMENTED`'s argument one step further out**: a bind mismatch is no more a verdict on
       the document than a gap is, and once the failure arrives as a `Diagnostic` there is no exception type
       left for a consumer to classify on — only the code. A consumer choosing an HTTP status wants the three
       apart (the sender's problem, its own wiring, this library); one code gives it none of that, and
       matching on message text is the alternative it should not be pushed to.
-    - **The default is a verdict rather than a rethrow, unlike `ofBaseSyntaxError`'s otherwise identical
-      shape.** That classification ends `default -> throw e` on the rule that a library fault propagates as
-      itself; this one cannot, because `TsonSchemaSource.fetch` mandates no exception type — a source may
-      signal an unfetchable schema with any `RuntimeException`, `IllegalStateException` included, and
-      rethrowing the types this library reserves for its own faults would turn a missing schema into a crash
-      for any source that spells it that way. So a genuine fault in a resolve or a compile still reads as a
-      problem with the schema; closing that means tightening the `fetch` contract, and is in `BACKLOG.md`.
+    - **Every branch is a positive verdict and the default rethrows**, the same rule `ofBaseSyntaxError`
+      ends on: a library fault propagates as itself. What makes that possible is `TsonSchemaSource.fetch`
+      naming `TsonSchemaFetchException` as the one way a source says "cannot supply this" — with no mandated
+      type, an `IllegalStateException` arriving here is equally a source's miss or a broken invariant, and
+      either every fault reads as a bad schema or every source that spells a miss that way crashes the read.
+      A source failing any other way is that source malfunctioning, and surfaces as the exception it threw:
+      `Tson.validate` promises a bad *document* never throws, and a bad *source* is not a document.
+    - **Three codes are now not a verdict on the document**, and they differ in *who* could not give one:
+      `NOT_IMPLEMENTED` (this library), `BIND_MISMATCH` (the reading application), `SCHEMA_UNAVAILABLE`
+      (whoever was to serve the schema). The CLI's exit codes follow them one for one — 70, no CLI path,
+      69 — and a mixed run takes the most permanent, since retrying fixes only the last.
 - **What still throws even with a receiver:** an `!!import` that won't load, a `!!meta` that may not
   govern, or a reference whose target owns a different `!!id` than it was fetched under (§2.2.1's
   cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Those make the namespace itself unusable rather

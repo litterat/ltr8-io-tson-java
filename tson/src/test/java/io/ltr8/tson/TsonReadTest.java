@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
@@ -44,7 +45,8 @@ class TsonReadTest {
             if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;
             }
-            throw new IllegalStateException("no schema for " + uri);
+            throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+                    "this fixture serves only " + POINT_ID, null);
         };
         return Tson.builder().schemaSource(source).build();
     }
@@ -96,7 +98,7 @@ class TsonReadTest {
         TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }"""));
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, thrown.diagnostic().code());
+        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, thrown.diagnostic().code());
     }
 
     @Test
@@ -225,7 +227,7 @@ class TsonReadTest {
         List<Case> cases = List.of(
                 new Case("""
                         !!schema:"https://example.test/not-there.tn"
-                        !point { x: 3  y: 4 }""", Diagnostic.Code.SCHEMA_ERROR),
+                        !point { x: 3  y: 4 }""", Diagnostic.Code.SCHEMA_UNAVAILABLE),
                 new Case("""
                         !!schema:"https://example.test/point-1.tn"
                         { x: 3  y: 4 }""", Diagnostic.Code.VALIDATION_ERROR),

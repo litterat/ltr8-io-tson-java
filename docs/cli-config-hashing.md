@@ -83,10 +83,13 @@ reading messages. `compile` renders a bare `ValidationReport` instead, having on
 name. Every file's report is collected before anything prints, since the envelope's verdict is the AND
 across them.
 
-**Exit codes: 0 all valid, 1 any data file invalid** (bad value / unresolvable `!!schema` / unknown type /
-no root type-ref), **2 usage/classification** (no data files, an unreadable/`!!id`-less schema, a bad
-flag), **70 (`EX_SOFTWARE`) the library failing to reach a verdict at all**. That fourth code
-is what makes `Diagnostic.ofBaseSyntaxError`'s rethrow worth anything: the read loop catches only
+**Exit codes: 0 all valid, 1 any data file invalid** (bad value / unknown type / no root type-ref),
+**2 usage/classification** (no data files, an unreadable/`!!id`-less schema, a bad flag), **69
+(`EX_UNAVAILABLE`) a schema nothing would supply**, **70 (`EX_SOFTWARE`) the library failing to reach a
+verdict at all**. The last two are the run declining to give a verdict rather than giving a bad one, and
+they name who could not give it: 69 is the caller's own setup or the world (the schema file was not passed,
+the host did not answer), 70 is this library. That is why 1 is not enough — and 70 in particular is what
+makes `Diagnostic.ofBaseSyntaxError`'s rethrow worth anything: the read loop catches only
 `IOException` (an unreadable file *is* that file's verdict), so a `RuntimeException` — which `Tson.validate`
 raises only for a bug, never for a bad document — reaches `TsonCli`'s own handler instead of being folded
 into "invalid". `UsageException` exists for the same reason one layer up: a bare `IllegalArgumentException`
@@ -94,12 +97,20 @@ catch would relabel a library fault as "your command line is wrong", so only thi
 parsing throws the type that means that.
 
 **A gap usually arrives as a diagnostic now, not as an exception**, and `TsonCli.exitCodeFor` is where the
-run's code is decided: any `NOT_IMPLEMENTED` in the collected problems makes the run 70 rather than 1, with a
-one-line note on stderr and the report on stdout unchanged. **A mixed run is 70, not 1**, deliberately — the
-ordinary problems are real and still printed, but something was not checked at all, so "invalid" is a claim
-the run cannot make, and exit 1 would tell a script the document had been judged and rejected. What this buys
-the author is the pass staying single: a schema with a gap in one declaration and a mistake in another
-reports both, where the throw used to take the second verdict with it.
+run's code is decided: any `NOT_IMPLEMENTED` in the collected problems makes the run 70 rather than 1, any
+`SCHEMA_UNAVAILABLE` makes it 69, each with a one-line note on stderr and the report on stdout unchanged.
+**A mixed run takes the most permanent of the three**, deliberately — the ordinary problems are real and
+still printed, but something was not checked at all, so "invalid" is a claim the run cannot make, and exit 1
+would tell a script the document had been judged and rejected. 70 outranks 69 because retrying reaches the
+gap again. What this buys the author is the pass staying single: a schema with a gap in one declaration and
+a mistake in another reports both, where the throw used to take the second verdict with it.
+
+**69 is reached two ways, and both are `TsonSchemaFetchException`.** A data document's `!!schema` that no
+configured source will serve arrives through `SchemaFailure` as a read diagnostic; a schema document's own
+`!!import`/`!!meta` that will not load arrives through `Tson.validateSchema`'s own catch as
+`Diagnostic.ofSchemaUnavailable`, located at the root pointer. So `tson validate` missing a schema file and
+`tson compile` on a schema importing something the CLI cannot fetch land on the same code, which is right:
+neither run read the thing it needed.
 
 **70 covers both halves of the exception-classification policy's non-verdict side, printed differently.** A
 gap (`UnsupportedOperationException` — *this library hasn't implemented that yet*) renders as `not

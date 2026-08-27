@@ -192,6 +192,23 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     }
 
     /**
+     * The schema could not be obtained at all -- {@link #ofSchemaError}'s shape with {@link
+     * Code#SCHEMA_UNAVAILABLE} in place of {@code SCHEMA_ERROR}, and the whole of the difference between
+     * "this schema is wrong" and "nobody would give me this schema".
+     *
+     * <p>Built from a {@link TsonSchemaFetchException} and from nothing else, which is what makes the
+     * distinction cheap: {@link TsonSchemaSource#fetch} names that type for "cannot supply this", so the
+     * two cases never have to be told apart by reading a message. An {@code !!import} or {@code !!meta}
+     * naming an identity no source will serve reaches this; one that resolves and then fails to link is a
+     * {@code SCHEMA_ERROR} like any other.
+     */
+    public static Diagnostic ofSchemaUnavailable(String schemaId, String declaration, String message,
+                                                 Optional<SourcePosition> position) {
+        return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
+                schemaId, Code.SCHEMA_UNAVAILABLE, message, "", "", Optional.empty(), position);
+    }
+
+    /**
      * A problem in a *schema* rather than in data -- one declaration failed to resolve or link
      * ([TSON-DATA] §8.1's resolver-error category, which [TSON-SCHEMA] populates with "every error that
      * makes a schema fail to load or ingest"). The data end is empty because there is no data: this is
@@ -262,16 +279,26 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * a schema that is <em>not</em> the schema's fault carries its own code (below), rather than being
      * flattened into this one because it arrived through the same catch.
      *
-     * <p><b>{@code NOT_IMPLEMENTED} and {@code BIND_MISMATCH} are the two members that are not a verdict on
-     * the document.</b> Both say the thing they name could not be checked, which is not the same as
-     * invalid, and a consumer that treats either as invalid is wrong in the one direction that matters.
-     * {@code NOT_IMPLEMENTED} says a construct is beyond this library; it exists so a gap can ride in the
-     * same single-pass list as the ordinary problems rather than throwing and taking their verdicts with
-     * it, and the exit code the CLI picks rides on it. {@code BIND_MISMATCH} says a schema and the Java
-     * classes bound to it disagree ({@link TsonBindMismatchException}, {@link
-     * TsonMissingBindingException}) -- a wiring mistake in the reading application, where the document may
-     * be perfectly valid and the message names one of that application's own classes. A consumer routing
-     * on these codes wants both apart from the rest: a verdict it cannot give, for two different reasons.
+     * <p><b>{@code NOT_IMPLEMENTED}, {@code BIND_MISMATCH} and {@code SCHEMA_UNAVAILABLE} are the three
+     * members that are not a verdict on the document.</b> Each says the thing it names could not be
+     * checked, which is not the same as invalid, and a consumer that treats any of them as invalid is
+     * wrong in the one direction that matters. They differ in <em>who</em> could not check it, which is
+     * exactly what a consumer picking an HTTP status or an exit code is asking:
+     * <ul>
+     *   <li>{@code NOT_IMPLEMENTED} -- this library. A construct is beyond it; the member exists so a gap
+     *       can ride in the same single-pass list as the ordinary problems rather than throwing and taking
+     *       their verdicts with it.</li>
+     *   <li>{@code BIND_MISMATCH} -- the reading application. A schema and the Java classes bound to it
+     *       disagree ({@link TsonBindMismatchException}, {@link TsonMissingBindingException}): a wiring
+     *       mistake, where the document may be perfectly valid and the message names one of that
+     *       application's own classes.</li>
+     *   <li>{@code SCHEMA_UNAVAILABLE} -- everyone else. No configured {@link TsonSchemaSource} would
+     *       supply the schema the document names: a host that did not answer, a reference this deployment
+     *       will not fetch, a schema nobody registered ({@link TsonSchemaFetchException}). Nothing is
+     *       wrong with the document, and nothing may be wrong with the schema either -- it was never
+     *       obtained, so it was never read. Kept apart from {@code SCHEMA_ERROR} because that one is a
+     *       verdict: the schema <em>was</em> obtained and it does not resolve.</li>
+     * </ul>
      */
     public enum Code {
         FIELD_REQUIRED,
@@ -287,6 +314,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         UNKNOWN_TYPE,
         VALIDATION_ERROR,
         NOT_IMPLEMENTED,
-        BIND_MISMATCH
+        BIND_MISMATCH,
+        SCHEMA_UNAVAILABLE
     }
 }

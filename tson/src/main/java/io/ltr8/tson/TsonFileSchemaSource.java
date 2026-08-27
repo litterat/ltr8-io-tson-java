@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 
 import java.io.IOException;

@@ -23,7 +23,11 @@ final class CompileCommand {
     private CompileCommand() {
     }
 
-    /** @return exit code: 0 compiled cleanly, 1 it didn't, 70 a construct in it is a gap in this library */
+    /**
+     * @return exit code: 0 compiled cleanly, 1 it didn't, 69 an {@code !!import}/{@code !!meta} of its own
+     *         could not be obtained, so it was never wholly read, 70 a construct in it is a gap in this
+     *         library ({@link TsonCli#exitCodeFor})
+     */
     static int run(Path schemaFile, OutputFormat format) {
         List<Diagnostic> problems;
         try {

@@ -1,4 +1,4 @@
-package io.ltr8.tson;
+package io.ltr8.tson.compiler;
 
 /**
  * A schema reference that could not be turned into schema text, and why.
@@ -8,6 +8,16 @@ package io.ltr8.tson;
  * yet ({@code UnsupportedOperationException}), or a broken invariant ({@code IllegalStateException}). A schema
  * host that is down is none of the three: nobody's document is wrong, nothing is unimplemented, and no
  * invariant broke. Fetching brings its own failure modes, so it brings its own exception.
+ *
+ * <p><b>This is the type {@link TsonSchemaSource#fetch} names</b>, and the only one it permits for "cannot
+ * supply this". That is what lets {@code SchemaFailure} classify a fetch failure positively and rethrow
+ * everything it does not recognise as the fault it is -- with no mandated type, an unfetchable schema and a
+ * broken invariant are indistinguishable where a read catches them, and every fault reads to a consumer as a
+ * problem with the schema.
+ *
+ * <p>It lives here, beside the interface whose contract it is, rather than with the sources that throw it:
+ * {@code TsonHttpSchemaSource}/{@code TsonFileSchemaSource} are in {@code tson}, which depends on this
+ * module, so a type declared there is invisible to the classification that has to route on it.
  *
  * <p><b>{@link Reason} is the part worth acting on</b>, and the reason this is not just a message. It
  * separates a caller's mistake from an operator's: {@code NOT_PERMITTED} means the reference names something

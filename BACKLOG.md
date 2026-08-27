@@ -185,29 +185,12 @@ that question.
   - **Which suggests an extended output mode**, rather than making every diagnostic bigger: the default stays
     one frame, and a caller that finds an error confusing asks for the chain. That is a CLI surface question
     (`--explain`? a verbosity flag?) as much as a model one, and it interacts with `diagnostics.tn` being a
-    versioned schema — a new frame list is a shape change, so §10's immutability rule means `diagnostics-2.tn`.
+    versioned schema — a new frame list is a shape change, so §10's immutability rule means the next version
+    under a new name, never an edit in place.
   - **The input already exists and is deliberately kept for this.** `TsonLinkedSchema.entryOrigins` answers
     "which document declared this entry", and every reader is already handed its own declaration's location
     (`ValueReaderContext.locationOf`) — today only used as the seed for a value nothing encloses. A caused-by
     frame is what would consume it in the ordinary nested case.
-- [ ] **`TsonSchemaSource.fetch` mandates no exception type, which costs a read one distinction.**
-  `SchemaFailure` classifies a failure to obtain a compiled schema — `BIND_MISMATCH` for a schema and the
-  reading application's classes that disagree, `NOT_IMPLEMENTED` for a construct beyond this library,
-  `SCHEMA_ERROR` for everything else. That last branch is a default rather than a positive verdict: a
-  source is free to signal an unfetchable schema with any `RuntimeException`, so an unfetchable schema and
-  a broken invariant are indistinguishable by type at that boundary, and a real fault in a resolve or a
-  compile reads to a consumer as a problem with the schema. Both other classifications in the codebase
-  (`Diagnostic.ofBaseSyntaxError`/`ofSchemaSyntaxError`) end `default -> throw e` on the rule that a fault
-  propagates as itself; this is the one place that cannot.
-  - The fix is at the `fetch` contract, not at the classification. Either the interface names the exception
-    a source must throw for "cannot supply this" (`TsonSchemaValidationException` — which is already what
-    the shipped `registeredOnly()` throws, and its Javadoc already argues the case, in exactly these terms),
-    or `resolveUncached` wraps whatever `fetch` throws in one. The second is compatible with sources that
-    already exist and is probably the answer; the first is cleaner and is a breaking change to a public
-    functional interface.
-  - Low priority while `registeredOnly()` is the only implementation and a real disk/HTTP-backed
-    `TsonSchemaSource` is itself unbuilt — the two should be decided together, since a fetching source is
-    what makes the failure modes here plural.
 
 ## Write side
 
@@ -356,8 +339,8 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   and matters at a core count this machine does not have. What is still open is deliberate mutation while others
   read: `Tson.resolve`/`TsonSchemaRegistry.register`/`registerAtom` stay strict about duplicates (right for
   a caller error, wrong if two threads are legitimately warming the same registry), nothing defines whether
-  a `DataBindContext` may be extended after first use, and a future fetching `TsonSchemaSource` will have
-  its own story. None of it is hypothetical-only: the read-path half was two real defects, found by
+  a `DataBindContext` may be extended after first use, and neither shipped fetching `TsonSchemaSource` states
+  what it promises a concurrent caller. None of it is hypothetical-only: the read-path half was two real defects, found by
   auditing and reproduced first try on 8 threads.
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
   opt-in, and reported as ordinary errors when enabled — §8.1 gives a conforming processor one severity) —

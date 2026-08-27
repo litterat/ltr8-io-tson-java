@@ -105,11 +105,22 @@ class TsonCliTest {
             !stamped { at: "2020-01-01T00:00:00Z"  n: 1 }
             """;
 
+    /**
+     * <b>A mixed run takes the most permanent code.</b> 1 is a verdict on the document; 70 and 69 are the
+     * absence of one, differing in who could not give it -- this library, or whoever was to serve the
+     * schema. A gap outranks an unavailable schema because retrying fixes only the second, and a run that
+     * holds both would reach the gap again on the retry.
+     */
     @Test
-    void aRunHoldingBothAGapAndAnOrdinaryErrorIsSeventyRatherThanOne() {
+    void aRunHoldingMoreThanOneKindOfProblemTakesTheMostPermanentCode() {
         assertEquals(70, TsonCli.exitCodeFor(List.of(
                 Diagnostic.Code.NOT_IMPLEMENTED, Diagnostic.Code.SCHEMA_ERROR)));
+        assertEquals(70, TsonCli.exitCodeFor(List.of(
+                Diagnostic.Code.NOT_IMPLEMENTED, Diagnostic.Code.SCHEMA_UNAVAILABLE)));
         assertEquals(70, TsonCli.exitCodeFor(List.of(Diagnostic.Code.NOT_IMPLEMENTED)));
+        assertEquals(69, TsonCli.exitCodeFor(List.of(
+                Diagnostic.Code.SCHEMA_UNAVAILABLE, Diagnostic.Code.SCHEMA_ERROR)));
+        assertEquals(69, TsonCli.exitCodeFor(List.of(Diagnostic.Code.SCHEMA_UNAVAILABLE)));
         assertEquals(1, TsonCli.exitCodeFor(List.of(Diagnostic.Code.SCHEMA_ERROR)));
     }
 
