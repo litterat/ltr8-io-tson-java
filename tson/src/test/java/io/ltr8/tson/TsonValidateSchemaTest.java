@@ -70,6 +70,152 @@ class TsonValidateSchemaTest {
                 () -> "named by the form the author wrote: " + lifted.getFirst().message());
     }
 
+    /**
+     * <b>A defect a held body deferred belongs to the declaration whose text wrote it, not to whoever applied
+     * the template.</b> Nothing checks {@code box}'s own references at its declaration -- a template's
+     * references cannot be settled until an application supplies arguments -- so the verdict arrives on the
+     * entry {@code box<text>} minted, and the walk back to a positioned entry finds {@code holder}. That line
+     * is not wrong and does not contain the name. Deferred checking is what holding buys, and it is
+     * survivable only if the author is sent to the line they can edit.
+     *
+     * <p><b>The subject moves with the location</b>, which the two halves of this assert together: naming
+     * {@code 'box<text>'} states the mistake against an application that is itself correct, and would name a
+     * different one for every applier.
+     */
+    @Test
+    void aDefectInsideATemplateIsReportedAgainstTheTemplate() {
+        List<Diagnostic> problems = check("""
+                {
+                  box => <T> { v: T  w: no_such_type }
+                  holder => { b: box<text> }
+                }""");
+
+        assertEquals(1, problems.size(), problems::toString);
+        Diagnostic only = problems.getFirst();
+        assertEquals(Optional.of("/box"), only.schemaPointer());
+        assertEquals(Optional.of(5), only.schemaPosition().map(SourcePosition::line));
+        assertEquals("'box' field 'w' has an unresolved reference 'no_such_type'", only.message());
+    }
+
+    /**
+     * Every template shape holds its body, so every one of them defers the same way -- and the trail inside
+     * the message ({@code field 'w'}, {@code element[1]}, {@code variant[1]}) transfers to the declaration
+     * unchanged, a closed body being the template's own with its parameters replaced.
+     *
+     * <p>The <b>alias</b> case is the one that decides how this is implemented. {@code half<text>} composes
+     * to {@code pair<no_such_type, text>} and mints an entry sourced on {@code pair} -- so walking a derived
+     * entry's lineage lands on {@code pair}, which is faultless. The offending <em>name</em> is the evidence
+     * instead: {@code half} is the held body that mentions it.
+     */
+    @Test
+    void anOpenTupleTemplateIsBlamedForItsOwnHeldText() {
+        assertBlamed("boxes => <T> [T, no_such_type]", "/boxes",
+                "'boxes' element[1] has an unresolved reference 'no_such_type'");
+    }
+
+    @Test
+    void anOpenChoiceTemplateIsBlamedForItsOwnHeldText() {
+        assertBlamed("result => <T> ( T | no_such_type )", "/result",
+                "'result' variant[1] has an unresolved reference 'no_such_type'");
+    }
+
+    @Test
+    void aTemplateAppliedByAnotherTemplateIsBlamedForItsOwnHeldText() {
+        assertBlamed("inner => <T> { i: T  bad: no_such_type }", "/inner",
+                "'inner' field 'bad' has an unresolved reference 'no_such_type'");
+    }
+
+    /** One open declaration, applied once by a {@code holder} that is itself correct. */
+    private static void assertBlamed(String declaration, String pointer, String message) {
+        String name = declaration.substring(0, declaration.indexOf(' '));
+        List<Diagnostic> problems = check("{\n  " + declaration + "\n  holder => { b: " + name + "<text> }\n}");
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Optional.of(pointer), problems.getFirst().schemaPointer());
+        assertEquals(Optional.of(5), problems.getFirst().schemaPosition().map(SourcePosition::line));
+        assertEquals(message, problems.getFirst().message());
+    }
+
+    /** §5.10's partial application: the alias wrote the name, and the application it composes into did not. */
+    @Test
+    void anAliasIsBlamedForAnArgumentItSuppliesItself() {
+        List<Diagnostic> problems = check("""
+                {
+                  pair => <A, B> { first: A  second: B }
+                  half => <B> pair<no_such_type, B>
+                  holder => { b: half<text> }
+                }""");
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Optional.of("/half"), problems.getFirst().schemaPointer());
+        assertEquals(Optional.of(6), problems.getFirst().schemaPosition().map(SourcePosition::line));
+    }
+
+    /**
+     * One mistake in a template is one mistake however many declarations apply it. Each application mints its
+     * own entry and each fails identically, so without this the author gets the same sentence once per
+     * applier -- and the count is a property of the schema's callers rather than of the defect.
+     */
+    @Test
+    void aTemplateDefectIsReportedOncePerDefectNotOncePerApplication() {
+        List<Diagnostic> problems = check("""
+                {
+                  box => <T> { v: T  w: no_such_type }
+                  first => { b: box<text> }
+                  second => { b: box<int32> }
+                  third => { b: box<float32> }
+                }""");
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Optional.of("/box"), problems.getFirst().schemaPointer());
+    }
+
+    /**
+     * <b>The converse, and the reason the offending name decides this rather than the entry.</b> A name the
+     * <em>applier</em> wrote is the applier's mistake, and both of these stay exactly where they were: no
+     * held body mentions {@code 3} or {@code some_typo}, so nothing is retargeted. Blaming the template for
+     * these would send the author to {@code box => <T> { v: T }} to look for a {@code 3} that is not there.
+     */
+    @Test
+    void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
+        assertStaysWithTheApplier("box<3>", "'box<3>' field 'v' has an unresolved reference '3'");
+    }
+
+    @Test
+    void anUnresolvedArgumentStaysWithTheApplier() {
+        assertStaysWithTheApplier("box<some_typo>",
+                "'box<some_typo>' source has an unresolved reference 'some_typo'");
+    }
+
+    private static void assertStaysWithTheApplier(String application, String message) {
+        List<Diagnostic> problems =
+                check("{\n  box => <T> { v: T }\n  holder => { b: " + application + " }\n}");
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Optional.of("/holder"), problems.getFirst().schemaPointer());
+        assertEquals(Optional.of(6), problems.getFirst().schemaPosition().map(SourcePosition::line));
+        assertEquals(message, problems.getFirst().message());
+    }
+
+    /**
+     * A closed declaration's own typo is never handed to a template, however the name reads there. {@code
+     * TemplateBody#names()} cannot tell a type reference from a field name, so a template with a field called
+     * {@code no_such_type} matches the name -- and must not be blamed, because the failing entry here is the
+     * author's own declaration and already carries the line they wrote.
+     */
+    @Test
+    void aClosedDeclarationKeepsItsOwnTypoEvenWhenATemplateNamesIt() {
+        List<Diagnostic> problems = check("""
+                {
+                  box => <T> { no_such_type: T }
+                  use => { u: no_such_type }
+                  holder => { b: box<text> }
+                }""");
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Optional.of("/use"), problems.getFirst().schemaPointer());
+    }
+
     @Test
     void aSoundSchemaReportsNothing() {
         assertEquals(List.of(), check("""

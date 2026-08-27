@@ -466,6 +466,33 @@ error* category, so this is the same layer, not a new one.
   `MAX_CLOSING_DEPTH` and reported the same defect a second time, against whichever entry applied it and
   carrying a 64-link chain of synthetic names the author never wrote. **The depth guard itself does not
   stand down**: what it guards is a hole in the static check, not a template the check already condemned.
+- **A defect a held body deferred is reported against the declaration whose text wrote it**
+  (`TsonSchemaLinker.heldDeclarationNaming`). A template's references cannot be settled until an application
+  supplies arguments, so nothing checks them at the declaration; the verdict arrives on the entry
+  materialisation minted, and the walk to a positioned entry finds the *applier*. So
+  `box => <T> { v: T  w: no_such_type }` was reported against `holder => { b: box<text> }` — a line that is
+  not wrong and does not contain the name — once per applier, each naming a different application. Deferred
+  checking is what holding buys, and it is survivable only if the author is sent to the line they can edit.
+    - **The offending name is the evidence, not the entry.** Walking a derived entry's own lineage cannot
+      answer this: a sugar lift's `source` is the bare constructor it applies, and an alias composes its
+      argument into someone else's application (`half => <B> pair<no_such_type, B>` closes to a `pair`
+      instantiation, and `pair` is faultless). Asking which *held body mentions the name* reaches `half`
+      directly — and reaches nothing when the name came from the argument list, so `box<3>` and
+      `box<some_typo>` keep their verdict at the application, which is where those two mistakes are.
+    - **The subject moves with the location**, which is why `UnresolvedReference` carries the sentence in
+      parts (subject, trail, name) rather than finished: `'box<text>' field 'w'` states the mistake against
+      an application that is itself correct. It is linker-internal and never escapes — re-stated as a
+      `TsonSchemaValidationException`, whose classification it shares — because that type is deliberately
+      `final` and lives in `tson-schema`, which holds no pipeline machinery.
+    - **Both filters are load-bearing.** Only a *derived* entry is retargeted, or a closed declaration's own
+      typo would be blamed on any template that happens to name it; and only a `TemplateBody` declaration is
+      a candidate, since a defect no held body deferred is already located correctly. `TemplateBody.names()`
+      cannot tell a type reference from a field name, which is why it is asked only about a name already
+      known to resolve to nothing — a field of that name is the one remaining way to mislead it, and it
+      misleads no worse than naming the applier does.
+    - **One mistake gets one diagnostic**, however many declarations apply the template: each application
+      mints its own entry and each fails identically, so the count would otherwise be a property of the
+      schema's callers rather than of the defect.
 - **`Tson.validateSchema(schemaText)` is the front door and owns the phase boundary** — the schema-side peer
   of `validate`, and the only caller that composes all three phases. Every declaration parses before a
   verdict and a document that didn't parse whole is not resolved at all; every declaration then resolves

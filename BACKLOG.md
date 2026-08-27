@@ -103,20 +103,6 @@ the proposals it answers. What is left below are consequences of holding, not sh
   `enum.members` a value channel in §5.10's kind table, or require the quoted spelling `e<"c">`. Which one
   lands decides what is built here, so this waits on the revision rather than on effort.
 
-- [ ] **A derived entry's failure must name the declaration that minted it, not the one that applied it.**
-  `SPEC-FEEDBACK.md` #5 asks the spec to *require* this — deferred checking is what holding buys, and it is
-  survivable only if the author is sent to the line they can edit — so this is the one item in this section
-  the register states as an obligation rather than a nicety.
-  A defect inside a held body reports at the application (`/use`) rather than the template (`/box`), because
-  the walk back to a positioned entry finds the application first. Recording which declaration each derived
-  entry was minted for would fix it: message text is unchanged, only the location moves — from the line that
-  used the template to the line that contains the mistake. It applies to every defect only *materialisation*
-  can reach: `box<3>` against `box => <T> { v: T }` says `'box<3>' field 'v' has an unresolved reference '3'`,
-  naming the application rather than the line holding the mistake. The declaration-time checks land correctly
-  already (§5.11 uniqueness in the desugar phase, §5.10.1 regularity and §5.10 arity at the linker), which is
-  what keeps the common errors located where the author can act on them, so this is the residue rather than
-  the bulk.
-
 ## Binding strictness
 
 A schema and the Java class bound to it must agree about a type's fields, checked when the schema is compiled
