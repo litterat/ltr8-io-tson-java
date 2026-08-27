@@ -5,6 +5,8 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * The policy table behind both read facades' one {@code catch}: a read reaches its schema through a single
@@ -12,8 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * the code is all a consumer has left to route on.
  *
  * <p>Each case here is a different <em>party</em> at fault -- the schema's author, the reading application's
- * wiring, this library -- which is exactly what a consumer picking an HTTP status or an exit code is asking
- * about, and exactly what one shared code erases.
+ * wiring, whoever was to serve the schema, this library -- which is exactly what a consumer picking an HTTP
+ * status or an exit code is asking about, and exactly what one shared code erases. The last of the four is
+ * not a verdict at all and does not become one: it is rethrown.
  */
 class SchemaFailureTest {
 
@@ -53,16 +56,31 @@ class SchemaFailureTest {
     }
 
     /**
-     * <b>The default is a verdict on the schema, not a rethrow</b>, which is where this classification
-     * deliberately parts from {@link Diagnostic#ofBaseSyntaxError}'s otherwise identical shape. {@link
-     * TsonSchemaSource#fetch} mandates no exception type, so a source may signal an unfetchable schema with
-     * anything at all -- and rethrowing the types this library reserves for its own faults would turn a
-     * missing schema into a crash for any source that spells it that way. See {@code SchemaFailure}'s own
-     * note; the residual is tracked in {@code BACKLOG.md}.
+     * The environment's: no source could supply the schema the document names. Coded like the author's for
+     * now -- the two differ in {@code expected}, and a code of their own is a {@code diagnostics.tn} version
+     * -- but classified by its own branch, so it is a verdict rather than the residue of the default.
      */
     @Test
-    void anythingElseIsReportedRatherThanThrown() {
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, SchemaFailure.of(new IllegalStateException("no such file")).code());
+    void anUnfetchableSchemaIsClassifiedByItsOwnBranch() {
+        TsonSchemaFetchException unfetchable = new TsonSchemaFetchException("https://example.test/x.tn",
+                TsonSchemaFetchException.Reason.TIMEOUT, "no answer in 5s", null);
+
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, SchemaFailure.of(unfetchable).code());
+        assertEquals("a schema that can be obtained", SchemaFailure.of(unfetchable).expected());
+    }
+
+    /**
+     * <b>Anything else is a fault, and propagates as itself</b> -- the rule {@link
+     * Diagnostic#ofBaseSyntaxError} states and this now shares. What makes it applicable is {@link
+     * TsonSchemaSource#fetch} naming {@link TsonSchemaFetchException} as the way a source says "cannot
+     * supply this": with no mandated type, an {@code IllegalStateException} here could equally be a source's
+     * miss or a broken invariant, and every classification of it is wrong half the time.
+     */
+    @Test
+    void aFaultPropagatesAsItself() {
+        IllegalStateException fault = new IllegalStateException("compiled readers rebound twice");
+
+        assertSame(fault, assertThrows(IllegalStateException.class, () -> SchemaFailure.of(fault)));
     }
 
     /** Each code brings the {@code expected} that goes with it, so the structured half never contradicts it. */

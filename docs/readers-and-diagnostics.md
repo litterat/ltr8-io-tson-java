@@ -551,20 +551,26 @@ error* category, so this is the same layer, not a new one.
   `TsonMissingBindingException` subclass included) is `BIND_MISMATCH`: the schema is fine, the class is
   fine, and the reading application pointed them at each other by mistake, so the message names one of
   *its* classes and the document may be perfectly valid. An `UnsupportedOperationException` is
-  `NOT_IMPLEMENTED`, the same code a gap gets everywhere else. Everything else is `SCHEMA_ERROR`, and each
-  branch carries the `expected` that matches its code.
+  `NOT_IMPLEMENTED`, the same code a gap gets everywhere else. A `TsonSchemaFetchException` and a
+  `TsonContentHashMismatchException` are `SCHEMA_ERROR`, and each branch carries the `expected` that matches
+  its code — including those last two, which share a code and are told apart by it ("a schema that can be
+  obtained", "a schema matching its `?sha256=` pin", "a resolvable schema").
     - **This is `NOT_IMPLEMENTED`'s argument one step further out**: a bind mismatch is no more a verdict on
       the document than a gap is, and once the failure arrives as a `Diagnostic` there is no exception type
       left for a consumer to classify on — only the code. A consumer choosing an HTTP status wants the three
       apart (the sender's problem, its own wiring, this library); one code gives it none of that, and
       matching on message text is the alternative it should not be pushed to.
-    - **The default is a verdict rather than a rethrow, unlike `ofBaseSyntaxError`'s otherwise identical
-      shape.** That classification ends `default -> throw e` on the rule that a library fault propagates as
-      itself; this one cannot, because `TsonSchemaSource.fetch` mandates no exception type — a source may
-      signal an unfetchable schema with any `RuntimeException`, `IllegalStateException` included, and
-      rethrowing the types this library reserves for its own faults would turn a missing schema into a crash
-      for any source that spells it that way. So a genuine fault in a resolve or a compile still reads as a
-      problem with the schema; closing that means tightening the `fetch` contract, and is in `BACKLOG.md`.
+    - **Every branch is a positive verdict and the default rethrows**, the same rule `ofBaseSyntaxError`
+      ends on: a library fault propagates as itself. What makes that possible is `TsonSchemaSource.fetch`
+      naming `TsonSchemaFetchException` as the one way a source says "cannot supply this" — with no mandated
+      type, an `IllegalStateException` arriving here is equally a source's miss or a broken invariant, and
+      either every fault reads as a bad schema or every source that spells a miss that way crashes the read.
+      A source failing any other way is that source malfunctioning, and surfaces as the exception it threw:
+      `Tson.validate` promises a bad *document* never throws, and a bad *source* is not a document.
+    - **What the fetch branch does not yet carry is a code of its own.** A host being down is nobody's
+      document being wrong, and `SCHEMA_ERROR` says otherwise; the `expected` half separates them, the code
+      does not. `Diagnostic.Code` copies into `diagnostics.tn` wholesale, so a new member costs a schema
+      version and a CLI exit-code decision — `BACKLOG.md`.
 - **What still throws even with a receiver:** an `!!import` that won't load, a `!!meta` that may not
   govern, or a reference whose target owns a different `!!id` than it was fetched under (§2.2.1's
   cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Those make the namespace itself unusable rather

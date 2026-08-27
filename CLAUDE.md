@@ -580,7 +580,11 @@ exactly, and share `SchemaReference` for §2.2.1's rules on what an identity may
 out of a document and in a server that means a request body: the HTTP one guards SSRF (no redirects ever, size
 capped against bytes delivered), the file one arbitrary reads (containment checked *after* `toRealPath`, so
 `..` and symlink escape fall together). Neither verifies the `?sha256=` pin or the fetched `!!id` — the loader
-does both; `requireContentHashPin` adds the one thing it cannot, that a pin be present.
+does both; `requireContentHashPin` adds the one thing it cannot, that a pin be present. **`TsonSchemaSource`
+names its own failure exception** — a source says "cannot supply this" with `TsonSchemaFetchException` and
+nothing else, which is what lets `SchemaFailure` classify every branch positively and rethrow a fault as
+itself; the exception lives in `tson-compiler` beside the interface, since the classification cannot see a
+type declared in `tson`.
 
 ```java
 Tson tson = Tson.builder().build();
@@ -791,8 +795,10 @@ compatibility).
   `record_field.value` must be the field's declared type — which catches `int32 ~ text` whether a parameter
   put it there or the author wrote it literally, and is the FIXED/DEFAULT value validation listed below.
   `SPEC-FEEDBACK.md` #5 carries the spec-side question.
-- **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation and a general
-  disk/HTTP-backed `TsonSchemaSource` (with whitelist/blacklist policy). **Routed-value substitution is
+- **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation, and what code a
+  schema that could not be *obtained* should carry (`SCHEMA_ERROR` says the schema is at fault, which a
+  host being down is not; a code of its own costs a `diagnostics.tn` version and a CLI exit code —
+  `BACKLOG.md`). **Routed-value substitution is
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →
   `REQUIRED_FIXED`, `~` staying a default), which is §5.7's "fixation happens downstream" applied to the
   downstream §5.7 now names ("fixation happens at materialisation"). **Thread-safety is no longer wholly

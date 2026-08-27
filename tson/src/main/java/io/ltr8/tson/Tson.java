@@ -43,10 +43,10 @@ import java.util.Optional;
  * operation => ~data & { ... }}), and {@link TsonConfig#metaNameBinder} adds the classes those bind to --
  * composed over the library's binder, so the mode and every kernel name stand.
  *
- * <p>Only supports a schema governed by (and importing only from) meta-kernel/meta.tn/core.tn --
- * a real, disk/HTTP-backed {@link TsonSchemaSource} for arbitrary other
- * governing chains is its own, separately tracked backlog item; {@link TsonConfig} is the natural
- * place for that to plug in once it exists.
+ * <p>Out of the box this serves only meta-kernel/meta.tn/core.tn: {@link TsonSchemaSource#registeredOnly()}
+ * is the default source, so a schema governed by or importing anything else has to be registered first, or
+ * reachable through a source configured on {@link TsonConfig} -- {@link TsonHttpSchemaSource} and {@link
+ * TsonFileSchemaSource} ship, and both deny by default.
  *
  * <p>{@link TsonObjectReader}/{@link TsonObjectWriter} live in {@code tson-compiler}'s own root
  * package, alongside the other read-side front doors -- {@code DefinitionResolver}, part of that
@@ -218,10 +218,12 @@ public final class Tson {
                 return problems.diagnostics();
             }
             treeRegistry().compile(core.schemaRegistry().register(linked));
-        } catch (TsonSchemaValidationException e) {
+        } catch (TsonSchemaValidationException | TsonSchemaFetchException e) {
             // Whatever the phases still raise rather than report: a document with no !!id, an !!import that
-            // will not load, a !!meta that may not govern. Author errors about the document as a whole, so
-            // they carry the root pointer rather than naming a declaration.
+            // will not load, a !!meta that may not govern. Problems with the document as a whole, so they
+            // carry the root pointer rather than naming a declaration. The fetch half is here because an
+            // !!import naming something no source can supply fails the document exactly as the rest do --
+            // what differs is only whose fault it is, and that is SchemaFailure's question, not this one's.
             problems.report(Diagnostic.ofSchemaError("", "", e.getMessage(), Optional.empty()));
         } catch (RuntimeException e) {
             // Base syntax is this document's problem; anything else is a fault in this library and rethrows

@@ -1,7 +1,8 @@
 package io.ltr8.tson;
 
 import com.sun.net.httpserver.HttpServer;
-import io.ltr8.tson.TsonSchemaFetchException.Reason;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.compiler.TsonSchemaFetchException.Reason;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
@@ -44,7 +45,8 @@ class TsonReadTest {
             if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;
             }
-            throw new IllegalStateException("no schema for " + uri);
+            throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+                    "this fixture serves only " + POINT_ID, null);
         };
         return Tson.builder().schemaSource(source).build();
     }

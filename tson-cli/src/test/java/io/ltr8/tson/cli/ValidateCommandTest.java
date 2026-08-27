@@ -123,8 +123,8 @@ class ValidateCommandTest {
         String output = captureStdout(() ->
                 assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
 
-        assertTrue(output.contains("no schema file provided for !!schema \"https://example.test/typo.tn1\""),
-                output);
+        assertTrue(output.contains("cannot fetch schema 'https://example.test/typo.tn1'"), output);
+        assertTrue(output.contains("no schema file on the command line declares that !!id"), output);
         assertTrue(output.contains("the schema files given declare: https://example.test/cli-validate.tn1"),
                 output);
     }

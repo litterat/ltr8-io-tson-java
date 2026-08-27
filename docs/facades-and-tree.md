@@ -357,6 +357,13 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
     `Content-Length`; the file one is an arbitrary-read risk, so containment is checked **after**
     `toRealPath`, which settles `..` and symlink escape together — checking the unresolved path is the usual
     way that control is defeated.
+  - **`TsonSchemaFetchException` is the contract, and it lives in `tson-compiler`** beside the interface it
+    belongs to rather than beside the two sources that throw it — `SchemaFailure`, which has to route on it,
+    is in that module and cannot see a type declared in `tson`. A source signals "cannot supply this" with
+    that and nothing else, so a read can tell an unfetchable schema from a broken invariant by type; anything
+    else out of a source is that source malfunctioning and propagates as itself. `Reason` is the part worth
+    acting on: `NOT_PERMITTED` is policy and no retry helps, where `TIMEOUT`/`TRANSPORT` say the reference
+    was fine and the world was not.
   - **Neither verifies the `?sha256=` pin or the fetched document's `!!id`** — the loader does both, after a
     source returns, and a second implementation would only drift from it. What the loader cannot express is
     *requiring* a pin, since it verifies only one that is present; `requireContentHashPin` is that.
