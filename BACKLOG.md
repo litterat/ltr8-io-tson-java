@@ -55,26 +55,17 @@ throw sites by that test is done across the whole schema pipeline (issue #26); i
 again, take it fresh rather than trusting a recorded one, since the last recorded numbers had gone stale
 by a factor of six.
 
-- [ ] **Composing or refining against a template application that is still open** (`vip => <T> customer &
-  box<T>`, §5.8's "Parameterized references"). Narrower than the heading sounds, so what already works is
-  worth stating first: a composition or refinement **template** is ordinary (`vip => <T> customer & { extra:
-  T }` resolves, its body held and closed like any other), and a **fully-bound** application in either
-  absorbing position closes on demand (`vip => customer & box<text>`). What is left is only an application
-  naming the enclosing declaration's own parameters — `<T> customer & box<T>`, and the same as a refinement
-  source.
-  - **It is a pure composition that retains the parameter**, and nothing about it needs materialisation. The
-    source's field set is known while the application is open — `box`'s own held record, substituted
-    parameter-for-parameter — so absorbing it gives `vip => <T> !record { fields: [ { name: id type: text }
-    { name: v type: T } ] }`, the shape a composition template already resolves to when its parameter sits in
-    its own body. An open entry is an intermediate form; its `supertypes`/`subtypes` are meaningful only once
-    closed, so `box` — not a type until applied — simply does not appear in them while `vip` is open.
-  - **What decides the work is where the flattening happens.** This phase flattens a composition or
-    refinement template into a held record at the declaration, which is why it wants the source's field set
-    now and so wants the application closed now. If an open entry instead held its declaration AST
-    unflattened, closing would substitute and then run ordinary closed-declaration resolution — the path
-    `vip => customer & box<text>` already takes — and this case would need no separate handling at all. That
-    is a design question about the held form, not a defect in the resolver, and it is worth settling before
-    writing code against either answer.
+- [ ] **One template applied to another at an absorbing position** (`vip => <T> plain & box<inner<T>>`).
+  Composing or refining against an application applied to the declaration's own parameter works now
+  (`OpenOperandCompositionTest`) — the operand's held body is substituted parameter-for-parameter and its
+  fields absorbed, no closure involved. What is left is an argument that is itself an application:
+  substitution writes a binding as one token, so `inner<T>` would land as `inner` and the argument list would
+  be dropped silently. Reported as the gap it is rather than closed wrongly, and it is the last
+  schema-reachable `NOT_IMPLEMENTED` in the resolver — `TsonValidateSchemaTest` and `TsonCliTest` both use it
+  as their gap fixture, so closing it means finding them another one.
+  - Fixing it properly means a binding that can carry an application rather than a token, which is the same
+    shape `SPEC-FEEDBACK.md` #4's identity question sits on: what a type argument *is*. Worth doing after that
+    settles, not before.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each

@@ -605,8 +605,15 @@ final class TemplateMaterialiser {
      * anything else is what it looks like. The one place the channel still shows is inside a {@code type_ref}
      * record, whose {@code name} member takes a reference: a parameter there bound to a literal moves to the
      * {@code value} member, since an argument list distinguishes the two by which member holds it.
+     *
+     * <p><b>An argument may itself be open, and that is a supported use rather than an accident.</b>
+     * {@code DefinitionResolver} substitutes an operand's held body with the arguments an enclosing
+     * declaration wrote, which may be that declaration's own parameters -- the result is a held body still
+     * carrying them, absorbed as fields and closed when the enclosing declaration is. Nothing here has to
+     * know: a binding is a {@link TypeArgument} either way, and this walk never asks whether the token it
+     * writes is concrete.
      */
-    private static CoreValue substitute(CoreValue value, String head, List<String> parameters,
+    static CoreValue substitute(CoreValue value, String head, List<String> parameters,
             Map<String, TypeArgument> bindings) {
         return switch (value) {
             case TokenValue token when token.form() == TokenForm.UNQUOTED

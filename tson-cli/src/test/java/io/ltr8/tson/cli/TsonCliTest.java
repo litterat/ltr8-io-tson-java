@@ -74,11 +74,12 @@ class TsonCliTest {
     }
 
     /**
-     * The same routing end to end, through a schema that really reaches a gap: [TSON-SCHEMA] §8.1 gives a
-     * type parameter inside a choice no open representation, and the refusal's own message names the way to
-     * write it today. Exit 70 stays -- a gap is not a verdict on the schema -- but it is now decided by the
-     * diagnostic's own code rather than by an exception that had to destroy the pass to be seen, so the gap
-     * arrives located, in the report, like every other problem.
+     * The same routing end to end, through a schema that really reaches a gap: one template applied to
+     * another at a supertype, where substitution would write the inner application's head and drop its
+     * argument list, and the refusal's own message names the way to write it today. Exit 70 stays -- a gap
+     * is not a verdict on the schema -- but it is decided by the diagnostic's own code rather than by an
+     * exception that had to destroy the pass to be seen, so the gap arrives located, in the report, like
+     * every other problem.
      */
     @Test
     void aSchemaReachingAGapCompilesToSeventyWithTheGapsOwnMessage(@TempDir Path dir) throws IOException {
@@ -88,8 +89,9 @@ class TsonCliTest {
                 !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   box     => <T> { v: T }
+                  inner   => <U> { u: U }
                   plain   => { n: int32 }
-                  derived => <T> plain & box<T>
+                  derived => <T> plain & box<inner<T>>
                 }
                 """);
 
@@ -117,8 +119,9 @@ class TsonCliTest {
                 !!import:"https://tson.io/2026/33/m/core.tn"
                 {
                   box     => <T> { v: T }
+                  inner   => <U> { u: U }
                   plain   => { n: int32 }
-                  derived => <T> plain & box<T>
+                  derived => <T> plain & box<inner<T>>
                   widens  => !uint8 ^ { min: -10 }
                   fine    => int32
                 }

@@ -105,18 +105,20 @@ class TsonValidateSchemaTest {
      * this is wrong. A consumer that conflates them is wrong in the direction that matters -- calling a
      * document invalid that was never judged.
      *
-     * <p>The gap here is a <b>parameterized supertype</b> ({@code plain & box<T>}), one of the §5.10
-     * substitution cases this resolver does not close yet. It has to be a real one: the case this fixture
-     * used to carry, a parameter in a collection-valued slot, is the author's error and reports {@code
-     * SCHEMA_ERROR} now.
+     * <p>The gap here is <b>one template applied to another at a supertype</b> ({@code plain &
+     * box<inner<T>>}), where substitution would write the inner application's head and drop its argument
+     * list. It has to be a real one, and the supply keeps shrinking: a plain parameterized supertype
+     * ({@code plain & box<T>}) resolves now, and a parameter in a collection-valued slot -- the case this
+     * fixture carried before that -- is the author's error and reports {@code SCHEMA_ERROR}.
      */
     @Test
     void aGapIsReportedBesideTheOrdinaryProblemsRatherThanReplacingThem() {
         List<Diagnostic> problems = check("""
                 {
                   box     => <T> { v: T }
+                  inner   => <U> { u: U }
                   plain   => { n: int32 }
-                  derived => <T> plain & box<T>
+                  derived => <T> plain & box<inner<T>>
                   widens  => !uint8 ^ { min: -10 }
                   fine    => int32
                 }

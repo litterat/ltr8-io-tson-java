@@ -688,10 +688,12 @@ compatibility).
 
 ## Not yet implemented
 
-- **Part 2 resolution gaps** — the identity-diagonal FIXED-value invariant, plus a small set that are all
-  one job: a generic type-ref whose argument is nested or a value rather than a plain name, a parameterized
-  supertype (`customer & box<T>`), and a field/element type that is none of the shapes the resolver handles
-  — each reachable only inside a template, and each blocked on §5.10 substitution (the item below).
+- **Part 2 resolution gaps** — the identity-diagonal FIXED-value invariant, plus a generic type-ref whose
+  argument is itself an application (`plain & box<inner<T>>`), which is the last schema-reachable
+  `NOT_IMPLEMENTED` in the resolver: substitution writes a binding as one token, so the inner argument list
+  would be dropped. A **parameterized supertype** is no longer among them — `vip => <T> customer & box<T>`
+  absorbs the operand's fields while the application is open (`OpenOperandCompositionTest`), the operand
+  contributing its own supertypes but not its name, a template being no type.
   `DefinitionResolver`'s Javadoc is the exact current boundary and `BACKLOG.md` carries the detail. Only
   about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.

@@ -264,9 +264,9 @@ recorded open form, and replacing the application with a reference to the entry 
 - **Failures report per entry**, through the same receiver resolution uses, so two bad applications in one
   schema are both reported against their own declarations rather than the first aborting the document.
 - **Two positions close on demand, during resolution, rather than waiting for the pass.** A composition
-  supertype (§5.8) and a refinement source (§5.7) copy the source's *fields*, and an open application has no
-  field set to copy — so `DefinitionResolver` closes one itself, through an `ApplicationCloser` hook wired to
-  this same instance. Sharing the instance is what makes an on-demand closing and a later batch closing of
+  supertype (§5.8) and a refinement source (§5.7) copy the source's *fields*, and a closed application's
+  fields live on the entry it denotes — so `DefinitionResolver` closes one itself, through an
+  `ApplicationCloser` hook wired to this same instance. Sharing the instance is what makes an on-demand closing and a later batch closing of
   the same application land on one entry. Each entry is *published into the namespace as it is built*,
   because absorbing its fields is the very next thing that happens: an entry visible only in this pass's own
   map would be invisible to the lookup right behind it.
@@ -274,10 +274,22 @@ recorded open form, and replacing the application with a reference to the entry 
     which is also the memo the circular-composition check rides on, so a cycle reached *through* an
     application (`a => b<text> & {}`, `b => <T> a & {}`) is reported as a circular composition rather than
     recursing. Pinned, because it is the one thing this wiring could have broken.
-  - **An application still naming the declaration's own parameters is refused** (`vip => <T> box<T> & { … }`)
-    — it cannot close until `vip` itself materialises, and deferring composition that far is a different
-    feature. Before this, refinement did not refuse: it copied the template's body with parameters unbound
-    and reported an unresolved reference to a parameter the author never wrote.
+  - **An application still naming the declaration's own parameters absorbs without closing anything.**
+    `vip => <T> customer & box<T>` needs no materialisation: the operand's body is *held*, so its field set is
+    known while the application is open, and substituting its parameters with the arguments as written — here
+    the absorbing declaration's own — yields a held record still carrying them. Read back through the
+    `record` constructor, that is an ordinary field set whose types mention a parameter, which is what a
+    template's fields are anyway. Inner applications are deliberately left unclosed: they close when the
+    absorbing declaration does, one pass later.
+    - **The operand contributes its own supertypes and not its own name.** `box` is a template and §5.10
+      makes a template no type, so nothing can be IS-A one; `box`'s own `base` is a type and its fields
+      arrived, so that edge is real. The cost is one row of the substitutability table: a closed
+      `vip<text>` stands where `customer` and `base` are expected but **not** where `box<text>` is, though
+      the hand-written `customer & box<text>` does — the application is flattened away here, so nothing
+      remains to say "close `box<text>` too, and index against the entry that mints".
+      `OpenOperandCompositionTest` pins all three rows, the deliberate no included.
+    - **One template applied to another is still refused**, as a gap: `box<inner<T>>` would substitute the
+      inner application as a single token and drop its argument list.
 - **A held body writes as the application it holds, and names its carrier nowhere.** `HeldBody` is
   `@Transparent` (`io.ltr8.annotation.Transparent`), so `tson-bind` resolves it to the held `DataValue`'s own
   descriptor with a bridge and `TsonObjectWriter` writes no type-ref for it at a `Top` position: a template's
