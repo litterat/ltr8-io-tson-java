@@ -701,15 +701,16 @@ final class SchemaDesugarer {
      * ElementState}, so each position needs a record built for it rather than a name token. {@code state} is
      * written only for an {@code OPTIONAL} position, for the reason {@link #arrayBinding} omits an unmarked
      * element's.
+     *
+     * <p>What the two do share is that a position's type is written through {@link #refValue}: an element
+     * holding a §5.10 application is spelled in {@code type_ref}'s record form and rewritten one pass later,
+     * exactly as a variant is.
      */
     private static Optional<Binding> tupleBinding(List<Position> positions) {
         List<ScopedValue> elements = new ArrayList<>();
         for (Position position : positions) {
-            if (!(position.typeRef() instanceof SimpleRef simple)) {
-                return Optional.empty();
-            }
             List<RecordValue.Field> members = new ArrayList<>();
-            members.add(nameField(ELEMENT_TYPE, simple.name()));
+            members.add(new RecordValue.Field(ELEMENT_TYPE, scoped(refValue(position.typeRef()))));
             if (position.optional()) {
                 members.add(nameField(STATE, ElementState.OPTIONAL.name()));
             }
@@ -722,7 +723,16 @@ final class SchemaDesugarer {
     /**
      * {@code !choice { variants: [A B ...] }} -- the choice row of the table. Variants arrive already
      * expanded: a nested inline form is hoisted by the caller first, so what reaches here is a {@link
-     * SimpleRef} per variant.
+     * SimpleRef} or -- for a §5.10 application, which has no entry to be hoisted to until materialisation
+     * mints one -- a {@code GenericRef}.
+     *
+     * <p><b>A variant is written through {@link #refValue}, like every other {@code type_ref}-typed slot.</b>
+     * A collection-valued slot is no different from a named one in what it holds: {@code variants} is a
+     * {@code [type_ref]}, so an application standing in it is spelled in {@code type_ref}'s record form and
+     * rewritten to the entry it denotes one pass later ({@code TemplateMaterialiser.mapBodyRefs}, which maps
+     * a choice's variants like any other reference). Refusing the application here instead left the whole
+     * choice unlifted, and a form the desugar table did not reduce reaches {@code DefinitionResolver} as a
+     * {@code ChoiceRef} it has no case for.
      *
      * <p>Distinctness of the variants (§5.4: "the resolver validates that each variant resolves to a distinct
      * type") is deliberately not checked here -- it is a question about what the names <em>resolve</em> to,
@@ -731,10 +741,7 @@ final class SchemaDesugarer {
     private static Optional<Binding> choiceBinding(List<TypeRef> variants) {
         List<ScopedValue> members = new ArrayList<>();
         for (TypeRef variant : variants) {
-            if (!(variant instanceof SimpleRef simple)) {
-                return Optional.empty();
-            }
-            members.add(scoped(new TokenValue(simple.name(), TokenForm.UNQUOTED)));
+            members.add(scoped(refValue(variant)));
         }
         return Optional.of(new Binding(CHOICE,
                 List.of(new RecordValue.Field(VARIANTS, scoped(new ArrayValue(members))))));

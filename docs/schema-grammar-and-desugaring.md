@@ -270,8 +270,18 @@ rebuilt and called a cache.
     and `[[T]]` lift at all. The table keeps both renderings of such a slot: the wire field a closed
     construction would write (`type_ref`'s record form, `{ name: tree  arguments: [ … ] }`, which is what
     `internalName` hashes) and the reference *as written*, which is what an open binding holds. Only
-    `element_type`/`key_type`/`value_type` are reached this way; `tuple` and `choice` put their positions
-    inside a collection and are unchanged.
+    `element_type`/`key_type`/`value_type` are reached this way, a named slot being the one an open binding
+    can address; `tuple` and `choice` put their positions inside a collection, so they keep only the first
+    rendering — written through the same `refValue` producer, since a `[type_ref]` holds what a `type_ref`
+    holds, and rewritten a pass later by `TemplateMaterialiser.mapBodyRefs`, which maps a choice's variants
+    and a tuple's elements like any other reference.
+    - **A slot that refuses an application does not fail where it decided.** `choiceBinding` required a bare
+      name per variant, so `( box<text> | int32 )` left the *whole* choice unlifted and reached
+      `DefinitionResolver` as a `ChoiceRef` it has no case for — the author of a closed, ordinary type being
+      told that only "fresh record constructions, composition, simple type references … are resolved so far".
+      Inside a template it was worse: with the choice unlifted, holding the body handed the `ChoiceRef` to
+      `refValue`, whose two documented inputs are `SimpleRef` and `GenericRef`, and the schema died on a
+      `ClassCastException`.
     - **A closed construction writes the record form and lets materialisation close it.** Its body goes
       through the constructor's own reader, so the application has to survive a wire hop, and the resulting
       entry names something that is not an entry yet — for exactly the window an ordinary forward reference

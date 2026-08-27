@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.meta.ChoiceBody;
+import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
@@ -74,6 +75,19 @@ class ContainerSugarEndToEndTest {
         return compiled.schema().entries().get(name);
     }
 
+    /**
+     * An entry's body with every {@code REFERENCE} hop followed. How many hops an alias costs is this
+     * resolver's own bookkeeping (§8.3 flattens uses, not entries), so a fixture asserting on the body a name
+     * denotes should not also be asserting on the length of the chain to it.
+     */
+    private static Top bodyOf(TsonCompiledSchema compiled, String name) {
+        Top body = compiled.schema().entries().get(name).body();
+        while (body instanceof Reference reference) {
+            body = compiled.schema().entries().get(reference.target().name()).body();
+        }
+        return body;
+    }
+
     /** The whole arc in one assertion: a map-typed field resolves, links, compiles, and reads real data. */
     @Test
     void aMapTypedFieldReadsRealData() {
@@ -86,6 +100,82 @@ class ContainerSugarEndToEndTest {
         TsonValue value = (TsonValue) compiled.get("holder")
                 .read(TestDocuments.document("{ entries: { \"a\" => \"one\"  \"b\" => \"two\" } }"));
         assertNotNull(value);
+    }
+
+    /**
+     * <b>A collection-valued slot holds an application like every other {@code type_ref}-typed slot.</b>
+     * {@code variants} is a {@code [type_ref]}, so a §5.10 application standing in one is spelled in {@code
+     * type_ref}'s record form and rewritten to the entry it denotes one pass later -- the same route a field
+     * type, an {@code element_type} and a map's {@code key_type}/{@code value_type} already took.
+     *
+     * <p>{@code choiceBinding} refused a variant that was not a bare name instead, which did not fail where
+     * it decided: refusing left the <em>whole</em> choice unlifted, so what reached {@code DefinitionResolver}
+     * was a {@code ChoiceRef} it has no case for, and the author of a closed, ordinary type was told that
+     * only "fresh record constructions, composition, simple type references ... are resolved so far".
+     */
+    @Test
+    void anApplicationIsAChoiceVariantLikeAnyOtherReference() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  u   => ( box<text> | int32 )""");
+
+        ChoiceBody choice = assertInstanceOf(ChoiceBody.class, compiled.schema().entries().get("u").body());
+        String variant = choice.variants().getFirst().name();
+        assertTrue(variant.startsWith("box_text_"), () -> "names the instantiation, not 'box': " + variant);
+        assertEquals(List.of(), choice.variants().getFirst().arguments(),
+                "and names it as a closed reference, the application having been rewritten");
+        assertInstanceOf(RecordBody.class, compiled.schema().entries().get(variant).body());
+    }
+
+    /** The tuple half of the same rule: {@code elements} is a collection of {@code tuple_element} records. */
+    @Test
+    void anApplicationIsATupleElementLikeAnyOtherReference() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  t   => [text, box<text>]""");
+
+        TupleBody tuple = assertInstanceOf(TupleBody.class, compiled.schema().entries().get("t").body());
+        assertEquals(TypeRef.of("text"), tuple.elements().getFirst().elementType());
+        String second = tuple.elements().get(1).elementType().name();
+        assertTrue(second.startsWith("box_text_"), () -> "names the instantiation: " + second);
+
+        TsonValue value = (TsonValue) compiled.get("t")
+                .read(TestDocuments.document("[\"a\" { v: \"b\" }]"));
+        assertNotNull(value);
+    }
+
+    /**
+     * <b>The open case, which failed worse than the closed one.</b> With the variant refused, the choice was
+     * never lifted, so holding {@code w}'s body handed the un-lifted {@code ChoiceRef} to the producer that
+     * spells a {@code type_ref} -- a {@code ClassCastException} out of the resolver, where the two shapes it
+     * accepts are {@code SimpleRef} and {@code GenericRef}. Lifting the choice is what keeps that producer's
+     * input to the two shapes it documents.
+     */
+    @Test
+    void anApplicationIsAChoiceVariantInsideATemplateToo() {
+        TsonCompiledSchema compiled = compile("""
+                  box => <T> { v: T }
+                  w   => <T> ( box<T> | int32 )
+                  u   => w<text>""");
+
+        ChoiceBody choice = assertInstanceOf(ChoiceBody.class, bodyOf(compiled, "u"));
+        assertTrue(choice.variants().getFirst().name().startsWith("box_text_"), choice::toString);
+    }
+
+    /**
+     * The property that says the fix is a fix rather than a new path: an application variant is the same
+     * type as the bare reference to it, so §5.4's distinctness sees through the spelling. Two applications of
+     * one template are one variant, exactly as two occurrences of one name are.
+     */
+    @Test
+    void twoApplicationsOfOneTemplateAreOneVariant() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> compile("""
+                          box => <T> { v: T }
+                          u   => ( box<text> | box<text> )"""));
+
+        assertTrue(thrown.getMessage().contains("twice"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("§5.4"), thrown.getMessage());
     }
 
     @Test
