@@ -246,6 +246,24 @@ schemaless `TsonTreeReader` alike. A sealed `TsonValue` over seven pure immutabl
 record-vs-map and array-vs-tuple distinctions survive into the model, where JSON's would collapse — and
 annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
 
+- **`TsonDocument` is the model's document, and `TsonValue` stays a pure value.** [TSON-DATA] §2.2 —
+  "Header directives are properties of the document, not of the body's root value" — is why the header is a
+  wrapper rather than two more components on every node, and it makes the tree model the counterpart of the
+  parser's own `ast.Document(id, schema, root)` rather than a value model with a hole where the document
+  should be. It needs no dependency, so `tson-tree` still requires nothing.
+  - **No `meta` component**, deliberately: a document carrying `!!meta` is a *schema* document, whose value
+    model is `schema.meta`. `TsonDocumentHeader` is the type that holds all three, and it answers a different
+    question — classifying a document from its opening bytes (`isSchemaDocument()`) before deciding how to
+    read it. Same reason `ast.Document` carries only the two.
+  - **`readDocument` sits beside `read`, and `read` is untouched.** The wrapper's one real cost was said to
+    be changing what a read hands back and every caller with it; that is a cost of *replacing* `read`, not of
+    the wrapper. `TsonTreeWriter.toTson(TsonDocument)` closes the loop from the other end, the document's own
+    directives winning over the writer's component by component and only where it has one — so reproducing a
+    document reproduces it, while a writer configured for something the document does not state still
+    contributes it.
+  - The object side has the worse version of the same gap and is not closed: a bound object carries neither
+    the schema nor its root type, which is why `TsonObjectWriter.describing` needs the type as a second
+    argument where the tree writer does not (`BACKLOG.md`).
 - **`TsonAtom.toString()` renders its value alone, and that is load-bearing.** A reader reporting on a
   decoded value stringifies whatever it decoded, and in tree mode that is a `TsonAtom` — so the record's own
   default rendering would reach a `Diagnostic`'s `expected`/`actual`, the two fields that exist precisely so
