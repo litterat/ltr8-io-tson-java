@@ -288,8 +288,18 @@ recorded open form, and replacing the application with a reference to the entry 
       the hand-written `customer & box<text>` does — the application is flattened away here, so nothing
       remains to say "close `box<text>` too, and index against the entry that mints".
       `OpenOperandCompositionTest` pins all three rows, the deliberate no included.
-    - **One template applied to another is still refused**, as a gap: `box<inner<T>>` would substitute the
-      inner application as a single token and drop its argument list.
+    - **An argument that is itself an application survives whole.** Substitution writes a bound reference
+      through `SchemaDesugarer.refValue` — positionally when it carries no arguments, in `type_ref`'s record
+      form when it does — so `box<inner<T>>` keeps `inner<T>` and the absorbing declaration's own
+      materialisation closes it. Sharing that producer is the requirement rather than an economy: two
+      spellings of one form are two entries for one type, and `refValue`'s `arguments().isEmpty()` branch is
+      what §5.6's positional spelling turns on.
+    - **A parameter cannot be a head.** `<T> { v: T<text> }` is refused at the declaration that writes it
+      (`SchemaResolver.refuseHeadAbstraction`, over the held body's own `applications()`), because
+      `type_ref.name` is a `type_name` and §5.10 admits no head abstraction. It cannot wait for the linker's
+      arity check, which reads the same accessor: materialisation runs first, and by then the parameter is
+      gone — leaving either an arity error against a content-derived name nobody typed, or a wire-vocabulary
+      mismatch, neither of which names what the author did.
 - **A held body writes as the application it holds, and names its carrier nowhere.** `HeldBody` is
   `@Transparent` (`io.ltr8.annotation.Transparent`), so `tson-bind` resolves it to the held `DataValue`'s own
   descriptor with a bridge and `TsonObjectWriter` writes no type-ref for it at a `Top` position: a template's

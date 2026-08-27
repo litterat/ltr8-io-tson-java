@@ -261,6 +261,7 @@ public final class SchemaResolver {
             Optional<SourcePosition> position = Optional.ofNullable(positions.get(declaration));
             try {
                 TypeDefinition resolved = holder[0].resolve(declaration, position);
+                refuseHeadAbstraction(name, resolved);
                 namespace.put(name, resolved);
                 return resolved;
             } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
@@ -434,6 +435,32 @@ public final class SchemaResolver {
         return error instanceof UnsupportedOperationException
                 ? Diagnostic.ofSchemaGap(schemaId, declaration, error.getMessage(), position)
                 : Diagnostic.ofSchemaError(schemaId, declaration, error.getMessage(), position);
+    }
+
+    /**
+     * §5.10 admits no head abstraction: a type parameter stands for a type, never for a template, so
+     * {@code <T> { v: T<text> }} is no form. Refused here, over every application the held body writes,
+     * because here is the last point at which the author's own spelling is still what fails.
+     *
+     * <p><b>It cannot wait for the linker</b>, which checks the rest of §5.10's arity rule off the same
+     * accessor: materialisation runs first, and by then the parameter has been substituted away. What
+     * arrives at the {@code type_name} head is then whatever bound it -- a bare entry name if the argument
+     * was closed, reported as an arity error against a content-derived name nobody typed, or {@code
+     * type_ref}'s record form if it was not, reported as a wire-vocabulary mismatch. Neither names what the
+     * author did.
+     */
+    private static void refuseHeadAbstraction(String name, TypeDefinition resolved) {
+        if (!(resolved.body() instanceof io.ltr8.tson.schema.meta.TemplateBody held)) {
+            return;
+        }
+        for (io.ltr8.tson.schema.meta.TypeRef application : held.applications()) {
+            if (resolved.parameters().contains(application.name())) {
+                throw new TsonSchemaValidationException("'" + name + "': '" + application.name()
+                        + "' is a type parameter applied to arguments -- a parameter stands for a type, never "
+                        + "for a template, and §5.10 admits no head abstraction, so '" + application.name()
+                        + "<...>' is no form. Take the applied type as the parameter instead");
+            }
+        }
     }
 
     private static TypeDefinition unresolved(Optional<SourcePosition> position, List<String> parameters) {

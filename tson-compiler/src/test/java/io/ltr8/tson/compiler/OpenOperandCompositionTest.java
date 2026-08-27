@@ -169,6 +169,52 @@ class OpenOperandCompositionTest {
     }
 
     /**
+     * One template applied to another, at an absorbing position and still open. Substitution writes a bound
+     * reference through {@code SchemaDesugarer.refValue}, which spells one carrying arguments in {@code
+     * type_ref}'s record form rather than as a bare token, so {@code inner<T>} survives whole and the
+     * absorbing declaration's own materialisation closes it. Writing the head name alone dropped the argument
+     * list with no diagnostic, which is why this was refused as a gap rather than closed wrongly.
+     */
+    @Test
+    void anArgumentThatIsItselfAnApplicationSurvivesSubstitutionWhole() {
+        TsonCompiledSchema compiled = compile("""
+                  plain => { n: int32 }
+                  inner => <U> { u: U }
+                  box   => <T> { v: T }
+                  vip   => <T> plain & box<inner<T>>
+                  use   => vip<text>
+                """);
+
+        RecordBody closed = (RecordBody) compiled.schema().entries()
+                .get(aliasTarget(compiled, "use")).body();
+        String v = closed.fields().stream().filter(f -> f.name().equals("v")).findFirst().orElseThrow()
+                .type().name();
+
+        RecordBody held = (RecordBody) compiled.schema().entries().get(v).body();
+        assertEquals(List.of("u"), held.fields().stream().map(f -> f.name()).toList(),
+                () -> "'v' should name the inner<text> instantiation, not bare 'inner': " + v);
+        assertEquals("text", held.fields().get(0).type().name(),
+                "the argument list survived, so U closed to text");
+    }
+
+    /**
+     * The one position a bound reference cannot be written into: a {@code type_ref}'s own head, which is a
+     * {@code type_name}. §5.10 admits no head abstraction, so this is refused where the author wrote it --
+     * at the template's declaration, before substitution has anything to say about it.
+     */
+    @Test
+    void aParameterAppliedAsAHeadIsRefusedAtTheDeclarationThatWritesIt() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> compile("""
+                          box => <T> { v: T<text> }
+                          use => box<int32>
+                        """));
+
+        assertTrue(thrown.getMessage().contains("'box'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("no head abstraction"), thrown.getMessage());
+    }
+
+    /**
      * An open operand with elements rather than fields gets the verdict its closed spelling gets, one phase
      * earlier: there is nothing for {@code &} to compose with.
      */

@@ -1088,13 +1088,22 @@ public final class TsonSchemaLinker {
      * close, so what reaches here is the set that genuinely needs checking: references inside template
      * bodies, which stay open by design, and bare names anywhere.
      *
-     * <p>A reference naming one of the enclosing declaration's own <em>parameters</em> is skipped -- a
-     * parameter is not an entry and declares nothing, and §5.10 admits no head abstraction, so it can carry
-     * no arguments to check.
+     * <p>A reference naming one of the enclosing declaration's own <em>parameters</em> has no arity to check
+     * -- a parameter is not an entry and declares nothing -- but it is not simply skipped: §5.10 admits no
+     * head abstraction, so a parameter carrying an argument list is refused here, where the author wrote it.
+     * Left to run, {@code <T> { v: T<text> }} substitutes whatever {@code T} binds into a {@code type_name}
+     * slot, and an argument-bearing binding lands there as {@code type_ref}'s record form -- reported one
+     * phase later as a wire-vocabulary mismatch, which names none of what the author did.
      */
     private static void checkArity(TypeRef ref, Map<String, TypeDefinition> namespace,
                                     List<String> ownParameters, String context) {
         if (ownParameters.contains(ref.name())) {
+            if (!ref.arguments().isEmpty()) {
+                throw new TsonSchemaValidationException(context + ": '" + ref.name() + "' is a type parameter "
+                        + "applied to arguments -- a parameter stands for a type, never for a template, and "
+                        + "§5.10 admits no head abstraction, so '" + ref.name() + "<...>' is no form. Name the "
+                        + "template and apply that, or take the applied type as the parameter instead");
+            }
             return;
         }
         TypeDefinition referenced = namespace.get(ref.name());
