@@ -352,6 +352,55 @@ excludes the lot. Two rules do have to be stated on top:
 Mixed script stays permitted; a restriction level remains available as an opt-in profile, default off
 (Step 4). At scope level rather than per name, no two names in one scope may share a `skeleton()` (Step 2).
 
+**Step 1c — what the grammars become, and where the constraint is actually enforced.** Part 1 gains an
+`identifier` production and uses it at the two positions that are already unquoted-only:
+
+```
+identifier      = identifier-start *identifier-continue
+identifier-start    = XID_Start / "_"
+identifier-continue = XID_Continue / "-" / "."
+                ; the profile of Step 1b; a name's decoded text is matched
+                ; against this in full, as §7.6 matches a number's
+
+type-ref        = "!" identifier
+annotation      = "@" identifier [ ":" data-value ]
+field-name      = unquoted-token / single-line-token
+```
+
+**`field-name` deliberately stays lexical**, and that is the move that makes the whole thing work. A Class 1
+document has no schema, so nothing there knows which tokens are meant as identifiers; `{"first name": 1}`
+reads as an ordinary record and JSON compatibility is untouched. The identifier constraint is stated once, in
+Part 2, on **declared** names — and the data side then conforms *by construction*: a schema's field names are
+identifiers, a data field name is valid only if it matches a declared one, so a field name that is not an
+identifier matches nothing and is already an `UNRECOGNIZED_FIELD`. No second check at the data layer, and no
+new failure mode — a document that would have been rejected is rejected for the reason it was always going to
+be.
+
+This is the shape the series already uses for values, one layer down. `{ x: text }` accepts the token `true`
+as the string `"true"`, because §7.3 gives `true` no special status under a schema: the lexer produces a
+token, and the layer that knows the type decides what it is. Names work the same way — the lexer produces a
+token, and the schema decides whether it was an identifier.
+
+**Two interactions this creates, both verified against the current implementation:**
+
+- **`_` at identifier-start, against `unquoted-token`-start.** Step 1b adds `_` to identifier-start;
+  §7.1 keeps it out of *token*-start because the bare token `_` is the absent sentinel. Today `{ "_id": 1 }`
+  is a record and `{ _id: 1 }` is not — the lexer emits `_` then `id`. So under this grammar `_id` is a
+  spellable field name and an **unspellable** type-ref or annotation name, since those positions are
+  unquoted-only. Either drop `_` from identifier-start (and `_id` stays a quoted-only field name, which is
+  where it already is), or let the lexer distinguish `_` alone from `_` followed by an identifier-continue
+  character — one token of lookahead, the same budget `.` versus `..` already costs. Worth deciding
+  explicitly rather than discovering.
+- **`field-name` drops `multi-line-token`.** It is `token` today, which includes the triple-quoted form, so a
+  multi-line string is currently a legal field name. Dropping it is a tightening with no cost anyone will
+  notice, but it is a change and should be stated as one.
+
+**And one consequence for the security story, which should not be left implicit.** Because Class 1 field
+names stay unconstrained, the identifier profile protects *schema-governed* documents only. Schemaless
+documents keep their protection from Step 2 instead — skeleton distinctness within a record's own field set,
+which needs no schema, since a record's fields are a closed scope on their own. The two mechanisms cover the
+two classes, and neither covers both; saying so is what keeps the layering honest.
+
 **Precedent, and one place the obvious precedent is a warning rather than a model.** Java's identifier rules
 line up with Step 1b's on the two decisions that were live here: an identifier may not start with a digit,
 and `_` is a legal start character. Java adds `$`, which TSON has no reason to copy — UAX #31 cites exactly
@@ -376,12 +425,14 @@ that defines the predicate. So Java is a good precedent for the *shape* of an id
 for its character set — and it is a second, independent instance of the exact trap this register is asking
 §7.1 to warn implementers about.
 
-**Interior whitespace, and the JSON divergence it creates.** `XID_Continue` excludes whitespace, so
-`{ "first name": 1 }` stops being a record. §7.1 currently claims "the comma separators and quoted keys
-required by JSON are accepted by the TSON grammar", and that claim narrows: a JSON object whose keys are not
-valid TSON names maps to a **map** (`{ "first name" => 1 }`), not a record — which is the honest reading
-anyway, since §2.6 makes map keys data values with no name constraints, and an arbitrary JSON key is data.
-§7.1's JSON paragraph should say so rather than leave the two sentences to be reconciled by a reader.
+**Interior whitespace, and why JSON compatibility survives it.** `XID_Continue` excludes whitespace, so
+`first name` is not an identifier. Under Step 1c that costs JSON nothing: `field-name` stays lexical, so
+`{ "first name": 1 }` is still an ordinary Class 1 record and §7.1's claim that "the comma separators and
+quoted keys required by JSON are accepted by the TSON grammar" stays true as written. What changes is only
+what happens when such a document is validated *against a schema*: no declared field can be named
+`first name`, so the field is unrecognised — an ordinary schema mismatch, reported where the mismatch is,
+rather than a lexical rejection of the document. That is the outcome to want, and it is the reason the
+constraint belongs on declarations rather than on the `field-name` production.
 
 **ZWNJ and ZWJ: §7.1's exclusion is over-broad, its remedy is the attack, and Unicode has moved.** §7.1
 excludes both, reasoning "they are invisible, which makes them confusable and spoofing surface (§9.4); names
