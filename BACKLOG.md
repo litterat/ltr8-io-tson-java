@@ -62,17 +62,31 @@ An open entry's body is the constructor application as written, held unread unti
 substitutes its parameters away — `docs/schema-resolution.md` describes it, `SPEC-FEEDBACK.md` #5 and #7 are
 the proposals it answers. What is left below are consequences of holding, not shapes outside it.
 
-- [ ] **Check a `~`/`=` value at a field typed by a record, container, tuple or choice.** §5.2 makes a
-  field's fixed or default value a value of the field's declared type; the linker enforces it where that
-  type is an atom or an enum and skips it otherwise, so `rec => { xs: ns ~ oops }` over `ns => [text]`
-  still links and compiles, and the read that trips over it reports `NOT_IMPLEMENTED` against the data —
-  a gap in this library, for the schema author's mistake.
-  - **What blocks it is ordering:** deciding whether a token satisfies a composite type takes that type's
-    compiled reader, and compilation runs after linking. Either run this part after compiling, or hoist
-    enough of the reader construction to answer it earlier.
-  - **Rejecting every token at a composite type is not the shortcut it looks like.** §5.6's positional
-    form lets a record with exactly one bare `REQUIRED` field be filled by a bare value, and a choice
-    variant may itself be an atom, so both have tokens that legitimately satisfy them.
+- [ ] **Check a `~`/`=` value at a field typed by a record or a choice.** §5.2 makes a field's fixed or
+  default value a value of the field's declared type. Atoms, enums and containers are decided at link;
+  these two are not, so `point => { n: int32 }` with `rec => { p: point ~ notanint }` links and compiles,
+  and the read that trips over it reports `NOT_IMPLEMENTED` against the data — a gap in this library, for
+  the schema author's mistake.
+  - **Neither is a rejection, which is what separates them from the containers.** A token satisfies both,
+    legitimately: §5.6's positional form fills a record with exactly one bare `REQUIRED` field from a bare
+    value (`point ~ 3` reads fine), and a choice variant may itself be an atom (`( int32 | text ) ~ oops`
+    reads fine). So the work is to decide, and deciding means reading the referenced type rather than
+    classifying it.
+  - **What blocks it is ordering:** that read is the type's compiled reader, and compilation runs after
+    linking. Either run this part after compiling, where the real readers exist, or hoist enough of the
+    reader construction to answer it earlier.
+  - **Both decisions are already stated somewhere and want reusing, not restating.** A record's
+    positional-form eligibility is exactly `RecordAbstractReader`'s own `positionalFieldIndex` count —
+    exactly one field in bare `REQUIRED`, never `REQUIRED_DEFAULT`/`REQUIRED_FIXED`/`OPTIONAL`/
+    `OPTIONAL_FIXED` — computed off `RecordField.state()` and nothing else, so it can be a static both
+    call. A choice does **not** accept a token because some variant would: it discriminates on the token's
+    §4 base-type class and requires *that* variant to parse (`( int32 | date ) ~ oops` fails, where
+    `( int32 | text ) ~ oops` passes), and `ChoiceDisjointness` already derives each variant's
+    `DiscriminationClass` in this package.
+  - **The property to protect is that the check cannot diverge from the reader.** It holds today because
+    the check hands the token to the field's own reader parser. Recursion over `schema.meta` is a partial
+    second implementation of what the reader does, which is the argument for the after-compilation route
+    even though it is more plumbing.
 
 - [ ] **A parametric enum member is classified as a type argument and fails.** `e => <M> !enum { members:
   [a b M] }` applied as `e<c>` reports `'e<c>' source has an unresolved reference 'c'`: an unquoted

@@ -798,14 +798,15 @@ compatibility).
   `int32 ~ text` whether a parameter put it there or the author wrote it literally (`TsonSchemaLinker`'s
   `checkFieldValue`, `FieldValueConformanceTest`). What is left is that check's own boundary, below.
   `SPEC-FEEDBACK.md` #5 carries the spec-side question.
-- **A `~`/`=` value at a field typed by a record, container, tuple or choice is unchecked.** §5.2's
-  dependency is enforced where the field's type is an atom or an enum (`TsonSchemaLinker.checkFieldValue`,
-  running the field's own resolved body over the token, so a default is accepted exactly when a read would
-  accept that token there). A composite type needs its compiled reader to decide, and compilation runs
-  after linking — so those keep the old path and a bad value reaches a data read as `ErrorReader`'s
-  `NOT_IMPLEMENTED`. Rejecting every token at a composite type is not the shortcut it looks like: §5.6's
-  positional form lets a record with one bare `REQUIRED` field take a bare value, and a choice variant may
-  be an atom.
+- **A `~`/`=` value at a field typed by a record or a choice is unchecked.** §5.2's dependency is enforced
+  at link for atoms and enums (`TsonSchemaLinker.checkFieldValue` runs the field's own resolved body over
+  the token, so a default is accepted exactly when a read would accept that token there) and for
+  array/map/tuple, where the field's type alone settles it — no token is a container value, and §12.1
+  admits only a bare token after the modifier, so such a field has no default it could state. A record or a
+  choice is neither: a token satisfies both legitimately (§5.6's positional form, an atom-typed variant), so
+  deciding needs the referenced type *read* rather than classified, and that is its compiled reader, which
+  runs after linking. Those keep the old path and a bad value reaches a data read as `ErrorReader`'s
+  `NOT_IMPLEMENTED`.
 - **Deferred design questions** — the identity-diagonal FIXED-value invariant. **Routed-value
   substitution is
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →

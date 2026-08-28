@@ -1172,11 +1172,22 @@ public final class TsonSchemaLinker {
                 || target.body() instanceof Reference) {
             return;
         }
+        Token value = field.value().get();
+        // No token is an array, map or tuple value, whatever it spells -- so the field's type alone decides
+        // this one, with no parser and no recursion. The other composites are not like this and are not
+        // grouped with them: §5.6's positional form lets a record with one bare REQUIRED field be filled by
+        // a bare value, and a choice variant may itself be an atom, so both have tokens that satisfy them
+        // and both need the referenced type read rather than merely classified (`BACKLOG.md`).
+        switch (target.body()) {
+            case ArrayBody ignored -> throw noTokenIsAContainer(entryName, field, value, "an array");
+            case MapBody ignored -> throw noTokenIsAContainer(entryName, field, value, "a map");
+            case TupleBody ignored -> throw noTokenIsAContainer(entryName, field, value, "a tuple");
+            default -> { }
+        }
         Optional<AtomType<?>> parser = AtomParsers.forBody(target.body());
         if (parser.isEmpty()) {
             return;
         }
-        Token value = field.value().get();
         try {
             parser.get().read(new TokenValue(value.text(), TokenForm.valueOf(value.form().name())));
         } catch (AtomTypeException e) {
@@ -1190,6 +1201,21 @@ public final class TsonSchemaLinker {
                     + asWritten(value) + " is not a value of that type -- " + e.getMessage() + ". §5.2 makes "
                     + "a field's fixed or default value a value of the field's own declared type");
         }
+    }
+
+    /**
+     * <b>The verdict is about the field, not about the token</b>: §12.1 admits only a bare token after
+     * {@code ~}/{@code =} (writing {@code ~ []} or {@code ~ {}} is a syntax error, not a different value),
+     * so a container-typed field has no default it could state. Saying "this token is not an array" would
+     * invite the author to write a better token, and there isn't one.
+     */
+    private static TsonSchemaValidationException noTokenIsAContainer(String entryName, RecordField field,
+                                                                      Token value, String container) {
+        return new TsonSchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
+                + "declared '" + field.type().name() + "', which is " + container + ", so it cannot have "
+                + (field.state() == FieldState.REQUIRED_DEFAULT ? "a default" : "a fixed value") + " -- "
+                + asWritten(value) + " is a token, and §5.2 admits only a bare token there. Drop the "
+                + "modifier, or declare the field with a type a token can be a value of");
     }
 
     /** A token echoed the way the schema spells it, so a quoted value is visibly quoted in the message. */

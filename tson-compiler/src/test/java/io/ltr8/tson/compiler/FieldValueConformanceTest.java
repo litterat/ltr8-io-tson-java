@@ -150,16 +150,41 @@ class FieldValueConformanceTest {
     }
 
     /**
-     * <b>A non-atom field type is deferred, not blessed.</b> Checking a value against a record, container or
-     * choice needs a compiled reader and compilation happens after linking, so these keep the existing path
-     * -- the value is decoded when the reader is built, and a bad one still fails there. Pinned so the
-     * boundary is visible rather than assumed: this compiles, and that is the current limit of the check.
+     * <b>A container-typed field cannot have one at all</b>, and the field's type alone settles it: no token
+     * is an array, map or tuple value, whatever it spells. §12.1 admits only a bare token after {@code
+     * ~}/{@code =} -- {@code ~ []} and {@code ~ {}} are syntax errors, not other values -- so there is no
+     * better token to suggest, which is why the message is about the field rather than about the value.
      */
     @Test
-    void aFieldTypedByAContainerIsOutsideTheCheckForNow() {
+    void aContainerTypedFieldCannotCarryAValueAtAll() {
+        for (String container : List.of("[text]", "{text => int32}", "[text, int32]")) {
+            TsonSchemaValidationException thrown = refused("""
+                      ns  => %s
+                      rec => { xs: ns ~ oops }""".formatted(container));
+
+            assertTrue(thrown.getMessage().contains("field 'xs'"), thrown.getMessage());
+            assertTrue(thrown.getMessage().contains("cannot have a default"), thrown.getMessage());
+        }
+    }
+
+    /**
+     * <b>A record and a choice are not grouped with the containers</b>, and the reason is that a token can
+     * satisfy them: §5.6's positional form fills a record with exactly one bare {@code REQUIRED} field from
+     * a bare value, and a choice variant may itself be an atom -- both of these read cleanly. Deciding the
+     * bad spellings beside them needs the referenced type <em>read</em> rather than merely classified, which
+     * is a compiled reader, which runs after linking. Pinned so the boundary is a measured line rather than
+     * an assumed one ({@code BACKLOG.md} carries what closing it would take).
+     */
+    @Test
+    void aRecordOrChoiceTypedFieldIsStillDecidedByTheReader() {
         assertNotNull(compile("""
-                  ns  => [text]
-                  rec => { xs: ns ~ oops }"""));
+                  point => { n: int32 }
+                  ch    => ( int32 | text )
+                  rec   => { p: point ~ 3  c: ch ~ oops }"""), "both of these are legitimate and read fine");
+
+        assertNotNull(compile("""
+                  point => { n: int32 }
+                  rec   => { p: point ~ notanint }"""), "and this one is not, and is not caught here yet");
     }
 
     /**
