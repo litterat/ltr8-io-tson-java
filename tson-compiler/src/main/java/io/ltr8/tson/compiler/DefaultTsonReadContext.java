@@ -219,17 +219,12 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
-    public TsonReadContext schemaField(String name) {
-        return stepping(new PathStep(tail, name, -1, schemaRoot != null));
-    }
-
-    @Override
     public TsonReadContext schemaField(String name, Optional<SourcePosition> fieldPosition) {
-        PathStep step = new PathStep(tail, name, -1, schemaRoot != null);
-        // No extra allocation: stepping() builds one of these either way, and this only chooses which
-        // position it carries. An absent field position leaves the enclosing record's, unchanged.
-        return fieldPosition.isEmpty() ? stepping(step)
-                : new DefaultTsonReadContext(cursor, step, schemaRoot, schemaId, fieldPosition, positionOverride);
+        // The same one allocation stepping() makes for every other descent; the ternary only chooses which
+        // position it carries, and an absent one leaves the enclosing record's exactly as before.
+        return new DefaultTsonReadContext(cursor, new PathStep(tail, name, -1, schemaRoot != null),
+                schemaRoot, schemaId, fieldPosition.isPresent() ? fieldPosition : schemaPosition,
+                positionOverride);
     }
 
     @Override

@@ -265,7 +265,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 continue;
             }
             if (seen[schemaIndex]) {
-                ctx.schemaField(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
+                ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position())
+                        .report(Diagnostic.Code.DUPLICATE_FIELD,
                         "duplicate field '" + fieldName.name() + "' on '" + displayName + "' -- a record states each "
                                 + "field at most once (§2.5), and the repeat states a value for nothing",
                         "each field stated once", "'" + fieldName.name() + "' stated again");
@@ -429,7 +430,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         }
         FixedCheck check = fixedCheck[schemaIndex];
         RecordField schema = fields.get(schemaIndex).schema();
-        TsonReadContext fieldCtx = ctx.schemaField(fieldName);
+        TsonReadContext fieldCtx = ctx.schemaField(fieldName, schema.position());
         if (ctx.peek() instanceof AbsentEvent) {
             ctx.next();
             if (schema.state() == FieldState.REQUIRED_FIXED) {

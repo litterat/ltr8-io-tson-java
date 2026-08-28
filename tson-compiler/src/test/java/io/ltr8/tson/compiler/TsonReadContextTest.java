@@ -113,7 +113,8 @@ class TsonReadContextTest {
         SchemaLocation outer = SchemaLocation.of("a.test/s.tn", "person", Optional.of(new Position(2, 1, 10)));
         SchemaLocation inner = SchemaLocation.of("a.test/s.tn", "address", Optional.of(new Position(6, 1, 40)));
 
-        SchemaLocation reached = ctx.inRecord(outer).schemaField("home").inRecord(inner).schemaField("city")
+        SchemaLocation reached = ctx.inRecord(outer).schemaField("home", Optional.empty())
+                .inRecord(inner).schemaField("city", Optional.empty())
                 .schemaLocation().orElseThrow();
 
         assertEquals("/person/home/city", reached.pointer());
@@ -132,7 +133,7 @@ class TsonReadContextTest {
 
         assertEquals(Optional.of(atom), ctx.underDeclaration(atom).schemaLocation());
 
-        SchemaLocation enclosed = ctx.inRecord(record).schemaField("y").underDeclaration(atom)
+        SchemaLocation enclosed = ctx.inRecord(record).schemaField("y", Optional.empty()).underDeclaration(atom)
                 .schemaLocation().orElseThrow();
         assertEquals("/point/y", enclosed.pointer());
         assertEquals("a.test/s.tn", enclosed.schemaId());
@@ -144,7 +145,7 @@ class TsonReadContextTest {
         TsonReadContext ctx = contextOver(token("42", new Position(1, 1, 0)));
         SchemaLocation record = SchemaLocation.of("a.test/s.tn", "person", Optional.of(new Position(2, 1, 10)));
 
-        TsonReadContext scoped = ctx.inRecord(record).schemaField("tags").field("some-key").index(3);
+        TsonReadContext scoped = ctx.inRecord(record).schemaField("tags", Optional.empty()).field("some-key").index(3);
 
         assertEquals("/tags/some-key/3", scoped.path());
         assertEquals("/person/tags", scoped.schemaLocation().orElseThrow().pointer());

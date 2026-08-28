@@ -327,8 +327,19 @@ a choice variant are the same gap still open.
 - **The reader takes it at the one descent that knows the field** — `ctx.schemaField(name, position)`, whose
   absent case leaves the enclosing record's position in place, which is the honest answer for a document
   whose source this resolver never saw (a hand-built one, or the bootstrap). No allocation changes:
-  `schemaField` already builds a context per declared-field descent and this only chooses which position it
-  carries.
+  `schemaField` already builds a context per declared-field descent and a ternary only chooses which
+  position it carries.
+    - **A parameter, not an overload**, and the read path is why. Every caller has the field in hand, so a
+      no-position `schemaField(String)` beside it would be a second way to take the same descent — and the
+      one that silently reports the enclosing record's line would be the shorter, more tempting call. One
+      method makes the compiler name every site that has to answer for a position.
+    - **There is no compile-time route for this, unlike the name beside it** (`UseSite`). A name is composed
+      by the reader, so a per-use-site reader copy can hold a different one; a position is consumed by the
+      *context* when it builds the diagnostic. Pushing one from a reader would need a second
+      `SchemaLocation` on every reader and a second context method to apply it — more surface, not less —
+      and a reader copy for **every field of every record**, where the naming fix copies only for an alias.
+      That would defeat reader sharing across the whole record family, which is the retained-memory cost
+      the resolve-at-startup design exists to keep flat.
 
 A read with no schema behind it carries none of the three.
 
