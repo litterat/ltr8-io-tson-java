@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=570f0616f3818f4b575450eac7db692d0a2b263d7c41547d492a093acc20bc03"
+!!id:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=fe236a5855de399610a4e27cd3ae369fac644331566e2a2075634ab176cd5101"
 !!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 33 draft).
@@ -374,6 +374,7 @@
     size_type:       product_size_type = VARIABLE
     key_type:        type_ref
     value_type:      type_ref
+    state:           element_state ~ REQUIRED
     min_items:       integer?
     max_items:       integer?
   }

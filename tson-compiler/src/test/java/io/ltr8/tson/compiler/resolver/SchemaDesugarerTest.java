@@ -158,6 +158,38 @@ class SchemaDesugarerTest {
         assertEquals("{ key_type: text  value_type: integer }", instanceBody(instance));
     }
 
+    /**
+     * <code>{K =&gt; V?}</code> binds {@code state: OPTIONAL} on the value, the same field and the same enum
+     * member {@code [T?]} binds on an element -- the {@code state} field the kernel gives {@code map} (issue
+     * #227). The marker rides the value only; a key never admits one, so there is no second slot to fill.
+     */
+    @Test
+    void anOptionalMapValueBindsTheStateField() {
+        SchemaDocument document = desugar("  holder => { entries: {text => integer?} }");
+
+        Instance instance = (Instance) onlyInjected(document, "map").typeDef();
+        assertEquals("{ key_type: text  value_type: integer  state: OPTIONAL }", instanceBody(instance));
+    }
+
+    /**
+     * And an unmarked value writes no {@code state} at all, for the reason the array form omits an unmarked
+     * element's: REQUIRED is the kernel's default, so writing it would put a field at its default value into
+     * every map ever desugared. The two spellings are therefore different entries, which is what makes
+     * {@code {text => integer}} and {@code {text => integer?}} different types.
+     */
+    @Test
+    void anUnmarkedMapValueWritesNoStateAndIsADifferentEntry() {
+        SchemaDocument document = desugar("  holder => { a: {text => integer}  b: {text => integer?} }");
+
+        List<SchemaMap.Declaration> maps = document.body().declarations().values().stream()
+                .filter(d -> d.name().startsWith("map_")).toList();
+        assertEquals(2, maps.size(), maps.stream().map(SchemaMap.Declaration::name).toList().toString());
+        assertEquals("{ key_type: text  value_type: integer }",
+                instanceBody((Instance) maps.get(0).typeDef()));
+        assertEquals("{ key_type: text  value_type: integer  state: OPTIONAL }",
+                instanceBody((Instance) maps.get(1).typeDef()));
+    }
+
     @Test
     void anInnerFormIsHoistedFirstAndReferredToByTheOuterOne() {
         // The walk is bottom-up, so the inner array is already a plain name when the outer map is built --

@@ -14,15 +14,22 @@ import java.util.Optional;
  * appear in output. Also backs the kernel's own {@code schema} type ({@code map<type_name,
  * type_definition>}). {@code @Field} renames each component to the kernel's own snake_case wire
  * name -- {@code tson-bind} otherwise writes the bare Java component name verbatim (camelCase).
+ *
+ * <p>{@code state} governs the <b>value</b> and only the value, spelled {@code {K => V?}} -- a key can
+ * never be absent ([TSON-DATA] §2.9), so there is no second state for the name to be ambiguous between.
+ * It is the same two-member {@link ElementState} an array element and a tuple position carry, defaulting
+ * the same way, so a map value defaults REQUIRED like every other container position and is loosened with
+ * {@code ?} rather than being permissive by default with no way to tighten it.
  */
 @Typename(name = "map")
 public record MapBody(@Field("key_type") TypeRef keyType, @Field("value_type") TypeRef valueType,
+                       @Field("state") ElementState state,
                        @Field("min_items") Optional<BigInteger> minItems,
                        @Field("max_items") Optional<BigInteger> maxItems) implements Product {
 
-    /** An unconstrained map: no size bounds. */
+    /** An unconstrained map: values required, no size bounds. */
     public static MapBody of(TypeRef keyType, TypeRef valueType) {
-        return new MapBody(keyType, valueType, Optional.empty(), Optional.empty());
+        return new MapBody(keyType, valueType, ElementState.REQUIRED, Optional.empty(), Optional.empty());
     }
 
     /**

@@ -637,7 +637,8 @@ final class SchemaDesugarer {
         return switch (ref) {
             case ArrayRef array -> arrayBinding(elementRef(array.elementType()),
                     array.elementType().optional(), array.size(), shownElement(array.elementType()));
-            case MapRef map -> mapBinding(typeRef(map.keyType()), elementRef(map.valueType()), map.size());
+            case MapRef map -> mapBinding(typeRef(map.keyType()), elementRef(map.valueType()),
+                    map.valueType().optional(), map.size());
             case TupleRef tuple -> tupleBinding(tuple.elementTypes().stream()
                     .map(e -> new Position(elementRef(e), e.optional())).toList());
             case ChoiceRef choice -> choiceBinding(mapShared(choice.variants(), this::typeRef));
@@ -679,11 +680,15 @@ final class SchemaDesugarer {
     }
 
     /**
-     * <code>!map { key_type: K  value_type: V [min_items: N] [max_items: M] }</code> -- the map row of the
-     * desugar table. Neither side carries a {@code state}: {@code map} declares no such field, absence has no
-     * defined meaning for a map value, and an absent key is already a Part 1 resolver error.
+     * <code>!map { key_type: K  value_type: V [state: OPTIONAL] [min_items: N] [max_items: M] }</code> --
+     * the map row of the desugar table. The <b>value</b> carries a {@code state} the way an array element
+     * does, written only when marked, for the reason {@link #arrayBinding} omits an unmarked element's: the
+     * kernel's default is REQUIRED, so writing it would put a field at its default value into every map.
+     * The key carries none -- a key is never absent ([TSON-DATA] §2.9), so the parser refuses the marker
+     * there rather than this table dropping it.
      */
-    private static Optional<Binding> mapBinding(TypeRef key, TypeRef value, Optional<SizeSpec> size) {
+    private static Optional<Binding> mapBinding(TypeRef key, TypeRef value, boolean optional,
+            Optional<SizeSpec> size) {
         if (!isReference(key) || !isReference(value)) {
             return Optional.empty();
         }
@@ -691,6 +696,9 @@ final class SchemaDesugarer {
         Map<String, TypeRef> applications = new LinkedHashMap<>();
         refSlot(KEY_TYPE, key, fields, applications);
         refSlot(VALUE_TYPE, value, fields, applications);
+        if (optional) {
+            fields.add(nameField(STATE, ElementState.OPTIONAL.name()));
+        }
         size.ifPresent(spec -> fields.addAll(
                 sizeFields(spec, "{" + shownRef(key) + " => " + shownRef(value) + "; 0..}")));
         return Optional.of(new Binding(MAP, fields, applications));

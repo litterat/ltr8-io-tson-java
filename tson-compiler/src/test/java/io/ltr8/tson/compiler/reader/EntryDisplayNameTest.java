@@ -81,8 +81,7 @@ class EntryDisplayNameTest {
 
     @Test
     void aMapRendersAsItsSugar() {
-        MapBody body = new MapBody(TypeRef.of("text"), TypeRef.of("order"),
-                Optional.of(BigInteger.ONE), Optional.empty());
+        MapBody body = new MapBody(TypeRef.of("text"), TypeRef.of("order"), ElementState.REQUIRED, Optional.of(BigInteger.ONE), Optional.empty());
 
         assertEquals("{text => order; 1..}", EntryDisplayName.of("x", synthetic(body)));
     }

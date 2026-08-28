@@ -65,19 +65,20 @@ is small and parsed once.)
   which falls out of counting rather than being checked for. Elements have no default/fixed concept at all
   (`ElementState` has two members where a record field's `FieldState` has five), so none of the
   `valueForAbsentField` machinery above has an array counterpart.
-- **A map entry's value may always be `_`, and the entry still counts.** §7.6 gives that row of its table a
-  plain "yes" — the only unconditional permission in it, because `MapBody` carries no element-state facet the
-  way an array's `ElementState` does, so there is nothing for an author to declare or a reader to consult.
-  `MapAbstractReader.decodedValue` answers it above the value's own reader, which is right to refuse the
-  sentinel (`_` is a value of no atom type) — absence is the container's question, the same place
-  `ArrayAbstractReader` asks it of an element. The entry is present with an absent value (§2.9), so it counts
-  toward `min_items`/`max_items` like any other, and both subclasses already had the no-value form to put
-  there: a `TsonAbsent` in tree mode, a `null` the bound `Map` really holds in bind mode. The **key** position
-  is the opposite and equally unconditional — §2.9 forbids it there.
-  **§5.3 disagrees with §7.6 about this**, refusing `{K => V?}` on the ground that "absence has no defined
-  meaning for map values" — the meaning §7.6 and §2.9 both give it. Both halves are built as written, which
-  is what makes the disagreement visible: the value cannot be marked optional and is optional anyway.
-  `SPEC-FEEDBACK.md` #12 carries it, and proposes the `state` field that would let the sugar say so.
+- **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody`
+  carries an `ElementState` governing the value — `{K => V?}`, the kernel field this implementation adds
+  ahead of the spec (`SPEC-FEEDBACK.md` #12) — so `MapAbstractReader.decodedValue` gives the array element's
+  two answers: the sentinel under `OPTIONAL`, `FIELD_REQUIRED` under the default `REQUIRED`. It answers
+  above the value's own reader, which is right to refuse the sentinel (`_` is a value of no atom type) —
+  absence is the container's question, the same place `ArrayAbstractReader` asks it. The entry is present
+  with an absent value (§2.9) whichever answer it gets, so it counts toward `min_items`/`max_items` and the
+  refusal costs the value its verdict, not the entry its place; both subclasses already had the no-value
+  form to put there — a `TsonAbsent` in tree mode, a `null` the bound `Map` really holds in bind mode. The
+  **key** is the opposite and unconditional: §2.9 forbids the sentinel there whatever a declaration says,
+  and the parser refuses a `?` on that side for the same reason.
+  Note that §7.6 still describes the permission as *not* schema-conditional, and §5.3 still says neither
+  side admits a `?`. Those two contradicted each other, which is what #12 is about; this is the reading that
+  makes them consistent, built ahead of the revision that would state it.
 - **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and
   a placeholder kept in place (so later indices stay accurate) — Java `null` in bind mode, `TsonAbsent` in
   tree mode, where the diagnostic, not the node, carries what went wrong; a shape mismatch reports

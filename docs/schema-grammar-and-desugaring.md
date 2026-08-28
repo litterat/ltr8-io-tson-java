@@ -95,9 +95,10 @@ materialization, no validation (those are the resolver's/linker's jobs).
   - **One consequence of the dispatch is worth knowing before you write the test.** `{text? => integer}` is
     `name` followed by `?`, so it commits to a *record* before the `=>` is read, and the author gets a
     record-field diagnostic — while `{pair<text>? => integer}`, whose `<` commits to a map first, gets the
-    map rule. Both are rejected; only one of them mentions maps. §5.3 states the interaction at the dispatch,
-    and buying the better message with a third token of lookahead is a bad trade §12.2's stated budget —
-    one consumed token plus one of lookahead — declines on the same terms.
+    map rule. Both are rejected (a `?` marks a map's *value*, never its key); only one mentions maps. §5.3
+    states the interaction at the dispatch, and buying the better message with a third token of lookahead is
+    a bad trade §12.2's stated budget — one consumed token plus one of lookahead — declines on the same
+    terms.
 
 ## Desugaring (`tson-compiler/.../resolver/SchemaDesugarer.java`)
 
@@ -159,6 +160,7 @@ rebuilt and called a cache.
   | `[T, U, …]` | `!tuple { elements: [{ element_type: T } { element_type: U }] }` |
   | `(A \| B)` | `!choice { variants: [A B] }` |
   | `{K => V}` | `!map { key_type: K  value_type: V }` |
+  | `{K => V?}`, `{K => V?; …}` | the corresponding form with `state: OPTIONAL` bound directly |
   | `{K => V; N..M}` | the same, plus `min_items`/`max_items` |
 
   The phase used to read that routing off the governing meta — constructors carried parameter lists and each
@@ -218,8 +220,10 @@ rebuilt and called a cache.
   `[T?]` and `[T]` collide on one injected entry. `[T?; 3]` — the form §5.3 states the rule through — puts
   the state and both bounds on one binding record, which is the shape the whole table is now written in. The
   read side needed nothing: `ArrayAbstractReader` already admitted `_` under `ElementState.OPTIONAL` and
-  already counted it toward the bounds. Neither side of a map's `=>` takes a `?`: `map` declares no `state`
-  field, and an absent key is already a Part 1 resolver error.
+  already counted it toward the bounds. **A map's value takes the same `?`** and binds the same field —
+  `map` carries an `element_state` here, which the published Revision 33 kernel does not (`SPEC-FEEDBACK.md`
+  #12) — so `{K => V}` means what `[T]` means and an author who wants absence writes it. The *key* takes
+  none and never will: §2.9 forbids an absent key outright, so there is no state for a marker to bind.
 - **The size specifier is one rule over the `min_items`/`max_items` pair, for arrays and maps alike.** There
   is no template in between: the kernel's `array_min`/`array_max`/`array_ranged` are deleted, and each of the
   four spellings binds the pair directly, an exact `N` pinning both. §5.3's bound coherence (`min <= max`) is

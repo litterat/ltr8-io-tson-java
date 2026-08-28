@@ -31,7 +31,7 @@ class MapBindReaderTest {
             !!meta:"https://tson.io/2026/33/m/meta.tn"
             !!import:"https://tson.io/2026/33/m/core.tn"
             {
-              catalogue => { entries: {text => text} }
+              catalogue => { entries: {text => text?} }
             }
             """;
 
@@ -58,7 +58,7 @@ class MapBindReaderTest {
     }
 
     /**
-     * [TSON-SCHEMA] §7.6 permits {@code _} at a map entry value unconditionally, so the entry is present with
+     * Under {@code {text => text?}} an entry's value may be the absent sentinel, so the entry is present with
      * an absent value ([TSON-DATA] §2.9) -- which on the bind side means the key is in the map and maps to
      * {@code null}, distinguishable from a key the document never stated.
      */

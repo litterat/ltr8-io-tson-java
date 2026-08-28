@@ -460,6 +460,7 @@
       !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: VARIABLE }
       !record_field { name: key_type        type: type_ref }
       !record_field { name: value_type      type: type_ref }
+      !record_field { name: state           type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
       !record_field { name: min_items       type: integer  state: OPTIONAL }
       !record_field { name: max_items       type: integer  state: OPTIONAL }
     ] }
