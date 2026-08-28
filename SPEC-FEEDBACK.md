@@ -112,104 +112,144 @@ something silently retained. The placement question itself is untouched.
 
 ---
 
-## 3. §9.4 cites UTS #39 but names the one mechanism that cannot be applied to a document in isolation, and leaves the rest unmentioned
+## 3. §9.4's confusable problem has nowhere to attach, because the series defines what may be in a *token* and never what may be a *name*
 
 **Section:** [TSON-DATA] §9.4 (Confusable Characters), §7.1 (UAX #31 profile), §2.5 (field-name identity),
-§7.2.1 (NFC normalization); [TSON-SCHEMA] §2.2.3 (`!!import` name disjointness).
+§7.2.1 (NFC normalization); [TSON-SCHEMA] §2.2.3 (`!!import` name disjointness), §5.2, §5.4.
 
 **Problem:** §9.4 is one sentence of advice:
 
 > Implementations processing untrusted TSON input SHOULD consider Unicode confusable detection (UTS #39)
 > when field name identity is security-relevant.
 
-Two things make that hard to act on.
+Four things make it unactionable, and the fourth is the root cause of the other three.
 
-**1. UTS #39 is several mechanisms, and §9.4 points at the one that needs context TSON has not defined.**
-"Confusable detection" is the `skeleton()` mapping (UTS #39 §4, `confusables.txt`): two strings are
-confusable iff their skeletons are equal. That is a *relation between strings*, so it answers nothing about a
-single identifier — it requires a defined comparison set, and §9.4 names none. The mechanisms that *are*
-decidable on one token, with no set and no context, go unmentioned:
+**1. It names the one UTS #39 mechanism that needs context the series has not defined.** "Confusable
+detection" is the `skeleton()` mapping (UTS #39 §4): two strings are confusable iff their skeletons are
+equal. That is a *relation between strings*, so it says nothing about a single name — it needs a comparison
+set, and §9.4 names none. The mechanisms decidable on one name alone go unmentioned: **Identifier_Status**
+(UTS #39 §3.1, a per-character Allowed/Restricted partition) and the **restriction levels** of §5.2, which
+are properties of one identifier computed from script.
 
-- **Identifier_Status** (`IdentifierStatus.txt`, the General Security Profile, UTS #39 §3.1) — a per-character
-  Allowed/Restricted partition. Composes directly with a UAX #31 profile and needs nothing but the token.
-- **Restriction levels** (UTS #39 §5.2: ASCII-Only, Single-Script, Highly Restrictive, …) and **mixed-script
-  detection** — properties of one identifier, computed from script extensions.
+**2. The strictness is inverted relative to the risk.** §7.2.1 makes NFC a MUST, so two canonically
+equivalent names *are the same name*. Confusability gets SHOULD-consider, so two visually identical names
+*are different names*. The series takes a firm, testable position on the convenience case and none on the
+attack.
 
-This matters because UAX #31 itself directs implementers to pair an identifier profile with UTS #39, and §7.1
-already *declares* a UAX #31 profile, in a table, with a documented exclusion (ZWNJ/ZWJ) justified by exactly
-this threat. That table is where an Identifier_Status requirement would go, and it is the one place a
-conforming implementation could act without the application telling it anything.
+**3. The prescribed workaround reopens the surface it closes.** §7.1 excludes ZWNJ/ZWJ and says "names whose
+orthography requires them MUST be quoted". But §7.1 constrains *unquoted tokens only*, and §2.5 makes a
+quoted name an ordinary field name (`field-name = token ; unquoted or quoted`, and "`name` and `"name"` are
+the same field name"). So the sanctioned route for a name needing ZWNJ is an unconstrained route for every
+character the profile excludes: the hardening is bypassed by the mechanism the same sentence prescribes.
 
-**2. The comparison set §9.4 lacks is one TSON can actually name.** A general-purpose language cannot bound
-"which identifiers might be confused with which"; a TSON document can, several times over:
+**4. The root cause: there is no name layer.** §7.1 defines a UAX #31 profile over *unquoted tokens* — a
+lexical class that in TSON is also how ordinary **values** are written (`{ name: Alice }`). So §7.1 cannot be
+tightened for names without tightening values, and §9.4 cannot attach to §7.1 without doing exactly that.
+Meanwhile nothing anywhere defines the class "name", even though the series uses names in six places with
+different rules. That absence is why §9.4 ended up in Security Considerations as advice: there was no
+normative surface to put it on. It is also why point 3's bypass exists — quoting escapes the token profile
+because the token profile is the only profile there is.
 
-- field names within one record — §2.5 already defines their identity and a duplicate rule
-- keys within one map — §2.6, which already asks implementations to *warn* on textually identical keys
-- `enum` members, and the variants of a choice ([TSON-SCHEMA] §5.4)
-- the declared type names of one schema, and — sharpest — the merged set at an `!!import`, since
-  [TSON-SCHEMA] §2.2.3 requires imported names be "disjoint from each other and from local entries".
-  Disjointness there is exact equality, which a confusable pair passes by construction: two entries a
-  reviewer reads as one name are, to the resolver, simply two names.
+**The data-cost objection, measured rather than assumed.** An earlier draft of this entry argued that any
+normative UTS #39 requirement obliges every implementation to ship UCD data, and treated that as one cost.
+It is three, and they differ by two orders of magnitude:
 
-Each of those is a small, closed set at a well-defined point in processing. §9.4 could name them instead of
-deferring to "when field name identity is security-relevant" — a judgement an implementation is not in a
-position to make, since only the application knows.
+| mechanism | data required | size | catches | misses |
+|---|---|---|---|---|
+| Restriction level (§5.2) | **none** — `Script` is a UCD core property every platform exposes | a 3-row table | mixed-script names — §9.4's own `a`/`а` example | whole-script confusables |
+| Identifier_Status (§3.1) | `IdentifierStatus.txt` | **556 ranges, 47 KB** | obsolete/technical/limited-use characters — removes 31,759 of `XID_Continue`'s 144,522 code points, leaving 112,763 | homographs entirely |
+| `skeleton()` (§4) | `confusables.txt` | **6,355 mappings, 706 KB** | whole-script confusables, within a comparison set | needs a set, which §9.4 does not give it |
 
-**3. The strictness is inverted relative to the risk.** §7.2.1 makes NFC normalization a MUST, so two
-canonically equivalent names *are the same name*. Confusability gets SHOULD-consider, so two visually
-identical names *are different names*. The format takes a firm, testable position on the case that is a
-convenience issue and none on the case that is the attack.
+Only the third is a materially larger ask. The first costs nothing and catches the case §9.4 opens with.
 
-**4. The prescribed workaround reopens the surface it closes.** §7.1 excludes ZWNJ and ZWJ from the profile
-and gives the reason: "They are invisible, which makes them confusable and spoofing surface (§9.4); names
-whose orthography requires them MUST be quoted." But the §7.1 profile constrains *unquoted* tokens only, and
-§2.5 makes a quoted name an ordinary field name. So the sanctioned route for a name needing ZWNJ is also an
-unconstrained route for every character the profile excludes — the hardening is bypassable by the mechanism
-the same sentence prescribes. Whatever §9.4 eventually requires needs to say whether it applies to quoted
-names, and if it does not, §7.1 should not describe quoting as the remedy.
+**Interpretation chosen:** none of UTS #39 is implemented. NFC normalization of unquoted tokens (§7.2.1) is,
+and §7.1's identifier profile is now exact (see #14), which removed the invisible-character half of the
+problem — no `Cf` character, bidi control included, can appear in an unquoted token. Nothing detects a
+confusable pair, a mixed-script name, or a Restricted character, at either layer, including at `!!import`
+merge, where disjointness is exact string equality and a confusable pair passes it by construction.
 
-**5. Nothing here is conformance-visible.** As with the annotation-conformance entry Revision 33 accepted
-(change log #29), a SHOULD-consider in Security Considerations makes
-no implementation measurably better than one that ignores it, and there is no vector a test suite could
-carry.
+### Proposal: define a name profile, and hang the three mechanisms off it in cost order
 
-**Interpretation chosen:** NFC normalization of unquoted tokens (§7.2.1) is implemented; no part of UTS #39
-is. Nothing in this implementation detects a confusable pair, a mixed-script identifier, or a Restricted
-character, at either the data or schema layer — including at `!!import` merge, where the disjointness check
-is exact string equality.
+**Step 1 — name the layer.** Add to §7.1, beside the token profile:
 
-Worth recording *why*, because it bears on how a requirement here should be worded: this implementation
-already approximates UAX #31, using the JDK's `Character.isUnicodeIdentifierStart`/`Part` in place of
-XID_Start/XID_Continue, because the JDK exposes no UAX #31 properties and building the tables was out of
-scope. The JDK likewise exposes no UTS #39 data at all — no `confusables.txt`, no Identifier_Status. So any
-normative UTS #39 requirement obliges every implementation to ship UCD data, which is a materially larger ask
-than the rest of the Unicode surface in this spec and should be a deliberate decision rather than a
-side effect of tightening §9.4.
+> **Name profile.** A **name** is a token in a naming position: a record field name (§2.5), and in
+> [TSON-SCHEMA] a declared type name, a record field name in a declaration (§5.2), an enum member, a choice
+> variant (§5.4), and an annotation name (§6). Map keys are **not** names — §2.6 makes them data values,
+> not restricted to strings. The name profile applies to a name **however it is spelled**, quoted or
+> unquoted; it is a constraint on names, where §7.1's token profile is a constraint on lexemes.
 
-**Suggested resolution:** Split §9.4 by what an implementation can decide alone and what it cannot.
+That one paragraph is most of the value here, independent of which mechanisms are then adopted. It gives
+§9.4 something to attach to, it closes point 3's bypass by construction (a quoted name is still a name), and
+it lets names be constrained without constraining values — which is the reason §9.4 could not be tightened
+before.
 
-1. **Adopt the General Security Profile in §7.1**, where the UAX #31 profile is already declared: require or
-   recommend that unquoted-token characters be Identifier_Status=Allowed. This subsumes the ad-hoc ZWNJ/ZWJ
-   exclusion, which is currently a hand-picked instance of a rule UTS #39 states generally.
-2. **State the comparison scopes** for skeleton-based detection — the record, the map, the enum, the choice,
-   the schema namespace, the import merge — rather than leaving the set to the implementation. Detection
-   within a closed set is a mechanical check; "is identity security-relevant here" is not.
-3. **Say what a processor does on detection**: reject, warn, or emit a diagnostic. §2.6 already chose "SHOULD
-   warn" for textually identical map keys; confusable names deserve at least the same treatment, and the two
-   should not disagree.
-4. **Decide whether a restriction level applies**, and if none does, say so — silence reads as an oversight
-   rather than a decision.
-5. **Address quoted names explicitly**, per point 4 above.
-6. **Consider making the schema layer normative and the data layer advisory.** [TSON-SCHEMA] §2.2.3's
-   disjointness check is a resolver-time operation over a closed, already-materialised set of names — the
-   cheapest place in the whole series to make confusability an error rather than advice, and the place where
-   a spoofed name does the most damage, since it changes which type a document is validated against.
+**Step 2 — the free tier, normative.** Require every name to be **Highly Restrictive** (UTS #39 §5.2,
+restriction level 3): the scripts of its characters, ignoring `Common` and `Inherited`, form a set of size
+≤ 1, or one of the three augmented sets — Latin+Han+Hiragana+Katakana, Latin+Han+Bopomofo,
+Latin+Han+Hangul.
 
-**Status against Revision 33:** open, carried deliberately, and recorded as "needs further
-investigation". §9.4 is unchanged: one SHOULD-consider sentence naming UTS #39 confusable detection, with
-no Identifier_Status profile at §7.1, no scoped comparison set, and no stated action on detection.
+This is the shape the series already prefers: total, two-valued, decidable on one name with no comparison
+set, no configuration, and no shipped data. It is roughly twenty lines. Prototyped against the JDK's own
+`Character.UnicodeScript` — thirteen cases, all as designed:
 
----
+```
+rejected  аdmin           Cyrillic а + Latin — §9.4's own example
+rejected  alpha_α         Latin + Greek
+rejected  user_поль       Latin + Cyrillic
+accepted  admin  my_type  abc123  éx        Common and Inherited are wildcards
+accepted  пользователь  καλή                single non-Latin script
+accepted  日本語abc  ひらがな日  한글日        the three augmented sets
+accepted  аес             all-Cyrillic — a whole-script confusable, correctly NOT caught
+```
+
+The last line is the rule's honest boundary, and the reason Step 4 exists.
+
+**Step 3 — where it binds, which falls out of the architecture rather than being chosen.** Make it a MUST
+for names **where they are declared** — a schema's type names, declaration field names, enum members,
+choice variants, annotation names, and the merged namespace at `!!import`. Data documents then conform *by
+construction*: under a schema, a data field name is valid only if it matches a declared one, so restricting
+declarations restricts the data that can validate. For schemaless data (Class 1) the same rule is a SHOULD,
+because there is no declaration to have caught it.
+
+This puts the requirement where the sets are small, closed, authored rather than user-supplied, and read by
+a human reviewer — which is the review the attack exists to defeat — and it means no conforming data
+document is newly rejected by a rule its schema already enforces.
+
+**Step 4 — the scoped tier, where the cost is.** `skeleton()` equality within a closed set catches what
+Step 2 cannot. The series can name every set it needs, which §9.4 could not:
+
+- the field names of one record (§2.5 already defines their identity and a duplicate rule)
+- the members of one enum, the variants of one choice (§5.4)
+- the declared names of one schema
+- **the merged namespace at `!!import`** — the sharpest of them, since §2.2.3 already requires imported
+  names be "disjoint from each other and from local entries", and disjointness there is exact equality,
+  which a confusable pair passes by construction: two entries a reviewer reads as one name are, to the
+  resolver, two names
+
+Recommendation: make skeleton-distinctness a MUST **at the `!!import` merge only**, and a SHOULD elsewhere.
+That is the smallest set, the highest-value one, computed once at schema load, and the only place where the
+706 KB table is worth requiring. A conforming implementation that declines Step 4 still gets Step 2 free.
+
+**Step 5 — Identifier_Status, if the 47 KB is acceptable.** Requiring name characters to be
+`Identifier_Status=Allowed` subsumes §7.1's hand-picked ZWNJ/ZWJ exclusion — currently a single instance of
+a rule UTS #39 states generally — and removes the obsolete and technical characters that have no business
+in a name. It belongs on the name profile, not the token profile, for the reason Step 1 gives: an unquoted
+*value* in a historic script should stay legal.
+
+**What a processor does on detection.** State it, in whichever direction: §2.6 already chose "MUST reject"
+for duplicate keys, and a confusable name pair is the same class of defect wearing a disguise. If any of the
+above is adopted as a SHOULD, it should still name the mechanism (a diagnostic, a code) so that two
+implementations that both comply are distinguishable from one that ignores it — the objection this entry
+raised in earlier revisions and which a SHOULD-consider cannot answer.
+
+**Vectors become possible.** Step 2 is per-name, total and data-free, so the shared test suite can carry it:
+`аdmin` rejected, `日本語abc` accepted, `аес` accepted-and-documented-as-a-known-gap. That is the first part
+of this topic that could ever have been conformance-tested.
+
+**Status against Revision 33:** open, carried, and now carrying a concrete proposal where earlier revisions
+of this entry carried only directions. §9.4 is unchanged: one SHOULD-consider sentence, no name profile, no
+restriction level, no scoped comparison set, and no stated action on detection. Step 2 is prototyped here
+and not shipped; nothing else is built.
 
 ## 4. A type argument's literal is called a bare token and typed `value`, and §8.2 identity depends on which
 

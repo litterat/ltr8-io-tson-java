@@ -319,9 +319,19 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   a `DataBindContext` may be extended after first use, and neither shipped fetching `TsonSchemaSource` states
   what it promises a concurrent caller. None of it is hypothetical-only: the read-path half was two real defects, found by
   auditing and reproduced first try on 8 threads.
-- [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
-  opt-in, and reported as ordinary errors when enabled — §8.1 gives a conforming processor one severity) —
-  the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;
-  neither is enforced anywhere yet. `SPEC-FEEDBACK.md` #3 is the fuller treatment: which UTS #39 mechanism
-  applies where, the comparison scopes TSON can actually name, and why a normative requirement would oblige
-  every implementation to ship UCD data the JDK does not expose.
+- [ ] **A name profile, and the script restriction on it** (§9.4-adjacent hardening). `SPEC-FEEDBACK.md` #3
+  carries the design: names are a class the series never defines — §7.1 constrains *tokens*, which is also
+  how values are written — so define one, apply it wherever a name is **declared** (a schema's type names,
+  declaration field names, enum members, choice variants, annotation names, and the `!!import` merge), and
+  require each to be Highly Restrictive per UTS #39 §5.2. Data conforms by construction under a schema,
+  since a field name is valid only if it matches a declared one. Costs **no shipped UCD data** — the JDK's
+  `Character.UnicodeScript` plus a three-row table of augmented script sets — and is about twenty lines;
+  prototyped against thirteen cases including §9.4's own `аdmin`. Needs a `TsonConfig` switch, a
+  `Diagnostic.Code`, and vectors, which the shared suite can carry because the rule is per-name and total.
+  The two data-bearing tiers stay unbuilt behind it and are separable: `Identifier_Status=Allowed` (556
+  ranges, 47 KB) on the same profile, and `skeleton()` distinctness within a scope (6,355 mappings, 706 KB),
+  which is worth requiring only at the `!!import` merge.
+- [ ] Bidi-formatting-character surfacing outside quoted tokens (§9.5) — the sibling gap to the
+  numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section; neither is enforced. Note
+  this is **not** the class #14 closed: U+200E/U+200F are `Pattern_White_Space`, so they *separate* tokens
+  rather than sitting inside one, and a stray LRM still splits a name silently.
