@@ -156,7 +156,7 @@ It is three, and they differ by two orders of magnitude:
 
 | mechanism | data required | size | catches | misses |
 |---|---|---|---|---|
-| Restriction level (§5.2) | **none** — `Script` is a UCD core property every platform exposes | a 3-row table | mixed-script names — §9.4's own `a`/`а` example | whole-script confusables |
+| Restriction level (§5.2) | **none** — `Script` is a UCD core property every platform exposes | a 3-row table | mixed-script names — §9.4's own `a`/`а` example | whole-script confusables, and it rejects ordinary names (see the proposal) |
 | Identifier_Status (§3.1) | `IdentifierStatus.txt` | **556 ranges, 47 KB** | obsolete/technical/limited-use characters — removes 31,759 of `XID_Continue`'s 144,522 code points, leaving 112,763 | homographs entirely |
 | `skeleton()` (§4) | `confusables.txt` | **6,355 mappings, 706 KB** | whole-script confusables, within a comparison set | needs a set, which §9.4 does not give it |
 
@@ -168,7 +168,7 @@ problem — no `Cf` character, bidi control included, can appear in an unquoted 
 confusable pair, a mixed-script name, or a Restricted character, at either layer, including at `!!import`
 merge, where disjointness is exact string equality and a confusable pair passes it by construction.
 
-### Proposal: define a name profile, and hang the three mechanisms off it in cost order
+### Proposal: define a name profile, then use the mechanism that has a comparison set
 
 **Step 1 — name the layer.** Add to §7.1, beside the token profile:
 
@@ -178,78 +178,92 @@ merge, where disjointness is exact string equality and a confusable pair passes 
 > not restricted to strings. The name profile applies to a name **however it is spelled**, quoted or
 > unquoted; it is a constraint on names, where §7.1's token profile is a constraint on lexemes.
 
-That one paragraph is most of the value here, independent of which mechanisms are then adopted. It gives
-§9.4 something to attach to, it closes point 3's bypass by construction (a quoted name is still a name), and
-it lets names be constrained without constraining values — which is the reason §9.4 could not be tightened
-before.
+That paragraph is most of the value here, independent of which mechanism is then adopted. It gives §9.4
+something to attach to, closes point 3's bypass by construction (a quoted name is still a name), and lets
+names be constrained without constraining values — the reason §9.4 could not be tightened before.
 
-**Step 2 — the free tier, normative.** Require every name to be **Highly Restrictive** (UTS #39 §5.2,
-restriction level 3): the scripts of its characters, ignoring `Common` and `Inherited`, form a set of size
-≤ 1, or one of the three augmented sets — Latin+Han+Hiragana+Katakana, Latin+Han+Bopomofo,
-Latin+Han+Hangul.
-
-This is the shape the series already prefers: total, two-valued, decidable on one name with no comparison
-set, no configuration, and no shipped data. It is roughly twenty lines. Prototyped against the JDK's own
-`Character.UnicodeScript` — thirteen cases, all as designed:
-
-```
-rejected  аdmin           Cyrillic а + Latin — §9.4's own example
-rejected  alpha_α         Latin + Greek
-rejected  user_поль       Latin + Cyrillic
-accepted  admin  my_type  abc123  éx        Common and Inherited are wildcards
-accepted  пользователь  καλή                single non-Latin script
-accepted  日本語abc  ひらがな日  한글日        the three augmented sets
-accepted  аес             all-Cyrillic — a whole-script confusable, correctly NOT caught
-```
-
-The last line is the rule's honest boundary, and the reason Step 4 exists.
-
-**Step 3 — where it binds, which falls out of the architecture rather than being chosen.** Make it a MUST
-for names **where they are declared** — a schema's type names, declaration field names, enum members,
-choice variants, annotation names, and the merged namespace at `!!import`. Data documents then conform *by
-construction*: under a schema, a data field name is valid only if it matches a declared one, so restricting
-declarations restricts the data that can validate. For schemaless data (Class 1) the same rule is a SHOULD,
-because there is no declaration to have caught it.
-
-This puts the requirement where the sets are small, closed, authored rather than user-supplied, and read by
-a human reviewer — which is the review the attack exists to defeat — and it means no conforming data
-document is newly rejected by a rule its schema already enforces.
-
-**Step 4 — the scoped tier, where the cost is.** `skeleton()` equality within a closed set catches what
-Step 2 cannot. The series can name every set it needs, which §9.4 could not:
+**Step 2 — require skeleton distinctness within each named scope.** No two names in the same scope may have
+equal UTS #39 `skeleton()`s. The scopes are the closed sets the series already defines:
 
 - the field names of one record (§2.5 already defines their identity and a duplicate rule)
 - the members of one enum, the variants of one choice (§5.4)
 - the declared names of one schema
-- **the merged namespace at `!!import`** — the sharpest of them, since §2.2.3 already requires imported
-  names be "disjoint from each other and from local entries", and disjointness there is exact equality,
-  which a confusable pair passes by construction: two entries a reviewer reads as one name are, to the
-  resolver, two names
+- **the merged namespace at `!!import`** — the sharpest, since §2.2.3 already requires imported names be
+  "disjoint from each other and from local entries", and disjointness there is exact equality, which a
+  confusable pair passes by construction: two entries a reviewer reads as one name are, to the resolver,
+  two names
 
-Recommendation: make skeleton-distinctness a MUST **at the `!!import` merge only**, and a SHOULD elsewhere.
-That is the smallest set, the highest-value one, computed once at schema load, and the only place where the
-706 KB table is worth requiring. A conforming implementation that declines Step 4 still gets Step 2 free.
+**Why this and not the restriction level, which is free.** An earlier draft of this entry recommended the
+opposite, ordering the mechanisms by the data an implementation must ship. That is the wrong cost to sort
+on. Sorted by what each rejects, they invert — measured, both prototyped:
 
-**Step 5 — Identifier_Status, if the 47 KB is acceptable.** Requiring name characters to be
-`Identifier_Status=Allowed` subsumes §7.1's hand-picked ZWNJ/ZWJ exclusion — currently a single instance of
-a rule UTS #39 states generally — and removes the obsolete and technical characters that have no business
-in a name. It belongs on the name profile, not the token profile, for the reason Step 1 gives: an unquoted
-*value* in a historic script should stay legal.
+| | catches mixed-script (`admin`/`аdmin`) | catches whole-script (`aec`/`аес`) | rejects a *lone* legitimate name | data |
+|---|---|---|---|---|
+| Restriction level (§5.2, Highly Restrictive) | yes | **no** | **yes — see below** | none |
+| `skeleton()` distinctness in scope | yes | **yes** | **no — needs a colliding pair** | 706 KB |
 
-**What a processor does on detection.** State it, in whichever direction: §2.6 already chose "MUST reject"
-for duplicate keys, and a confusable name pair is the same class of defect wearing a disguise. If any of the
-above is adopted as a SHOULD, it should still name the mechanism (a diagnostic, a code) so that two
-implementations that both comply are distinguishable from one that ignores it — the objection this entry
-raised in earlier revisions and which a SHOULD-consider cannot answer.
+The restriction level is a property of one name, so it must guess from the name alone, and it guesses wrong
+on ordinary names. These are all rejected by it:
 
-**Vectors become possible.** Step 2 is per-name, total and data-free, so the shared test suite can carry it:
-`аdmin` rejected, `日本語abc` accepted, `аес` accepted-and-documented-as-a-known-gap. That is the first part
-of this topic that could ever have been conformance-tested.
+```
+REJECTED  id_пользователя      REJECTED  url_адрес      REJECTED  api_ключ      REJECTED  χ_index
+accepted  日本語id
+```
+
+A Latin abbreviation beside a Cyrillic or Greek word is an ordinary way to name things, and the last line is
+the tell: the same mixing is permitted for Japanese and refused for Russian. That is principled — Han is not
+confusable with Latin and Cyrillic is — but it lands as a tax on precisely the authors the rule exists to
+protect, while a Latin-script author never encounters it. A rule that fires on innocent names in one script
+community and never in another gets switched off, and then protects nobody.
+
+`skeleton()` distinctness has no such failure mode: it is a relation, so it fires only when two names *in the
+same set* actually collide. Over 32 names of the kind a real schema declares together — including all four
+rejected above — it reported **zero** collisions, while catching every homograph pair tested, the
+whole-script `aec`/`аес` included. What it does flag is genuine: `l`/`I`, `O`/`0`, `rn`/`m`.
+
+**The reason the free mechanism looks attractive and is not.** Restriction levels are what browsers use for
+IDN, and browsers are right to: a browser **cannot enumerate the comparison set** — it has no way to know
+which domains a user might confuse this one with — so it must judge a name in isolation, and accepts false
+positives as the price. TSON is in the opposite position: every scope above is closed, small, and known at
+the moment the check would run. Borrowing the browsers' answer without borrowing their constraint imports a
+false-positive rate that TSON has no reason to pay.
+
+**Step 3 — where it binds.** A MUST at the `!!import` merge and over one schema's declared names; a MUST for
+the field names of one record and the members of one enum, which are the same closed-set check one level
+down. Data documents then conform *by construction* under a schema, since a data field name is valid only
+if it matches a declared one. For schemaless data (Class 1) the record-scope check still applies — it needs
+no schema, only the record's own field names.
+
+The 706 KB falls on implementers, once, and can be a generated table; the alternative puts a recurring cost
+on authors, in one script community, forever. If shipping the table is judged too much, the honest outcome
+is to keep §9.4 advisory rather than to adopt the cheap mechanism as a substitute — it is not one.
+
+**Step 4 — the restriction level, as an option and not a default.** Keep it available for deployments that
+want defence in depth, stated as a named profile rather than as prose (so two implementations offering it
+agree on what it means). Its right default is off: it rejects names that are not ambiguous with anything in
+the document, which is a judgement about the outside world that a format processor is not positioned to
+make.
+
+**Step 5 — Identifier_Status, cheaply, on the same profile.** Requiring name characters to be
+`Identifier_Status=Allowed` (556 ranges, 47 KB) subsumes §7.1's hand-picked ZWNJ/ZWJ exclusion — currently a
+single instance of a rule UTS #39 states generally — and removes obsolete and technical characters that have
+no business in a name. It belongs on the *name* profile, not the token profile, for the reason Step 1 gives:
+an unquoted **value** in a historic script should stay legal. Unlike the restriction level, it is a
+per-character rule with no cross-script judgement in it, so it does not reject `url_адрес`.
+
+**What a processor does on detection.** State it: §2.6 already chose "MUST reject" for duplicate keys, and a
+confusable name pair is that same defect wearing a disguise. §2.6 is also the precedent for the diagnostic —
+at the repeated occurrence's position.
+
+**Vectors become possible.** All of the above is decidable from the document plus a fixed table, so the
+shared suite can carry it: a record declaring `admin` and `аdmin` rejected, one declaring `id_пользователя`
+alone accepted, `l` beside `I` rejected. That is the first part of this topic that could ever have been
+conformance-tested.
 
 **Status against Revision 33:** open, carried, and now carrying a concrete proposal where earlier revisions
 of this entry carried only directions. §9.4 is unchanged: one SHOULD-consider sentence, no name profile, no
-restriction level, no scoped comparison set, and no stated action on detection. Step 2 is prototyped here
-and not shipped; nothing else is built.
+comparison scopes, and no stated action on detection. Both mechanisms are prototyped here against the real
+UCD tables; neither is shipped.
 
 ## 4. A type argument's literal is called a bare token and typed `value`, and §8.2 identity depends on which
 
