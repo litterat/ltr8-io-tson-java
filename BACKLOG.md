@@ -46,21 +46,23 @@ own prose (which had gone stale on at least one of them):
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
-- [ ] **A materialised *atom* entry has no display name, so a diagnostic names its content-derived key.**
-  `EntryDisplayName` renders a derived entry as the form the author wrote — `[order; 1..]`, `paged<order>` —
-  and falls back to the raw key otherwise, on the reasoning that "a form with no spelling is a form nobody
-  wrote". An atom synthetic is the counterexample: `b => <N> !integer_type { min: N max: 100 }` applied as
-  `b<10>` mints an entry with no sugar spelling *and* a `source` carrying no arguments (`TypeRef.of
-  ("integer_type")`), so neither branch fires. A read then reports
-  `'integer_type_10_100_786fbcfb': '5' is less than the minimum 10` — naming a thing that appears nowhere in
-  the author's file, which this project's own rule forbids and which travels to consumers who cannot open
-  the schema at all.
-  - Rendering it needs something the mint does not currently keep: either the application (`b<10>`) recorded
-    on the entry, or the constructor body written back out (`!integer_type { min: 10  max: 100 }`). The
-    first is what the author wrote; the second is what every other derived-entry rendering does.
-  - `TsonSchemaLinker`'s own coherence diagnostic sidesteps it by naming no entry at all, which works there
-    because the location already names the applying declaration. A *read* has no such fallback: the value's
-    own path is the data end, and the schema end is exactly this name.
+- [ ] **A reader names the entry at the end of a reference chain, where the author named the one at the
+  start.** `b => <N> !integer_type { min: N max: 100 }` applied as `b<10>` reports
+  `'integer_type_10_100_786fbcfb': '5' is less than the minimum 10` — a name that appears nowhere in the
+  author's file, against this project's own rule, and travelling to consumers who cannot open the schema.
+  - **The application is recorded, one hop from where the message looks.** Closing an *open instance*
+    template mints two entries: a synthetic for the closed constructor form (`integer_type_10_100_786fbcfb`,
+    `source: integer_type` with **no** arguments, body `IntegerType`) and a `REFERENCE` instantiation
+    aliasing it (`b_10_e37cb70b`, `source: b<10>`, body `Reference`). The field's own type-ref names the
+    *instantiation* — §8.3's walk stops at a materialised one — and `EntryDisplayName.application()` renders
+    that one as `b<10>` today, with no change. What reports is the reader for the entry the `Reference`
+    points at, which names the leaf instead.
+  - So this is the naming twin of a rule `SchemaLocation` already follows: the pointer is the path taken
+    (`/person/age`), never the leaf it resolves to (`/int32` in core.tn), "because the leaf names a file the
+    author didn't write". The name in the message should take the same route.
+  - **A record template does not show the defect, and that is the tell.** `paged<text>` substitutes into one
+    entry (`source: paged<text>`, body `RecordBody`), so the reader's own entry is already the one that
+    renders. Only the two-entry shape — an open instance, and any alias chain — loses the name.
 
 ## Open form: the held template body
 
