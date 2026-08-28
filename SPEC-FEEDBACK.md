@@ -1717,11 +1717,23 @@ them read **four** properties, and a mainstream runtime exposes two:
 | `Canonical_Combining_Class` | A2/B's `$V` (Virama) and `$M₁` | **absent** — no `Character` API at all; 64 Virama ranges, ~335 more for `ccc≠0` |
 | `Indic_Syllabic_Category` | B's `$D` | **absent** — 257 `Vowel_Dependent` ranges |
 
-So an implementation ships roughly 1,400 range entries across three derived tables. That is far less than
-`confusables.txt` and rather more than "two core properties", and a spec adopting the rule should say so
-where it says the rule is "simple enough to be easily implemented with standard mechanisms such as regular
-expressions" — that sentence is true of the *matching* and silent about the data behind the character
-classes.
+**The data is small, though, because these code points are contiguous.** Merged, the four sets are 48, 58,
+148 and 143 ranges — 397 in all, not the ~1,400 lines the source files spend on them. As a delta-encoded
+table that is about 1.9 KB, and **under 1 KB gzipped**; as plain JSON arrays, 4.3 KB. So the honest summary
+is not "another `confusables.txt`" but "one kilobyte and three tables an implementation would not otherwise
+need".
+
+**And how much is free depends sharply on the host.** JavaScript's regex property escapes cover
+`\p{XID_Start}`, `\p{XID_Continue}`, `\p{Script=…}`, `\p{gc=…}` and even `\p{Join_Control}` natively — so a
+browser implementation ships *no* table for the identifier profile itself, and the joiner rule is the only
+thing that makes it ship any UCD data at all. The JDK is the opposite: it exposes `Script` and
+`General_Category`, has no `Joining_Type`, `Canonical_Combining_Class` or `Indic_Syllabic_Category` API, and
+its identifier predicates are not the XID properties (#14), so it ships tables for both.
+
+Worth the spec saying so where it quotes UTS #39 calling the rule "simple enough to be easily implemented
+with standard mechanisms such as regular expressions": that sentence is true of the *matching* and silent
+about the data behind the character classes, and which side of that line a platform falls on varies by an
+order of magnitude.
 
 **The two must land together**, and that is a real constraint rather than a tidiness point. A lexer whose
 token profile is exactly `XID_Continue` admits `ab<ZWNJ>c`; if the contextual check does not yet exist, that

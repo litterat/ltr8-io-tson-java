@@ -351,8 +351,8 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   contextual rule — conditions A1/A2/B, under single-script and NFC. **Costed:** no UTS #39 table, but the
   JDK exposes only two of the four properties it reads. `Joining_Type` (~777 listed code points, `T` deriving
   from `Mn`/`Me`/`Cf`), `Canonical_Combining_Class` (64 Virama ranges plus ~335 for `ccc≠0`) and
-  `Indic_Syllabic_Category=Vowel_Dependent` (257 ranges) all need shipping — about 1,400 entries across three
-  derived tables. **Do not implement A1 alone**: the Arabic condition without the two Indic ones accepts
+  `Indic_Syllabic_Category=Vowel_Dependent` all need shipping — but merged they are 397 ranges, ~1.9 KB
+  delta-encoded and under 1 KB gzipped, not the ~1,400 lines the source files spend on them. **Do not implement A1 alone**: the Arabic condition without the two Indic ones accepts
   Persian names and refuses Malayalam ones, which is the failure mode `SPEC-FEEDBACK.md` #3 rejects the
   restriction level for. The conformance vector
   `lexer/invalid/zwnj-inside-unquoted-token` asserts today's behaviour and flips in the same change; its
