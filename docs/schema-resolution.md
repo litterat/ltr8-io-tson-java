@@ -113,7 +113,7 @@ are kept in step deliberately.
   (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
   rejecting one would reject a documented construct — §5.7 states the rule per facet kind, and a selector is
   settable where the source leaves it at the constructor's default, identity-only once bound.
-- **An atom body must also be coherent with itself**, which is the other question about the same facets and
+- **A body must also be coherent with itself**, which is the other question about the same facets and
   needs no source to compare against. `checkCoherent` asks `Atom.coherenceCheck()` — one rule per family over
   the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `TsonSchemaValidationException`
   when a body's own facets admit nothing (`{ min_length: 10 max_length: 3 }`, `{ min: 10 max: 3 }`,
@@ -121,7 +121,15 @@ are kept in step deliberately.
   between bindings (e.g. `min ≤ max`) is a **compilation** and ingest concern (§8), **not data validation**"
   — which is also why it cannot live in the atom parsers. Running it at *resolution* rather than compilation
   is deliberate and strictly earlier: the bound constraint objects first exist here, and both are schema-load
-  time. meta.tn's own header `@doc` states the same obligation from the other side: bounds are field
+  time. It asks the **container** families the same question through `Product.coherenceCheck()`, the
+  structural twin: `min_items` above `max_items` admits no value of any length, and an array and a map share
+  the one rule since they carry the identical pair. Stating it on the family rather than with any one
+  spelling is what makes `[text; 5..3]` and the `!array { … min_items: 5 max_items: 3 }` body it denotes get
+  the same verdict — they are one type, and the rule used to live in the desugar phase, which only ever saw
+  the first. `TsonSchemaLinker` asks it a second time for the entries **materialisation** mints, which
+  resolution never produced: §8.2's "family coherence rules whose operands were parameters" is exactly a
+  template whose bounds were `MIN`/`MAX` until an application supplied both. meta.tn's own header `@doc`
+  states the same obligation from the other side: bounds are field
   groups so an inclusive/exclusive pair on one side is unrepresentable, while "value-level coherence (the
   lower bound not exceeding the upper) remains a schema-load check". `cidr4_type`'s `@doc` adds the family
   range — prefixes narrow "within the family range 0-32", and "bounds outside that range are invalid at the

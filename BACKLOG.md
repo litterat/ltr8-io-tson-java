@@ -46,15 +46,23 @@ own prose (which had gone stale on at least one of them):
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
-- [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
-  open bounds deferred: family coherence rules whose operands were parameters". The array family's
-  `min_items <= max_items` is one rule over the binding pair for arrays *and maps*, and nothing compares a
-  *pair* of bounds once both go concrete at materialisation. The kin §8.2 gestures at — "bounds within a
-  width-derived range, and their kin" — belong with the constraint families that own them, next to
-  `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
-  means the check moves out of the desugarer entirely and `checkBounds` goes with it. Distinct from the
-  atom-body self-coherence item below, which shares that destination but has no parameter or
-  materialisation dimension at all.
+- [ ] **A reader names the entry at the end of a reference chain, where the author named the one at the
+  start.** `b => <N> !integer_type { min: N max: 100 }` applied as `b<10>` reports
+  `'integer_type_10_100_786fbcfb': '5' is less than the minimum 10` — a name that appears nowhere in the
+  author's file, against this project's own rule, and travelling to consumers who cannot open the schema.
+  - **The application is recorded, one hop from where the message looks.** Closing an *open instance*
+    template mints two entries: a synthetic for the closed constructor form (`integer_type_10_100_786fbcfb`,
+    `source: integer_type` with **no** arguments, body `IntegerType`) and a `REFERENCE` instantiation
+    aliasing it (`b_10_e37cb70b`, `source: b<10>`, body `Reference`). The field's own type-ref names the
+    *instantiation* — §8.3's walk stops at a materialised one — and `EntryDisplayName.application()` renders
+    that one as `b<10>` today, with no change. What reports is the reader for the entry the `Reference`
+    points at, which names the leaf instead.
+  - So this is the naming twin of a rule `SchemaLocation` already follows: the pointer is the path taken
+    (`/person/age`), never the leaf it resolves to (`/int32` in core.tn), "because the leaf names a file the
+    author didn't write". The name in the message should take the same route.
+  - **A record template does not show the defect, and that is the tell.** `paged<text>` substitutes into one
+    entry (`source: paged<text>`, body `RecordBody`), so the reader's own entry is already the one that
+    renders. Only the two-entry shape — an open instance, and any alias chain — loses the name.
 
 ## Open form: the held template body
 

@@ -323,13 +323,17 @@ class ContainerSugarEndToEndTest {
     /**
      * §5.3's bound-coherence rule, reported where the author wrote the bounds: {@code min <= max}, checked at
      * schema load wherever both bounds are literal.
+     *
+     * <p>The rule is the container family's own ({@code ArrayBody}/{@code MapBody}), not the sugar's, which
+     * is what makes this form and the {@code !array { ... }} body it denotes get the same answer --
+     * {@code ContainerBoundCoherenceTest} is where every spelling is compared.
      */
     @Test
     void aSizedArrayWhoseBoundsCannotBeSatisfiedIsAResolverError() {
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> compile("  impossible => [text; 5..3]"));
 
-        assertTrue(thrown.getMessage().contains("min_items 5 above max_items 3"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("min_items 5 is above max_items 3"), thrown.getMessage());
     }
 
     /**

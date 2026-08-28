@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
@@ -31,6 +32,7 @@ import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.RationalType;
+import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
@@ -859,6 +861,7 @@ public final class TsonSchemaLinker {
 
     private static void validateBody(String entryName, Top body, Map<String, TypeDefinition> namespace,
                                       List<String> ownParameters) {
+        checkCoherent(body);
         switch (body) {
             case RecordBody r -> {
                 for (String supertype : r.supertypes()) {
@@ -1135,6 +1138,44 @@ public final class TsonSchemaLinker {
             if (argument instanceof TypeArgument.Ref nested) {
                 collectNames(nested.ref(), into);
             }
+        }
+    }
+
+    /**
+     * §8.2's materialisation-time coherence check, over <b>every</b> family: "Materialisation also runs the
+     * value-level checks that open bindings deferred: family coherence rules whose operands were parameters
+     * -- {@code min_items <= max_items} (§5.3) <b>and their kin</b> -- ... are verified once concrete, and a
+     * violation is a resolver error reported at the materialising application."
+     *
+     * <p><b>"And their kin" needs no enumeration, which is why this is one line.</b> Each family already owns
+     * its own coherence rule ({@link Atom#coherenceCheck}, {@link Product#coherenceCheck}) for the body an
+     * author writes literally; the rule an application closes onto is the same rule over the same facets, so
+     * asking every body here covers the named case and its kin together. Anything §5.5 adds to a family later
+     * arrives here for free.
+     *
+     * <p><b>It runs on every entry, not only the materialised ones</b>, because this phase is the one place
+     * that sees them all exactly once however they were produced. A declared body was already asked at
+     * resolution, beside its own constructor's vocabulary check -- and one that failed there is replaced by a
+     * placeholder and never reaches this, so nothing is reported twice. What is left for this to catch is
+     * exactly the set resolution never produced: {@code sized<10, 3>} over an array template, and
+     * {@code b<10>} over {@code <N> !integer_type { min: N max: 3 }}, whose bounds were parameters until an
+     * application supplied them.
+     */
+    private static void checkCoherent(Top body) {
+        List<String> violations = switch (body) {
+            case Atom atom -> atom.coherenceCheck();
+            case Product product -> product.coherenceCheck();
+            default -> List.of();
+        };
+        if (!violations.isEmpty()) {
+            // No name leads this one, deliberately. Only an entry resolution never produced can reach here --
+            // a declared body failed the same check one phase earlier, under its own declaration's name -- and
+            // a materialised entry's name is content-derived, which is the one thing a diagnostic may never
+            // put in front of an author. The location already names the declaration that wrote the
+            // application; what is left to say is what the application closed onto.
+            throw new TsonSchemaValidationException("the constraints this application closes onto contradict "
+                    + "each other: " + String.join("; ", violations) + " -- no value can satisfy them, so "
+                    + "nothing could ever be a valid instance of the type it denotes");
         }
     }
 

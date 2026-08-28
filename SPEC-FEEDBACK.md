@@ -814,3 +814,55 @@ being FIXED. Deleting it is the smaller change and loses nothing a schema can cu
 **Status against Revision 33:** open, new against this revision. Both facets are declared in the bundled
 `meta.tn` this repo packages, so a schema can write them today and no implementation can agree with another
 about what happens next.
+
+
+---
+
+## 10. §8.2 defers "family coherence rules whose operands were parameters — `min_items ≤ max_items` (§5.3) and their kin" without saying what the kin are
+
+**Section:** Part 2 §8.2 (materialisation), §5.3 (size specifier), §5.5 (constraint vocabularies).
+
+**Problem:** §8.2's sentence is normative and its subject is a set it does not enumerate:
+
+> Materialisation also runs the value-level checks that open bindings deferred: family coherence rules whose
+> operands were parameters — `min_items ≤ max_items` (§5.3) **and their kin** — and the typing of every
+> substituted value (§5.10) are verified once concrete, and a violation is a resolver error reported at the
+> materialising application.
+
+One rule is named and the rest are gestured at. An implementer can build the named one and has no way to
+know whether they have finished — "and their kin" is not a set anything can be checked against, and the
+obvious reading (that it means the other bound pairs) understates it, since a family may state a coherence
+rule that is not a bound pair at all (`min_prefix`/`max_prefix` against the address family's own width).
+
+**What this implementation does, and it needs no list.** Every constraint family already owns its coherence
+rule for the body an author writes literally — that is where `min_length: 10 max_length: 3` is refused, and
+where §7.2 puts it ("family coherence between bindings (e.g. `min ≤ max`) is a compilation and ingest
+concern"). The rule an application *closes onto* is the same rule over the same facets, so materialisation
+does not need its own set: it asks every family the question it already answers. One call, at the phase that
+sees every entry exactly once, covers `min_items ≤ max_items` and its kin together, and a family that gains
+a rule later is covered without anything being added.
+
+This is not hypothetical for the atom families. §12.1 refuses a parameterized `^` refinement, but the
+constructor spelling is open, so an atom's own bounds reach materialisation as readily as a container's:
+
+```
+b => <N> !integer_type { min: N  max: 3 }      r => { x: b<10> }
+b => <N> !text_type { min_length: N  max_length: 3 }   r => { x: b<10> }
+b => <N> !cidr4_type { min_prefix: N  max_prefix: 8 }  r => { x: b<40> }
+```
+
+All three describe a type nothing can satisfy, none of them is `min_items ≤ max_items`, and all three are
+the kin the sentence has in mind.
+
+**Recommendation:** replace "and their kin" with the general rule, which is shorter than a list and cannot
+go stale: *every family coherence rule §5.3 and §5.5 state applies again at materialisation, over the
+operands that were parameters.* If a list is preferred, it must include the non-pair rules, which the
+current phrasing reads past.
+
+**One thing §8.2 gets exactly right and is worth keeping:** "a violation is a resolver error reported **at
+the materialising application**". That is the only location an author can act on — the entry itself is
+minted, content-named, and appears nowhere in their file — and it is also where §5.10's substituted-value
+typing has to land for the same reason.
+
+**Status against Revision 33:** open, new against this revision. The general rule is what is built and
+running here (`ContainerBoundCoherenceTest`), across both base kinds and every family.
