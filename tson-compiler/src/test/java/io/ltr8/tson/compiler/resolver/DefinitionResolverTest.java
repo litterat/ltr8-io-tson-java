@@ -395,8 +395,8 @@ class DefinitionResolverTest {
         TypeDefinition doc = resolver.resolve(schemaMap.declarations().get("doc"));
         TypeDefinition alias = resolver.resolve(schemaMap.declarations().get("alias"));
 
-        // type_name/field_name/param_name => token; each is its own fresh REFERENCE entry, not
-        // three views of the same one -- source/target both name "token" for all three.
+        // type_name/field_name/param_name => identifier; each is its own fresh REFERENCE entry, not
+        // three views of the same one -- source/target both name "identifier" for all three.
         assertEquals(TypeKind.REFERENCE, typeName.kind());
         assertEquals(TypeKind.REFERENCE, fieldName.kind());
         assertEquals(TypeKind.REFERENCE, paramName.kind());
@@ -405,9 +405,9 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.REFERENCE, doc.kind());
         assertEquals(TypeKind.REFERENCE, alias.kind());
 
-        assertEquals("{ source: { name: \"token\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+        assertEquals("{ source: { name: \"identifier\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
                 + "constructor: false supertypes: [] subtypes: [] "
-                + "body: !reference { target: { name: \"token\" arguments: [] } } }", write(typeName));
+                + "body: !reference { target: { name: \"identifier\" arguments: [] } } }", write(typeName));
         assertEquals(write(typeName), write(fieldName));
         assertEquals(write(typeName), write(paramName));
 
@@ -889,8 +889,8 @@ class DefinitionResolverTest {
     // ── A field typed by a named constructor application ──────────────────
 
     @Test
-    void resolvesEnumFromTheRealMetaKernelFixtureNamingTheTokenSetEntry() throws IOException, DataBindException {
-        // enum => ~atom & { members: token_set }, where token_set => !set { element_type: token }.
+    void resolvesEnumFromTheRealMetaKernelFixtureNamingTheEnumSetEntry() throws IOException, DataBindException {
+        // enum => ~atom & { members: enum_set }, where enum_set => !set { element_type: identifier  min_items: 1 }.
         // The named entry exists because `!` forms stay prohibited at field positions (§5.2) and `set`
         // has no sugar of its own -- there is no generic application left to write here.
         SchemaMap schemaMap = schemaMapFromFixture();
@@ -904,7 +904,7 @@ class DefinitionResolverTest {
         assertEquals(List.of("atom", "top"), enumDef.supertypes());
         assertEquals("{ kind: \"ATOM\" parameters: [] constructor: true supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"atom\" ] fields: [ "
-                        + "{ name: \"members\" type: { name: \"token_set\" arguments: [] } state: \"REQUIRED\" } "
+                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } state: \"REQUIRED\" } "
                         + "] groups: [] } }",
                 write(enumDef));
     }
@@ -990,13 +990,13 @@ class DefinitionResolverTest {
 
     @Test
     void instanceResolutionRejectsATargetThatIsNotAConstructor() {
-        // "token" resolves fine (kind ATOM) but constructor: false -- !token {} must be rejected,
+        // "identifier" resolves fine (kind ATOM) but constructor: false -- !identifier {} must be rejected,
         // not silently treated as a valid constructor application (§3.3.1's own suggested
         // diagnostic: "did you mean atom refinement?").
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         SchemaMap schemaMap = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/33/m/meta-kernel.tn1"
-                { bad => !token {} }""").parseSchemaDocument().body();
+                { bad => !identifier {} }""").parseSchemaDocument().body();
 
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(

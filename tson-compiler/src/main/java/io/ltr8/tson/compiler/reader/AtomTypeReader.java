@@ -26,7 +26,7 @@ import io.ltr8.tson.compiler.atom.RationalParser;
 import io.ltr8.tson.compiler.atom.RegexParser;
 import io.ltr8.tson.compiler.atom.TextParser;
 import io.ltr8.tson.compiler.atom.TimeParser;
-import io.ltr8.tson.compiler.atom.TokenParser;
+import io.ltr8.tson.compiler.atom.IdentifierParser;
 import io.ltr8.tson.compiler.atom.UriParser;
 import io.ltr8.tson.compiler.atom.UuidParser;
 import io.ltr8.tson.compiler.atom.ValueParser;
@@ -152,12 +152,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * declaration's own name, not its resolved shape. {@code void} doesn't fit {@link AtomType}'s
      * {@code read(TokenValue)} shape at all (its contract admits only the absent sentinel {@code _},
      * not a token), so it bypasses this class entirely via {@link VoidReader}. An unrecognized
-     * {@code unit}-constructed name falls back to {@link TokenParser}'s raw-text behavior.
+     * {@code unit}-constructed name falls back to {@link IdentifierParser}, which validates the name profile.
      */
     static final ValueReaderFactory UNIT = (name, definition, context) -> switch (name) {
         case "void" -> new VoidReader(context.locationOf(name, definition));
         case "value" -> new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition));
-        default -> new AtomTypeReader<>(name, TokenParser.INSTANCE, context.locationOf(name, definition));
+        default -> new AtomTypeReader<>(name, IdentifierParser.INSTANCE, context.locationOf(name, definition));
     };
 
     /**

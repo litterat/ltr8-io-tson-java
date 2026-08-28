@@ -356,6 +356,50 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
+     * The kernel types every naming position {@code identifier} (issue #231), and the resolver builds
+     * {@code record_field.name} directly rather than round-tripping the model through the compiled meta
+     * reader — so the contract is asserted here as well as at the constructor applications that do round
+     * trip. Each of these was a valid schema until the type carried a contract.
+     */
+    @Test
+    void aDeclaredFieldNameMustBeAnIdentifier() {
+        for (String[] c : new String[][] {
+                {"\"first name\"", "U+0020 at index 5 cannot appear in an identifier"},
+                {"a.b", "U+002E at index 1 cannot appear in an identifier"},
+                {"42", "cannot start an identifier -- an identifier never begins with a digit or a sign"},
+        }) {
+            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                    () -> compile("  ok => { " + c[0] + ": text }"), c[0]);
+            assertTrue(thrown.getMessage().contains("invalid field name"), thrown.getMessage());
+            assertTrue(thrown.getMessage().contains(c[1]), thrown.getMessage());
+        }
+    }
+
+    /** And the ordinary shapes keep working, including the one extension `Continue` retains. */
+    @Test
+    void ordinaryFieldNamesAreUnaffected() {
+        assertNotNull(compile("  ok => { my-field: text  a_b: text  日本語: text }"));
+    }
+
+    /**
+     * `enum.members` is typed through `enum_set`, so members reach the contract by the other route — the
+     * constructor body read back against the kernel's own vocabulary — and pick up `min_items: 1` and the
+     * set's uniqueness with it.
+     */
+    @Test
+    void enumMembersAreIdentifiersAndAtLeastOneAndUnique() {
+        assertNotNull(compile("  e => !enum [OPEN DONE]"));
+
+        assertTrue(assertThrows(TsonSchemaValidationException.class, () -> compile("  e => !enum []"))
+                .getMessage().contains("fewer than the minimum 1"));
+        assertTrue(assertThrows(TsonSchemaValidationException.class,
+                () -> compile("  e => !enum [\"in progress\" DONE]"))
+                .getMessage().contains("U+0020 at index 2 cannot appear in an identifier"));
+        assertTrue(assertThrows(TsonSchemaValidationException.class, () -> compile("  e => !enum [OPEN OPEN]"))
+                .getMessage().contains("requires unique elements"));
+    }
+
+    /**
      * §5.3's bound-coherence rule, reported where the author wrote the bounds: {@code min <= max}, checked at
      * schema load wherever both bounds are literal.
      *

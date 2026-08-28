@@ -54,6 +54,11 @@ tokens, modes, or character-classification changes).
   continue — the characters XID drops for not being NFKC-closed), which is **exact** against Unicode 16.0:
   zero over-, zero under-acceptance on both predicates across all 1,112,064 non-surrogate code points.
   `Lexer.UNICODE_VERSION` declares the version, as §7.1 asks.
+- **`Xid` is the shared property, and neither profile is it.** `Xid.isStart`/`isContinue` are exactly
+  `XID_Start`/`XID_Continue`; the lexer's token profile adds `Nd`/`-`/`+`/`.` and subtracts the joiners,
+  and the kernel's `identifier` contract (`IdentifierParser`) adds only `-` and requires NFC. Keeping the
+  property in one place is what stops the two drifting — the identifier profile is written to
+  `XID_Continue`, joiners included, so it is already right when the lexer stops subtracting them.
 - **The ignorable subtraction also removes ZWNJ/ZWJ, and that is the profile, not a bug.** U+200C and
   U+200D *are* in `XID_Continue` (Unicode 16.0 `DerivedCoreProperties.txt`), so §7.1's set algebra admits
   them while its prose excludes them by name — "deliberately excluded … names whose orthography requires

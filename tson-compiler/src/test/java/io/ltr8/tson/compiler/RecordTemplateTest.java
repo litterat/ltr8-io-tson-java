@@ -185,7 +185,8 @@ class RecordTemplateTest {
                 () -> compile("""
                           test1 => <T, N> { first: T ~ N }
                           holder => { d: test1<10, int32> }"""));
-        assertTrue(swapped.getMessage().contains("unresolved reference '10'"), swapped.getMessage());
+        assertTrue(swapped.getMessage().contains("'10': U+0031 at index 0 cannot start an identifier"),
+                swapped.getMessage());
     }
 
     /** An inner application closes before the outer one names it, so nesting needs no special case. */
@@ -486,7 +487,8 @@ class RecordTemplateTest {
                 () -> compile("""
                           box => <T> { v: T }
                           holder => { b: box<3> }"""));
-        assertTrue(thrown.getMessage().contains("unresolved reference '3'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'3': U+0033 at index 0 cannot start an identifier"),
+                thrown.getMessage());
     }
 
     /**

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=fe236a5855de399610a4e27cd3ae369fac644331566e2a2075634ab176cd5101"
+!!id:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=5c8f7830757fbf25ebb7d5da8cd87c4c12acdc68a2612a3e135211b65b6aac56"
 !!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 33 draft).
@@ -66,7 +66,7 @@
   @doc:"""
     Unit atom constructor. An atom with no constraint vocabulary — the
     atom equivalent of the empty record `{}` for products. Its instances
-    (`value`, `token`, `void`, all in the kernel) are
+    (`value`, `identifier`, `void`, all in the kernel) are
     opaque atoms distinguished by name and prose-level parsing contract,
     not by schema shape.
     """
@@ -90,23 +90,40 @@
   value => !unit {}
 
   @doc:"""
-    Lexical token primitive. Instance of the unit atom constructor. The
-    canonical NFC-normalised form of a source lexeme — for unquoted
-    lexemes the lexer normalises ([TSON-DATA] §7.2.1); for quoted lexemes appearing
-    in identifier positions the resolver normalises ([TSON-DATA] §7.2.1). Identity
-    comparison is by canonical form; tokens are whitespace-free by
-    construction because the lexer terminates tokens on whitespace.
+    Identifier primitive. Instance of the unit atom constructor, and the
+    type of every naming position in the series — type names, field
+    names, parameter names (through the three roles below) and enum
+    members (through enum_set). A rule stated here reaches all of them.
 
-    token is not used in data and exists so the kernel can describe
-    lexical identifiers (type names, field names, parameter names) and
-    enum members honestly. Core declares no sibling of it (no
-    core-level type targets it directly), unlike `void`, whose core
-    sibling exists because annotations in core need it. The
-    implementation-internal constraints on what constitutes a
-    well-formed token are fixed by the grammar; no constraint vocabulary
-    is needed at the type level.
+    An identifier is a name, not a lexeme: it is the decoded text of a
+    token, after unquoting, escape processing and normalisation, and it
+    is constrained however it was spelled. Its profile is stated beside
+    the unquoted-token profile of [TSON-DATA] §7.1:
+
+      Start    = XID_Start
+      Continue = XID_Continue + "-"
+
+    and the text MUST be in NFC. The profile is the token profile minus
+    the extensions the number grammar requires — Nd, "-", "+" and "."
+    at Start exist so a *number* can be an unquoted token, and reach
+    names only because names and values share one lexical class — so an
+    identifier never begins with a digit or a sign, which subsumes the
+    rule that numbers are not declarable names. "+" is dropped from
+    Continue as an exponent-only character, and "." is reserved as a
+    future identifier separator. Everything else follows from XID
+    membership: whitespace, control characters, format characters,
+    emoji and unassigned code points are none of them XID_Continue.
+
+    Every part of this profile lies inside the unquoted-token profile,
+    so every identifier is a well-formed unquoted token and none ever
+    needs quoting — which is what lets the type-ref and annotation
+    positions, admitting no quoted form, cost nothing.
+
+    Core declares no sibling of it (no core-level type targets it
+    directly), unlike `void`, whose core sibling exists because
+    annotations in core need it.
     """
-  token => !unit {}
+  identifier => !unit {}
 
   @doc:"""
     Void primitive. Instance of the unit atom constructor whose
@@ -214,10 +231,10 @@
 
   regex => !regex_type {}
 
-  @doc:"Identifier types — distinct lexical roles referencing the token primitive."
-  type_name  => token
-  field_name => token
-  param_name => token
+  @doc:"Identifier roles — distinct naming positions referencing the identifier primitive."
+  type_name  => identifier
+  field_name => identifier
+  param_name => identifier
 
   @doc:"""
     Structured type reference ([TSON-SCHEMA] §8.1). `name` is the
@@ -390,10 +407,10 @@
     applications remain prohibited at field positions
     ([TSON-SCHEMA] §5.2) and `set` has no sugar of its own.
     """
-  token_set => !set { element_type: token }
+  enum_set => !set { element_type: identifier  min_items: 1 }
 
   enum => ~atom & {
-    members: token_set
+    members: enum_set
   }
 
   choice => ~sum & {

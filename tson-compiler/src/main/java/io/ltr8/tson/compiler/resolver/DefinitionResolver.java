@@ -33,6 +33,8 @@ import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonObjectWriter;
+import io.ltr8.tson.compiler.atom.IdentifierParser;
+import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ElementState;
@@ -390,6 +392,22 @@ final class DefinitionResolver {
      * namespace. Worded from the two ways an author gets here -- a name they declared in this very schema (or
      * imported into it), which is the near miss the rule actually catches, and a name that is simply nowhere.
      */
+    /**
+     * Checks a name the author wrote against the kernel's {@code identifier} contract (§7.1's name profile).
+     * The resolver builds {@code record_field.name} and its kin directly rather than round-tripping the
+     * resolved model through the compiled meta reader, so the type these positions carry -- {@code
+     * field_name}, an alias of {@code identifier} -- would otherwise constrain only the positions that *are*
+     * read back as data, which is constructor applications and materialisation. Calling it here is what
+     * makes one contract reach every naming position rather than the subset the model happens to round-trip.
+     */
+    private static void requireIdentifier(String name, String role) {
+        try {
+            IdentifierParser.INSTANCE.read(new TokenValue(name, TokenForm.UNQUOTED));
+        } catch (AtomTypeException e) {
+            throw new TsonSchemaValidationException("invalid " + role + " -- " + e.getMessage());
+        }
+    }
+
     private TsonSchemaValidationException unresolvedAnnotation(String declaration, String annotationName) {
         boolean local = namespaceDefinitions.getTypeDefinition(annotationName) != null;
         return new TsonSchemaValidationException("'" + declaration + "': '@" + annotationName + "' does not name "
@@ -1620,6 +1638,7 @@ final class DefinitionResolver {
      */
     private RecordField resolveFieldEntry(FieldDef field, List<String> parameters,
                                            Optional<RecordField> inherited) {
+        requireIdentifier(field.name(), "field name");
         io.ltr8.tson.schema.meta.TypeRef type;
         if (field.type().isPresent()) {
             type = resolveTypeRef(field.type().get().typeRef());

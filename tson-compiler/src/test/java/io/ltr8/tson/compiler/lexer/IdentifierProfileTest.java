@@ -136,6 +136,6 @@ class IdentifierProfileTest {
     /** §7.1 asks an implementation to document its Unicode version; this pins that it says so. */
     @Test
     void theSupportedUnicodeVersionIsDeclared() {
-        assertEquals("16.0", Lexer.UNICODE_VERSION);
+        assertEquals("16.0", Xid.UNICODE_VERSION);
     }
 }

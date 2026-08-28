@@ -818,8 +818,11 @@ compatibility).
   a `caused by` frame chaining the author's location to the leaf constraint's (`BACKLOG.md`).
 - **§5.10's argument-kind rule is answered by two other rules, not by the kind rule.** A held body has no
   slot types — that is what it is for — so it can never say *this slot expected a value*. Neither half needs
-  it to: a literal applied where the body uses the parameter as a **type** is refused because nothing
-  declares a type called `3` (an unresolved reference), and a type name routed into a field's **value** is
+  it to: a literal applied where the body uses the parameter as a **type** is refused because `3` is not an
+  identifier at all — `type_ref.name` is typed `identifier`, so it fails where the substituted body is read
+  against the kernel's own vocabulary, which is sharper than the unresolved-reference verdict it used to get
+  (that one implied an author could go and declare a type called `3`) — and a type name routed into a
+  field's **value** is
   refused because §5.2 makes `record_field.value` a value of the field's declared type — which catches
   `int32 ~ text` whether a parameter put it there or the author wrote it literally (`TsonSchemaLinker`'s
   `checkFieldValue`, `FieldValueConformanceTest`). What is left is that check's own boundary, below.

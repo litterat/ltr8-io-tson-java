@@ -70,7 +70,7 @@ public final class AtomParsers {
             case Unit ignored -> switch (declaredName) {
                 case "void" -> null;
                 case "value" -> ValueParser.INSTANCE;
-                default -> TokenParser.INSTANCE;
+                default -> IdentifierParser.INSTANCE;
             };
             case IntegerType t -> new IntegerParser(t);
             case TextType t -> new TextParser(t);

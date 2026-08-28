@@ -176,9 +176,20 @@ class TsonValidateSchemaTest {
      * held body mentions {@code 3} or {@code some_typo}, so nothing is retargeted. Blaming the template for
      * these would send the author to {@code box => <T> { v: T }} to look for a {@code 3} that is not there.
      */
+    /**
+     * The literal case is refused for a sharper reason than the typo below it: {@code 3} is not an
+     * unresolved <em>name</em>, it is not a name at all, and {@code type_ref.name} is typed {@code
+     * identifier} (issue #231), so it fails where the substituted body is read against the kernel's own
+     * vocabulary rather than later at reference resolution. The verdict is the same and the explanation is
+     * better — "an identifier never begins with a digit or a sign" is actionable where "unresolved
+     * reference '3'" implied an author could go and declare one.
+     */
     @Test
     void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
-        assertStaysWithTheApplier("box<3>", "'box<3>' field 'v' has an unresolved reference '3'");
+        assertStaysWithTheApplier("box<3>",
+                "'box<...>' substitutes into a body that is not valid data for 'record', the constructor's "
+                        + "own constraint vocabulary -- 'type_name': '3': U+0033 at index 0 cannot start an "
+                        + "identifier -- an identifier never begins with a digit or a sign");
     }
 
     @Test

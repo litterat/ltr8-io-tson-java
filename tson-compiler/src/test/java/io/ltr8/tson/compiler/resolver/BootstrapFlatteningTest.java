@@ -39,10 +39,10 @@ class BootstrapFlatteningTest {
         TsonSchema kernel = MetaKernelBootstrapResolver.getMetaKernelSchema();
         TypeDefinition recordField = kernel.entries().get("record_field");
 
-        assertEquals("token", field(recordField, "name").type().name());
+        assertEquals("identifier", field(recordField, "name").type().name());
         assertEquals(Optional.of("field_name"), alias(field(recordField, "name")));
         TypeDefinition typeRef = kernel.entries().get("type_ref");
-        assertEquals("token", field(typeRef, "name").type().name());
+        assertEquals("identifier", field(typeRef, "name").type().name());
         assertEquals(Optional.of("type_name"), alias(field(typeRef, "name")));
     }
 
@@ -61,7 +61,7 @@ class BootstrapFlatteningTest {
     void anAliasEntryKeepsItsHopOnTheBootstrapRoute() {
         TypeDefinition typeName = MetaKernelBootstrapResolver.getMetaKernelSchema().entries().get("type_name");
 
-        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("token"),
+        assertEquals(io.ltr8.tson.schema.meta.TypeRef.of("identifier"),
                 assertInstanceOf(io.ltr8.tson.schema.meta.Reference.class, typeName.body()).target());
     }
 }

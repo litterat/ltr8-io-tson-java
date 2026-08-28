@@ -13,7 +13,7 @@ import java.math.BigInteger;
  * Parses meta-kernel's {@code value} instance of the {@code unit} atom constructor (§4.2, §8.1) --
  * the "escape hatch primitive": per its own kernel doc, "the result of base type resolution
  * ([TSON-DATA] §4) applied to a source token, with no further interpretation... the host runtime is
- * responsible for type-checking values at use site." Unlike {@link TokenParser} (raw lexical text,
+ * responsible for type-checking values at use site." Unlike {@link IdentifierParser} (raw lexical text,
  * unconstrained) this actually runs {@link BaseTypeResolver} -- null/boolean/number/string, §4.5's
  * fixed order -- and narrows the result to the natural Java host type each {@link BaseValue}
  * variant implies: {@code null}, {@link Boolean}, {@link BigInteger}/{@link BigDecimal} (or {@link
@@ -22,7 +22,7 @@ import java.math.BigInteger;
  * no constraint vocabulary and is explicitly "not narrowable" (its own kernel doc), so there is only
  * ever the one, natural representation.
  *
- * <p>See {@link TokenParser}'s own Javadoc for why this class -- along with {@code void}'s own
+ * <p>See {@link IdentifierParser}'s own Javadoc for why this class -- along with {@code void}'s own
  * {@code io.ltr8.tson.compiler.reader.VoidReader} -- exists as a separate,
  * name-keyed specialization rather than one shared {@code unit} compiler: the kernel's own text says
  * {@code value}/{@code token}/{@code void} are "distinguished by name and prose-level parsing

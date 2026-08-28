@@ -67,7 +67,7 @@ class MetaKernelBootstrapResolverTest {
     void unitInstancesResolveToAnEmptyUnitBodyWithAtomKindTransferredFromUnit() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        for (String name : List.of("value", "token", "void")) {
+        for (String name : List.of("value", "identifier", "void")) {
             TypeDefinition resolved = schema.entries().get(name);
             assertEquals(TypeKind.ATOM, resolved.kind());
             assertInstanceOf(Unit.class, resolved.body());
@@ -131,7 +131,7 @@ class MetaKernelBootstrapResolverTest {
      * entry from the {@code {K => V}} sugar in {@code instance_template.bindings}. They are the same entries
      * the linker used to synthesize; producing them here is what leaves the linker with nothing to
      * materialize (see {@code MetaKernelSchemaRegistryTest}). {@code enum}'s member set is not among them:
-     * it is the fixture's own {@code token_set} declaration, since {@code set} has no sugar and a {@code !}
+     * it is the fixture's own {@code enum_set} declaration, since {@code set} has no sugar and a {@code !}
      * form stays prohibited at a field position (§5.2).
      */
     @Test

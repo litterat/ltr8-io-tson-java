@@ -63,7 +63,7 @@ class MetaKernelSchemaRegistryTest {
         // `fields: [record_field]`, `groups: [field_group]?`, `supertypes`/`subtypes`/`parameters:
         // [type_name]?`/`[param_name]?` -- three separate `[type_name]?` uses correctly dedup to a
         // single `array_type_name_*` entry, not three -- `elements: [tuple_element]`, `variants:
-        // [type_ref]`, `members: [field_name]`). `enum`'s member set is not among them: `token_set` is
+        // [type_ref]`, `members: [field_name]`). `enum`'s member set is not among them: `enum_set` is
         // a declaration the fixture writes, since `set` has no sugar of its own.
         Set<String> expectedHeads = Set.of("array_tuple_element", "array_field_name",
                 "array_type_ref", "array_type_name", "array_type_argument", "array_param_name",
@@ -81,7 +81,7 @@ class MetaKernelSchemaRegistryTest {
         RecordField membersField = enumBody.fields().stream()
                 .filter(f -> f.name().equals("members"))
                 .findFirst().orElseThrow();
-        assertEquals(TypeRef.of("token_set"), membersField.type());
+        assertEquals(TypeRef.of("enum_set"), membersField.type());
     }
 
     /**
