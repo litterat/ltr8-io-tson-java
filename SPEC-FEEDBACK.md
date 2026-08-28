@@ -252,6 +252,55 @@ Three consequences follow, and they are the whole of why §9.4 is stuck:
 A useful side effect: the comparison scopes Step 2 needs are then expressible in the model rather than only
 in prose. "The declared names of one schema" is the key set of `schema => {type_name => type_definition}`.
 
+**Step 1b — what `token`'s contract should say.** Form and policy are orthogonal, and separating them is what
+makes this cheap. The *grammar* decides which spellings a position admits — `annotation = "@" unquoted-token`
+and `type-ref = "!" unquoted-token` are unquoted for adjacency reasons that have nothing to do with
+confusability, and should stay that way. The *policy* decides which names are admitted, and is the same
+policy at every position. A position may admit fewer spellings without admitting a different set of names.
+
+The practical consequence is that this costs almost nothing to adopt: at the three unquoted-only positions
+every clause below is already true, because an unquoted token cannot contain a space, a control, or a format
+character. **The policy's entire effect lands on quoted field names** — which is exactly where the bypass is.
+
+A name, whatever spells it, MUST:
+
+1. **be non-empty.** `{ "": 1 }` is legal today. Nothing can reference it (`type-name` cannot be empty), and
+   two of them in one record are a duplicate that renders as nothing.
+2. **be NFC-normalized.** §7.2.1 already requires this of unquoted tokens, and §2.5/§2.6 already define name
+   *identity* by NFC ("`café`" NFC and NFD are one field name). Requiring the **form** is strictly simpler
+   than requiring the **comparison**: it is checkable on one name, it makes the stored name equal the
+   compared name, and it makes duplicate detection ordinary string equality. Requiring only the comparison
+   is the harder rule and the easy one to get wrong — this implementation gets it wrong today, accepting
+   both spellings in one record as two fields.
+3. **contain no character with `White_Space=Yes` at its start or end, and no C0/C1 control anywhere.**
+   `"admin "` and `"admin"` are indistinguishable in every renderer; a newline inside a name breaks every
+   diagnostic that prints it. *Interior* whitespace is deliberately left legal — see the open question below.
+4. **contain no `Cf` (format) character.** This is the security clause: BOM, soft hyphen, word joiner, ZWNJ,
+   ZWJ, the bidi controls (U+202A–U+202E, U+2066–U+2069) and U+061C. It already holds for unquoted names,
+   since none of these is in `XID_Continue`; stating it on the name is what closes the quoted bypass.
+5. **be permitted to mix scripts.** `id_пользователя` is a name, not a defect. A restriction level stays
+   available as an opt-in profile, default off (Step 4).
+
+And, at scope level rather than per name, no two names in one scope may share a `skeleton()` (Step 2).
+
+**Three open decisions this raises, which the policy should settle explicitly rather than inherit:**
+
+- **Interior whitespace, and JSON.** §7.1 says "the comma separators and quoted keys required by JSON are
+  accepted by the TSON grammar", so `{"first name": 1}` is a TSON record today. Banning interior whitespace
+  would make it one only as a *map* (`{"first name" => 1}`), since map keys are data and unconstrained.
+  Clause 3 above takes the narrow option — boundaries only — to keep that claim true. The strict option is
+  defensible; it just needs saying which, because "names may not contain spaces" and "JSON objects are
+  records" cannot both hold.
+- **Numeric names.** `{ 42: 1 }` is a legal record today, while §12.1 forbids a numeric *type* name outright
+  ("numbers are not declarable names"). One name concept, two answers. If the type-name rule is right, it is
+  right for the same reason everywhere, and clause 1's list should carry it.
+- **§7.1's ZWNJ escape hatch stops working, by design.** §7.1 excludes ZWNJ/ZWJ and tells authors that
+  "names whose orthography requires them MUST be quoted". Clause 4 makes that route close: the exclusion
+  becomes real instead of bypassable, and a Persian or Indic name needing ZWNJ becomes unspellable as a
+  name. That is the cost of the exclusion the spec already chose; what it needs is for §7.1 to stop offering
+  a remedy that will no longer exist, and to say what such an author does instead — accept a different name,
+  or adopt UAX #31 R1a's contextual rules and let the two characters back in under stated conditions.
+
 **Step 2 — require skeleton distinctness within each named scope.** No two names in the same scope may have
 equal UTS #39 `skeleton()`s. The scopes are the closed sets the series already defines:
 

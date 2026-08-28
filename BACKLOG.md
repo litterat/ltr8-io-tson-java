@@ -319,6 +319,15 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   a `DataBindContext` may be extended after first use, and neither shipped fetching `TsonSchemaSource` states
   what it promises a concurrent caller. None of it is hypothetical-only: the read-path half was two real defects, found by
   auditing and reproduced first try on 8 threads.
+- [ ] **Name identity ignores NFC, so one name can appear twice in a record.** §2.5: "Two field names are
+  identical if they produce the same NFC-normalized string after escape processing"; §2.6 says the same for
+  scalar map keys. `Normalizer` appears in `Lexer` alone, where it *checks* that an unquoted token is already
+  NFC and rejects it otherwise — quoted tokens are exempt from the check and nothing anywhere normalizes
+  before comparing. So `{ "caf\u00E9": 1  "cafe\u0301": 2 }` reads as a record with two fields, both
+  rendering as `café`, where §2.5 makes it a duplicate that MUST be rejected. Same defect at map keys, and at
+  the schema layer wherever declared names are compared. Fix is to compare NFC-normalized names — or, if
+  `SPEC-FEEDBACK.md` #3's clause 2 is adopted, to require the NFC *form* of a name and keep comparison as
+  plain equality, which is the cheaper rule and the one that cannot be got wrong this way.
 - [ ] **Audit every `unquoted-token` reference in both grammars, and decide whether it should be `token`.**
   The kernel types every name position with one atom (`token`, aliased as `type_name`/`field_name`/
   `param_name`), and the grammar governs those positions with four productions: `field-name = token` admits
