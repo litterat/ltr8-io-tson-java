@@ -6,6 +6,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.compiler.reader.Subsumption;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.LinkedHashMap;
@@ -216,7 +217,10 @@ public final class TsonSchemaCompiler {
                         EntryDisplayName.of(name, definition));
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
-            return factory.create(name, definition, new ValueReaderContext(linked, readers));
+            TsonTypeReader<?> built = factory.create(name, definition, new ValueReaderContext(linked, readers));
+            // §7.2's subsumption rule, applied at every position it governs rather than only where a record
+            // happened to have subtypes -- see Subsumption for which kinds it deliberately leaves alone.
+            return Subsumption.guard(name, definition, built, linked.schema().entries(), readers);
         }
     }
 }

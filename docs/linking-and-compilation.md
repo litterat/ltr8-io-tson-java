@@ -254,6 +254,20 @@ forbids — at the price of verdicts an author cannot predict (two default-`allo
 NaN however far apart their ranges sit) and a conformance bar no second implementation should have to
 match.
 
+**§7.2's subsumption guard wraps every entry the rule governs** (`Subsumption`, applied at
+`TsonSchemaCompiler`'s single `build` site). At a position typed `T`, a value annotated `!S` is valid iff
+`S` is `T` or `T` is in `S`'s supertypes — and that was enforced only where `T` was a record with a
+non-empty `subtypes()`, the one case that got a `VariantSchemaReader`. Every atom, array, map, tuple, and
+every record whose type had no subtype, consumed the type-ref and discarded it, so a document could claim
+any type at those positions. The guard is the same `VariantSchemaReader`, now wired wherever the rule
+applies. Three things it has to get right, each a real bug found while wiring it: it **follows the body, not
+`kind()`** (a hand-built entry can carry a `ChoiceBody` under `PRODUCT`, and choices and externs have their
+own membership relations §7.2 excludes); it accepts an entry's **aliases as the entry itself**, since §7.2
+compares "after reference flattening of both" and resolving an alias would arrive back at the same reader
+and recurse; and it is **transparent to `UseSite` renaming and to bind-mode container rebinding**, both of
+which look at the reader it wraps — the first or a diagnostic names the entry instead of the author's
+alias, the second or a bound `Map` field silently loses its rebinding.
+
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
 §4's four scalar classes — `null`, `boolean`, `number` (every numeric family: an `integer` and a `decimal`
 are one class, so never disjoint), `string` (every text-form family: `text`, enums by their members' shared
