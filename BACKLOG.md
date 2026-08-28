@@ -328,10 +328,10 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   the schema layer wherever declared names are compared. Fix is to compare NFC-normalized names — or, if
   `SPEC-FEEDBACK.md` #3's clause 2 is adopted, to require the NFC *form* of a name and keep comparison as
   plain equality, which is the cheaper rule and the one that cannot be got wrong this way.
-- [ ] **Audit every `unquoted-token` reference in both grammars, and decide whether it should be `name`.**
+- [ ] **Audit every `unquoted-token` reference in both grammars, and decide whether it should be `identifier`.**
   The kernel types every name position with one atom (`token`, aliased as `type_name`/`field_name`/
-  `param_name`) — which `SPEC-FEEDBACK.md` #3 proposes splitting into a `name` entry for those three and a
-  `token` kept for `enum.members`, since §5.4 makes enum members values rather than identifiers. The grammar
+  `param_name`) — which `SPEC-FEEDBACK.md` #3 proposes splitting into an `identifier` entry for those three,
+  leaving `token` to `enum.members`, since §5.4 makes enum members values rather than identifiers. The grammar
   governs those positions with four productions: `field-name = token` admits
   all three lexical forms, while `annotation = "@" unquoted-token`, `type-ref = "!" unquoted-token` and
   [TSON-SCHEMA]'s `type-name = unquoted-token` admit only the bare one. So a field name may be quoted and a
@@ -343,7 +343,7 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   whatever Revision 34 settles. The audit is the deliverable either way: each site, which production it
   uses, and whether the parser agrees with the grammar — `TsonSchemaParser.expectTypeName` requires
   `TokenType.UNQUOTED`, and it is worth knowing where else that is assumed.
-- [ ] **A name profile, and skeleton distinctness on it** (§9.4-adjacent hardening). `SPEC-FEEDBACK.md` #3
+- [ ] **An `identifier` profile, and skeleton distinctness on it** (§9.4-adjacent hardening). `SPEC-FEEDBACK.md` #3
   carries the design: names are a class the series never defines — §7.1 constrains *tokens*, which is also
   how values are written — so define one, apply it wherever a name is declared (a schema's type names,
   declaration field names, enum members, choice variants, and the `!!import` merge), and require that no two

@@ -169,9 +169,9 @@ problem — no `Cf` character, bidi control included, can appear in an unquoted 
 confusable pair, a mixed-script name, or a Restricted character, at either layer, including at `!!import`
 merge, where disjointness is exact string equality and a confusable pair passes it by construction.
 
-### Proposal: define a name profile, then use the mechanism that has a comparison set
+### Proposal: define an `identifier` profile, then use the mechanism that has a comparison set
 
-**Step 1 — the name profile already exists in the kernel, as `token`, and it carries no contract.**
+**Step 1 — the identifier profile already exists in the kernel, as `token`, and it carries no contract.**
 
 This is the foundation, and it is worth adopting even if no mechanism below it ever is. It is also smaller
 than it first appears, because nothing needs inventing: the meta-kernel already types every name position in
@@ -200,7 +200,7 @@ diagnostics can still say which *kind* of name failed, because the alias survive
 
 **Critically, `token` is not `text`.** `token` is a `unit` instance with no constraint vocabulary; `text` is
 a `text_type` instance with `min_length`, `pattern` and the rest. They are separate types, so they can carry
-separate policies — which is exactly the affordance a name profile needs, and it is already built. The thing
+separate policies — which is exactly the affordance an identifier profile needs, and it is already built. The thing
 that has never been decided is what `token`'s policy *is*.
 
 **The kernel says so itself, and points at the grammar:**
@@ -272,16 +272,24 @@ name, and an enum member, and the three have different rules:
    reach them.
 
 The practical consequence for the kernel: `type_name`, `field_name` and `param_name` should alias a new
-entry — `name` — carrying the contract in Step 1b, while `enum.members` keeps `token` (through `token_set`)
-with its present "NFC-canonical lexeme" meaning. Two kernel types where there is now one, which is what lets
-a rule be stated once and reach exactly the right positions.
+entry — **`identifier`** — carrying the contract in Step 1b, while `enum.members` keeps `token` (through
+`token_set`) with its present "NFC-canonical lexeme" meaning. Two kernel types where there is now one, which
+is what lets a rule be stated once and reach exactly the right positions. Whether enum members then want a
+contract of their own is a separate question this entry deliberately does not take up.
+
+**On the word.** `identifier` is what every programming language calls this, and §7.1 already reaches for it:
+"TSON's unquoted tokens are a declared profile of Unicode **identifiers** per UAX #31 requirement R1." That
+sentence attaches the word to the wrong class — an unquoted token is a *spelling*, and UAX #31's profile is
+about the thing spelled — so adopting `identifier` for the thing itself makes §7.1's own sentence true where
+it currently is not. The sentence should be reworded to match: the profile constrains identifiers, of which
+an unquoted token is one spelling and a quoted token another.
 
 **And the spec already has the mechanism this needs; it is used for numbers.** §7.6:
 
 > The number grammar applies to the complete text of a token; it is not part of the token-stream grammar …
 > a candidate token is first produced by the lexer, then matched — in full — against it.
 
-That is exactly the two-layer shape a name profile wants: the lexer emits a token, and the token's decoded
+That is exactly the two-layer shape an identifier profile wants: the lexer emits a token, and its decoded
 text is then matched against a separate production that is *not* part of the token-stream grammar. Numbers
 already work this way; names should, and the note explaining why can be copied nearly verbatim. It also
 disposes of the objection that a name rule would complicate lexing — it does not touch the lexer, for the
@@ -297,7 +305,7 @@ excluded from names is excluded for lexical reasons:
   into a token happily (it did until #14). Excluding them is a *policy* decision, and stating it in §7.1 —
   which governs unquoted tokens — is why the exclusion never reached quoted names.
 
-**Step 1b — what the `name` contract should say.** Form and policy stay orthogonal: the *grammar* decides
+**Step 1b — what the `identifier` contract should say.** Form and policy stay orthogonal: the *grammar* decides
 which spellings a position admits — `annotation = "@" unquoted-token` and `type-ref = "!" unquoted-token` are
 unquoted for adjacency reasons unrelated to confusability, and should stay so — while the *policy* decides
 which names are admitted, and is the same at every position. A position may admit fewer spellings without
@@ -308,12 +316,12 @@ where the number grammar forced the token profile's hand:
 
 ```
 Token   Start = XID_Start ∪ Nd ∪ { - + . }     Continue = XID_Continue ∪ { - + . }
-Name    Start = XID_Start ∪ { _ }              Continue = XID_Continue ∪ { - . }
+Ident.  Start = XID_Start ∪ { _ }              Continue = XID_Continue ∪ { - . }
 ```
 
 Three differences, each with its own reason:
 
-- **Name-Start drops `Nd`, `-`, `+`, `.`** — §7.1 adds those four to *Start* for one stated purpose: "every
+- **Identifier-Start drops `Nd`, `-`, `+`, `.`** — §7.1 adds those four to *Start* for one stated purpose: "every
   extension character is required by a production of the number grammar (§7.6): `Nd` for digits, `-`/`+` for
   signs and exponent signs, `.` for the decimal point and `.inf`/`.infinity`/`.nan`". They exist so a
   **number** can be an unquoted token, and they leak into names only because names and values share one
@@ -321,7 +329,7 @@ Three differences, each with its own reason:
   **subsumes [TSON-SCHEMA] §12.1's existing rule** that "numbers are not declarable names" — every spelling
   the number grammar admits begins with a digit, a sign, or a dot, so the general rule and the type-name rule
   become one rule. `Continue` keeps `-` and `.` (`my-field`, `a.b`), which no number-grammar concern touches.
-- **Name-Start adds `_`.** §7.1 keeps `_` out of token-Start for a purely lexical reason — the bare token `_`
+- **Identifier-Start adds `_`.** §7.1 keeps `_` out of token-Start for a purely lexical reason — the bare token `_`
   is the absent sentinel (§2.9) — and then tells authors that "names with a leading underscore (`_id`) MUST
   be quoted". That is a statement about *spelling*, not about names, and `_id` is an entirely ordinary field
   name. Under the split, the policy admits it and the grammar still requires the quoted spelling: exactly the
@@ -343,6 +351,30 @@ excludes the lot. Two rules do have to be stated on top:
 
 Mixed script stays permitted; a restriction level remains available as an opt-in profile, default off
 (Step 4). At scope level rather than per name, no two names in one scope may share a `skeleton()` (Step 2).
+
+**Precedent, and one place the obvious precedent is a warning rather than a model.** Java's identifier rules
+line up with Step 1b's on the two decisions that were live here: an identifier may not start with a digit,
+and `_` is a legal start character. Java adds `$`, which TSON has no reason to copy — UAX #31 cites exactly
+that as its example of a profile extension ("Java and C++ identifiers include '$', which is a Pattern_Syntax
+character"). Two Java rules TSON should state rather than inherit silently:
+
+- **Case sensitivity.** Java identifiers are case-sensitive; so are TSON names, and §2.5's NFC-based identity
+  says so only by omission. One clause.
+- **Reserved words.** Java excludes its keywords. TSON's equivalent is exactly one character — `_`, which
+  §7.1 reserves at token-initial position for the absent sentinel — and it is reserved at the level of
+  *spelling*, not of names. Under the split that resolves cleanly and is worth stating as the worked example:
+  `{ "_": 1 }` is a record with a field named `_`, while `{ _: 1 }` is not a record at all. The identifier is
+  legal; one of its two spellings is taken. Nothing else in TSON needs a keyword list, because name
+  collisions with declared types are a namespace question (§3.3.1) rather than a lexical one.
+
+**The warning:** Java identifiers are *not* the ASCII set they are often summarised as. `int café`,
+`int Ω`, `int 名前` all compile, because the rule is `Character.isJavaIdentifierStart/Part` — and that
+predicate carries the same defect as `isUnicodeIdentifierPart` (#14): it admits every identifier-ignorable
+character, so `isJavaIdentifierPart` returns true for U+200C, U+FEFF **and U+202E**. A bidi override is a
+legal character inside a Java identifier, which is the Trojan Source class of vulnerability in the language
+that defines the predicate. So Java is a good precedent for the *shape* of an identifier rule and a poor one
+for its character set — and it is a second, independent instance of the exact trap this register is asking
+§7.1 to warn implementers about.
 
 **Interior whitespace, and the JSON divergence it creates.** `XID_Continue` excludes whitespace, so
 `{ "first name": 1 }` stops being a record. §7.1 currently claims "the comma separators and quoted keys
@@ -481,7 +513,7 @@ alone accepted, `l` beside `I` rejected. That is the first part of this topic th
 conformance-tested.
 
 **Status against Revision 33:** open, carried, and now carrying a concrete proposal where earlier revisions
-of this entry carried only directions. §9.4 is unchanged: one SHOULD-consider sentence, no name profile, no
+of this entry carried only directions. §9.4 is unchanged: one SHOULD-consider sentence, no identifier profile, no
 comparison scopes, and no stated action on detection. Both mechanisms are prototyped here against the real
 UCD tables; neither is shipped.
 
