@@ -259,8 +259,12 @@ addressed (never char-addressed), with `Position` tracking line / code-point col
 counted from the input rather than re-derived from the decoded character, and malformed UTF-8 is a
 `LexException` rather than a U+FFFD substitution (§7.1: a decoder MUST NOT substitute). NFC normalization
 applies to *unquoted* tokens only; Pattern_White_Space is the spec's fixed 11-character set, hardcoded.
-`Character.isUnicodeIdentifierStart/Part` stands in for XID_Start/XID_Continue — a known, deliberate
-approximation. Errors are fail-fast (`LexException`); multi-error recovery is deferred.
+§7.1's UAX #31 profile is implemented exactly, not approximated: the JDK's identifier predicates are
+`ID_*` unioned with the identifier-ignorable set (all `Cf`, plus non-whitespace controls), so `Lexer`
+subtracts that set and two literal `ID_ \ XID_` tables — verified zero-over/zero-under against Unicode
+16.0, which `Lexer.UNICODE_VERSION` declares. ZWNJ/ZWJ are excluded per §7.1's prose although
+`XID_Continue` admits them (`SPEC-FEEDBACK.md` #14). Errors are fail-fast (`LexException`); multi-error
+recovery is deferred.
 
 ### Structural parsing: Tier 2 stream + Tier 3 AST — `docs/lexer-and-data-parsing.md`
 

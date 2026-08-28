@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -105,7 +106,13 @@ public final class Lexer {
 
     private static final int BOM = 0xFEFF;
 
-    /** A single leading BOM is discarded invisibly -- not counted toward {@link #line}/{@link #col}/{@link #byteOffset}, matching §7.1. A BOM anywhere else is left alone, falling through to "unrecognised character" naturally. */
+    /**
+     * A single leading BOM is discarded invisibly -- not counted toward {@link #line}/{@link #col}/{@link
+     * #byteOffset}, matching §7.1. A BOM anywhere else outside a quoted token is "an unrecognised character
+     * and a lexer error": between tokens it reaches the dispatch's own fallthrough, and <em>inside</em> an
+     * unquoted token {@link #isProfileContinue} refuses it, which is not free -- the JDK identifier predicate
+     * admits it, and did until issue #229.
+     */
     private void stripLeadingBom() {
         if (peekCodePointAt(0) == BOM) {
             bytesDecoded -= lookaheadByteLengths[0];   // §7.1: not a character at offset zero -- not there at all
@@ -320,13 +327,85 @@ public final class Lexer {
         }
     }
 
+    /** §7.1's {@code Start = XID_Start ∪ Nd ∪ { - + . }} -- the three extension characters are dispatched before this is reached ("Profile boundaries"). */
     private static boolean isUnquotedStart(int cp) {
-        return Character.isUnicodeIdentifierStart(cp) || isDecimalDigit(cp);
+        return isXidStart(cp) || isDecimalDigit(cp);
     }
 
+    /** §7.1's {@code Continue = XID_Continue ∪ { - + . }}, with ZWNJ/ZWJ excluded as that section requires -- see {@link #isProfileContinue}. */
     private static boolean isUnquotedContinuation(int cp) {
-        return Character.isUnicodeIdentifierPart(cp) || cp == '-' || cp == '+' || cp == '.';
+        return isProfileContinue(cp) || cp == '-' || cp == '+' || cp == '.';
     }
+
+    /**
+     * The Unicode version whose {@code XID_Start}/{@code XID_Continue} this lexer implements -- §7.1 asks an
+     * implementation to document it. It is the version the running JDK's own character data carries, since
+     * {@link #NOT_XID_START}/{@link #NOT_XID_CONTINUE} are derived against that data; a JDK whose Unicode
+     * version moves needs both tables re-derived (see their Javadoc for how).
+     */
+    static final String UNICODE_VERSION = "16.0";
+
+    /**
+     * {@code XID_Start}, exactly. {@link Character#isUnicodeIdentifierStart} is {@code ID_Start}, which
+     * differs from {@code XID_Start} only by the characters XID drops for not being closed under NFKC --
+     * {@link #NOT_XID_START}, 24 of them for Unicode 16.0, and nothing in the other direction.
+     */
+    private static boolean isXidStart(int cp) {
+        return Character.isUnicodeIdentifierStart(cp) && !isNfkcExcluded(NOT_XID_START, cp);
+    }
+
+    /**
+     * §7.1's {@code Continue} set minus its three extension characters, which is {@code XID_Continue} minus
+     * ZWNJ and ZWJ -- <em>not</em> {@code XID_Continue} itself, and the difference is deliberate twice over.
+     *
+     * <p>{@link Character#isUnicodeIdentifierPart} is {@code ID_Continue} <b>union every character
+     * {@link Character#isIdentifierIgnorable} covers</b>: all of {@code Cf} plus the non-whitespace C0/C1
+     * controls. None of that is in {@code XID_Continue}, and it is the half that matters -- it is what let a
+     * U+FEFF, a soft hyphen, a raw control, or a bidi override (U+202A..U+202E, U+2066..U+2069, U+061C) sit
+     * inside an identifier. Subtracting the ignorable set removes all of it.
+     *
+     * <p>That subtraction also removes U+200C and U+200D, which <em>are</em> in {@code XID_Continue}
+     * (Unicode 16.0 {@code DerivedCoreProperties.txt}) -- and removing them is right, because §7.1 excludes
+     * them from the profile by name: "deliberately excluded ... names whose orthography requires them MUST
+     * be quoted". So one subtraction lands on the profile rather than on the property, for the reason the
+     * section gives. §7.1's own set algebra says otherwise; {@code SPEC-FEEDBACK.md} #14 carries that.
+     *
+     * <p>What remains after the ignorable set is the NFKC exclusion list again, four members shorter than
+     * the start one -- U+0E33, U+0EB3, U+FF9E and U+FF9F are {@code XID_Continue} but not {@code XID_Start}.
+     */
+    private static boolean isProfileContinue(int cp) {
+        return Character.isUnicodeIdentifierPart(cp)
+                && !Character.isIdentifierIgnorable(cp)
+                && !isNfkcExcluded(NOT_XID_CONTINUE, cp);
+    }
+
+    /**
+     * Sorted, so a lookup is a binary search -- guarded by the lowest member, since every exclusion is above
+     * U+0379 and the tokens that matter in practice are not.
+     */
+    private static boolean isNfkcExcluded(int[] table, int cp) {
+        return cp >= table[0] && Arrays.binarySearch(table, cp) >= 0;
+    }
+
+    /**
+     * {@code ID_Start \ XID_Start} for Unicode 16.0: characters XID drops because their NFKC form is not
+     * itself an identifier. Re-derive from {@code DerivedCoreProperties.txt} against
+     * {@link Character#isUnicodeIdentifierStart} if the JDK's Unicode version moves; {@code LexerTest}
+     * pins a sample, and {@link #UNICODE_VERSION} records which version these are.
+     */
+    private static final int[] NOT_XID_START = {
+        0x037A, 0x0E33, 0x0EB3, 0x2E2F, 0x309B, 0x309C,
+        0xFC5E, 0xFC5F, 0xFC60, 0xFC61, 0xFC62, 0xFC63, 0xFDFA, 0xFDFB,
+        0xFE70, 0xFE72, 0xFE74, 0xFE76, 0xFE78, 0xFE7A, 0xFE7C, 0xFE7E,
+        0xFF9E, 0xFF9F,
+    };
+
+    /** {@code ID_Continue \ XID_Continue} for Unicode 16.0 -- {@link #NOT_XID_START} without the four that are continue-only. */
+    private static final int[] NOT_XID_CONTINUE = {
+        0x037A, 0x2E2F, 0x309B, 0x309C,
+        0xFC5E, 0xFC5F, 0xFC60, 0xFC61, 0xFC62, 0xFC63, 0xFDFA, 0xFDFB,
+        0xFE70, 0xFE72, 0xFE74, 0xFE76, 0xFE78, 0xFE7A, 0xFE7C, 0xFE7E,
+    };
 
     private static boolean isDecimalDigit(int cp) {
         return Character.getType(cp) == Character.DECIMAL_DIGIT_NUMBER;

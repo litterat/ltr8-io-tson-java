@@ -45,10 +45,20 @@ tokens, modes, or character-classification changes).
 - **`Token` is a flat record of six raw `int` coordinates plus type/text**, not nested `Position` objects,
   to keep allocation off the high-throughput read path; `start()`/`end()` materialize a `Position` on
   demand.
-- **`Character.isUnicodeIdentifierStart/Part` stands in for XID_Start/XID_Continue** (§7.1). The JDK
-  doesn't expose the exact UAX #31 properties and building the table from scratch is out of scope — a
-  known, deliberate approximation. Flag it if a lexing bug ever hinges on a script where Java's notion and
-  true XID_* diverge.
+- **§7.1's identifier profile is exact, and the JDK predicate alone is not it.** `Character
+  .isUnicodeIdentifierStart/Part` is `ID_Start`/`ID_Continue`, and the `Part` half is additionally unioned
+  with everything `Character.isIdentifierIgnorable` covers — all of `Cf` plus the non-whitespace C0/C1
+  controls. Standing it in unmodified put a BOM, a soft hyphen, a raw control and every bidi override
+  (U+202A–U+202E, U+2066–U+2069, U+061C) inside identifiers, and every ASCII test still passed. `Lexer`
+  subtracts the ignorable set and two literal `ID_ \ XID_` tables (24 code points for start, 20 for
+  continue — the characters XID drops for not being NFKC-closed), which is **exact** against Unicode 16.0:
+  zero over-, zero under-acceptance on both predicates across all 1,112,064 non-surrogate code points.
+  `Lexer.UNICODE_VERSION` declares the version, as §7.1 asks.
+- **The ignorable subtraction also removes ZWNJ/ZWJ, and that is the profile, not a bug.** U+200C and
+  U+200D *are* in `XID_Continue` (Unicode 16.0 `DerivedCoreProperties.txt`), so §7.1's set algebra admits
+  them while its prose excludes them by name — "deliberately excluded … names whose orthography requires
+  them MUST be quoted". This follows the prose. `SPEC-FEEDBACK.md` #14 carries the contradiction.
+  A JDK whose Unicode version moves needs both tables re-derived; their Javadoc says how.
 - **NFC normalization** (`java.text.Normalizer`) applies to *unquoted* tokens only (§7.2.1) — quoted
   tokens preserve exact content. **Pattern_White_Space is the spec's fixed 11-character set**, hardcoded
   (not `Character.isWhitespace`). A single leading **BOM** is stripped; U+FEFF elsewhere falls through to
