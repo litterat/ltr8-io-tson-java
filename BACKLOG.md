@@ -62,19 +62,17 @@ An open entry's body is the constructor application as written, held unread unti
 substitutes its parameters away — `docs/schema-resolution.md` describes it, `SPEC-FEEDBACK.md` #5 and #7 are
 the proposals it answers. What is left below are consequences of holding, not shapes outside it.
 
-- [ ] **A field's `~`/`=` value is checked only where the field's type is an atom or an enum.**
-  `TsonSchemaLinker.checkFieldValue` runs the field's own resolved body over the token, which is what makes
-  the check exact: it accepts a default exactly when a read would accept the same token in the same
-  position. A field typed by a **record, container, tuple or choice** is skipped, because checking one needs
-  a compiled reader and compilation runs after linking — so those keep the old path, where the value is
-  decoded as the record's reader is built and a bad one becomes an `ErrorReader`, reaching a data sender as
-  `NOT_IMPLEMENTED` for what is the schema author's mistake.
-  - **Not simply "a bare token cannot be a composite".** §5.6's positional form lets a record with exactly
-    one bare `REQUIRED` field be filled by a bare value, and a choice variant may itself be an atom, so both
-    have tokens that legitimately satisfy them. What decides it is the same thing the reader uses.
-  - The shape to explore is running the check after compilation for the types linking had to skip, or
-    hoisting enough of the reader construction to answer it earlier. Either way the classification is the
-    payoff: the verdict belongs to the author, at their declaration, before a document is ever read.
+- [ ] **Check a `~`/`=` value at a field typed by a record, container, tuple or choice.** §5.2 makes a
+  field's fixed or default value a value of the field's declared type; the linker enforces it where that
+  type is an atom or an enum and skips it otherwise, so `rec => { xs: ns ~ oops }` over `ns => [text]`
+  still links and compiles, and the read that trips over it reports `NOT_IMPLEMENTED` against the data —
+  a gap in this library, for the schema author's mistake.
+  - **What blocks it is ordering:** deciding whether a token satisfies a composite type takes that type's
+    compiled reader, and compilation runs after linking. Either run this part after compiling, or hoist
+    enough of the reader construction to answer it earlier.
+  - **Rejecting every token at a composite type is not the shortcut it looks like.** §5.6's positional
+    form lets a record with exactly one bare `REQUIRED` field be filled by a bare value, and a choice
+    variant may itself be an atom, so both have tokens that legitimately satisfy them.
 
 - [ ] **A parametric enum member is classified as a type argument and fails.** `e => <M> !enum { members:
   [a b M] }` applied as `e<c>` reports `'e<c>' source has an unresolved reference 'c'`: an unquoted
