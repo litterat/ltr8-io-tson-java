@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The eleven below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+The twelve below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
 it resolved are gone from here, because the spec now carries their rules and that is where the answer
 belongs. **This file is the as-built record**, not a pointer to one: where an entry proposes a design this
 implementation has built, the entry states the design, what is running, and what is not, so that a reviewer
@@ -931,3 +931,87 @@ possible answer and is currently unstated.
 
 **Status against Revision 33:** open, new against this revision. The narrow reading is what is built and
 running here, across all four container positions.
+
+---
+
+## 12. §5.3 refuses `{K => V?}` because "absence has no defined meaning for map values", and §7.6 gives that same absence a defined meaning
+
+**Section:** Part 2 §5.3 (the container sugar forms), §7.6 (the absent sentinel under a schema), §9 (the
+kernel's `map` constructor); Part 1 §2.9.
+
+**Problem:** three passages, and they do not agree about whether `_` means anything at a map entry value.
+
+§5.3 refuses the marker and gives its reason:
+
+> Neither side of `=>` admits `?`: the kernel's `map` has no `state` field, and **absence has no defined
+> meaning for map values** (an absent key is already a resolver error, [TSON-DATA] §2.9).
+
+§7.6's table gives that exact position a defined meaning, and the only unconditional permission in the table:
+
+> | Map entry value (schema in scope) | yes | Entry present with an absent value ([TSON-DATA] §2.9); `map`
+> carries no element-state facet, so the permission is not schema-conditional |
+
+Part 1 §2.9 agrees with §7.6, twice and normatively: "`_` may occupy any data-value position: record field
+values, **map entry values**, array elements, and the document's top-level value", and "A field or **entry**
+set to `_` is **present with an absent value** — distinct from not appearing at all."
+
+So §5.3's justification is contradicted by the section that states the rule and by the Part 1 clause both cite.
+Taken together the two live passages produce an author-visible incoherence: the value **is** optional, and the
+author has no way to say it is not.
+
+Two further problems with §5.3's argument, independent of which way the contradiction is settled. It reasons
+**from the artifact to the rule** — "the kernel's `map` has no `state` field" — where the kernel is this
+series' own bundled document and its field list is the thing in question, not evidence about it. And its
+parenthetical concerns absent *keys*, which is §2.9's own unconditional rule and says nothing about values;
+the sugar's key side needs no `?` for a reason that has never been in doubt.
+
+**Interpretation chosen:** §7.6's, which is also Part 1's. `_` at a map entry value reads, unconditionally,
+as an entry present with an absent value: the key is decoded and kept, nothing is reported, and the entry
+counts toward `min_items`/`max_items` like any other (§2.9 has higher parts count all slots). In tree mode the
+value is a `TsonAbsent`; in bind mode the bound `Map` holds the key against a `null`, which is as close as
+Java comes to the distinction and still tells it from a key never stated. §5.3 is implemented as written
+alongside it — `{K => V?}` is a parse error naming §5.3 — so this implementation currently ships both halves
+of the incoherence, which is what makes it visible: an author reads that the value cannot be marked optional,
+and finds that it is optional anyway.
+
+**Recommendation — give `map` the `state` field, and let the sugar spell it.** This is the reading that makes
+the container family uniform, and it is a subtraction from the prose rather than an addition:
+
+```
+map => ~product & {
+  access_pattern:  product_access_type = NAMED
+  size_type:       product_size_type = VARIABLE
+  key_type:        type_ref
+  value_type:      type_ref
+  state:           element_state ~ REQUIRED
+  min_items:       integer?
+  max_items:       integer?
+}
+```
+
+`element_state ~ REQUIRED` already appears three times in the kernel — `array`, `tuple_element`,
+`field_group` — so this reuses the enum and the default rather than introducing either. Then:
+
+- §5.3's table gains one row, `{K => V?}`, beside the `[T?]` row it copies; the "neither side admits `?`"
+  sentence keeps only its key half, where it was never in question.
+- §7.6's map-entry-value row becomes `conditional` and reads **identically** to its array-element row, and
+  the clause explaining why the map row is the exception comes out. The table stops having an exception.
+- Naming needs no new word. A map key can never be optional (§2.9), so `state` on `map` can only govern the
+  value, exactly as `state` on `array` governs the element.
+
+**The reason to prefer it over the status quo is that the default flipped.** Every other container defaults
+strict and is loosened with `?` — `[T]` is REQUIRED, a tuple position is REQUIRED, a record field is
+REQUIRED. `{K => V}` alone defaults permissive, and there is no marker to tighten it. So a schema author can
+forbid an absent array element and cannot forbid an absent map value, which is not a distinction any of the
+three passages sets out to draw; it falls out of a missing field. For a format whose stated use is validation
+feedback, "this map has no absent values" is an ordinary thing to want to say and currently unsayable.
+
+**The third option is closed, and worth recording as closed.** Reading §5.3's sentence at face value —
+absence genuinely has no meaning at a map value, so `_` is refused there outright — would be coherent, and it
+is what this implementation did before the §7.6 reading was applied. It requires amending Part 1 §2.9, which
+lists map entry values explicitly and states the present-with-an-absent-value distinction for entries as well
+as fields. Part 1 is frozen, so this option is not available without reopening it; that is a reason to rule
+it out rather than merely to disfavour it.
+
+**Status against Revision 33:** open, new against this revision. §7.6's half is built and running here; §5.3's
+half is built as written, which is how the two were found to disagree. The `state` field is not built.

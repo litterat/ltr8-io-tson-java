@@ -74,6 +74,10 @@ is small and parsed once.)
   toward `min_items`/`max_items` like any other, and both subclasses already had the no-value form to put
   there: a `TsonAbsent` in tree mode, a `null` the bound `Map` really holds in bind mode. The **key** position
   is the opposite and equally unconditional — §2.9 forbids it there.
+  **§5.3 disagrees with §7.6 about this**, refusing `{K => V?}` on the ground that "absence has no defined
+  meaning for map values" — the meaning §7.6 and §2.9 both give it. Both halves are built as written, which
+  is what makes the disagreement visible: the value cannot be marked optional and is optional anyway.
+  `SPEC-FEEDBACK.md` #12 carries it, and proposes the `state` field that would let the sugar say so.
 - **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and
   a placeholder kept in place (so later indices stay accurate) — Java `null` in bind mode, `TsonAbsent` in
   tree mode, where the diagnostic, not the node, carries what went wrong; a shape mismatch reports

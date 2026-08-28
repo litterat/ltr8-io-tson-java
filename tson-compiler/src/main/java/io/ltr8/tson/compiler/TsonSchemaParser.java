@@ -681,6 +681,12 @@ public final class TsonSchemaParser extends TsonDataParser {
     /**
      * Neither side of the map sugar's {@code '=>'} admits {@code ?} (§5.3): {@code map} declares no {@code
      * state} field for one to bind, and an absent key is already a data-grammar error.
+     *
+     * <p>The key half is settled — §2.9 forbids an absent key outright. The <b>value</b> half is refused here
+     * on §5.3's ground that "absence has no defined meaning for map values", which §7.6 and [TSON-DATA] §2.9
+     * contradict by giving it one; {@code MapAbstractReader.decodedValue} follows those two and admits it. So
+     * a map value is optional and cannot be marked optional. Both halves are implemented as written rather
+     * than reconciled here, the choice being the spec's: {@code SPEC-FEEDBACK.md} #12.
      */
     private void rejectMapQuestion(String side) {
         if (check(TokenType.QUESTION)) {
