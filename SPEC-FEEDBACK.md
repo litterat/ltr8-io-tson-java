@@ -274,8 +274,8 @@ name, and an enum member, and the three have different rules:
 The practical consequence for the kernel: `type_name`, `field_name` and `param_name` should alias a new
 entry — **`identifier`** — carrying the contract in Step 1b, while `enum.members` keeps `token` (through
 `token_set`) with its present "NFC-canonical lexeme" meaning. Two kernel types where there is now one, which
-is what lets a rule be stated once and reach exactly the right positions. Whether enum members then want a
-contract of their own is a separate question this entry deliberately does not take up.
+is what lets a rule be stated once and reach exactly the right positions. Step 1d works the kernel edit
+through and shows why `enum.members` keeps `token` rather than moving with the rest.
 
 **On the word.** `identifier` is what every programming language calls this, and §7.1 already reaches for it:
 "TSON's unquoted tokens are a declared profile of Unicode **identifiers** per UAX #31 requirement R1." That
@@ -316,7 +316,7 @@ where the number grammar forced the token profile's hand:
 
 ```
 Token   Start = XID_Start ∪ Nd ∪ { - + . }     Continue = XID_Continue ∪ { - + . }
-Ident.  Start = XID_Start ∪ { _ }              Continue = XID_Continue ∪ { - . }
+Ident.  Start = XID_Start                      Continue = XID_Continue ∪ { - . }
 ```
 
 Three differences, each with its own reason:
@@ -329,11 +329,13 @@ Three differences, each with its own reason:
   **subsumes [TSON-SCHEMA] §12.1's existing rule** that "numbers are not declarable names" — every spelling
   the number grammar admits begins with a digit, a sign, or a dot, so the general rule and the type-name rule
   become one rule. `Continue` keeps `-` and `.` (`my-field`, `a.b`), which no number-grammar concern touches.
-- **Identifier-Start adds `_`.** §7.1 keeps `_` out of token-Start for a purely lexical reason — the bare token `_`
-  is the absent sentinel (§2.9) — and then tells authors that "names with a leading underscore (`_id`) MUST
-  be quoted". That is a statement about *spelling*, not about names, and `_id` is an entirely ordinary field
-  name. Under the split, the policy admits it and the grammar still requires the quoted spelling: exactly the
-  form/policy separation this step is built on, demonstrated on the spec's own example.
+- **Identifier-Start does *not* add `_`, deliberately.** It is tempting to: §7.1 keeps `_` out of token-Start
+  for a purely lexical reason — the bare token `_` is the absent sentinel (§2.9) — and `_id` is an ordinary
+  field name. But admitting it buys only `!_id` and `@_note`, since `_id` is *already* spellable as a quoted
+  field name (`{ "_id": 1 }` reads today), and it costs either a lexer change to tell `_` from `_x` or an
+  identifier that its own unquoted spelling cannot express. Leaving `_` out changes nothing that works
+  today. §7.1's "names with a leading underscore MUST be quoted" then stays true and becomes a statement
+  about spelling, which is what it always was.
 - **`+` is dropped from `Continue`** as well, being needed only for exponents.
 
 Everything else falls out of XID membership rather than needing a clause: whitespace, C0/C1 controls, `Cf`
@@ -357,7 +359,7 @@ Mixed script stays permitted; a restriction level remains available as an opt-in
 
 ```
 identifier      = identifier-start *identifier-continue
-identifier-start    = XID_Start / "_"
+identifier-start    = XID_Start
 identifier-continue = XID_Continue / "-" / "."
                 ; the profile of Step 1b; a name's decoded text is matched
                 ; against this in full, as §7.6 matches a number's
@@ -381,16 +383,8 @@ as the string `"true"`, because §7.3 gives `true` no special status under a sch
 token, and the layer that knows the type decides what it is. Names work the same way — the lexer produces a
 token, and the schema decides whether it was an identifier.
 
-**Two interactions this creates, both verified against the current implementation:**
+**One interaction this creates, verified against the current implementation:**
 
-- **`_` at identifier-start, against `unquoted-token`-start.** Step 1b adds `_` to identifier-start;
-  §7.1 keeps it out of *token*-start because the bare token `_` is the absent sentinel. Today `{ "_id": 1 }`
-  is a record and `{ _id: 1 }` is not — the lexer emits `_` then `id`. So under this grammar `_id` is a
-  spellable field name and an **unspellable** type-ref or annotation name, since those positions are
-  unquoted-only. Either drop `_` from identifier-start (and `_id` stays a quoted-only field name, which is
-  where it already is), or let the lexer distinguish `_` alone from `_` followed by an identifier-continue
-  character — one token of lookahead, the same budget `.` versus `..` already costs. Worth deciding
-  explicitly rather than discovering.
 - **`field-name` drops `multi-line-token`.** It is `token` today, which includes the triple-quoted form, so a
   multi-line string is currently a legal field name. Dropping it is a tightening with no cost anyone will
   notice, but it is a change and should be stated as one.
@@ -400,6 +394,53 @@ names stay unconstrained, the identifier profile protects *schema-governed* docu
 documents keep their protection from Step 2 instead — skeleton distinctness within a record's own field set,
 which needs no schema, since a record's fields are a closed scope on their own. The two mechanisms cover the
 two classes, and neither covers both; saying so is what keeps the layering honest.
+
+**Step 1d — the kernel edit, and why `enum.members` keeps `token`.** The three identifier roles move:
+
+```
+identifier => !unit {}
+type_name  => identifier
+field_name => identifier
+param_name => identifier
+```
+
+`token` is then used by exactly one thing, `token_set => !set { element_type: token }`, feeding
+`enum.members` — and it should stay there. Retyping the members as `[text]` or `[identifier]` loses two
+properties the current shape carries, both checked against the running implementation:
+
+| written | today | under `[text]` | under `[identifier]` |
+|---|---|---|---|
+| `!enum [OPEN ACTIVE DONE]` | ok | ok | ok |
+| `!enum [true false]` | ok, **boolean-class** (§5.4) | ok, but string-class | ok, but string-class |
+| `!enum [1 2 3]` | ok | ok, but string-class | **rejected** — no leading digit |
+| `!enum ["in progress"]` | ok | ok | **rejected** — space |
+| `!enum [OPEN OPEN]` | **rejected** | accepted | accepted |
+
+- **Uniqueness is load-bearing and comes from `set`.** `set => ~array ^ { unique_items: = true … }`, so
+  `!enum [OPEN OPEN]` is refused today with "'members' requires unique elements". `[text]` and
+  `[identifier]` are *arrays*: both silently accept a repeated member. Whatever the element type ends up
+  being, the collection has to stay a set — which is also why `token_set` exists as a named entry rather
+  than inline (§5.2 prohibits `!` at field positions, and `set` has no sugar).
+- **Members are deliberately polymorphic, and §5.4 depends on it.** "An enum's class is its members' shared
+  class (`[true false]` is boolean-class; mixed members yield none)." That only works because a member is an
+  *uninterpreted lexeme* whose base type is resolved per member (§4). Fixing the element type to `text`
+  makes every enum string-class and quietly falsifies §5.4's own example; fixing it to `identifier`
+  additionally kills numeric and space-bearing members, which resolve today.
+
+So `enum.members` is the one place the kernel's `token` was always right: an enum member **is** a token in
+the lexer sense — a unit the lexer emitted, not yet typed. The confusion was never that `token` was wrong
+here; it was that the same entry was doing double duty for names. Splitting `identifier` off leaves `token`
+holding only the job it fits.
+
+**If the overloaded word itself is the objection**, the alternative is to rename rather than repurpose:
+`token` → `lexeme`, `token_set` → `lexeme_set`, which frees "token" entirely and says what the type is. That
+is naming churn across the resolved fixtures for no behavioural gain, so it is worth doing only if the word
+is judged to be the problem rather than the double duty.
+
+**And enum members do still want protection — from Step 2, not from their type.** `!enum [ACTIVE АCTIVE]`
+with a Cyrillic `А` passes the uniqueness check, because the two members are genuinely different strings.
+That is the confusable case, and §5.4's member list is already one of the closed scopes Step 2 enumerates, so
+skeleton distinctness covers it without touching the element type at all.
 
 **Precedent, and one place the obvious precedent is a warning rather than a model.** Java's identifier rules
 line up with Step 1b's on the two decisions that were live here: an identifier may not start with a digit,
