@@ -5,11 +5,18 @@ import java.util.Optional;
 import java.util.function.ToIntFunction;
 
 /**
- * Shared facet-comparison utilities behind {@link Atom#coherenceCheck} -- the {@link AtomNarrowing}
- * twin, for the other question. {@code AtomNarrowing} compares two bodies (is this refinement a
- * tightening of that source?); this compares one body's facets against each other (does what the
- * author wrote admit any value at all?), so a family again only has to say <em>which</em> of its own
- * fields form a range, not how a range is judged empty.
+ * Shared facet-comparison utilities behind {@link Atom#coherenceCheck} and {@link
+ * Product#coherenceCheck} -- the {@link AtomNarrowing} twin, for the other question. {@code
+ * AtomNarrowing} compares two bodies (is this refinement a tightening of that source?); this compares
+ * one body's facets against each other (does what the author wrote admit any value at all?), so a
+ * family again only has to say <em>which</em> of its own fields form a range, not how a range is judged
+ * empty.
+ *
+ * <p><b>Both base kinds reach it, which is the point of it being here rather than on either.</b> An
+ * atom's {@code min}/{@code max} family and a container's {@code min_items}/{@code max_items} pair ask
+ * the identical question of the identical shape; two implementations of it would be two places for one
+ * to drift, and drift is exactly how {@code [text; 5..3]} came to be refused while the {@code !array {
+ * ... }} body it denotes was accepted.
  *
  * <p>Every {@code check*} method appends a human-readable violation fragment to {@code out} and
  * appends nothing when the facets are coherent, matching {@code AtomNarrowing}'s convention so a

@@ -4,6 +4,8 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -25,5 +27,17 @@ public record ArrayBody(@Field("element_type") TypeRef elementType, ElementState
     /** The unconstrained shape every built-in array uses before size refinement: REQUIRED, ordered, non-unique, unbounded. */
     public static ArrayBody of(TypeRef elementType) {
         return new ArrayBody(elementType, ElementState.REQUIRED, false, false, Optional.empty(), Optional.empty());
+    }
+
+    /**
+     * {@inheritDoc} <p>The {@code min_items}/{@code max_items} pair: a container whose floor sits above its
+     * ceiling admits no value of any length ([TSON-SCHEMA] §5.3). Judged by the same comparison the atom
+     * families' plain inclusive bounds use, since it is the same shape.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkOrdered(violations, "min_items", minItems, "max_items", maxItems);
+        return violations;
     }
 }

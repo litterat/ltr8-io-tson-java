@@ -38,6 +38,7 @@ import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.MapBody;
+import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -828,10 +829,13 @@ final class DefinitionResolver {
      * {@code !C value} and {@link #resolveAtomRefinement}'s {@code !I ^ { ... }} bind through this
      * method and nothing else does.
      *
-     * <p>Only an {@link Atom} body has constraint facets to contradict each other, so every other
-     * {@link Top} the constructor vocabulary can produce ({@link RecordBody}, a container, a sum)
-     * passes straight through. The check is the family's own -- see {@link Atom#coherenceCheck} --
-     * since only it knows which of its fields form a range.
+     * <p>Both base kinds that carry orderable facets are asked, each by its own rule: {@link
+     * Atom#coherenceCheck} for a constraint vocabulary's {@code min}/{@code max} family, {@link
+     * Product#coherenceCheck} for a container's {@code min_items}/{@code max_items} pair. A {@link
+     * RecordBody}, a {@link TupleBody} or a sum has no such pair and passes straight through on the
+     * default. The rule is the family's own in both cases, since only it knows which of its fields form a
+     * range -- and asking them here rather than one per kind is what lets a body with both kinds of
+     * incoherence report both in one pass.
      *
      * <p>A violation is the <b>author's</b> error and stays a {@link TsonSchemaValidationException}:
      * the verdict on {@code { min_length: 10  max_length: 3 }} does not change when this library
@@ -843,10 +847,11 @@ final class DefinitionResolver {
      * body never mentioned is already filled in from the constructor's own schema-composed default.
      */
     private static void checkCoherent(String name, String constructorName, Top body) {
-        if (!(body instanceof Atom atom)) {
-            return;
-        }
-        List<String> violations = atom.coherenceCheck();
+        List<String> violations = switch (body) {
+            case Atom atom -> atom.coherenceCheck();
+            case Product product -> product.coherenceCheck();
+            default -> List.of();
+        };
         if (!violations.isEmpty()) {
             throw new TsonSchemaValidationException("'" + name + "': the body's own '" + constructorName
                     + "' constraints contradict each other: " + String.join("; ", violations));

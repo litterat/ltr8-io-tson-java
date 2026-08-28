@@ -282,16 +282,16 @@ class SchemaDesugarerTest {
     }
 
     /**
-     * §5.3's bound-coherence rule on the {@code min_items}/{@code max_items} pair, stated once and applying
-     * identically to both tiers: a resolver error where the bounds are literal at schema load.
+     * <b>An incoherent size range desugars, and is refused later.</b> §5.3's {@code min <= max} rule belongs
+     * to the container family rather than to this phase: the sugar and the {@code !array { ... min_items:
+     * ... }} body it denotes are the same type, and a rule stated here would refuse one spelling and admit
+     * the other. So this phase's job ends at producing the binding, and {@code ContainerBoundCoherenceTest}
+     * owns the verdict for every spelling that reaches it.
      */
     @Test
-    void anIncoherentSizeRangeIsRejectedForArraysAndMapsAlike() {
-        for (String declaration : List.of("  bad => [text; 5..3]", "  bad => {text => integer; 5..3}")) {
-            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                    () -> desugar(declaration), declaration);
-            assertTrue(thrown.getMessage().contains("min <= max"), thrown.getMessage());
-        }
+    void anIncoherentSizeRangeStillDesugarsBecauseTheRuleIsTheFamilysOwn() {
+        assertEquals("{ element_type: text  min_items: 5  max_items: 3 }",
+                instanceBody(instanceOf(desugar("  bad => [text; 5..3]"), "bad")));
     }
 
     /**

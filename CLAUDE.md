@@ -344,7 +344,12 @@ resolver error, the valueless form included). Every atom body is checked twice o
 per-family rules asking different questions: `Atom.constraintsCheck` (over `AtomNarrowing`) that a refinement
 tightens its source, and `Atom.coherenceCheck` (over `AtomCoherence`) that a single body's own facets admit
 anything at all — `{ min: 10 max: 3 }` is the second one's, and meta.tn's own `@doc` calls it "a schema-load
-check". The exception-classification policy under Conventions governs every rejection here;
+check". **`Product.coherenceCheck` is that second rule's structural twin**, asking it of a container's
+`min_items`/`max_items` pair over the same `AtomCoherence` comparison; it lives on the family rather than
+with any one spelling, so `[text; 5..3]` and the `!array { … }` body it denotes — one type — get one answer,
+and `TsonSchemaLinker` asks **every** family the same question again for the entries materialisation mints,
+which is §8.2's "and their kin" without needing them enumerated (`SPEC-FEEDBACK.md` #10).
+The exception-classification policy under Conventions governs every rejection here;
 `DefinitionResolver`'s Javadoc lists the exact boundary.
 
 **Materialisation (`TemplateMaterialiser`)** closes a §5.10 template application, running over the

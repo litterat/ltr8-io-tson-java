@@ -4,6 +4,8 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
 
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -21,5 +23,17 @@ public record MapBody(@Field("key_type") TypeRef keyType, @Field("value_type") T
     /** An unconstrained map: no size bounds. */
     public static MapBody of(TypeRef keyType, TypeRef valueType) {
         return new MapBody(keyType, valueType, Optional.empty(), Optional.empty());
+    }
+
+    /**
+     * {@inheritDoc} <p>The {@code min_items}/{@code max_items} pair: a container whose floor sits above its
+     * ceiling admits no value of any length ([TSON-SCHEMA] §5.3). Judged by the same comparison the atom
+     * families' plain inclusive bounds use, since it is the same shape.
+     */
+    @Override
+    public List<String> coherenceCheck() {
+        List<String> violations = new ArrayList<>();
+        AtomCoherence.checkOrdered(violations, "min_items", minItems, "max_items", maxItems);
+        return violations;
     }
 }

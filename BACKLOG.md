@@ -46,15 +46,21 @@ own prose (which had gone stale on at least one of them):
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
-- [ ] **The rest of §8.2's deferred value-level checks.** Materialisation "runs the value-level checks that
-  open bounds deferred: family coherence rules whose operands were parameters". The array family's
-  `min_items <= max_items` is one rule over the binding pair for arrays *and maps*, and nothing compares a
-  *pair* of bounds once both go concrete at materialisation. The kin §8.2 gestures at — "bounds within a
-  width-derived range, and their kin" — belong with the constraint families that own them, next to
-  `AtomNarrowing`, not in a syntax rewrite. Doing that properly probably
-  means the check moves out of the desugarer entirely and `checkBounds` goes with it. Distinct from the
-  atom-body self-coherence item below, which shares that destination but has no parameter or
-  materialisation dimension at all.
+- [ ] **A materialised *atom* entry has no display name, so a diagnostic names its content-derived key.**
+  `EntryDisplayName` renders a derived entry as the form the author wrote — `[order; 1..]`, `paged<order>` —
+  and falls back to the raw key otherwise, on the reasoning that "a form with no spelling is a form nobody
+  wrote". An atom synthetic is the counterexample: `b => <N> !integer_type { min: N max: 100 }` applied as
+  `b<10>` mints an entry with no sugar spelling *and* a `source` carrying no arguments (`TypeRef.of
+  ("integer_type")`), so neither branch fires. A read then reports
+  `'integer_type_10_100_786fbcfb': '5' is less than the minimum 10` — naming a thing that appears nowhere in
+  the author's file, which this project's own rule forbids and which travels to consumers who cannot open
+  the schema at all.
+  - Rendering it needs something the mint does not currently keep: either the application (`b<10>`) recorded
+    on the entry, or the constructor body written back out (`!integer_type { min: 10  max: 100 }`). The
+    first is what the author wrote; the second is what every other derived-entry rendering does.
+  - `TsonSchemaLinker`'s own coherence diagnostic sidesteps it by naming no entry at all, which works there
+    because the location already names the applying declaration. A *read* has no such fallback: the value's
+    own path is the data end, and the schema end is exactly this name.
 
 ## Open form: the held template body
 

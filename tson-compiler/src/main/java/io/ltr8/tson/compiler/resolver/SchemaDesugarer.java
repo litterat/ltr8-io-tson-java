@@ -655,7 +655,6 @@ final class SchemaDesugarer {
             fields.add(nameField(STATE, ElementState.OPTIONAL.name()));
         }
         size.ifPresent(spec -> fields.addAll(sizeFields(spec, "[" + shown + "; 0..]")));
-        checkBounds(fields);
         return Optional.of(new Binding(ARRAY, fields, applications));
     }
 
@@ -683,7 +682,6 @@ final class SchemaDesugarer {
         refSlot(VALUE_TYPE, value, fields, applications);
         size.ifPresent(spec -> fields.addAll(
                 sizeFields(spec, "{" + shownRef(key) + " => " + shownRef(value) + "; 0..}")));
-        checkBounds(fields);
         return Optional.of(new Binding(MAP, fields, applications));
     }
 
@@ -1010,39 +1008,6 @@ final class SchemaDesugarer {
             case SizeSpec.Exact exact ->
                     List.of(nameField(MIN_ITEMS, exact.bound()), nameField(MAX_ITEMS, exact.bound()));
         };
-    }
-
-    /**
-     * §5.3's bound-coherence rule on the {@code min_items}/{@code max_items} pair, applying identically to
-     * arrays and maps: a resolver error where the bounds are literal at schema load. A bound that names a
-     * value parameter is not concrete here, and checking it is §8.2's materialisation-time question.
-     *
-     * <p>Deliberately not a general facility. The remaining rules §8.2 gestures at ("bounds within a
-     * width-derived range, and their kin") belong with the constraint families that own them, alongside
-     * {@code AtomNarrowing}, not in a syntax rewrite -- see {@code BACKLOG.md}.
-     */
-    private static void checkBounds(List<RecordValue.Field> fields) {
-        BigInteger min = null;
-        BigInteger max = null;
-        for (RecordValue.Field field : fields) {
-            if (!(field.value().value().coreValue() instanceof TokenValue token)) {
-                continue;
-            }
-            try {
-                if (field.name().equals(MIN_ITEMS)) {
-                    min = new BigInteger(token.text());
-                } else if (field.name().equals(MAX_ITEMS)) {
-                    max = new BigInteger(token.text());
-                }
-            } catch (NumberFormatException e) {
-                return; // a bound that is not a literal -- nothing concrete to compare yet
-            }
-        }
-        if (min != null && max != null && min.compareTo(max) > 0) {
-            throw new TsonSchemaValidationException("a size specifier binds min_items " + min
-                    + " above max_items " + max + " -- a container's size range must satisfy min <= max "
-                    + "(§5.3), and no value can ever satisfy this one");
-        }
     }
 
     // ── Hoisting: a sugar form becomes a declaration plus a reference to it ──────────────────────
