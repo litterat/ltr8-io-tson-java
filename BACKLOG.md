@@ -319,6 +319,45 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   a `DataBindContext` may be extended after first use, and neither shipped fetching `TsonSchemaSource` states
   what it promises a concurrent caller. None of it is hypothetical-only: the read-path half was two real defects, found by
   auditing and reproduced first try on 8 threads.
+- [ ] **The lexer's unquoted-token predicates are `ID_*`, not `XID_*`, and admit every identifier-ignorable
+  character.** §7.1's profile is `Start = XID_Start ∪ Nd ∪ { - + . }`, `Continue = XID_Continue ∪ { - + . }`;
+  `Lexer.isUnquotedStart`/`isUnquotedContinuation` stand `Character.isUnicodeIdentifierStart/Part` in for the
+  XID properties, and the JDK predicate is a different set in two directions. Found by the TypeScript port,
+  which uses real XID tables and rejects what this one accepts.
+    - **Identifier-ignorable characters (the serious half).** `isUnicodeIdentifierPart` returns true for
+      anything `isIdentifierIgnorable` covers — **every** `Cf` character plus the non-whitespace C0/C1
+      controls — none of which is in `XID_Continue`. So `ab<U+FEFF>c`, `ab<U+200C>c`, `ab<U+00AD>c`,
+      `ab<U+2060>c`, `ab<U+0001>c` and `ab<U+007F>c` all lex as one `UNQUOTED` token today. **The bidi
+      controls are in that set** — U+202A–U+202E, U+2066–U+2069, U+061C — so an identifier may currently
+      carry a Trojan Source payload, which is worse than the unchecked-confusables item below: this is not a
+      check we have yet to add, it is a character class the lexer actively admits where the profile excludes
+      it.
+    - **`ID_` versus `XID_` (the minor half).** Java 25's predicate is `ID_Start`/`ID_Continue` — it now
+      includes `Other_ID_Continue` (U+00B7, U+0387, U+1369–U+1371, U+19DA), so the old "too narrow"
+      direction is gone — which leaves the characters XID excludes for not being NFKC-closed (U+037A,
+      U+0E33, U+0EB3, the Arabic presentation ligatures U+FC5E–, U+FDFA–) admitted where the profile
+      excludes them. This does not break §7.1's stability claim, which is about NFC, not NFKC.
+    - **U+FEFF is the case with an explicit rule, and three of its four positions are already right.**
+      §7.1: a leading BOM is stripped (correct here), a BOM between tokens is "an unrecognised character and
+      a lexer error" (correct — `LexException: unrecognised character U+FEFF`), a BOM inside a quoted token
+      is content (correct). Only mid-*unquoted*-token is wrong, and `Lexer`'s own Javadoc asserts the
+      behaviour that does not hold: "A BOM anywhere else is left alone, falling through to 'unrecognised
+      character' naturally." True between tokens, false inside one — which is why it survived review. That
+      Javadoc goes with the fix.
+    - **NFC does not catch any of them.** `Normalizer.isNormalized` is true for every case above, since NFC
+      preserves `Cf`; `checkNfc` is not a backstop here.
+    - **The fix needs real XID data, which the JDK does not expose.** Either generate a code-point table
+      from the UCD at build time (the `tson-regex` module already owns interval-set machinery that a
+      `CodePointSet` of XID ranges would fit), or derive one by subtracting `isIdentifierIgnorable` and the
+      ID∖XID set from the JDK predicate — cheaper, and exact enough to state, but it pins the answer to a
+      JDK version rather than to a declared Unicode version. §7.1 also asks that an implementation "SHOULD
+      document which Unicode version they support", which this one does not do anywhere; the fix is the
+      moment to start.
+    - **Add suite vectors with the fix, not before** — the sibling repo is present and the port already
+      rejects these, so vectors would fail `ConformanceSuiteTest` here until the lexer moves.
+    - `SPEC-FEEDBACK.md` #14 is the spec-side half: the profile itself is correct and unambiguous, so what
+      goes to the spec is the R1a gap and a conformance note, not a defect report.
+
 - [ ] Confusable-character and bidi-formatting-character checks (§9.4-adjacent security hardening;
   opt-in, and reported as ordinary errors when enabled — §8.1 gives a conforming processor one severity) —
   the sibling gap to the numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section;

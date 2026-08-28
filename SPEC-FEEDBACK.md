@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The thirteen below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+The fourteen below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
 it resolved are gone from here, because the spec now carries their rules and that is where the answer
 belongs. **This file is the as-built record**, not a pointer to one: where an entry proposes a design this
 implementation has built, the entry states the design, what is running, and what is not, so that a reviewer
@@ -1191,3 +1191,96 @@ token fixes it. It is filed with them only because that is where findings agains
 
 **Status against Revision 33:** open, new against this revision. The `core-value` reading is what is built
 and running here, and is the only reading under which `core.tn` loads.
+
+---
+
+## 14. §7.1's UAX #31 profile is unambiguous, and its most likely misimplementation admits bidi controls into identifiers — plus R1a (ZWJ/ZWNJ) is unaddressed
+
+**Section:** Part 1 §7.1 (the UAX #31 profile, and the byte-order-mark rule), §9.4 (confusables and bidi),
+§1.3 (the Unicode foundation principle).
+
+**This entry is not a defect report.** §7.1's profile is correct, and its BOM rule is one of the clearest
+sentences in the series. What is reported is (a) a gap the profile leaves an implementer to guess at, and
+(b) an implementation hazard the reference implementation walked straight into, which the section is well
+placed to warn about and currently does not. Both come from a second implementation — a TypeScript port —
+diverging from this one and being right.
+
+**(a) UAX #31 R1a is unaddressed.** §7.1 declares a profile "per UAX #31 requirement R1" and gives the set
+algebra:
+
+```
+Start    = XID_Start ∪ Nd ∪ { - + . }
+Continue = XID_Continue ∪ { - + . }
+```
+
+UAX #31's next requirement, R1a, is the one about ZWJ (U+200D) and ZWNJ (U+200C): a profile is expected to
+state whether it permits them, because several scripts — Persian, and the Indic scripts generally — need
+them to spell ordinary words, and neither is in `XID_Continue`. §7.1 says nothing, so the answer is
+"excluded, by set membership". That is a defensible answer and very likely the intended one, but it is
+currently reached by silence rather than stated, and §1.3's own promise — "Field names and values work in
+all scripts without quoting" — invites exactly the question R1a exists to answer. An implementer serving
+Persian or Devanagari data will look for the provision, not find it, and has to decide whether the omission
+is a decision or an oversight. One sentence closes it either way.
+
+**(b) The profile is set algebra over UAX #31 properties, and the obvious host predicate is a different
+set — in a way that is security-relevant.** This is worth a conformance note because of what the divergence
+contains rather than its size.
+
+This implementation used `Character.isUnicodeIdentifierStart/Part` as the XID stand-in. That predicate is
+`ID_Start`/`ID_Continue` **∪ everything `Character.isIdentifierIgnorable` covers**, which is every `Cf`
+character plus the non-whitespace C0/C1 controls. Measured on JDK 25, `isUnicodeIdentifierPart` returns true
+for all of:
+
+```
+U+00AD SOFT HYPHEN        U+200C ZWNJ    U+200D ZWJ       U+2060 WORD JOINER
+U+FEFF ZWNBSP             U+061C ALM     U+0001 SOH       U+007F DELETE
+U+202A..U+202E  (LRE, RLE, PDF, LRO, RLO)                 U+2066..U+2069  (LRI..PDI)
+```
+
+none of which is in `XID_Continue`. The consequence is that a lexer built on the host shortcut accepts
+`ab<U+202E>c` as a single identifier — a Trojan Source payload inside a field name — while §9.4 elsewhere
+discusses precisely that risk. The characters §9.4 is *about* are admitted by the profile's most convenient
+misreading.
+
+Three things make this worth the spec's ink rather than just the implementation's:
+
+1. **The trap is not Java-specific.** JavaScript offers `\p{ID_Continue}` and `\p{XID_Continue}` one letter
+   apart, and Python's `str.isidentifier()` is XID-based but carries its own underscore rule. Picking the
+   wrong one is a plausible first move in every host language, and it fails silently: every ASCII test
+   passes.
+2. **§7.1 already anticipates one member of the set, which masks the rest.** Its byte-order-mark paragraph
+   says "U+FEFF anywhere else outside a quoted token is an unrecognised character and a lexer error", and
+   that is the *only* invisible character named. A reader checking "does this document handle invisible
+   characters?" finds a precise rule, concludes the topic is covered, and never notices that U+202E is
+   handled only by set membership — even though U+FEFF is the least harmful member and the bidi controls
+   are the dangerous ones.
+3. **The reference implementation is the evidence.** It implemented three of §7.1's four BOM positions
+   correctly — leading BOM stripped, BOM between tokens a lexer error, BOM in a quoted token content — and
+   got the fourth wrong, absorbing a mid-token BOM into an identifier. Its own class comment asserted the
+   rule it was breaking ("a BOM anywhere else is left alone, falling through to 'unrecognised character'
+   naturally"), which is true between tokens and false inside one. So the same document lexes U+FEFF as
+   not-a-character at offset 0 and as an identifier character at offset 2. NFC is not a backstop: NFC
+   preserves `Cf`, so every one of these tokens is already normalised.
+
+**Suggested resolution.** Two additions to §7.1, both small:
+
+- After the profile's set algebra, state R1a explicitly — e.g. *"This profile does not adopt UAX #31 R1a:
+  ZWJ (U+200D) and ZWNJ (U+200C) are not permitted in unquoted tokens. Scripts requiring them use the quoted
+  form."* If the intent is the opposite, the same sentence inverted, with the contexts R1a scopes.
+- Extend the byte-order-mark paragraph, or add one beside it, so the rule generalises from the one character
+  to the class: *"U+FEFF is not special in this respect. No `Cf` (format) character is in `XID_Continue`, so
+  none may appear in an unquoted token — the bidi formatting controls (U+202A–U+202E, U+2066–U+2069, U+061C)
+  included, which §9.4 depends on. Implementations SHOULD note that host-language identifier predicates are
+  frequently `ID_*` rather than `XID_*` and frequently admit the identifier-ignorable characters, and so are
+  not substitutes for the properties named here."*
+
+The second is the one that would have prevented this bug, and it costs three sentences in the section that
+already spends a paragraph on a single member of the class it describes.
+
+**Interpretation chosen:** the profile as written — `XID_*`, format characters excluded, ZWJ/ZWNJ excluded
+with them. That is not yet what this implementation does; the divergence is tracked in `BACKLOG.md` and is
+the reason this entry exists. The TypeScript port already implements the profile as written, using real XID
+tables, which is what surfaced the difference.
+
+**Status against Revision 33:** open, new against this revision. Raised from a two-implementation
+comparison rather than from reading, which is the first time in this register.
