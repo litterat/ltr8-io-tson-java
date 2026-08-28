@@ -171,7 +171,7 @@ merge, where disjointness is exact string equality and a confusable pair passes 
 
 ### Proposal: define a name profile, then use the mechanism that has a comparison set
 
-**Step 1 — the name profile already exists. It is the kernel's `token`, and it carries no contract.**
+**Step 1 — the name profile already exists in the kernel, as `token`, and it carries no contract.**
 
 This is the foundation, and it is worth adopting even if no mechanism below it ever is. It is also smaller
 than it first appears, because nothing needs inventing: the meta-kernel already types every name position in
@@ -252,11 +252,56 @@ Three consequences follow, and they are the whole of why §9.4 is stuck:
 A useful side effect: the comparison scopes Step 2 needs are then expressible in the model rather than only
 in prose. "The declared names of one schema" is the key set of `schema => {type_name => type_definition}`.
 
-**Step 1b — what `token`'s contract should say.** Form and policy are orthogonal, and separating them is what
-makes this cheap. The *grammar* decides which spellings a position admits — `annotation = "@" unquoted-token`
-and `type-ref = "!" unquoted-token` are unquoted for adjacency reasons that have nothing to do with
-confusability, and should stay that way. The *policy* decides which names are admitted, and is the same
-policy at every position. A position may admit fewer spellings without admitting a different set of names.
+**Step 1a — "token" is doing three jobs, and only one of them is lexical.** The word names a lexer output, a
+name, and an enum member, and the three have different rules:
+
+1. **A lexer token** — a unit of `token-stream = *( ws / single-line-token / multi-line-token /
+   unquoted-token / structural-delimiter / … )` (§7.4). Its constraints are genuinely lexical: an
+   *unquoted* token cannot contain a space, because a space ends it; a *quoted* token can contain spaces
+   anywhere, because its delimiters say where it ends. This is the only sense in which "what may appear in a
+   token" is a question about tokenising.
+2. **A name** — `field-name`, `type-name`, `param-name`. Not a lexer output at all: it is the *decoded text*
+   of one, after unquoting, escape processing and NFC. Its constraints are semantic, and the grammar
+   currently states them by writing `field-name = token`, which is the category error at the root of this
+   entry. A name may not contain a space anywhere, including the middle, and that has nothing to do with
+   whether a space would have ended the token that spelled it.
+3. **An enum member** — also typed `token` by the kernel (§9: "`token` — admits NFC-canonical lexemes. Used
+   for identifier types (`type_name`, `field_name`, `param_name`) **and enum members**"), and **not a name**.
+   §5.4 computes an enum's discrimination class from its members' shared class and gives `[true false]` as
+   boolean-class, so members are *values* with base types, not identifiers. A rule written for names must not
+   reach them.
+
+The practical consequence for the kernel: `type_name`, `field_name` and `param_name` should alias a new
+entry — `name` — carrying the contract in Step 1b, while `enum.members` keeps `token` (through `token_set`)
+with its present "NFC-canonical lexeme" meaning. Two kernel types where there is now one, which is what lets
+a rule be stated once and reach exactly the right positions.
+
+**And the spec already has the mechanism this needs; it is used for numbers.** §7.6:
+
+> The number grammar applies to the complete text of a token; it is not part of the token-stream grammar …
+> a candidate token is first produced by the lexer, then matched — in full — against it.
+
+That is exactly the two-layer shape a name profile wants: the lexer emits a token, and the token's decoded
+text is then matched against a separate production that is *not* part of the token-stream grammar. Numbers
+already work this way; names should, and the note explaining why can be copied nearly verbatim. It also
+disposes of the objection that a name rule would complicate lexing — it does not touch the lexer, for the
+same reason the number grammar does not.
+
+**One correction worth carrying into the wording, because it decides where each rule lives.** Not everything
+excluded from names is excluded for lexical reasons:
+
+- **Genuinely lexical:** whitespace, and U+200E/U+200F (LRM/RLM). These are `Pattern_White_Space`, so they
+  *terminate* an unquoted token — `ab<LRM>c` lexes as two tokens, silently, which is §9.5's concern.
+- **Not lexical at all:** ZWNJ, ZWJ, BOM, soft hyphen, word joiner, the bidi overrides. Every one of these is
+  in `XID_Continue` or was admitted by the JDK predicate this implementation used; the lexer absorbs them
+  into a token happily (it did until #14). Excluding them is a *policy* decision, and stating it in §7.1 —
+  which governs unquoted tokens — is why the exclusion never reached quoted names.
+
+**Step 1b — what the `name` contract should say.** Form and policy stay orthogonal: the *grammar* decides
+which spellings a position admits — `annotation = "@" unquoted-token` and `type-ref = "!" unquoted-token` are
+unquoted for adjacency reasons unrelated to confusability, and should stay so — while the *policy* decides
+which names are admitted, and is the same at every position. A position may admit fewer spellings without
+admitting a different set of names.
 
 Stated as a profile beside §7.1's own, the contract is almost the token profile already — it differs exactly
 where the number grammar forced the token profile's hand:

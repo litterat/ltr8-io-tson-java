@@ -328,9 +328,11 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   the schema layer wherever declared names are compared. Fix is to compare NFC-normalized names — or, if
   `SPEC-FEEDBACK.md` #3's clause 2 is adopted, to require the NFC *form* of a name and keep comparison as
   plain equality, which is the cheaper rule and the one that cannot be got wrong this way.
-- [ ] **Audit every `unquoted-token` reference in both grammars, and decide whether it should be `token`.**
+- [ ] **Audit every `unquoted-token` reference in both grammars, and decide whether it should be `name`.**
   The kernel types every name position with one atom (`token`, aliased as `type_name`/`field_name`/
-  `param_name`), and the grammar governs those positions with four productions: `field-name = token` admits
+  `param_name`) — which `SPEC-FEEDBACK.md` #3 proposes splitting into a `name` entry for those three and a
+  `token` kept for `enum.members`, since §5.4 makes enum members values rather than identifiers. The grammar
+  governs those positions with four productions: `field-name = token` admits
   all three lexical forms, while `annotation = "@" unquoted-token`, `type-ref = "!" unquoted-token` and
   [TSON-SCHEMA]'s `type-name = unquoted-token` admit only the bare one. So a field name may be quoted and a
   type name may not, for no stated reason. Settling on `token` throughout is the consistent direction and
