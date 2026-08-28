@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The fourteen below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+The fifteen below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
 it resolved are gone from here, because the spec now carries their rules and that is where the answer
 belongs. **This file is the as-built record**, not a pointer to one: where an entry proposes a design this
 implementation has built, the entry states the design, what is running, and what is not, so that a reviewer
@@ -1771,3 +1771,64 @@ the defect is that the algebra above it says the opposite.
 **Status against Revision 33:** open, new against this revision. The prose reading is built and running
 here, and is pinned by conformance vectors in the sibling suite (`lexer/invalid/zwnj-inside-unquoted-token`
 among them).
+
+---
+
+## 15. §5.11's labelled-sum example does not parse: a datetime cannot be an unquoted token, and §7.1's always-quote list omits the kind
+
+**Section:** Part 2 §5.11 (the labelled-sum pattern); Part 1 §7.1 (the UAX #31 profile and its "Profile
+boundaries" paragraph), §7.2.4, §5.4/§5.5 (the temporal atoms).
+
+**Problem:** §5.11 illustrates the labelled-sum pattern with
+
+```
+timestamps => { ( created: timestamp | modified: timestamp | accessed: timestamp ) }
+```
+
+> An instance is `{ modified: 2026-05-21T13:05:00Z }` …
+
+and that instance is not a well-formed TSON document. `:` is `Pattern_Syntax` and outside §7.1's unquoted
+profile — deliberately, since it is the record field separator — so the token ends at the first colon. The
+lexer produces `2026-05-21T13`, then a `:`, and the record grammar has a value where it expects a separator
+or `}`. This implementation reports "adjacent values must be separated by whitespace, a comma, or both"; the
+diagnostic varies but the rejection does not. The example works only quoted:
+
+```
+{ modified: "2026-05-21T13:05:00Z" }
+```
+
+**The near miss is what makes it worth reporting.** §7.1 gives `2025-03-13` among its unquoted examples, and
+that is correct — a *date* is entirely inside the profile, `Nd` and `-` both being members. The profile
+covers dates and stops at times, because a time needs `:`. So the two look alike, one is spellable bare and
+the other never is, and nothing in §7.1 says so.
+
+**§7.1's own "quote by kind" list is where it should say it.** That paragraph exists for exactly this
+purpose:
+
+> Content kinds the profile cannot cover totally (paths, URIs, monetary amounts, rationals, networks,
+> percentages, ranges) are excluded entirely, so their quoting rule is *always*, never a per-character scan.
+
+Times and datetimes belong in that list and are missing from it — which is presumably how the §5.11 example
+came to be written. The omission is the more consequential half of this entry: the list is what a generator
+implements, and a generator built from it will emit `2026-05-21T13:05:00Z` bare and produce documents no
+reader accepts. The one-word fix is to add the kinds; the sentence's own construction ("cannot cover
+totally") already justifies it.
+
+**Two details worth getting right in the wording**, because the boundary is not where a reader might guess:
+
+- It is not the whole temporal family. `date` is fully coverable and should stay spellable bare — the entry
+  is *time* and *datetime*, and any `duration` carrying a time part (`PT1H30M` is fine; the colon forms are
+  not).
+- It is not about the `T` or the `Z`. Both are `XID_Continue`. The single character that ends the token is
+  the colon, which is why `2026-05-21T13` survives as a token and the rest does not.
+
+**Interpretation chosen:** none was available — the example is rejected by the ordinary lexer, and this
+implementation neither special-cases it nor could. `2025-03-13` lexes as one unquoted token;
+`2026-05-21T13:05:00Z` does not; `13:05:00` does not. The temporal atoms parse quoted content in all three
+cases, so nothing about the type vocabulary is affected: this is purely which spellings reach it.
+
+**Suggested resolution:** fix the §5.11 instance to quote its value, and add times and datetimes to §7.1's
+excluded-kinds list so the next example is written correctly by construction rather than by review.
+
+**Status against Revision 33:** open, new against this revision. §5.11's example is unchanged and §7.1's list
+does not mention the temporal kinds.
