@@ -319,6 +319,19 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   a `DataBindContext` may be extended after first use, and neither shipped fetching `TsonSchemaSource` states
   what it promises a concurrent caller. None of it is hypothetical-only: the read-path half was two real defects, found by
   auditing and reproduced first try on 8 threads.
+- [ ] **Audit every `unquoted-token` reference in both grammars, and decide whether it should be `token`.**
+  The kernel types every name position with one atom (`token`, aliased as `type_name`/`field_name`/
+  `param_name`), and the grammar governs those positions with four productions: `field-name = token` admits
+  all three lexical forms, while `annotation = "@" unquoted-token`, `type-ref = "!" unquoted-token` and
+  [TSON-SCHEMA]'s `type-name = unquoted-token` admit only the bare one. So a field name may be quoted and a
+  type name may not, for no stated reason. Settling on `token` throughout is the consistent direction and
+  would let a name carrying an out-of-profile character be spelled at every position, which is what §7.1's
+  ZWNJ advice assumes is possible. **It is not a safe change on its own** — today the inconsistency is the
+  only thing confining the quoting bypass (`SPEC-FEEDBACK.md` #3, point 3) to field names, so `token`
+  everywhere widens it until `token` itself carries a contract. Sequence it after the item below, or behind
+  whatever Revision 34 settles. The audit is the deliverable either way: each site, which production it
+  uses, and whether the parser agrees with the grammar — `TsonSchemaParser.expectTypeName` requires
+  `TokenType.UNQUOTED`, and it is worth knowing where else that is assumed.
 - [ ] **A name profile, and skeleton distinctness on it** (§9.4-adjacent hardening). `SPEC-FEEDBACK.md` #3
   carries the design: names are a class the series never defines — §7.1 constrains *tokens*, which is also
   how values are written — so define one, apply it wherever a name is declared (a schema's type names,

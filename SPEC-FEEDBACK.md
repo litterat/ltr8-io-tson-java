@@ -112,7 +112,7 @@ something silently retained. The placement question itself is untouched.
 
 ---
 
-## 3. §9.4's confusable problem has nowhere to attach, because the series defines what may be in a *token* and never what may be a *name*
+## 3. §9.4 has nowhere to attach: the kernel types every name `token`, `token` carries no contract, and the grammar governs it four different ways
 
 **Section:** [TSON-DATA] §9.4 (Confusable Characters), §7.1 (UAX #31 profile), §2.5 (field-name identity),
 §7.2.1 (NFC normalization); [TSON-SCHEMA] §2.2.3 (`!!import` name disjointness), §5.2, §5.4.
@@ -142,13 +142,14 @@ quoted name an ordinary field name (`field-name = token ; unquoted or quoted`, a
 the same field name"). So the sanctioned route for a name needing ZWNJ is an unconstrained route for every
 character the profile excludes: the hardening is bypassed by the mechanism the same sentence prescribes.
 
-**4. The root cause: there is no name layer.** §7.1 defines a UAX #31 profile over *unquoted tokens* — a
-lexical class that in TSON is also how ordinary **values** are written (`{ name: Alice }`). So §7.1 cannot be
-tightened for names without tightening values, and §9.4 cannot attach to §7.1 without doing exactly that.
-Meanwhile nothing anywhere defines the class "name", even though the series uses names in six places with
-different rules. That absence is why §9.4 ended up in Security Considerations as advice: there was no
-normative surface to put it on. It is also why point 3's bypass exists — quoting escapes the token profile
-because the token profile is the only profile there is.
+**4. The root cause: the name layer exists and is empty.** §7.1 defines a UAX #31 profile over *unquoted
+tokens* — a lexical class that in TSON is also how ordinary **values** are written (`{ name: Alice }`) — so
+§9.4 cannot attach to §7.1 without constraining values too. The place it should attach to is the kernel's
+`token`, which types every name in the series and holds no constraint at all, deferring to a grammar that
+governs its positions with four different productions. That is why §9.4 ended up in Security Considerations
+as advice: the surface exists, but nothing has ever been said on it. It is also why point 3's bypass exists,
+and why the bypass is confined to field names. The proposal below is mostly a matter of filling in a slot
+the kernel already reserved.
 
 **The data-cost objection, measured rather than assumed.** An earlier draft of this entry argued that any
 normative UTS #39 requirement obliges every implementation to ship UCD data, and treated that as one cost.
@@ -170,47 +171,86 @@ merge, where disjointness is exact string equality and a confusable pair passes 
 
 ### Proposal: define a name profile, then use the mechanism that has a comparison set
 
-**Step 1 — define what a name is. The series uses the concept everywhere and defines it nowhere.**
+**Step 1 — the name profile already exists. It is the kernel's `token`, and it carries no contract.**
 
-This is the foundation, and it is worth adopting even if no mechanism below it ever is. Today "name" is not a
-thing the series defines; it is a word used across at least three different lexical treatments:
+This is the foundation, and it is worth adopting even if no mechanism below it ever is. It is also smaller
+than it first appears, because nothing needs inventing: the meta-kernel already types every name position in
+the series with one atom.
 
-| what | production | may be quoted? |
+```
+token      => !unit {}        ; the lexical-identifier primitive
+type_name  => token
+field_name => token
+param_name => token
+```
+
+Every naming position in the resolved model is typed by it, directly or through one of those three roles —
+`type_ref.name`, `record_field.name`, `field_group.members`, `record.supertypes`,
+`type_definition.parameters`/`supertypes`/`subtypes`, `enum.members` (via `token_set => !set { element_type:
+token }`), and the keys of `schema => {type_name => type_definition}`. §8.3 flattens the roles away, so
+resolved output states the type uniformly and keeps the role as an alias:
+
+```
+!record_field { name: name  type: @alias:field_name token }
+body: !map { key_type: @alias:type_name token  value_type: type_definition }
+```
+
+A rule stated on `token` therefore reaches every name in the series without enumerating positions, and
+diagnostics can still say which *kind* of name failed, because the alias survives.
+
+**Critically, `token` is not `text`.** `token` is a `unit` instance with no constraint vocabulary; `text` is
+a `text_type` instance with `min_length`, `pattern` and the rest. They are separate types, so they can carry
+separate policies — which is exactly the affordance a name profile needs, and it is already built. The thing
+that has never been decided is what `token`'s policy *is*.
+
+**The kernel says so itself, and points at the grammar:**
+
+> The implementation-internal constraints on what constitutes a well-formed token are fixed by the grammar;
+> no constraint vocabulary is needed at the type level.
+
+That deferral is where it breaks, because **the grammar does not fix one thing.** Four productions govern
+name positions and three of them disagree:
+
+| position | production | quoted form admitted? |
 |---|---|---|
-| record field name (§2.5, and [TSON-SCHEMA] §12.1 imports it) | `field-name = token` | **yes** |
-| declared type name, parameter name ([TSON-SCHEMA] §12.1) | `type-name = unquoted-token` | **no** |
-| enum member, choice variant | rides `core-value` (`!enum [OPEN ACTIVE]`) — a data token | yes, as a quoted string |
+| record field name (§7.4, and [TSON-SCHEMA] §12.1 imports it) | `field-name = token` | **yes** — all three lexical forms |
+| annotation name (§7.4) | `annotation = "@" unquoted-token` | no |
+| type-ref in data (§7.4) | `type-ref = "!" unquoted-token` | no |
+| declared type name, parameter name ([TSON-SCHEMA] §12.1) | `type-name = unquoted-token` | no |
 
-Three spellings, three rules, one concept. And the only place the series constrains characters at all —
-§7.1's UAX #31 profile — is defined over **unquoted tokens**, which is the class that carries *values* as
-well: in `{ name: Alice }` both `name` and `Alice` are unquoted tokens. Three consequences follow, and they
-are the whole of why §9.4 is stuck:
+`token` in the grammar is `unquoted-token / single-line-token / multi-line-token`, so `field-name` is the one
+name position in either part that admits a quoted spelling. Everything else the kernel types `token` is
+grammatically `unquoted-token`. **One kernel type, four grammar rules.** Enum members are a fifth treatment
+again: the model types them `token`, and the grammar has them ride `core-value` as ordinary data.
 
-1. **Names cannot be constrained without constraining values.** Any rule added to §7.1 — Identifier_Status,
-   a script restriction, anything — lands on `Alice` too. An unquoted *value* in a historic script should
-   stay legal; a *name* in one is a different question. There is currently no way to say so.
-2. **Quoting escapes the rules, and §7.1 prescribes quoting as the remedy.** §7.1 excludes ZWNJ/ZWJ and
-   says names needing them "MUST be quoted" — but §7.1 governs unquoted tokens only, and §2.5 makes
-   `"аdmin"` an ordinary field name. The hardening is bypassed by the mechanism the same sentence
-   recommends. (Type names escape nothing, being unquotable — which is the divergence in the table above,
-   and another symptom of the same missing definition.)
-3. **§9.4 has nowhere to attach.** It is a rule about names, and there is no normative surface named
-   "name", so it became a SHOULD-consider sentence in Security Considerations. §5.10 already reaches for
-   §9.4 to justify a *schema* naming rule ("silent capture ... is the confusability hazard [TSON-DATA] §9.4
-   names"), from the other part of the series, with nothing shared between them.
+Three consequences follow, and they are the whole of why §9.4 is stuck:
 
-So, added to §7.1 beside the token profile:
+1. **Names cannot be constrained without constraining values.** The only place the series constrains
+   characters is §7.1's UAX #31 profile, which is defined over `unquoted-token` — the class that also carries
+   values. In `{ name: Alice }` both `name` and `Alice` are unquoted tokens, so any rule added there lands on
+   the value too. `token` is where a name rule belongs, and it holds none.
+2. **Quoting escapes the rules, at the one position that allows it, and §7.1 prescribes quoting as the
+   remedy.** §7.1 excludes ZWNJ/ZWJ and says names needing them "MUST be quoted" — but §7.1 governs unquoted
+   tokens, and `"аdmin"` is an ordinary field name (§2.5). The hardening is bypassed by the mechanism the
+   same sentence recommends. That the bypass is confined to field names is an accident of the inconsistency
+   above, not a design.
+3. **§9.4 has nowhere to attach.** It is a rule about names; `token` is the type of every name and says
+   nothing; so §9.4 became a SHOULD-consider sentence in Security Considerations. Meanwhile [TSON-SCHEMA]
+   §5.10 reaches across parts to cite §9.4 for a schema naming hazard, with no shared surface between them.
 
-> **Name profile.** A **name** is a token in a naming position: a record field name (§2.5), and in
-> [TSON-SCHEMA] a declared type name, a record field name in a declaration (§5.2), an enum member, a choice
-> variant (§5.4), and an annotation name (§6). Map keys are **not** names — §2.6 makes them data values,
-> not restricted to strings. Constraints on names apply to a name **however it is spelled**, quoted or
-> unquoted; the name profile constrains names, where §7.1's token profile constrains lexemes.
+**So the ask is two small things, not a new concept:**
 
-What it gives, before any mechanism is chosen: one place to state a rule about names instead of three; a
-surface §9.4 can become normative on; the quoting bypass closed by construction; and the freedom to
-tighten names without touching values. What it costs: one paragraph, and no change to any existing
-document's validity.
+- **Give `token` a stated contract** — in the kernel's own terms, or in §7.1 beside the token profile, saying
+  that constraints on names apply to a name *however it is spelled*. Map keys stay out: §2.6 makes them data
+  values, not restricted to strings, and they are typed accordingly.
+- **Make the grammar reference one production for it.** Whichever way it is settled, the four rows above
+  should be one row. Settling on `token` (admitting quoted spellings everywhere) is the more consistent
+  direction and is only safe *after* the first bullet, since today the inconsistency is what accidentally
+  limits the bypass; settling on `unquoted-token` closes the bypass by grammar but makes a name that needs
+  an out-of-profile character unspellable, which is the situation §7.1's ZWNJ advice was written to avoid.
+
+A useful side effect: the comparison scopes Step 2 needs are then expressible in the model rather than only
+in prose. "The declared names of one schema" is the key set of `schema => {type_name => type_definition}`.
 
 **Step 2 — require skeleton distinctness within each named scope.** No two names in the same scope may have
 equal UTS #39 `skeleton()`s. The scopes are the closed sets the series already defines:
