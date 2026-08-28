@@ -252,7 +252,7 @@ closure) was built and discarded during PR #36's review: it answered questions n
 act on — separating same-class variants takes the type-directed second inspection [TSON-DATA] §2.4
 forbids — at the price of verdicts an author cannot predict (two default-`allow_nan` floats overlap via
 NaN however far apart their ranges sit) and a conformance bar no second implementation should have to
-match. #47 carries the full account.
+match.
 
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
 §4's four scalar classes — `null`, `boolean`, `number` (every numeric family: an `integer` and a `decimal`

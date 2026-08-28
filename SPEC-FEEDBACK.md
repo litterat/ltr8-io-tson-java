@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The seven below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+The eleven below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
 it resolved are gone from here, because the spec now carries their rules and that is where the answer
 belongs. **This file is the as-built record**, not a pointer to one: where an entry proposes a design this
 implementation has built, the entry states the design, what is running, and what is not, so that a reviewer
@@ -866,3 +866,68 @@ typing has to land for the same reason.
 
 **Status against Revision 33:** open, new against this revision. The general rule is what is built and
 running here (`ContainerBoundCoherenceTest`), across both base kinds and every family.
+
+---
+
+## 11. Part 1 §2.8 resolves an empty brace to "the empty container of that type"; Part 2 §7.7 enumerates two containers, and the series has four
+
+**Section:** Part 1 §2.8 (brace disambiguation and empty braces), Part 2 §7.7 (resolver behaviours at typed
+positions), §5.3 (the container sugar forms and their size specifiers).
+
+**Problem:** the two parts state the same rule at different widths, and the wider one is the one that reads
+like the general statement.
+
+§2.8 defers an empty brace to the resolver and closes with: "In the absence of declared type information, an
+empty-brace resolves to an empty record. When a higher part supplies an expected type ([TSON-SCHEMA]), it
+resolves to **the empty container of that type**." Nothing there is limited to two kinds; "that type" is
+whatever the position declares, and §5.3 gives the series four container kinds — record, map, array, tuple.
+
+§7.7's "Empty braces" paragraph is the higher part supplying it, and it enumerates instead: "the resolver
+transforms an empty-brace value into **an empty record or empty map** per the expected type, defaulting to an
+empty record when the position is untyped." An array position is not in the list, and §7.7 does not say
+whether that is a deliberate exclusion or an enumeration of the two cases the author had in mind.
+
+Both readings are defensible and they differ observably on a one-line document. Under `holder => { tags:
+[text] }`, the data `!holder { tags: {} }` is either an empty array (§2.8 read generally) or a type error
+(§7.7 read as exhaustive). Neither part says which.
+
+Three things make the narrow reading the more likely intent, none of them decisive:
+
+1. **`{}` is brace-shaped and an array is bracket-shaped.** Every other empty container has a spelling of its
+   own — `[]` for an array and a tuple — so nothing is unspellable under the narrow reading, where an empty
+   *map* genuinely needs `{}` because it has no other empty form. The rule earns its keep only for the two
+   kinds that share the `{...}` form and cannot be told apart when empty.
+2. **§5.4's discrimination classes already treat `{}` as brace-class**, ambiguous between a record and a map
+   and distinct from `bracket`. Admitting `{}` at an array position would make a value of brace class conform
+   to a bracket-class type, which is a wrinkle in a table the spec is otherwise careful to keep total.
+3. **A tuple would follow an array**, and there §7.7's silence is louder: a tuple's arity is fixed and exact
+   (§5.3), so `{}` at a two-slot tuple would resolve to "the empty container of that type" and then fail
+   arity — a two-step verdict for what the narrow reading calls one type error.
+
+What the narrow reading costs is that §2.8's sentence is then wrong as written, in the part that defines the
+concept, and an implementor reading Part 1 first will build the general rule.
+
+**Interpretation chosen:** §7.7's enumeration, treated as exhaustive. `{}` reads as an empty record at a
+record position and an empty map at a map position (facing `min_items`/`max_items` there like any other map —
+the count is validated in `MapAbstractReader.expectMapShape`, the one funnel every map reader passes through);
+at an array or tuple position it is a `TYPE_MISMATCH`, reported as "expected an array for '[text]', found
+{}". Schemaless, and at any untyped position, it is an empty record, per §2.8's own first sentence.
+
+**Suggested resolution:** make the two parts agree, in whichever direction, and say it in Part 1 as well as
+Part 2 — the sentence an implementor builds from is §2.8's, and it is the one that currently overstates.
+
+If the narrow reading is intended, §2.8's closing sentence wants replacing with something that does not
+generalise past it: *"When a higher part supplies an expected type ([TSON-SCHEMA]), it resolves to the empty
+record or the empty map according to that type"* — and §7.7 wants one clause saying an empty brace at any
+other container position is a validation error, so the exclusion is stated rather than inferred from a list.
+
+If the general reading is intended, §7.7's list wants replacing with §2.8's own phrasing, and two consequences
+want stating outright, because both are places an implementation would otherwise diverge silently: an empty
+brace at an array position is a zero-element array and **faces the size constraints** (`[text; 1..]` rejects
+it, exactly as `{text => text; 1..}` rejects it today); and an empty brace at a tuple position resolves to a
+zero-element tuple that then fails §5.3's exact-arity rule for any tuple with slots — unless §5.4's
+brace/bracket classes are meant to exclude tuples and arrays from the rule after all, which would be the third
+possible answer and is currently unstated.
+
+**Status against Revision 33:** open, new against this revision. The narrow reading is what is built and
+running here, across all four container positions.

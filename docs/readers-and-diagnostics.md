@@ -123,10 +123,11 @@ is small and parsed once.)
   does the stripping explicitly; the other two readers compare bound host values, which strips both by
   construction.
 - **A written `_` at a `REQUIRED_DEFAULT` field is an error**, where plain omission still injects the
-  default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 asks for a warning
-  and an injection; #42 calls this its strongest case, since warn-and-inject answers "here is a value" to
-  a document that said "absent". The default is still what the field decodes to — only the verdict
-  changes, the same split `verifyFixed` makes for a contradicted FIXED value.
+  default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 makes an explicit `_` a
+  validation error at every REQUIRED-family field — "`_` asserts absence at a position the schema always
+  fills; at REQUIRED_DEFAULT the fix is to omit the field" — which is §7.6's table read down its own column.
+  The default is still what the field decodes to — only the verdict changes, the same split `verifyFixed`
+  makes for a contradicted FIXED value.
 - **`{}` is the empty container of the position's own type, size rules included.** [TSON-DATA] §2.8 defers
   an empty brace to the resolver and resolves it to "the empty container of that type" once a schema
   supplies one, so at a map position it is a map with zero entries and `min_items: 1` rejects it. The count

@@ -289,12 +289,31 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
 
 ## Miscellaneous
 
-- [ ] **General resolver-layer structural rules as reusable primitives**, rather than binding-time-only
-  behaviour — empty-brace resolution, the absent-vs-missing distinction. §2.8's "the empty container of that
-  type" is still a rule each container reader applies for itself: the map reader's own zero-entry case was
-  silently exempt from `min_items` until it was fixed one reader at a time, and nothing structural stops the
-  next container from repeating it. What a primitive would buy is the rule stated once, where "how many
-  entries does this value have" has one answer whatever spelled it.
+- [ ] **`_` at a map entry value is refused, and [TSON-SCHEMA] §7.6 permits it unconditionally.** That row of
+  §7.6's table is a plain "yes" — `map` carries no element-state facet, so the permission is not
+  schema-conditional the way an array element's or a record field's is. `MapAbstractReader.readInto` hands the
+  value straight to the value type's own reader, which refuses the sentinel: `{ "k" => _ }` under
+  `{text => text}` reports `expected a token for 'text', found the absent sentinel '_'`. The tree side already
+  expects it (`MapTreeReader` turns a null decode into `TsonAbsent`); what is missing is the permission at the
+  entry loop, and an answer for what bind mode hands a map value that has none.
+
+- [ ] **A record field written `_` reads identically to one never written.** Under a schema, `{ x: _  y: "h" }`
+  and `{ y: "h" }` against `x: text?` both produce a tree with no `x` at all; the same pair read schemalessly
+  gives `TsonAbsent` and `TsonMissing`. [TSON-DATA] §2.9 makes the distinction normative — "A field or entry set
+  to `_` is **present with an absent value** — distinct from not appearing at all" — and an array element and a
+  tuple slot already keep it, as a `TsonAbsent` placeholder that round-trips back through `TsonTreeWriter`. So
+  the record is the one container of the four that drops it: `valueForAbsentField`'s `OPTIONAL` case answers
+  `null` for both readings and `RecordTreeReader.putField` omits a `null`. Bind mode needs its own answer first
+  — a Java component has no third state between "null" and "not there" — since the tree's answer should not be
+  the one that happens to be reachable.
+
+- [ ] **Decide what `{}` means at an array or tuple position.** `TYPE_MISMATCH` today
+  (`ArrayAbstractReader.expectArrayStart`, `TupleAbstractReader.expectTupleStart`), which follows
+  [TSON-SCHEMA] §7.7's enumeration — "an empty record or empty map per the expected type" — and not
+  [TSON-DATA] §2.8's "the empty container of that type". `SPEC-FEEDBACK.md` #11 carries the inconsistency and
+  the reading built here; the work is whichever answer it closes on. If an empty brace becomes an empty array,
+  it has to reach `validateSize` on the way, the way `MapAbstractReader.expectMapShape` already routes it —
+  the funnel exists because the count went missing the last time a container grew an empty branch of its own.
 
 - [ ] Thread-safety **outside a read**. Concurrent *reads* through one `Tson` are safe and tested
   (`ReadPathConcurrencyTest`): the compiled readers are immutable, a `Lexer`/`TsonDataStream` is per read,
