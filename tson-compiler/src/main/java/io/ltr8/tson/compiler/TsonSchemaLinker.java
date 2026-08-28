@@ -1173,20 +1173,9 @@ public final class TsonSchemaLinker {
             return;
         }
         Token value = field.value().get();
-        // No token is an array, map or tuple value, whatever it spells -- so the field's type alone decides
-        // this one, with no parser and no recursion. The other composites are not like this and are not
-        // grouped with them: §5.6's positional form lets a record with one bare REQUIRED field be filled by
-        // a bare value, and a choice variant may itself be an atom, so both have tokens that satisfy them
-        // and both need the referenced type read rather than merely classified (`BACKLOG.md`).
-        switch (target.body()) {
-            case ArrayBody ignored -> throw noTokenIsAContainer(entryName, field, value, "an array");
-            case MapBody ignored -> throw noTokenIsAContainer(entryName, field, value, "a map");
-            case TupleBody ignored -> throw noTokenIsAContainer(entryName, field, value, "a tuple");
-            default -> { }
-        }
-        Optional<AtomType<?>> parser = AtomParsers.forBody(target.body());
+        Optional<AtomType<?>> parser = AtomParsers.forType(field.type().name(), target.body());
         if (parser.isEmpty()) {
-            return;
+            throw notAScalarType(entryName, field, value, target.body());
         }
         try {
             parser.get().read(new TokenValue(value.text(), TokenForm.valueOf(value.form().name())));
@@ -1204,18 +1193,44 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * <b>The verdict is about the field, not about the token</b>: §12.1 admits only a bare token after
-     * {@code ~}/{@code =} (writing {@code ~ []} or {@code ~ {}} is a syntax error, not a different value),
-     * so a container-typed field has no default it could state. Saying "this token is not an array" would
-     * invite the author to write a better token, and there isn't one.
+     * <b>Only a scalar-typed field may carry a value, and the verdict is about the field rather than about
+     * the token.</b> §12.1 admits only a bare token after {@code ~}/{@code =} -- writing {@code ~ [...]} or
+     * {@code ~ { ... }} is a syntax error, not another value -- so for a non-scalar field there is no better
+     * token to suggest and saying "this token is not a record" would invite the author to look for one.
+     *
+     * <p><b>A record and a choice are refused too, though a token can reach them.</b> §5.6's positional form
+     * fills a record with exactly one bare {@code REQUIRED} field from a bare value, and a choice
+     * discriminates a token to an atom-typed variant, so both have tokens a <em>read</em> would accept.
+     * Admitting them here would make "may this field have a default?" depend on the referenced type's field
+     * count or variant list -- a rule an author has to compute rather than remember. One line settles it
+     * instead: a fixed or default value is available on a scalar-typed field and nowhere else. §5.6 is a
+     * spelling rule for data values, not a claim that a record <em>is</em> a token, and this reads §5.2's
+     * "the value must be the field's declared type" as requiring a type a token denotes directly.
+     * {@code SPEC-FEEDBACK.md} carries the interpretation, since the spec does not settle it outright.
      */
-    private static TsonSchemaValidationException noTokenIsAContainer(String entryName, RecordField field,
-                                                                      Token value, String container) {
+    private static TsonSchemaValidationException notAScalarType(String entryName, RecordField field,
+                                                                 Token value, Top body) {
         return new TsonSchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
-                + "declared '" + field.type().name() + "', which is " + container + ", so it cannot have "
-                + (field.state() == FieldState.REQUIRED_DEFAULT ? "a default" : "a fixed value") + " -- "
-                + asWritten(value) + " is a token, and §5.2 admits only a bare token there. Drop the "
-                + "modifier, or declare the field with a type a token can be a value of");
+                + "declared '" + field.type().name() + "', which is " + describe(body) + ", so it cannot "
+                + "have " + (field.state() == FieldState.REQUIRED_DEFAULT ? "a default" : "a fixed value")
+                + " -- " + asWritten(value) + " is a token, and §5.2 admits only a bare token there. A "
+                + "fixed or default value is available on a field typed by an atom or an enum, and nowhere "
+                + "else: drop the modifier, or declare the field with a scalar type");
+    }
+
+    /** What a non-scalar body is, for the message -- named the way an author would name it, not by class. */
+    private static String describe(Top body) {
+        return switch (body) {
+            case ArrayBody ignored -> "an array";
+            case MapBody ignored -> "a map";
+            case TupleBody ignored -> "a tuple";
+            case RecordBody ignored -> "a record";
+            case ChoiceBody ignored -> "a choice";
+            case Unit ignored -> "the void type";
+            case Extern ignored -> "an external type";
+            case UnknownType ignored -> "the unknown type, which is every type rather than a token shape";
+            default -> "not a scalar type";
+        };
     }
 
     /** A token echoed the way the schema spells it, so a quoted value is visibly quoted in the message. */

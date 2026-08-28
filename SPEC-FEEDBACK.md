@@ -689,3 +689,55 @@ that kept a name-only body in step with `source` whenever materialisation rewrot
 
 **Status against Revision 33:** open, new against this revision. Implemented here, which makes it the first
 change to the bundled `spec/m/` artifacts' *content* — the three digests move with it.
+
+
+---
+
+## 8. §5.2 makes a field's fixed or default value a value of the field's declared type, but does not say which declared types can have one
+
+**Section:** Part 2 §5.2 (`record_field.value`, the six field-state spellings), §5.6 (positional form),
+§12.1 (`field-modifier`). Part 1 §7.4 (form is not meaning).
+
+**Problem:** §12.1 admits only a bare token after `~`/`=` — writing `~ [ ... ]` or `~ { ... }` is a syntax
+error, not another value — and meta-kernel's own `@doc` on `record_field.value` says the slot holds "the
+type of fixed/default values, **which must be the field's declared type** — a dependency the schema
+language does not express directly". Put together, those settle every scalar case. They do not settle
+whether a field whose declared type is a **record** or a **choice** may carry one, because a bare token can
+legitimately reach both:
+
+```
+point => { n: int32 }        rec => { p: point ~ 3 }        # §5.6 positional form
+ch    => ( int32 | text )    rec => { c: ch ~ oops }        # discriminates to the text variant
+```
+
+Both read cleanly if a resolver admits them: §5.6 fills a record with exactly one bare `REQUIRED` field
+from a bare value, and a choice discriminates a token by its §4 base-type class to a variant that accepts
+it. Nothing in §5.2 says whether the "must be the field's declared type" test is satisfied by *a value the
+type admits* or by *a type a token denotes directly*, and the two answers differ for exactly these two
+kinds.
+
+**What this implementation does:** refuses both. A fixed or default value is available on a field typed by
+an **atom or an enum** and nowhere else — `TsonSchemaLinker` resolves the field's type, and a body that is
+not a scalar is a resolver error at the declaration, whatever token stands beside it. `void`, `unknown` and
+`extern` fall out of the same rule for their own reasons: the type with no value, the universe of types,
+and a mechanism with no token shape.
+
+**Why, and it is a cost worth naming.** Admitting the two cases makes "may this field have a default?"
+depend on the referenced type's field count (exactly one bare `REQUIRED`) and on its variant list and their
+discrimination classes. That is a rule an author computes rather than remembers, and it is computed against
+a *different* declaration than the one they are editing — adding a second field to `point` would silently
+invalidate a default written on a field somewhere else. The refusal costs two spellings that would have
+worked and buys a rule that fits in one line. §5.6 is a spelling rule for *data values*; reading it as a
+claim that a record **is** a token is what would carry it into a schema's own field modifiers, and it does
+not say that.
+
+**Recommendation:** §5.2 should state which declared types may carry a fixed or default value, in one
+sentence, rather than leaving it to be derived from §12.1's token-only production plus §5.6. Either
+answer is implementable; what costs an implementation is that the question is not asked. If the answer is
+the permissive one, §5.2 should also say that a record's positional-form eligibility is part of its
+contract — because a default written against it then breaks when an unrelated field is added to that
+record, which authors will not expect from a change that is otherwise backward-compatible.
+
+**Status against Revision 33:** open, new against this revision. The restrictive reading is what is built
+and running here (`FieldValueConformanceTest`); the permissive one is what a resolver gets by deferring to
+its reader, which is the shape an implementation falls into by accident.

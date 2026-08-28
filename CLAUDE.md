@@ -130,6 +130,16 @@ value is disambiguation at the call site (`TsonSchema` vs. a domain `Schema`). W
 developer-facing type, ask "would a consumer plausibly have their own class with this bare name?" — if yes
 and it's consumer-facing, prefix it; if it's internal machinery, leave it bare.
 
+**A fixed or default value is available on a scalar-typed field and nowhere else.** §5.2 makes a `~`/`=`
+value a value of the field's declared type, and §12.1 admits only a bare token there; `TsonSchemaLinker`
+resolves the field's type and parses the token with that type's own reader parser, so a default is accepted
+exactly when a read would accept the same token in the same position. A field typed by anything but an
+**atom or an enum** is refused whatever token stands beside it — records and choices included, though §5.6's
+positional form and an atom-typed variant mean a read would accept some. Admitting those would make "may
+this field have a default?" depend on another declaration's field count or variant list, a rule an author
+computes rather than remembers, and one that breaks silently when that other declaration gains a field.
+`SPEC-FEEDBACK.md` #8 carries the interpretation; `void`/`unknown`/`extern` fall out of the same line.
+
 **A schema and its bound class must agree about a type's fields** (`TsonBindMismatchException`, raised at
 bind-mode compile — startup, not first read; its subclass `TsonMissingBindingException` covers a type with
 *no* class at all and is deferred to the first read of that type, since a schema legitimately declares types
@@ -798,15 +808,6 @@ compatibility).
   `int32 ~ text` whether a parameter put it there or the author wrote it literally (`TsonSchemaLinker`'s
   `checkFieldValue`, `FieldValueConformanceTest`). What is left is that check's own boundary, below.
   `SPEC-FEEDBACK.md` #5 carries the spec-side question.
-- **A `~`/`=` value at a field typed by a record or a choice is unchecked.** §5.2's dependency is enforced
-  at link for atoms and enums (`TsonSchemaLinker.checkFieldValue` runs the field's own resolved body over
-  the token, so a default is accepted exactly when a read would accept that token there) and for
-  array/map/tuple, where the field's type alone settles it — no token is a container value, and §12.1
-  admits only a bare token after the modifier, so such a field has no default it could state. A record or a
-  choice is neither: a token satisfies both legitimately (§5.6's positional form, an atom-typed variant), so
-  deciding needs the referenced type *read* rather than classified, and that is its compiled reader, which
-  runs after linking. Those keep the old path and a bad value reaches a data read as `ErrorReader`'s
-  `NOT_IMPLEMENTED`.
 - **Deferred design questions** — the identity-diagonal FIXED-value invariant. **Routed-value
   substitution is
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →

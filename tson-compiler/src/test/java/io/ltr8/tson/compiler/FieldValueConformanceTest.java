@@ -168,23 +168,44 @@ class FieldValueConformanceTest {
     }
 
     /**
-     * <b>A record and a choice are not grouped with the containers</b>, and the reason is that a token can
-     * satisfy them: §5.6's positional form fills a record with exactly one bare {@code REQUIRED} field from
-     * a bare value, and a choice variant may itself be an atom -- both of these read cleanly. Deciding the
-     * bad spellings beside them needs the referenced type <em>read</em> rather than merely classified, which
-     * is a compiled reader, which runs after linking. Pinned so the boundary is a measured line rather than
-     * an assumed one ({@code BACKLOG.md} carries what closing it would take).
+     * <b>A record and a choice are refused too, and this is the case that makes the rule a rule.</b> A token
+     * <em>can</em> reach both: §5.6's positional form fills a record with exactly one bare {@code REQUIRED}
+     * field from a bare value, and a choice discriminates a token to an atom-typed variant -- so a read
+     * would accept {@code point ~ 3} and {@code ( int32 | text ) ~ oops}. Admitting them would make "may
+     * this field have a default?" depend on the referenced type's field count and variant list, which is a
+     * rule an author computes rather than remembers.
+     *
+     * <p>So the answer is one line -- <b>a fixed or default value is available on a scalar-typed field and
+     * nowhere else</b> -- and it costs those two spellings. §5.6 is a spelling rule for data values, not a
+     * claim that a record <em>is</em> a token; {@code SPEC-FEEDBACK.md} carries the interpretation, since
+     * this narrows what the reader alone would accept.
      */
     @Test
-    void aRecordOrChoiceTypedFieldIsStillDecidedByTheReader() {
-        assertNotNull(compile("""
+    void aRecordOrChoiceTypedFieldIsRefusedEvenWhereAReadWouldAcceptTheToken() {
+        TsonSchemaValidationException positional = refused("""
                   point => { n: int32 }
-                  ch    => ( int32 | text )
-                  rec   => { p: point ~ 3  c: ch ~ oops }"""), "both of these are legitimate and read fine");
+                  rec   => { p: point ~ 3 }""");
+        assertTrue(positional.getMessage().contains("which is a record"), positional.getMessage());
+        assertTrue(positional.getMessage().contains("declare the field with a scalar type"),
+                positional.getMessage());
 
-        assertNotNull(compile("""
-                  point => { n: int32 }
-                  rec   => { p: point ~ notanint }"""), "and this one is not, and is not caught here yet");
+        TsonSchemaValidationException variant = refused("""
+                  ch  => ( int32 | text )
+                  rec => { c: ch ~ oops }""");
+        assertTrue(variant.getMessage().contains("which is a choice"), variant.getMessage());
+    }
+
+    /**
+     * <b>{@code void} is not a scalar either</b>, and shares its resolved shape with {@code value} and
+     * {@code token} -- three declarations, one deliberately uninformative {@code unit} body, told apart by
+     * the declaration's own name, which §4.2 makes the normative dispatch. So the check asks for the name
+     * as well as the body, exactly as the reader stack's own {@code unit} factory does.
+     */
+    @Test
+    void voidIsNotAScalarAndCannotCarryAValue() {
+        TsonSchemaValidationException thrown = refused("rec => { v: void ~ anything }");
+
+        assertTrue(thrown.getMessage().contains("the void type"), thrown.getMessage());
     }
 
     /**

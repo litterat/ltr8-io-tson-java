@@ -20,6 +20,7 @@ import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.Top;
+import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
@@ -41,9 +42,9 @@ import java.util.Optional;
  * lets a phase running before compilation -- {@code TsonSchemaLinker}, checking a field's {@code ~}/{@code =}
  * value against the field's declared type -- ask the question at all.
  *
- * <p><b>An empty result means "not an atom", never "unsupported".</b> A record, container, choice or
- * reference body has no token-level answer to give, and a caller is expected to have its own handling for
- * one rather than to treat the absence as a failure.
+ * <p><b>An empty result means "not a scalar type", never "unsupported".</b> A record, container, choice or
+ * reference body has no token-level answer to give, and neither does {@code void}. A caller is expected to
+ * have its own handling for one rather than to treat the absence as a failure.
  */
 public final class AtomParsers {
 
@@ -51,14 +52,26 @@ public final class AtomParsers {
     }
 
     /**
-     * The parser for {@code body}, or empty if {@code body} is not an atom.
+     * The parser for the entry named {@code declaredName} with body {@code body}, or empty if that entry is
+     * not a scalar type.
      *
      * <p>{@code complex}/{@code ipv4}/{@code ipv6} hand back their unconstrained singletons: their bodies
      * carry facets these parsers do not model (see each parser's own Javadoc), so the body selects the
      * parser without configuring it. Every other family is constructed from the body it was given.
+     *
+     * <p><b>{@code declaredName} is needed for exactly one family, and §4.2 makes that normative.</b>
+     * {@code value}, {@code token} and {@code void} are three declarations sharing one deliberately
+     * uninformative resolved shape ({@code unit}), so the name is the only thing that tells them apart --
+     * the same dispatch the reader stack's own {@code unit} factory performs. {@code void} is not a scalar
+     * and yields nothing: it is the type with no value, so no token is one.
      */
-    public static Optional<AtomType<?>> forBody(Top body) {
+    public static Optional<AtomType<?>> forType(String declaredName, Top body) {
         return Optional.ofNullable(switch (body) {
+            case Unit ignored -> switch (declaredName) {
+                case "void" -> null;
+                case "value" -> ValueParser.INSTANCE;
+                default -> TokenParser.INSTANCE;
+            };
             case IntegerType t -> new IntegerParser(t);
             case TextType t -> new TextParser(t);
             case DecimalType t -> new DecimalParser(t);
