@@ -170,17 +170,47 @@ merge, where disjointness is exact string equality and a confusable pair passes 
 
 ### Proposal: define a name profile, then use the mechanism that has a comparison set
 
-**Step 1 — name the layer.** Add to §7.1, beside the token profile:
+**Step 1 — define what a name is. The series uses the concept everywhere and defines it nowhere.**
+
+This is the foundation, and it is worth adopting even if no mechanism below it ever is. Today "name" is not a
+thing the series defines; it is a word used across at least three different lexical treatments:
+
+| what | production | may be quoted? |
+|---|---|---|
+| record field name (§2.5, and [TSON-SCHEMA] §12.1 imports it) | `field-name = token` | **yes** |
+| declared type name, parameter name ([TSON-SCHEMA] §12.1) | `type-name = unquoted-token` | **no** |
+| enum member, choice variant | rides `core-value` (`!enum [OPEN ACTIVE]`) — a data token | yes, as a quoted string |
+
+Three spellings, three rules, one concept. And the only place the series constrains characters at all —
+§7.1's UAX #31 profile — is defined over **unquoted tokens**, which is the class that carries *values* as
+well: in `{ name: Alice }` both `name` and `Alice` are unquoted tokens. Three consequences follow, and they
+are the whole of why §9.4 is stuck:
+
+1. **Names cannot be constrained without constraining values.** Any rule added to §7.1 — Identifier_Status,
+   a script restriction, anything — lands on `Alice` too. An unquoted *value* in a historic script should
+   stay legal; a *name* in one is a different question. There is currently no way to say so.
+2. **Quoting escapes the rules, and §7.1 prescribes quoting as the remedy.** §7.1 excludes ZWNJ/ZWJ and
+   says names needing them "MUST be quoted" — but §7.1 governs unquoted tokens only, and §2.5 makes
+   `"аdmin"` an ordinary field name. The hardening is bypassed by the mechanism the same sentence
+   recommends. (Type names escape nothing, being unquotable — which is the divergence in the table above,
+   and another symptom of the same missing definition.)
+3. **§9.4 has nowhere to attach.** It is a rule about names, and there is no normative surface named
+   "name", so it became a SHOULD-consider sentence in Security Considerations. §5.10 already reaches for
+   §9.4 to justify a *schema* naming rule ("silent capture ... is the confusability hazard [TSON-DATA] §9.4
+   names"), from the other part of the series, with nothing shared between them.
+
+So, added to §7.1 beside the token profile:
 
 > **Name profile.** A **name** is a token in a naming position: a record field name (§2.5), and in
 > [TSON-SCHEMA] a declared type name, a record field name in a declaration (§5.2), an enum member, a choice
 > variant (§5.4), and an annotation name (§6). Map keys are **not** names — §2.6 makes them data values,
-> not restricted to strings. The name profile applies to a name **however it is spelled**, quoted or
-> unquoted; it is a constraint on names, where §7.1's token profile is a constraint on lexemes.
+> not restricted to strings. Constraints on names apply to a name **however it is spelled**, quoted or
+> unquoted; the name profile constrains names, where §7.1's token profile constrains lexemes.
 
-That paragraph is most of the value here, independent of which mechanism is then adopted. It gives §9.4
-something to attach to, closes point 3's bypass by construction (a quoted name is still a name), and lets
-names be constrained without constraining values — the reason §9.4 could not be tightened before.
+What it gives, before any mechanism is chosen: one place to state a rule about names instead of three; a
+surface §9.4 can become normative on; the quoting bypass closed by construction; and the freedom to
+tighten names without touching values. What it costs: one paragraph, and no change to any existing
+document's validity.
 
 **Step 2 — require skeleton distinctness within each named scope.** No two names in the same scope may have
 equal UTS #39 `skeleton()`s. The scopes are the closed sets the series already defines:
@@ -213,8 +243,17 @@ accepted  日本語id
 A Latin abbreviation beside a Cyrillic or Greek word is an ordinary way to name things, and the last line is
 the tell: the same mixing is permitted for Japanese and refused for Russian. That is principled — Han is not
 confusable with Latin and Cyrillic is — but it lands as a tax on precisely the authors the rule exists to
-protect, while a Latin-script author never encounters it. A rule that fires on innocent names in one script
-community and never in another gets switched off, and then protects nobody.
+protect, while a Latin-script author never encounters it.
+
+**And "ordinary" understates it.** Software development is conducted in an English-oriented system: keywords,
+library names, protocol terms and the conventional abbreviations (`id`, `url`, `api`, `http`, `json`) are all
+Latin, and they appear inside identifiers written in every other script. For a developer working in Cyrillic,
+Greek, Devanagari or Arabic, mixing Latin into a name is not an edge case to be traded away — it is the
+common case, and `id_пользователя` is a more natural name than the all-Cyrillic alternative, not a worse one.
+So the restriction level's false-positive rate is not "occasional in some documents": it is close to routine
+for one part of the userbase and exactly zero for another. A rule with that distribution is not a strict
+default with a documented cost; it is a rule that will be switched off wherever it actually applies, and
+protect only the people who were never going to trigger it.
 
 `skeleton()` distinctness has no such failure mode: it is a relation, so it fires only when two names *in the
 same set* actually collide. Over 32 names of the kind a real schema declares together — including all four
