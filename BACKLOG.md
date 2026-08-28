@@ -122,10 +122,10 @@ the proposals it answers. What is left below are consequences of holding, not sh
   not applied. The refusal is at read, not at load: such a schema resolves, links and compiles clean, and
   the first document to reach the field gets `ErrorReader`'s gap and exit 70 — so it lands on whoever sends
   data, not on the author who wrote the facet. What
-  remains is enforcement, and both halves need a decision before code: `precision`'s required semantics
-  (exact vs. maximum fractional-digit count) are not settled by the spec and want a `SPEC-FEEDBACK.md` entry,
-  and `require_timezone: false` needs an offset-less parse path neither parser has (`true` is already the
-  behaviour, RFC 3339 requiring an offset on every value these atoms accept).
+  remains is enforcement, and both halves wait on a spec answer rather than on effort: `SPEC-FEEDBACK.md` #9
+  asks what `precision` bounds (exactly N fractional digits or at most N, at the token or the value, reject
+  or truncate) and whether `require_timezone` can mean anything beside a `spec` fixed to RFC 3339, which
+  requires the offset on every value these atoms accept. Which answers land decide what is built here.
 
 ## Schema-side diagnostics
 

@@ -531,9 +531,11 @@ record is held — a §5.7 tightening entry states a modifier and no type-ref, s
 the inherited field supplies one — which is the one reason those two are normalised a phase later than the rest.
 
 **And what is not built**, gathered here so a reviewer has the boundary in one place rather than in footnotes:
-a parametric enum member (above), value conformance of a field's `~`/`=` against its declared type (above),
-locating a held-body defect at the template's declaration (above), and the D6 merge that would make the two
-lift channels agree (above). A parameterized `atom-refinement` is *deliberately* not on that list: it remains
+a parametric enum member (above), locating a held-body defect at the template's declaration (above), and the
+D6 merge that would make the two lift channels agree (above). Value conformance of a field's `~`/`=` against
+its declared type — this entry's proposed replacement for the argument-kind rule — is **not** among them: it
+is built, and #8 carries the one question it raises that this entry does not. A parameterized
+`atom-refinement` is *deliberately* not on that list: it remains
 no form at all, as §12.1 already has it, and holding does not change that. Nothing on the list is load-bearing
 for the design — each is a check or a location, not a shape the held form cannot express — but a reviewer
 adopting this should know which claims here are running code and which are recommendations.
@@ -741,3 +743,74 @@ record, which authors will not expect from a change that is otherwise backward-c
 **Status against Revision 33:** open, new against this revision. The restrictive reading is what is built
 and running here (`FieldValueConformanceTest`); the permissive one is what a resolver gets by deferring to
 its reader, which is the shape an implementation falls into by accident.
+
+
+---
+
+## 9. `time_type`/`datetime_type` declare `precision` and `require_timezone`, and no prose anywhere says what either means
+
+**Section:** Part 2 §9 (the bundled `meta.tn` artifact), §5.5/§5.7 (constraint vocabularies and tightening).
+Part 1 §5.4 (the temporal atoms), §5.2 (an atom's parse/validate split).
+
+**Problem:** `meta.tn` declares both facets, normatively:
+
+```
+time_type => ~atom & atom_specification & {
+  spec:              = "https://www.rfc-editor.org/rfc/rfc3339"
+  min:               value?
+  max:               value?
+  precision:         integer?
+  require_timezone:  boolean?
+}
+```
+
+`datetime_type` is identical. Neither field carries a `@doc`, and **neither name appears anywhere in Part 1
+or Part 2's prose** — the only mention of `time_type`/`datetime_type` outside the artifact itself is the §9
+table listing them as constructors. So the vocabulary a conforming schema may write is defined, and what
+writing it *means* is not. An implementation must pick, and every pick is a different accept/reject set.
+
+**`precision`, four ways to read it, and they are not equivalent:**
+
+1. **Exactly N fractional digits, or at most N?** `precision: 3` against `12:00:00.12` — accept or reject?
+2. **Does it constrain the written token or the value?** `12:00:00.100` and `12:00:00.1` are the same
+   instant with different digit counts. A token-level reading separates them; a value-level one does not.
+3. **Is it a validation constraint or a truncation instruction?** Part 1 §5.6 sets the precedent that the
+   *approximate* atoms round onto their grid and "loss of precision is expected, not an error", so a reader
+   could reasonably expect `precision` to truncate rather than reject. The temporal atoms are not on that
+   split, which leaves the question open rather than answered.
+4. **What is `precision: 0`?** No fractional part admitted, or unconstrained?
+
+The choice is not cosmetic, because it decides whether the facet can participate in refinement at all
+(§5.7). Under "at most N", a smaller N is a narrowing and `precision` behaves like every other bound. Under
+"exactly N", two different values are *disjoint* rather than ordered, and a refinement tightening
+`precision: 6` to `precision: 3` is neither a narrowing nor a widening — a shape this vocabulary has nowhere
+else, and one an implementation's narrowing check cannot express.
+
+**`require_timezone` is stranger, because the pinned `spec` appears to make it unusable.** Part 1 §5.4 maps
+`!datetime` to RFC 3339 `date-time` and `!time` to `full-time`, and both productions make the offset
+**mandatory**. So `require_timezone: true` constrains nothing that the atom's own format does not already
+require, and `require_timezone: false` can only mean *accepting values the named format does not produce* —
+`partial-time`, or a local date-time. That is a facet that **widens** an atom, against a `spec` field the
+same record fixes to RFC 3339. Every other facet in this vocabulary narrows. Either the field means
+something narrower than it reads, or it is the one place a constraint vocabulary relaxes its own
+specification pin, and §5.5 should say which.
+
+**What this implementation does:** neither facet is enforced, and a schema setting either is accepted at
+load and **refused at the first read of that type**, with a message that names the ambiguity rather than
+resolving it — `'datetime' does not enforce 'precision' yet … the spec does not say whether it bounds the
+fractional-second digits exactly or at most, and this implementation will not guess`. That is deliberate:
+the alternative is to pick silently, and a schema author who wrote `precision: 3` would then get whichever
+of the four readings this implementation happened to choose, with no way to tell. Two of the six remaining
+read-time gaps in this implementation are these two facets, and they are the only ones whose cause is a
+question rather than unwritten code.
+
+**Recommendation:** state both, in §5.5, beside the family they belong to. For `precision`, the useful
+answer is almost certainly "at most N fractional digits, at the token level, a validation constraint" —
+that is the only reading under which the facet orders, refines, and composes like the rest of the
+vocabulary. For `require_timezone`, either delete it (RFC 3339 already requires the offset, so the facet is
+vacuous) or say explicitly that `false` relaxes the atom to `partial-time` and reconcile that with `spec`
+being FIXED. Deleting it is the smaller change and loses nothing a schema can currently express.
+
+**Status against Revision 33:** open, new against this revision. Both facets are declared in the bundled
+`meta.tn` this repo packages, so a schema can write them today and no implementation can agree with another
+about what happens next.
