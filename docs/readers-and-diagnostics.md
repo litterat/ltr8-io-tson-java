@@ -65,6 +65,18 @@ is small and parsed once.)
   which falls out of counting rather than being checked for. Elements have no default/fixed concept at all
   (`ElementState` has two members where a record field's `FieldState` has five), so none of the
   `valueForAbsentField` machinery above has an array counterpart.
+- **A name's identity is its NFC form, and normalising happens where a token becomes a name.** §2.5 and
+  §2.6 define field-name and scalar-key identity by NFC-normalised text, whichever spelling produced it, so
+  `café` precomposed and decomposed are one name, and §7.2.1 mandates it directly — "quoted tokens that
+  occupy identifier positions … are NFC-normalised by the resolver before identity comparison. String-typed
+  positions are not normalised." The axis is the **position**, not the quoting, and the lexer cannot draw it
+  because at lex time a quoted token's position is not yet known. So it lives at the two places
+  `TsonDataStream` emits a `FieldName` — one tier earlier than the "resolver layer" §7.2.1 names, which
+  satisfies the requirement and makes the AST carry the normalised name. That is one chokepoint for all three record
+  readers, and it means a name is stored in the form its identity is defined by, so an ordinary
+  `record.get("café")` finds a decomposed one. A map **key** is a value and keeps its written content; only
+  its comparison normalises (`Nfc.keyOf`), which is §2.6's "textual identity is the parser's minimum" read
+  against a processor that decodes.
 - **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody`
   carries an `ElementState` governing the value — `{K => V?}`, the kernel field this implementation adds
   ahead of the spec (`SPEC-FEEDBACK.md` #12) — so `MapAbstractReader.decodedValue` gives the array element's

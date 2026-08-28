@@ -355,12 +355,22 @@ Everything else falls out of XID membership rather than needing a clause: whites
 format characters, emoji and unassigned code points are none of them `XID_Continue`, so a one-line profile
 excludes the lot. Two rules do have to be stated on top:
 
-1. **A name MUST be NFC-normalized.** §7.2.1 already requires this of unquoted tokens, and §2.5/§2.6 already
-   define name *identity* by NFC. Requiring the **form** is strictly simpler than requiring the
-   **comparison**: it is checkable on one name, it makes the stored name equal the compared name, and it
-   reduces duplicate detection to string equality. Requiring only the comparison is the harder rule and the
-   easy one to get wrong — this implementation gets it wrong today, reading `"café"` NFC and NFD in one
-   record as two fields where §2.5 makes them one.
+1. **NFC — and here the series already has a rule, which this entry would change rather than clarify.**
+   §7.2.1 does not merely define identity by NFC; it says what a processor does about it: "quoted tokens
+   that occupy identifier positions … are NFC-normalised by the resolver before identity comparison.
+   String-typed positions are not normalised." So a non-NFC name is **normalised**, not refused, and the
+   section already draws this entry's own axis — position, not quoting — several sections before the
+   identifier layer this entry proposes naming. That is worth saying plainly: §7.2.1's second paragraph is
+   the closest the series comes to having the concept already.
+
+   The open question is only whether normalising is the right treatment or whether a name should be
+   **required** to be NFC, as an unquoted token already is. Requiring the form is the simpler rule — it is
+   checkable on one name, it keeps the document's bytes authoritative for names as the first paragraph
+   keeps them for unquoted tokens, and it removes the one place a conforming processor alters text. Against
+   it: it rejects documents §7.2.1 accepts, and a quoted name is exactly where an author has least control
+   over the form their editor produced. **Recommendation: keep §7.2.1's normalisation**, and treat the
+   requirement version as a tightening to weigh separately rather than as part of the identifier profile.
+   Either way the profile's other clauses are unaffected.
 2. **ZWNJ and ZWJ are constrained contextually, not excluded.** See below — this is the one place the
    proposal contradicts §7.1 outright.
 

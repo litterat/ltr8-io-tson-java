@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.atom.ValueParser;
+import io.ltr8.tson.compiler.lexer.Nfc;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
@@ -275,7 +276,7 @@ public final class SchemalessTreeReader {
      */
     private static Object keyIdentity(TsonValue key) {
         return switch (key) {
-            case TsonAtom atom -> atom.value();
+            case TsonAtom atom -> Nfc.keyOf(atom.value());
             case TsonArray array -> array.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
             case TsonTuple tuple -> tuple.elements().stream().map(SchemalessTreeReader::keyIdentity).toList();
             case TsonRecord record -> {

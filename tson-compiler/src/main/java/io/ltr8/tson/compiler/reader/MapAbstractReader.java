@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.lexer.Nfc;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
 import io.ltr8.tson.compiler.stream.MapEnd;
@@ -155,7 +156,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             String keySegment = keySegmentFor(keyPeek);
             int before = ctx.reported();
             Object key = keyParser.read(ctx.field(keySegment));
-            if (ctx.reported() == before && !seen.add(key)) {
+            if (ctx.reported() == before && !seen.add(Nfc.keyOf(key))) {
                 ctx.field(keySegment).report(Diagnostic.Code.DUPLICATE_MAP_KEY,
                         "duplicate key '" + keySegment + "' in '" + displayName + "' -- a map states each key at most "
                                 + "once (§2.6), and the repeat states an entry for nothing",
