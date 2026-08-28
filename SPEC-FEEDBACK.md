@@ -266,16 +266,15 @@ name, and an enum member, and the three have different rules:
    entry. A name may not contain a space anywhere, including the middle, and that has nothing to do with
    whether a space would have ended the token that spelled it.
 3. **An enum member** — also typed `token` by the kernel (§9: "`token` — admits NFC-canonical lexemes. Used
-   for identifier types (`type_name`, `field_name`, `param_name`) **and enum members**"), and **not a name**.
-   §5.4 computes an enum's discrimination class from its members' shared class and gives `[true false]` as
-   boolean-class, so members are *values* with base types, not identifiers. A rule written for names must not
-   reach them.
+   for identifier types (`type_name`, `field_name`, `param_name`) **and enum members**"). Today that makes a
+   member an uninterpreted lexeme whose base type resolves per member, which is why §5.4 can call
+   `[true false]` boolean-class. Step 1d proposes closing this job rather than naming it: members become
+   identifiers, as they are in every comparable schema language, and the third sense of "token" disappears
+   along with the entry that carried it.
 
-The practical consequence for the kernel: `type_name`, `field_name` and `param_name` should alias a new
-entry — **`identifier`** — carrying the contract in Step 1b, while `enum.members` keeps `token` (through
-`token_set`) with its present "NFC-canonical lexeme" meaning. Two kernel types where there is now one, which
-is what lets a rule be stated once and reach exactly the right positions. Step 1d works the kernel edit
-through and shows why `enum.members` keeps `token` rather than moving with the rest.
+The practical consequence for the kernel: `type_name`, `field_name` and `param_name` alias a new entry —
+**`identifier`** — carrying the contract in Step 1b, and `enum.members` joins them (Step 1d), which leaves
+`token` with no remaining use. One rule, stated once, reaching exactly the positions that hold names.
 
 **On the word.** `identifier` is what every programming language calls this, and §7.1 already reaches for it:
 "TSON's unquoted tokens are a declared profile of Unicode **identifiers** per UAX #31 requirement R1." That
@@ -395,52 +394,59 @@ documents keep their protection from Step 2 instead — skeleton distinctness wi
 which needs no schema, since a record's fields are a closed scope on their own. The two mechanisms cover the
 two classes, and neither covers both; saying so is what keeps the layering honest.
 
-**Step 1d — the kernel edit, and why `enum.members` keeps `token`.** The three identifier roles move:
+**Step 1d — the kernel edit, including `enum.members`.** The three identifier roles move, and enum members
+move with them:
 
 ```
 identifier => !unit {}
 type_name  => identifier
 field_name => identifier
 param_name => identifier
+
+enum_set   => !set { element_type: identifier  min_items: 1 }
+enum       => ~atom & { members: enum_set }
 ```
 
-`token` is then used by exactly one thing, `token_set => !set { element_type: token }`, feeding
-`enum.members` — and it should stay there. Retyping the members as `[text]` or `[identifier]` loses two
-properties the current shape carries, both checked against the running implementation:
+`token` and `token_set` are then unused and go. Nothing in the kernel needs an "uninterpreted lexeme" type
+once members are identifiers, which is the point: the word that was doing three jobs ends up doing none, and
+the two real jobs have their own names.
 
-| written | today | under `[text]` | under `[identifier]` |
-|---|---|---|---|
-| `!enum [OPEN ACTIVE DONE]` | ok | ok | ok |
-| `!enum [true false]` | ok, **boolean-class** (§5.4) | ok, but string-class | ok, but string-class |
-| `!enum [1 2 3]` | ok | ok, but string-class | **rejected** — no leading digit |
-| `!enum ["in progress"]` | ok | ok | **rejected** — space |
-| `!enum [OPEN OPEN]` | **rejected** | accepted | accepted |
+**Why `identifier` and not `text`.** `text` would keep members as arbitrary strings and change nothing about
+the rules; `identifier` removes rules. Four reasons, in ascending order of weight:
 
-- **Uniqueness is load-bearing and comes from `set`.** `set => ~array ^ { unique_items: = true … }`, so
-  `!enum [OPEN OPEN]` is refused today with "'members' requires unique elements". `[text]` and
-  `[identifier]` are *arrays*: both silently accept a repeated member. Whatever the element type ends up
-  being, the collection has to stay a set — which is also why `token_set` exists as a named entry rather
-  than inline (§5.2 prohibits `!` at field positions, and `set` has no sugar).
-- **Members are deliberately polymorphic, and §5.4 depends on it.** "An enum's class is its members' shared
-  class (`[true false]` is boolean-class; mixed members yield none)." That only works because a member is an
-  *uninterpreted lexeme* whose base type is resolved per member (§4). Fixing the element type to `text`
-  makes every enum string-class and quietly falsifies §5.4's own example; fixing it to `identifier`
-  additionally kills numeric and space-bearing members, which resolve today.
+1. **Every comparable schema language already does it.** GraphQL is the closest — `EnumValue : Name but not
+   true or false or null`, "enum values are represented as unquoted names (ex. `MOBILE_WEB`)", and "it is
+   recommended that Enum values be 'all caps'". Protobuf and Rust, C#, Java, TypeScript agree. An author
+   coming from any of them finds what they expect, which for a format aimed at generated output matters more
+   than for one aimed at hand-editing.
+2. **It extends Step 1b's contract to members at no cost.** Members get NFC, no whitespace, no `Cf`, no
+   controls — protection that would otherwise need stating separately for this one position.
+3. **It makes §5.4 shorter, not merely different.** Today an enum's class is "its members' shared class …
+   mixed members yield none" — a computation with a partial result that then feeds choice disjointness. With
+   identifier members **every enum is string-class**, full stop: one rule instead of a computation, one
+   fewer source of the classless case, and disjointness becomes more decidable rather than less.
+4. **The cases it removes have better homes.** `!enum [1 2 3]` is an `!integer ^ { min: 1 max: 3 }` or a
+   choice, and modelling it as an enum was always a way of saying "small integer" in the wrong vocabulary.
+   `!enum ["in progress"]` becomes `IN_PROGRESS` with the display string mapped at the boundary — exactly
+   what GraphQL and Protobuf require, and not a limitation anyone reports as one.
 
-So `enum.members` is the one place the kernel's `token` was always right: an enum member **is** a token in
-the lexer sense — a unit the lexer emitted, not yet typed. The confusion was never that `token` was wrong
-here; it was that the same entry was doing double duty for names. Splitting `identifier` off leaves `token`
-holding only the job it fits.
+**Two rules the change brings with it, both cheap and worth stating rather than deriving:**
 
-**If the overloaded word itself is the objection**, the alternative is to rename rather than repurpose:
-`token` → `lexeme`, `token_set` → `lexeme_set`, which frees "token" entirely and says what the type is. That
-is naming churn across the resolved fixtures for no behavioural gain, so it is worth doing only if the word
-is judged to be the problem rather than the double duty.
+- **`true`, `false` and `null` are not members**, following GraphQL's own carve-out. All three are lexically
+  valid identifiers, so nothing in the profile stops them, but a bare `true` in a data document base-resolves
+  to a boolean (§4). Under a schema §7.3 would settle it — the position's type decides — yet that leaves a
+  reader needing a special case for exactly three tokens, and an author reading `!enum [true false]` cannot
+  tell whether it means two booleans or two names. Excluding them costs an author nothing and removes the
+  question.
+- **`min_items: 1`.** An enum with no members is uninhabited, and GraphQL requires "at least one" for the
+  same reason. Stating it on the set is one field, and it means `!enum []` fails at schema load with a size
+  violation rather than at the first read with nothing to match.
 
-**And enum members do still want protection — from Step 2, not from their type.** `!enum [ACTIVE АCTIVE]`
-with a Cyrillic `А` passes the uniqueness check, because the two members are genuinely different strings.
-That is the confusable case, and §5.4's member list is already one of the closed scopes Step 2 enumerates, so
-skeleton distinctness covers it without touching the element type at all.
+Uniqueness continues to come from `set` (`unique_items: = true`), which is why this stays a set rather than
+becoming `[identifier]`: `!enum [OPEN OPEN]` must remain the error it is today, and GraphQL requires it too
+("they must have unique names"). And confusable members — `!enum [ACTIVE АCTIVE]` with a Cyrillic `А` —
+still need Step 2, since both are valid, distinct identifiers; §5.4's member list is already one of the
+scopes it covers.
 
 **Precedent, and one place the obvious precedent is a warning rather than a model.** Java's identifier rules
 line up with Step 1b's on the two decisions that were live here: an identifier may not start with a digit,

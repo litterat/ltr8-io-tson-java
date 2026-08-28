@@ -330,8 +330,8 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   plain equality, which is the cheaper rule and the one that cannot be got wrong this way.
 - [ ] **Audit every `unquoted-token` reference in both grammars, and decide whether it should be `identifier`.**
   The kernel types every name position with one atom (`token`, aliased as `type_name`/`field_name`/
-  `param_name`) — which `SPEC-FEEDBACK.md` #3 proposes splitting into an `identifier` entry for those three,
-  leaving `token` to `enum.members`, since §5.4 makes enum members values rather than identifiers. The grammar
+  `param_name`) — which `SPEC-FEEDBACK.md` #3 proposes replacing with a single `identifier` entry those three
+  alias, with `enum.members` moving to it as well, retiring `token` and `token_set`. The grammar
   governs those positions with four productions: `field-name = token` admits
   all three lexical forms, while `annotation = "@" unquoted-token`, `type-ref = "!" unquoted-token` and
   [TSON-SCHEMA]'s `type-name = unquoted-token` admit only the bare one. So a field name may be quoted and a
