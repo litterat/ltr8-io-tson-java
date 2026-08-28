@@ -934,12 +934,13 @@ running here, across all four container positions.
 
 ---
 
-## 12. §5.3 refuses `{K => V?}` because "absence has no defined meaning for map values", and §7.6 gives that same absence a defined meaning
+## 12. §12.1's grammar admits `{K => V?}`, §5.3's prose forbids it, and `map` has no `state` field to bind it to
 
-**Section:** Part 2 §5.3 (the container sugar forms), §7.6 (the absent sentinel under a schema), §9 (the
-kernel's `map` constructor); Part 1 §2.9.
+**Section:** Part 2 §5.3 (the container sugar forms), §7.6 (the absent sentinel under a schema), §12.1 (the
+`map-type` and `element-type` productions), §9 (the kernel's `map` constructor); Part 1 §2.9.
 
-**Problem:** three passages, and they do not agree about whether `_` means anything at a map entry value.
+**Problem:** four passages — three of prose and one of grammar — and they do not agree about whether `_`
+means anything at a map entry value.
 
 §5.3 refuses the marker and gives its reason:
 
@@ -958,6 +959,28 @@ set to `_` is **present with an absent value** — distinct from not appearing a
 So §5.3's justification is contradicted by the section that states the rule and by the Part 1 clause both cite.
 Taken together the two live passages produce an author-visible incoherence: the value **is** optional, and the
 author has no way to say it is not.
+
+**And §12.1's grammar is a fourth passage, which sides against §5.3.** The `map-type` production draws its
+value from `element-type`, and `element-type` carries the marker:
+
+```
+map-type     = "{" ws map-key ws "=>" ws element-type
+               [ ws ";" ws size-spec ] ws "}"
+
+map-key      = type-name [ "<" type-args ">" ]
+element-type = type-ref [ "?" ]
+```
+
+So the ABNF already admits `{K => V?}` and already forbids `{K? => V}` — `map-key` has no `?` to write. §5.3's
+prose contradicts the production directly on the value half, and merely restates it on the key half. That
+makes the defect statable at its sharpest: **the grammar produces a marker the model has no field to bind.**
+A conforming parser built from §12.1 alone accepts `{K => V?}`, reaches the desugar table, and finds `map`
+has no `state` slot to put it in; only §5.3's prose stops it, and an implementation that reads the grammar
+first will not find that prose until it has already built the node. Two implementations of Revision 33
+therefore disagree about whether the document parses, which is the practical cost of leaving this open.
+
+It also settles what the fix costs: **§12.1 needs no change.** The recommendation below is one kernel field
+plus two prose edits, with the grammar already saying what the kernel would then be able to express.
 
 Two further problems with §5.3's argument, independent of which way the contradiction is settled. It reasons
 **from the artifact to the rule** — "the kernel's `map` has no `state` field" — where the kernel is this
@@ -1004,11 +1027,49 @@ map => ~product & {
 - Naming needs no new word. A map key can never be optional (§2.9), so `state` on `map` can only govern the
   value, exactly as `state` on `array` governs the element.
 
+The two prose edits in full, so adoption needs nothing beside this entry. §5.3's table gains a row directly
+under the `[T?]` row it copies:
+
+```
+| `{K => V?}`, `{K => V?; …}`  | the corresponding form with `state: OPTIONAL` bound directly                   |
+```
+
+and §5.3's map paragraph replaces one sentence. Currently:
+
+> Neither side of `=>` admits `?`: the kernel's `map` has no `state` field, and absence has no defined meaning
+> for map values (an absent key is already a resolver error, [TSON-DATA] §2.9).
+
+becomes:
+
+> The value side admits `?`, marking the value OPTIONAL exactly as `[T?]` marks an array element (§12.1's
+> `map-type` already draws its value from `element-type`). The key side does not: an absent key is a resolver
+> error ([TSON-DATA] §2.9), and `map-key` has no `?` to write.
+
+§7.6's map-entry-value row becomes its array-element row with the nouns changed. Currently:
+
+> | Map entry value (schema in scope) | yes | Entry present with an absent value ([TSON-DATA] §2.9); `map`
+> carries no element-state facet, so the permission is not schema-conditional |
+
+becomes:
+
+> | Map entry value (schema in scope) | conditional | Permitted only when the map type's value state is
+> OPTIONAL, written `{K => V?}` (§5.3); the entry is then present with an absent value ([TSON-DATA] §2.9) |
+
+The key row of §7.6 is unchanged, and so is every other row.
+
+**Adopting this invalidates data that Revision 33 accepts**, which is worth stating plainly rather than
+leaving an editor to notice: a document writing `_` at a map value validates today against any map type and
+validates afterwards only where the schema wrote `?`. Revision 33 is a working draft with no compatibility
+guarantee between revisions, so this is permitted; it is not, however, a pure clarification, and it is the
+one part of this proposal with a cost outside the specification text. The direction of the break is the
+conservative one — documents become invalid rather than silently changing meaning, and the fix in every case
+is one character in the schema.
+
 **The reason to prefer it over the status quo is that the default flipped.** Every other container defaults
 strict and is loosened with `?` — `[T]` is REQUIRED, a tuple position is REQUIRED, a record field is
 REQUIRED. `{K => V}` alone defaults permissive, and there is no marker to tighten it. So a schema author can
 forbid an absent array element and cannot forbid an absent map value, which is not a distinction any of the
-three passages sets out to draw; it falls out of a missing field. For a format whose stated use is validation
+four passages sets out to draw; it falls out of a missing field. For a format whose stated use is validation
 feedback, "this map has no absent values" is an ordinary thing to want to say and currently unsayable.
 
 **The third option is closed, and worth recording as closed.** Reading §5.3's sentence at face value —
