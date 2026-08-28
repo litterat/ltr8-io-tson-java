@@ -201,7 +201,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         recordAndVerify(sourceText, id, TsonCanonicalIdentity.canonicalize(id));
         TsonSchemaParser parser = new TsonSchemaParser(sourceText);
         SchemaDocument document = parser.parseSchemaDocument();
-        TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.declarationPositions());
+        TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.schemaPositions());
         if (isMetaLayer(resolved)) {
             register(resolved, loadMeta(document.meta()));
         } else {
@@ -354,7 +354,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         if (receiver == null) {
             SchemaDocument document = parser.parseSchemaDocument();
             crossCheckId(document, uri, identity);
-            TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.declarationPositions());
+            TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.schemaPositions());
             return schemaRegistry.registerIfAbsent(TsonSchemaLinker.link(resolved, schemaRegistry));
         }
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
@@ -366,7 +366,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         SchemaDocument document = parsed.get();
         crossCheckId(document, uri, identity);
         TsonSchema resolved = new SchemaResolver(this)
-                .resolveSchema(document, parser.declarationPositions(), problems);
+                .resolveSchema(document, parser.schemaPositions(), problems);
         if (problems.isEmpty()) {
             TsonLinkedSchema linked = TsonSchemaLinker.link(resolved, schemaRegistry, problems);
             if (problems.isEmpty()) {

@@ -96,10 +96,20 @@ public interface TsonReadContext {
     TsonReadContext index(int i);
 
     /**
-     * A copy of this context scoped one <em>declared record field</em> deeper, stepping the data path and the
-     * schema pointer together -- the one descent where the schema has a name of its own for where we went.
+     * A copy of this context scoped one <em>declared record field</em> deeper, stepping the data path, the
+     * schema pointer <em>and</em> the schema position together -- the one descent where the schema has a name
+     * of its own for where we went, and a line of its own to go with it.
+     *
+     * <p>{@code fieldPosition} is the field's own declaration position, so a diagnostic against
+     * {@code /person/age} is located at {@code age} rather than at {@code person}'s line -- the finest a
+     * per-declaration table could offer, and one level coarser than the pointer it sits beside. It is a
+     * parameter rather than an overload because every caller has the field in hand: a second method would be
+     * a second way to take this descent, and the one that forgot the position would be the tempting one.
+     *
+     * <p><b>Absent keeps the enclosing record's position</b>, which is the honest answer for a document whose
+     * source this resolver never saw -- a hand-built one, or the bootstrap.
      */
-    TsonReadContext schemaField(String name);
+    TsonReadContext schemaField(String name, Optional<SourcePosition> fieldPosition);
 
     /**
      * A copy of this context anchored on the record now reading: {@code declaration}'s identity and position

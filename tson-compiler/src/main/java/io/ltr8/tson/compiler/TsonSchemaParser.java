@@ -75,6 +75,14 @@ public final class TsonSchemaParser extends TsonDataParser {
     private final Map<SchemaMap.Declaration, Position> declarationPositions = new IdentityHashMap<>();
 
     /**
+     * Every {@link FieldDef} built during this parse, at its own name token, keyed by reference identity --
+     * same table shape and same reasoning as {@link #declarationPositions}, one level finer. What lets a read
+     * diagnostic that already points at {@code /person/age} position itself at {@code age} rather than at
+     * {@code person}'s declaration line, which is all a per-declaration table can offer.
+     */
+    private final Map<FieldDef, Position> fieldPositions = new IdentityHashMap<>();
+
+    /**
      * Where a recovered parse's problems go, and the switch between the two modes: {@code null} (the
      * {@link #parseSchemaDocument()} entry point) is fail-fast, and the first {@link TsonParseException}
      * leaves this class. A receiver turns on the declaration-level recovery in {@link #parseSchemaMap}.
@@ -97,6 +105,14 @@ public final class TsonSchemaParser extends TsonDataParser {
     /** Every {@link SchemaMap.Declaration} built by {@link #parseSchemaDocument()}, mapped to its own name token's start {@link Position} -- see {@link #declarationPositions}'s own Javadoc for why this is identity-keyed. */
     public Map<SchemaMap.Declaration, Position> declarationPositions() {
         return Collections.unmodifiableMap(declarationPositions);
+    }
+
+    /**
+     * Everything this parse recorded about where things sit in the source, as the one carrier the resolver
+     * chain threads -- see {@link SchemaPositions}.
+     */
+    public SchemaPositions schemaPositions() {
+        return new SchemaPositions(new IdentityHashMap<>(declarationPositions), new IdentityHashMap<>(fieldPositions));
     }
 
     /** Parses fail-fast: the first syntax error anywhere in the document leaves as a {@link TsonParseException}. */
@@ -487,6 +503,8 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     private FieldDef parseFieldDef(List<Annotation> annotations) {
+        // Taken before the token is consumed, exactly as a declaration's own name position is.
+        Position namePosition = peek().start();
         Token name = expectFieldNameToken("a record field name");
         if (check(TokenType.MAP_ARROW)) {
             throw parseError("a record body's entries are 'name: type'; '=>' begins a map type only where a "
@@ -507,7 +525,9 @@ public final class TsonSchemaParser extends TsonDataParser {
                 modifier = Optional.of(parseFieldModifier());
             }
         }
-        return new FieldDef(annotations, name.text(), type, modifier);
+        FieldDef field = new FieldDef(annotations, name.text(), type, modifier);
+        fieldPositions.put(field, namePosition);
+        return field;
     }
 
     private FieldDef.Modifier parseFieldModifier() {

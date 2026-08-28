@@ -31,6 +31,7 @@ import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
+import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.Atom;
@@ -270,6 +271,13 @@ final class DefinitionResolver {
     private final ApplicationCloser applicationCloser;
 
     /**
+     * Where each field of this document was written, for the position a resolved {@link RecordField} carries.
+     * Empty for a resolver with no source text behind it (the bootstrap, a hand-built document), which is
+     * why a field's position is {@code Optional} rather than assumed.
+     */
+    private final SchemaPositions positions;
+
+    /**
      * No annotation reader: an annotation's name is kept, its value is out of reach, and no name is checked
      * against the structure namespace. See {@link AnnotationValueReader}.
      */
@@ -287,6 +295,14 @@ final class DefinitionResolver {
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
                         DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions,
                         ApplicationCloser applicationCloser) {
+        this(definitionMetaReader, annotationValueReader, metaDefinitions, namespaceDefinitions,
+                applicationCloser, SchemaPositions.none());
+    }
+
+    DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
+                        DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions,
+                        ApplicationCloser applicationCloser, SchemaPositions positions) {
+        this.positions = Objects.requireNonNull(positions, "positions");
         this.definitionMetaReader = Objects.requireNonNull(definitionMetaReader, "definitionMetaReader");
         this.annotationsResolve = annotationValueReader != null;
         this.annotationValueReader = annotationValueReader == null ? (type, value) -> null : annotationValueReader;
@@ -1118,8 +1134,7 @@ final class DefinitionResolver {
         for (int i = 0; i < fields.size(); i++) {
             RecordField field = fields.get(i);
             if (field.name().equals(member)) {
-                fields.set(i, new RecordField(field.name(), field.type(), state, field.value(),
-                        field.annotations()));
+                fields.set(i, field.withState(state));
                 return;
             }
         }
@@ -1635,7 +1650,8 @@ final class DefinitionResolver {
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), optional, field.modifier(), parameters);
         return new RecordField(field.name(), type, resolved.state(),
-                resolved.value().map(DefinitionResolver::toMetaToken));
+                resolved.value().map(DefinitionResolver::toMetaToken), Annotations.empty(),
+                positions.of(field));
     }
 
     /** §5.2's presence axis: the two states under which a conforming value may leave the field out. */

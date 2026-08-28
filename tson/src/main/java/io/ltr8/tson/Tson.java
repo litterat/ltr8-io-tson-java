@@ -121,7 +121,7 @@ public final class Tson {
     public TsonLinkedSchema resolve(String schemaText) {
         TsonSchemaParser parser = new TsonSchemaParser(schemaText);
         SchemaDocument document = parser.parseSchemaDocument();
-        TsonSchema resolved = new TsonSchemaResolver(core).resolveSchema(document, parser.declarationPositions());
+        TsonSchema resolved = new TsonSchemaResolver(core).resolveSchema(document, parser.schemaPositions());
         return core.schemaRegistry().register(TsonSchemaLinker.link(resolved, core.schemaRegistry()));
     }
 
@@ -209,7 +209,7 @@ public final class Tson {
             SchemaDocument document = parsed.get();
 
             TsonSchema resolved = new TsonSchemaResolver(core)
-                    .resolveSchema(document, parser.declarationPositions(), problems);
+                    .resolveSchema(document, parser.schemaPositions(), problems);
             if (!problems.isEmpty()) {
                 return problems.diagnostics();
             }

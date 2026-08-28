@@ -130,14 +130,16 @@ which is why they sit low. The lexer's fail-fast floor is not among them: nothin
 someone decides whether lexer errors feed the `Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds
 that question.
 
-- [ ] **`schemaPosition` is one level coarser than the pointer beside it.** A read diagnostic locates
-  `/person/age` but positions it at `person`'s own declaration line, because positions are per declaration
-  (from the declaration's own name token) and `RecordField` carries none. Closing it means giving
-  `TsonSchemaParser` per-field positions and threading them onto `RecordField` — a `schema.meta` bind target,
-  so the `@Record` constructor-selection trap and the hand-written `equals` both apply. Nothing in the reader
-  stack changes: `SchemaLocation` already carries the pointer that names the field. Same gap for a supertype
-  or a choice variant. A *syntax* error is the one exception — it has the failing token's own position, since
-  the parser reports it where it stands rather than looking it up per declaration afterwards.
+- [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
+  now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against
+  `/person/age` lands on `age`'s line. A supertype and a choice variant are bare names in a `List<String>`
+  with nowhere to hang one, so a problem against either is still located at the enclosing declaration.
+  - The parser side is a third identity-keyed table in `SchemaPositions`, which is the shape it was given
+    for this; the awkward half is the destination, since neither is a record with somewhere to put it.
+  - Whatever carries it must be carried across a rebuild the way `RecordField.withType` is — §8.3's
+    flattening walk rebuilds bodies wholesale, and a dropped position is invisible to every test, position
+    being excluded from equality.
+
 - [ ] **A `caused by` frame, for when the author's location is not the whole story.** A read diagnostic now
   locates the rule where the author can act on it (`/person/age` in their own schema) rather than at the leaf
   the constraint came from (`/int32` in core.tn). That is the right primary frame, but the leaf is genuinely

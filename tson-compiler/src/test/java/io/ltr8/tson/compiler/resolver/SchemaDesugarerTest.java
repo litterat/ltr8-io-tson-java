@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -105,16 +106,17 @@ class SchemaDesugarerTest {
                   sugared => { tags: [text] }
                 }""");
         SchemaDocument document = parser.parseSchemaDocument();
-        Map<SchemaMap.Declaration, SourcePosition> positions = new IdentityHashMap<>(parser.declarationPositions());
+        SchemaPositions positions = parser.schemaPositions();
 
         SchemaDocument desugared = SchemaDesugarer.desugar(document, Set.of(), null, positions);
 
         Map<String, SchemaMap.Declaration> after = desugared.body().declarations();
         assertNotSame(document.body().declarations().get("sugared"), after.get("sugared"),
                 "a declaration containing sugar is genuinely rebuilt");
-        assertEquals(5, positions.get(after.get("sugared")).line(), "carried onto the node that replaced it");
+        assertEquals(5, positions.of(after.get("sugared")).orElseThrow().line(),
+                "carried onto the node that replaced it");
         assertSame(document.body().declarations().get("plain"), after.get("plain"));
-        assertEquals(3, positions.get(after.get("plain")).line());
+        assertEquals(3, positions.of(after.get("plain")).orElseThrow().line());
     }
 
     @Test
