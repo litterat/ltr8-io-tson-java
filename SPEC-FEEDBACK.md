@@ -639,10 +639,18 @@ shared suite can carry it: a record declaring `admin` and `аdmin` rejected, one
 alone accepted, `l` beside `I` rejected. That is the first part of this topic that could ever have been
 conformance-tested.
 
-**Status against Revision 33:** open, carried, and now carrying a concrete proposal where earlier revisions
-of this entry carried only directions. §9.4 is unchanged: one SHOULD-consider sentence, no identifier profile, no
-comparison scopes, and no stated action on detection. Both mechanisms are prototyped here against the real
-UCD tables; neither is shipped.
+**Status against Revision 33:** open, and Steps 1–1d are **built**. The kernel carries `identifier`
+(`XID_Start`-initial, `XID_Continue ∪ { - }`, NFC) with `type_name`/`field_name`/`param_name` aliasing it and
+`enum_set => !set { element_type: identifier  min_items: 1 }` feeding `enum.members`; `token`/`token_set` are
+gone. `IdentifierParser` enforces the contract where the resolved model is read back as data, and
+`DefinitionResolver` asserts it for declared field names, which the resolver builds directly. §9.4 itself is
+unchanged — one SHOULD-consider sentence, no comparison scopes, no stated action on detection — so Steps 2–5
+remain proposals, both mechanisms prototyped against the real UCD tables and neither shipped.
+
+Two parts of Step 1 are deliberately not built. The `field-name` production is untouched, so Class 1 field
+names stay unconstrained exactly as Step 1c intends. And the joiners' contextual rule is not implemented, so
+`Lexer` still subtracts ZWNJ/ZWJ from the token profile while `IdentifierParser` admits them: the identifier
+layer is written to the property and is already correct when the lexer catches up (#14).
 
 ## 4. A type argument's literal is called a bare token and typed `value`, and §8.2 identity depends on which
 

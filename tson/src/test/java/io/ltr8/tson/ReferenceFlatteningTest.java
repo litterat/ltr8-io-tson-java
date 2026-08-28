@@ -44,12 +44,12 @@ class ReferenceFlatteningTest {
         TypeDefinition recordField = tson().bindRegistry().core()
                 .resolveLinked(TsonBundledSchemas.META_KERNEL_ID).schema().entries().get("record_field");
 
-        assertEquals("token", fieldType(recordField, "name").name());
+        assertEquals("identifier", fieldType(recordField, "name").name());
         assertEquals(Optional.of("field_name"), alias(fieldType(recordField, "name")));
 
         TypeDefinition typeRef = tson().bindRegistry().core()
                 .resolveLinked(TsonBundledSchemas.META_KERNEL_ID).schema().entries().get("type_ref");
-        assertEquals("token", fieldType(typeRef, "name").name());
+        assertEquals("identifier", fieldType(typeRef, "name").name());
         assertEquals(Optional.of("type_name"), alias(fieldType(typeRef, "name")));
     }
 

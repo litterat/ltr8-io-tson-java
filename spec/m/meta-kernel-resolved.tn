@@ -129,7 +129,7 @@
   @doc:"""
     Unit atom constructor. An atom with no constraint vocabulary — the
     atom equivalent of the empty record `{}` for products. Its instances
-    (`value`, `token`, `void`, all in the kernel) are
+    (`value`, `identifier`, `void`, all in the kernel) are
     opaque atoms distinguished by name and prose-level parsing contract,
     not by schema shape.
     """
@@ -147,8 +147,8 @@
     body: !unit {}
   }
 
-  @doc:"Lexical token primitive: the canonical NFC-normalised form of a source lexeme. Instance of `unit`."
-  token => !type_definition {
+  @doc:"Identifier primitive: the type of every naming position; XID_Start-initial, XID_Continue plus '-', in NFC. Instance of `unit`."
+  identifier => !type_definition {
     kind: ATOM
     source: unit
     body: !unit {}
@@ -272,30 +272,30 @@
     body: !regex_type {}
   }
 
-  @doc:"Identifier types — distinct lexical roles referencing the token primitive."
+  @doc:"Identifier roles — distinct naming positions referencing the identifier primitive."
   type_name => !type_definition {
     kind: REFERENCE
-    source: token
-    body: !reference { target: token }
+    source: identifier
+    body: !reference { target: identifier }
   }
 
   field_name => !type_definition {
     kind: REFERENCE
-    source: token
-    body: !reference { target: token }
+    source: identifier
+    body: !reference { target: identifier }
   }
 
   param_name => !type_definition {
     kind: REFERENCE
-    source: token
-    body: !reference { target: token }
+    source: identifier
+    body: !reference { target: identifier }
   }
 
   @doc:"Structured type reference (Part 2 Section 8.1). `name` is the only REQUIRED field, so the positional form applies at every type_ref-typed position: bare token when argument-free, explicit record when carrying arguments."
   type_ref => !type_definition {
     kind: PRODUCT
     body: !record { fields: [
-      !record_field { name: name       type: @alias:type_name token }
+      !record_field { name: name       type: @alias:type_name identifier }
       !record_field { name: arguments  type: array_type_argument_xxhash  state: OPTIONAL }
     ] }
   }
@@ -378,7 +378,7 @@
   record_field => !type_definition {
     kind: PRODUCT
     body: !record { fields: [
-      !record_field { name: name         type: @alias:field_name token }
+      !record_field { name: name         type: @alias:field_name identifier }
       !record_field { name: type         type: type_ref }
       !record_field { name: state        type: field_state  state: REQUIRED_DEFAULT  value: REQUIRED }
       !record_field { name: value        type: value  state: OPTIONAL }
@@ -478,10 +478,10 @@
   }
 
   @doc:"A named entry rather than an inline form: ! constructor applications remain prohibited at field positions (Part 2 Section 5.2) and set has no sugar of its own."
-  token_set => !type_definition {
+  enum_set => !type_definition {
     kind: PRODUCT
     source: set
-    body: !set { element_type: token }
+    body: !set { element_type: identifier  min_items: 1 }
   }
 
   enum => !type_definition {
@@ -489,7 +489,7 @@
     constructor: true
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: members  type: token_set }
+      !record_field { name: members  type: enum_set }
     ] }
   }
 
@@ -520,7 +520,7 @@
   schema => !type_definition {
     kind: PRODUCT
     source: map
-    body: !map { key_type: @alias:type_name token  value_type: type_definition }
+    body: !map { key_type: @alias:type_name identifier  value_type: type_definition }
   }
 
   @doc:"""
@@ -540,19 +540,19 @@
   @synthetic array_type_name_xxhash => !type_definition {
     kind: PRODUCT
     source: array
-    body: !array { element_type: @alias:type_name token }
+    body: !array { element_type: @alias:type_name identifier }
   }
 
   @synthetic array_field_name_xxhash => !type_definition {
     kind: PRODUCT
     source: array
-    body: !array { element_type: @alias:field_name token }
+    body: !array { element_type: @alias:field_name identifier }
   }
 
   @synthetic array_param_name_xxhash => !type_definition {
     kind: PRODUCT
     source: array
-    body: !array { element_type: @alias:param_name token }
+    body: !array { element_type: @alias:param_name identifier }
   }
 
   @synthetic array_type_ref_xxhash => !type_definition {

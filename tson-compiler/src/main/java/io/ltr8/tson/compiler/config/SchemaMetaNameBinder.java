@@ -64,9 +64,9 @@ public final class SchemaMetaNameBinder {
             Map.entry("set", "array_body"),
             Map.entry("binary", "binary_type"),
             Map.entry("datetime_type", "date_time_type"),
-            Map.entry("field_name", "token"),
-            Map.entry("type_name", "token"),
-            Map.entry("param_name", "token"));
+            Map.entry("field_name", "identifier"),
+            Map.entry("type_name", "identifier"),
+            Map.entry("param_name", "identifier"));
             ;
 
     public static final DataNameBinder INSTANCE = new DataNameBinder.DefaultDataNameBinder(Set.of(NAMESPACE), ALIASES);
