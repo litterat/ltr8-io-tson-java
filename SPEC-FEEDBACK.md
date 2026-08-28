@@ -270,7 +270,8 @@ name, and an enum member, and the three have different rules:
    member an uninterpreted lexeme whose base type resolves per member, which is why §5.4 can call
    `[true false]` boolean-class. Step 1d proposes closing this job rather than naming it: members become
    identifiers, as they are in every comparable schema language, and the third sense of "token" disappears
-   along with the entry that carried it.
+   along with the entry that carried it. That constrains how a member is *written* and leaves §5.4 alone —
+   the class is still read off each member's own token by §4.
 
 The practical consequence for the kernel: `type_name`, `field_name` and `param_name` alias a new entry —
 **`identifier`** — carrying the contract in Step 1b, and `enum.members` joins them (Step 1d), which leaves
@@ -407,46 +408,54 @@ enum_set   => !set { element_type: identifier  min_items: 1 }
 enum       => ~atom & { members: enum_set }
 ```
 
-`token` and `token_set` are then unused and go. Nothing in the kernel needs an "uninterpreted lexeme" type
-once members are identifiers, which is the point: the word that was doing three jobs ends up doing none, and
-the two real jobs have their own names.
+`token` and `token_set` are then unused and go. The word that was doing three jobs ends up doing none, and
+the one real job has its own name.
 
-**Why `identifier` and not `text`.** `text` would keep members as arbitrary strings and change nothing about
-the rules; `identifier` removes rules. Four reasons, in ascending order of weight:
+**Why `identifier` and not `text`.** `text` would leave members as arbitrary strings and change nothing;
+`identifier` constrains how a member may be spelled and does so for the same reasons every other name is
+constrained. Three of them:
 
-1. **Every comparable schema language already does it.** GraphQL is the closest — `EnumValue : Name but not
-   true or false or null`, "enum values are represented as unquoted names (ex. `MOBILE_WEB`)", and "it is
-   recommended that Enum values be 'all caps'". Protobuf and Rust, C#, Java, TypeScript agree. An author
-   coming from any of them finds what they expect, which for a format aimed at generated output matters more
-   than for one aimed at hand-editing.
-2. **It extends Step 1b's contract to members at no cost.** Members get NFC, no whitespace, no `Cf`, no
-   controls — protection that would otherwise need stating separately for this one position.
-3. **It makes §5.4 shorter, not merely different.** Today an enum's class is "its members' shared class …
-   mixed members yield none" — a computation with a partial result that then feeds choice disjointness. With
-   identifier members **every enum is string-class**, full stop: one rule instead of a computation, one
-   fewer source of the classless case, and disjointness becomes more decidable rather than less.
-4. **The cases it removes have better homes.** `!enum [1 2 3]` is an `!integer ^ { min: 1 max: 3 }` or a
-   choice, and modelling it as an enum was always a way of saying "small integer" in the wrong vocabulary.
+1. **Every comparable schema language already does it.** GraphQL is the closest — "enum values are
+   represented as unquoted names (ex. `MOBILE_WEB`)", "it is recommended that Enum values be 'all caps'",
+   and "there must be at least one and they must have unique names". Protobuf, Rust, C#, Java and TypeScript
+   agree. An author arriving from any of them finds what they expect, which for a format aimed at generated
+   output matters more than for one aimed at hand-editing.
+2. **Members inherit Step 1b's contract at no cost** — NFC, no whitespace, no `Cf`, no controls — protection
+   that would otherwise need restating for this one position. `!enum [ACTIVE ACTIVE<ZWNJ>]` stops being
+   expressible, which is the class of member confusion nothing currently prevents.
+3. **The cases it removes have better homes.** `!enum [1 2 3]` is an `!integer ^ { min: 1 max: 3 }` or a
+   choice, and modelling it as an enum was a way of saying "small integer" in the wrong vocabulary.
    `!enum ["in progress"]` becomes `IN_PROGRESS` with the display string mapped at the boundary — exactly
-   what GraphQL and Protobuf require, and not a limitation anyone reports as one.
+   what GraphQL and Protobuf require, and not a limitation anyone reports as one. Every enum in the three
+   bundled schemas is already identifier-shaped, so nothing in the series moves.
 
-**Two rules the change brings with it, both cheap and worth stating rather than deriving:**
+**No carve-out for `true`, `false` and `null`, unlike GraphQL — and the reason is instructive.** The kernel
+defines the boolean primitive *as an enum*:
 
-- **`true`, `false` and `null` are not members**, following GraphQL's own carve-out. All three are lexically
-  valid identifiers, so nothing in the profile stops them, but a bare `true` in a data document base-resolves
-  to a boolean (§4). Under a schema §7.3 would settle it — the position's type decides — yet that leaves a
-  reader needing a special case for exactly three tokens, and an author reading `!enum [true false]` cannot
-  tell whether it means two booleans or two names. Excluding them costs an author nothing and removes the
-  question.
-- **`min_items: 1`.** An enum with no members is uninhabited, and GraphQL requires "at least one" for the
-  same reason. Stating it on the set is one field, and it means `!enum []` fails at schema load with a size
-  violation rather than at the first read with nothing to match.
+```
+boolean => !enum [true false]
+```
+
+so excluding those tokens would leave the kernel unable to state its own scalar types. GraphQL can carve
+them out because `Boolean` is a built-in scalar there and enums are a user-facing construct layered above it;
+in TSON `enum` is a kernel constructor that **defines** primitives, and the carve-out does not transfer.
+
+Nor is one needed, which is worth being precise about because it is easy to talk oneself into. **Typing
+`members` as `identifier` constrains how a member is written; it does not change what §4 makes of that token
+on the wire.** An enum's discrimination class (§5.4) is computed by running base-type resolution over each
+member's own text, so `boolean` stays boolean-class, `[INDEX NAMED]` stays string-class, and a mixed enum
+still yields none. §5.4 is untouched by this change, choice disjointness is unaffected, and there is no
+special case anywhere: the enum reader compares the token it was given against the member list, which is the
+same thing it does for `INDEX`.
+
+**One rule the change does bring: `min_items: 1`.** An enum with no members is uninhabited, and GraphQL
+requires "at least one" for the same reason. Stating it on the set is one field, and it means `!enum []`
+fails at schema load with a size violation rather than at first read with nothing to match.
 
 Uniqueness continues to come from `set` (`unique_items: = true`), which is why this stays a set rather than
-becoming `[identifier]`: `!enum [OPEN OPEN]` must remain the error it is today, and GraphQL requires it too
-("they must have unique names"). And confusable members — `!enum [ACTIVE АCTIVE]` with a Cyrillic `А` —
-still need Step 2, since both are valid, distinct identifiers; §5.4's member list is already one of the
-scopes it covers.
+becoming `[identifier]`: `!enum [OPEN OPEN]` must remain the error it is today, and GraphQL requires it too.
+Confusable members — `!enum [ACTIVE АCTIVE]` with a Cyrillic `А` — still need Step 2, since both are valid,
+distinct identifiers; §5.4's member list is already one of the scopes it covers.
 
 **Precedent, and one place the obvious precedent is a warning rather than a model.** Java's identifier rules
 line up with Step 1b's on the two decisions that were live here: an identifier may not start with a digit,
