@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The twelve below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+The thirteen below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
 it resolved are gone from here, because the spec now carries their rules and that is where the answer
 belongs. **This file is the as-built record**, not a pointer to one: where an entry proposes a design this
 implementation has built, the entry states the design, what is running, and what is not, so that a reviewer
@@ -1082,3 +1082,112 @@ it out rather than merely to disfavour it.
 **Status against Revision 33:** open, new against this revision. The `state` field, the sugar's `?` on the
 value side, and the reader's two answers are built and running here; the spec still says otherwise in both
 places, which is what this entry asks the next revision to settle.
+
+---
+
+## 13. `atom-refinement` takes a `record-def`, which cannot express a constraint binding — every atom refinement in the spec's own `core.tn` fails to parse
+
+**Section:** Part 2 §12.1 (`atom-refinement`, `refined-def`, `record-def`, `field-def`), §5.5 (atom
+refinement), §5.6 (canonical form), §9 (the bundled `core.tn`).
+
+**Problem:** §12.1 gives the two `^` forms the same payload production:
+
+```
+refined-def     = type-name [ws "<" type-args ">"] ws "^" ws record-def
+atom-refinement = "!" type-name ws "^" ws record-def
+```
+
+For `refined-def` — §5.7 record refinement — `record-def` is right. `production => config ^ { host: =
+"prod.example.com" }` binds a *modifier* onto a field the source record already declares, which is exactly
+`field-def`'s third alternative.
+
+For `atom-refinement` it is wrong, because the body is not a record of field declarations. It is a record of
+**values** filling the constructor's constraint vocabulary. `record-def` expands to `record-entry`, to
+`field-def`:
+
+```
+field-def  = *annotation field-name ws ":" ws
+             ( field-type field-modifier / field-type / field-modifier )
+field-type = type-ref ["?"]
+```
+
+so whatever follows `name:` must be a `type-ref` — and `type-ref` is `paren-type / bracket-type / map-type /
+type-name ["<" type-args ">"]`, with `type-name = unquoted-token`. A constraint value is none of those.
+
+**This is not a theoretical mismatch: the spec's own core type library does not parse.** `core.tn` declares
+17 atom refinements, and every one of them fails or misreads under this production:
+
+- **12 carry a nested record** — `int8 => !integer ^ { size: { bits: 8  signed: true } }`, and the eleven
+  other sized integer families. A braced record is not a `type-ref` at all: `map-type` is the only brace
+  alternative and it requires `=>`, while a bare record body is explicitly unspellable at a type position
+  (§5.2). There is no reading under which this parses. Hard failure.
+- **5 carry a bare number** — `positive_integer => !integer ^ { min: 1 }`, `negative_integer => !integer ^
+  { max: -1 }`, `non_empty_text => !text ^ { min_length: 1 }`, and the rest. Here the production *shapes*
+  the text but assigns it the wrong meaning: `min: 1` becomes a field named `min` whose declared **type** is
+  `1`. Whether that is also a parse error turns on whether `type-name`'s numeric restriction ("a declaration
+  name whose text matches the number production ... is a parse error") reaches a reference position or only
+  a declaration; either way the resolver is handed a field declaration where the author wrote a constraint.
+
+§5.5's own worked examples are in the second group (`!integer ^ { min: 0  max: 150 }`), so the production
+does not parse the examples of the section it implements. A vocabulary with a quoted-string facet — a
+`pattern`, a `spec` — would land in the first group, since a quoted token is not an `unquoted-token`.
+
+**The one alternative of `field-def` that carries a value is `field-modifier`, and it means something else.**
+`field-name ":" field-modifier` admits `min: ~ 0` or `min: = 0` — a field with a *default* or a *fixed*
+value and no declared type. No example anywhere writes a refinement that way, and it would not mean what a
+refinement means: §5.5's body binds a value into the constructor's vocabulary, where `~`/`=` declare how a
+field of a record under construction behaves.
+
+**§5.6 makes the contradiction exact**, because it prints the two forms side by side and they are the same
+characters:
+
+> `!integer ^ { min: 0  max: 150 }`   →   `!integer_type { min: 0  max: 150 }`
+
+The right-hand side is `instance`, whose payload production is `core-value`. So one production calls
+`{ min: 0  max: 150 }` a record of field declarations and the other calls the identical text a data record
+of bindings, and §5.6 says the desugar between them is a retargeting of the head — the body is carried
+across untouched.
+
+**§12.1's own prose already half-concedes it.** Its opening paragraph says `core-value` "appears at exactly
+one point — the constructor-application payload (`instance`, **§5.5**–§5.6)", citing the atom-refinement
+section for the production that does not use it, and then states the mismatch as though it were a design
+choice: "an atom-refinement body is a braced `record-def` (§5.5)".
+
+**Interpretation chosen:** the body is a `core-value`, restricted to the braced form. `TsonSchemaParser`
+requires a `{` and then parses the payload with the **data** grammar — the same `parseCoreValue()` the
+`instance` branch calls one block below — and hands the resolver a `DataValue`. `DefinitionResolver` then
+merges it over the target instance's own bound values per §5.6 and binds the result through the
+constructor's compiled reader, which is what makes `!integer ^ { size: { bits: 8  signed: true } }` work at
+all. The brace requirement is enforced as its own diagnostic ("an atom refinement's body is a braced record
+of constraint bindings (§5.5), never a bare value, a second type-ref or an annotation") rather than by
+falling through to `instance`, since `^` has already committed the production.
+
+This was not a deliberate divergence — the AST node's own Javadoc has always read `atom-refinement = "!"
+type-name ws "^" ws data-value`, three lines below a comment quoting the production as `record-def`. The
+grammar could not have been implemented as written; nothing that reads `core.tn` can.
+
+**Suggested resolution — change one token in the production**, and the prose that describes it:
+
+```
+atom-refinement = "!" type-name ws "^" ws core-value
+                ; atom refinement (§5.5): the constructor's own
+                ; constraint bindings, the same payload `instance`
+                ; takes; the target MUST resolve to an atom-family
+                ; instance (§3.3.1)
+```
+
+§5.5 already supplies the restriction the production then needs — "the body MUST be a braced record of
+constraint bindings" — so the positional form (§5.6) is excluded by prose that exists, and no second
+production is required. `refined-def` keeps `record-def` unchanged; it was always the right payload there,
+and the fix does not touch §5.7.
+
+§12.1's opening paragraph then needs its count corrected: `core-value` appears at **two** points, the
+constructor-application payload (`instance`, §5.6) and the atom-refinement body (§5.5) — which is the same
+statement §5.6 already makes when it desugars one into the other.
+
+**This is an error, not an open design question.** Unlike the entries above it, there is nothing here for a
+revision to weigh: the production cannot parse the bundled artifact the same document publishes, and one
+token fixes it. It is filed with them only because that is where findings against Revision 33 live.
+
+**Status against Revision 33:** open, new against this revision. The `core-value` reading is what is built
+and running here, and is the only reading under which `core.tn` loads.
