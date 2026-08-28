@@ -305,11 +305,11 @@ excluded from names is excluded for lexical reasons:
   into a token happily (it did until #14). Excluding them is a *policy* decision, and stating it in §7.1 —
   which governs unquoted tokens — is why the exclusion never reached quoted names.
 
-**Step 1b — what the `identifier` contract should say.** Form and policy stay orthogonal: the *grammar* decides
-which spellings a position admits — `annotation = "@" unquoted-token` and `type-ref = "!" unquoted-token` are
-unquoted for adjacency reasons unrelated to confusability, and should stay so — while the *policy* decides
-which names are admitted, and is the same at every position. A position may admit fewer spellings without
-admitting a different set of names.
+**Step 1b — what the `identifier` contract should say.** Form and policy stay orthogonal: the *grammar*
+decides which spellings a position admits — the `@` and `!` positions are unquoted-only for adjacency reasons
+unrelated to confusability, and stay so (Step 1c) — while the *policy* decides which identifiers exist, and
+is the same at every position. A position may admit fewer spellings without admitting a different set of
+identifiers.
 
 Stated as a profile beside §7.1's own, the contract is almost the token profile already — it differs exactly
 where the number grammar forced the token profile's hand:
@@ -337,6 +337,14 @@ Three differences, each with its own reason:
   today. §7.1's "names with a leading underscore MUST be quoted" then stays true and becomes a statement
   about spelling, which is what it always was.
 - **`+` is dropped from `Continue`** as well, being needed only for exponents.
+
+**A property worth stating, because it makes the unquoted-only positions free.** With `_` left out, every
+part of the identifier profile is inside the token profile: `XID_Start ⊂ XID_Start ∪ Nd ∪ { - + . }` and
+`XID_Continue ∪ { - . } ⊂ XID_Continue ∪ { - + . }`. So **every identifier is a well-formed unquoted token**,
+and no identifier ever needs quoting to be written. That is what makes `type-ref` and `annotation` — which
+admit no quoted form — lose nothing, and it is the invariant to preserve if the profile is ever widened:
+adding anything to identifier-Start that token-Start lacks (`_` being the obvious candidate) breaks it, and
+creates identifiers that cannot be spelled at two of the four name positions.
 
 Everything else falls out of XID membership rather than needing a clause: whitespace, C0/C1 controls, `Cf`
 format characters, emoji and unassigned code points are none of them `XID_Continue`, so a one-line profile
