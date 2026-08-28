@@ -546,8 +546,7 @@ case and permits the attack.
 
 **Recommendation:** replace the exclusion with UTS #39 §3.1.1.1's contextual rule, applied to identifiers,
 and leave §7.1's set algebra alone — `XID_Continue` should keep meaning `XID_Continue`. The rule is total and
-two-valued, needs `Joining_Type` and `Script` (both UCD core properties, both exposed by every platform — no
-UTS #39 *table* for this part), permits `کتاب‌ها`, refuses `ad<ZWNJ>min`, and composes with the rest of
+two-valued, permits `کتاب‌ها`, refuses `ad<ZWNJ>min`, and composes with the rest of
 Step 1b rather than sitting beside it: its two global conditions are NFC and single-script, and NFC is
 already clause 1 above. §7.1's ZWNJ paragraph then states a rule instead of a prohibition plus a remedy that
 does not work.
@@ -1703,8 +1702,26 @@ Persian names that need ZWNJ while its "MUST be quoted" remedy is how the attack
 
 In its place, the contextual rule the removal of R1a relocated to UTS #39 §3.1.1.1 — conditions A1/A2/B on
 the neighbouring characters' `Joining_Type`, under two global conditions, single-script and NFC. It belongs
-on the identifier layer #3 proposes, not on the token profile, and it needs `Joining_Type` and `Script`
-only: both UCD core properties, neither requiring a UTS #39 table.
+on the identifier layer #3 proposes, not on the token profile.
+
+**What it costs, measured — and correcting an earlier draft of this entry.** It said the rule "needs
+`Joining_Type` and `Script` only: both UCD core properties, neither requiring a UTS #39 table". No UTS #39
+table is needed, which was the point being made, but the rest understates it. The three conditions between
+them read **four** properties, and a mainstream runtime exposes two:
+
+| property | used by | JDK |
+|---|---|---|
+| `General_Category` | A1's `$T`, A2/B's `$L`/`$M` | `Character.getType` |
+| `Script` | the global single-script condition | `Character.UnicodeScript` |
+| `Joining_Type` | A1 | **absent** — `ArabicShaping.txt`, ~777 code points explicitly listed; `T` derives from `Mn`/`Me`/`Cf` |
+| `Canonical_Combining_Class` | A2/B's `$V` (Virama) and `$M₁` | **absent** — no `Character` API at all; 64 Virama ranges, ~335 more for `ccc≠0` |
+| `Indic_Syllabic_Category` | B's `$D` | **absent** — 257 `Vowel_Dependent` ranges |
+
+So an implementation ships roughly 1,400 range entries across three derived tables. That is far less than
+`confusables.txt` and rather more than "two core properties", and a spec adopting the rule should say so
+where it says the rule is "simple enough to be easily implemented with standard mechanisms such as regular
+expressions" — that sentence is true of the *matching* and silent about the data behind the character
+classes.
 
 **The two must land together**, and that is a real constraint rather than a tidiness point. A lexer whose
 token profile is exactly `XID_Continue` admits `ab<ZWNJ>c`; if the contextual check does not yet exist, that

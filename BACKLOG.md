@@ -348,8 +348,13 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   the format characters; they are `XID_Continue`, so the end state is a token profile that is exactly the
   property (`SPEC-FEEDBACK.md` #14, whose recommendation now keeps the algebra and replaces §7.1's prose).
   Doing that alone reopens the invisible-character hole #229 closed, so it lands in one step with the
-  contextual rule — conditions A1/A2/B on neighbouring `Joining_Type`, under single-script and NFC, needing
-  `Character.UnicodeScript` and `Joining_Type` and no UTS #39 table. The conformance vector
+  contextual rule — conditions A1/A2/B, under single-script and NFC. **Costed:** no UTS #39 table, but the
+  JDK exposes only two of the four properties it reads. `Joining_Type` (~777 listed code points, `T` deriving
+  from `Mn`/`Me`/`Cf`), `Canonical_Combining_Class` (64 Virama ranges plus ~335 for `ccc≠0`) and
+  `Indic_Syllabic_Category=Vowel_Dependent` (257 ranges) all need shipping — about 1,400 entries across three
+  derived tables. **Do not implement A1 alone**: the Arabic condition without the two Indic ones accepts
+  Persian names and refuses Malayalam ones, which is the failure mode `SPEC-FEEDBACK.md` #3 rejects the
+  restriction level for. The conformance vector
   `lexer/invalid/zwnj-inside-unquoted-token` asserts today's behaviour and flips in the same change; its
   sidecar already says the contradiction is why it exists.
 - [ ] **An `identifier` profile, and skeleton distinctness on it** (§9.4-adjacent hardening). `SPEC-FEEDBACK.md` #3
