@@ -59,7 +59,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
 
     ArrayAbstractReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
                          SchemaLocation schemaLocation) {
-        this(name, displayName, body, resolver.resolve(body.elementType().name()), schemaLocation);
+        this(name, displayName, body, UseSite.reader(body.elementType(), resolver), schemaLocation);
     }
 
     /**

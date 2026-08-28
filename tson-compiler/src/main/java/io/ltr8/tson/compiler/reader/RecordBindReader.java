@@ -263,7 +263,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             DataClassField target = findTargetField(classFields, carrier, field.name());
             return target != null && target.type() == io.ltr8.tson.schema.meta.Token.class
                     ? AtomTypeReader.of(name, RawTokenParser.INSTANCE, location)
-                    : resolver.resolve(field.type().name());
+                    : UseSite.reader(field.type(), resolver);
         };
     }
 

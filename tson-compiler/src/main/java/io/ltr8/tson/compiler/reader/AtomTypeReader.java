@@ -66,7 +66,7 @@ import io.ltr8.tson.schema.meta.UuidType;
  * additionally in {@link #ENUM_OBJECT_MODE}/{@link #UNIT}, both keyed on the declaration's own name rather
  * than its resolved shape -- see each one's own note.
  */
-final class AtomTypeReader<T> implements TsonTypeReader<T> {
+final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
     static final ValueReaderFactory INTEGER_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new IntegerParser((IntegerType) definition.body()),
@@ -182,6 +182,15 @@ final class AtomTypeReader<T> implements TsonTypeReader<T> {
     /** A reader over an {@link AtomType} chosen by the caller rather than by the declaration's own body. */
     static <T> AtomTypeReader<T> of(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
         return new AtomTypeReader<>(name, delegate, schemaLocation);
+    }
+
+    /**
+     * {@inheritDoc} <p>Shares the parser and the location; only the name differs. Built once when a
+     * composite reader wires an aliased child, never on a read -- see {@link UseSite}.
+     */
+    @Override
+    public TsonTypeReader<?> renamed(String displayName) {
+        return new AtomTypeReader<>(displayName, delegate, schemaLocation);
     }
 
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {

@@ -17,11 +17,24 @@ import java.util.Optional;
  * mode -- the diagnostic carries the real problem). This is how atoms produce nodes uniformly, so a
  * container reader's children are always nodes, and reading an atom at the root is a node too.
  */
-final class AtomTreeReader implements TsonTypeReader<TsonValue> {
+final class AtomTreeReader implements TsonTypeReader<TsonValue>, UseSite.Renamed {
 
     private final TsonTypeReader<?> delegate;
     private final Optional<String> typeRef;
     private final AnnotationTypes annotationTypes;
+
+    /**
+     * {@inheritDoc} <p>Passes the name through to the wrapped atom, which is what composes the message --
+     * this wrapper only turns the leaf into a {@code TsonAtom}. A delegate with no name to change hands
+     * itself back, and so does this.
+     */
+    @Override
+    public TsonTypeReader<?> renamed(String displayName) {
+        if (!(delegate instanceof UseSite.Renamed renameable)) {
+            return this;
+        }
+        return new AtomTreeReader(renameable.renamed(displayName), typeRef.orElse(null), annotationTypes);
+    }
 
     AtomTreeReader(TsonTypeReader<?> delegate, String typeRef, AnnotationTypes annotationTypes) {
         this.delegate = delegate;

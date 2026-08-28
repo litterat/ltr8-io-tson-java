@@ -71,8 +71,8 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
 
     MapAbstractReader(String name, String displayName, MapBody body, TsonTypeReaderResolver resolver,
                        SchemaLocation schemaLocation) {
-        this(name, displayName, body, resolver.resolve(body.keyType().name()),
-                resolver.resolve(body.valueType().name()), schemaLocation);
+        this(name, displayName, body, UseSite.reader(body.keyType(), resolver),
+                UseSite.reader(body.valueType(), resolver), schemaLocation);
     }
 
     /**

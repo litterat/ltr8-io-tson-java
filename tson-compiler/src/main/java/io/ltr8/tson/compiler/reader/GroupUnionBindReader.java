@@ -52,7 +52,7 @@ final class GroupUnionBindReader extends RecordAbstractReader<Object> {
             Class<?> component = member == null ? null : member.fields()[0].type();
             return component == io.ltr8.tson.schema.meta.Token.class
                     ? AtomTypeReader.of(name, RawTokenParser.INSTANCE, schemaLocation)
-                    : resolver.resolve(field.type().name());
+                    : UseSite.reader(field.type(), resolver);
         }, schemaLocation);
         this.members = members;
     }

@@ -193,9 +193,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
         TsonTypeReader<?> forField(RecordField field);
 
-        /** By the field's declared schema type alone. */
+        /** By the field's declared schema type alone, named as the author wrote it here ({@link UseSite}). */
         static FieldReaders byType(TsonTypeReaderResolver resolver) {
-            return field -> resolver.resolve(field.type().name());
+            return field -> UseSite.reader(field.type(), resolver);
         }
     }
 
