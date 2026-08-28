@@ -65,6 +65,15 @@ is small and parsed once.)
   which falls out of counting rather than being checked for. Elements have no default/fixed concept at all
   (`ElementState` has two members where a record field's `FieldState` has five), so none of the
   `valueForAbsentField` machinery above has an array counterpart.
+- **A map entry's value may always be `_`, and the entry still counts.** §7.6 gives that row of its table a
+  plain "yes" — the only unconditional permission in it, because `MapBody` carries no element-state facet the
+  way an array's `ElementState` does, so there is nothing for an author to declare or a reader to consult.
+  `MapAbstractReader.decodedValue` answers it above the value's own reader, which is right to refuse the
+  sentinel (`_` is a value of no atom type) — absence is the container's question, the same place
+  `ArrayAbstractReader` asks it of an element. The entry is present with an absent value (§2.9), so it counts
+  toward `min_items`/`max_items` like any other, and both subclasses already had the no-value form to put
+  there: a `TsonAbsent` in tree mode, a `null` the bound `Map` really holds in bind mode. The **key** position
+  is the opposite and equally unconditional — §2.9 forbids it there.
 - **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and
   a placeholder kept in place (so later indices stay accurate) — Java `null` in bind mode, `TsonAbsent` in
   tree mode, where the diagnostic, not the node, carries what went wrong; a shape mismatch reports

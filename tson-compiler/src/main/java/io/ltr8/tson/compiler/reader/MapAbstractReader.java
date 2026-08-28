@@ -25,9 +25,9 @@ import java.util.function.BiConsumer;
  * {@code EmptyBraceEvent}, zero entries, matching {@code TsonObjectReader.toMap}'s own treatment of
  * {@code {}}), and decoding entries one at a time straight off the event stream -- validating {@code
  * min_items}/{@code max_items} against the final count (known only once {@code MapEnd} arrives),
- * rejecting the absent sentinel {@code _} in key position (§2.9) -- handing each decoded key/value
- * pair to a {@link BiConsumer} rather than assembling a result itself, the same reasoning {@link
- * ArrayAbstractReader#readInto} documents for arrays.
+ * rejecting the absent sentinel {@code _} in key position and admitting it in value position (§2.9) --
+ * handing each decoded key/value pair to a {@link BiConsumer} rather than assembling a result itself, the
+ * same reasoning {@link ArrayAbstractReader#readInto} documents for arrays.
  *
  * <p><b>{@code {}} is a zero-entry map here, size rules included.</b> [TSON-DATA] §2.8 defers an empty
  * brace to the resolver and says it resolves to "the empty container of that type" once a schema supplies
@@ -37,7 +37,10 @@ import java.util.function.BiConsumer;
  *
  * <p>Unlike {@link ArrayAbstractReader}, there's no {@code unique_items}/{@code ElementState}
  * concept here at all -- {@link MapBody} carries neither: a map has no per-entry required/optional
- * state for a value the way an array element or tuple position has.
+ * state for a value the way an array element or tuple position has. That absence is itself the rule at an
+ * entry's value: [TSON-SCHEMA] §7.6 permits {@code _} there with no condition attached, precisely because
+ * there is no element-state facet to make the permission conditional on (see {@link #decodedValue}). The
+ * key position is the opposite and unconditional the other way.
  *
  * <p><b>A repeated key is a validation error</b> ({@code DUPLICATE_MAP_KEY}), reported at the repeat's
  * own position and then decoded like any other entry so the sink still ends up "last value wins".
@@ -161,12 +164,33 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             if (ctx.peek() instanceof SchemaRef) {
                 ctx.next();
             }
-            Object decodedValue = valueParser.read(ctx.field(keySegment));
-            sink.accept(key, decodedValue);
+            sink.accept(key, decodedValue(keySegment, ctx));
             count++;
         }
         ctx.next(); // MapEnd
         validateSize(count, ctx);
+    }
+
+    /**
+     * The entry's value, or nothing where the document wrote {@code _} there. [TSON-SCHEMA] §7.6 permits the
+     * absent sentinel at a map entry value with no condition attached -- {@code map} carries no element-state
+     * facet, so unlike an array element ({@code [T?]}) or a record field there is nothing to declare and
+     * nothing to consult, and the entry is present with an absent value ([TSON-DATA] §2.9). Answered here
+     * rather than by the value's own reader, which is right to refuse the sentinel: {@code _} is a value of no
+     * atom type, so absence is the container's question, exactly as {@link ArrayAbstractReader#readInto} asks
+     * it of an element before reaching for the element parser.
+     *
+     * <p>{@code null} is what both subclasses already turn into their own no-value form ({@link
+     * MapTreeReader} a {@code TsonAbsent}, {@link MapBindReader} a null map value), which is also what a
+     * soft-failed value read hands them in collecting mode -- the same conflation an absent array element
+     * carries, and for the same reason: what went wrong is the diagnostic's to say, not the value's.
+     */
+    private Object decodedValue(String keySegment, TsonReadContext ctx) {
+        if (ctx.peek() instanceof AbsentEvent) {
+            ctx.next();
+            return null;
+        }
+        return valueParser.read(ctx.field(keySegment));
     }
 
     /** A map key's own path segment: its scalar text, or {@code ?} for a key with no single text form -- the same fallback {@code SchemalessTreeReader.keySegment} uses. A raw event's {@code toString()} has no business in an RFC 6901 path. */

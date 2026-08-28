@@ -289,14 +289,6 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
 
 ## Miscellaneous
 
-- [ ] **`_` at a map entry value is refused, and [TSON-SCHEMA] §7.6 permits it unconditionally.** That row of
-  §7.6's table is a plain "yes" — `map` carries no element-state facet, so the permission is not
-  schema-conditional the way an array element's or a record field's is. `MapAbstractReader.readInto` hands the
-  value straight to the value type's own reader, which refuses the sentinel: `{ "k" => _ }` under
-  `{text => text}` reports `expected a token for 'text', found the absent sentinel '_'`. The tree side already
-  expects it (`MapTreeReader` turns a null decode into `TsonAbsent`); what is missing is the permission at the
-  entry loop, and an answer for what bind mode hands a map value that has none.
-
 - [ ] **A record field written `_` reads identically to one never written.** Under a schema, `{ x: _  y: "h" }`
   and `{ y: "h" }` against `x: text?` both produce a tree with no `x` at all; the same pair read schemalessly
   gives `TsonAbsent` and `TsonMissing`. [TSON-DATA] §2.9 makes the distinction normative — "A field or entry set

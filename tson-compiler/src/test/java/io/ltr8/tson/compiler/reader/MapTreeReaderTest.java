@@ -13,6 +13,9 @@ import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
+import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonAtom;
+import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -101,6 +104,54 @@ class MapTreeReaderTest {
 
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> readMap(compiled, "{ _ => 1 }"));
+        assertTrue(thrown.getMessage().contains("absent sentinel"), thrown.getMessage());
+    }
+
+    /**
+     * [TSON-SCHEMA] §7.6's table permits {@code _} at a map entry value with a plain "yes" -- the one
+     * unconditional permission in it, because {@code MapBody} carries no element-state facet for an author
+     * to declare or a reader to consult. The entry is present with an absent value ([TSON-DATA] §2.9), so
+     * the key is decoded and kept and nothing is reported.
+     */
+    @Test
+    void anAbsentEntryValueIsPermitted() {
+        TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        TsonMap result = (TsonMap) compiled.get("scores").read(TestDocuments.document("{ 1 => _  2 => 20 }", problems));
+
+        assertEquals(List.of(), problems.diagnostics(), problems.diagnostics().toString());
+        assertEquals(2, result.entries().size());
+        assertEquals(TsonAbsent.instance(), result.entries().get(0).value());
+        assertEquals(BigInteger.ONE, ((TsonAtom) result.entries().get(0).key()).value());
+    }
+
+    /**
+     * An entry whose value is absent is still an entry: [TSON-DATA] §2.9 has higher parts that impose size
+     * constraints "count all slots", so two absent-valued entries satisfy {@code min_items: 2} and breach
+     * {@code max_items: 1}.
+     */
+    @Test
+    void anAbsentEntryValueCountsTowardTheSizeBounds() {
+        MapBody atLeastTwo = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.of(BigInteger.TWO),
+                Optional.empty());
+        assertEquals(2, ((TsonMap) compile(atLeastTwo).get("scores")
+                .read(TestDocuments.document("{ 1 => _  2 => _ }"))).entries().size());
+
+        MapBody atMostOne = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.empty(),
+                Optional.of(BigInteger.ONE));
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> compile(atMostOne).get("scores").read(TestDocuments.document("{ 1 => _  2 => _ }")));
+        assertTrue(thrown.getMessage().contains("has 2 entries, more than the maximum 1"), thrown.getMessage());
+    }
+
+    /** The permission is the value position's alone -- §2.9's own rule still refuses the sentinel as a key. */
+    @Test
+    void anAbsentKeyIsStillRefusedWhenTheValueIsAbsentToo() {
+        TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
+
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> readMap(compiled, "{ _ => _ }"));
         assertTrue(thrown.getMessage().contains("absent sentinel"), thrown.getMessage());
     }
 
