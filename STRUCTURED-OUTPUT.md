@@ -257,6 +257,26 @@ all, with no decoder integration required.
   *against a TSON schema*, where accepting a duplicate would validate a document the JDK's own parser
   rejects.
 
+- [ ] **A JSON object whose keys are not valid TSON *names* is a map, not a record — a third place the two
+  formats separate.** JSON keys are arbitrary strings: `{"first name": 1}`, `{"": 1}`, `{"42": 1}`,
+  `{"a\nb": 1}` are all well-formed JSON objects. Under the name policy proposed in `SPEC-FEEDBACK.md` #3
+  (names are `XID_Start`-initial and `XID_Continue`-bodied, so no whitespace, no controls, no numeric names,
+  no empty name) none of those keys is a name, so none of those objects is a TSON **record**. Each maps to a
+  TSON **map** instead, which is the honest target anyway: §2.6 makes map keys data values with no name
+  constraints, and an arbitrary JSON key is data rather than a declared name.
+    - The consequence for `TsonJsonParser` is a routing decision it must make per object, not a lexing one:
+      an object whose keys are all valid names may become a record (and validate against a record type); one
+      whose keys are not must become a map (and validate against a map type). Getting this wrong in the
+      permissive direction — emitting a record with a space-bearing field name — produces a `DataValue` no
+      TSON document could have contained, which is exactly the class of divergence the shared-AST design
+      exists to prevent.
+    - It also narrows a claim [TSON-DATA] §7.1 currently makes without qualification, that "the comma
+      separators and quoted keys required by JSON are accepted by the TSON grammar". They are accepted as
+      *tokens*; whether the result is a record depends on what the keys say. #3 asks §7.1 to say so.
+    - Sequenced behind #3: if the name policy lands differently — interior whitespace permitted, say — this
+      item shrinks or disappears. It is recorded now because the JSON front end is where the divergence
+      becomes a user-visible behaviour rather than a spec sentence.
+
 - [ ] **JSON `null` at a non-`void` position reads as the string `"null"`, and that is the spec's answer,
   not a bug.** [TSON-SCHEMA] §7.3 gives `null` no special status under a schema — "their meaning is
   determined entirely by the position's type" — with a single concession at `void`-typed positions, where it

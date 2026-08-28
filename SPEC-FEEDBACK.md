@@ -258,48 +258,95 @@ and `type-ref = "!" unquoted-token` are unquoted for adjacency reasons that have
 confusability, and should stay that way. The *policy* decides which names are admitted, and is the same
 policy at every position. A position may admit fewer spellings without admitting a different set of names.
 
-The practical consequence is that this costs almost nothing to adopt: at the three unquoted-only positions
-every clause below is already true, because an unquoted token cannot contain a space, a control, or a format
-character. **The policy's entire effect lands on quoted field names** — which is exactly where the bypass is.
+Stated as a profile beside §7.1's own, the contract is almost the token profile already — it differs exactly
+where the number grammar forced the token profile's hand:
 
-A name, whatever spells it, MUST:
+```
+Token   Start = XID_Start ∪ Nd ∪ { - + . }     Continue = XID_Continue ∪ { - + . }
+Name    Start = XID_Start ∪ { _ }              Continue = XID_Continue ∪ { - . }
+```
 
-1. **be non-empty.** `{ "": 1 }` is legal today. Nothing can reference it (`type-name` cannot be empty), and
-   two of them in one record are a duplicate that renders as nothing.
-2. **be NFC-normalized.** §7.2.1 already requires this of unquoted tokens, and §2.5/§2.6 already define name
-   *identity* by NFC ("`café`" NFC and NFD are one field name). Requiring the **form** is strictly simpler
-   than requiring the **comparison**: it is checkable on one name, it makes the stored name equal the
-   compared name, and it makes duplicate detection ordinary string equality. Requiring only the comparison
-   is the harder rule and the easy one to get wrong — this implementation gets it wrong today, accepting
-   both spellings in one record as two fields.
-3. **contain no character with `White_Space=Yes` at its start or end, and no C0/C1 control anywhere.**
-   `"admin "` and `"admin"` are indistinguishable in every renderer; a newline inside a name breaks every
-   diagnostic that prints it. *Interior* whitespace is deliberately left legal — see the open question below.
-4. **contain no `Cf` (format) character.** This is the security clause: BOM, soft hyphen, word joiner, ZWNJ,
-   ZWJ, the bidi controls (U+202A–U+202E, U+2066–U+2069) and U+061C. It already holds for unquoted names,
-   since none of these is in `XID_Continue`; stating it on the name is what closes the quoted bypass.
-5. **be permitted to mix scripts.** `id_пользователя` is a name, not a defect. A restriction level stays
-   available as an opt-in profile, default off (Step 4).
+Three differences, each with its own reason:
 
-And, at scope level rather than per name, no two names in one scope may share a `skeleton()` (Step 2).
+- **Name-Start drops `Nd`, `-`, `+`, `.`** — §7.1 adds those four to *Start* for one stated purpose: "every
+  extension character is required by a production of the number grammar (§7.6): `Nd` for digits, `-`/`+` for
+  signs and exponent signs, `.` for the decimal point and `.inf`/`.infinity`/`.nan`". They exist so a
+  **number** can be an unquoted token, and they leak into names only because names and values share one
+  profile. Dropping them is what makes `{ 42: 1 }` stop being a record with a numeric field name, and it
+  **subsumes [TSON-SCHEMA] §12.1's existing rule** that "numbers are not declarable names" — every spelling
+  the number grammar admits begins with a digit, a sign, or a dot, so the general rule and the type-name rule
+  become one rule. `Continue` keeps `-` and `.` (`my-field`, `a.b`), which no number-grammar concern touches.
+- **Name-Start adds `_`.** §7.1 keeps `_` out of token-Start for a purely lexical reason — the bare token `_`
+  is the absent sentinel (§2.9) — and then tells authors that "names with a leading underscore (`_id`) MUST
+  be quoted". That is a statement about *spelling*, not about names, and `_id` is an entirely ordinary field
+  name. Under the split, the policy admits it and the grammar still requires the quoted spelling: exactly the
+  form/policy separation this step is built on, demonstrated on the spec's own example.
+- **`+` is dropped from `Continue`** as well, being needed only for exponents.
 
-**Three open decisions this raises, which the policy should settle explicitly rather than inherit:**
+Everything else falls out of XID membership rather than needing a clause: whitespace, C0/C1 controls, `Cf`
+format characters, emoji and unassigned code points are none of them `XID_Continue`, so a one-line profile
+excludes the lot. Two rules do have to be stated on top:
 
-- **Interior whitespace, and JSON.** §7.1 says "the comma separators and quoted keys required by JSON are
-  accepted by the TSON grammar", so `{"first name": 1}` is a TSON record today. Banning interior whitespace
-  would make it one only as a *map* (`{"first name" => 1}`), since map keys are data and unconstrained.
-  Clause 3 above takes the narrow option — boundaries only — to keep that claim true. The strict option is
-  defensible; it just needs saying which, because "names may not contain spaces" and "JSON objects are
-  records" cannot both hold.
-- **Numeric names.** `{ 42: 1 }` is a legal record today, while §12.1 forbids a numeric *type* name outright
-  ("numbers are not declarable names"). One name concept, two answers. If the type-name rule is right, it is
-  right for the same reason everywhere, and clause 1's list should carry it.
-- **§7.1's ZWNJ escape hatch stops working, by design.** §7.1 excludes ZWNJ/ZWJ and tells authors that
-  "names whose orthography requires them MUST be quoted". Clause 4 makes that route close: the exclusion
-  becomes real instead of bypassable, and a Persian or Indic name needing ZWNJ becomes unspellable as a
-  name. That is the cost of the exclusion the spec already chose; what it needs is for §7.1 to stop offering
-  a remedy that will no longer exist, and to say what such an author does instead — accept a different name,
-  or adopt UAX #31 R1a's contextual rules and let the two characters back in under stated conditions.
+1. **A name MUST be NFC-normalized.** §7.2.1 already requires this of unquoted tokens, and §2.5/§2.6 already
+   define name *identity* by NFC. Requiring the **form** is strictly simpler than requiring the
+   **comparison**: it is checkable on one name, it makes the stored name equal the compared name, and it
+   reduces duplicate detection to string equality. Requiring only the comparison is the harder rule and the
+   easy one to get wrong — this implementation gets it wrong today, reading `"café"` NFC and NFD in one
+   record as two fields where §2.5 makes them one.
+2. **ZWNJ and ZWJ are constrained contextually, not excluded.** See below — this is the one place the
+   proposal contradicts §7.1 outright.
+
+Mixed script stays permitted; a restriction level remains available as an opt-in profile, default off
+(Step 4). At scope level rather than per name, no two names in one scope may share a `skeleton()` (Step 2).
+
+**Interior whitespace, and the JSON divergence it creates.** `XID_Continue` excludes whitespace, so
+`{ "first name": 1 }` stops being a record. §7.1 currently claims "the comma separators and quoted keys
+required by JSON are accepted by the TSON grammar", and that claim narrows: a JSON object whose keys are not
+valid TSON names maps to a **map** (`{ "first name" => 1 }`), not a record — which is the honest reading
+anyway, since §2.6 makes map keys data values with no name constraints, and an arbitrary JSON key is data.
+§7.1's JSON paragraph should say so rather than leave the two sentences to be reconciled by a reader.
+
+**ZWNJ and ZWJ: §7.1's exclusion is over-broad, its remedy is the attack, and Unicode has moved.** §7.1
+excludes both, reasoning "they are invisible, which makes them confusable and spoofing surface (§9.4); names
+whose orthography requires them MUST be quoted", and notes that "UAX #31 permits them in restricted
+contexts".
+
+Three things are wrong with that, and they compound:
+
+1. **The characters are not optional decoration in the scripts that use them.** ZWNJ breaks a cursive
+   connection; ZWJ forces one. In Persian it is ordinary spelling — `می‌رود` ("he goes") and `کتاب‌ها`
+   ("books") are written with ZWNJ separating the morpheme, and without it the word is misspelled. Indic
+   scripts use both to control conjunct formation. Excluding them does not inconvenience an author; it makes
+   a class of correct words unspellable as names.
+2. **They are invisible only where they do nothing.** In a cursive script a ZWNJ has a visible effect — the
+   letters render disconnected, which is the whole point of writing it. It is invisible precisely when
+   inserted where it has no shaping role, i.e. into Latin: `ad<ZWNJ>min` renders exactly as `admin`. So the
+   dangerous case and the legitimate case are distinguishable by context, mechanically.
+3. **UAX #31 no longer says what §7.1 cites it as saying.** The "restricted contexts" wording matches
+   requirement **R1a, which has been removed**: "The characters that were added when meeting this requirement
+   are now part of the default; the contextual checks required by this requirement remain as part of the
+   General Security Profile in [UTS #39]." That is why ZWNJ/ZWJ are in `XID_Continue` today (see #14) — they
+   are default identifier characters now, and the safety rule moved to UTS #39 §3.1.1.1, *Limited Contexts
+   for Joining Controls*, which states conditions A1/A2/B on the neighbouring characters' `Joining_Type`,
+   under two global conditions — the sequence must be single-script (ignoring Common/Inherited) and in NFC —
+   and which UTS #39 itself describes as "simple enough to be easily implemented with standard mechanisms
+   such as regular expressions".
+
+**So §7.1 has it exactly backwards.** The blanket exclusion blocks the legitimate use — a Persian field name
+— while the escape hatch it offers in the same sentence ("MUST be quoted") is precisely the route by which
+`"ad<ZWNJ>min"` reaches a Latin name today, because §7.1 governs unquoted tokens only. It forbids the safe
+case and permits the attack.
+
+**Recommendation:** replace the exclusion with UTS #39 §3.1.1.1's contextual rule, applied to names. It is
+total and two-valued, needs `Joining_Type` and `Script` (both UCD core properties, both exposed by every
+platform — no UTS #39 *table* is required for this part), it permits `کتاب‌ها` and refuses `ad<ZWNJ>min`, and
+it composes with the rest of Step 1b rather than sitting beside it: its two global conditions are NFC and
+single-script, and NFC is already clause 1 above. §7.1's ZWNJ paragraph then states a rule instead of a
+prohibition plus a remedy that does not work.
+
+If the contextual rule is judged too much machinery, the fallback is to keep the exclusion and **delete the
+remedy** — say plainly that such names cannot be expressed, rather than directing authors to a spelling that
+also lets the attack through. What should not survive is the current pairing.
 
 **Step 2 — require skeleton distinctness within each named scope.** No two names in the same scope may have
 equal UTS #39 `skeleton()`s. The scopes are the closed sets the series already defines:
@@ -1395,7 +1442,13 @@ and three paragraphs later states an exclusion in prose:
 > which makes them confusable and spoofing surface (§9.4); names whose orthography requires them MUST be
 > quoted.
 
-**U+200C and U+200D are in `XID_Continue`.** Unicode 16.0, `DerivedCoreProperties.txt`:
+**U+200C and U+200D are in `XID_Continue`** — and are so *by design*, not by accident. UAX #31's
+requirement R1a, whose wording §7.1's "restricted contexts" parenthetical echoes, **has been removed**: "The
+characters that were added when meeting this requirement are now part of the default; the contextual checks
+required by this requirement remain as part of the General Security Profile in [UTS #39]." So the joiners are
+ordinary identifier characters now, with their safety rule relocated to UTS #39 §3.1.1.1 rather than
+withdrawn. §7.1's prose is describing a version of UAX #31 that no longer exists. Unicode 16.0,
+`DerivedCoreProperties.txt`:
 
 ```
 200C..200D    ; ID_Continue  # Cf   [2] ZERO WIDTH NON-JOINER..ZERO WIDTH JOINER
