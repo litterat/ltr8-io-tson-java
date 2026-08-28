@@ -483,9 +483,11 @@ schema authoring through the meta's compiled reader); repeated fields/map keys a
 last-value-wins recovery underneath; map-key identity is the decoded host value, type-ref and annotations
 stripped (§2.6); a written `_` at `REQUIRED_DEFAULT` is an error where omission injects silently; `{}` is
 the empty container of the position's own type (§2.8), so a zero-entry map faces `min_items` like any
-other value; and a reader names itself in a message by what the author wrote (`EntryDisplayName` — a
-synthetic entry renders as the sugar or application that produced it, told apart by having no source
-position), never by its content-derived entry name.
+other value; and a reader names itself in a message by what the author wrote, never by a
+content-derived entry name — `EntryDisplayName` renders a minted entry as the sugar or application that
+produced it (told apart by having no source position), and `UseSite` names a *position* as that position
+wrote it, following §8.3's `@alias` where flattening left one and the referring entry's own `source`
+where it did not. Both run where a composite reader wires its children, so neither costs a read anything.
 
 ### Diagnostics — `docs/readers-and-diagnostics.md`
 

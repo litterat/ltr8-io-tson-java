@@ -72,7 +72,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
         List<CompiledSlot> slots = new ArrayList<>(body.elements().size());
         for (int position = 0; position < body.elements().size(); position++) {
             TupleElement element = body.elements().get(position);
-            TsonTypeReader<?> parser = AnnotationBoxing.wrap(resolver.resolve(element.elementType().name()),
+            TsonTypeReader<?> parser = AnnotationBoxing.wrap(UseSite.reader(element.elementType(), resolver),
                     boxedAt.apply(position), annotationTypes);
             slots.add(new CompiledSlot(element, parser));
         }

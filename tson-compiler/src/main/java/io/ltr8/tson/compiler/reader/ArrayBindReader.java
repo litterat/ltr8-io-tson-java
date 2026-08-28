@@ -63,7 +63,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                            TsonTypeReaderResolver resolver,
                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
         super(name, displayName, body,
-                AnnotationBoxing.wrap(resolver.resolve(body.elementType().name()), descriptor.arrayDataClass(),
+                AnnotationBoxing.wrap(UseSite.reader(body.elementType(), resolver), descriptor.arrayDataClass(),
                         annotationTypes),
                 schemaLocation);
         this.descriptor = descriptor;

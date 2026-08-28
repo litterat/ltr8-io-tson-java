@@ -145,7 +145,22 @@ is small and parsed once.)
   `tag_list` and the anonymous form inside it renders as `[order; 1..]`, a map as `{text => order}`, a tuple
   as `[text, int32]`, a choice as `(text | int32)`, and an instantiation entry as the application its
   `source` records (`paged<order>`). Anything with no sugar spelling falls back to the entry name — honest
-  rather than invented, and unreachable, since a form with no spelling is a form nobody wrote.
+  rather than invented.
+- **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). §8.3
+  flattens a type position past a `REFERENCE` entry, so `c: pct` over `pct => small` reaches the reader for
+  `small` — one shared reader, right for a position that names `small` directly and wrong for one that does
+  not. The name the author wrote rides the type-ref as `@alias`, and a composite reader consults it where it
+  **wires its children**, which is compile time: an aliased position gets a copy of the reader differing only
+  in its name, an unaliased one gets the shared reader back unchanged and allocates nothing. Nothing is added
+  to `TsonReadContext` and no per-read allocation changes (`AllocationHarnessTest` is the guard).
+    - **A materialised application takes the other carrier**, because §8.3's walk stops at an instantiation
+      and leaves no alias. That entry's body is a `Reference`, and a `REFERENCE` entry compiles to its
+      target's reader — so `TsonSchemaCompiler` names it for the entry doing the referring, whose `source` is
+      the application (`b<10>`). Without it a violation against `b<10>` reads
+      `'integer_type_10_100_786fbcfb': …`, the one shape that made `EntryDisplayName`'s fallback reachable.
+    - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
+      (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per
+      read — and the variant that rejected the value is the informative name anyway.
   - **`displayName` is beside `name`, never instead of it.** The entry name is what a type-ref resolves
     against (`VariantSchemaReader` dispatches on it) and what a tree node carries as its own `typeRef`, so
     substituting the display name would break dispatch and round-tripping alike.

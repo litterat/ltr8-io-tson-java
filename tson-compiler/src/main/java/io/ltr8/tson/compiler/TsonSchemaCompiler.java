@@ -208,7 +208,12 @@ public final class TsonSchemaCompiler {
             }
             Top body = definition.body();
             if (body instanceof Reference r) {
-                return resolve(r.target().name());
+                // The target's reader, named for the entry doing the referring rather than the one referred
+                // to. §8.3 flattens an ordinary use site past a reference and records the author's name as
+                // `@alias` there, but the walk stops at a materialised instantiation -- so this is the only
+                // place that knows `b<10>` was written where `integer_type_10_100_786fbcfb` will be read.
+                return UseSite.named(resolve(r.target().name()),
+                        EntryDisplayName.of(name, definition));
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
             return factory.create(name, definition, new ValueReaderContext(linked, readers));
