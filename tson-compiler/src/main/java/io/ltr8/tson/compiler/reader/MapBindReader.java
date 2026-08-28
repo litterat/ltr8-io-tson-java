@@ -32,8 +32,12 @@ import java.util.Map;
  * ArrayBindReader}, there's no narrowing at this level either -- each key and value's own binding
  * already happened recursively, inside whatever reader {@code resolver} produced for its type.
  *
- * <p>Everything else -- resolving the key/value readers, confirming a map shape, size validation,
- * rejecting an absent key -- lives on {@link MapAbstractReader}.
+ * <p>An entry whose value the document wrote as {@code _} arrives here as a {@code null} and is
+ * {@code put} like any other, so the key is in the bound map and maps to nothing -- the closest a Java
+ * {@code Map} comes to §2.9's "present with an absent value", and distinguishable from a key never stated.
+ *
+ * <p>Everything else -- resolving the key/value readers, confirming a map shape, size validation, rejecting
+ * an absent key and admitting an absent value -- lives on {@link MapAbstractReader}.
  */
 final class MapBindReader extends MapAbstractReader<Object> {
 
