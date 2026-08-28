@@ -210,6 +210,15 @@ surface.
   (`lexer`/`parser`/`resolver`/`vocabulary`). Still Part 1 (lexer/parser/§5 vocabulary) only — Part 2
   (resolution, linking, compilation) has no conformance-suite coverage at all yet, only this repo's own
   unit/integration tests.
+- [ ] **A reader layer for the suite.** Its four buckets stop below the readers: `lexer` runs `Lexer`,
+  `parser` runs `TsonDataParser`, and §1.2 makes *neither* tier dedupe fields or keys, resolve an empty
+  brace, or interpret token text — those are reader rules. So every §2.5/§2.6 rule the readers actually
+  enforce has nowhere to be tested from outside: duplicate fields, duplicate keys, NFC name identity
+  (issue #233), `{}` as the empty container of its type, absent-sentinel positions. Found while trying to
+  add two NFC-identity vectors and discovering that a `lexer`- or `parser`-bucket vector cannot fail on
+  them — the parser accepts `{ a: 1  a: 2 }` by design. The bucket wants the schemaless tree reader behind
+  it, since that is the layer where a Class 1 document gets its verdict; it is a sibling of the missing
+  Part 2 layer above, and cheaper.
 - [ ] **Run the JSON front-end against the established JSON Parsing Test Suite** when it lands (the
   `TsonJsonParser` tracked in `STRUCTURED-OUTPUT.md`). JEP 540 commits to exactly this for the JDK's own
   parser — its own unit tests *plus* that external corpus, "which contains numerous edge-case inputs" —
@@ -319,15 +328,6 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   a `DataBindContext` may be extended after first use, and neither shipped fetching `TsonSchemaSource` states
   what it promises a concurrent caller. None of it is hypothetical-only: the read-path half was two real defects, found by
   auditing and reproduced first try on 8 threads.
-- [ ] **Name identity ignores NFC, so one name can appear twice in a record.** §2.5: "Two field names are
-  identical if they produce the same NFC-normalized string after escape processing"; §2.6 says the same for
-  scalar map keys. `Normalizer` appears in `Lexer` alone, where it *checks* that an unquoted token is already
-  NFC and rejects it otherwise — quoted tokens are exempt from the check and nothing anywhere normalizes
-  before comparing. So `{ "caf\u00E9": 1  "cafe\u0301": 2 }` reads as a record with two fields, both
-  rendering as `café`, where §2.5 makes it a duplicate that MUST be rejected. Same defect at map keys, and at
-  the schema layer wherever declared names are compared. Fix is to compare NFC-normalized names — or, if
-  `SPEC-FEEDBACK.md` #3's clause 2 is adopted, to require the NFC *form* of a name and keep comparison as
-  plain equality, which is the cheaper rule and the one that cannot be got wrong this way.
 - [ ] **Audit every `unquoted-token` reference in both grammars, and decide whether it should be `identifier`.**
   The kernel types every name position with one atom (`token`, aliased as `type_name`/`field_name`/
   `param_name`) — which `SPEC-FEEDBACK.md` #3 proposes replacing with a single `identifier` entry those three

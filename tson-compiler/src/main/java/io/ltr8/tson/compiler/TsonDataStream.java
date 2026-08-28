@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.atom.AtomParseException;
 import io.ltr8.tson.compiler.atom.UriParser;
 import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
+import io.ltr8.tson.compiler.lexer.Nfc;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
@@ -688,7 +689,7 @@ public final class TsonDataStream implements TsonEventSource {
                     advance(); // field-name token
                     advance(); // ':'
                     ready.add(new RecordStart(lbrace.start()));
-                    ready.add(new FieldName(t1.text(), t1.start()));
+                    ready.add(new FieldName(Nfc.of(t1.text()), t1.start()));
                     pushFrame(new RecordFrame());
                     pushFrame(new ScopedValueFrame());
                     return;
@@ -748,7 +749,7 @@ public final class TsonDataStream implements TsonEventSource {
             consumeSeparatorOrCloseCheck(TokenType.RBRACE);
             Token name = expectFieldNameToken("a record field name");
             expect(TokenType.COLON, "a record field's ':'");
-            ready.add(new FieldName(name.text(), name.start()));
+            ready.add(new FieldName(Nfc.of(name.text()), name.start()));
             pushFrame(new RecordFrame());
             pushFrame(new ScopedValueFrame());
         }
