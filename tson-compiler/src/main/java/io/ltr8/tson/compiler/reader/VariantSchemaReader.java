@@ -43,32 +43,77 @@ import java.util.Set;
  * is what this used to do, left the reader that builds the value unable to see them, and re-attaching
  * afterwards could only put them back on a {@code TsonValue}.
  */
-final class VariantSchemaReader implements TsonTypeReader<Object> {
+final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renamed {
 
     private final String name;
     private final TsonTypeReader<?> ownParser;
+    private final Set<String> selfNames;
     private final Set<String> subtypeNames;
     private final TsonTypeReaderResolver resolver;
 
     VariantSchemaReader(String name, TsonTypeReader<?> ownParser, Collection<String> subtypeNames,
                         TsonTypeReaderResolver resolver) {
+        this(name, Set.of(name), ownParser, subtypeNames, resolver);
+    }
+
+    /**
+     * {@code selfNames} are the written names that mean <em>this</em> type and so read through
+     * {@code ownParser} rather than dispatching: the entry's own name, plus any alias that flattens to it.
+     * §7.2 compares "after reference flattening of both", so an alias is not a different type to be
+     * dispatched to -- resolving it would arrive back here and recurse.
+     */
+    VariantSchemaReader(String name, Collection<String> selfNames, TsonTypeReader<?> ownParser,
+                        Collection<String> subtypeNames, TsonTypeReaderResolver resolver) {
         this.name = name;
+        this.selfNames = Set.copyOf(selfNames);
         this.ownParser = ownParser;
         this.subtypeNames = Set.copyOf(subtypeNames);
         this.resolver = resolver;
     }
 
+    /**
+     * {@inheritDoc} <p>Renames the <em>wrapped</em> reader and keeps this one's own {@code name} for
+     * dispatch: the display name is what the position wrote (§8.3's {@code @alias}), while dispatch compares
+     * against the entry's real name and its aliases. Without this the wrapper would swallow the rename and a
+     * diagnostic would report the entry a use site resolved to rather than the name the author typed --
+     * which is the rule {@link UseSite} exists to keep.
+     */
+    /**
+     * The reader this guards, and a rebuilt guard around a replacement for it. Object-binding rebinds a
+     * container field's reader to the component's own Java type ({@code RecordBindReader}'s rebind step),
+     * which tests the reader's concrete class -- so that step has to see through this wrapper and put it
+     * back, or a guarded field silently loses its rebinding.
+     */
+    TsonTypeReader<?> wrapped() {
+        return ownParser;
+    }
+
+    VariantSchemaReader rewrap(TsonTypeReader<?> replacement) {
+        return new VariantSchemaReader(name, selfNames, replacement, subtypeNames, resolver);
+    }
+
+    @Override
+    public TsonTypeReader<?> renamed(String displayName) {
+        if (!(ownParser instanceof UseSite.Renamed renameable)) {
+            return this;
+        }
+        return new VariantSchemaReader(name, selfNames, renameable.renamed(displayName), subtypeNames, resolver);
+    }
+
     @Override
     public Object read(TsonReadContext ctx) {
         Optional<String> typeRef = EventSkip.typeRefAhead(ctx);
-        if (typeRef.isEmpty() || typeRef.get().equals(name)) {
+        if (typeRef.isEmpty() || selfNames.contains(typeRef.get())) {
             return ownParser.read(ctx);
         }
         String ref = typeRef.get();
         if (!subtypeNames.contains(ref)) {
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + ref + "' is not a known subtype of '" + name
-                            + "' -- expected one of " + subtypeNames,
-                    "one of " + subtypeNames, ref);
+            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, subtypeNames.isEmpty()
+                            ? "'" + ref + "' is not valid at a '" + name + "' position -- a type annotation "
+                                    + "must name the position's own type, which has no subtypes (§7.2)"
+                            : "'" + ref + "' is not a known subtype of '" + name + "' -- expected one of "
+                                    + subtypeNames,
+                    subtypeNames.isEmpty() ? "'" + name + "'" : "one of " + subtypeNames, ref);
             EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable
             return null;
         }

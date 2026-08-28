@@ -288,6 +288,13 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private static TsonTypeReader<?> rebindContainerIfNeeded(CompiledField field, DataClassField target,
                                                              TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes) {
         TsonTypeReader<?> parser = field.parser();
+        // A §7.2 subsumption guard wraps the container reader, and the tests below are on its concrete class
+        // -- so look through the guard and put it back around whatever replaces it (Subsumption).
+        if (parser instanceof VariantSchemaReader guard) {
+            TsonTypeReader<?> rebound = rebindContainerIfNeeded(
+                    new CompiledField(field.schema(), guard.wrapped()), target, resolver, annotationTypes);
+            return rebound == guard.wrapped() ? parser : guard.rewrap(rebound);
+        }
         // The field's own name serves as both, here and only here: this rebuild deliberately drops the
         // schema type name (see above), and a field name is already the author's own word for the value --
         // there is nothing a derived display name would add over it.
