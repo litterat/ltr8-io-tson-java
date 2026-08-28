@@ -674,24 +674,20 @@ public final class TsonSchemaParser extends TsonDataParser {
      */
     private TypeRef parseMapKey() {
         TypeRef key = parseTypeRefHead();
-        rejectMapQuestion("key");
+        rejectKeyQuestion();
         return key;
     }
 
     /**
-     * Neither side of the map sugar's {@code '=>'} admits {@code ?} (§5.3): {@code map} declares no {@code
-     * state} field for one to bind, and an absent key is already a data-grammar error.
-     *
-     * <p>The key half is settled — §2.9 forbids an absent key outright. The <b>value</b> half is refused here
-     * on §5.3's ground that "absence has no defined meaning for map values", which §7.6 and [TSON-DATA] §2.9
-     * contradict by giving it one; {@code MapAbstractReader.decodedValue} follows those two and admits it. So
-     * a map value is optional and cannot be marked optional. Both halves are implemented as written rather
-     * than reconciled here, the choice being the spec's: {@code SPEC-FEEDBACK.md} #12.
+     * A map's <em>key</em> never admits {@code ?}. [TSON-DATA] §2.9 forbids the absent sentinel in key
+     * position outright and [TSON-SCHEMA] §7.6 restates it, so there is no state for the marker to bind and
+     * no reading under which one could be wanted -- unlike the value side, which takes it ({@link
+     * #parseMapBody}).
      */
-    private void rejectMapQuestion(String side) {
+    private void rejectKeyQuestion() {
         if (check(TokenType.QUESTION)) {
-            throw parseError("'?' is not permitted on a map type's " + side + " (§5.3); a map has no element "
-                    + "state to mark optional");
+            throw parseError("'?' is not permitted on a map type's key (§7.6); a map key is never absent, "
+                    + "so there is no state to mark -- write it on the value if the value may be absent");
         }
     }
 
@@ -759,12 +755,17 @@ public final class TsonSchemaParser extends TsonDataParser {
      * {@code map-type} past its opening {@code '{'} (§12.1): one {@code key => value} entry, an optional size
      * specifier after {@code ';'}, and the closing brace. The size specifier is the bracket form's own, under
      * the same grammar and the same {@code N <= M} coherence rule (§5.3).
+     *
+     * <p>The value is an {@link #parseElementType}, so {@code {K => V?}} marks it OPTIONAL exactly as
+     * {@code [T?]} marks an element -- §12.3's adjacency rule included, rather than restated. The key is not
+     * ({@link #rejectKeyQuestion}). This is [TSON-SCHEMA] §7.6's own permission made sayable: the value is
+     * optional there with no condition attached, which leaves an author unable to require one. See {@code
+     * SPEC-FEEDBACK.md} #12 -- §5.3 still says neither side admits the marker.
      */
     private MapRef parseMapBody() {
         TypeRef key = parseMapKey();
         expect(TokenType.MAP_ARROW, "a map type's '=>'");
-        TypeRef value = parseTypeRef();
-        rejectMapQuestion("value");
+        ElementType value = parseElementType();
         Optional<SizeSpec> size = Optional.empty();
         if (check(TokenType.SEMICOLON)) {
             advance();
@@ -772,7 +773,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
         requireMapClose();
         expect(TokenType.RBRACE, "a map type's closing '}'");
-        return new MapRef(key, new ElementType(value, false), size);
+        return new MapRef(key, value, size);
     }
 
     /**

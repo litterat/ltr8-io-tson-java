@@ -267,7 +267,8 @@ class DefinitionResolverTest {
         TypeDefinition translations = TypeDefinition.product(MapBody.of(TypeRef.of("text"), TypeRef.of("text")));
 
         assertEquals("{ kind: \"PRODUCT\" parameters: [] constructor: false supertypes: [] subtypes: [] "
-                        + "body: !map { key_type: { name: \"text\" arguments: [] } value_type: { name: \"text\" arguments: [] } } }",
+                        + "body: !map { key_type: { name: \"text\" arguments: [] } value_type: { name: \"text\" arguments: [] } "
+                        + "state: \"REQUIRED\" } }",
                 write(translations));
     }
 
@@ -747,6 +748,8 @@ class DefinitionResolverTest {
                         + "state: \"REQUIRED\" } "
                         + "{ name: \"value_type\" type: { name: \"type_ref\" arguments: [] } "
                         + "state: \"REQUIRED\" } "
+                        + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
+                        + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
                         + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",

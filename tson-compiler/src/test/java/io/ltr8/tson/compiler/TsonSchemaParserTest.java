@@ -361,19 +361,40 @@ class TsonSchemaParserTest {
     }
 
     /**
-     * Neither side of the {@code =>} admits {@code ?}: a map declares no element state (§5.3). The value
-     * side, and a <em>generic</em> key, reach that rule; a plain-name key marked {@code ?} never does, because
-     * §12.2's dispatch has already committed the brace to a record by the time the {@code ?} is read -- see
-     * {@link #aQuestionMarkOnAPlainMapKeyIsAnsweredByTheBraceDispatch}.
+     * A map's <b>key</b> never admits {@code ?}: [TSON-DATA] §2.9 forbids an absent key outright, so there is
+     * no state to mark. Only a <em>generic</em> key reaches that rule; a plain-name key marked {@code ?} never
+     * does, because §12.2's dispatch has already committed the brace to a record by the time the {@code ?} is
+     * read -- see {@link #aQuestionMarkOnAPlainMapKeyIsAnsweredByTheBraceDispatch}.
      */
     @Test
-    void aQuestionMarkOnAMapTypeIsAParseError() {
-        for (String body : List.of("{text => integer?}", "{pair<text>? => integer}")) {
-            TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
-                    !!meta:"https://tson.io/2026/33/m/meta.tn"
-                    { m => %s }""".formatted(body)), body);
-            assertTrue(thrown.getMessage().contains("not permitted on a map type's"), thrown.getMessage());
-        }
+    void aQuestionMarkOnAMapKeyIsAParseError() {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                { m => {pair<text>? => integer} }"""));
+        assertTrue(thrown.getMessage().contains("not permitted on a map type's key"), thrown.getMessage());
+    }
+
+    /**
+     * The <b>value</b> side does admit it, marking the value OPTIONAL exactly as {@code [T?]} marks an
+     * element -- the {@code state} field the kernel gives {@code map} (issue #227, {@code SPEC-FEEDBACK.md}
+     * #12). §12.3's adjacency rule comes with it, since the value parses through the same {@code
+     * element-type} production every bracket position does.
+     */
+    @Test
+    void aQuestionMarkOnAMapValueMarksItOptional() {
+        MapRef map = mapOf("m => {text => integer?}");
+
+        assertTrue(map.valueType().optional());
+        assertEquals(new SimpleRef("integer"), map.valueType().typeRef());
+    }
+
+    /** And §12.3's adjacency rule applies there like anywhere else. */
+    @Test
+    void aDetachedQuestionMarkOnAMapValueIsAParseError() {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                { m => {text => integer ?} }"""));
+        assertTrue(thrown.getMessage().contains("immediately adjacent"), thrown.getMessage());
     }
 
     /**

@@ -188,8 +188,7 @@ class ChoiceDisjointnessTest {
     void aRecordAndAMapAreNotDisjoint() {
         atom("text", TextType.UNCONSTRAINED);
         TypeRef record = product("point", RecordBody.of(List.of()));
-        TypeRef map = product("lookup", new MapBody(TypeRef.of("text"), TypeRef.of("text"),
-                Optional.empty(), Optional.empty()));
+        TypeRef map = product("lookup", new MapBody(TypeRef.of("text"), TypeRef.of("text"), ElementState.REQUIRED, Optional.empty(), Optional.empty()));
         assertFalse(disjoint(record, map));
     }
 

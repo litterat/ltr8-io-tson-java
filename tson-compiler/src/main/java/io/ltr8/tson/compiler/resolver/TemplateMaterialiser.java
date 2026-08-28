@@ -777,7 +777,7 @@ final class TemplateMaterialiser {
             case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.state(),
                     array.unordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(map.apply(mapBody.keyType()), map.apply(mapBody.valueType()),
-                    mapBody.minItems(), mapBody.maxItems());
+                    mapBody.state(), mapBody.minItems(), mapBody.maxItems());
             case TupleBody tuple -> new TupleBody(tuple.elements().stream()
                     .map(element -> new TupleElement(map.apply(element.elementType()), element.state())).toList());
             case ChoiceBody choice -> new ChoiceBody(choice.variants().stream().map(map).toList());

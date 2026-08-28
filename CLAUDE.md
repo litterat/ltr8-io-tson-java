@@ -40,9 +40,11 @@ a source of truth — with one standing exception: the three `.tn` schemas are *
 time**, so they are the live copies rather than a snapshot. Two things follow. They carry real `?sha256=`
 digests over their own bytes where the published drafts spell the pin `xxhash` and pin at publication. And
 their **content** now diverges from Revision 33 as well: meta-kernel declares `reference.target` as a
-`type_ref` rather than a `type_name`, and no longer declares `instance_template`, `template_argument` or
+`type_ref` rather than a `type_name`, no longer declares `instance_template`, `template_argument` or
 `record_field.value_param` — the quoted open-body vocabulary held bodies replaced (`SPEC-FEEDBACK.md` #5,
-#7). So a diff against the published draft shows three declarations missing, not only different pin values.
+#7) — and gives `map` a `state: element_state ~ REQUIRED` field, so `{K => V?}` can mark a value optional
+the way `[T?]` marks an element (`SPEC-FEEDBACK.md` #12). So a diff against the published draft shows three
+declarations missing and one field added, not only different pin values.
 **Changing them means re-stamping all three digests bottom-up** (`tson hash`, kernel first), moving the
 matching `*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which
 carry the published values.
@@ -320,7 +322,9 @@ form — a template application — and everything closed is an entry referenced
 reference or `!C value`. **The phase is purely syntactic and consults no governing meta**: the sugar set is
 closed, so the head each form desugars to and the vocabulary field each argument fills are a fixed table —
 which is also why meta-kernel's bootstrap needs no hand-written routing of its own. §5.3's element/position
-`?` binds `state` directly (`[T?; 3]` puts a state and both bounds on one binding record), and the size
+`?` binds `state` directly (`[T?; 3]` puts a state and both bounds on one binding record) — **and so does a
+map's value**, `{K => V?}`, against the `state` field this kernel gives `map` (`SPEC-FEEDBACK.md` #12); a map
+*key* takes no `?`, §2.9 forbidding an absent key outright. The size
 specifier binds the `min_items`/`max_items` pair directly for arrays and maps alike, with no size template in
 between. §5.3's declaration-level container syntax is complete. Bottom-up, so nesting needs no special case;
 an injected name derives from the *resolved binding record*, so `[T; 3]` and `[T; 3..3]` land on one entry. A

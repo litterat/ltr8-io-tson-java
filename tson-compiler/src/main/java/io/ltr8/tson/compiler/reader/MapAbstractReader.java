@@ -12,6 +12,7 @@ import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
 
 import java.math.BigInteger;
@@ -36,11 +37,11 @@ import java.util.function.BiConsumer;
  * map reader passes through, rather than in {@link #readInto}, which a {@code {}} never reaches.
  *
  * <p>Unlike {@link ArrayAbstractReader}, there's no {@code unique_items}/{@code ElementState}
- * concept here at all -- {@link MapBody} carries neither: a map has no per-entry required/optional
- * state for a value the way an array element or tuple position has. That absence is itself the rule at an
- * entry's value: [TSON-SCHEMA] §7.6 permits {@code _} there with no condition attached, precisely because
- * there is no element-state facet to make the permission conditional on (see {@link #decodedValue}). The
- * key position is the opposite and unconditional the other way.
+ * concept here at all -- {@link MapBody} carries no {@code unique_items}. It does carry an {@link
+ * ElementState}, governing the <b>value</b> ({@code {K => V?}}): an entry's value may be the absent
+ * sentinel under OPTIONAL and is {@code FIELD_REQUIRED} otherwise, which is the array element's own rule
+ * (see {@link #decodedValue}). The key is the opposite and unconditional -- §2.9 forbids the sentinel
+ * there whatever the declaration says, checked in {@link #readInto} before the key is decoded at all.
  *
  * <p><b>A repeated key is a validation error</b> ({@code DUPLICATE_MAP_KEY}), reported at the repeat's
  * own position and then decoded like any other entry so the sink still ends up "last value wins".
@@ -172,13 +173,13 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * The entry's value, or nothing where the document wrote {@code _} there. [TSON-SCHEMA] §7.6 permits the
-     * absent sentinel at a map entry value with no condition attached -- {@code map} carries no element-state
-     * facet, so unlike an array element ({@code [T?]}) or a record field there is nothing to declare and
-     * nothing to consult, and the entry is present with an absent value ([TSON-DATA] §2.9). Answered here
-     * rather than by the value's own reader, which is right to refuse the sentinel: {@code _} is a value of no
-     * atom type, so absence is the container's question, exactly as {@link ArrayAbstractReader#readInto} asks
-     * it of an element before reaching for the element parser.
+     * The entry's value, or nothing where the document wrote {@code _} there -- permitted under {@code
+     * {K => V?}} ({@link ElementState#OPTIONAL}) and {@code FIELD_REQUIRED} otherwise, the same two answers
+     * {@link ArrayAbstractReader#defaultOrRequire} gives an element. Either way the entry is present with an
+     * absent value ([TSON-DATA] §2.9) and counts toward the size bounds. Answered here rather than by the
+     * value's own reader, which is right to refuse the sentinel: {@code _} is a value of no atom type, so
+     * absence is the container's question, exactly as {@link ArrayAbstractReader#readInto} asks it of an
+     * element before reaching for the element parser.
      *
      * <p>{@code null} is what both subclasses already turn into their own no-value form ({@link
      * MapTreeReader} a {@code TsonAbsent}, {@link MapBindReader} a null map value), which is also what a
@@ -187,7 +188,12 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
      */
     private Object decodedValue(String keySegment, TsonReadContext ctx) {
         if (ctx.peek() instanceof AbsentEvent) {
-            ctx.next();
+            ctx.next(); // consumed regardless of REQUIRED/OPTIONAL, so the entry keeps its place either way
+            if (body.state() == ElementState.REQUIRED) {
+                ctx.field(keySegment).report(Diagnostic.Code.FIELD_REQUIRED,
+                        "'" + displayName + "' entry '" + keySegment + "' is absent, but values are required",
+                        "a value", "(absent)");
+            }
             return null;
         }
         return valueParser.read(ctx.field(keySegment));

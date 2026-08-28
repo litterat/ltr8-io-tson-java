@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -76,7 +77,7 @@ class MapTreeReaderTest {
      */
     @Test
     void emptyBraceIsAZeroEntryMapForMinItemsToo() {
-        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.of(BigInteger.ONE),
+        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, Optional.of(BigInteger.ONE),
                 Optional.empty());
         TsonCompiledSchema compiled = compile(body);
         TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
@@ -92,7 +93,7 @@ class MapTreeReaderTest {
     /** The same count against an upper bound: zero entries satisfy any {@code max_items}, and still do. */
     @Test
     void emptyBraceSatisfiesMaxItems() {
-        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.empty(),
+        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, Optional.empty(),
                 Optional.of(BigInteger.ONE));
 
         assertEquals(Map.of(), readMap(compile(body), "{}"));
@@ -107,15 +108,20 @@ class MapTreeReaderTest {
         assertTrue(thrown.getMessage().contains("absent sentinel"), thrown.getMessage());
     }
 
+    /** A map whose values may be absent -- {@code {K => V?}}, the sugar for {@code state: OPTIONAL}. */
+    private static MapBody optionalValues() {
+        return new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.OPTIONAL, Optional.empty(),
+                Optional.empty());
+    }
+
     /**
-     * [TSON-SCHEMA] §7.6's table permits {@code _} at a map entry value with a plain "yes" -- the one
-     * unconditional permission in it, because {@code MapBody} carries no element-state facet for an author
-     * to declare or a reader to consult. The entry is present with an absent value ([TSON-DATA] §2.9), so
-     * the key is decoded and kept and nothing is reported.
+     * Under {@code state: OPTIONAL} an entry's value may be the absent sentinel: the entry is present with an
+     * absent value ([TSON-DATA] §2.9), so the key is decoded and kept and nothing is reported. This is
+     * [TSON-SCHEMA] §7.6's permission, now conditional on the declaration the way an array element's is.
      */
     @Test
-    void anAbsentEntryValueIsPermitted() {
-        TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
+    void anAbsentEntryValueIsPermittedUnderOptional() {
+        TsonCompiledSchema compiled = compile(optionalValues());
         TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
 
         TsonMap result = (TsonMap) compiled.get("scores").read(TestDocuments.document("{ 1 => _  2 => 20 }", problems));
@@ -127,19 +133,40 @@ class MapTreeReaderTest {
     }
 
     /**
+     * And under the default REQUIRED it is refused, which is the whole point of giving {@code map} a {@code
+     * state} field: {@code {K => V}} now means what {@code [T]} means, and an author who wants absence says
+     * so. Reported as {@code FIELD_REQUIRED} at the entry's own path, the answer {@code
+     * ArrayAbstractReader} gives a required element.
+     */
+    @Test
+    void anAbsentEntryValueIsRefusedUnderTheDefaultRequired() {
+        TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        compiled.get("scores").read(TestDocuments.document("{ 1 => _ }", problems));
+
+        assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
+        Diagnostic reported = problems.diagnostics().getFirst();
+        assertEquals(Diagnostic.Code.FIELD_REQUIRED, reported.code());
+        assertEquals(Optional.of("/1"), reported.path());
+        assertTrue(reported.message().contains("is absent, but values are required"), reported.message());
+    }
+
+    /**
      * An entry whose value is absent is still an entry: [TSON-DATA] §2.9 has higher parts that impose size
      * constraints "count all slots", so two absent-valued entries satisfy {@code min_items: 2} and breach
-     * {@code max_items: 1}.
+     * {@code max_items: 1}. Counted the same under either state -- the refusal above costs the value its
+     * verdict, not the entry its place.
      */
     @Test
     void anAbsentEntryValueCountsTowardTheSizeBounds() {
-        MapBody atLeastTwo = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.of(BigInteger.TWO),
-                Optional.empty());
+        MapBody atLeastTwo = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.OPTIONAL,
+                Optional.of(BigInteger.TWO), Optional.empty());
         assertEquals(2, ((TsonMap) compile(atLeastTwo).get("scores")
                 .read(TestDocuments.document("{ 1 => _  2 => _ }"))).entries().size());
 
-        MapBody atMostOne = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.empty(),
-                Optional.of(BigInteger.ONE));
+        MapBody atMostOne = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.OPTIONAL,
+                Optional.empty(), Optional.of(BigInteger.ONE));
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> compile(atMostOne).get("scores").read(TestDocuments.document("{ 1 => _  2 => _ }")));
         assertTrue(thrown.getMessage().contains("has 2 entries, more than the maximum 1"), thrown.getMessage());
@@ -206,7 +233,7 @@ class MapTreeReaderTest {
 
     @Test
     void minItemsRejectsTooFewEntries() {
-        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.of(BigInteger.TWO), Optional.empty());
+        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, Optional.of(BigInteger.TWO), Optional.empty());
         TsonCompiledSchema compiled = compile(body);
 
         assertEquals(2, readMap(compiled, "{ 1 => 1 2 => 2 }").size());
@@ -215,7 +242,7 @@ class MapTreeReaderTest {
 
     @Test
     void maxItemsRejectsTooManyEntries() {
-        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), Optional.empty(), Optional.of(BigInteger.ONE));
+        MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, Optional.empty(), Optional.of(BigInteger.ONE));
         TsonCompiledSchema compiled = compile(body);
 
         assertEquals(1, readMap(compiled, "{ 1 => 1 }").size());

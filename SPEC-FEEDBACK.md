@@ -965,14 +965,19 @@ series' own bundled document and its field list is the thing in question, not ev
 parenthetical concerns absent *keys*, which is §2.9's own unconditional rule and says nothing about values;
 the sugar's key side needs no `?` for a reason that has never been in doubt.
 
-**Interpretation chosen:** §7.6's, which is also Part 1's. `_` at a map entry value reads, unconditionally,
-as an entry present with an absent value: the key is decoded and kept, nothing is reported, and the entry
-counts toward `min_items`/`max_items` like any other (§2.9 has higher parts count all slots). In tree mode the
-value is a `TsonAbsent`; in bind mode the bound `Map` holds the key against a `null`, which is as close as
-Java comes to the distinction and still tells it from a key never stated. §5.3 is implemented as written
-alongside it — `{K => V?}` is a parse error naming §5.3 — so this implementation currently ships both halves
-of the incoherence, which is what makes it visible: an author reads that the value cannot be marked optional,
-and finds that it is optional anyway.
+**Interpretation chosen: the recommendation below, built.** `map` carries a `state` field here, so `_` at a
+map entry value reads as an entry present with an absent value where the declaration wrote `{K => V?}`, and
+is `FIELD_REQUIRED` under the default — the two answers an array element already gets. Either way the entry
+counts toward `min_items`/`max_items` (§2.9 has higher parts count all slots): the refusal costs the value
+its verdict, not the entry its place. In tree mode a permitted absence is a `TsonAbsent`; in bind mode the
+bound `Map` holds the key against a `null`, which is as close as Java comes to the distinction and still
+tells it from a key never stated.
+
+This is a **deliberate divergence from the published Revision 33 kernel**, the third this implementation
+carries, and it resolves the contradiction rather than picking a side of it: §7.6's permission survives, now
+sayable; §5.3's refusal survives for the key, where it was never in doubt. Before it, both halves were
+implemented as written and the incoherence was author-visible — the value could not be marked optional and
+was optional anyway.
 
 **Recommendation — give `map` the `state` field, and let the sugar spell it.** This is the reading that makes
 the container family uniform, and it is a subtraction from the prose rather than an addition:
@@ -1013,5 +1018,6 @@ lists map entry values explicitly and states the present-with-an-absent-value di
 as fields. Part 1 is frozen, so this option is not available without reopening it; that is a reason to rule
 it out rather than merely to disfavour it.
 
-**Status against Revision 33:** open, new against this revision. §7.6's half is built and running here; §5.3's
-half is built as written, which is how the two were found to disagree. The `state` field is not built.
+**Status against Revision 33:** open, new against this revision. The `state` field, the sugar's `?` on the
+value side, and the reader's two answers are built and running here; the spec still says otherwise in both
+places, which is what this entry asks the next revision to settle.

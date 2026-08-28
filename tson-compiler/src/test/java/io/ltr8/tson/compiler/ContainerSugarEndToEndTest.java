@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
+import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -318,6 +319,40 @@ class ContainerSugarEndToEndTest {
                 () -> compiled.get("holder").read(TestDocuments.document(
                         "{ entries: { \"a\" => \"1\"  \"b\" => \"2\"  \"c\" => \"3\" } }")))
                 .getMessage().contains("maximum 2"));
+    }
+
+    /**
+     * <code>{K =&gt; V?}</code> through the real bundled chain: the marker reaches the kernel's {@code map}
+     * {@code state} field (issue #227), so the value may be the absent sentinel and the map's own type says
+     * so. The peer of {@code [T?]}, and the end-to-end half of {@code SchemaDesugarerTest}'s binding check.
+     */
+    @Test
+    void anOptionalMapValueResolvesToAMapBodyCarryingTheState() {
+        TsonCompiledSchema compiled = compile("""
+                  loose => {text => text?}
+                  strict => {text => text}""");
+
+        assertEquals(ElementState.OPTIONAL, ((MapBody) bodyOf(compiled, "loose")).state());
+        assertEquals(ElementState.REQUIRED, ((MapBody) bodyOf(compiled, "strict")).state());
+    }
+
+    /**
+     * And it is live at read time, which is the point of the field: the same document is valid under one
+     * declaration and a {@code FIELD_REQUIRED} under the other. Before {@code map} carried a state, both
+     * accepted it and no schema could say otherwise ({@code SPEC-FEEDBACK.md} #12).
+     */
+    @Test
+    void anAbsentMapValueIsAcceptedOnlyWhereTheSchemaMarkedItOptional() {
+        TsonCompiledSchema compiled = compile("""
+                  loose => {text => text?}
+                  strict => {text => text}
+                  holder => { a: loose  b: strict }""");
+
+        assertNotNull(compiled.get("holder")
+                .read(TestDocuments.document("{ a: { \"k\" => _ }  b: { \"k\" => \"v\" } }")));
+        assertTrue(assertThrows(TsonReadException.class, () -> compiled.get("holder")
+                .read(TestDocuments.document("{ a: { \"k\" => _ }  b: { \"k\" => _ } }")))
+                .getMessage().contains("is absent, but values are required"));
     }
 
     /**
