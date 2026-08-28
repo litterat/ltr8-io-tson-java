@@ -130,6 +130,16 @@ value is disambiguation at the call site (`TsonSchema` vs. a domain `Schema`). W
 developer-facing type, ask "would a consumer plausibly have their own class with this bare name?" — if yes
 and it's consumer-facing, prefix it; if it's internal machinery, leave it bare.
 
+**A fixed or default value is available on a scalar-typed field and nowhere else.** §5.2 makes a `~`/`=`
+value a value of the field's declared type, and §12.1 admits only a bare token there; `TsonSchemaLinker`
+resolves the field's type and parses the token with that type's own reader parser, so a default is accepted
+exactly when a read would accept the same token in the same position. A field typed by anything but an
+**atom or an enum** is refused whatever token stands beside it — records and choices included, though §5.6's
+positional form and an atom-typed variant mean a read would accept some. Admitting those would make "may
+this field have a default?" depend on another declaration's field count or variant list, a rule an author
+computes rather than remembers, and one that breaks silently when that other declaration gains a field.
+`SPEC-FEEDBACK.md` #8 carries the interpretation; `void`/`unknown`/`extern` fall out of the same line.
+
 **A schema and its bound class must agree about a type's fields** (`TsonBindMismatchException`, raised at
 bind-mode compile — startup, not first read; its subclass `TsonMissingBindingException` covers a type with
 *no* class at all and is deferred to the first read of that type, since a schema legitimately declares types
@@ -726,7 +736,7 @@ compatibility).
 
 ## Not yet implemented
 
-- **Part 2 resolution gaps** — the identity-diagonal FIXED-value invariant. Otherwise **none: no
+- **Part 2 resolution gaps** — **none: no
   `NOT_IMPLEMENTED` is reachable from a schema any more**, the pipeline reporting `SCHEMA_ERROR` for
   everything it refuses. A parameterized supertype resolves (`vip => <T> customer & box<T>` absorbs the
   operand's fields while the application is open, the operand contributing its own supertypes but not its
@@ -790,15 +800,15 @@ compatibility).
   declaration**, one level coarser than the pointer beside it — `/person/age` carries `person`'s own line,
   because `RecordField` has no position. A `caused by` frame chaining the author's location to the leaf
   constraint's is the other open shape (`BACKLOG.md`).
-- **Half of §5.10's argument-kind rule, on a held record body.** A held body has no slot types — that is what
-  it is for — so it cannot say *this slot expected a value*. A literal applied where the body uses the
-  parameter as a type is still refused (nothing declares a type called `3`, so the verdict arrives as an
-  unresolved reference); its converse, a type name applied into a field's `value`, is accepted, `value` being
-  §4's escape-hatch atom. **What closes it is not the kind rule** but §5.2's own dependency —
-  `record_field.value` must be the field's declared type — which catches `int32 ~ text` whether a parameter
-  put it there or the author wrote it literally, and is the FIXED/DEFAULT value validation listed below.
+- **§5.10's argument-kind rule is answered by two other rules, not by the kind rule.** A held body has no
+  slot types — that is what it is for — so it can never say *this slot expected a value*. Neither half needs
+  it to: a literal applied where the body uses the parameter as a **type** is refused because nothing
+  declares a type called `3` (an unresolved reference), and a type name routed into a field's **value** is
+  refused because §5.2 makes `record_field.value` a value of the field's declared type — which catches
+  `int32 ~ text` whether a parameter put it there or the author wrote it literally (`TsonSchemaLinker`'s
+  `checkFieldValue`, `FieldValueConformanceTest`). What is left is that check's own boundary, below.
   `SPEC-FEEDBACK.md` #5 carries the spec-side question.
-- **Deferred design questions** — `REQUIRED_FIXED`/`OPTIONAL_FIXED` value validation. **Routed-value
+- **Deferred design questions** — the identity-diagonal FIXED-value invariant. **Routed-value
   substitution is
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →
   `REQUIRED_FIXED`, `~` staying a default), which is §5.7's "fixation happens downstream" applied to the

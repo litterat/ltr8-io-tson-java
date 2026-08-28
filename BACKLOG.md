@@ -62,24 +62,6 @@ An open entry's body is the constructor application as written, held unread unti
 substitutes its parameters away — `docs/schema-resolution.md` describes it, `SPEC-FEEDBACK.md` #5 and #7 are
 the proposals it answers. What is left below are consequences of holding, not shapes outside it.
 
-- [ ] **A field's `~`/`=` value is never checked against the field's own declared type, and the failure wears
-  the wrong clothes.** meta-kernel's `@doc` on `value` states the dependency outright -- `record_field.value`
-  holds "the type of fixed/default values, **which must be the field's declared type** -- a dependency the
-  schema language does not express directly" -- and nothing enforces it. `{ first: int32 ~ "nope" }` resolves,
-  links and compiles; the first read of that type throws
-  `UnsupportedOperationException: '…' has no usable compiled reader … 'nope' is not a valid integer`.
-  - **Not template-specific**, and worth saying so: `test1 => <T, N> { first: T ~ N }` applied as
-    `test1<int32, "nope">` behaves *identically* to the literal spelling beside it. The template inherits the
-    hole rather than opening one, which is also why §5.10's argument-kind rule is the wrong instrument --
-    both sides there are correctly kinded (a value argument bound to a value parameter) and the kind rule has
-    nothing to say, where value-conformance catches it. `SPEC-FEEDBACK.md` #5 carries the recommendation.
-  - `SPEC-FEEDBACK.md` #5 offers this check to the spec as the replacement for §5.10's argument-kind rule,
-    where it is marked a recommendation rather than a report — building it is what would change that.
-  - **The exception classification is wrong today**, which is the part that is a defect rather than a gap. A
-    default that is not valid for its field's type is an author error whose verdict does not change as this
-    library improves, so it belongs in `TsonSchemaValidationException` at the declaration -- not in the
-    `ErrorReader` path, whose `UnsupportedOperationException` says "library gap" and carries the CLI's exit 70.
-    Reachable from an ordinary schema, so this half is worth fixing even before the check itself lands.
 - [ ] **A parametric enum member is classified as a type argument and fails.** `e => <M> !enum { members:
   [a b M] }` applied as `e<c>` reports `'e<c>' source has an unresolved reference 'c'`: an unquoted
   non-numeric argument rides the reference channel (§12.1's own `type-arg` rule) and `c` is an enum member,
@@ -134,14 +116,6 @@ the proposals it answers. What is left below are consequences of holding, not sh
       family has no CIDR parser.
     - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
       than moving the value model's dependencies.
-- [ ] **A quoted numeric is accepted where an integer is declared.** `xs => !array { element_type: float32
-  min_items: "3" }` resolves with `min_items` 3, and so does every other integer-typed constraint slot: the
-  family's parser reads the token's text and never consults its form, where §4 base resolution makes a quoted
-  token a *string* whatever it spells. Pre-existing and unrelated to templates -- found while checking that a
-  value type-argument keeps its form, which it does; identity keeps `<3>` and `<"3">` apart, and it is the
-  constraint slot underneath that then accepts both. The fix belongs with the atom families, next to
-  `AtomNarrowing`: a parser that takes the whole `TokenValue` can reject a quoted token at a numeric slot,
-  which is the same shape the width-derived-range checks want.
 - [ ] **`precision` and `require_timezone` are carried but not enforced** (`datetime`/`time`). The bodies
   declare them — a field with no component is one this model silently loses — and the parsers refuse to
   *read* against a schema that sets either, so the facet is a stated gap rather than a constraint quietly

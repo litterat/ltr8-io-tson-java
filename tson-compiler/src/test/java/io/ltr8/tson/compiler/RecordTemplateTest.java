@@ -490,23 +490,27 @@ class RecordTemplateTest {
     }
 
     /**
-     * <b>The converse is a known gap, pinned here so it stays visible.</b> A type name applied where the body
-     * routes the parameter into a field's <em>value</em> is accepted: substitution puts {@code text} in the
-     * {@code value} slot, {@code value} is §4's escape-hatch atom that accepts any token, and no rule
-     * downstream compares a field's default against the field's own declared type.
+     * <b>The converse is caught, and not by the kind rule.</b> A type name applied where the body routes the
+     * parameter into a field's <em>value</em> substitutes {@code text} into the {@code value} slot -- both
+     * sides correctly kinded, so §5.10's argument-kind rule has nothing to say. What catches it is §5.2's own
+     * dependency: {@code record_field.value} must be the field's declared type, and {@code text} is not an
+     * {@code int32} whether a parameter put it there or the author wrote it literally.
      *
-     * <p><b>What would close it is not the kind rule.</b> §5.2's own dependency -- "record_field.value ... must
-     * be the field's declared type" -- catches this and needs no notion of a parameter's kind: {@code text} is
-     * not an {@code int32}, whether a parameter put it there or the author wrote it literally. That check is
-     * {@code BACKLOG.md}'s deferred FIXED/DEFAULT value validation, and it subsumes this case. The residue it
-     * would not catch -- a type name applied into a {@code text}-typed value slot -- is a value slot holding a
-     * valid value, which is no error to give.
+     * <p>So the two halves of the kind rule are answered by two different rules, which is the finding
+     * {@code SPEC-FEEDBACK.md} #5 carries: the type-position half above by an unresolved reference, this one
+     * by value conformance. Neither needs a held body to know what its slots expected. The residue value
+     * conformance does not catch -- a type name applied into a {@code text}-typed value slot -- is a value
+     * slot holding a valid value, which is no error to give.
      */
     @Test
-    void applyingATypeWhereTheBodyRoutesAValueIsNotYetCaught() {
-        assertNotNull(compile("""
-                  retry => <N> { attempts: int32 ~ N }
-                  holder => { r: retry<text> }"""), "accepted today; see this test's own note");
+    void applyingATypeWhereTheBodyRoutesAValueIsCaughtByValueConformance() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> compile("""
+                          retry => <N> { attempts: int32 ~ N }
+                          holder => { r: retry<text> }"""));
+
+        assertTrue(thrown.getMessage().contains("field 'attempts'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("declared 'int32'"), thrown.getMessage());
     }
 
     /**
