@@ -343,6 +343,15 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   whatever Revision 34 settles. The audit is the deliverable either way: each site, which production it
   uses, and whether the parser agrees with the grammar — `TsonSchemaParser.expectTypeName` requires
   `TokenType.UNQUOTED`, and it is worth knowing where else that is assumed.
+- [ ] **Admit ZWNJ/ZWJ in the lexer, together with the UTS #39 §3.1.1.1 contextual check — never before it.**
+  `Lexer.isProfileContinue` subtracts the identifier-ignorable set, which removes U+200C/U+200D along with
+  the format characters; they are `XID_Continue`, so the end state is a token profile that is exactly the
+  property (`SPEC-FEEDBACK.md` #14, whose recommendation now keeps the algebra and replaces §7.1's prose).
+  Doing that alone reopens the invisible-character hole #229 closed, so it lands in one step with the
+  contextual rule — conditions A1/A2/B on neighbouring `Joining_Type`, under single-script and NFC, needing
+  `Character.UnicodeScript` and `Joining_Type` and no UTS #39 table. The conformance vector
+  `lexer/invalid/zwnj-inside-unquoted-token` asserts today's behaviour and flips in the same change; its
+  sidecar already says the contradiction is why it exists.
 - [ ] **An `identifier` profile, and skeleton distinctness on it** (§9.4-adjacent hardening). `SPEC-FEEDBACK.md` #3
   carries the design: names are a class the series never defines — §7.1 constrains *tokens*, which is also
   how values are written — so define one, apply it wherever a name is declared (a schema's type names,

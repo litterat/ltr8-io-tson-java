@@ -316,7 +316,7 @@ where the number grammar forced the token profile's hand:
 
 ```
 Token   Start = XID_Start ∪ Nd ∪ { - + . }     Continue = XID_Continue ∪ { - + . }
-Ident.  Start = XID_Start                      Continue = XID_Continue ∪ { - . }
+Ident.  Start = XID_Start                      Continue = XID_Continue ∪ { - }
 ```
 
 Three differences, each with its own reason:
@@ -328,7 +328,7 @@ Three differences, each with its own reason:
   profile. Dropping them is what makes `{ 42: 1 }` stop being a record with a numeric field name, and it
   **subsumes [TSON-SCHEMA] §12.1's existing rule** that "numbers are not declarable names" — every spelling
   the number grammar admits begins with a digit, a sign, or a dot, so the general rule and the type-name rule
-  become one rule. `Continue` keeps `-` and `.` (`my-field`, `a.b`), which no number-grammar concern touches.
+  become one rule. `Continue` keeps `-` (`my-field`), which no number-grammar concern touches.
 - **Identifier-Start does *not* add `_`, deliberately.** It is tempting to: §7.1 keeps `_` out of token-Start
   for a purely lexical reason — the bare token `_` is the absent sentinel (§2.9) — and `_id` is an ordinary
   field name. But admitting it buys only `!_id` and `@_note`, since `_id` is *already* spellable as a quoted
@@ -336,11 +336,16 @@ Three differences, each with its own reason:
   identifier that its own unquoted spelling cannot express. Leaving `_` out changes nothing that works
   today. §7.1's "names with a leading underscore MUST be quoted" then stays true and becomes a statement
   about spelling, which is what it always was.
-- **`+` is dropped from `Continue`** as well, being needed only for exponents.
+- **`+` and `.` are dropped from `Continue`** as well. `+` is needed only for exponents. `.` is dropped
+  **to reserve it**: a dot is the near-universal identifier *separator* — qualified names, path access,
+  namespacing — and admitting it into identifiers now would foreclose using it as one later. Nothing in the
+  three bundled schemas declares a name containing a dot, so the reservation costs nothing today and keeps
+  `person.name` and `ns.type` available as future syntax rather than as two identifiers that happen to
+  contain dots.
 
 **A property worth stating, because it makes the unquoted-only positions free.** With `_` left out, every
 part of the identifier profile is inside the token profile: `XID_Start ⊂ XID_Start ∪ Nd ∪ { - + . }` and
-`XID_Continue ∪ { - . } ⊂ XID_Continue ∪ { - + . }`. So **every identifier is a well-formed unquoted token**,
+`XID_Continue ∪ { - } ⊂ XID_Continue ∪ { - + . }`. So **every identifier is a well-formed unquoted token**,
 and no identifier ever needs quoting to be written. That is what makes `type-ref` and `annotation` — which
 admit no quoted form — lose nothing, and it is the invariant to preserve if the profile is ever widened:
 adding anything to identifier-Start that token-Start lacks (`_` being the obvious candidate) breaks it, and
@@ -368,7 +373,7 @@ Mixed script stays permitted; a restriction level remains available as an opt-in
 ```
 identifier      = identifier-start *identifier-continue
 identifier-start    = XID_Start
-identifier-continue = XID_Continue / "-" / "."
+identifier-continue = XID_Continue / "-"
                 ; the profile of Step 1b; a name's decoded text is matched
                 ; against this in full, as §7.6 matches a number's
 
@@ -529,12 +534,19 @@ Three things are wrong with that, and they compound:
 `"ad<ZWNJ>min"` reaches a Latin name today, because §7.1 governs unquoted tokens only. It forbids the safe
 case and permits the attack.
 
-**Recommendation:** replace the exclusion with UTS #39 §3.1.1.1's contextual rule, applied to names. It is
-total and two-valued, needs `Joining_Type` and `Script` (both UCD core properties, both exposed by every
-platform — no UTS #39 *table* is required for this part), it permits `کتاب‌ها` and refuses `ad<ZWNJ>min`, and
-it composes with the rest of Step 1b rather than sitting beside it: its two global conditions are NFC and
-single-script, and NFC is already clause 1 above. §7.1's ZWNJ paragraph then states a rule instead of a
-prohibition plus a remedy that does not work.
+**Recommendation:** replace the exclusion with UTS #39 §3.1.1.1's contextual rule, applied to identifiers,
+and leave §7.1's set algebra alone — `XID_Continue` should keep meaning `XID_Continue`. The rule is total and
+two-valued, needs `Joining_Type` and `Script` (both UCD core properties, both exposed by every platform — no
+UTS #39 *table* for this part), permits `کتاب‌ها`, refuses `ad<ZWNJ>min`, and composes with the rest of
+Step 1b rather than sitting beside it: its two global conditions are NFC and single-script, and NFC is
+already clause 1 above. §7.1's ZWNJ paragraph then states a rule instead of a prohibition plus a remedy that
+does not work.
+
+**The token profile moves with it.** Because the joiners are `XID_Continue`, the lexer's unquoted-token
+profile admits them too — which it must, or the subset invariant above breaks and an identifier containing a
+ZWNJ becomes unspellable at the `!` and `@` positions. So one rule governs both layers, and the contextual
+check is the only thing standing between `کتاب‌ها` and `ad<ZWNJ>min`. It follows that the lexer change and
+the contextual check are a single step: admitting the joiners first would reopen the hole #14's fix closed.
 
 If the contextual rule is judged too much machinery, the fallback is to keep the exclusion and **delete the
 remedy** — say plainly that such names cannot be expressed, rather than directing authors to a spelling that
@@ -1656,23 +1668,30 @@ This is not the harmless kind of disagreement. The prose is the reading with the
 it cites §9.4, and it imposes a MUST on authors ("names whose orthography requires them MUST be quoted") that
 the algebra silently lifts.
 
-**Interpretation chosen: the prose.** `Lexer` implements `Continue` as `XID_Continue ∖ { U+200C, U+200D }`,
-and `ab<ZWNJ>c` is a lexer error. The exclusion is not a special case in the code — the same subtraction that
-removes the format characters generally removes these two — but it is a deliberate departure from the stated
-algebra, and it is called out at the predicate so it cannot be "cleaned up" later by someone checking the
-code against the formula.
+**Interpretation chosen: the prose, for now, and it is the half that should change.** `Lexer` implements
+`Continue` as `XID_Continue ∖ { U+200C, U+200D }`, so `ab<ZWNJ>c` is a lexer error today. The exclusion is
+not a special case in the code — the same subtraction that removes the format characters generally removes
+these two — but it is a deliberate departure from the stated algebra, called out at the predicate so it is
+not "cleaned up" by someone checking the code against the formula. The intended end state is the opposite:
+the lexer admits the joiners, because they are `XID_Continue`, and the contextual rule below refuses the
+cases that are actually invisible. That change waits on the contextual rule existing, for the reason given
+under the resolution.
 
-**Suggested resolution — correct the algebra, keep the prose.** The prose is almost certainly the intent, so
-the fix is to make the formula say it:
+**Suggested resolution — keep the algebra, replace the prose.** The set algebra is correct as written and
+should not move: `XID_Continue` contains the joiners because UAX #31 put them in the default when it removed
+R1a, and a profile stated over a UCD property should mean that property. What goes is the blanket exclusion,
+which is over-broad in one direction and bypassable in the other (#3 has the full argument: it forbids the
+Persian names that need ZWNJ while its "MUST be quoted" remedy is how the attack reaches a Latin name).
 
-```
-Start    = XID_Start ∪ Nd ∪ { - + . }
-Continue = ( XID_Continue \ { U+200C, U+200D } ) ∪ { - + . }
-```
+In its place, the contextual rule the removal of R1a relocated to UTS #39 §3.1.1.1 — conditions A1/A2/B on
+the neighbouring characters' `Joining_Type`, under two global conditions, single-script and NFC. It belongs
+on the identifier layer #3 proposes, not on the token profile, and it needs `Joining_Type` and `Script`
+only: both UCD core properties, neither requiring a UTS #39 table.
 
-and the existing ZWNJ/ZWJ paragraph then explains a subtraction the reader can see rather than contradicting
-one they cannot. If instead the intent is to admit them, that paragraph goes and §9.4 gains a sentence about
-why the profile carries two invisible characters.
+**The two must land together**, and that is a real constraint rather than a tidiness point. A lexer whose
+token profile is exactly `XID_Continue` admits `ab<ZWNJ>c`; if the contextual check does not yet exist, that
+is the invisible-character hole reopened. So the profile correction, the contextual rule, and any conformance
+vector asserting the current behaviour move in one step — not the algebra first.
 
 **A second, smaller ask in the same section: say that no format character is admitted, not only that U+FEFF
 and ZWNJ/ZWJ are not.** §7.1 currently names exactly three invisible characters — U+FEFF, in a paragraph of
