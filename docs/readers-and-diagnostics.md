@@ -306,13 +306,31 @@ about which file to open. The seed for a non-record comes from `TsonLinkedSchema
 schema being read against, which is what keeps that true for an imported declaration; `ValueReaderContext.locationOf`
 is the single construction site, so there is nowhere else for a mismatched pair to come from.
 
-**`schemaPosition` is per declaration, so it is one level coarser than the pointer** — `/person/age` carries
-`person`'s own line, not the field's, because `RecordField` has no position (`BACKLOG.md`). It is populated
-because `SchemaResolver.resolveSchema` threads `TsonSchemaParser.declarationPositions()` into
-`DefinitionResolver.resolve` — **and because `SchemaDesugarer` re-registers the position of every declaration
-it rebuilds.** That second half is not incidental: the position table is identity-keyed, and any record
-holding a single `[T]` field is rewritten whole, so without it the common case resolves with no position at
-all. A read with no schema behind it carries none of the three.
+**`schemaPosition` descends with the pointer** — `/person/age` carries `age`'s own line and column, not the
+enclosing declaration's, because `RecordField` carries a position of its own beside `TypeDefinition`'s. Both
+are populated because `SchemaResolver.resolveSchema` threads `TsonSchemaParser.schemaPositions()` down to
+`DefinitionResolver` — one `SchemaPositions` carrier rather than a parameter per kind, since a supertype and
+a choice variant are the same gap still open.
+
+- **A position table is identity-keyed, so every phase that rebuilds a node has to carry it over**, and
+  three do. `SchemaDesugarer` re-registers a rebuilt *declaration* and a rebuilt *field* (any record holding
+  a single `[T]` field is rewritten whole, so this is the common case, not an edge); §8.3's use-site
+  flattening rebuilds every `RecordField` in the schema to rewrite its type-ref. That last one is why
+  `RecordField.withType`/`withState` exist: a rebuild naming components positionally silently drops the ones
+  it does not mention, and **no test comparing resolved values can catch it**, since position is excluded
+  from equality on `annotations`' own footing.
+- **`RecordField.position` is `@Unbound`**, on `TypeDefinition.position`'s precedent — §8.1's `record_field`
+  declares no such field, so nothing fills it and strict binding would call it a mismatch. Deliberately not
+  carried in the annotation channel, which is the opposite kind of thing: annotations are schema data, they
+  resolve one hop against the governing meta (§6, and an unresolvable name is the author's error), and they
+  round-trip into resolver output checked against the `*-resolved.tn` fixtures.
+- **The reader takes it at the one descent that knows the field** — `ctx.schemaField(name, position)`, whose
+  absent case leaves the enclosing record's position in place, which is the honest answer for a document
+  whose source this resolver never saw (a hand-built one, or the bootstrap). No allocation changes:
+  `schemaField` already builds a context per declared-field descent and this only chooses which position it
+  carries.
+
+A read with no schema behind it carries none of the three.
 
 An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
 `ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the

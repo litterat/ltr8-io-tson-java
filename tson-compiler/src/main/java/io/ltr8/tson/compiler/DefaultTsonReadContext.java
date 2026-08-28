@@ -224,6 +224,15 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
+    public TsonReadContext schemaField(String name, Optional<SourcePosition> fieldPosition) {
+        PathStep step = new PathStep(tail, name, -1, schemaRoot != null);
+        // No extra allocation: stepping() builds one of these either way, and this only chooses which
+        // position it carries. An absent field position leaves the enclosing record's, unchanged.
+        return fieldPosition.isEmpty() ? stepping(step)
+                : new DefaultTsonReadContext(cursor, step, schemaRoot, schemaId, fieldPosition, positionOverride);
+    }
+
+    @Override
     public TsonReadContext inRecord(SchemaLocation declaration) {
         // The pointer survives, the anchor does not: this record declares the field the pointer now ends
         // with, so it is what a reader following the pointer needs opened. Only an outermost record, with no

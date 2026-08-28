@@ -102,6 +102,16 @@ public interface TsonReadContext {
     TsonReadContext schemaField(String name);
 
     /**
+     * {@link #schemaField(String)} with the field's <em>own</em> declaration position, where the schema
+     * records one -- so a diagnostic against {@code /person/age} is positioned at {@code age} rather than at
+     * {@code person}'s declaration line, which is the finest a per-declaration table can offer.
+     *
+     * <p>Absent leaves the enclosing record's position in place, which is the honest answer for a field this
+     * resolver never saw a source line for -- a hand-built document, or the bootstrap.
+     */
+    TsonReadContext schemaField(String name, Optional<SourcePosition> fieldPosition);
+
+    /**
      * A copy of this context anchored on the record now reading: {@code declaration}'s identity and position
      * replace whatever was there, and its pointer is taken only if none has been established. See this
      * interface's own "offer my own declaration" note.

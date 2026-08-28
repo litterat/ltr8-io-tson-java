@@ -803,10 +803,11 @@ compatibility).
   `TsonDiagnosticsReceiver` (see `docs/readers-and-diagnostics.md`), and read- and schema-side diagnostics
   now populate the same four location components. Throw-site classification is done across the whole schema
   pipeline. The lexer stays fail-fast on purpose and is the floor under schema-parse recovery — not a tracked
-  gap; `STRUCTURED-OUTPUT.md` holds the open question. What remains is granularity: `schemaPosition` is **per
-  declaration**, one level coarser than the pointer beside it — `/person/age` carries `person`'s own line,
-  because `RecordField` has no position. A `caused by` frame chaining the author's location to the leaf
-  constraint's is the other open shape (`BACKLOG.md`).
+  gap; `STRUCTURED-OUTPUT.md` holds the open question. **`schemaPosition` descends with the pointer** —
+  `/person/age` carries `age`'s own line, `RecordField` holding an `@Unbound` position beside
+  `TypeDefinition`'s and one `SchemaPositions` carrier threading both from the parser. What remains is the
+  same gap for a **supertype and a choice variant**, both bare names in a list with nowhere to hang one, and
+  a `caused by` frame chaining the author's location to the leaf constraint's (`BACKLOG.md`).
 - **§5.10's argument-kind rule is answered by two other rules, not by the kind rule.** A held body has no
   slot types — that is what it is for — so it can never say *this slot expected a value*. Neither half needs
   it to: a literal applied where the body uses the parameter as a **type** is refused because nothing

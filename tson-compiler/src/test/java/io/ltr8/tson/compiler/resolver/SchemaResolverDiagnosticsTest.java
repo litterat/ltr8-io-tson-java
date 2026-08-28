@@ -73,7 +73,7 @@ class SchemaResolverDiagnosticsTest {
         SchemaDocument document = parser.parseSchemaDocument();
         TsonDiagnosticsCollector collector = new TsonDiagnosticsCollector();
         TsonSchema resolved = new SchemaResolver(standardLibrary())
-                .resolveSchema(document, parser.declarationPositions(), collector);
+                .resolveSchema(document, parser.schemaPositions(), collector);
         // Even a schema that failed comes back whole -- placeholders stand in for the broken entries, which is
         // what lets the good ones resolve rather than the run stopping at the first bad one.
         assertNotNull(resolved);
@@ -268,7 +268,7 @@ class SchemaResolverDiagnosticsTest {
         SchemaResolver resolver = new SchemaResolver(standardLibrary());
 
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                () -> resolver.resolveSchema(document, parser.declarationPositions()));
+                () -> resolver.resolveSchema(document, parser.schemaPositions()));
         assertTrue(thrown.getMessage().contains("pins a floor of zero"), thrown.getMessage());
     }
 
@@ -280,6 +280,6 @@ class SchemaResolverDiagnosticsTest {
         SchemaResolver resolver = new SchemaResolver(standardLibrary());
 
         assertThrows(TsonSchemaValidationException.class,
-                () -> resolver.resolveSchema(document, parser.declarationPositions()));
+                () -> resolver.resolveSchema(document, parser.schemaPositions()));
     }
 }

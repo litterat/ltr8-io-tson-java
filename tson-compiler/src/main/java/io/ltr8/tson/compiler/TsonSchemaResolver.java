@@ -35,7 +35,7 @@ public class TsonSchemaResolver {
     /**
      * Resolves {@code document}'s own header directives and every declaration in its body -- see {@link
      * SchemaResolver#resolveSchema}'s own Javadoc for the full contract. Every resolved definition carries
-     * no source position; use {@link #resolveSchema(SchemaDocument, Map)} to keep them.
+     * no source position; use {@link #resolveSchema(SchemaDocument, SchemaPositions)} to keep them.
      */
     public TsonSchema resolveSchema(SchemaDocument document) {
         return this.resolver.resolveSchema(document);
@@ -47,18 +47,18 @@ public class TsonSchemaResolver {
      * same document.
      */
     public TsonSchema resolveSchema(SchemaDocument document,
-                                    Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions) {
+                                    SchemaPositions declarationPositions) {
         return this.resolver.resolveSchema(document, declarationPositions);
     }
 
     /**
-     * {@link #resolveSchema(SchemaDocument, Map)} reporting every declaration that fails through {@code
+     * {@link #resolveSchema(SchemaDocument, SchemaPositions)} reporting every declaration that fails through {@code
      * receiver} rather than throwing at the first -- see {@link SchemaResolver#resolveSchema(SchemaDocument,
-     * Map, TsonDiagnosticsReceiver)} for the contract, and in particular for why the returned schema must not
+     * SchemaPositions, TsonDiagnosticsReceiver)} for the contract, and in particular for why the returned schema must not
      * be linked, registered or compiled when anything was reported.
      */
     public TsonSchema resolveSchema(SchemaDocument document,
-                                    Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions,
+                                    SchemaPositions declarationPositions,
                                     TsonDiagnosticsReceiver receiver) {
         return this.resolver.resolveSchema(document, declarationPositions, receiver);
     }

@@ -519,8 +519,7 @@ final class TemplateMaterialiser {
         }
         return new RecordBody(record.supertypes(), record.fields().stream()
                 .map(field -> field.state() == FieldState.REQUIRED && field.value().isPresent()
-                        ? new RecordField(field.name(), field.type(), FieldState.REQUIRED_FIXED, field.value(),
-                                field.annotations())
+                        ? field.withState(FieldState.REQUIRED_FIXED)
                         : field)
                 .toList(), record.groups());
     }
@@ -773,8 +772,7 @@ final class TemplateMaterialiser {
     static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map) {
         return switch (body) {
             case RecordBody record -> new RecordBody(record.supertypes(),
-                    record.fields().stream().map(field -> new RecordField(field.name(), map.apply(field.type()),
-                            field.state(), field.value(), field.annotations())).toList(),
+                    record.fields().stream().map(field -> field.withType(map.apply(field.type()))).toList(),
                     record.groups());
             case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.state(),
                     array.unordered(), array.uniqueItems(), array.minItems(), array.maxItems());

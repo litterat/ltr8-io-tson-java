@@ -12,6 +12,7 @@ import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.ChoiceRef;
 import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.ElementType;
+import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
@@ -218,18 +219,21 @@ final class SchemaDesugarer {
      * The identity-keyed declaration positions, carried across a rewrite -- see {@link #schemaMap}. Never
      * {@code null}; a caller with no positions to keep passes an empty map it then discards.
      */
-    private final Map<SchemaMap.Declaration, SourcePosition> positions;
+    private final SchemaPositions positions;
 
     private SchemaDesugarer(Set<String> imported, DesugarFailureReporter reporter,
-            Map<SchemaMap.Declaration, SourcePosition> positions) {
+            SchemaPositions positions) {
         this.imported = imported;
         this.reporter = reporter;
         this.positions = positions;
     }
 
-    /** {@link #desugar(SchemaDocument, Set, DesugarFailureReporter, Map)}, throwing at the first invalid sugar form. */
+    /**
+     * {@link #desugar(SchemaDocument, Set, DesugarFailureReporter, SchemaPositions)}, throwing at the first
+     * invalid sugar form and keeping no positions -- a caller with no source text behind the document.
+     */
     static SchemaDocument desugar(SchemaDocument document, Set<String> imported) {
-        return desugar(document, imported, null, new IdentityHashMap<>());
+        return desugar(document, imported, null, SchemaPositions.none());
     }
 
     /**
@@ -259,7 +263,7 @@ final class SchemaDesugarer {
      * #desugarOrReport}. With a {@code null} {@code reporter} the first such form throws instead.
      */
     static SchemaDocument desugar(SchemaDocument document, Set<String> imported,
-            DesugarFailureReporter reporter, Map<SchemaMap.Declaration, SourcePosition> positions) {
+            DesugarFailureReporter reporter, SchemaPositions positions) {
         SchemaDesugarer pass = new SchemaDesugarer(imported, reporter, positions);
         pass.local = document.body().declarations();
         SchemaMap body = pass.schemaMap(document.body());
@@ -290,9 +294,9 @@ final class SchemaDesugarer {
         for (Map.Entry<String, SchemaMap.Declaration> entry : map.declarations().entrySet()) {
             SchemaMap.Declaration declaration = desugarOrReport(entry.getValue());
             if (declaration != entry.getValue()) {
-                SourcePosition position = positions.get(entry.getValue());
+                SourcePosition position = positions.declarations().get(entry.getValue());
                 if (position != null) {
-                    positions.put(declaration, position);
+                    positions.declarations().put(declaration, position);
                 }
                 if (rewritten == null) {
                     rewritten = new LinkedHashMap<>(map.declarations());
@@ -449,9 +453,16 @@ final class SchemaDesugarer {
                 }
                 FieldDef.FieldType fieldType = field.type().orElseThrow();
                 TypeRef ref = typeRef(fieldType.typeRef());
-                yield ref == fieldType.typeRef() ? field
-                        : new FieldDef(field.annotations(), field.name(),
-                                Optional.of(new FieldDef.FieldType(ref, fieldType.optional())), field.modifier());
+                if (ref == fieldType.typeRef()) {
+                    yield field;
+                }
+                // The field's own position has to be carried, for schemaMap's reason one level down: a field
+                // whose type is a sugar form is rebuilt, and a rebuilt node is a different identity in a
+                // table keyed by one. Any record with a single `[T]` field hits this.
+                FieldDef rewritten = new FieldDef(field.annotations(), field.name(),
+                        Optional.of(new FieldDef.FieldType(ref, fieldType.optional())), field.modifier());
+                positions.carry(field, rewritten);
+                yield rewritten;
             }
             case GroupDef group -> {
                 List<GroupDef.Member> members = mapShared(group.members(), this::groupMember);

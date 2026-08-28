@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
@@ -127,7 +128,7 @@ public final class SchemaResolver {
      * from {@code TsonSchemaRegistry.register}'s own eventual output instead.
      */
     public TsonSchema resolveSchema(SchemaDocument document) {
-        return resolveSchema(document, Map.of());
+        return resolveSchema(document, SchemaPositions.none());
     }
 
     /**
@@ -148,12 +149,12 @@ public final class SchemaResolver {
      * it violated was declared; and it is what schema-side reporting will attach its own problems to.
      */
     public TsonSchema resolveSchema(SchemaDocument document,
-                                    Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions) {
+                                    SchemaPositions declarationPositions) {
         return resolve(document, declarationPositions, null);
     }
 
     /**
-     * {@link #resolveSchema(SchemaDocument, Map)} reporting each declaration that fails to resolve through
+     * {@link #resolveSchema(SchemaDocument, SchemaPositions)} reporting each declaration that fails to resolve through
      * {@code receiver} instead of throwing at the first one ([TSON-DATA] §8.1: implementations SHOULD
      * "continue processing after an error to report multiple issues in a single pass"). Every declaration is
      * attempted; a failed one is reported and replaced with a placeholder so its siblings and dependents still
@@ -179,7 +180,7 @@ public final class SchemaResolver {
      * @param receiver where a failed declaration is reported; must not be {@code null}
      */
     public TsonSchema resolveSchema(SchemaDocument document,
-                                    Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions,
+                                    SchemaPositions declarationPositions,
                                     TsonDiagnosticsReceiver receiver) {
         Objects.requireNonNull(receiver, "receiver");
         return resolve(document, declarationPositions, receiver);
@@ -187,7 +188,7 @@ public final class SchemaResolver {
 
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private TsonSchema resolve(SchemaDocument document,
-                               Map<SchemaMap.Declaration, ? extends SourcePosition> declarationPositions,
+                               SchemaPositions declarationPositions,
                                TsonDiagnosticsReceiver receiver) {
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
@@ -212,11 +213,11 @@ public final class SchemaResolver {
         // A mutable identity-keyed copy, because desugaring rewrites the declarations that contain sugar and
         // has to carry each one's position onto the node it produced -- see SchemaDesugarer.schemaMap. Every
         // position lookup below goes through this copy, so a rewritten declaration is located like any other.
-        Map<SchemaMap.Declaration, SourcePosition> positions = new IdentityHashMap<>(declarationPositions);
+        SchemaPositions positions = declarationPositions.copy();
         SchemaDocument desugared = SchemaDesugarer.desugar(document,
                 namespace.keySet(), receiver == null ? null : (declaration, error) ->
                         receiver.report(schemaProblem(id, declaration.name(), error,
-                                Optional.ofNullable(positions.get(declaration)))), positions);
+                                positions.of(declaration))), positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
         // The names desugaring generated, as opposed to the ones the author wrote. These are the schema's
         // synthetic entries (§5.3's lift rule), so they are both what carries the derived @synthetic marker
@@ -258,7 +259,7 @@ public final class SchemaResolver {
                         + "supertype or refinement source cannot depend, directly or transitively, on the type "
                         + "it helps define");
             }
-            Optional<SourcePosition> position = Optional.ofNullable(positions.get(declaration));
+            Optional<SourcePosition> position = positions.of(declaration);
             try {
                 TypeDefinition resolved = holder[0].resolve(declaration, position);
                 refuseHeadAbstraction(name, resolved);
@@ -295,7 +296,7 @@ public final class SchemaResolver {
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary.
                 (type, value) -> read(metaParser.get(type), value),
-                metaParser.schema().entries()::get, namespaceGetter, materialiser::closeApplication);
+                metaParser.schema().entries()::get, namespaceGetter, materialiser::closeApplication, positions);
 
         for (String name : declarations.keySet()) {
             namespaceGetter.getTypeDefinition(name);
@@ -318,7 +319,7 @@ public final class SchemaResolver {
         Set<String> irregular = TemplateRegularity.check(resolvedLocals, receiver == null ? null
                 : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
                         TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),
-                        Optional.ofNullable(positions.get(declarations.get(name))))));
+                        positions.of(declarations.get(name)))));
 
         // A condemned template is replaced before materialisation, on the same terms as a declaration that
         // failed to resolve: the verdict is in, and closing an application of one only reports the same
@@ -335,7 +336,7 @@ public final class SchemaResolver {
         Map<String, TypeDefinition> instantiations = materialiser.materialise(resolvedLocals,
                 receiver == null ? null : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
                         TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),
-                        Optional.ofNullable(positions.get(declarations.get(name))))));
+                        positions.of(declarations.get(name)))));
         namespace.putAll(resolvedLocals);
         namespace.putAll(instantiations);
 
@@ -368,7 +369,7 @@ public final class SchemaResolver {
                     throw e;
                 }
                 receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id), name,
-                        e.getMessage(), Optional.ofNullable(positions.get(declarations.get(name)))));
+                        e.getMessage(), positions.of(declarations.get(name))));
                 nameAnnotations = Annotations.empty();
             }
             // §8.2: a synthetic entry's key carries the derived @synthetic marker, and a lifted declaration
@@ -401,7 +402,7 @@ public final class SchemaResolver {
      * <p><b>Producing one means a diagnostic has already been reported</b> (Swift's {@code ErrorType}
      * obligation). It is not a resolution and must never be linked, registered or compiled -- guaranteed
      * structurally rather than by inspection, because the only overload that can produce one ({@link
-     * #resolveSchema(SchemaDocument, Map, TsonDiagnosticsReceiver)}) hands the caller a receiver whose report
+     * #resolveSchema(SchemaDocument, SchemaPositions, TsonDiagnosticsReceiver)}) hands the caller a receiver whose report
      * count is the signal to stop at the phase boundary. It carries the failed declaration's own position so
      * anything that does surface it can still point at the source.
      *
