@@ -47,6 +47,15 @@ check there would report one token twice. The underlying stream produces each to
 needs no set of already-reported positions. `wrap` returns the source unchanged when the policy checks
 nothing, which is the default — an ordinary read pays not even a predicate.
 
+**A raised policy is not a per-token allocation either**, which is what makes it advisable to turn on. The
+conforming path through `TsonUnicodePolicy.violation` scans and returns `Optional.empty()`: no split array
+(hand-segmented, since `"[_-]"` misses `String.split`'s single-character fast path and compiles a `Pattern`
+per call), no script set (a single-script unit is decided without materialising one — only a genuinely mixed
+token builds the set `covered` and the message need), no stream, and `isPresent`/`get` at the call rather than
+a lambda that would capture three fields per token. What is left is the decorator, once per read:
+`AllocationHarnessTest.aRaisedTokenPolicyCostsAlmostNothingPerRead` pins it at ~100 bytes per read, against
+~2.3 KB before the scan paths were written this way.
+
 The check sees the four events carrying text — a value, a field name, a type-ref, an annotation name — because
 at that layer nothing yet knows which is which. **So a name is a token**, and a token policy stricter than the
 identifier policy subsumes it: the name has already cleared the stricter rule by the time the name rule looks

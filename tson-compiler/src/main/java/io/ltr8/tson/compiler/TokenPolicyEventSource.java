@@ -7,6 +7,8 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.compiler.stream.TypeRef;
 
+import java.util.Optional;
+
 /**
  * Applies a read's {@link TsonUnicodePolicy} to every token as it leaves the stream
  * ({@code SPEC-FEEDBACK.md} #3 Step 4b) -- the token-surface half of UTS #39 §5.2, where the identifier
@@ -80,8 +82,12 @@ final class TokenPolicyEventSource implements TsonEventSource {
             default -> null;
         };
         if (text != null) {
-            policy.violation(text).ifPresent(why ->
-                    receiver.report(Diagnostic.ofRestrictedToken(text, why, event.position())));
+            // isPresent/get rather than ifPresent: the lambda would capture text, event and receiver, so it
+            // would allocate once per token on the read path. This runs for every token of every document.
+            Optional<String> why = policy.violation(text);
+            if (why.isPresent()) {
+                receiver.report(Diagnostic.ofRestrictedToken(text, why.get(), event.position()));
+            }
         }
         return event;
     }
