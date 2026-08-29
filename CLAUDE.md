@@ -707,20 +707,43 @@ the class and (where noted) pinned by a test; the `docs/` notes carry the full w
 
 Separate from the fine-grained unit tests, this runs every vector in the sibling
 [ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite) repo against the real
-`Lexer`/`TsonDataParser` as JUnit 5 dynamic tests — a conformance/integration check against an external,
-language-agnostic, spec-derived fixture set, to catch drift against the spec. It assumes the sibling repo
-at `../../ltr8-io-tson-test-suite` and skips gracefully (via `Assumptions.assumeTrue`, reported *aborted*)
-if absent. CI doesn't check the sibling out, so it always shows skipped there — expected. **Add
-test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge — with one
-standing exception: the suite's `resolver` layer is Part 1 *base-type* resolution, and there is **no Part 2
-layer at all** (no schema-resolution, linking or compilation vectors, and no sidecar schema for them). Part 2
-work therefore has nowhere to put a vector today, and the honest move is to say so rather than wedge one into
-a Part 1 bucket. **The suite lives at `../../ltr8-io-tson-test-suite` relative to the *module* directory** —
-`github/ltr8-io-tson-test-suite`, beside this repo, not one level above it; checking the wrong path and
-concluding it is absent is a mistake worth not repeating. A vector whose sidecar carries `encoding` is fed
-the file's bytes unchanged (`checkEncodingVector`), because the ordinary string round-trip would re-encode
-exactly the bytes such a vector exists to test; an encoding this implementation does not read is skipped,
-not failed. Opening that layer is its own `BACKLOG.md` item.
+`Lexer`/`TsonDataParser`/`BaseTypeResolver`/`BuiltinTypeVocabulary` as JUnit 5 dynamic tests — a
+conformance/integration check against an external, language-agnostic, spec-derived fixture set, to catch
+drift against the spec.
+
+**The corpus states its own contract, and this runner obeys it rather than inferring it.**
+`schemas/<layer>-sidecar.tn` gives each layer's sidecar shape and every sidecar names one with
+`!!schema`; `RUNNER.md` is normative for the runner. Three rules bind here: a subject reaches the lexer
+as the **bytes on disk**, never a decoded and re-encoded string; an `error` vector's §8.1 **category is
+asserted at every layer**, not only the vocabulary one (the layers are pipeline stages and cross the
+categories — the vocabulary layer raises `resolver` and `validation` errors and never a "vocabulary"
+one); and **position is never asserted**, implementations legitimately failing at different points
+depending on lookahead. A sidecar carries its outcome as a **field group member** (§5.11), so exactly
+one of `valid`/`error`/`schema-document` is present and the payload cannot be separated from it;
+`absent`, `empty-brace` and `schema-document` carry nothing and are typed `void`, written `_`.
+
+`SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
+documentation: every sidecar read against the schema it declares, plus the negatives the groups exist
+for. `SidecarSchemasTest` checks the schemas themselves resolve, serving the suite's own identities
+beside the bundled ones since the layer schemas `!!import` `sidecar-common.tn`.
+
+**A skip is not a pass.** `SuiteCheckout` finds the corpus — a sibling working copy first (a developer
+editing vectors must see their own edits), then the pinned copy `scripts/fetch-references.sh` fetches
+into `.references/`, with `-Dtson.testSuite.dir` overriding both authoritatively. An absent corpus
+aborts through `Assumptions` so a bare clone stays green, **except where `TSON_REQUIRE_TEST_SUITE` is
+set — CI sets it — where it fails instead**. CI used not to check the corpus out at all, so every vector
+aborted and the build went green while measuring nothing; that is what the variable exists to stop.
+**The pin is a commit, never a branch**: an upstream vector must not be able to turn this repo red with
+no change here.
+
+**Add test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge —
+with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, and the
+`class2/` tree is **empty**, so Part 2 work has nowhere to put a vector today and the honest move is to
+say so rather than wedge one into a Part 1 bucket. Opening those layers is its own `BACKLOG.md` item.
+A vector whose sidecar carries `encoding` is fed the file's bytes unchanged (`checkEncodingVector`),
+because the ordinary string round-trip would re-encode exactly the bytes such a vector exists to test;
+an encoding this implementation does not read is skipped, not failed, which `RUNNER.md` admits as one of
+its three legitimate grounds.
 
 ## Build and test
 

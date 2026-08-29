@@ -218,69 +218,56 @@ surface.
 
 ## Conformance test suite
 
-- [ ] Build out `ltr8-io-tson-test-suite` well beyond its current 127 vectors, spread across four buckets
-  (`lexer`/`parser`/`resolver`/`vocabulary`). Still Part 1 (lexer/parser/§5 vocabulary) only — Part 2
-  (resolution, linking, compilation) has no conformance-suite coverage at all yet, only this repo's own
-  unit/integration tests.
-- [ ] **A reader layer for the suite.** Its four buckets stop below the readers: `lexer` runs `Lexer`,
-  `parser` runs `TsonDataParser`, and §1.2 makes *neither* tier dedupe fields or keys, resolve an empty
-  brace, or interpret token text — those are reader rules. So every §2.5/§2.6 rule the readers actually
-  enforce has nowhere to be tested from outside: duplicate fields, duplicate keys, NFC name identity
-  (issue #233), `{}` as the empty container of its type, absent-sentinel positions. Found while trying to
-  add two NFC-identity vectors and discovering that a `lexer`- or `parser`-bucket vector cannot fail on
-  them — the parser accepts `{ a: 1  a: 2 }` by design. The bucket wants the schemaless tree reader behind
-  it, since that is the layer where a Class 1 document gets its verdict; it is a sibling of the missing
-  Part 2 layer above, and cheaper.
+The corpus states its own contract now: `schemas/*.tn` (field groups, so an outcome cannot appear
+without its payload), `RUNNER.md` (normative for runners), and a `class1/`/`class2/` split. Both
+implementations pin it to a commit, and this repo runs it as a gating CI step. What is left is
+everything above Part 1.
+
+- [ ] **A `reader` layer**, the cheaper of the two missing ones. The existing buckets stop below the
+  readers: §1.2 makes *neither* tier dedupe fields or keys, resolve an empty brace, or interpret token
+  text, so every §2.5/§2.6 rule the readers actually enforce has nowhere to be tested from outside —
+  duplicate fields, duplicate keys, NFC name identity, `{}` as the empty container of its type, the
+  absent sentinel. A `lexer`- or `parser`-bucket vector cannot fail on them: the parser accepts
+  `{ a: 1  a: 2 }` by design. The bucket wants `SchemalessTreeReader` behind it, that being the layer
+  where a Class 1 document gets its verdict, and the expected side can reuse the parser layer's own
+  document shape, post-reader.
+- [ ] **The Class 2 layers, over the spec's own §8 resolver output.** Part 2 §1.3 makes producing a
+  resolved schema value a MUST and §8 fixes its serialization, so a `class2/schema/valid/` vector needs
+  no invented format: the subject is a schema document and the sidecar's payload is the resolved output,
+  which the corpus can validate against meta.tn like any other document. `ResolvedFixtureTest` already
+  does this comparison against `spec/m/*-resolved.tn`, including the one normalisation `RUNNER.md`
+  states — a synthetic entry's trailing content hash is not normative (§8.2 keys identity on structure),
+  so both sides reduce it before comparing. Seed from the schema-side cases now locked inside this
+  repo's inline-string tests. Then `class2/link/` (import-closure merging and collision §2.2.3, choice
+  disjointness §5.4, inhabitance §5.10.1) and `class2/validate/`, whose expected side is the neutral
+  half of a diagnostic only: §8.1 category plus RFC 6901 data path, never messages and never positions.
+  The `meta`/`import` splice both runners already carry needs `schema` adding for the last of those.
+- [ ] **Fill the coverage the corpus now reports on itself.** `COVERAGE.md` is generated and
+  diff-checked, and what it shows is a corpus that is 89/159 §5 vocabulary while §7.3 has no vectors at
+  all, §7.5 and §2.8 have one each, and §2.9 and §6 have none. Work downward from the thinnest: the
+  lexical grammar, §7.2's escapes and multi-line token rules, the absent sentinel, brace
+  disambiguation, adjacency, §2.4 separators, §3's annotations and directives.
+- [ ] **A `class1/json/` layer** (§6). Cheap and currently empty: the two mandatory-error exceptions
+  (unescaped NEL/LS/PS in a single-line token, unpaired surrogate escapes), the JSON→base-type
+  mappings, and a vector pinning that `//` is *not* a comment. Distinct from the item below, which
+  needs a parser that does not exist.
+- [ ] **A `proposed/` tree**, so `SPEC-FEEDBACK.md`'s open entries have executable evidence for the
+  next revision's adjudication rather than prose. `RUNNER.md` already defines the bucket: a runner
+  executes it and reports it separately, and it never counts toward a conformance claim, so a third
+  implementation failing one is not a defect. The entries with concrete data- or schema-level
+  behaviour are the candidates.
+- [ ] **Move sidecar validation into the corpus's own CI.** Each runner reads every sidecar against
+  its declared schema (`SidecarSchemaReadTest` here), which is where a real implementation already is,
+  but it means a malformed sidecar lands upstream and breaks consumers rather than being caught at the
+  source. The corpus's CI is stdlib-only on purpose — an implementation-neutral corpus should not
+  build one of the implementations under test — so this wants a published CLI to `npx`, which neither
+  implementation has yet.
 - [ ] **Run the JSON front-end against the established JSON Parsing Test Suite** when it lands (the
   `TsonJsonParser` tracked in `STRUCTURED-OUTPUT.md`). JEP 540 commits to exactly this for the JDK's own
   parser — its own unit tests *plus* that external corpus, "which contains numerous edge-case inputs" —
-  and the reasoning is the same one this repo's sibling suite exists for: an external, language-agnostic
+  and the reasoning is the same one the sibling corpus exists for: an external, language-agnostic
   fixture set catches drift a self-authored suite agrees with. Cheap, since the corpus is pass/fail on
   parse and the front-end's whole job is RFC 8259 conformance.
-
-- [ ] **Retrofit the ~110 existing sidecars with a real `!!schema` directive** pointing at the new
-  per-layer schemas above, and fix whatever real shape mismatches that validation surfaces —
-  explicitly *not* done in the same pass that wrote the schemas (see the sibling README's own note
-  on this), so today the schemas are resolver-verified documentation, not live validation of the
-  actual fixtures. **Worth doing sooner rather than later, per the user's own explicit reasoning**
-  (2026-07-29): only ~110 files exist today, cheap to migrate; that stops being true once the suite
-  grows into the thousands, so if the wire format itself is going to change (see the next item), now
-  is the cheap moment to do it, not after the corpus is large.
-- [ ] **A precise, `outcome`/`kind`-correlated sidecar shape needs a real design decision first,
-  not just a retrofit** — the flat, all-optional modeling these schemas use today (`core_value`'s
-  `kind` plus every variant's fields all `OPTIONAL` side by side) doesn't enforce that `kind: token`
-  implies `form`/`text` present and `fields`/`entries`/`elements` absent, and so on. Three ways to
-  actually get that enforcement, discussed with the user 2026-07-29, in order of how much the real
-  wire format would have to change:
-  - `!choice { variants: [...] }` — no longer blocked: choice resolves, links, compiles and reads. But the
-    reservation that always sat behind it stands and is the deciding factor here — a schema built on it
-    needs a `!typeName` tag unless every variant occupies a distinct base-type class, and `core_value`'s
-    variants are all records, so every one of them would be tagged on the wire.
-  - **Field groups** (§5.11) — confirmed empirically to work today, including with a record-typed
-    member (`core_value => { ( token: core_value_token | record: core_value_record | ... ) }`,
-    resolves cleanly, each member individually `OPTIONAL`, mutual exclusivity captured in the
-    entry's own `groups`). The real cost: the group member's own *name* is what discriminates, so
-    each variant's fields would have to move under a keyed sub-object (`{ token: { form: ...
-    text: ... } }`) instead of today's flat `{ kind: token form: ... text: ... }` — a genuine wire
-    format break for every existing sidecar, not just a schema change.
-  - **Dependent typing at the meta-schema level — the user's own proposed direction, already on
-    their own "not yet" list before this discussion, and the one that best fits this specific case**:
-    `kind` stays exactly as it is today (a plain enum field, flat, no wire change at all) — the new
-    mechanism is a meta-schema-level association from an enum's own *member* to a type, so a
-    companion field's actual type is resolved from whichever member `kind` currently holds, rather
-    than from the field's own static declared type or its own name. Lets a schema designer decouple
-    "which type validates this value" from "what this field happens to be named" — relevant well
-    beyond this one schema, including for JSON-facing discriminated unions (see
-    `STRUCTURED-OUTPUT.md`'s own "The real sharp edge: untagged unions" item, extended with this
-    same mechanism). This is real, unstarted design work at the meta-kernel/meta.tn vocabulary level,
-    not a `DefinitionResolver` bug fix — tracked here and in `STRUCTURED-OUTPUT.md` so it isn't lost,
-    not scoped or planned yet.
-- [ ] **`vocabulary-sidecar.tn`'s own `value` field is a known simplification** — typed as plain
-  optional `text`, which doesn't capture the two atom families (`complex`, `duration`) that actually
-  write `value` as a small nested record on the wire. `!choice` now resolves, but this was never the
-  item waiting on it: a precise per-family shape needs a discriminator on `type-ref` itself — an open
-  ~30-name vocabulary, not a small closed enum like `outcome`/`kind` — so it isn't the free win the
-  `outcome`-discriminated shapes are.
 
 ## Documentation
 
