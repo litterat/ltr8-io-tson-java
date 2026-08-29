@@ -578,7 +578,7 @@ on. Sorted by what each rejects, they invert — measured, both prototyped:
 
 | | catches mixed-script (`admin`/`аdmin`) | catches whole-script (`aec`/`аес`) | rejects a *lone* legitimate name | data |
 |---|---|---|---|---|
-| Restriction level (§5.2, Highly Restrictive) | yes | **no** | **yes — see below** | none |
+| Restriction level (§5.2, Highly Restrictive) | yes | **no** | **yes over a whole name; no per segment — Step 4** | none |
 | `skeleton()` distinctness in scope | yes | **yes** | **no — needs a colliding pair** | 706 KB |
 
 The restriction level is a property of one name, so it must guess from the name alone, and it guesses wrong
@@ -626,11 +626,180 @@ The 706 KB falls on implementers, once, and can be a generated table; the altern
 on authors, in one script community, forever. If shipping the table is judged too much, the honest outcome
 is to keep §9.4 advisory rather than to adopt the cheap mechanism as a substitute — it is not one.
 
-**Step 4 — the restriction level, as an option and not a default.** Keep it available for deployments that
-want defence in depth, stated as a named profile rather than as prose (so two implementations offering it
-agree on what it means). Its right default is off: it rejects names that are not ambiguous with anything in
-the document, which is a judgement about the outside world that a format processor is not positioned to
-make.
+**Step 4 — the restriction level: Highly Restrictive by default, with per-segment as the first
+relaxation.** An earlier draft of this entry recommended opt-in and default off, because §5.2's levels are
+stated over a whole identifier and every one of them rejects `id_пользователя`, `url_адрес` and `api_ключ` —
+the Latin abbreviations that appear inside identifiers written in every other script. The objection was
+sound and its conclusion was not: it assumed the only alternative to a strict rule is no rule. Applying the
+same level to each `_`/`-` delimited segment is a *narrower* rule, not an absent one, and it is what makes a
+strict default safe to ship.
+
+**Apply Highly Restrictive to each `_`/`-` delimited segment rather than to the whole name.** Programming
+identifiers are compounds, and their separators are exactly the boundaries at which a script change is
+ordinary rather than suspicious. Measured over the cases that decided the earlier recommendation:
+
+```
+                       whole name      per segment
+аdmin  pаssword  usеr   REJECT          REJECT        within-word homographs — the attack
+id_аdmin                REJECT          REJECT        one bad segment is still one bad segment
+id_пользователя         REJECT          accept        the common case for a non-Latin developer
+url_адрес  api_ключ     REJECT          accept
+alpha_α  χ_index        REJECT          accept
+日本語id  order_id       accept          accept
+```
+
+Every rejection the rule exists for survives; every false positive that made it undeployable disappears.
+Nothing is given up to the attacker, because a homograph has to sit *inside* a word to read as that word:
+spoofing `admin` needs `аdmin`, which is one segment mixing scripts, and spoofing `id_admin` needs
+`id_аdmin`, whose second segment does. What passes the script rule is a segment that is wholly one script
+and merely *looks* Latin — `id_аdмin` — and that is the whole-script case Step 2's skeleton distinctness
+catches. The two mechanisms compose: the script rule refuses mixing inside a word, the skeleton refuses
+lookalikes across a scope, and neither covers the other's case.
+
+**So it can be a MUST rather than an option**, which is the better default for a security rule and removes
+the awkwardness of a normative document specifying something it expects to be switched off.
+
+**What it still costs, and who pays it.** A name with no separator that legitimately mixes scripts is
+refused, and the author writes the separator: `ид_HTTP` rather than `идHTTP`. That is much smaller than the
+narrowing it replaces, but it is **not symmetric**, and the asymmetry is inherited rather than introduced.
+
+Highly Restrictive admits three augmented script sets — Latin+Han+Hiragana+Katakana, Latin+Han+Bopomofo,
+Latin+Hangul+Han — so `日本語id` is `{Latin, Han}` and passes with or without a separator, while
+`пользовательid` is `{Latin, Cyrillic}` and passes only as `пользователь_id`. Unicode draws that line for a
+reason: Han, Kana and Hangul share no confusable characters with Latin, and Cyrillic and Greek are full of
+them (а/a, е/e, о/o, р/p, с/c; α/a, ο/o, ρ/p). So the rule is not arbitrary — but a Japanese author may omit
+the separator and a Russian one may not, and that is the residue of the objection segmentation otherwise
+removes. It is worth saying out loud in the spec rather than leaving an author to infer it from a rejection,
+because the fix is one character and the confusion otherwise is total.
+
+**Step 4's configuration surface — two dimensions, not a ladder.** It is tempting to expose one ordered
+knob from strictest to loosest. That is wrong, because per-segment Highly Restrictive and Moderately
+Restrictive are **incomparable**: the first admits `id_пользователя` (Latin and Cyrillic, but never inside
+one word) and refuses `id_हिन्दी`; the second does the opposite (Latin plus any one Recommended script
+"except Cyrillic, Greek", anywhere in the name). Neither contains the other, so they are two axes:
+
+- **level** — which script combinations a unit may contain. UTS #39 §5.2's own six, unchanged, so the
+  default is a named standard rather than a TSON invention and two implementations agree on it without
+  reading this document.
+- **unit** — whether the level is applied to the whole name or to each `_`/`-` delimited segment. A no-op at
+  ASCII-Only and at levels 5–6; it changes levels 2–4.
+
+**Recommended default: Highly Restrictive, whole name.** Strictest of the practically deployable levels, and
+a level UTS #39 names — which matters more than it first appears. A default that is TSON's own refinement
+would mean a document validating under one implementation and not another that implemented only the
+standard; a standard default interoperates, and the refinement is something a deployment opts into
+knowingly.
+
+**And the relaxation to reach for first is the unit, not the level.** Moving to per-segment keeps every
+within-word homograph refused — `аdmin`, `pаssword`, `usеr`, `id_аdmin` — while admitting the compound names
+that made the whole-name form undeployable. That is the property that makes a strict default safe to ship:
+the pressure a strict rule creates is answered by a narrower rule rather than by switching the rule off,
+which is the failure mode an earlier draft of this entry worried about and the reason it recommended
+defaulting to off.
+
+**The two "off" positions are different, and the difference matters.** §5.2 is explicit: Minimally
+Restrictive drops the script restriction while "characters in the string must also be in the identifier
+profile"; Unrestricted additionally allows characters "outside of the identifier profile" — so it discards
+`Identifier_Status` too (Step 5), and with it the obsolete and technical characters and the joiners. A
+deployment that means "stop checking scripts" wants **Minimally Restrictive**; Unrestricted is a diagnostic
+tool, and §5.2 says so. A configuration surface offering one "off" would silently give the second.
+
+**A third axis worth offering, narrower than any of the above: an additional permitted script set.** A
+deployment that knows what it is — a Russian shop, a Greek-language corpus — can say so precisely
+(`Latin + Cyrillic`) instead of dropping a level and losing the rule everywhere else. It is the same
+mechanism §5.2 already uses for Latn+Jpan and its siblings, extended by configuration rather than by
+standard, and it is the most targeted relaxation available.
+
+**What should not be configurable**, and stating it is part of the design. Skeleton distinctness has no
+false positives — it fires only on a colliding pair, so there is nothing for a deployment to be relieved of.
+`Identifier_Status` is not a separate switch: it is what level 6 turns off, and offering it twice would let a
+configuration hold two contradictory answers. And no severity knob: the levels *are* the severity, each one a
+conforming position, where a report-but-accept mode would make the processor non-conforming while looking
+like a setting.
+
+**Step 4b — the same levels belong on values, and there the restriction level is the *only* mechanism.**
+Everything above constrains names. A **value** is unconstrained beyond §7.1's token profile if unquoted, and
+entirely unconstrained if quoted — so `аdmin` with a Cyrillic а can be a *value* wherever it cannot be a
+name. That matters: an application comparing a value against a blocklist, or rendering it to a user, faces
+the same spoofing surface §9.4 raises for names, and nothing in the series speaks to it.
+
+**Why the mechanism has to be the restriction level here, having been the wrong choice for names.** Step 2
+prefers skeleton distinctness because it is a *relation* and TSON can name the sets it holds over. Values
+have no such sets: two values in one array are not required to be distinguishable, and two values in
+different documents cannot be compared at all. So the argument that made the restriction level second-best
+for names — that a better, set-based rule was available — does not apply, and the per-string mechanism is
+what remains. This is the same reasoning that makes restriction levels right for a browser judging a domain
+name (#3's own comparison), applied to the one surface in TSON that is likewise setless.
+
+**The default must be the opposite of the names default.** A value is data, and data may legitimately be
+anything: `{ note: "Ωmega" }`, a Greek quotation, a Cyrillic display name. So **Unrestricted for values,
+Highly Restrictive for names** — the same ladder, opposite ends, for the same reason in each case. A service
+that renders untrusted values, or matches them against a list, raises the value level knowingly; nothing is
+imposed on a format that mostly carries ordinary data.
+
+**Three consequences worth stating.** Levels 5 and 6 collapse on the token surface — §5.2 says so directly
+("where there is no such identifier profile, Levels 5 and 6 are identical") — and `Identifier_Status` is a
+name rule, so a token that is not a name has no identifier profile to drop. The default costs nothing at
+read time: at Unrestricted no scan runs, so a format carrying ordinary data pays for none of this. And
+because the token check runs before anything knows which tokens are names, a token policy stricter than the
+identifier policy simply subsumes it — a name is a token, so it has already cleared the stricter rule by the
+time the name rule looks at it. That is a property of where the checks sit, not a special case, and the
+naming below is chosen to make it visible.
+
+**A suggested configuration surface.** Two checks at two layers, which is what the naming should say:
+
+```java
+// The defaults, written out. Tson.builder().build() gives exactly this.
+Tson tson = Tson.builder()
+        .tokenPolicy(UnicodePolicy.unrestricted())            // every token off the stream
+        .identifierPolicy(UnicodePolicy.highlyRestrictive())  // additionally, at naming positions
+        .build();
+
+// Relaxing identifiers: reach for the unit before the level. Per-segment still refuses
+// every within-word homograph, and admits id_пользователя and alpha_α.
+        .identifierPolicy(UnicodePolicy.highlyRestrictive().perSegment())
+
+// Narrower still, where a deployment knows what it is:
+        .identifierPolicy(UnicodePolicy.highlyRestrictive().permitting(LATIN, CYRILLIC))
+
+// The two "off" positions, named apart so neither is reached by accident:
+        .identifierPolicy(UnicodePolicy.scriptsUnchecked())   // level 5 — identifier profile kept
+        .identifierPolicy(UnicodePolicy.unrestricted())       // level 6 — profile dropped too
+
+// Tightening tokens, for a service that renders or matches the values it reads:
+        .tokenPolicy(UnicodePolicy.moderatelyRestrictive())
+        .tokenPolicy(UnicodePolicy.asciiOnly())
+```
+
+**Why `token` and not `value`, and why that is the honest name.** The check runs where tokens leave the
+stream, before anything knows which of them is a name — so it constrains names as well as values, and the
+effective constraint on a name is the **stricter of the two policies**. Calling the setter `valuePolicy`
+would hide that; calling it `tokenPolicy` states it, and matches where the check actually sits. The
+consequence is worth having in the Javadoc rather than discovered: a deployment that sets
+`tokenPolicy(asciiOnly())` has made its identifiers ASCII-only too, whatever `identifierPolicy` says, and
+that is the right answer rather than a wrinkle — a name is a token.
+
+**`UnicodePolicy`, not `ScriptPolicy`.** The policy is script-based today, but it already carries a unit,
+and its loosest rung reaches `Identifier_Status` rather than any script rule (§5.2 level 6). Naming a
+configuration type after the mechanism it happens to use now would age into a lie the first time it carries
+anything else.
+
+**`perSegment()` belongs on the identifier policy only.** `_` and `-` are word separators by convention in
+an identifier; in a value they are ordinary characters. UTS #39's own Minimally Restrictive example is
+`Toys-Я-Us`, which per-segment would accept and which is exactly the spoof a strict token policy exists to
+refuse.
+
+Every method here is a *code* path, never an environment variable, for the reasons below.
+
+**On how an implementation should let it be relaxed**, since a normative rule with no escape hatch invites
+worse ones: **not through the environment.** A security policy read from an environment variable is ambient
+authority — a CI config, a container image, a shell wrapper or a dependency calling `setenv` changes it with
+no code change, no diff and nothing in review; it is invisible at the call site, process-global, so an
+embedding library cannot hold its own policy, and it appears in no artifact anyone reads. An opt-out
+expressed **in code** has the opposite properties: greppable, diffable, attributable, and scoped to the
+processor instance that holds it. With the rule strict by default, the code path is a *weakening*, which is
+the right thing to make expensive and visible — and it should be named for what it permits rather than for
+the check it disables.
 
 **Step 5 — Identifier_Status, cheaply, on the same profile.** Requiring name characters to be
 `Identifier_Status=Allowed` (556 ranges, 47 KB) subsumes §7.1's hand-picked ZWNJ/ZWJ exclusion — currently a
@@ -648,13 +817,25 @@ shared suite can carry it: a record declaring `admin` and `аdmin` rejected, one
 alone accepted, `l` beside `I` rejected. That is the first part of this topic that could ever have been
 conformance-tested.
 
-**Status against Revision 33:** open, and Steps 1–1d are **built**. The kernel carries `identifier`
+**Status against Revision 33:** open, and Steps 1–1d, 2, 3 and 5 are **built**. The kernel carries `identifier`
 (`XID_Start`-initial, `XID_Continue ∪ { - }`, NFC) with `type_name`/`field_name`/`param_name` aliasing it and
 `enum_set => !set { element_type: identifier  min_items: 1 }` feeding `enum.members`; `token`/`token_set` are
 gone. `IdentifierParser` enforces the contract where the resolved model is read back as data, and
-`DefinitionResolver` asserts it for declared field names, which the resolver builds directly. §9.4 itself is
-unchanged — one SHOULD-consider sentence, no comparison scopes, no stated action on detection — so Steps 2–5
-remain proposals, both mechanisms prototyped against the real UCD tables and neither shipped.
+`DefinitionResolver` asserts it for declared field names, which the resolver builds directly. Skeleton distinctness runs over the merged
+namespace, each record's field names and each enum's members, reported as `CONFUSABLE_NAMES`; a Class 1
+record's own fields are checked by the schemaless reader, which is the one scope with no declaration behind
+it. `Identifier_Status=Allowed` is on the profile. §9.4 itself is unchanged — one SHOULD-consider sentence,
+no comparison scopes, no stated action on detection — so what is built is this entry's proposal, not the
+spec's text.
+
+**One scope in Step 2's list turned out not to be one.** A choice's *variants* are references to declared
+names, so two confusable variants are two confusable entries in the namespace and are reported there; a
+check over variants could never fire, and the list above should drop them. Field names and enum members are
+genuine scopes because neither is a declared name.
+
+**Step 4 is not built.** The restriction level needs a configuration channel reaching `TsonSchemaLinker` and
+the identifier parser, which today have none — six call sites across three modules — and it is the one
+mechanism this entry recommends defaulting to off. Its absence changes nothing about what the others decide.
 
 Two parts of Step 1 are deliberately not built. The `field-name` production is untouched, so Class 1 field
 names stay unconstrained exactly as Step 1c intends. And the joiners' contextual rule is not implemented, so

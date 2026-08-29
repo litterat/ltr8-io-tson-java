@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomParsers;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
+import io.ltr8.tson.compiler.lexer.ConfusableNames;
 import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
@@ -188,6 +189,43 @@ public final class TsonSchemaLinker {
      * @return {@code true} if the caller should carry on as though the check had passed -- always, since a
      *         throw is the only other outcome. Reads as a guard at the call sites that want to skip the entry.
      */
+    /**
+     * §9.4's confusability, over the closed sets this schema actually defines ({@code SPEC-FEEDBACK.md} #3
+     * Steps 2–3): the merged namespace, and each entry's own field names, enum members and choice variants.
+     *
+     * <p><b>The namespace check runs over {@code merged}, which is the point.</b> §2.2.3 already requires
+     * imported names be "disjoint from each other and from local entries", and that disjointness is exact
+     * equality — which a confusable pair passes by construction, since two entries a reviewer reads as one
+     * name are, to the resolver, two names. Running here catches a spoofed name arriving from an import as
+     * well as one declared locally, and it is the place where the damage is greatest: a name that changes
+     * which type a document validates against.
+     *
+     * <p>Data-side field names need no check of their own under a schema: a data field name is valid only if
+     * it matches a declared one, so restricting declarations restricts the data by construction. A Class 1
+     * record is the case that has no declaration, and is checked by the schemaless readers instead.
+     */
+    private static void checkConfusableNames(TsonDiagnosticsReceiver receiver, TsonSchema schema,
+                                             Map<String, TypeDefinition> merged) {
+        ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> report(receiver, schema,
+                collision.second(), merged.get(collision.second()),
+                "in the namespace of '" + schema.id() + "': " + collision.describe()));
+
+        merged.forEach((name, definition) -> {
+            Top body = definition.body();
+            // A choice's variants are deliberately *not* a scope of their own: a variant is a reference to
+            // a declared name, so two confusable variants are two confusable entries in `merged` and the
+            // namespace check above has already reported them. A check here could never fire.
+            List<String> names = switch (body) {
+                case RecordBody record -> record.fields().stream().map(RecordField::name).toList();
+                case EnumBody enumBody -> List.copyOf(enumBody.members());
+                default -> List.of();
+            };
+            String noun = body instanceof RecordBody ? "field names" : "members";
+            ConfusableNames.firstCollision(names).ifPresent(collision -> report(receiver, schema, name,
+                    definition, "'" + name + "' has " + noun + " that read alike: " + collision.describe()));
+        });
+    }
+
     private static boolean report(TsonDiagnosticsReceiver receiver, TsonSchema schema, String name,
                                   TypeDefinition def, String message) {
         if (receiver == null) {
@@ -422,6 +460,7 @@ public final class TsonSchemaLinker {
 
         merged = computeSubtypes(merged, localNames);
         merged = computeDisjointness(merged);
+        checkConfusableNames(receiver, schema, merged);
 
         Set<String> blamedOnce = new LinkedHashSet<>();
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {

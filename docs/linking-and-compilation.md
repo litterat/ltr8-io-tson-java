@@ -254,6 +254,16 @@ forbids — at the price of verdicts an author cannot predict (two default-`allo
 NaN however far apart their ranges sit) and a conformance bar no second implementation should have to
 match.
 
+**Confusable names are refused per scope, not per name** (`ConfusableNames` over `Confusables.skeleton`,
+UTS #39 §4). The linker checks the merged namespace — local entries and every import's, which is where §2.2.3's
+own disjointness rule is exact equality and a confusable pair passes it by construction — plus each entry's
+record field names and enum members. A **choice's variants are deliberately not checked**: a variant is a
+reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
+there could never fire. The one scope the linker cannot reach is a Class 1 record, which has no declaration;
+`SchemalessTreeReader` checks its own field set. Being a *relation*, the rule never rejects a lone name — a
+mixed-script `id_пользователя` collides with nothing and passes, which is the property that keeps it switched
+on and the reason it is the rule where a per-name restriction level is an option (`SPEC-FEEDBACK.md` #3).
+
 **§7.2's subsumption guard wraps every entry the rule governs** (`Subsumption`, applied at
 `TsonSchemaCompiler`'s single `build` site). At a position typed `T`, a value annotated `!S` is valid iff
 `S` is `T` or `T` is in `S`'s supertypes — and that was enforced only where `T` was a record with a
