@@ -153,6 +153,15 @@ public final class TsonUnicodePolicy {
         return level != Level.UNRESTRICTED;
     }
 
+    /**
+     * Whether the level applies to each {@code _}/{@code -} delimited segment rather than to the whole text.
+     * A surface where segmenting has no meaning -- a value, where those are ordinary characters rather than
+     * word separators -- asks this in order to refuse such a policy rather than to quietly ignore it.
+     */
+    public boolean isPerSegment() {
+        return perSegment;
+    }
+
     /** The reason {@code text} fails this policy, or empty when it satisfies it. */
     public Optional<String> violation(String text) {
         if (!checksScripts()) {

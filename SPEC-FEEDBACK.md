@@ -953,8 +953,15 @@ confusable check — over the namespace, each record's field names and each enum
 Highly Restrictive over a whole name, so an ordinary compound like `id_пользователя` is refused until a
 caller reaches for `perSegment()`.
 
-`tokenPolicy` is designed above and deliberately not added: its channel is the reader construction rather
-than the registry, and a setter that silently did nothing would be worse than an absent one.
+**Step 4b is built too, so both surfaces now carry a policy.** `TsonConfig.tokenPolicy` defaults to
+Unrestricted and reaches both facades, with `withTokenPolicy` as the per-reader axis — it has to be a reader
+axis rather than a registry one, since the standalone schemaless constructors hold no registry and a Class 1
+read is where a value arrives least constrained. `TokenPolicyEventSource` wraps the event source, so each
+token is checked exactly once despite the read context's rewinding, and the wrapper is not installed at all
+when the policy checks nothing. Violations report as `RESTRICTED_TOKEN`, located at the token and carrying no
+`path` — there is none yet where the check runs. A per-segment policy is refused on this surface rather than
+ignored. The subsumption predicted above holds and is pinned by a test: a field name is a token, so
+`tokenPolicy(asciiOnly())` constrains names whatever `identifierPolicy` says.
 
 Two parts of Step 1 are deliberately not built. The `field-name` production is untouched, so Class 1 field
 names stay unconstrained exactly as Step 1c intends. And the joiners' contextual rule is not implemented, so

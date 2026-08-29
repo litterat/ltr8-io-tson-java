@@ -19,12 +19,36 @@ forces the schemaless path on a schema-aware reader.
 **These two are the whole document-reading surface**, and both derive Jackson-`ObjectReader`-style rather
 than taking parameters, so source form, error policy and schema selection stay orthogonal instead of
 multiplying overloads: `withDiagnostics(receiver)` swaps fail-fast for any other receiver,
-`preservingUnknownTypeRefs()` relaxes the schemaless type-ref rules below, and
+`preservingUnknownTypeRefs()` relaxes the schemaless type-ref rules below,
+`withTokenPolicy(policy)` applies UTS #39 §5.2 to every token the read pulls (see below), and
 `withSchema(uri).readAs(source, typeName)` covers data that *isn't* self-describing — the caller supplies
 what a `!!schema` plus a root type-ref would have said, and validation is identical either way. Each returns
 a new reader **sharing** the original's compiled-schema registry, never rebuilding it. A
 `TsonTypeReader` from a compiled schema is the layer underneath: a strict single-method interface that
 reads one value at a cursor and polices nothing around it.
+
+**`withTokenPolicy` is the token-surface half of the Unicode policy** (`SPEC-FEEDBACK.md` #3 Step 4b), where
+`TsonConfig.identifierPolicy` is the declared-name half that rides the registry to the linker. It has to be a
+reader axis rather than a registry one, because the surface it guards includes the standalone schemaless
+constructors, which hold no registry at all — and a Class 1 read is exactly where a value arrives least
+constrained.
+
+`TokenPolicyEventSource` wraps the event source rather than checking inside `TsonReadContext`, and the reason
+is exactly-once: the context rewinds, and a probe context can be built over events already seen
+(`AnnotationCapture`), so a check there would report one token twice. The underlying stream produces each
+token once, so the decorator needs no set of already-reported positions. `wrap` returns the source unchanged
+when the policy checks nothing, which is the default — an ordinary read pays not even a predicate.
+
+The check sees the four events carrying text — a value, a field name, a type-ref, an annotation name — because
+at that layer nothing yet knows which is which. **So a name is a token**, and a token policy stricter than the
+identifier policy subsumes it: the name has already cleared the stricter rule by the time the name rule looks
+at it. The setter is named for the surface rather than for the values it mostly affects so that this is
+visible where it is configured. Document directives are not checked: a `!!schema`/`!!id` token is a URI naming
+an external resource, §2.2.1 governs what an identity may be, and an IRI's scripts are the resource owner's
+business. The diagnostic (`RESTRICTED_TOKEN`) carries a position and no `path`, which is not an omission —
+there is no path yet at the point the check runs. `perSegment()` is refused rather than ignored here: `_` and
+`-` are word separators by convention in a name and ordinary characters in a value, so segmenting one would
+admit UTS #39's own `Toys-Я-Us`.
 
 - **The class-driven binding / tree-building mechanics live in the internal `reader` package**
   (`SchemalessObjectReader`/`SchemalessTreeReader`, unexported); the public readers are thin facades that

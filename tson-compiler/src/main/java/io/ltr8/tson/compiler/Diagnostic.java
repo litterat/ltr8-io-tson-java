@@ -146,6 +146,20 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     }
 
     /**
+     * A token whose script mix the read's {@code TsonUnicodePolicy} does not permit ({@code SPEC-FEEDBACK.md}
+     * #3 Step 4b, UTS #39 §5.2).
+     *
+     * <p><b>No {@code path}, and that is not an omission.</b> The check runs where tokens leave the stream,
+     * before any reader has descended into them, which is exactly what lets it see a value and a field name
+     * alike. There is no path yet to state, so the diagnostic carries the one location it really has.
+     */
+    public static Diagnostic ofRestrictedToken(String text, String why, SourcePosition position) {
+        return new Diagnostic(Optional.empty(), Optional.empty(), "", Code.RESTRICTED_TOKEN,
+                "the token '" + text + "' " + why, "a token the Unicode policy admits", text,
+                Optional.ofNullable(position), Optional.empty());
+    }
+
+    /**
      * A *syntax* error in a schema document -- {@link #ofBaseSyntaxError}'s schema-side peer, and the shape
      * {@link TsonSchemaParser}'s recovering parse reports each failed declaration under.
      *
@@ -311,6 +325,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         DUPLICATE_MAP_KEY,
         DUPLICATE_FIELD,
         CONFUSABLE_NAMES,
+        RESTRICTED_TOKEN,
         SCHEMA_ERROR,
         UNKNOWN_TYPE,
         VALIDATION_ERROR,
