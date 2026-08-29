@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -158,14 +159,30 @@ public interface TsonReadContext {
      * -- belongs to whoever owns the document: {@link TsonTreeReader}/{@link TsonObjectReader}, which is what
      * a consumer reads through. Driving a {@link TsonTypeReader} over a raw source here reads one value at
      * the cursor and polices nothing around it.
+     *
+     * <p><b>{@code tokenPolicy} is required rather than defaulted, and that is the point of its being a
+     * parameter.</b> This is where every read converges, so a policy defaulted here would be one any caller
+     * could drop by saying nothing -- and {@code SPEC-FEEDBACK.md} #3 argues a security policy should be
+     * weakenable only in a way that leaves something to grep for. Naming
+     * {@link TsonUnicodePolicy#unrestricted()} is a fine answer, and the right one for a source whose events
+     * did not come from document text; it is just not an answer a caller gives by accident.
+     *
+     * <p>The policy is applied here rather than by the caller, so no context can exist whose events went
+     * unchecked. Nothing is installed when the policy checks nothing, so the default costs a read no wrapper.
      */
-    static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver) {
-        return DefaultTsonReadContext.of(events, receiver);
+    static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
+                              TsonUnicodePolicy tokenPolicy) {
+        Objects.requireNonNull(tokenPolicy, "tokenPolicy -- name one, TsonUnicodePolicy.unrestricted() if "
+                + "this source's tokens are not to be checked");
+        return DefaultTsonReadContext.of(TokenPolicyEventSource.wrap(events, tokenPolicy, receiver), receiver);
     }
 
-    /** {@link #of(TsonEventSource, TsonDiagnosticsReceiver)} with the fail-fast receiver -- the first problem throws {@link TsonReadException}. */
-    static TsonReadContext throwing(TsonEventSource events) {
-        return of(events, TsonDiagnosticsReceiver.throwing());
+    /**
+     * {@link #of(TsonEventSource, TsonDiagnosticsReceiver, TsonUnicodePolicy)} with the fail-fast receiver --
+     * the first problem throws {@link TsonReadException}.
+     */
+    static TsonReadContext throwing(TsonEventSource events, TsonUnicodePolicy tokenPolicy) {
+        return of(events, TsonDiagnosticsReceiver.throwing(), tokenPolicy);
     }
 
     /**

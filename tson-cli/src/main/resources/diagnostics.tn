@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/33/ltr8/cli/diagnostics-10.tn"
+!!id:"https://tson.io/2026/33/ltr8/cli/diagnostics-11.tn"
 !!meta:"https://tson.io/2026/33/m/meta.tn"
 !!import:"https://tson.io/2026/33/m/core.tn"
 @doc:"""
@@ -25,8 +25,8 @@
 {
   diagnostic_code => !enum [
     FIELD_REQUIRED FIELD_FIXED TYPE_MISMATCH WRONG_ARITY UNKNOWN_TYPE_REF ATOM_CONSTRAINT_VIOLATION
-    UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD CONFUSABLE_NAMES SCHEMA_ERROR UNKNOWN_TYPE
-    VALIDATION_ERROR NOT_IMPLEMENTED BIND_MISMATCH SCHEMA_UNAVAILABLE
+    UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD CONFUSABLE_NAMES RESTRICTED_TOKEN SCHEMA_ERROR
+    UNKNOWN_TYPE VALIDATION_ERROR NOT_IMPLEMENTED BIND_MISMATCH SCHEMA_UNAVAILABLE
   ]
   @doc:"""
     One problem, located at up to two ends: the value in the data (path, data_position) and the rule

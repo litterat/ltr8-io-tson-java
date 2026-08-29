@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -93,7 +94,7 @@ class StreamingLazinessTest {
         TsonDataStream realStream = new TsonDataStream(dataSource);
         realStream.next(); // DocumentStart
         CountingEventSource counting = new CountingEventSource(realStream);
-        TsonReadContext ctx = TsonReadContext.throwing(counting);
+        TsonReadContext ctx = TsonReadContext.throwing(counting, TsonUnicodePolicy.unrestricted());
 
         assertThrows(TsonReadException.class, () -> compiled.get("big_record").read(ctx));
 

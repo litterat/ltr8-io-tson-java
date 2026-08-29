@@ -34,6 +34,8 @@ public final class TsonConfig {
     private TsonSchemaSource schemaSource = TsonSchemaSource.registeredOnly();
     private DataNameBinder metaNameBinder;
     private TsonUnicodePolicy identifierPolicy = TsonUnicodePolicy.highlyRestrictive();
+
+    private TsonUnicodePolicy tokenPolicy = TsonUnicodePolicy.unrestricted();
     private boolean strictBinding = true;
     private Map<String, Class<?>> bindings;
     private String profile;
@@ -271,6 +273,50 @@ public final class TsonConfig {
         return this;
     }
 
+    /**
+     * UTS #39 §5.2 over <b>every token a read pulls off the stream</b>, values included
+     * ({@code SPEC-FEEDBACK.md} #3 Step 4b) -- {@link #identifierPolicy}'s peer on the other surface.
+     * Defaults to {@link TsonUnicodePolicy#unrestricted()}, which checks nothing.
+     *
+     * <p><b>The default is the opposite of the identifier default, for the same reason in each case.</b> A
+     * declared name is an interface and a homograph in one is an attack, so names default to Highly
+     * Restrictive. A value is data, and data may legitimately be anything -- a Greek quotation, a Cyrillic
+     * display name -- so imposing a script rule on it would break ordinary documents to no end. Nothing is
+     * checked here until a deployment says otherwise, and at the default no scan runs at all.
+     *
+     * <p><b>Raise it when values are more than payload:</b> a service that renders what it reads into a UI,
+     * or matches it against a blocklist or an allowlist, faces on values exactly the spoofing surface
+     * [TSON-DATA] §9.4 raises for names, and nothing in the series speaks to it.
+     *
+     * <p><b>A name is a token, so this also constrains names, and that is deliberate.</b> The check runs
+     * before anything knows which tokens are names, so a token policy stricter than the identifier policy
+     * subsumes it -- {@code tokenPolicy(asciiOnly())} has made this instance's identifiers ASCII-only too,
+     * whatever {@link #identifierPolicy} says. The setter is named for the surface it acts on rather than
+     * for the values it mostly affects, so that consequence is visible where it is configured.
+     *
+     * <p>The restriction level is the only mechanism available here, where for names it was the second
+     * choice. Skeleton distinctness is a <em>relation</em> and needs a set to hold over; values have none --
+     * two values in one array need not be distinguishable, and two values in different documents cannot be
+     * compared at all. The per-string rule is what remains, which is the same reason it is right for a
+     * browser judging a domain name.
+     *
+     * <p>{@link TsonUnicodePolicy.Level#MINIMALLY_RESTRICTIVE} and {@link TsonUnicodePolicy.Level#UNRESTRICTED}
+     * collapse here: §5.2 says so directly, a token that is not a name having no identifier profile to drop.
+     *
+     * @throws IllegalArgumentException if {@code policy} is per-segment -- {@code _} and {@code -} are word
+     *         separators by convention in a name and ordinary characters in a value, so segmenting one admits
+     *         UTS #39's own {@code Toys-Я-Us}, the spoof a strict token policy exists to refuse
+     */
+    public TsonConfig tokenPolicy(TsonUnicodePolicy policy) {
+        Objects.requireNonNull(policy, "policy");
+        if (policy.isPerSegment()) {
+            throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
+                    + "characters in a value, not word separators -- use the whole-text policy instead");
+        }
+        this.tokenPolicy = policy;
+        return this;
+    }
+
     public TsonConfig lenientBinding() {
         this.strictBinding = false;
         return this;
@@ -301,7 +347,7 @@ public final class TsonConfig {
                 : fileSchemas != null ? fileSchemas.build() : schemaSource;
         TsonCompiledMetaRegistry core =
                 TsonCompiledMetaRegistry.withStandardLibrary(schemaContext, source, identifierPolicy);
-        return new Tson(core, dataBindContext, strictBinding);
+        return new Tson(core, dataBindContext, strictBinding, tokenPolicy);
     }
 
     /**

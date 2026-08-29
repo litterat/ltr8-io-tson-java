@@ -538,7 +538,8 @@ lexer under everything, are still fail-fast.
 document-reading surface, dual-mode fixed at construction: standalone = schemaless (Class 1,
 Jackson-style); from a `Tson` facade = schema-aware (a self-describing document validates against its
 `!!schema` as it's read). Jackson-`ObjectReader`-style derivation (`withDiagnostics`, `withSchema(uri)`,
-`preservingUnknownTypeRefs`) keeps source form / error policy / schema selection orthogonal; derived
+`preservingUnknownTypeRefs`, `withTokenPolicy`) keeps source form / error policy / schema selection / Unicode
+policy orthogonal; derived
 readers share the original's compiled-schema registry. Failures reaching or resolving the schema are
 diagnostics, not exceptions. A schemaless read still checks type-refs (`TypeRefCheck`: built-in name →
 must satisfy the atom; names-the-target → accepted, bind only; else `UNKNOWN_TYPE_REF` — a reader policy,

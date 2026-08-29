@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import java.util.Objects;
 import io.ltr8.tson.compiler.reader.EventSkip;
 import io.ltr8.tson.compiler.reader.SchemalessTreeReader;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
@@ -66,6 +67,10 @@ public final class TsonTreeReader {
     /** The schema {@link #readAs} validates against, or {@code null} until {@link #withSchema} names one. */
     private final String schemaUri;
 
+    /** UTS #39 §5.2 over every token this reader pulls. Never {@code null} -- the unset default is
+     * {@link TsonUnicodePolicy#unrestricted()}, which checks nothing. */
+    private final TsonUnicodePolicy tokenPolicy;
+
     /**
      * Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved and
      * compiled through {@code tree}. Used by {@code Tson#treeReader()}.
@@ -79,7 +84,8 @@ public final class TsonTreeReader {
      *         bound objects this reader cannot assemble into a tree
      */
     public TsonTreeReader(TsonCompiledSchemaRegistry tree) {
-        this(requireTreeMode(tree), TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader());
+        this(requireTreeMode(tree), TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(),
+                TsonUnicodePolicy.unrestricted());
     }
 
     /**
@@ -103,16 +109,18 @@ public final class TsonTreeReader {
 
     /** Schemaless (Class 1) -- reads the wire structure into a tree, ignoring any {@code !!schema} the document declares. */
     public TsonTreeReader() {
-        this(null, TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader());
+        this(null, TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(),
+                TsonUnicodePolicy.unrestricted());
     }
 
     /** Shares {@code tree} rather than rebuilding it -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
     private TsonTreeReader(TsonCompiledSchemaRegistry tree, TsonDiagnosticsReceiver receiver, String schemaUri,
-                           SchemalessTreeReader schemaless) {
+                           SchemalessTreeReader schemaless, TsonUnicodePolicy tokenPolicy) {
         this.tree = tree;
         this.receiver = receiver;
         this.schemaUri = schemaUri;
         this.schemaless = schemaless;
+        this.tokenPolicy = tokenPolicy;
     }
 
     /**
@@ -126,7 +134,7 @@ public final class TsonTreeReader {
             throw new IllegalStateException("a schemaless TsonTreeReader has no schema environment to resolve '"
                     + schemaUri + "' through -- obtain one from Tson.treeReader()");
         }
-        return new TsonTreeReader(tree, receiver, schemaUri, schemaless);
+        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy);
     }
 
     /**
@@ -142,7 +150,37 @@ public final class TsonTreeReader {
      * schema-aware read resolves type-refs against its compiled schema.
      */
     public TsonTreeReader preservingUnknownTypeRefs() {
-        return new TsonTreeReader(tree, receiver, schemaUri, SchemalessTreeReader.preserving());
+        return new TsonTreeReader(tree, receiver, schemaUri, SchemalessTreeReader.preserving(), tokenPolicy);
+    }
+
+    /**
+     * This reader with {@code policy} applied to every token it pulls -- a new reader, leaving this one unchanged
+     * ({@code SPEC-FEEDBACK.md} #3 Step 4b). Orthogonal to {@link #withSchema} and {@link #withDiagnostics},
+     * and available on a schemaless reader, which is the point: a Class 1 read has no schema and no registry,
+     * and is where a value arrives least constrained.
+     *
+     * <p><b>The default checks nothing</b>, which is the opposite of a declared name's Highly Restrictive
+     * default and right for the same reason in each case. A value is data, and data may legitimately be
+     * anything -- a Greek quotation, a Cyrillic display name. A service that renders the values it reads, or
+     * matches them against a list, raises this knowingly.
+     *
+     * <p><b>A name is a token, so this reaches names too.</b> Set stricter than the identifier policy, it
+     * subsumes it: the check runs before anything knows which tokens are names, so a name has already cleared
+     * the stricter rule by the time the name rule looks at it. That is the honest consequence of where the
+     * check sits, and is why this is not called {@code withValuePolicy}.
+     *
+     * @throws IllegalArgumentException if {@code policy} is per-segment. {@code _} and {@code -} are word
+     *         separators by convention in a name and ordinary characters in a value, so segmenting one admits
+     *         UTS #39's own {@code Toys-Я-Us} -- the spoof a strict token policy exists to refuse. Refused
+     *         rather than ignored, so a policy that cannot mean what it says is never silently accepted.
+     */
+    public TsonTreeReader withTokenPolicy(TsonUnicodePolicy policy) {
+        Objects.requireNonNull(policy, "policy");
+        if (policy.isPerSegment()) {
+            throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
+                    + "characters in a value, not word separators -- use the whole-text policy instead");
+        }
+        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, policy);
     }
 
     /**
@@ -164,7 +202,7 @@ public final class TsonTreeReader {
      * carries its own receiver, and that one wins.
      */
     public TsonTreeReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
-        return new TsonTreeReader(tree, receiver, schemaUri, schemaless);
+        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy);
     }
 
     // ── Whole-document entry points ──────────────────────────────────────
@@ -250,7 +288,7 @@ public final class TsonTreeReader {
      */
     private TsonDocument readDocument(TsonDataStream stream) {
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             TsonValue root = (tree == null || start.schema().isEmpty())
                     ? schemaless.read(ctx)
@@ -265,7 +303,7 @@ public final class TsonTreeReader {
 
     private TsonValue readRoot(TsonDataStream stream, boolean ignoreSchema) {
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             TsonValue result = (ignoreSchema || tree == null || start.schema().isEmpty())
                     ? schemaless.read(ctx)
@@ -282,7 +320,7 @@ public final class TsonTreeReader {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
             TsonValue result = readAgainstSchema(schemaUri, ctx, typeName);
             requireDocumentEnd(ctx);

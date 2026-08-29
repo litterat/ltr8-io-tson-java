@@ -63,7 +63,13 @@ public final class Tson {
     private final TsonCompiledSchemaRegistry bind;
     private final DataBindContext dataBindContext;
 
-    Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext, boolean strictBinding) {
+    /** UTS #39 §5.2 over every token a read off this instance pulls -- the token-surface half of the
+     * two policies, where {@code core.identifierPolicy()} is the declared-name half. */
+    private final TsonUnicodePolicy tokenPolicy;
+
+    Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext, boolean strictBinding,
+         TsonUnicodePolicy tokenPolicy) {
+        this.tokenPolicy = tokenPolicy;
         this.core = core;
         this.dataBindContext = dataBindContext;
         this.tree = TsonCompiledSchemaRegistry.tree(core);
@@ -82,7 +88,7 @@ public final class Tson {
      * instance shares one compiled-schema cache: a schema is compiled once here, not once per reader.
      */
     public TsonObjectReader objectReader() {
-        return new TsonObjectReader(bind, dataBindContext);
+        return new TsonObjectReader(bind, dataBindContext).withTokenPolicy(tokenPolicy);
     }
 
     /**
@@ -93,7 +99,7 @@ public final class Tson {
      * makes a reader per call, from recompiling the schema for every document it checks.
      */
     public TsonTreeReader treeReader() {
-        return new TsonTreeReader(tree);
+        return new TsonTreeReader(tree).withTokenPolicy(tokenPolicy);
     }
 
     /** A fresh, schemaless (Class 1) {@link TsonObjectWriter} bound to {@link #dataBindContext()} -- the inverse of {@link #objectReader()}. */

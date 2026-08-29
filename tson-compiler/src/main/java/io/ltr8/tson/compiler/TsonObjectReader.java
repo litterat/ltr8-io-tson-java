@@ -66,6 +66,10 @@ public final class TsonObjectReader {
     /** The schema {@link #readAs} validates against, or {@code null} until {@link #withSchema} names one. */
     private final String schemaUri;
 
+    /** UTS #39 §5.2 over every token this reader pulls. Never {@code null} -- the unset default is
+     * {@link TsonUnicodePolicy#unrestricted()}, which checks nothing. */
+    private final TsonUnicodePolicy tokenPolicy;
+
     /**
      * Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved and
      * compiled through {@code bind}. Used by {@code Tson#objectReader()}.
@@ -80,7 +84,8 @@ public final class TsonObjectReader {
      */
     public TsonObjectReader(TsonCompiledSchemaRegistry bind, DataBindContext dataBindContext) {
         this(dataBindContext, new SchemalessObjectReader(dataBindContext),
-                requireBindMode(bind), TsonDiagnosticsReceiver.throwing(), null);
+                requireBindMode(bind), TsonDiagnosticsReceiver.throwing(), null,
+                TsonUnicodePolicy.unrestricted());
     }
 
     /**
@@ -103,7 +108,8 @@ public final class TsonObjectReader {
 
     /** Schemaless -- binds to the target class alone, ignoring any {@code !!schema} the document declares. */
     public TsonObjectReader(DataBindContext context) {
-        this(context, new SchemalessObjectReader(context), null, TsonDiagnosticsReceiver.throwing(), null);
+        this(context, new SchemalessObjectReader(context), null, TsonDiagnosticsReceiver.throwing(), null,
+                TsonUnicodePolicy.unrestricted());
     }
 
     /** Schemaless, over {@link TsonAtomContext#defaultContext()}. */
@@ -113,12 +119,14 @@ public final class TsonObjectReader {
 
     /** Shares {@code bind} and {@code schemaless} rather than rebuilding them -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
     private TsonObjectReader(DataBindContext dataBindContext, SchemalessObjectReader schemaless,
-                             TsonCompiledSchemaRegistry bind, TsonDiagnosticsReceiver receiver, String schemaUri) {
+                             TsonCompiledSchemaRegistry bind, TsonDiagnosticsReceiver receiver, String schemaUri,
+                             TsonUnicodePolicy tokenPolicy) {
         this.dataBindContext = dataBindContext;
         this.schemaless = schemaless;
         this.bind = bind;
         this.receiver = receiver;
         this.schemaUri = schemaUri;
+        this.tokenPolicy = tokenPolicy;
     }
 
     /**
@@ -132,7 +140,37 @@ public final class TsonObjectReader {
             throw new IllegalStateException("a schemaless TsonObjectReader has no schema environment to resolve '"
                     + schemaUri + "' through -- obtain one from Tson.objectReader()");
         }
-        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri);
+        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, tokenPolicy);
+    }
+
+    /**
+     * This reader with {@code policy} applied to every token it pulls -- a new reader, leaving this one unchanged
+     * ({@code SPEC-FEEDBACK.md} #3 Step 4b). Orthogonal to {@link #withSchema} and {@link #withDiagnostics},
+     * and available on a schemaless reader, which is the point: a Class 1 read has no schema and no registry,
+     * and is where a value arrives least constrained.
+     *
+     * <p><b>The default checks nothing</b>, which is the opposite of a declared name's Highly Restrictive
+     * default and right for the same reason in each case. A value is data, and data may legitimately be
+     * anything -- a Greek quotation, a Cyrillic display name. A service that renders the values it reads, or
+     * matches them against a list, raises this knowingly.
+     *
+     * <p><b>A name is a token, so this reaches names too.</b> Set stricter than the identifier policy, it
+     * subsumes it: the check runs before anything knows which tokens are names, so a name has already cleared
+     * the stricter rule by the time the name rule looks at it. That is the honest consequence of where the
+     * check sits, and is why this is not called {@code withValuePolicy}.
+     *
+     * @throws IllegalArgumentException if {@code policy} is per-segment. {@code _} and {@code -} are word
+     *         separators by convention in a name and ordinary characters in a value, so segmenting one admits
+     *         UTS #39's own {@code Toys-Я-Us} -- the spoof a strict token policy exists to refuse. Refused
+     *         rather than ignored, so a policy that cannot mean what it says is never silently accepted.
+     */
+    public TsonObjectReader withTokenPolicy(TsonUnicodePolicy policy) {
+        Objects.requireNonNull(policy, "policy");
+        if (policy.isPerSegment()) {
+            throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
+                    + "characters in a value, not word separators -- use the whole-text policy instead");
+        }
+        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, policy);
     }
 
     /**
@@ -153,7 +191,7 @@ public final class TsonObjectReader {
      * that carries its own receiver, and that one wins.
      */
     public TsonObjectReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
-        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri);
+        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, tokenPolicy);
     }
 
     /**
@@ -169,7 +207,7 @@ public final class TsonObjectReader {
      */
     public TsonObjectReader preservingUnknownTypeRefs() {
         return new TsonObjectReader(dataBindContext, SchemalessObjectReader.preserving(dataBindContext),
-                bind, receiver, schemaUri);
+                bind, receiver, schemaUri, tokenPolicy);
     }
 
     // ── Whole-document entry points ──────────────────────────────────────
@@ -260,7 +298,7 @@ public final class TsonObjectReader {
     private <T> TsonObjectDocument<T> readDocument(TsonDataStream stream, Class<T> type) {
         Objects.requireNonNull(type, "type");
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             T value;
             Optional<String> rootType = Optional.empty();
@@ -284,7 +322,7 @@ public final class TsonObjectReader {
     private <T> T readDocument(TsonDataStream stream, Class<T> type, boolean ignoreSchema) {
         Objects.requireNonNull(type, "type");
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             T result = (ignoreSchema || bind == null || start.schema().isEmpty())
                     ? schemaless.read(ctx, type)
@@ -302,7 +340,7 @@ public final class TsonObjectReader {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
             T result = valueOf(readAgainstSchema(schemaUri, ctx, type, typeName));
             requireDocumentEnd(ctx);

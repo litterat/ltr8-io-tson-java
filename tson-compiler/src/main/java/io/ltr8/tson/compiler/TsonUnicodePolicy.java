@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler;
 
 import java.lang.Character.UnicodeScript;
 import java.util.EnumSet;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -153,32 +152,79 @@ public final class TsonUnicodePolicy {
         return level != Level.UNRESTRICTED;
     }
 
+    /**
+     * Whether the level applies to each {@code _}/{@code -} delimited segment rather than to the whole text.
+     * A surface where segmenting has no meaning -- a value, where those are ordinary characters rather than
+     * word separators -- asks this in order to refuse such a policy rather than to quietly ignore it.
+     */
+    public boolean isPerSegment() {
+        return perSegment;
+    }
+
     /** The reason {@code text} fails this policy, or empty when it satisfies it. */
     public Optional<String> violation(String text) {
         if (!checksScripts()) {
             return Optional.empty();
         }
-        for (String unit : perSegment ? text.split("[_-]") : new String[] {text}) {
-            if (unit.isEmpty()) {
+        if (!perSegment) {
+            return text.isEmpty() ? Optional.empty() : checkUnit(text);
+        }
+        // Segmented by hand rather than by String.split: "[_-]" is not split's single-character fast path, so
+        // it compiles a Pattern per call. This runs per token on the read path, where that is the whole cost.
+        int start = 0;
+        for (int i = 0; i <= text.length(); i++) {
+            if (i < text.length() && text.charAt(i) != '_' && text.charAt(i) != '-') {
                 continue;
             }
-            Optional<String> failure = checkUnit(unit);
-            if (failure.isPresent()) {
-                return failure;
+            if (i > start) {
+                Optional<String> failure = checkUnit(text.substring(start, i));
+                if (failure.isPresent()) {
+                    return failure;
+                }
+            }
+            start = i + 1;
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * <b>Allocation-free when the unit passes</b>, which on the token surface is every token of an ordinary
+     * document. A conforming unit is answered by a scan that materialises nothing; only a genuinely
+     * mixed-script one reaches {@link #mixed}, and that one is either an error or a deliberate combination,
+     * so a set and a message there cost nothing that matters.
+     */
+    private Optional<String> checkUnit(String unit) {
+        if (level == Level.ASCII_ONLY) {
+            for (int i = 0; i < unit.length(); i++) {
+                if (unit.charAt(i) >= 0x80) {
+                    return Optional.of("'" + unit + "' is not ASCII, and this processor requires ASCII-only "
+                            + (perSegment ? "segments" : "names") + " (UTS #39 §5.2)");
+                }
+            }
+            return Optional.empty();
+        }
+        UnicodeScript only = null;
+        for (int i = 0; i < unit.length(); ) {
+            int codePoint = unit.codePointAt(i);
+            i += Character.charCount(codePoint);
+            UnicodeScript script = UnicodeScript.of(codePoint);
+            if (script == UnicodeScript.COMMON || script == UnicodeScript.INHERITED
+                    || script == UnicodeScript.UNKNOWN) {
+                continue;
+            }
+            if (only == null) {
+                only = script;
+            } else if (only != script) {
+                return mixed(unit);
             }
         }
         return Optional.empty();
     }
 
-    private Optional<String> checkUnit(String unit) {
-        if (level == Level.ASCII_ONLY) {
-            return unit.chars().allMatch(c -> c < 0x80)
-                    ? Optional.empty()
-                    : Optional.of("'" + unit + "' is not ASCII, and this processor requires ASCII-only "
-                            + (perSegment ? "segments" : "names") + " (UTS #39 §5.2)");
-        }
+    /** The unit is written in more than one script: decide whether this level admits the combination. */
+    private Optional<String> mixed(String unit) {
         Set<UnicodeScript> scripts = scriptsOf(unit);
-        if (scripts.size() <= 1 || covered(scripts)) {
+        if (covered(scripts)) {
             return Optional.empty();
         }
         return Optional.of("'" + unit + "' mixes the scripts " + scripts + ", which UTS #39 §5.2's "
@@ -187,8 +233,10 @@ public final class TsonUnicodePolicy {
     }
 
     private boolean covered(Set<UnicodeScript> scripts) {
-        if (permitted.stream().anyMatch(set -> set.containsAll(scripts))) {
-            return true;
+        for (int i = 0; i < permitted.size(); i++) {
+            if (permitted.get(i).containsAll(scripts)) {
+                return true;
+            }
         }
         if (level == Level.SINGLE_SCRIPT) {
             return false;
@@ -200,21 +248,34 @@ public final class TsonUnicodePolicy {
             return false;
         }
         // Latin and any one other script, except the two §5.2 names as confusable with Latin.
-        Set<UnicodeScript> others = new LinkedHashSet<>(scripts);
-        return others.remove(UnicodeScript.LATIN) && others.size() == 1
-                && CONFUSABLE_WITH_LATIN.stream().noneMatch(others::contains);
+        if (!scripts.contains(UnicodeScript.LATIN)) {
+            return false;
+        }
+        UnicodeScript other = null;
+        for (UnicodeScript script : scripts) {
+            if (script == UnicodeScript.LATIN) {
+                continue;
+            }
+            if (other != null) {
+                return false;
+            }
+            other = script;
+        }
+        return other != null && !CONFUSABLE_WITH_LATIN.contains(other);
     }
 
     /** The scripts {@code text} is written in, ignoring Common and Inherited per §5.1. */
     private static Set<UnicodeScript> scriptsOf(String text) {
         EnumSet<UnicodeScript> seen = EnumSet.noneOf(UnicodeScript.class);
-        text.codePoints().forEach(cp -> {
-            UnicodeScript script = UnicodeScript.of(cp);
+        for (int i = 0; i < text.length(); ) {
+            int codePoint = text.codePointAt(i);
+            i += Character.charCount(codePoint);
+            UnicodeScript script = UnicodeScript.of(codePoint);
             if (script != UnicodeScript.COMMON && script != UnicodeScript.INHERITED
                     && script != UnicodeScript.UNKNOWN) {
                 seen.add(script);
             }
-        });
+        }
         return seen;
     }
 

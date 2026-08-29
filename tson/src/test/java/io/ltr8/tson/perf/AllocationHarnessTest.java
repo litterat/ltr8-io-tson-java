@@ -1,5 +1,6 @@
 package io.ltr8.tson.perf;
 
+import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.compiler.TsonDataStream;
@@ -174,6 +175,33 @@ class AllocationHarnessTest {
         report("allocated per read (" + DOCUMENT.length() + "-char document)", perRead, "bytes");
         assertTrue(perRead < 125_000, "a read of a " + DOCUMENT.length() + "-char document allocated "
                 + perRead + " bytes");
+    }
+
+    /**
+     * <b>A raised {@code tokenPolicy} is not a per-token allocation.</b> UTS #39 §5.2 runs on every token a
+     * read pulls, so a policy that materialised anything per token would put the cost of the whole document
+     * on the one feature a deployment turns on for safety -- and would make the honest advice "leave it off".
+     *
+     * <p>The conforming path therefore scans and returns {@code Optional.empty()}: no split array, no script
+     * set, no stream, and no capturing lambda at the call. Only a genuinely mixed-script token builds
+     * anything, and that one is a diagnostic. What is left is the decorator itself, once per read.
+     *
+     * <p>The ceiling is loose enough to survive a JDK upgrade and tight enough to catch the shape this
+     * guards: the first cut of this code allocated ~2.3 KB per read of this document at {@code asciiOnly},
+     * two orders of magnitude over what it now costs.
+     */
+    @Test
+    void aRaisedTokenPolicyCostsAlmostNothingPerRead() {
+        double unrestricted = AllocationProbe.allocatedPerOperation(20_000, () ->
+                AllocationProbe.sink = reader.read(DOCUMENT, Order.class));
+        double restricted = AllocationProbe.allocatedPerOperation(20_000, () -> AllocationProbe.sink =
+                reader.withTokenPolicy(TsonUnicodePolicy.highlyRestrictive()).read(DOCUMENT, Order.class));
+        double overhead = restricted - unrestricted;
+
+        report("allocated per read, tokenPolicy raised to highlyRestrictive", restricted, "bytes");
+        report("  overhead over the unrestricted default", overhead, "bytes");
+        assertTrue(overhead < 1_000, "a raised token policy added " + overhead + " bytes per read, which is "
+                + "per-token allocation rather than the one decorator a read should cost");
     }
 
     /**

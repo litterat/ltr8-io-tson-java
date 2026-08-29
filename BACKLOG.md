@@ -369,14 +369,18 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   restriction level for. The conformance vector
   `lexer/invalid/zwnj-inside-unquoted-token` asserts today's behaviour and flips in the same change; its
   sidecar already says the contradiction is why it exists.
-- [ ] **`tokenPolicy` — the restriction level on the token surface.** `SPEC-FEEDBACK.md` #3 Step 4b, the
-  half of that step not built: `identifierPolicy` ships, `TsonUnicodePolicy` carries the levels and the unit, and
-  what is missing is the second channel. The identifier policy rides `TsonCompiledMetaRegistry` to the
-  linker; a token policy has to reach the *reader* construction instead, including the standalone schemaless
-  constructors that hold no registry. Default Unrestricted, so it costs nothing at read time and changes no
-  existing behaviour — which is also why it was left out rather than added as a setter that silently did
-  nothing. `perSegment()` stays off this surface: `_` and `-` are word separators by convention in a name and
-  ordinary characters in a value, and UTS #39's own `Toys-Я-Us` is what segmenting a value would admit.
+- [ ] **An object read whose bind target fails to resolve throws `IllegalStateException` under a collecting
+  receiver.** With the fail-fast receiver the failure is a `TsonReadException` naming the class, which is
+  right. With `withDiagnostics(collector)` the bind failure is reported instead of thrown, the read therefore
+  consumes nothing, and the `requireDocumentEnd` pull then finds the document's own `RecordStart` still
+  pending and raises `IllegalStateException: unexpected trailing event after the document's value`. So a
+  caller who asked for collection gets an internal-invariant exception rather than the report they asked for,
+  and the collected diagnostics are lost with it. Reproduces on both the standalone and the `Tson`-derived
+  object reader, on any unresolvable target; the tree path is unaffected because a tree read always consumes.
+  Per this project's exception policy an `IllegalStateException` means an internal invariant broke, and this
+  one is reachable from ordinary caller input. The fix is presumably for a reported (rather than thrown) bind
+  failure to skip the value the way every other collecting-mode failure does, so framing stays consistent.
+
 - [ ] Bidi-formatting-character surfacing outside quoted tokens (§9.5) — the sibling gap to the
   numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section; neither is enforced. Note
   this is **not** the class #14 closed: U+200E/U+200F are `Pattern_White_Space`, so they *separate* tokens

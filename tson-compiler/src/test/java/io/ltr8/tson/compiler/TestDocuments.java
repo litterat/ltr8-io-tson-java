@@ -24,7 +24,7 @@ public final class TestDocuments {
     /** As {@link #document(String)}, reporting through {@code receiver} instead of throwing at the first problem. */
     public static TsonReadContext document(String source, TsonDiagnosticsReceiver receiver) {
         TsonDataStream stream = new TsonDataStream(source);
-        TsonReadContext ctx = TsonReadContext.of(stream, receiver);
+        TsonReadContext ctx = TsonReadContext.of(stream, receiver, TsonUnicodePolicy.unrestricted());
         ctx.next(); // DocumentStart
         return ctx;
     }

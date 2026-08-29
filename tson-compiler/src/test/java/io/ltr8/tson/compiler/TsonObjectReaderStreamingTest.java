@@ -64,7 +64,7 @@ class TsonObjectReaderStreamingTest {
         TsonDataStream realStream = new TsonDataStream(source);
         realStream.next(); // DocumentStart
         CountingEventSource counting = new CountingEventSource(realStream);
-        TsonReadContext ctx = TsonReadContext.throwing(counting);
+        TsonReadContext ctx = TsonReadContext.throwing(counting, TsonUnicodePolicy.unrestricted());
 
         assertThrows(TsonReadException.class, () -> new TsonObjectReader().read(ctx, Holder.class));
 
@@ -79,7 +79,7 @@ class TsonObjectReaderStreamingTest {
         TsonDataStream stream = new TsonDataStream(source);
         stream.next(); // DocumentStart
         TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
-        TsonReadContext ctx = TsonReadContext.of(stream, problems);
+        TsonReadContext ctx = TsonReadContext.of(stream, problems, TsonUnicodePolicy.unrestricted());
 
         TwoFields result = new TsonObjectReader().read(ctx, TwoFields.class);
 
