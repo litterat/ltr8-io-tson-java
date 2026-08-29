@@ -680,6 +680,76 @@ class TsonSchemaParserTest {
                 { 42 => text }"""));
     }
 
+    /**
+     * {@code type-name = identifier} (§12.1 under the kernel's {@code type_name} role): every name the schema
+     * grammar reads is matched against the profile in full, not merely required to be an unquoted token.
+     * §12.1's own "numbers are not declarable names" is one consequence of identifier-Start dropping {@code Nd},
+     * {@code -}, {@code +} and {@code .}, and no longer a separate rule -- so a name that begins with a digit but
+     * is not itself a number is refused by the same clause that refuses {@code 42}.
+     */
+    @ValueSource(strings = {"42x", "-foo", ".foo", "+foo"})
+    @ParameterizedTest
+    void aDeclarationNameOutsideTheIdentifierProfileIsAParseError(String name) {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/33/m/meta.tn1"
+                { %s => text }""".formatted(name)));
+        assertTrue(thrown.getMessage().contains("cannot start an identifier"), thrown.getMessage());
+    }
+
+    /**
+     * The dot is <em>reserved</em> rather than spent (see {@code IdentifierParser}): it is the near-universal
+     * identifier separator, so admitting it into a name now would foreclose using it as one later. It fails as a
+     * continue character, where the cases above fail at Start.
+     */
+    @Test
+    void aDeclarationNameContainingADotIsAParseError() {
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/33/m/meta.tn1"
+                { x.y => text }"""));
+        assertTrue(thrown.getMessage().contains("cannot appear in an identifier"), thrown.getMessage());
+    }
+
+    /**
+     * Identifier-Start is {@code XID_Start} and deliberately does not add {@code _}: the bare token {@code _} is
+     * §2.9's absent sentinel, and admitting the character would buy only {@code !_id} and {@code @_note} while
+     * costing the invariant that every identifier is a well-formed unquoted token. A leading underscore is a
+     * <em>field</em> name, spelled quoted, and never a declared type name.
+     */
+    @Test
+    void aLeadingUnderscoreDeclarationNameIsAParseError() {
+        assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/33/m/meta.tn1"
+                { _id => text }"""));
+    }
+
+    /** A type parameter is a name through the same {@code param_name} role, and reaches the same check. */
+    @Test
+    void aTypeParameterOutsideTheIdentifierProfileIsAParseError() {
+        assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/33/m/meta.tn1"
+                { box => <9t> { v: 9t } }"""));
+    }
+
+    /** And so is the constructor head of an atom refinement or instance, which names a type. */
+    @Test
+    void aConstructorHeadOutsideTheIdentifierProfileIsAParseError() {
+        assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/33/m/meta.tn1"
+                { t => !9integer { min: 1 } }"""));
+    }
+
+    /**
+     * The profile is the name's, not the spelling's, so an ordinary name is untouched -- including the {@code -}
+     * identifier-Continue keeps and the non-Latin names {@code XID_Start} admits.
+     */
+    @ValueSource(strings = {"my-field", "\u00e9quipe", "\u0438\u043c\u044f"})
+    @ParameterizedTest
+    void anIdentifierDeclarationNameParses(String name) {
+        assertTrue(parse("""
+                !!meta:"https://tson.io/2026/33/m/meta.tn1"
+                { %s => text }""".formatted(name)).body().declarations().containsKey(name));
+    }
+
     // ── §1.6's full worked example ────────────────────────────────────────
 
     @Test

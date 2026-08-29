@@ -136,6 +136,21 @@ Key points:
   whether or not a space precedes them, precisely because the old wording sent authors to the spaced
   spelling; `?` only when adjacent, there being no message advising otherwise. The separation rule itself is
   unchanged and still catches everything else (`!int32"5"`).
+- **A name position takes an `identifier`, not merely a bare token, and the check sits in the grammar.**
+  `type-ref = "!" identifier` and `annotation = "@" identifier` (§7.4): `TsonDataStream` matches each name's
+  text in full against `IdentifierParser` once adjacency is settled, which is §7.6's own two-layer shape —
+  the lexer produces a token, and a production that is no part of the token-stream grammar then matches its
+  decoded text, exactly as a number is matched. It has to be the profile and not the token class, because
+  token-Start carries `Nd`/`-`/`+`/`.` so a *number* can be an unquoted token, and those reach names only
+  because names and values share one lexical class. So `!42x` and `@x.y` are syntax errors rather than a
+  reference to an undeclared type and an annotation carrying a name the format reserves — the dot being
+  reserved as a future identifier separator. **`field-name` is the deliberate exception and stays lexical**:
+  `unquoted-token / single-line-token` (`isFieldNameTokenType`, narrower than the map key's
+  `isBareTokenType`, a key being a value and not a name, §2.6). A Class 1 document has no schema, so nothing
+  there knows which tokens are meant as names, and `{"first name": 1}` must keep reading as an ordinary
+  record; the identifier contract is stated once on *declarations* (`TsonSchemaParser.expectTypeName`,
+  `DefinitionResolver.requireIdentifier`) and data conforms by construction, a field name that is not an
+  identifier matching nothing and already being an `UNRECOGNIZED_FIELD`. `SPEC-FEEDBACK.md` #3 Step 1c.
 - **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`.** This is a
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
   parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic).

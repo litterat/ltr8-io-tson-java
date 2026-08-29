@@ -13,6 +13,16 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **`extends TsonDataParser`, same package** — §12.1 imports Part 1's `annotation`/`data-value`/directive
   grammar directly, so `TsonSchemaParser` calls straight into package-private methods rather than
   re-implementing them, adding only the schema-only tokens (`~ ^ & | ( ) < > ? ; -`).
+- **`type-name = identifier`, and that one rule replaces §12.1's number rule rather than joining it.**
+  `expectTypeName` matches every declared name, type parameter and referenced name against
+  `IdentifierParser`, and `parseAtomRefinementOrInstance` matches the `!` head. §12.1 states separately that
+  "numbers are not declarable names"; identifier-Start is `XID_Start`, and every spelling the number grammar
+  admits begins with a digit, a sign or a dot — all in token-Start only so a *number* can be an unquoted
+  token — so the profile subsumes it and also catches the names that merely *begin* like a number (`42x`,
+  `-foo`) which the number rule let through. Field names are the one naming position the parser leaves
+  alone: `field-name` stays lexical for the Class 1 reason (`docs/lexer-and-data-parsing.md`), and
+  `DefinitionResolver.requireIdentifier` applies the contract to the ones a declaration actually binds.
+  `SPEC-FEEDBACK.md` #3 Step 1b.
 - **`SchemaMap.declarations` is a `Map<String, Declaration>`** (a `LinkedHashMap`, insertion order
   preserved) — §3.4.1's Pass 1 shape and the schema's own `{type_name => type_definition}`. A duplicate
   name overwrites, same "grammar layer doesn't dedupe" treatment the data grammar gives duplicate fields.

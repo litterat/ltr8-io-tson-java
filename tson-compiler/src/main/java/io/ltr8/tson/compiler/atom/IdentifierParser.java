@@ -66,7 +66,17 @@ public final class IdentifierParser implements AtomType<String> {
 
     @Override
     public String read(TokenValue token) {
-        String text = token.text();
+        return validate(token.text());
+    }
+
+    /**
+     * The profile itself, over a name's decoded text. Separate from {@link #read(TokenValue)} because the form a
+     * name was spelled in is no part of the contract -- an identifier is constrained however it was written -- so
+     * a caller that already holds the text (the grammar, at each name position; the resolver, for a field name it
+     * built) states the check directly rather than wrapping a {@link TokenValue} around the string to get at it.
+     * Returns the text, so it composes where a value is wanted.
+     */
+    public static String validate(String text) {
         if (text.isEmpty()) {
             throw new AtomParseException("an identifier may not be empty", EXPECTED);
         }
