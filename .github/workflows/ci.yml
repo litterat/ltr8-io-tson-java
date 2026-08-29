@@ -20,6 +20,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # The shared conformance corpus, pinned to a commit. Without it every vector in
+      # ConformanceSuiteTest and SidecarSchemasTest aborts via Assumptions -- which reads green,
+      # so CI reported success while measuring this implementation against none of the corpus.
+      - name: Fetch references
+        run: ./scripts/fetch-references.sh
+
       # `build` reaches javadoc now: every module publishes a javadoc jar, so `assemble` runs the
       # doclint pass that used to need a step of its own here.
       - name: Build and test

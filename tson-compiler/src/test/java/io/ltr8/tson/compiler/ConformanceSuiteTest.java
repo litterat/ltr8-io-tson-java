@@ -47,7 +47,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -68,7 +67,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Runs every vector in the sibling {@code ltr8-io-tson-test-suite} repo (see its own README for
+ * Runs every vector in the shared {@code ltr8-io-tson-test-suite} corpus (see its own README for
  * the vector/sidecar format) against this implementation's real {@link Lexer}, {@link TsonDataParser},
  * {@link BaseTypeResolver}, and {@link BuiltinTypeVocabulary}.
  *
@@ -79,16 +78,17 @@ import static org.junit.jupiter.api.Assertions.fail;
  * other implementations -- it exists to catch drift between this implementation and the spec,
  * not to pinpoint which internal rule regressed.
  *
- * <p>The sibling repo is assumed to be checked out next to this one
- * ({@code ../../ltr8-io-tson-test-suite} relative to this module's directory, which is Gradle's
- * and most IDEs' default test working directory). If it isn't present -- as in CI, which
- * deliberately doesn't check it out -- every {@code @TestFactory} here is skipped via
- * {@link Assumptions}, not failed.
+ * <p>The suite checkout is located by {@link SuiteCheckout}: a sibling working copy, or the pinned
+ * copy {@code scripts/fetch-references.sh} fetches into {@code .references/}, which is what CI runs.
+ * If neither is present -- a bare clone, or a fork that cannot reach the suite repo -- every
+ * {@code @TestFactory} here is skipped via {@link Assumptions}, not failed.
+ *
+ * <p><b>A skip is not a pass, and CI must not take one.</b> An aborted {@code Assumptions} run
+ * reads green, so a CI that never checked the suite out reported success while running no vector at
+ * all. The fetch step exists to close that: the reference implementation is measured against the
+ * shared corpus on every push, like the ports are.
  */
 class ConformanceSuiteTest {
-
-    private static final Path SUITE_TESTS_ROOT =
-            Paths.get("").toAbsolutePath().resolve("../../ltr8-io-tson-test-suite/tests").normalize();
 
     /**
      * Short, unversioned names a vector's own sidecar may use for {@code meta}/{@code import}
@@ -127,10 +127,10 @@ class ConformanceSuiteTest {
     }
 
     private Stream<DynamicTest> vectorsIn(String layer, VectorCheck check) {
-        Path layerRoot = SUITE_TESTS_ROOT.resolve(layer);
-        Assumptions.assumeTrue(Files.isDirectory(layerRoot),
-                "ltr8-io-tson-test-suite not found at " + SUITE_TESTS_ROOT
-                        + " (expected a sibling checkout) -- skipping conformance vectors");
+        Path layerRoot = SuiteCheckout.testsRoot().map(r -> r.resolve(layer)).orElse(null);
+        Assumptions.assumeTrue(layerRoot != null && Files.isDirectory(layerRoot),
+                "ltr8-io-tson-test-suite not found (searched " + SuiteCheckout.searchedLocations()
+                        + ") -- run scripts/fetch-references.sh; skipping conformance vectors");
 
         try (Stream<Path> buckets = Files.list(layerRoot)) {
             return buckets
