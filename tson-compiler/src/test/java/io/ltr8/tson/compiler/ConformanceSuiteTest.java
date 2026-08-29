@@ -29,6 +29,12 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.IsoDuration;
 import io.ltr8.tson.schema.meta.Rational;
+import io.ltr8.tson.tree.TsonAbsent;
+import io.ltr8.tson.tree.TsonArray;
+import io.ltr8.tson.tree.TsonAtom;
+import io.ltr8.tson.tree.TsonMap;
+import io.ltr8.tson.tree.TsonRecord;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
@@ -115,6 +121,11 @@ class ConformanceSuiteTest {
     @TestFactory
     Stream<DynamicTest> parserVectors() {
         return vectorsIn("parser", ConformanceSuiteTest::checkParserVector);
+    }
+
+    @TestFactory
+    Stream<DynamicTest> readerVectors() {
+        return vectorsIn("reader", ConformanceSuiteTest::checkReaderVector);
     }
 
     @TestFactory
@@ -361,6 +372,99 @@ class ConformanceSuiteTest {
     private static void assertScopedValueMatches(RecordValue expected, ScopedValue actual) {
         assertEquals(fieldTextOrAbsent(expected, "schema-ref"), actual.schemaRef().orElse(null), "schema-ref");
         assertDataValueMatches((RecordValue) fieldValue(expected, "value").coreValue(), actual.value());
+    }
+
+    // ── Reader-layer vectors ─────────────────────────────────────────────
+
+    /**
+     * The layer §1.2 leaves nothing below: neither tier dedupes fields or keys, resolves an empty
+     * brace, or interprets token text, so §2.5's field uniqueness, §2.6's key identity, §2.8's
+     * empty brace and §2.9's absent-key restriction have no other layer that can fail on them.
+     * A schemaless read is where a Class 1 document gets its verdict, so that is what runs here.
+     *
+     * <p><b>An error vector's subject must parse.</b> That is what makes it a reader-layer vector
+     * rather than a parser-layer one, and asserting it is how this layer answers {@code RUNNER.md}
+     * rule 3: the stated {@code resolver} category means the reader rejected the document, not the
+     * lexer or the parser, and a vector that turned out to be a parse error would otherwise pass
+     * here for the wrong reason.
+     */
+    private static void checkReaderVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
+        byte[] raw = subjectBytes(subject, sidecar);
+        switch (outcomeOf(sidecar)) {
+            case "valid" -> {
+                TsonValue actual = new TsonTreeReader().read(new ByteArrayInputStream(raw));
+                assertReaderValueMatches((RecordValue) fieldCore(outcomePayload(sidecar), "value"), actual);
+            }
+            case "error" -> {
+                new TsonDataParser(new ByteArrayInputStream(raw)).parseDocument();
+                List<Diagnostic> reported = new ArrayList<>();
+                new TsonTreeReader().withDiagnostics(reported::add).read(new ByteArrayInputStream(raw));
+                assertTrue(!reported.isEmpty(),
+                        "the document parses, so the reader is what must reject it -- none reported");
+            }
+            default -> fail("unknown reader-layer outcome: " + outcomeOf(sidecar));
+        }
+    }
+
+    private static void assertReaderValueMatches(RecordValue expected, TsonValue actual) {
+        RecordValue.Field member = soleField(expected, "reader-value");
+        CoreValue payload = member.value().value().coreValue();
+        switch (member.name()) {
+            case "absent" -> assertInstanceOf(TsonAbsent.class, actual, "reader-value 'absent'");
+            case "atom" -> assertAtomMatches((RecordValue) payload,
+                    assertInstanceOf(TsonAtom.class, actual, "reader-value 'atom'"));
+            case "record" -> {
+                TsonRecord record = assertInstanceOf(TsonRecord.class, actual, "reader-value 'record'");
+                ArrayValue expFields = (ArrayValue) fieldCore((RecordValue) payload, "fields");
+                assertEquals(expFields.elements().size(), record.fields().size(), "record field count");
+                List<Map.Entry<String, TsonValue>> actualFields = new ArrayList<>(record.fields().entrySet());
+                for (int i = 0; i < actualFields.size(); i++) {
+                    RecordValue expField = (RecordValue) expFields.elements().get(i).value().coreValue();
+                    assertEquals(fieldText(expField, "name"), actualFields.get(i).getKey(),
+                            "record field[" + i + "].name");
+                    assertReaderValueMatches((RecordValue) fieldCore(expField, "value"),
+                            actualFields.get(i).getValue());
+                }
+            }
+            case "map" -> {
+                TsonMap map = assertInstanceOf(TsonMap.class, actual, "reader-value 'map'");
+                ArrayValue expEntries = (ArrayValue) fieldCore((RecordValue) payload, "entries");
+                assertEquals(expEntries.elements().size(), map.entries().size(), "map entry count");
+                for (int i = 0; i < map.entries().size(); i++) {
+                    RecordValue expEntry = (RecordValue) expEntries.elements().get(i).value().coreValue();
+                    assertReaderValueMatches((RecordValue) fieldCore(expEntry, "key"), map.entries().get(i).key());
+                    assertReaderValueMatches((RecordValue) fieldCore(expEntry, "value"), map.entries().get(i).value());
+                }
+            }
+            case "array" -> {
+                TsonArray array = assertInstanceOf(TsonArray.class, actual, "reader-value 'array'");
+                ArrayValue expElements = (ArrayValue) fieldCore((RecordValue) payload, "elements");
+                assertEquals(expElements.elements().size(), array.elements().size(), "array element count");
+                for (int i = 0; i < array.elements().size(); i++) {
+                    assertReaderValueMatches(
+                            (RecordValue) expElements.elements().get(i).value().coreValue(),
+                            array.elements().get(i));
+                }
+            }
+            default -> fail("unknown reader-value kind: " + member.name());
+        }
+    }
+
+    /**
+     * A leaf, named by the base type §4 resolved it to. A number is compared by numeric value rather
+     * than by spelling: §4.3 leaves the host type an implementation concern, so what a vector may
+     * state is the value, not which of its spellings the document wrote.
+     */
+    private static void assertAtomMatches(RecordValue expected, TsonAtom actual) {
+        RecordValue.Field member = soleField(expected, "reader atom");
+        String text = ((TokenValue) member.value().value().coreValue()).text();
+        switch (member.name()) {
+            case "boolean" -> assertEquals(Boolean.parseBoolean(text), actual.value(), "boolean atom");
+            case "string" -> assertEquals(text, String.valueOf(actual.value()), "string atom");
+            case "number" -> assertEquals(0, new BigDecimal(text).compareTo(new BigDecimal(String.valueOf(actual.value()))),
+                    "number atom: expected " + text + ", got " + actual.value());
+            default -> fail("unknown reader atom kind: " + member.name());
+        }
     }
 
     // ── Resolver-layer vectors ───────────────────────────────────────────

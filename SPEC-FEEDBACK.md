@@ -2302,3 +2302,62 @@ distinction is the rule and not a blanket ban.
 
 **Status against Revision 33:** open, new against this revision. §7.2 rule 1's list is unchanged and §9.5
 still attributes the separator reading to UAX #31.
+
+
+## 17. §2.5 and §2.6 require a duplicate to be rejected but assign it no §8.1 category, and §8.1's own lists do not mention duplicates
+
+**Section:** Part 1 §2.5 (record field uniqueness), §2.6 (map key identity), §8.1 (errors and reporting).
+
+**Problem:** §8.1 is emphatic that every diagnostic the series requires falls into exactly one of four
+categories, and that the category is always recoverable:
+
+> **Canonical phrasing.** Normative rules throughout this series refer to errors using one of four
+> canonical phrasings, each mapping unambiguously to a category: "is a lexer error", "is a parse error",
+> "is a resolver error", "is a validation error". Where conformance language appears without an explicit
+> category, the layer that detects the violation determines the category.
+
+§2.5 and §2.6 use none of the four phrasings. Both say *malformed*:
+
+> Field names within a record MUST be unique. A record containing the same field name more than once is
+> **malformed** and MUST be rejected, with the diagnostic at the repeated occurrence's position.
+
+> Duplicate keys MUST NOT be present: a map containing two identical keys is **malformed** and MUST be
+> rejected, with the diagnostic at the repeated occurrence's position.
+
+The fallback — "the layer that detects the violation determines the category" — does not settle it either,
+because §1.2 puts the detection *below* no layer in particular and §2.6 then puts it in two at once. §1.2
+excludes it from both tiers of the structural grammar, and §2.6 makes the rule explicitly layered:
+
+> **Textual identity** is the parser's minimum … **A processor that decodes values compares decoded
+> values**: from base type resolution (§4) onward, different spellings of one value are one key (`0xFF` and
+> `255`, `1_000` and `1000`), so a reader producing decoded output rejects keys the parser's textual rule
+> could not relate.
+
+So one document's duplicate is detected by the parser and another's only by a reader, and under §8.1's
+fallback the two would land in different categories for the same rule. Meanwhile §8.1's own enumerations
+mention neither case: its `parser` bullet lists "unclosed brackets, adjacency violations, unexpected
+tokens, missing separators, `!!` without an adjacent colon form, a directive name outside the closed
+positional set", and its `resolver` bullet lists "an absent sentinel in map key position; a built-in type
+annotation on a container value (§5.1); a token that a built-in atom's parsing contract rejects (§5.2)".
+A duplicate is in neither list.
+
+This matters because a conformance corpus has to state the category: an error vector that only says
+"rejected" passes an implementation that rejects for the wrong reason.
+
+**What this implementation does:** reports `resolver` for both, and for every spelling of both. The
+reasoning is §8.1's own resolver bullet, which already houses the data-format rules a processor applies
+*after* the structural parser has accepted the document — the absent map key next door is exactly parallel,
+and §2.9 names it a resolver-layer constraint in so many words. Choosing by detecting layer instead would
+make `{ Alice => 1  "Alice" => 2 }` a parse error and `{ 0xFF => 1  255 => 2 }` a resolver error, which is
+one rule with two categories and an author's diagnostic changing category with the spelling they happened
+to use.
+
+**Suggested resolution:** state the category in §2.5 and §2.6 directly, using one of the four canonical
+phrasings, and add duplicates to §8.1's matching bullet. `resolver` for both is the recommendation, on the
+parallel with the absent map key. If the intent is instead that the *minimum* textual duplicate is a parse
+error and the decoded-only duplicate a resolver error, that is a defensible reading but wants saying
+outright — it is not what the fallback rule produces on its own, and it makes the category depend on which
+spelling a document used rather than on which rule it broke.
+
+**Status against Revision 33:** open, new against this revision. Both sections still say "malformed", and
+§8.1's lists are unchanged.

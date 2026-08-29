@@ -32,8 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 class SidecarSchemasTest {
 
     private static final List<String> SCHEMA_FILES = List.of(
-            "sidecar-common.tn", "lexer-sidecar.tn", "parser-sidecar.tn", "resolver-sidecar.tn",
-            "vocabulary-sidecar.tn");
+            "sidecar-common.tn", "lexer-sidecar.tn", "parser-sidecar.tn", "reader-sidecar.tn",
+            "resolver-sidecar.tn", "vocabulary-sidecar.tn");
 
     /** The identity prefix the suite's own schemas are published under; anything else is a bundled schema. */
     private static final String SUITE_SCHEMA_PREFIX = "https://tson.io/test-suite/schemas/";
