@@ -12,6 +12,8 @@ import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Map;
 
@@ -33,6 +35,12 @@ class TsonDataParserTest {
     private static DataValue root(String source) {
         return parse(source).root();
     }
+
+    /**
+     * One multi-line token, spelled out: neither delimiter shares its line with anything else (§7.2.3), so the
+     * trailing newline is part of writing one at all and not padding.
+     */
+    private static final String MULTI_LINE = "\"\"\"\na\n\"\"\"\n";
 
     /** The parse error a source produces -- every §3.2 fixture asserts on the wording, not just the type. */
     private static String messageOf(String source) {
@@ -674,6 +682,54 @@ class TsonDataParserTest {
         assertEquals(new Position(1, 1, 0), positions.get(record));
         assertEquals(1, positions.get(value).line());
         assertTrue(positions.get(value).column() > positions.get(record).column());
+    }
+
+    // ── Names are identifiers, however the position spells them (§7.1's name profile) ────
+
+    /**
+     * {@code type-ref = "!" identifier} and {@code annotation = "@" identifier}: both positions take a name, so
+     * both match the profile in full rather than merely requiring an unquoted token. Token-Start admits
+     * {@code Nd}, {@code -}, {@code +} and {@code .} so a <em>number</em> can be an unquoted token; a name never
+     * begins with one, and never carries a dot at all.
+     */
+    @ValueSource(strings = {"!42x 1", "!-t 1", "!x.y 1", "@42x:1 v", "@x.y:1 v", "@-note 1"})
+    @ParameterizedTest
+    void aNameOutsideTheIdentifierProfileIsAParseError(String source) {
+        assertThrows(TsonParseException.class, () -> parse(source));
+    }
+
+    /** The ordinary names either position takes are untouched, {@code -} included. */
+    @Test
+    void anIdentifierTypeRefAndAnnotationParse() {
+        DataValue value = root("@my-note:1 !my-type 7");
+        assertEquals("my-type", value.typeRef().orElseThrow());
+        assertEquals("my-note", value.annotations().get(0).name());
+    }
+
+    /**
+     * {@code field-name = unquoted-token / single-line-token} (§7.4): the production stays <em>lexical</em>, so a
+     * quoted field name is ordinary and Class 1 documents keep JSON compatibility -- but it no longer admits the
+     * multi-line form, which no name needs and which a record body reads as a field name today.
+     */
+    @Test
+    void aMultiLineTokenIsNotAFieldName() {
+        assertThrows(TsonParseException.class, () -> parse("{" + MULTI_LINE + ": 1}"));
+        assertThrows(TsonParseException.class, () -> parse("{b: 1 " + MULTI_LINE + ": 2}"));
+    }
+
+    /** A multi-line token stays an ordinary map key, which is a value and not a name (§2.6). */
+    @Test
+    void aMultiLineTokenIsStillAMapKey() {
+        MapValue map = assertInstanceOf(MapValue.class, root("{" + MULTI_LINE + " => 1}").coreValue());
+        assertEquals(TokenForm.MULTI_LINE_QUOTED,
+                assertInstanceOf(TokenValue.class, map.entries().get(0).key().coreValue()).form());
+    }
+
+    /** And a single-line quoted field name keeps working -- it is the spelling §7.1 sends out-of-profile names to. */
+    @Test
+    void aSingleLineQuotedFieldNameParses() {
+        RecordValue record = assertInstanceOf(RecordValue.class, root("{\"first name\": 1}").coreValue());
+        assertEquals("first name", record.fields().get(0).name());
     }
 
     @Test

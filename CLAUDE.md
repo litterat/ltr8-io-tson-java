@@ -279,7 +279,13 @@ at most two tokens of lookahead; **`TsonDataParser`** (Tier 3) reduces the event
 `CoreValue` AST and holds no grammar logic of its own. Whitespace is gone by token time — adjacency (§7.5)
 and separators (§2.4) are checked via `Position` gaps. The layering is deliberately incomplete per §1.2:
 neither tier dedupes fields/keys, resolves `EmptyBrace`, or interprets token text — those belong to later
-layers. `!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException` (a
+layers. **A name is the one exception, and §7.6 is the precedent**: `type-ref = "!" identifier` and
+`annotation = "@" identifier`, so `TsonDataStream` matches each name's decoded text against
+`IdentifierParser` the way a number's text is matched against the number grammar — a production that is no
+part of the token-stream grammar, over a token the lexer has already produced. `field-name` stays lexical
+(`unquoted-token / single-line-token`, where a map key keeps all three forms), the identifier contract being
+stated once on declarations so Class 1 data keeps JSON compatibility and conforms by construction.
+`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException` (a
 schema document is unsupported, not malformed).
 
 ### Base type resolution (`.../base/`) — `docs/lexer-and-data-parsing.md`
@@ -316,7 +322,10 @@ alongside it. A `{` at a type position dispatches by consuming one token and ins
 record/map idiom, imported wholesale — and `{` is a map and only a map everywhere except type-def position,
 since a bare record body is not spellable at a type position (§5.2). §12.2 states the dispatch's own
 lookahead budget — one consumed token plus one of lookahead — and §5.3 the key-`?` rule it makes
-unreachable for the common spelling.
+unreachable for the common spelling. **`type-name = identifier`** — every declared name, type parameter,
+referenced name and `!` constructor head matches the profile, which *replaces* §12.1's separate "numbers are
+not declarable names" rather than joining it: identifier-Start is `XID_Start`, so the one rule answers both
+and also catches the names that merely begin like a number (`42x`, `-foo`).
 
 ### Desugaring (`.../resolver/SchemaDesugarer.java`) — `docs/schema-grammar-and-desugaring.md`
 

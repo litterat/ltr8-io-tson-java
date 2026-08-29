@@ -934,10 +934,9 @@ it was made when the rule was going to be validity.
 **Status against Revision 33:** open, and Steps 1–1d, 2, 3 and 5 are **built**. The kernel carries `identifier`
 (`XID_Start`-initial, `XID_Continue ∪ { - }`, NFC) with `type_name`/`field_name`/`param_name` aliasing it and
 `enum_set => !set { element_type: identifier  min_items: 1 }` feeding `enum.members`; `token`/`token_set` are
-gone. `IdentifierParser` enforces the contract where the resolved model is read back as data, and
-`DefinitionResolver` asserts it for declared field names, which the resolver builds directly — which is not yet every
-naming position: three still take a bare unquoted token and nothing more (below). Skeleton distinctness runs over the
-merged namespace, each record's field names and each enum's members, reported as `CONFUSABLE_NAMES`; a Class 1
+gone. `IdentifierParser` enforces the contract at every naming position (below), and `DefinitionResolver` asserts it
+for declared field names, which the resolver builds directly rather than reading back as data. Skeleton distinctness
+runs over the merged namespace, each record's field names and each enum's members, reported as `CONFUSABLE_NAMES`; a Class 1
 record's own fields are checked by the schemaless reader, which is the one scope with no declaration behind
 it. `Identifier_Status=Allowed` is on the profile. §9.4 itself is unchanged — one SHOULD-consider sentence,
 no comparison scopes, no stated action on detection — so what is built is this entry's proposal, not the
@@ -968,27 +967,28 @@ token and carrying no `path` — there is none yet where the check runs. A per-s
 this surface rather than ignored. The subsumption predicted above holds and is pinned by a test: a field name is a token, so
 `tokenPolicy(asciiOnly())` constrains names whatever `identifierPolicy` says.
 
-**Three naming positions still take a bare unquoted token.** The contract is stated in the kernel and enforced where
-the resolver builds a name or reads one back as data; these three test `TokenType.UNQUOTED` and nothing further, so
-every name token-Start admits and identifier-Start does not passes at each:
+**Every naming position matches the profile, and the check sits where the production is parsed.** §7.6 is the model
+and says so for numbers — "the number grammar applies to the complete text of a token; it is not part of the
+token-stream grammar" — so a name's decoded text is matched the same way, against the profile rather than against the
+lexical class it was spelled in:
 
-- **`type-ref` and `annotation` in data.** `TsonDataStream.parseTypeRefName` and its annotation frame check the token
-  type alone, where Step 1c specifies `type-ref = "!" identifier` and `annotation = "@" identifier`. So `!42x` and
-  `@x.y:1` parse. The cost is a weaker verdict rather than a hole — an unresolved reference under a schema, an
-  `UNKNOWN_TYPE_REF` without one — except in a schemaless tree read, which simply captures an annotation named `x.y`.
-- **Declared type and parameter names.** `TsonSchemaParser.expectTypeName` applies [TSON-SCHEMA] §12.1's "numbers are
-  not declarable names" rule alone, and `DefinitionResolver.requireIdentifier` is called from one site: field names.
-  §12.1's rule is strictly weaker, so `x.y => text`, `-foo => text` and `42x => text` all resolve while the kernel
-  types that schema-map key `@alias:type_name identifier`. This is the sharpest of the three, because Step 1b's
-  subsumption argument — the profile absorbs §12.1's rule, and reserves `.` as a future separator — is stated in
-  meta-kernel's own `@doc` and is not what runs.
-- **`field-name` still admits `multi-line-token`.** Step 1c keeps the production lexical but narrows it to
-  `unquoted-token / single-line-token`; `isBareTokenType` admits all three forms. Step 1c names the drop as a
-  tightening that should be stated as a change, and it is neither made nor recorded as declined.
+- **`type-ref = "!" identifier` and `annotation = "@" identifier` in data.** `TsonDataStream` matches each name once
+  adjacency is settled, so `!42x` and `@x.y:1` are syntax errors rather than a reference to a type nobody declared and
+  an annotation carrying a name the format reserves. It has to be the profile and not the token class, token-Start
+  carrying `Nd`/`-`/`+`/`.` only so a *number* can be an unquoted token.
+- **`type-name = identifier` in the schema grammar**, covering declared names, type parameters, referenced names and
+  the `!` constructor head. This **replaces** [TSON-SCHEMA] §12.1's separate "numbers are not declarable names" rather
+  than joining it, which is Step 1b's subsumption claim built: identifier-Start is `XID_Start`, every number spelling
+  begins with a digit, a sign or a dot, and the one rule also catches `42x` and `-foo`, which merely begin like a
+  number and which §12.1's rule admitted.
+- **`field-name = unquoted-token / single-line-token`**, narrowed from all three token forms. A map key keeps all
+  three, being a value and not a name (§2.6), and the two constructs are told apart by `:` versus `=>`.
 
-**One part of Step 1 is deliberately not built**, and reads apart from those three: `field-name` stays *lexical*, so
-Class 1 field names are unconstrained exactly as Step 1c intends — the narrowing above is within that decision, not
-against it. **The joiners' contextual rule is built** — `Lexer` no longer subtracts ZWNJ/ZWJ, and `JoiningControls`
+**One part of Step 1 is deliberately not built**, and reads apart from that narrowing: `field-name` stays *lexical*,
+so Class 1 field names are unconstrained exactly as Step 1c intends — the identifier contract is stated once on
+declarations, and data conforms by construction, a field name that is no identifier matching nothing and already being
+an `UNRECOGNIZED_FIELD`. `{"first name": 1}` therefore still reads as an ordinary record and JSON compatibility is
+untouched. **The joiners' contextual rule is built** — `Lexer` no longer subtracts ZWNJ/ZWJ, and `JoiningControls`
 applies UTS #39 §3.1.1.1's three contexts to a name, which is the layering this step always described (#14).
 
 **Layer 2 is not yet reportable as such here.** `Diagnostic.Code.CONFUSABLE_NAMES` exists and is emitted for

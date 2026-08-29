@@ -33,6 +33,8 @@ import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.compiler.lexer.TokenType;
+import io.ltr8.tson.compiler.atom.AtomTypeException;
+import io.ltr8.tson.compiler.atom.IdentifierParser;
 import io.ltr8.tson.compiler.base.NumberGrammar;
 
 import java.util.ArrayList;
@@ -389,7 +391,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             throw parseError("'!' must be immediately adjacent to the type name (no whitespace)");
         }
         advance();
-        rejectNumericTypeName(name);
+        requireIdentifierName(name);
         String target = name.text();
 
         if (check(TokenType.CARET)) {
@@ -834,20 +836,25 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /**
-     * {@code type-name = unquoted-token} (§12.1), with the added restriction that its text MUST
-     * NOT match [TSON-DATA] §7.6's {@code number} production -- "numbers are not declarable names"
-     * (shared verbatim by {@code param-name}).
+     * {@code type-name = identifier} (§12.1, through the kernel's {@code type_name} role; {@code param-name}
+     * shares it verbatim). The token is matched in full against meta-kernel's {@code identifier} profile, which
+     * <b>subsumes</b> §12.1's separate "numbers are not declarable names" rule rather than standing beside it:
+     * identifier-Start is {@code XID_Start}, and every spelling the number grammar admits begins with a digit, a
+     * sign or a dot, all of which sit in token-Start only so a <em>number</em> can be an unquoted token. One rule
+     * therefore answers both, and answers the names that begin like a number without being one.
      */
     private String expectTypeName(String context) {
         Token t = expect(TokenType.UNQUOTED, context);
-        rejectNumericTypeName(t);
+        requireIdentifierName(t);
         return t.text();
     }
 
-    private void rejectNumericTypeName(Token t) {
-        if (NumberGrammar.tryParse(t.text()).isPresent()) {
-            throw new TsonParseException("'" + t.text() + "' is not a valid type name -- "
-                    + "names that match the number grammar are not declarable (§12.1)", t.start());
+    private void requireIdentifierName(Token t) {
+        try {
+            IdentifierParser.INSTANCE.read(new TokenValue(t.text(), TokenForm.UNQUOTED));
+        } catch (AtomTypeException e) {
+            throw new TsonParseException("'" + t.text() + "' is not a valid type name -- " + e.getMessage(),
+                    t.start());
         }
     }
 

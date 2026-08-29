@@ -3,6 +3,8 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomParseException;
+import io.ltr8.tson.compiler.atom.AtomTypeException;
+import io.ltr8.tson.compiler.atom.IdentifierParser;
 import io.ltr8.tson.compiler.atom.UriParser;
 import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
@@ -423,6 +425,32 @@ public final class TsonDataStream implements TsonEventSource {
         };
     }
 
+    /**
+     * {@code field-name = unquoted-token / single-line-token} (§7.4). Narrower than {@link #isBareTokenType},
+     * which stays the map-key shape: a key is a value (§2.6) and takes all three forms, where a name takes the
+     * two a name is ever written in. The production stays <em>lexical</em> on purpose -- a quoted field name is
+     * ordinary, so a Class 1 document keeps JSON compatibility and the identifier contract is stated once, on
+     * declarations, with data conforming by construction.
+     */
+    private static boolean isFieldNameTokenType(TokenType type) {
+        return type == TokenType.UNQUOTED || type == TokenType.SINGLE_LINE_STRING;
+    }
+
+    /**
+     * A name position's token, matched in full against meta-kernel's {@code identifier} profile (§7.1's name
+     * profile). The two-layer shape is §7.6's, stated there for numbers: the lexer produces a token, and a
+     * production that is no part of the token-stream grammar then matches its decoded text. Token-Start admits
+     * {@code Nd}, {@code -}, {@code +} and {@code .} so a <em>number</em> can be an unquoted token, and those
+     * reach names only because names and values share one lexical class; identifier-Start drops them.
+     */
+    private void requireIdentifier(Token name, String role) {
+        try {
+            IdentifierParser.INSTANCE.read(new TokenValue(name.text(), formOf(name.type())));
+        } catch (AtomTypeException e) {
+            throw new TsonParseException("invalid " + role + " -- " + e.getMessage(), name.start());
+        }
+    }
+
     private static TokenForm formOf(TokenType type) {
         return switch (type) {
             case UNQUOTED -> TokenForm.UNQUOTED;
@@ -517,6 +545,7 @@ public final class TsonDataStream implements TsonEventSource {
         if (!bang.adjacentTo(name)) {
             throw parseError("'!' must be immediately adjacent to the type name (no whitespace)");
         }
+        requireIdentifier(name, "type name");
         advance();
 
         Token next = peekToken();
@@ -541,13 +570,13 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
-     * {@code field-name = token} (§7.4): any of the three token forms. Shared with [TSON-SCHEMA]'s identical
-     * production (§12.1). {@code construct} names the position in the author's voice, exactly as
-     * {@link #expect}'s does.
+     * {@code field-name = unquoted-token / single-line-token} (§7.4) -- see {@link #isFieldNameTokenType} for why
+     * the multi-line form is not a name. Shared with [TSON-SCHEMA]'s identical production (§12.1).
+     * {@code construct} names the position in the author's voice, exactly as {@link #expect}'s does.
      */
     Token expectFieldNameToken(String construct) {
         Token name = peekToken();
-        if (!isBareTokenType(name.type())) {
+        if (!isFieldNameTokenType(name.type())) {
             throw mismatch(construct);
         }
         advance();
@@ -599,7 +628,7 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
-     * One standalone annotation (§3.1): {@code "@" unquoted-token [ ":" data-value ]}. Split out
+     * One standalone annotation (§3.1): {@code "@" identifier [ ":" data-value ]}. Split out
      * of {@link DataValueFrame} so {@link #nextAnnotationEvents()} can drive exactly this
      * production on its own -- [TSON-SCHEMA]'s own annotation positions (§12.1) reuse it the same
      * way {@link TsonSchemaParser} reuses {@code TsonDataParser.parseAnnotation()} today.
@@ -615,6 +644,7 @@ public final class TsonDataStream implements TsonEventSource {
             if (!at.adjacentTo(name)) {
                 throw parseError("'@' must be immediately adjacent to the annotation name (no whitespace)");
             }
+            requireIdentifier(name, "annotation name");
             advance();
 
             if (check(TokenType.COLON) && name.adjacentTo(peekToken())) {
@@ -686,6 +716,9 @@ public final class TsonDataStream implements TsonEventSource {
             if (isBareTokenType(t1.type())) {
                 Token t2 = peekSecond();
                 if (t2.type() == TokenType.COLON) {
+                    if (!isFieldNameTokenType(t1.type())) {
+                        throw mismatch("a record field name");
+                    }
                     advance(); // field-name token
                     advance(); // ':'
                     ready.add(new RecordStart(lbrace.start()));
