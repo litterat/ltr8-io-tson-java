@@ -657,9 +657,18 @@ lookalikes across a scope, and neither covers the other's case.
 **So it can be a MUST rather than an option**, which is the better default for a security rule and removes
 the awkwardness of a normative document specifying something it expects to be switched off.
 
-**What it still costs.** A name with no separator that legitimately mixes scripts — `идHTTP` rather than
-`ид_HTTP` — is refused, and an author writes the separator. That is a real narrowing and much smaller than
-the one it replaces, and it is worth stating rather than discovering.
+**What it still costs, and who pays it.** A name with no separator that legitimately mixes scripts is
+refused, and the author writes the separator: `ид_HTTP` rather than `идHTTP`. That is much smaller than the
+narrowing it replaces, but it is **not symmetric**, and the asymmetry is inherited rather than introduced.
+
+Highly Restrictive admits three augmented script sets — Latin+Han+Hiragana+Katakana, Latin+Han+Bopomofo,
+Latin+Hangul+Han — so `日本語id` is `{Latin, Han}` and passes with or without a separator, while
+`пользовательid` is `{Latin, Cyrillic}` and passes only as `пользователь_id`. Unicode draws that line for a
+reason: Han, Kana and Hangul share no confusable characters with Latin, and Cyrillic and Greek are full of
+them (а/a, е/e, о/o, р/p, с/c; α/a, ο/o, ρ/p). So the rule is not arbitrary — but a Japanese author may omit
+the separator and a Russian one may not, and that is the residue of the objection segmentation otherwise
+removes. It is worth saying out loud in the spec rather than leaving an author to infer it from a rejection,
+because the fix is one character and the confusion otherwise is total.
 
 **On how an implementation should let it be relaxed**, since a normative rule with no escape hatch invites
 worse ones: **not through the environment.** A security policy read from an environment variable is ambient
