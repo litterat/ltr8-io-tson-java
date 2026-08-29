@@ -55,6 +55,13 @@ subprojects {
 
     tasks.withType<Test> {
         useJUnitPlatform()
+
+        // CI sets this so a missing conformance corpus fails the build instead of aborting through
+        // Assumptions. An abort reads green, which is how CI ran none of the shared corpus for as
+        // long as it did -- see SuiteCheckout. Passed through explicitly rather than left to
+        // environment inheritance, so the daemon sees it change.
+        System.getenv("TSON_REQUIRE_TEST_SUITE")?.let { environment("TSON_REQUIRE_TEST_SUITE", it) }
+        System.getProperty("tson.testSuite.dir")?.let { systemProperty("tson.testSuite.dir", it) }
     }
 
     // Every module publishes, so `./gradlew publishToMavenLocal` puts the whole set in ~/.m2 and another

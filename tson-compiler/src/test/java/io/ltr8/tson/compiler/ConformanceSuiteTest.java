@@ -127,10 +127,9 @@ class ConformanceSuiteTest {
     }
 
     private Stream<DynamicTest> vectorsIn(String layer, VectorCheck check) {
-        Path layerRoot = SuiteCheckout.testsRoot().map(r -> r.resolve(layer)).orElse(null);
-        Assumptions.assumeTrue(layerRoot != null && Files.isDirectory(layerRoot),
-                "ltr8-io-tson-test-suite not found (searched " + SuiteCheckout.searchedLocations()
-                        + ") -- run scripts/fetch-references.sh; skipping conformance vectors");
+        SuiteCheckout.assumeAvailable();
+        Path layerRoot = SuiteCheckout.testsRoot().orElseThrow().resolve(layer);
+        Assumptions.assumeTrue(Files.isDirectory(layerRoot), "no " + layer + " layer in this suite checkout");
 
         try (Stream<Path> buckets = Files.list(layerRoot)) {
             return buckets

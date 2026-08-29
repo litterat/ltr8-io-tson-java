@@ -36,10 +36,8 @@ class SidecarSchemasTest {
 
     @TestFactory
     Stream<DynamicTest> sidecarSchemasResolve() {
-        Path schemasRoot = SuiteCheckout.schemasRoot().orElse(null);
-        Assumptions.assumeTrue(schemasRoot != null,
-                "ltr8-io-tson-test-suite not found (searched " + SuiteCheckout.searchedLocations()
-                        + ") -- run scripts/fetch-references.sh; skipping sidecar schema checks");
+        SuiteCheckout.assumeAvailable();
+        Path schemasRoot = SuiteCheckout.schemasRoot().orElseThrow();
         return SCHEMA_FILES.stream()
                 .map(fileName -> DynamicTest.dynamicTest(fileName, () -> checkSchemaResolves(schemasRoot, fileName)));
     }

@@ -1,10 +1,14 @@
 package io.ltr8.tson.compiler;
 
+import org.junit.jupiter.api.Assumptions;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Locates the shared {@code ltr8-io-tson-test-suite} checkout the conformance tests read their
@@ -17,17 +21,37 @@ import java.util.Optional;
  * editing vectors in their own checkout must see those edits, and a pinned copy shadowing them
  * would report on a corpus nobody is looking at. {@code -Dtson.testSuite.dir=...} overrides both.
  *
- * <p>Every caller treats an absent suite as a <em>skip</em>, never a failure: CI in a fork that
- * cannot reach the suite repo, and a bare clone, both stay green. What must not happen is a skip
- * nobody notices, which is why CI fetches the suite rather than relying on this fallback --
- * see {@link ConformanceSuiteTest}.
+ * <p>An absent suite is a <em>skip</em>, never a failure, so a bare clone stays green. But a skip
+ * nobody notices is how CI came to run none of the corpus for as long as it did, so
+ * {@code TSON_REQUIRE_TEST_SUITE} inverts that: where it is set -- CI sets it -- an absent checkout
+ * fails the build instead of aborting. Green then means the corpus ran, which is the only thing a
+ * conformance signal is worth.
  */
 final class SuiteCheckout {
 
     /** Overrides the search entirely: the path to a suite checkout's own root directory. */
     private static final String OVERRIDE_PROPERTY = "tson.testSuite.dir";
 
+    /** Set by CI: an absent checkout is a build failure here, not an abort. */
+    private static final String REQUIRE_VARIABLE = "TSON_REQUIRE_TEST_SUITE";
+
     private SuiteCheckout() {
+    }
+
+    /**
+     * Aborts the calling test when no checkout was found -- or fails it, where
+     * {@code TSON_REQUIRE_TEST_SUITE} says the corpus was meant to be there.
+     */
+    static void assumeAvailable() {
+        if (root().isPresent()) {
+            return;
+        }
+        String message = "ltr8-io-tson-test-suite not found (searched " + searchedLocations()
+                + ") -- run scripts/fetch-references.sh";
+        if (System.getenv(REQUIRE_VARIABLE) != null) {
+            fail(message + "; " + REQUIRE_VARIABLE + " is set, so this is a failure rather than a skip");
+        }
+        Assumptions.abort(message + "; skipping conformance vectors");
     }
 
     /** The suite's {@code tests/} directory, if a checkout was found. */
@@ -61,8 +85,10 @@ final class SuiteCheckout {
         Path moduleDir = Paths.get("").toAbsolutePath();
         Path fetched = moduleDir.resolve("../.references/ltr8-io-tson-test-suite").normalize();
         Path sibling = moduleDir.resolve("../../ltr8-io-tson-test-suite").normalize();
+        // An override is authoritative, not merely first: pointing at one checkout and silently
+        // getting another is worse than finding none, and it is what makes the absent case testable.
         return (override == null || override.isBlank())
                 ? List.of(sibling, fetched)
-                : List.of(Paths.get(override).toAbsolutePath().normalize(), sibling, fetched);
+                : List.of(Paths.get(override).toAbsolutePath().normalize());
     }
 }

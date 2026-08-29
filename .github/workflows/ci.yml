@@ -29,6 +29,10 @@ jobs:
       # `build` reaches javadoc now: every module publishes a javadoc jar, so `assemble` runs the
       # doclint pass that used to need a step of its own here.
       - name: Build and test
+        # An absent corpus is a skip locally and a failure here, so a green CI run means the
+        # conformance vectors actually ran rather than quietly aborting.
+        env:
+          TSON_REQUIRE_TEST_SUITE: "1"
         run: ./gradlew build
 
       # The publication itself, which nothing else exercises -- a POM or component wired wrong is
