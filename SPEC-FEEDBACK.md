@@ -737,39 +737,59 @@ Highly Restrictive for names** — the same ladder, opposite ends, for the same 
 that renders untrusted values, or matches them against a list, raises the value level knowingly; nothing is
 imposed on a format that mostly carries ordinary data.
 
-**Two consequences worth stating.** Levels 5 and 6 collapse on the value surface — §5.2 says so directly
-("where there is no such identifier profile, Levels 5 and 6 are identical"), and `Identifier_Status` is a
-name rule, so a value has no identifier profile to drop. And the default costs nothing at read time: at
-Unrestricted there is no scan, so a format that carries ordinary data pays for none of this.
+**Three consequences worth stating.** Levels 5 and 6 collapse on the token surface — §5.2 says so directly
+("where there is no such identifier profile, Levels 5 and 6 are identical") — and `Identifier_Status` is a
+name rule, so a token that is not a name has no identifier profile to drop. The default costs nothing at
+read time: at Unrestricted no scan runs, so a format carrying ordinary data pays for none of this. And
+because the token check runs before anything knows which tokens are names, a token policy stricter than the
+identifier policy simply subsumes it — a name is a token, so it has already cleared the stricter rule by the
+time the name rule looks at it. That is a property of where the checks sit, not a special case, and the
+naming below is chosen to make it visible.
 
-**A suggested configuration surface**, one ladder offered twice:
+**A suggested configuration surface.** Two checks at two layers, which is what the naming should say:
 
 ```java
 // The defaults, written out. Tson.builder().build() gives exactly this.
 Tson tson = Tson.builder()
-        .nameScripts(ScriptPolicy.highlyRestrictive())   // §5.2 level 3, whole name
-        .valueScripts(ScriptPolicy.unrestricted())       // data is data
+        .tokenPolicy(UnicodePolicy.unrestricted())            // every token off the stream
+        .identifierPolicy(UnicodePolicy.highlyRestrictive())  // additionally, at naming positions
         .build();
 
-// Relaxing names: reach for the unit before the level. Per-segment still refuses
+// Relaxing identifiers: reach for the unit before the level. Per-segment still refuses
 // every within-word homograph, and admits id_пользователя and alpha_α.
-        .nameScripts(ScriptPolicy.highlyRestrictive().perSegment())
+        .identifierPolicy(UnicodePolicy.highlyRestrictive().perSegment())
 
 // Narrower still, where a deployment knows what it is:
-        .nameScripts(ScriptPolicy.highlyRestrictive().permitting(LATIN, CYRILLIC))
+        .identifierPolicy(UnicodePolicy.highlyRestrictive().permitting(LATIN, CYRILLIC))
 
 // The two "off" positions, named apart so neither is reached by accident:
-        .nameScripts(ScriptPolicy.scriptsUnchecked())    // level 5 — identifier profile kept
-        .nameScripts(ScriptPolicy.unrestricted())        // level 6 — profile dropped too
+        .identifierPolicy(UnicodePolicy.scriptsUnchecked())   // level 5 — identifier profile kept
+        .identifierPolicy(UnicodePolicy.unrestricted())       // level 6 — profile dropped too
 
-// Tightening values, for a service that renders or matches them:
-        .valueScripts(ScriptPolicy.moderatelyRestrictive())
-        .valueScripts(ScriptPolicy.asciiOnly())
+// Tightening tokens, for a service that renders or matches the values it reads:
+        .tokenPolicy(UnicodePolicy.moderatelyRestrictive())
+        .tokenPolicy(UnicodePolicy.asciiOnly())
 ```
 
-`ScriptPolicy` carries the level, the unit and any additional permitted script sets; `perSegment()` and
-`permitting(…)` return a modified copy, so a call site reads as one position rather than three settings.
-Every method is a *code* path, never an environment variable, for the reasons below.
+**Why `token` and not `value`, and why that is the honest name.** The check runs where tokens leave the
+stream, before anything knows which of them is a name — so it constrains names as well as values, and the
+effective constraint on a name is the **stricter of the two policies**. Calling the setter `valuePolicy`
+would hide that; calling it `tokenPolicy` states it, and matches where the check actually sits. The
+consequence is worth having in the Javadoc rather than discovered: a deployment that sets
+`tokenPolicy(asciiOnly())` has made its identifiers ASCII-only too, whatever `identifierPolicy` says, and
+that is the right answer rather than a wrinkle — a name is a token.
+
+**`UnicodePolicy`, not `ScriptPolicy`.** The policy is script-based today, but it already carries a unit,
+and its loosest rung reaches `Identifier_Status` rather than any script rule (§5.2 level 6). Naming a
+configuration type after the mechanism it happens to use now would age into a lie the first time it carries
+anything else.
+
+**`perSegment()` belongs on the identifier policy only.** `_` and `-` are word separators by convention in
+an identifier; in a value they are ordinary characters. UTS #39's own Minimally Restrictive example is
+`Toys-Я-Us`, which per-segment would accept and which is exactly the spoof a strict token policy exists to
+refuse.
+
+Every method here is a *code* path, never an environment variable, for the reasons below.
 
 **On how an implementation should let it be relaxed**, since a normative rule with no escape hatch invites
 worse ones: **not through the environment.** A security policy read from an environment variable is ambient

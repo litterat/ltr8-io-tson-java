@@ -381,7 +381,13 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       over, which is exactly the setless case the restriction level exists for. Default Unrestricted because
       data may legitimately be anything, so the default also costs nothing at read time — no scan runs.
       Levels 5 and 6 collapse on this surface, `Identifier_Status` being a name rule (§5.2 says so).
-      Suggested surface: `nameScripts(...)` / `valueScripts(...)` over one `ScriptPolicy`, sketched in #3.
+    - **Suggested surface: `tokenPolicy(...)` and `identifierPolicy(...)` over one `UnicodePolicy`**, sketched
+      in #3. `token`, not `value`, because the check runs where tokens leave the stream — before anything
+      knows which are names — so a token policy stricter than the identifier policy subsumes it, a name
+      having already cleared it. `UnicodePolicy` rather than `ScriptPolicy` because the type already carries
+      a unit and its loosest rung reaches `Identifier_Status` rather than any script rule. `perSegment()` on
+      the identifier policy only: `_`/`-` are word separators by convention in a name and ordinary characters
+      in a value, and UTS #39's own `Toys-Я-Us` is what per-segment would wrongly admit there.
     - **The relaxation must be expressed in code, never in the environment.** A policy read from an env var
       is ambient authority: a CI config, a container image or a dependency calling `setenv` changes it with
       no diff and nothing in review, it is invisible at the call site, and it is process-global so an
