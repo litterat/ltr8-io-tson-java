@@ -71,6 +71,11 @@ import static org.junit.jupiter.api.Assertions.fail;
  * the vector/sidecar format) against this implementation's real {@link Lexer}, {@link TsonDataParser},
  * {@link BaseTypeResolver}, and {@link BuiltinTypeVocabulary}.
  *
+ * <p><b>{@code RUNNER.md} in that repo is normative for this class.</b> It is what feeds a subject as
+ * raw bytes rather than a re-encoded string, checks an {@code error} vector's §8.1 category at every
+ * layer rather than only the vocabulary one, and limits what may be skipped -- rules that exist
+ * because this runner and the TypeScript port's had already drifted apart on the first two.
+ *
  * <p>This is deliberately separate from {@link io.ltr8.tson.compiler.lexer.LexerTest} and
  * {@link TsonDataParserTest}: those are fine-grained unit tests of individual grammar rules with
  * assertion messages that point at exactly what broke. This is a conformance/integration test
@@ -128,7 +133,7 @@ class ConformanceSuiteTest {
 
     private Stream<DynamicTest> vectorsIn(String layer, VectorCheck check) {
         SuiteCheckout.assumeAvailable();
-        Path layerRoot = SuiteCheckout.testsRoot().orElseThrow().resolve(layer);
+        Path layerRoot = SuiteCheckout.testsRoot().orElseThrow().resolve("class1").resolve(layer);
         Assumptions.assumeTrue(Files.isDirectory(layerRoot), "no " + layer + " layer in this suite checkout");
 
         try (Stream<Path> buckets = Files.list(layerRoot)) {
@@ -181,17 +186,16 @@ class ConformanceSuiteTest {
     // ── Lexer-layer vectors ──────────────────────────────────────────────
 
     private static void checkLexerVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        String outcome = fieldText(sidecar, "outcome");
         if (hasField(sidecar, "encoding")) {
-            checkEncodingVector(subject, sidecar, outcome);
+            checkEncodingVector(subject, sidecar);
             return;
         }
-        String raw = resolvedRaw(subject, sidecar);
-        switch (outcome) {
+        byte[] raw = subjectBytes(subject, sidecar);
+        switch (outcomeOf(sidecar)) {
             case "valid" -> {
-                List<Token> actual = new Lexer(new ByteArrayInputStream(raw.getBytes(StandardCharsets.UTF_8))).tokenize();
+                List<Token> actual = new Lexer(new ByteArrayInputStream(raw)).tokenize();
                 actual.removeIf(t -> t.type() == TokenType.EOF);
-                ArrayValue expectedTokens = (ArrayValue) fieldCore(sidecar, "tokens");
+                ArrayValue expectedTokens = (ArrayValue) fieldCore(outcomePayload(sidecar), "tokens");
                 assertEquals(expectedTokens.elements().size(), actual.size(), "token count");
                 for (int i = 0; i < actual.size(); i++) {
                     RecordValue expTok = (RecordValue) expectedTokens.elements().get(i).value().coreValue();
@@ -201,9 +205,9 @@ class ConformanceSuiteTest {
                     assertEquals(expText, actual.get(i).text(), "token[" + i + "].text");
                 }
             }
-            case "error" -> assertThrows(LexException.class,
-                    () -> new Lexer(new ByteArrayInputStream(raw.getBytes(StandardCharsets.UTF_8))).tokenize());
-            default -> fail("unknown lexer-layer outcome: " + outcome);
+            case "error" -> assertThrows(errorClassFor(sidecar),
+                    () -> new Lexer(new ByteArrayInputStream(raw)).tokenize());
+            default -> fail("unknown lexer-layer outcome: " + outcomeOf(sidecar));
         }
     }
 
@@ -220,15 +224,16 @@ class ConformanceSuiteTest {
      * <p>{@code utf-16}/{@code utf-32} are skipped rather than failed: §9.1 permits them and this
      * implementation reads only UTF-8, which is a gap in the implementation and not a vector to fail on.
      */
-    private static void checkEncodingVector(Path subject, RecordValue sidecar, String outcome) throws IOException {
+    private static void checkEncodingVector(Path subject, RecordValue sidecar) throws IOException {
         String encoding = fieldText(sidecar, "encoding");
         Assumptions.assumeTrue("invalid-utf8".equals(encoding),
                 "this implementation reads only UTF-8 (§9.1 permits utf-16/utf-32); vector encoding: " + encoding);
         byte[] raw = Files.readAllBytes(subject);
-        switch (outcome) {
-            case "error" -> assertThrows(LexException.class, () -> new Lexer(new ByteArrayInputStream(raw)).tokenize());
+        switch (outcomeOf(sidecar)) {
+            case "error" -> assertThrows(errorClassFor(sidecar),
+                    () -> new Lexer(new ByteArrayInputStream(raw)).tokenize());
             case "valid" -> fail("an 'invalid-utf8' subject cannot lex cleanly: " + subject.getFileName());
-            default -> fail("unknown lexer-layer outcome: " + outcome);
+            default -> fail("unknown lexer-layer outcome: " + outcomeOf(sidecar));
         }
     }
 
@@ -249,18 +254,18 @@ class ConformanceSuiteTest {
     // ── TsonDataParser-layer vectors ─────────────────────────────────────────────
 
     private static void checkParserVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        String outcome = fieldText(sidecar, "outcome");
-        String raw = resolvedRaw(subject, sidecar);
-        switch (outcome) {
+        byte[] raw = subjectBytes(subject, sidecar);
+        switch (outcomeOf(sidecar)) {
             case "valid" -> {
-                Document actual = new TsonDataParser(raw).parseDocument();
-                RecordValue expectedDoc = (RecordValue) fieldCore(sidecar, "document");
+                Document actual = new TsonDataParser(new ByteArrayInputStream(raw)).parseDocument();
+                RecordValue expectedDoc = (RecordValue) fieldCore(outcomePayload(sidecar), "document");
                 assertDocumentMatches(expectedDoc, actual);
             }
-            case "error" -> assertThrows(TsonParseException.class, () -> new TsonDataParser(raw).parseDocument());
+            case "error" -> assertThrows(errorClassFor(sidecar),
+                    () -> new TsonDataParser(new ByteArrayInputStream(raw)).parseDocument());
             case "schema-document" -> assertThrows(TsonUnsupportedDocumentException.class,
-                    () -> new TsonDataParser(raw).parseDocument());
-            default -> fail("unknown parser-layer outcome: " + outcome);
+                    () -> new TsonDataParser(new ByteArrayInputStream(raw)).parseDocument());
+            default -> fail("unknown parser-layer outcome: " + outcomeOf(sidecar));
         }
     }
 
@@ -297,24 +302,28 @@ class ConformanceSuiteTest {
     }
 
     private static void assertCoreValueMatches(RecordValue expected, CoreValue actual) {
-        String kind = fieldText(expected, "kind");
+        RecordValue.Field member = soleField(expected, "core-value");
+        String kind = member.name();
+        RecordValue payload = kind.equals("absent") || kind.equals("empty-brace")
+                ? null
+                : (RecordValue) member.value().value().coreValue();
         switch (kind) {
             case "token" -> {
                 TokenValue tv = assertInstanceOf(TokenValue.class, actual, "core-value kind 'token'");
-                String expForm = fieldText(expected, "form");
+                String expForm = fieldText(payload, "form");
                 String actForm = switch (tv.form()) {
                     case UNQUOTED -> "unquoted";
                     case SINGLE_LINE_QUOTED -> "single-line";
                     case MULTI_LINE_QUOTED -> "multi-line";
                 };
                 assertEquals(expForm, actForm, "token form");
-                assertEquals(fieldText(expected, "text"), tv.text(), "token text");
+                assertEquals(fieldText(payload, "text"), tv.text(), "token text");
             }
             case "absent" -> assertInstanceOf(AbsentValue.class, actual, "core-value kind 'absent'");
             case "empty-brace" -> assertInstanceOf(EmptyBrace.class, actual, "core-value kind 'empty-brace'");
             case "record" -> {
                 RecordValue rv = assertInstanceOf(RecordValue.class, actual, "core-value kind 'record'");
-                ArrayValue expFields = (ArrayValue) fieldCore(expected, "fields");
+                ArrayValue expFields = (ArrayValue) fieldCore(payload, "fields");
                 assertEquals(expFields.elements().size(), rv.fields().size(), "record field count");
                 for (int i = 0; i < rv.fields().size(); i++) {
                     RecordValue expField = (RecordValue) expFields.elements().get(i).value().coreValue();
@@ -326,7 +335,7 @@ class ConformanceSuiteTest {
             }
             case "map" -> {
                 MapValue mv = assertInstanceOf(MapValue.class, actual, "core-value kind 'map'");
-                ArrayValue expEntries = (ArrayValue) fieldCore(expected, "entries");
+                ArrayValue expEntries = (ArrayValue) fieldCore(payload, "entries");
                 assertEquals(expEntries.elements().size(), mv.entries().size(), "map entry count");
                 for (int i = 0; i < mv.entries().size(); i++) {
                     RecordValue expEntry = (RecordValue) expEntries.elements().get(i).value().coreValue();
@@ -338,7 +347,7 @@ class ConformanceSuiteTest {
             }
             case "array" -> {
                 ArrayValue av = assertInstanceOf(ArrayValue.class, actual, "core-value kind 'array'");
-                ArrayValue expElements = (ArrayValue) fieldCore(expected, "elements");
+                ArrayValue expElements = (ArrayValue) fieldCore(payload, "elements");
                 assertEquals(expElements.elements().size(), av.elements().size(), "array element count");
                 for (int i = 0; i < av.elements().size(); i++) {
                     RecordValue expScoped = (RecordValue) expElements.elements().get(i).value().coreValue();
@@ -357,41 +366,41 @@ class ConformanceSuiteTest {
     // ── Resolver-layer vectors ───────────────────────────────────────────
 
     private static void checkResolverVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        String outcome = fieldText(sidecar, "outcome");
-        if (!outcome.equals("valid")) {
-            fail("unknown resolver-layer outcome: " + outcome);
-            return;
-        }
-        Document doc = new TsonDataParser(resolvedRaw(subject, sidecar)).parseDocument();
+        // §4 never rejects a token, so this layer has one outcome and the sidecar carries `valid`
+        // as a plain field -- a group of one is not a group (§5.11's two-member minimum).
+        Document doc = new TsonDataParser(new ByteArrayInputStream(subjectBytes(subject, sidecar))).parseDocument();
         TokenValue token = assertInstanceOf(TokenValue.class, doc.root().coreValue(),
                 "resolver vector .tn must be a single bare token");
         BaseValue actual = BaseTypeResolver.resolve(token);
-        RecordValue expected = (RecordValue) fieldCore(sidecar, "base-value");
-        assertBaseValueMatches(expected, actual);
+        RecordValue valid = (RecordValue) fieldCore(sidecar, "valid");
+        assertBaseValueMatches((RecordValue) fieldCore(valid, "base-value"), actual);
     }
 
     private static void assertBaseValueMatches(RecordValue expected, BaseValue actual) {
-        String kind = fieldText(expected, "kind");
-        switch (kind) {
+        RecordValue.Field member = soleField(expected, "base-value");
+        CoreValue payload = member.value().value().coreValue();
+        switch (member.name()) {
             case "null" -> assertInstanceOf(BaseValue.NullValue.class, actual, "base-value kind 'null'");
             case "boolean" -> {
                 BaseValue.BooleanValue bv = assertInstanceOf(BaseValue.BooleanValue.class, actual, "base-value kind 'boolean'");
-                assertEquals(fieldText(expected, "value").equals("true"), bv.value(), "boolean value");
+                assertEquals(((TokenValue) payload).text().equals("true"), bv.value(), "boolean value");
             }
             case "string" -> {
                 BaseValue.StringValue sv = assertInstanceOf(BaseValue.StringValue.class, actual, "base-value kind 'string'");
-                assertEquals(fieldText(expected, "text"), sv.text(), "string text");
+                assertEquals(fieldText((RecordValue) payload, "text"), sv.text(), "string text");
             }
             case "number" -> {
                 BaseValue.NumberValue nv = assertInstanceOf(BaseValue.NumberValue.class, actual, "base-value kind 'number'");
-                assertNumberFormMatches((RecordValue) fieldValue(expected, "form").coreValue(), nv.form());
+                assertNumberFormMatches((RecordValue) payload, nv.form());
             }
-            default -> fail("unknown expected base-value kind: " + kind);
+            default -> fail("unknown expected base-value kind: " + member.name());
         }
     }
 
-    private static void assertNumberFormMatches(RecordValue expected, NumberForm actual) {
-        String shape = fieldText(expected, "shape");
+    private static void assertNumberFormMatches(RecordValue group, NumberForm actual) {
+        RecordValue.Field member = soleField(group, "number-form");
+        RecordValue expected = (RecordValue) member.value().value().coreValue();
+        String shape = member.name();
         switch (shape) {
             case "integer" -> {
                 NumberForm.IntegerForm f = assertInstanceOf(NumberForm.IntegerForm.class, actual, "number-form shape 'integer'");
@@ -456,31 +465,25 @@ class ConformanceSuiteTest {
     // ── Vocabulary-layer vectors (§5) ────────────────────────────────────
 
     /**
-     * The .tn is a {@code !type-ref token} data-value. On a {@code valid} vector, most families
-     * assert {@code value} (a plain decimal string) against {@link AtomType#read(TokenValue, Class)}
-     * with {@link BigDecimal} as the target -- host-representation-neutral, matching the suite's own
-     * resolver-vector philosophy (§5.2 leaves the concrete bound type implementation-defined), and
-     * the one target every {@code BigDecimal}-representable family shares. {@code rational} and
-     * {@code complex} have no natural {@code BigDecimal} representation ({@link Rational}/{@link
-     * Complex} are each other atom's *only* legitimate target, per {@link AtomType}'s default {@code
-     * read(token, target)}), so those two are asserted against their own natural type instead --
-     * {@code rational}'s {@code value} is a {@code "numerator/denominator"} string parsed directly
-     * into a {@link Rational} (comparable via its own value-based {@code equals}); {@code complex}'s
-     * {@code value} is a {@code { real: ... imaginary: ... }} record, each part compared via {@link
-     * BigDecimal#compareTo} the same way the {@code BigDecimal}-based families are. {@code base64}/
-     * {@code base64url}/{@code base32}/{@code hex} (§5.3) have no {@code BigDecimal} representation
-     * either -- their {@code value} is a plain hex string decoded via {@link HexFormat} and compared
-     * against the atom's {@code byte[]} result with {@link
-     * org.junit.jupiter.api.Assertions#assertArrayEquals}, not {@code equals} (arrays don't have
-     * value-based {@code equals} in Java). On an {@code error} vector, {@code category} is
-     * additionally checked against which of {@link
-     * AtomParseException}/{@link AtomValidationException} was actually thrown, per this
-     * §5.2/§8.1's own split, which the test suite's README still flags as unsettled: a token the atom's
-     * grammar rejects is a resolver error, a parsed value violating its range a validation error.
+     * The .tn is a {@code !type-ref token} data-value: at every other layer a bare token is a
+     * complete data-value, and here the type-ref is what selects a built-in atom's parsing contract
+     * (§5).
+     *
+     * <p><b>The expected value names the textual family it is written in</b>, rather than being one
+     * {@code text} field every atom has to fit -- {@code decimal}, {@code hex}, {@code rational},
+     * {@code text}, {@code complex}, {@code duration}. All six are host-representation-neutral, §5.2
+     * leaving the concrete bound type implementation-defined, which is the same reasoning the
+     * resolver layer's {@code base-value} follows. Which family an atom uses is
+     * {@code vocabulary-sidecar.tn}'s to state; this switches on the type-ref only to pick the
+     * <em>target</em> type to read into, since {@code ipv6} and the binary family share the
+     * {@code hex} spelling but not a host type.
+     *
+     * <p>On an {@code error} vector the §8.1 category picks the exception, like every other layer --
+     * a token the atom's grammar rejects is a resolver error, a parsed value violating its range a
+     * validation error. The suite's README flags the first half as not yet settled by the spec.
      */
     private static void checkVocabularyVector(String bucket, Path subject, RecordValue sidecar) throws IOException {
-        String outcome = fieldText(sidecar, "outcome");
-        Document doc = new TsonDataParser(resolvedRaw(subject, sidecar)).parseDocument();
+        Document doc = new TsonDataParser(new ByteArrayInputStream(subjectBytes(subject, sidecar))).parseDocument();
         DataValue root = doc.root();
         String typeRef = root.typeRef().orElseThrow(
                 () -> new AssertionError("vocabulary vector .tn must carry a type-ref"));
@@ -489,68 +492,62 @@ class ConformanceSuiteTest {
         AtomType<?> atomType = BuiltinTypeVocabulary.lookup(typeRef)
                 .orElseThrow(() -> new AssertionError("unrecognized type-ref in vocabulary vector: " + typeRef));
 
-        switch (outcome) {
-            case "valid" -> checkValidVocabularyVector(typeRef, atomType, token, sidecar);
-            case "error" -> {
-                String category = fieldText(sidecar, "category");
-                AtomTypeException thrown = assertThrows(AtomTypeException.class, () -> atomType.read(token));
-                switch (category) {
-                    case "resolver" -> assertInstanceOf(AtomParseException.class, thrown,
-                            "category 'resolver' -> AtomParseException");
-                    case "validation" -> assertInstanceOf(AtomValidationException.class, thrown,
-                            "category 'validation' -> AtomValidationException");
-                    default -> fail("unexpected category for vocabulary-layer error: " + category);
-                }
-            }
-            default -> fail("unknown vocabulary-layer outcome: " + outcome);
+        assertEquals(fieldText(sidecar, "type-ref"), typeRef,
+                "the sidecar's type-ref must name the atom the subject's own type-ref does");
+        switch (outcomeOf(sidecar)) {
+            case "valid" -> checkValidVocabularyVector(typeRef, atomType, token, outcomePayload(sidecar));
+            case "error" -> assertThrows(errorClassFor(sidecar), () -> atomType.read(token));
+            default -> fail("unknown vocabulary-layer outcome: " + outcomeOf(sidecar));
         }
     }
 
-    private static void checkValidVocabularyVector(String typeRef, AtomType<?> atomType, TokenValue token, RecordValue sidecar) {
+    private static void checkValidVocabularyVector(String typeRef, AtomType<?> atomType, TokenValue token, RecordValue valid) {
+        RecordValue.Field family = soleField((RecordValue) fieldCore(valid, "value"), "vocabulary value");
+        CoreValue payload = family.value().value().coreValue();
         switch (typeRef) {
             case "rational" -> {
                 Rational actual = (Rational) atomType.read(token, Rational.class);
-                assertEquals(parseRational(fieldText(sidecar, "value")), actual, "vocabulary value");
+                assertEquals(parseRational(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "complex" -> {
                 Complex actual = (Complex) atomType.read(token, Complex.class);
-                RecordValue expected = (RecordValue) fieldCore(sidecar, "value");
+                RecordValue expected = (RecordValue) payload;
                 assertEquals(0, new BigDecimal(fieldText(expected, "real")).compareTo(actual.real()), "complex real part");
                 assertEquals(0, new BigDecimal(fieldText(expected, "imaginary")).compareTo(actual.imaginary()), "complex imaginary part");
             }
             case "uuid" -> {
                 UUID actual = (UUID) atomType.read(token, UUID.class);
-                assertEquals(UUID.fromString(fieldText(sidecar, "value")), actual, "vocabulary value");
+                assertEquals(UUID.fromString(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "base64", "base64url", "base32", "hex" -> {
                 byte[] actual = (byte[]) atomType.read(token, byte[].class);
-                assertArrayEquals(HexFormat.of().parseHex(fieldText(sidecar, "value")), actual, "vocabulary value");
+                assertArrayEquals(HexFormat.of().parseHex(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "date" -> {
                 LocalDate actual = (LocalDate) atomType.read(token, LocalDate.class);
-                assertEquals(LocalDate.parse(fieldText(sidecar, "value")), actual, "vocabulary value");
+                assertEquals(LocalDate.parse(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "time" -> {
                 OffsetTime actual = (OffsetTime) atomType.read(token, OffsetTime.class);
-                assertEquals(OffsetTime.parse(fieldText(sidecar, "value")), actual, "vocabulary value");
+                assertEquals(OffsetTime.parse(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "datetime" -> {
                 OffsetDateTime actual = (OffsetDateTime) atomType.read(token, OffsetDateTime.class);
-                assertEquals(OffsetDateTime.parse(fieldText(sidecar, "value")), actual, "vocabulary value");
+                assertEquals(OffsetDateTime.parse(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "duration" -> {
                 IsoDuration actual = (IsoDuration) atomType.read(token, IsoDuration.class);
-                RecordValue expected = (RecordValue) fieldCore(sidecar, "value");
+                RecordValue expected = (RecordValue) payload;
                 assertEquals(Period.parse(fieldText(expected, "period")), actual.calendarPart(), "duration calendar part");
                 assertEquals(Duration.parse(fieldText(expected, "clock")), actual.clockPart(), "duration clock part");
             }
             case "uri" -> {
                 URI actual = (URI) atomType.read(token, URI.class);
-                assertEquals(URI.create(fieldText(sidecar, "value")), actual, "vocabulary value");
+                assertEquals(URI.create(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "ipv4" -> {
                 Inet4Address actual = (Inet4Address) atomType.read(token, Inet4Address.class);
-                assertEquals(InetAddress.ofLiteral(fieldText(sidecar, "value")), actual, "vocabulary value");
+                assertEquals(InetAddress.ofLiteral(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "ipv6" -> {
                 // Unlike ipv4, value is the plain hex string of the 16 raw address bytes (the same
@@ -558,7 +555,7 @@ class ConformanceSuiteTest {
                 // itself silently collapses an IPv4-mapped 16-byte pattern to an Inet4Address, so
                 // there's no single JDK parse this suite could trust as a neutral oracle here.
                 Inet6Address actual = (Inet6Address) atomType.read(token, Inet6Address.class);
-                assertArrayEquals(HexFormat.of().parseHex(fieldText(sidecar, "value")), actual.getAddress(),
+                assertArrayEquals(HexFormat.of().parseHex(((TokenValue) payload).text()), actual.getAddress(),
                         "vocabulary value");
             }
             case "text", "cidr4", "cidr6", "mac", "email" -> {
@@ -568,11 +565,11 @@ class ConformanceSuiteTest {
                 // the token's text"), while `cidr4`/`cidr6`/`mac` keep their text because Java has no type to
                 // map onto (see Cidr4Parser/MacParser) and `email` because the address shape is the contract.
                 String actual = (String) atomType.read(token, String.class);
-                assertEquals(fieldText(sidecar, "value"), actual, "vocabulary value");
+                assertEquals(((TokenValue) payload).text(), actual, "vocabulary value");
             }
             default -> {
                 BigDecimal actual = (BigDecimal) atomType.read(token, BigDecimal.class);
-                BigDecimal expected = new BigDecimal(fieldText(sidecar, "value"));
+                BigDecimal expected = new BigDecimal(((TokenValue) payload).text());
                 assertEquals(0, expected.compareTo(actual),
                         "vocabulary value: expected " + expected + ", got " + actual);
             }
@@ -626,6 +623,54 @@ class ConformanceSuiteTest {
         TsonSchema resolvedSchema = new TsonSchemaResolver(loader).resolveSchema(schemaDocument);
         assertTrue(resolvedSchema.entries().containsKey("my_int"),
                 "my_int should resolve as a bare reference to core.tn's own integer, reachable via the real spliced !!import");
+    }
+
+    // ── The outcome group, and the error category (RUNNER.md rules 3 and 5) ──
+
+    /**
+     * The name of the outcome group's present member -- {@code valid}, {@code error} or, at the
+     * parser layer, {@code schema-document}. §5.11 makes the group REQUIRED, so exactly one is
+     * present and the member label <em>is</em> the outcome: there is no separate {@code outcome}
+     * field to disagree with the payload beside it.
+     */
+    private static String outcomeOf(RecordValue sidecar) {
+        for (RecordValue.Field f : sidecar.fields()) {
+            if (OUTCOMES.contains(f.name())) {
+                return f.name();
+            }
+        }
+        throw new AssertionError("sidecar states no outcome; expected one of " + OUTCOMES);
+    }
+
+    private static final List<String> OUTCOMES = List.of("valid", "error", "schema-document");
+
+    /** The present outcome member's own payload record. */
+    private static RecordValue outcomePayload(RecordValue sidecar) {
+        return (RecordValue) fieldCore(sidecar, outcomeOf(sidecar));
+    }
+
+    /**
+     * The exception an {@code error} vector's §8.1 category demands. Checked at <b>every</b> layer,
+     * not only the vocabulary one: asserting merely that something was thrown passes a lexer that
+     * rejects a document for the wrong reason, and the category is not derivable from the layer --
+     * the vocabulary layer raises {@code resolver} and {@code validation} errors and never a
+     * "vocabulary" one.
+     */
+    private static Class<? extends Throwable> errorClassFor(RecordValue sidecar) {
+        String category = fieldText(outcomePayload(sidecar), "category");
+        return switch (category) {
+            case "lexer" -> LexException.class;
+            case "parser" -> TsonParseException.class;
+            case "resolver" -> AtomParseException.class;
+            case "validation" -> AtomValidationException.class;
+            default -> throw new AssertionError("unknown §8.1 category: " + category);
+        };
+    }
+
+    /** The one field of a single-member group record, named for the message when there isn't exactly one. */
+    private static RecordValue.Field soleField(RecordValue group, String what) {
+        assertEquals(1, group.fields().size(), what + " must state exactly one kind");
+        return group.fields().get(0);
     }
 
     // ── Sidecar field helpers ────────────────────────────────────────────
@@ -686,11 +731,16 @@ class ConformanceSuiteTest {
      * block is inserted right after the subject's own {@code !!id} line (every real schema-document
      * subject already writes one), or at the very start if the subject has none.
      */
+    private static byte[] subjectBytes(Path subject, RecordValue sidecar) throws IOException {
+        byte[] bytes = Files.readAllBytes(subject);
+        if (!hasField(sidecar, "meta")) {
+            return bytes;
+        }
+        return resolvedRaw(subject, sidecar).getBytes(StandardCharsets.UTF_8);
+    }
+
     private static String resolvedRaw(Path subject, RecordValue sidecar) throws IOException {
         String raw = readRaw(subject);
-        if (!hasField(sidecar, "meta")) {
-            return raw;
-        }
         StringBuilder directives = new StringBuilder();
         directives.append("!!meta:\"").append(resolveShortName(fieldText(sidecar, "meta"))).append("\"\n");
         if (hasField(sidecar, "import")) {

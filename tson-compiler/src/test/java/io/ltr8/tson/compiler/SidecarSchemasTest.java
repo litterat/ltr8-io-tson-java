@@ -31,8 +31,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  */
 class SidecarSchemasTest {
 
-    private static final List<String> SCHEMA_FILES =
-            List.of("lexer-sidecar.tn", "parser-sidecar.tn", "resolver-sidecar.tn", "vocabulary-sidecar.tn");
+    private static final List<String> SCHEMA_FILES = List.of(
+            "sidecar-common.tn", "lexer-sidecar.tn", "parser-sidecar.tn", "resolver-sidecar.tn",
+            "vocabulary-sidecar.tn");
+
+    /** The identity prefix the suite's own schemas are published under; anything else is a bundled schema. */
+    private static final String SUITE_SCHEMA_PREFIX = "https://tson.io/test-suite/schemas/";
 
     @TestFactory
     Stream<DynamicTest> sidecarSchemasResolve() {
@@ -43,12 +47,7 @@ class SidecarSchemasTest {
     }
 
     private static void checkSchemaResolves(Path schemasRoot, String fileName) {
-        String source;
-        try {
-            source = Files.readString(schemasRoot.resolve(fileName), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        String source = read(schemasRoot.resolve(fileName));
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
 
         // Same bootstrap sequence TsonConfig#build uses -- meta-kernel has to be resolved and
@@ -56,7 +55,7 @@ class SidecarSchemasTest {
         // register itself. A fresh registry per schema file, deliberately, so one file's own
         // failure doesn't leave a shared registry in a half-registered state for the next.
         TsonCompiledMetaRegistry compiledRegistry =
-                new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
+                new TsonCompiledMetaRegistry(SchemaMetaNameBinder.defaultContext(), id -> fetch(schemasRoot, id));
         TsonCompiledSchemaLoader loader = compiledRegistry;
         SchemaDocument metaKernelDocument = new TsonSchemaParser(
                 TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID)).parseSchemaDocument();
@@ -65,5 +64,29 @@ class SidecarSchemasTest {
 
         TsonSchema resolved = new TsonSchemaResolver(loader).resolveSchema(document);
         assertFalse(resolved.entries().isEmpty(), fileName + " resolved with no entries");
+    }
+
+    /**
+     * Serves the suite's own schemas beside the bundled ones. The layer schemas {@code !!import}
+     * {@code sidecar-common.tn}, so a fetcher that only knows meta.tn/core.tn cannot resolve any of
+     * them -- and the shared declarations they used to duplicate are exactly what that import
+     * exists to stop.
+     *
+     * <p>An identity maps to a file name directly: these schemas are published under one prefix and
+     * named after the file they live in, so there is nothing to look up.
+     */
+    private static String fetch(Path schemasRoot, String id) {
+        if (id.startsWith(SUITE_SCHEMA_PREFIX)) {
+            return read(schemasRoot.resolve(id.substring(SUITE_SCHEMA_PREFIX.length())));
+        }
+        return TsonBundledSchemas.fetch(id);
+    }
+
+    private static String read(Path path) {
+        try {
+            return Files.readString(path, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }
