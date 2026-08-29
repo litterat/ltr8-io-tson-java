@@ -833,9 +833,15 @@ names, so two confusable variants are two confusable entries in the namespace an
 check over variants could never fire, and the list above should drop them. Field names and enum members are
 genuine scopes because neither is a declared name.
 
-**Step 4 is not built.** The restriction level needs a configuration channel reaching `TsonSchemaLinker` and
-the identifier parser, which today have none — six call sites across three modules — and it is the one
-mechanism this entry recommends defaulting to off. Its absence changes nothing about what the others decide.
+**Step 4 is built on the identifier surface and not on the token surface.** `UnicodePolicy` carries §5.2's
+six levels, the unit, and additional permitted script sets; `TsonConfig.identifierPolicy` reaches
+`TsonSchemaLinker` through the compiled meta registry, and the level is applied in the same pass as the
+confusable check — over the namespace, each record's field names and each enum's members. The default is
+Highly Restrictive over a whole name, so an ordinary compound like `id_пользователя` is refused until a
+caller reaches for `perSegment()`.
+
+`tokenPolicy` is designed above and deliberately not added: its channel is the reader construction rather
+than the registry, and a setter that silently did nothing would be worse than an absent one.
 
 Two parts of Step 1 are deliberately not built. The `field-name` production is untouched, so Class 1 field
 names stay unconstrained exactly as Step 1c intends. And the joiners' contextual rule is not implemented, so

@@ -5,6 +5,7 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.config.UnicodePolicy;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 
@@ -32,6 +33,7 @@ public final class TsonConfig {
     private DataBindContext dataBindContext = TsonAtomContext.defaultContext();
     private TsonSchemaSource schemaSource = TsonSchemaSource.registeredOnly();
     private DataNameBinder metaNameBinder;
+    private UnicodePolicy identifierPolicy = UnicodePolicy.highlyRestrictive();
     private boolean strictBinding = true;
     private Map<String, Class<?>> bindings;
     private String profile;
@@ -235,6 +237,40 @@ public final class TsonConfig {
      * <p>The narrower alternative to reaching for this is {@code @Unbound} on the one component that is the
      * class's own business rather than the wire's.
      */
+    /**
+     * The UTS #39 §5.2 restriction level applied to every name a schema declares -- type names, record field
+     * names, parameter names and enum members ({@code SPEC-FEEDBACK.md} #3 Step 4).
+     *
+     * <p>The default is {@link UnicodePolicy#highlyRestrictive()} over a whole name: the strictest of §5.2's
+     * practically deployable levels, and one it <em>names</em>, so the default is a position two
+     * implementations agree on without reading this project's documents. It refuses a name that mixes
+     * scripts, which is how a homograph reads as another name.
+     *
+     * <p><b>Reach for the unit before the level.</b> The default rejects ordinary compounds —
+     * {@code id_}<i>пользователя</i>, {@code url_}<i>адрес</i>, {@code alpha_α} — because a Latin
+     * abbreviation beside a word in another script is how identifiers are written outside English. Passing
+     * {@code highlyRestrictive().perSegment()} applies the same level to each {@code _}/{@code -} delimited
+     * segment, which admits all of those and still refuses every within-word homograph, because a homograph
+     * has to sit inside a word to read as that word. That is a narrower rule, not a weaker posture, and it is
+     * the relaxation to try first. Narrower still is {@code permitting(LATIN, CYRILLIC)}, for a deployment
+     * that knows exactly which combination it means.
+     *
+     * <p>The two ways of switching it off are deliberately distinct: {@link UnicodePolicy#scriptsUnchecked()}
+     * drops the script rule and keeps the identifier profile, while {@link UnicodePolicy#unrestricted()}
+     * drops that too — §5.2's own level 6, which takes {@code Identifier_Status} with it and which §5.2
+     * describes as a diagnostic tool.
+     *
+     * <p><b>This is a code path on purpose.</b> A security policy read from the environment is ambient
+     * authority: a CI config, a container image or a dependency calling {@code setenv} would change it with
+     * no diff and nothing in review, it would be invisible at the call site, and it would be process-global,
+     * so a library embedding this one could not hold its own. A method call is greppable, diffable and
+     * scoped to the instance that holds it.
+     */
+    public TsonConfig identifierPolicy(UnicodePolicy policy) {
+        this.identifierPolicy = Objects.requireNonNull(policy, "policy");
+        return this;
+    }
+
     public TsonConfig lenientBinding() {
         this.strictBinding = false;
         return this;
@@ -263,7 +299,8 @@ public final class TsonConfig {
         // accumulate hosts into one source instead of each replacing the last.
         TsonSchemaSource source = httpSchemas != null ? httpSchemas.build()
                 : fileSchemas != null ? fileSchemas.build() : schemaSource;
-        TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(schemaContext, source);
+        TsonCompiledMetaRegistry core =
+                TsonCompiledMetaRegistry.withStandardLibrary(schemaContext, source, identifierPolicy);
         return new Tson(core, dataBindContext, strictBinding);
     }
 

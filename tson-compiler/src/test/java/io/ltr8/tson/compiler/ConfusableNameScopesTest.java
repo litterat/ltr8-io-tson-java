@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.compiler.config.UnicodePolicy;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import org.junit.jupiter.api.Test;
 
@@ -31,6 +32,10 @@ class ConfusableNameScopesTest {
     private static final String ID = "https://example.test/confusable.tn";
 
     private static TsonCompiledSchema compile(String declarations) {
+        return compileWith(UnicodePolicy.highlyRestrictive(), declarations);
+    }
+
+    private static TsonCompiledSchema compileWith(UnicodePolicy identifiers, String declarations) {
         String schema = """
                 !!id:"https://example.test/confusable.tn"
                 !!meta:"https://tson.io/2026/33/m/meta.tn"
@@ -45,9 +50,8 @@ class ConfusableNameScopesTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return TsonCompiledSchemaRegistry.tree(
-                TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source))
-                .get(ID);
+        return TsonCompiledSchemaRegistry.tree(TsonCompiledMetaRegistry.withStandardLibrary(
+                SchemaMetaNameBinder.defaultContext(), source, identifiers)).get(ID);
     }
 
     private static String refused(String declarations) {
@@ -90,13 +94,19 @@ class ConfusableNameScopesTest {
     }
 
     /**
-     * And the precision that makes it a rule rather than a heuristic: it fires on a colliding *pair*, so no
-     * lone name is ever rejected. `id_пользователя` is the case #3 rejects the restriction level over.
+     * The precision that makes the confusable rule a rule rather than a heuristic: it fires on a colliding
+     * <em>pair</em>, so no lone name is ever rejected by it.
+     *
+     * <p>Checked under a relaxed restriction level, because the two rules are independent and the default
+     * level does reject these names — which is the whole reason #3 keeps them as separate mechanisms rather
+     * than one. Here the level is per-segment, so it admits `id_пользователя` and this test is left
+     * asserting only what it means to: that the skeleton check stays silent.
      */
     @Test
-    void aLoneMixedScriptNameIsUntouched() {
-        assertNotNull(compile("  rec => { id_" + new String(Character.toChars(0x043F))
-                + ": text  url_" + new String(Character.toChars(0x0430)) + ": text }"));
+    void theConfusableRuleNeverFiresOnALoneName() {
+        assertNotNull(compileWith(UnicodePolicy.highlyRestrictive().perSegment(),
+                "  rec => { id_" + new String(Character.toChars(0x043F))
+                        + ": text  url_" + new String(Character.toChars(0x0430)) + ": text }"));
     }
 
     /** Ordinary schemas are unaffected, which is the property that keeps the rule switched on. */

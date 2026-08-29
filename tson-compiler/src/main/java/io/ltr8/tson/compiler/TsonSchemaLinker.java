@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.atom.AtomParsers;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.lexer.ConfusableNames;
+import io.ltr8.tson.compiler.config.UnicodePolicy;
 import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
@@ -152,11 +153,18 @@ public final class TsonSchemaLinker {
                     + "TsonSchemaLinker.linkBootstrap exists specifically for that case; call "
                     + "link directly for an ordinary schema instead");
         }
-        return linkWith(bootstrap, null, null);
+        // The bootstrap is this library's own artifact, not user input, so it is linked under the default
+        // rather than under whatever a caller configured -- a policy should not be able to break meta-kernel.
+        return linkWith(bootstrap, null, null, UnicodePolicy.highlyRestrictive());
     }
 
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
-        return linkWith(schema, loader, null);
+        return linkWith(schema, loader, null, UnicodePolicy.highlyRestrictive());
+    }
+
+    /** {@link #link(TsonSchema, TsonSchemaLoader)} with the §5.2 restriction level for declared names chosen. */
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, UnicodePolicy identifiers) {
+        return linkWith(schema, loader, null, identifiers);
     }
 
     /**
@@ -179,8 +187,14 @@ public final class TsonSchemaLinker {
      */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
                                         TsonDiagnosticsReceiver receiver) {
+        return link(schema, loader, receiver, UnicodePolicy.highlyRestrictive());
+    }
+
+    /** The reporting overload with the §5.2 restriction level for declared names chosen. */
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
+                                        TsonDiagnosticsReceiver receiver, UnicodePolicy identifiers) {
         Objects.requireNonNull(receiver, "receiver");
-        return linkWith(schema, loader, receiver);
+        return linkWith(schema, loader, receiver, identifiers);
     }
 
     /**
@@ -204,11 +218,17 @@ public final class TsonSchemaLinker {
      * it matches a declared one, so restricting declarations restricts the data by construction. A Class 1
      * record is the case that has no declaration, and is checked by the schemaless readers instead.
      */
-    private static void checkConfusableNames(TsonDiagnosticsReceiver receiver, TsonSchema schema,
-                                             Map<String, TypeDefinition> merged) {
+    private static void checkNames(TsonDiagnosticsReceiver receiver, TsonSchema schema,
+                                   Map<String, TypeDefinition> merged, UnicodePolicy identifiers) {
         ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> report(receiver, schema,
                 collision.second(), merged.get(collision.second()),
                 "in the namespace of '" + schema.id() + "': " + collision.describe()));
+
+        // §5.2's restriction level, over the same names, in the same pass. Where the collision check above
+        // is a relation and needs the whole set, this is a property of each name on its own -- so it is the
+        // rule that reaches a name nothing else in the schema resembles.
+        merged.forEach((name, definition) -> identifiers.violation(name).ifPresent(why ->
+                report(receiver, schema, name, definition, "declared name " + why)));
 
         merged.forEach((name, definition) -> {
             Top body = definition.body();
@@ -223,6 +243,9 @@ public final class TsonSchemaLinker {
             String noun = body instanceof RecordBody ? "field names" : "members";
             ConfusableNames.firstCollision(names).ifPresent(collision -> report(receiver, schema, name,
                     definition, "'" + name + "' has " + noun + " that read alike: " + collision.describe()));
+            names.forEach(member -> identifiers.violation(member).ifPresent(why ->
+                    report(receiver, schema, name, definition, "'" + name + "' has a "
+                            + noun.substring(0, noun.length() - 1) + " where " + why)));
         });
     }
 
@@ -403,7 +426,7 @@ public final class TsonSchemaLinker {
 
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
-                                             TsonDiagnosticsReceiver receiver) {
+                                             TsonDiagnosticsReceiver receiver, UnicodePolicy identifiers) {
         Map<String, String> origins = new LinkedHashMap<>();
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins);
 
@@ -460,7 +483,7 @@ public final class TsonSchemaLinker {
 
         merged = computeSubtypes(merged, localNames);
         merged = computeDisjointness(merged);
-        checkConfusableNames(receiver, schema, merged);
+        checkNames(receiver, schema, merged, identifiers);
 
         Set<String> blamedOnce = new LinkedHashSet<>();
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {

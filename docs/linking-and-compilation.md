@@ -254,6 +254,17 @@ forbids — at the price of verdicts an author cannot predict (two default-`allo
 NaN however far apart their ranges sit) and a conformance bar no second implementation should have to
 match.
 
+**And the restriction level is refused per name, in the same pass** (`UnicodePolicy`, UTS #39 §5.2). The two
+are complementary rather than overlapping: the confusable check is a *relation* and needs the whole set, so
+it can never fire on a lone name; the level is a *property* of one name, so it is what reaches a name nothing
+else in the schema resembles. Configured by `TsonConfig.identifierPolicy` and carried on
+`TsonCompiledMetaRegistry`, which is the one object every resolve and every read already passes through.
+**Two axes, not a ladder** — a level and a unit — because per-segment Highly Restrictive and Moderately
+Restrictive are incomparable. The default is Highly Restrictive over a whole name, which refuses
+`id_пользователя`; the relaxation to reach for is the *unit*, since `perSegment()` admits that and still
+refuses `аdmin`. The bootstrap links under the default rather than under a caller's policy: a configuration
+should not be able to break meta-kernel.
+
 **Confusable names are refused per scope, not per name** (`ConfusableNames` over `Confusables.skeleton`,
 UTS #39 §4). The linker checks the merged namespace — local entries and every import's, which is where §2.2.3's
 own disjointness rule is exact equality and a confusable pair passes it by construction — plus each entry's

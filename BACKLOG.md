@@ -357,45 +357,14 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   restriction level for. The conformance vector
   `lexer/invalid/zwnj-inside-unquoted-token` asserts today's behaviour and flips in the same change; its
   sidecar already says the contradiction is why it exists.
-- [ ] **The UTS #39 restriction level, Highly Restrictive by default** — `SPEC-FEEDBACK.md` #3 Step 4, the
-  one piece of that entry not built. No shipped data: `Character.UnicodeScript` plus a three-row
-  augmented-set table. Two configuration axes rather than one ladder, since per-segment Highly Restrictive
-  and Moderately Restrictive are incomparable — a **level** (§5.2's own six, so the default is a named
-  standard two implementations agree on) and a **unit** (whole name, or each `_`/`-` segment). Default:
-  Highly Restrictive over the whole name; the first relaxation to offer is the *unit*, which still refuses
-  every within-word homograph (`аdmin`, `pаssword`, `id_аdmin`) while admitting `id_пользователя`,
-  `url_адрес` and `alpha_α`. It composes with the skeleton check rather than overlapping it — script inside
-  a word, skeleton across a scope.
-    - **The two "off" positions differ**: Minimally Restrictive drops the script rule and keeps the
-      identifier profile; Unrestricted drops both, taking `Identifier_Status` and the joiner exclusion with
-      it. Offering one "off" would silently give the second.
-    - A third, narrower axis worth having: an **additional permitted script set**, so a deployment that
-      knows it is Russian says `Latin + Cyrillic` rather than dropping a level everywhere.
-    - **Not configurable, deliberately**: skeleton distinctness (no false positives, nothing to relax),
-      `Identifier_Status` as its own switch (it is what level 6 turns off), and severity — the levels are
-      the severity, and a report-but-accept mode would be non-conforming while looking like a setting.
-    - **The same ladder belongs on values, defaulting to Unrestricted.** A value is unconstrained beyond the
-      token profile if unquoted and entirely unconstrained if quoted, so `аdmin` with a Cyrillic а can be a
-      *value* where it cannot be a name — the surface an application faces when it matches a value against a
-      list or renders it. Skeleton distinctness cannot help there: values form no set the rule could hold
-      over, which is exactly the setless case the restriction level exists for. Default Unrestricted because
-      data may legitimately be anything, so the default also costs nothing at read time — no scan runs.
-      Levels 5 and 6 collapse on this surface, `Identifier_Status` being a name rule (§5.2 says so).
-    - **Suggested surface: `tokenPolicy(...)` and `identifierPolicy(...)` over one `UnicodePolicy`**, sketched
-      in #3. `token`, not `value`, because the check runs where tokens leave the stream — before anything
-      knows which are names — so a token policy stricter than the identifier policy subsumes it, a name
-      having already cleared it. `UnicodePolicy` rather than `ScriptPolicy` because the type already carries
-      a unit and its loosest rung reaches `Identifier_Status` rather than any script rule. `perSegment()` on
-      the identifier policy only: `_`/`-` are word separators by convention in a name and ordinary characters
-      in a value, and UTS #39's own `Toys-Я-Us` is what per-segment would wrongly admit there.
-    - **The relaxation must be expressed in code, never in the environment.** A policy read from an env var
-      is ambient authority: a CI config, a container image or a dependency calling `setenv` changes it with
-      no diff and nothing in review, it is invisible at the call site, and it is process-global so an
-      embedding library cannot hold its own. A `TsonConfig` method is greppable, diffable and scoped to the
-      instance; name it for what it permits, not for the check it turns off.
-    - What it needs is that configuration channel, which neither `TsonSchemaLinker` nor `IdentifierParser`
-      has — `link` is called from six sites across three modules, and `TsonConfig`'s existing flags reach the
-      bind context rather than the linker. That plumbing is the work; the rule itself is about twenty lines.
+- [ ] **`tokenPolicy` — the restriction level on the token surface.** `SPEC-FEEDBACK.md` #3 Step 4b, the
+  half of that step not built: `identifierPolicy` ships, `UnicodePolicy` carries the levels and the unit, and
+  what is missing is the second channel. The identifier policy rides `TsonCompiledMetaRegistry` to the
+  linker; a token policy has to reach the *reader* construction instead, including the standalone schemaless
+  constructors that hold no registry. Default Unrestricted, so it costs nothing at read time and changes no
+  existing behaviour — which is also why it was left out rather than added as a setter that silently did
+  nothing. `perSegment()` stays off this surface: `_` and `-` are word separators by convention in a name and
+  ordinary characters in a value, and UTS #39's own `Toys-Я-Us` is what segmenting a value would admit.
 - [ ] Bidi-formatting-character surfacing outside quoted tokens (§9.5) — the sibling gap to the
   numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section; neither is enforced. Note
   this is **not** the class #14 closed: U+200E/U+200F are `Pattern_White_Space`, so they *separate* tokens
