@@ -130,6 +130,18 @@ which is why they sit low. The lexer's fail-fast floor is not among them: nothin
 someone decides whether lexer errors feed the `Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds
 that question.
 
+- [ ] **A name-hygiene refusal reports as `SCHEMA_ERROR` on the schema side and `CONFUSABLE_NAMES` on the data
+  side.** `Diagnostic.Code.CONFUSABLE_NAMES` is emitted for exactly one scope — a Class 1 record's own field
+  names, where `SchemalessTreeReader` checks them because no declaration stands behind them. Every schema-side
+  equivalent, the confusable check and the `UnicodePolicy` restriction level alike, goes through
+  `TsonSchemaLinker`'s `report` and comes out `SCHEMA_ERROR`. So one defect carries two codes depending on
+  whether a schema governs the document, and on the schema side a caller cannot tell a spoofing refusal from an
+  ordinary schema error. Both halves want a code that says which rule fired — the confusable relation and the
+  restriction level are different rules with different remedies, and neither is a statement that the schema is
+  malformed. `SPEC-FEEDBACK.md` #3 argues the distinction is normative, not cosmetic: a hygiene refusal is this
+  processor declining a schema, where a validity error is the schema being wrong, and only the second is
+  portable. Worth doing whatever the spec settles on.
+
 - [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
   now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against
   `/person/age` lands on `age`'s line. A supertype and a choice variant are bare names in a `List<String>`
