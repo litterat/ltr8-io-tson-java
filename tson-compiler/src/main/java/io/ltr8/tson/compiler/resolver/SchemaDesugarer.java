@@ -606,8 +606,8 @@ final class SchemaDesugarer {
      * {@code Token}, §5.10 describing a type argument's literal as a bare token rather than as the value it
      * denotes, so the reader that fills it preserves the token instead of decoding it ({@code
      * RawTokenParser}). The spelling is therefore what reaches identity, and {@link NumericIdentity} applies
-     * [TSON-DATA] §4.3's equivalence there so {@code <255>} and {@code <0xFF>} are one application
-     * ({@code SPEC-FEEDBACK.md} #4).
+     * [TSON-DATA] §4.3's equivalence there so {@code <255>} and {@code <0xFF>} are one application -- which
+     * is [TSON-SCHEMA] §8.2's rule exactly: recorded as written, compared as the value the token denotes.
      */
     private static RecordValue refRecord(GenericRef generic) {
         List<ScopedValue> arguments = new ArrayList<>();

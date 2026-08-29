@@ -41,8 +41,8 @@ class TupleReadTest {
     private static String schema(String declaration) {
         return """
                 !!id:"%s"
-                !!meta:"https://tson.io/2026/33/m/meta.tn"
-                !!import:"https://tson.io/2026/33/m/core.tn"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
+                !!import:"https://tson.io/2026/34/m/core.tn"
                 {
                   pair => %s
                   holder => {

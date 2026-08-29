@@ -36,7 +36,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   schemas declaring one name is an error naming both, and a local declaration may not reuse a name the
   closure already binds — no hiding, no redefinition. Listing one schema twice, or under two spellings of
   one canonical identity, is redundant rather than an error. Because identities carry the spec revision, a
-  closure reaching both `/2026/32/m/core.tn` and `/2026/33/m/core.tn` is rejected here rather than surfacing
+  closure reaching both `/2026/32/m/core.tn` and `/2026/34/m/core.tn` is rejected here rather than surfacing
   later as a field conflict between two identically-spelled types; (2) **populate `subtypes`**
   (reverse of `supertypes`); (3) **derive `disjoint`** for every choice entry (`ChoiceDisjointness`, §5.4) —
   total and two-valued, detailed under "The disjointness derivation" below, so a linked choice always
@@ -119,8 +119,8 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
       Asking the zero-argument half ("this token names an unapplied template") off `names()` rejects a
       correct schema whose field happens to be called `box` beside a template of that name, which is a worse
       failure than a late verdict. So that half runs on the entry materialisation mints, and an unapplied
-      template gets no verdict — the open form's own position (`SPEC-FEEDBACK.md` #5: "an unapplied template
-      is checked no further and gets no verdict"), not a shortfall.
+      template gets no verdict — the open form's own position (§5.10: "an unapplied template is checked no
+      further and receives no verdict"), not a shortfall.
   - **`entryOrigins` is on `TsonLinkedSchema`, not on `TsonSchema` or `TypeDefinition`**, because it is a
     fact *linking* establishes rather than part of the resolved schema value §9 defines — and because
     `schema.meta` is a bind target with a hand-written `equals` and the `@Record` constructor-selection trap,
@@ -273,7 +273,8 @@ reference to a declared name, so a confusable pair is already two confusable nam
 there could never fire. The one scope the linker cannot reach is a Class 1 record, which has no declaration;
 `SchemalessTreeReader` checks its own field set. Being a *relation*, the rule never rejects a lone name — a
 mixed-script `id_пользователя` collides with nothing and passes, which is the property that keeps it switched
-on and the reason it is the rule where a per-name restriction level is an option (`SPEC-FEEDBACK.md` #3).
+on and the reason [TSON-DATA] §8.2 defaults it on where mechanism 3's level is the one to relax. §11.4 names
+the schema-layer scopes, variants excluded for exactly the reason above.
 
 **§7.2's subsumption guard wraps every entry the rule governs** (`Subsumption`, applied at
 `TsonSchemaCompiler`'s single `build` site). At a position typed `T`, a value annotated `!S` is valid iff
@@ -420,9 +421,9 @@ for a record body, so no `type_ref` carrying `arguments` could be read at all.
     byte-identical bodies. The stake is a verdict: §5.4 can only ask "are these variants distinct types?" of
     entry names, so two names for one type admitted `( [float32; 255] | [float32; 0xFF] )` — a choice between
     two identical, non-disjoint variants no untagged read can discriminate — where two spellings of one name
-    were refused. `SPEC-FEEDBACK.md` #4 puts the underlying disagreement to the spec: the same slot is a bare
-    token in the prose and a `value` in the kernel, and §8.2's identity rule inherits the ambiguity. What is
-    recorded stays the token, so resolved output still shows the author's spelling.
+    were refused. §8.2 settles it in exactly these terms — a value argument is "recorded as written" and
+    compared as the value the token denotes under §4, "and no wider" — so resolved output still shows the
+    author's spelling while identity sees one argument.
 - **Bind mode only.** Tree mode reads into `TsonValue` and has no Java shape to satisfy.
 
 ## The registries (`tson-compiler/{TsonCompiledMetaRegistry,TsonCompiledSchemaRegistry}.java`)

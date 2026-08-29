@@ -47,13 +47,13 @@ Try it (the data names its own schema and type, so no --type is needed):
 ```
 
 Here's the `person.tn` schema created. It shows a few of the basic schema features,
-including records, record groups, enums and some in-built types. The `2026/33` in the
+including records, record groups, enums and some in-built types. The `2026/34` in the
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/33/getting-started/person.tn?sha256=13cf46617c13225c7df1e292f60798d99af6ae6593657ca117b5a617220b0c51"
-!!meta:"https://tson.io/2026/33/m/meta.tn?sha256=ff2866c0d71cfaeee837c30ccc7328ac9c790df8ea700da8d85b5c36d0efe414"
-!!import:"https://tson.io/2026/33/m/core.tn?sha256=034d76d41e3cee431ab2f484a0a18f39b6c5752f6b8a90a501cb0a7aa2ebe55a"
+!!id:"https://example.com/2026/34/getting-started/person.tn?sha256=13cf46617c13225c7df1e292f60798d99af6ae6593657ca117b5a617220b0c51"
+!!meta:"https://tson.io/2026/34/m/meta.tn?sha256=a5cf63664cccaafed4b11e494fdb8b3aed0133bf47200910a039a252daed0613"
+!!import:"https://tson.io/2026/34/m/core.tn?sha256=c2127732df2dbac80ac4bbb7cb7d35070bfe546472368088a2f76343a8d85830"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]
@@ -90,7 +90,7 @@ And here's a corresponding `person-data.tn` *data* document. It's *self-describi
 `!!schema` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
-!!schema:"https://example.com/2026/33/getting-started/person.tn"
+!!schema:"https://example.com/2026/34/getting-started/person.tn"
 !person {
   id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
   name: "Ada Lovelace"
@@ -342,9 +342,9 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.builder().build();
 
 String schema = """
-        !!id:"https://example.com/2026/33/app/server-1.tn"
-        !!meta:"https://tson.io/2026/33/m/meta.tn"
-        !!import:"https://tson.io/2026/33/m/core.tn"
+        !!id:"https://example.com/2026/34/app/server-1.tn"
+        !!meta:"https://tson.io/2026/34/m/meta.tn"
+        !!import:"https://tson.io/2026/34/m/core.tn"
         {
             server => { hostname: text  port: int32 }
         }""";
@@ -352,7 +352,7 @@ String schema = """
 tson.resolve(schema);
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/33/app/server-1.tn")
+        .withSchema("https://example.com/2026/34/app/server-1.tn")
         .readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
 
 value.get("hostname").asString();          // Optional[web-01] — validated against the schema
@@ -386,7 +386,7 @@ Tson tson = Tson.builder()
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
 TsonValue server = tson.treeReader().read("""
-        !!schema:"https://example.com/2026/33/app/server-1.tn"
+        !!schema:"https://example.com/2026/34/app/server-1.tn"
         !server { hostname: "web-01"  port: 8080 }""");        // validated as it builds the tree
 
 // No !!schema? The same reader reads schemalessly, straight off the wire.
@@ -604,9 +604,9 @@ nothing to reopen, so piped input is always treated as data.
 For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
-!!id:"https://example.com/2026/33/app/person-1.tn"
-!!meta:"https://tson.io/2026/33/m/meta.tn"
-!!import:"https://tson.io/2026/33/m/core.tn"
+!!id:"https://example.com/2026/34/app/person-1.tn"
+!!meta:"https://tson.io/2026/34/m/meta.tn"
+!!import:"https://tson.io/2026/34/m/core.tn"
 {
     person => { name: text  age: int32 }
 }
@@ -618,7 +618,7 @@ OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
 {"valid":false,"files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
-  "schemaPointer":"/person/name","schemaId":"example.com/2026/33/app/person-1.tn",
+  "schemaPointer":"/person/name","schemaId":"example.com/2026/34/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(absent)","dataPosition":"2:9:63",
   "schemaPosition":"5:5:145"}]}],"errors":[]}

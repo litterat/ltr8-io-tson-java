@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * UTS #39 §5.2 on the token surface ({@code SPEC-FEEDBACK.md} #3 Step 4b) -- the half that reaches values,
+ * UTS #39 §5.2 on the token surface ([TSON-DATA] §8.2's "Values") -- the half that reaches values,
  * where {@code ConfusableNameScopesTest} covers declared names.
  *
  * <p><b>Every mixed-script spelling here is built from code points</b>, never typed: the two spellings are

@@ -11,8 +11,8 @@ import java.util.Optional;
 
 /**
  * Applies a read's {@link TsonUnicodePolicy} to every token as it leaves the stream
- * ({@code SPEC-FEEDBACK.md} #3 Step 4b) -- the token-surface half of UTS #39 §5.2, where the identifier
- * surface's half runs in {@code TsonSchemaLinker} over declared names.
+ * ([TSON-DATA] §8.2's "Values") -- the token-surface half of UTS #39 §5.2, where the name surface's half
+ * runs in {@code TsonSchemaLinker} over declared names.
  *
  * <p><b>Why a decorator on the source rather than a check in the context.</b> {@code TsonReadContext}
  * rewinds: an event consumed during lookahead can be delivered a second time, and a probe context can be

@@ -27,7 +27,7 @@ a new reader **sharing** the original's compiled-schema registry, never rebuildi
 `TsonTypeReader` from a compiled schema is the layer underneath: a strict single-method interface that
 reads one value at a cursor and polices nothing around it.
 
-**`withTokenPolicy` is the token-surface half of the Unicode policy** (`SPEC-FEEDBACK.md` #3 Step 4b), where
+**`withTokenPolicy` is the token-surface half of the Unicode policy** ([TSON-DATA] §8.2's "Values"), where
 `TsonConfig.identifierPolicy` is the declared-name half that rides the registry to the linker. It has to be a
 reader axis rather than a registry one, because the surface it guards includes the standalone schemaless
 constructors, which hold no registry at all — and a Class 1 read is exactly where a value arrives least

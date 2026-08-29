@@ -30,8 +30,8 @@ import java.util.regex.Pattern;
  *
  * <p>Not implemented: ISO 8601's alternative week form ({@code PnW}, e.g. {@code P3W}) -- TSON's own
  * table gives the accepted format as literally {@code PnYnMnDTnHnMnS}, with no {@code W}, so this
- * reads that as exhaustive rather than illustrative; see {@code SPEC-FEEDBACK.md} #1 for why that's
- * a real ambiguity, not a confident call.
+ * reads that as exhaustive rather than illustrative; see {@code SPEC-FEEDBACK.md} #1, still open, for why
+ * that's a real ambiguity rather than a confident call.
  *
  * <p>{@link DurationType#min}/{@link DurationType#max} are raw {@code String} text, not {@link
  * IsoDuration} (matching the {@code TextType.pattern}/{@code UriType.pattern} precedent, so the

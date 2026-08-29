@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=5c8f7830757fbf25ebb7d5da8cd87c4c12acdc68a2612a3e135211b65b6aac56"
-!!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
+!!id:"https://tson.io/2026/34/m/meta-kernel.tn?sha256=13de02b2f0ee17bee0337252d069d332a33cd63a8f25732fca6bfc142685357e"
+!!meta:"https://tson.io/2026/34/m/meta-kernel.tn"
 @doc:"""
-  TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 33 draft).
+  TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 34 draft).
 
   The root of the schema ladder, written in the Part 2 schema grammar:
   a braced schema map of `name => definition` declarations, one entry
@@ -16,8 +16,7 @@
   Hash pins here are real digests over the bytes of this copy,
   computed bottom-up (kernel body, then each dependent's pins and
   digest) so the chain verifies as shipped. Hash *values* are not
-  normative — only the pin's shape is; the published drafts spell
-  them `xxhash` and pin at publication instead.
+  normative — only the pin's shape is ([TSON-DATA] §2.2.1).
   """
 {
   @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A, so instances and fresh records sit under the kinds without supertypes. The first three describe the shape of a data value; `data` describes something that is not one."
@@ -314,7 +313,7 @@
     label to do so: a held body is not read against this vocabulary
     until materialisation has substituted its parameters away, so a
     token there is a parameter exactly when its text resolves into
-    the enclosing entry's `parameters` ([TSON-SCHEMA] §8.1's
+    the enclosing entry's `parameters` ([TSON-SCHEMA] §5.10's
     shadowing rule). A closed entry has no parameters for one to
     resolve into, so the same slot is unambiguous at both ends.
 
@@ -351,15 +350,19 @@
   }
 
   @doc:"""
-    Constructors — ~ marks type factories. Type slots (array's
-    element_type, map's key_type and value_type) are ordinary fields
-    typed type_ref, their values routed from the application by
-    parameter (= T): the slot's type never varies — it is always a
-    reference — and the parameter rides the value channel like any
-    other value modifier. A closed application
-    therefore carries the bound reference as the field's value
-    (!array { element_type: person }), and its binding record is
-    ordinary data of this vocabulary.
+    Constructors — ~ marks type factories. The container
+    constructors carry no parameters: a type slot (array's
+    element_type, map's key_type and value_type) is an ordinary
+    REQUIRED field typed type_ref, filled by the construction or by
+    a sugar form's desugaring like any other required field, and a
+    closed application carries the bound reference as the field's
+    value (!array { element_type: person }), its binding record
+    being ordinary data of this vocabulary. Inside a held template
+    body ([TSON-SCHEMA] §5.10) any slot — type, scalar, or
+    collection — may hold a parameter token, substituted away
+    before the body is read against this vocabulary. `map.state`
+    governs the entry value, as `array.state` governs the element;
+    a map key can never be absent.
     """
   record => ~product & {
     access_pattern:  product_access_type = NAMED
@@ -418,11 +421,12 @@
   }
 
   @doc:"""
-    Resolver output. `disjoint` is a resolver-derived index over sum
-    definitions, parallel to `subtypes`: true when the resolver has
-    proved the variants pairwise disjoint as value sets ([TSON-SCHEMA]
-    §5.4), absent otherwise (refuted or unprovable). Declarations never
-    set it; on ingest it MUST be discarded and recomputed. It carries
+    Resolver output. `disjoint` is a resolver-derived index over
+    choice definitions, parallel to `subtypes`: true or false by
+    discrimination-class distinctness ([TSON-SCHEMA] §5.4), recorded
+    on every entry whose body is a `!choice` and absent on every
+    other. Declarations never set it; on ingest it MUST be discarded
+    and recomputed. It carries
     the encoding-independent fact each encoding's discrimination rules
     consume ([TSON-SCHEMA] §5.4, §7.2).
     """

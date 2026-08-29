@@ -82,7 +82,7 @@ class LexerTest {
      * exactly the second group -- "where their insertion shall have no effect on the meaning of the program".
      * Treating them as the third is what let {@code [1<LRM>2]} read as two elements: an insertion that
      * changes the meaning, invisibly, in the one position where juxtaposition is the separator and the
-     * result is still a valid document. {@code SPEC-FEEDBACK.md} #16 carries the spec-side finding.
+     * result is still a valid document. §7.2 rule 1 sorts them the same way, and §9.5 rests on it.
      */
     @Test
     void anIgnorableFormatControlInsideATokenIsRefused() {

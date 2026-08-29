@@ -1,8 +1,8 @@
-!!id:"https://tson.io/2026/33/m/meta.tn?sha256=ff2866c0d71cfaeee837c30ccc7328ac9c790df8ea700da8d85b5c36d0efe414"
-!!meta:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=5c8f7830757fbf25ebb7d5da8cd87c4c12acdc68a2612a3e135211b65b6aac56"
-!!import:"https://tson.io/2026/33/m/meta-kernel.tn?sha256=5c8f7830757fbf25ebb7d5da8cd87c4c12acdc68a2612a3e135211b65b6aac56"
+!!id:"https://tson.io/2026/34/m/meta.tn?sha256=a5cf63664cccaafed4b11e494fdb8b3aed0133bf47200910a039a252daed0613"
+!!meta:"https://tson.io/2026/34/m/meta-kernel.tn?sha256=13de02b2f0ee17bee0337252d069d332a33cd63a8f25732fca6bfc142685357e"
+!!import:"https://tson.io/2026/34/m/meta-kernel.tn?sha256=13de02b2f0ee17bee0337252d069d332a33cd63a8f25732fca6bfc142685357e"
 @doc:"""
-  TSON meta-schema — 2026 Revision 33 draft.
+  TSON meta-schema — 2026 Revision 34 draft.
 
   The canonical meta-schema for user schemas: a schema governed by the
   meta-kernel that adds the type constructors the core type library
@@ -222,22 +222,34 @@
     max:   value?
   }
 
-  @doc:"Time constraint vocabulary. Instance is `time` in core."
+  @doc:"""
+    Time constraint vocabulary. Instance is `time` in core. `precision`
+    bounds the fractional-second digits: `precision: N` admits a token
+    whose fractional part has at most N digits, judged on the written
+    token, as a validation constraint — the atom is exact, so nothing
+    is truncated — and `precision: 0` admits no fractional part
+    ([TSON-SCHEMA] §5.5). No timezone facet: RFC 3339 `full-time`
+    already makes the offset mandatory.
+    """
   time_type => ~atom & atom_specification & {
-    spec:              = "https://www.rfc-editor.org/rfc/rfc3339"
-    min:               value?
-    max:               value?
-    precision:         integer?
-    require_timezone:  boolean?
+    spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
+    min:        value?
+    max:        value?
+    precision:  integer?
   }
 
-  @doc:"Datetime constraint vocabulary. Instance is `datetime` in core."
+  @doc:"""
+    Datetime constraint vocabulary. Instance is `datetime` in core.
+    `precision` as for `time_type`: at most N fractional-second digits
+    on the written token, a validation constraint ([TSON-SCHEMA] §5.5).
+    No timezone facet: RFC 3339 `date-time` already makes the offset
+    mandatory.
+    """
   datetime_type => ~atom & atom_specification & {
-    spec:              = "https://www.rfc-editor.org/rfc/rfc3339"
-    min:               value?
-    max:               value?
-    precision:         integer?
-    require_timezone:  boolean?
+    spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
+    min:        value?
+    max:        value?
+    precision:  integer?
   }
 
   @doc:"Duration constraint vocabulary. Instance is `duration` in core."
@@ -346,8 +358,9 @@
     void-targeted presence marker like `@numeric`: written bare, and
     presence is the assertion. Carries no decode force — the resolver
     computes disjointness whether or not the annotation is present.
-    Present and refuted is a schema-load error; present and unprovable
-    is a warning; present and proved, or absent, is silent.
+    The derivation is total, so there is no unprovable state: present
+    and refuted is a schema-load error; present and verified, or
+    absent, is silent.
     """
   disjoint => @annotation void
 

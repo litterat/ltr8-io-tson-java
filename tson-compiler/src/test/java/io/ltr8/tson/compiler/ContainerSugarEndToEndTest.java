@@ -51,8 +51,8 @@ class ContainerSugarEndToEndTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/container-sugar.tn"
-                !!meta:"https://tson.io/2026/33/m/meta.tn"
-                !!import:"https://tson.io/2026/33/m/core.tn"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
+                !!import:"https://tson.io/2026/34/m/core.tn"
                 {
                 %s
                 }
@@ -339,7 +339,8 @@ class ContainerSugarEndToEndTest {
     /**
      * And it is live at read time, which is the point of the field: the same document is valid under one
      * declaration and a {@code FIELD_REQUIRED} under the other. Before {@code map} carried a state, both
-     * accepted it and no schema could say otherwise ({@code SPEC-FEEDBACK.md} #12).
+     * accepted it and no schema could say otherwise; §5.3 and §7.6 now make the permission conditional on
+     * the map's own value state.
      */
     @Test
     void anAbsentMapValueIsAcceptedOnlyWhereTheSchemaMarkedItOptional() {
@@ -454,12 +455,10 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * The sugar form Revision 33 had no open representation for, and now the ordinary case. A {@code
-     * template_argument} was {@code param | value | type_ref} with no collection case (§8.1), so a parameter
-     * inside {@code choice}'s {@code variants} -- or {@code tuple}'s {@code elements} -- had nowhere to sit,
-     * and the declaration writing one was refused. A held body is not read against that vocabulary at all
-     * until materialisation substitutes, so the parameter is a token inside an array and lifts like any
-     * other form ({@code SPEC-FEEDBACK.md} #5).
+     * <b>Collection-valued slots are parameterizable</b> (§5.10). A held body is not read against the
+     * constructor's vocabulary at all until materialisation substitutes, so a parameter inside {@code
+     * choice}'s {@code variants} -- or {@code tuple}'s {@code elements} -- is a token inside an array and
+     * the form lifts like any other.
      */
     @Test
     void aParameterInsideACollectionValuedSlotLiftsLikeAnyOther() {

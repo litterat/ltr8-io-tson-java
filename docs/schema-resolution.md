@@ -260,8 +260,9 @@ recorded open form, and replacing the application with a reference to the entry 
   argument reaching a type position is the author's error
   — §5.10 infers a parameter's kind from its use, so the body's use and the applied argument are the two
   things being compared. Arity is checked before any of it, against the template's own `parameters`.
-  - **A *held* body has no slot types, so it can only enforce half of it**, which is §5.10's open question
-    rather than a defect here (`SPEC-FEEDBACK.md` #5). A literal applied where the body uses the parameter as
+  - **A *held* body has no slot types, so the kind rule enforces neither half — two other rules do**, which
+    is §5.10's own account: an argument is "read by the position it lands in". A literal applied where the
+    body uses the parameter as
     a type is still refused, because the substituted token stands in a type position and nothing declares a
     type called `3` — the verdict arrives as an unresolved reference rather than as a kind error. Its converse,
     a type name applied where the body routes the parameter into a field's *value*, is accepted: `value` is
@@ -351,8 +352,8 @@ recorded open form, and replacing the application with a reference to the entry 
     inside a collection are the same thing here: a token in a tree, rewritten when its text resolves into the
     entry's `parameters` (§8.1's shadowing rule). Quoting does not enter into it — a token's form is a
     schemaless-data concern ([TSON-DATA] §4.4) — which is why a held body needs no `param`/`value` label
-    where a typed open vocabulary did, and why the collection boundary went with the vocabulary
-    (`SPEC-FEEDBACK.md` #5).
+    where a typed open vocabulary did, and why §5.10 can state "substitution is one rule at any depth" with
+    collection-valued slots included.
   - **Applications inside it close before the entry is named**, which is what keeps one type on one entry:
     the desugar phase lifts innermost-first, so a form it writes already names the entry its inner form
     became, and a form closed here has to agree or `[[pixel; 3]; 3]` written out and `grid<pixel, 3>` closed

@@ -45,8 +45,9 @@ public final class Xid {
      * {@code XID_Continue}, exactly -- <b>including U+200C and U+200D</b>, which are members of the property
      * (Unicode 16.0 {@code DerivedCoreProperties.txt}) because UAX #31 folded them into the default when it
      * removed requirement R1a. Whether a given profile then admits them is that profile's decision, not this
-     * one's: [TSON-DATA] §7.1's prose excludes them where its own set algebra does not, which
-     * {@code SPEC-FEEDBACK.md} #14 carries, and {@link Lexer} subtracts them for that reason.
+     * one's: [TSON-DATA] §7.1 admits them in the unquoted-token profile on exactly those terms and relocates
+     * the safety rule to the name layer, where §7.7 applies UTS #39's contextual rule -- so neither profile
+     * subtracts a joiner, and this predicate is the property and nothing more.
      */
     public static boolean isContinue(int cp) {
         return (Character.isUnicodeIdentifierPart(cp) && !Character.isIdentifierIgnorable(cp)

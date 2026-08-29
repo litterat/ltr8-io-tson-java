@@ -12,26 +12,26 @@ class TsonCanonicalIdentityTest {
 
     @Test
     void stripsSchemeAndDelimiterFromTheRealMetaKernelId() {
-        Assertions.assertEquals("tson.io/2026/33/m/meta-kernel.tn1",
-                TsonCanonicalIdentity.canonicalize("https://tson.io/2026/33/m/meta-kernel.tn1"));
+        Assertions.assertEquals("tson.io/2026/34/m/meta-kernel.tn1",
+                TsonCanonicalIdentity.canonicalize("https://tson.io/2026/34/m/meta-kernel.tn1"));
     }
 
     @Test
     void httpAndHttpsResolveToTheSameIdentity() {
-        assertEquals(TsonCanonicalIdentity.canonicalize("https://tson.io/2026/33/m/meta-kernel.tn1"),
-                TsonCanonicalIdentity.canonicalize("http://tson.io/2026/33/m/meta-kernel.tn1"));
+        assertEquals(TsonCanonicalIdentity.canonicalize("https://tson.io/2026/34/m/meta-kernel.tn1"),
+                TsonCanonicalIdentity.canonicalize("http://tson.io/2026/34/m/meta-kernel.tn1"));
     }
 
     @Test
     void queryIsDropped() {
-        assertEquals("tson.io/2026/33/m/meta-kernel.tn1",
-                TsonCanonicalIdentity.canonicalize("https://tson.io/2026/33/m/meta-kernel.tn1?sha256=abc123"));
+        assertEquals("tson.io/2026/34/m/meta-kernel.tn1",
+                TsonCanonicalIdentity.canonicalize("https://tson.io/2026/34/m/meta-kernel.tn1?sha256=abc123"));
     }
 
     @Test
     void rejectsNonLowercaseHost() {
         assertThrows(TsonSchemaValidationException.class,
-                () -> TsonCanonicalIdentity.canonicalize("https://Tson.io/2026/33/m/meta-kernel.tn1"));
+                () -> TsonCanonicalIdentity.canonicalize("https://Tson.io/2026/34/m/meta-kernel.tn1"));
     }
 
     @Test
@@ -43,26 +43,26 @@ class TsonCanonicalIdentityTest {
     @Test
     void rejectsUserinfo() {
         assertThrows(TsonSchemaValidationException.class,
-                () -> TsonCanonicalIdentity.canonicalize("https://user@tson.io/2026/33/m/meta-kernel.tn1"));
+                () -> TsonCanonicalIdentity.canonicalize("https://user@tson.io/2026/34/m/meta-kernel.tn1"));
     }
 
     @Test
     void rejectsExplicitPort() {
         assertThrows(TsonSchemaValidationException.class,
-                () -> TsonCanonicalIdentity.canonicalize("https://tson.io:443/2026/33/m/meta-kernel.tn1"));
+                () -> TsonCanonicalIdentity.canonicalize("https://tson.io:443/2026/34/m/meta-kernel.tn1"));
     }
 
     @Test
     void rejectsFragment() {
         assertThrows(TsonSchemaValidationException.class,
-                () -> TsonCanonicalIdentity.canonicalize("https://tson.io/2026/33/m/meta-kernel.tn1#section"));
+                () -> TsonCanonicalIdentity.canonicalize("https://tson.io/2026/34/m/meta-kernel.tn1#section"));
     }
 
     @Test
     void rejectsPercentEncodedUnreservedCharacter() {
         // %7E decodes to '~', an unreserved character -- MUST NOT be percent-encoded.
         assertThrows(TsonSchemaValidationException.class,
-                () -> TsonCanonicalIdentity.canonicalize("https://tson.io/2026/33/m/meta-kernel%7E.tn1"));
+                () -> TsonCanonicalIdentity.canonicalize("https://tson.io/2026/34/m/meta-kernel%7E.tn1"));
     }
 
     @Test
@@ -75,7 +75,7 @@ class TsonCanonicalIdentityTest {
     @Test
     void rejectsMissingScheme() {
         assertThrows(TsonSchemaValidationException.class,
-                () -> TsonCanonicalIdentity.canonicalize("tson.io/2026/33/m/meta-kernel.tn1"));
+                () -> TsonCanonicalIdentity.canonicalize("tson.io/2026/34/m/meta-kernel.tn1"));
     }
 
     @Test

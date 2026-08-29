@@ -2,8 +2,10 @@ package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.meta.DateTimeType;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigInteger;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
@@ -75,5 +77,29 @@ class DateTimeParserTest {
     void writeRoundTripsThroughRead() {
         assertEquals("2025-03-13T10:15:30Z",
                 DateTimeParser.UNCONSTRAINED.write(DateTimeParser.UNCONSTRAINED.read(token("2025-03-13T10:15:30Z"))));
+    }
+
+    /**
+     * <b>{@code precision} bounds the fractional-second digits from above, on the token as written</b>
+     * (§5.5) -- the same rule {@code TimeParser} applies, inherited from the same {@code full-time}
+     * production, and judged on the token because the atom is exact and never truncates to fit.
+     */
+    @Test
+    void precisionBoundsTheWrittenFractionalDigits() {
+        DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
+                Optional.of(BigInteger.valueOf(3))));
+        assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), type.read(token("2025-03-13T10:15:30Z")));
+        assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30.100Z"),
+                type.read(token("2025-03-13T10:15:30.100Z")));
+        assertThrows(AtomValidationException.class, () -> type.read(token("2025-03-13T10:15:30.1234Z")));
+    }
+
+    /** {@code precision: 0} admits no fractional part at all (§5.5). */
+    @Test
+    void precisionZeroAdmitsNoFraction() {
+        DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
+                Optional.of(BigInteger.ZERO)));
+        assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), type.read(token("2025-03-13T10:15:30Z")));
+        assertThrows(AtomValidationException.class, () -> type.read(token("2025-03-13T10:15:30.1Z")));
     }
 }

@@ -26,9 +26,9 @@ A from-scratch Java implementation of TSON (Typed Schema Object Notation), built
 spec series (2026 revision):
 
 - Part 1 — lexer, structural grammar, base type resolution, built-in type vocabulary:
-  https://tson.io/raw/2026/33/tson-part1-data.md
+  https://tson.io/raw/2026/34/tson-part1-data.md
 - Part 2 — schema grammar, type system, resolution, linking, compilation:
-  https://tson.io/raw/2026/33/tson-part2-schema.md
+  https://tson.io/raw/2026/34/tson-part2-schema.md
 
 The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
 doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
@@ -37,14 +37,12 @@ copy. `spec/` holds local snapshots (revision 33) for quick reference: `spec/tso
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not
 a source of truth — with one standing exception: the three `.tn` schemas are **packaged from here at build
-time**, so they are the live copies rather than a snapshot. Two things follow. They carry real `?sha256=`
-digests over their own bytes where the published drafts spell the pin `xxhash` and pin at publication. And
-their **content** now diverges from Revision 33 as well: meta-kernel declares `reference.target` as a
-`type_ref` rather than a `type_name`, no longer declares `instance_template`, `template_argument` or
-`record_field.value_param` — the quoted open-body vocabulary held bodies replaced (`SPEC-FEEDBACK.md` #5,
-#7) — and gives `map` a `state: element_state ~ REQUIRED` field, so `{K => V?}` can mark a value optional
-the way `[T?]` marks an element (`SPEC-FEEDBACK.md` #12). So a diff against the published draft shows three
-declarations missing and one field added, not only different pin values.
+time**, so they are the live copies rather than a snapshot. As of Revision 34 they **are** the published
+artifacts, digests included: Part 2 §13.2 lists these three identities with these three `?sha256=` values,
+so a diff against the published draft is empty. The divergences earlier revisions carried are all in the
+spec now — `reference.target` typed `type_ref`, no `instance_template`/`template_argument`/`value_param`
+(§5.10's held bodies replaced the quoted open-body vocabulary), and `map`'s `state` field behind
+`{K => V?}` (§5.3).
 **Changing them means re-stamping all three digests bottom-up** (`tson hash`, kernel first), moving the
 matching `*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which
 carry the published values.
@@ -140,7 +138,8 @@ exactly when a read would accept the same token in the same position. A field ty
 positional form and an atom-typed variant mean a read would accept some. Admitting those would make "may
 this field have a default?" depend on another declaration's field count or variant list, a rule an author
 computes rather than remembers, and one that breaks silently when that other declaration gains a field.
-`SPEC-FEEDBACK.md` #8 carries the interpretation; `void`/`unknown`/`extern` fall out of the same line.
+§5.2's "Which fields may carry a value" states exactly this rule; `void`/`unknown`/`extern` fall out of the
+same line.
 
 **A schema and its bound class must agree about a type's fields** (`TsonBindMismatchException`, raised at
 bind-mode compile — startup, not first read; its subclass `TsonMissingBindingException` covers a type with
@@ -165,7 +164,7 @@ keeps it apart. The exception classification itself is unchanged and is what pic
 `DefinitionResolver`'s Javadoc lists the exact current boundary.
 
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
-`https://tson.io/2026/33/ltr8/<group>/<name>-<version>.tn` — `/2026/33` is the spec revision, `ltr8` the
+`https://tson.io/2026/34/ltr8/<group>/<name>-<version>.tn` — `/2026/34` is the spec revision, `ltr8` the
 publishing org, `<group>` the subsystem (`cli`), `<name>-<version>` the schema name with a trailing
 integer version. Bump the version under a new name (`diagnostics-2.tn`, not an in-place edit) whenever the
 shape changes (§10's immutability rule). **Use `.tn`, not `.tn1`** — `.tn1` is a stability claim §7.1
@@ -262,13 +261,14 @@ applies to *unquoted* tokens only; Pattern_White_Space is the spec's fixed 11-ch
 **not one set doing one job**: UAX31-R3a-1 splits it into line terminators, *ignorable format controls*
 (U+200E/U+200F, which it names) and horizontal space, so an LRM/RLM is consumed, contributes nothing, and is
 refused where it stands inside a token rather than at a boundary — §7.2 rule 1 folds them into horizontal
-space instead, which is what let `[1<LRM>2]` read as two elements (`SPEC-FEEDBACK.md` #16).
+space would be what let `[1<LRM>2]` read as two elements, which is why §7.2 rule 1 sorts them apart and
+§9.5 rests on it.
 §7.1's UAX #31 profile is implemented exactly, not approximated: the JDK's identifier predicates are
 `ID_*` unioned with the identifier-ignorable set (all `Cf`, plus non-whitespace controls), so `Lexer`
 subtracts that set and two literal `ID_ \ XID_` tables — verified zero-over/zero-under against Unicode
-16.0, which `Lexer.UNICODE_VERSION` declares. ZWNJ/ZWJ continue a token, `XID_Continue` containing
-both where §7.1's prose excludes them by name; the exclusion the prose wants is a *name* rule, applied by
-`IdentifierParser` through `JoiningControls` (UTS #39 §3.1.1.1's contexts A1/A2/B) — `SPEC-FEEDBACK.md` #14.
+16.0, which `Lexer.UNICODE_VERSION` declares. ZWNJ/ZWJ continue a token, `XID_Continue` containing both and
+§7.1 admitting them on that basis; what constrains them is a *name* rule (§7.7 rule 2), applied by
+`IdentifierParser` through `JoiningControls` (UTS #39 §3.1.1.1's contexts A1/A2/B).
 Errors are fail-fast (`LexException`); multi-error recovery is deferred.
 
 ### Structural parsing: Tier 2 stream + Tier 3 AST — `docs/lexer-and-data-parsing.md`
@@ -332,7 +332,7 @@ and also catches the names that merely begin like a number (`42x`, `-foo`).
 An AST→AST rewrite between parsing and resolution: every sugar form — `[T]` and the sized forms, `[T, U]`,
 `{K => V}`, `(A | B)` — becomes the `!C value` construction it denotes, at declaration position simply *being*
 one and anywhere else becoming an injected declaration plus a bare reference — **which is now the spec's own
-rule**, not a divergence: Revision 33 de-parameterises `array`/`set`/`map` (§4.2) so a container at a use site
+rule**, not a divergence: §4.2 de-parameterises `array`/`set`/`map` so a container at a use site
 cannot be an application at all, and §5.3 states one lift rule — every sugar form lifts at desugar, a concrete
 form to a closed synthetic entry. The rule this settles on: **`TypeRef.arguments` non-empty means an open
 form — a template application — and everything closed is an entry referenced by a bare name.** So
@@ -341,7 +341,7 @@ reference or `!C value`. **The phase is purely syntactic and consults no governi
 closed, so the head each form desugars to and the vocabulary field each argument fills are a fixed table —
 which is also why meta-kernel's bootstrap needs no hand-written routing of its own. §5.3's element/position
 `?` binds `state` directly (`[T?; 3]` puts a state and both bounds on one binding record) — **and so does a
-map's value**, `{K => V?}`, against the `state` field this kernel gives `map` (`SPEC-FEEDBACK.md` #12); a map
+map's value**, `{K => V?}`, against the `state` field the kernel gives `map` (§5.3's own row); a map
 *key* takes no `?`, §2.9 forbidding an absent key outright. The size
 specifier binds the `min_items`/`max_items` pair directly for arrays and maps alike, with no size template in
 between. §5.3's declaration-level container syntax is complete. Bottom-up, so nesting needs no special case;
@@ -370,7 +370,8 @@ check". **`Product.coherenceCheck` is that second rule's structural twin**, aski
 `min_items`/`max_items` pair over the same `AtomCoherence` comparison; it lives on the family rather than
 with any one spelling, so `[text; 5..3]` and the `!array { … }` body it denotes — one type — get one answer,
 and `TsonSchemaLinker` asks **every** family the same question again for the entries materialisation mints,
-which is §8.2's "and their kin" without needing them enumerated (`SPEC-FEEDBACK.md` #10).
+which is how §8.2's "every family coherence rule ... asked once more of the closed record" is met without a
+list — "a resolver needs no list", as it puts it.
 The exception-classification policy under Conventions governs every rejection here;
 `DefinitionResolver`'s Javadoc lists the exact boundary.
 
@@ -806,19 +807,18 @@ compatibility).
   edges an open operand does and does not give. `DefinitionResolver`'s Javadoc is the exact current boundary.
   Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
-  **Gaps reaching a read still exist**, six of them, all through `ErrorReader` and all on a schema that
-  loaded clean: `unknown` and `extern` (below), and `datetime`/`time` with `precision` or `require_timezone`
-  set. Each **rides in the report as `NOT_IMPLEMENTED`**, located at the value it could not read, and costs
-  that value a verdict and nothing else's — so a gap and an ordinary error in one document both get
-  reported, and `TsonCli.exitCodeFor` lifts the run to 70.
+  **Gaps reaching a read still exist**, two of them, both through `ErrorReader` and both on a schema that
+  loaded clean: `unknown` and `extern` (below). Each **rides in the report as `NOT_IMPLEMENTED`**, located
+  at the value it could not read, and costs that value a verdict and nothing else's — so a gap and an
+  ordinary error in one document both get reported, and `TsonCli.exitCodeFor` lifts the run to 70.
 - **A container position that is an application, and what a held open body still cannot say.** §5.10
   substitution works for both template shapes: a **record** template (parameters occupying field types and
   values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T
   min_items: N }`. An open instance's body is **held** rather than quoted — the application as written, unread
   until materialisation substitutes its parameters away (`TemplateBody`/`HeldBody`, `docs/schema-resolution.md`)
-  — which is what removes Revision 33's collection boundary: `result => <T> ( T | error )`, `<T> [T, text]`
-  and `<T> { v: (T | text) }` all resolve, where §5.10 refuses them by rule (`SPEC-FEEDBACK.md` #5, a
-  deliberate divergence implemented as proof for the next revision). A container position holding an
+  — which is what makes §5.10's "collection-valued slots are parameterizable" work: `result => <T>
+  ( T | error )` (the spec's own example), `<T> [T, text]` and `<T> { v: (T | text) }` all resolve. A
+  container position holding an
   application works too: the binding keeps the `type_ref` whole, so `tree => <T> { value: T  children:
   [tree<T>; 1..] }` ties its knot through the lifted synthetic. A *closed* container position takes one as
   well (`[box<text>]`, nested arguments included): the slot is written in `type_ref`'s record form and
@@ -828,8 +828,9 @@ compatibility).
   `variants`/`elements`, closed or open, because a `[type_ref]` holds what a `type_ref` holds. What remains is narrower: a *value*
   argument keeps its token, so `[vector<float32, 3>]` closes to a nested array with both bounds at 3
   (`RawTokenParser`); §4.3's equivalence is applied where identity is derived (`NumericIdentity`), so `<255>`
-  and `<0xFF>` are one application while `1` and `1.0` stay two, §4 resolving them to different base types
-  (`SPEC-FEEDBACK.md` #4). **Every template holds its body**, so one process closes them all.
+  and `<0xFF>` are one application while `1` and `1.0` stay two, §4 resolving them to different base types —
+  §8.2's rule exactly, recorded as written and compared as the value denoted. **Every template holds its
+  body**, so one process closes them all.
   §5.2 says `{ x: T }` denotes `!record { fields: [ { name: x  type: T } ] }`, and `SchemaDesugarer` rewrites
   it there, where the body is written; a **composition or refinement** template is held one phase later
   (`DefinitionResolver.holdIfOpen`), because both absorb fields from a source and the form to hold is the
@@ -870,8 +871,9 @@ compatibility).
   field's **value** is
   refused because §5.2 makes `record_field.value` a value of the field's declared type — which catches
   `int32 ~ text` whether a parameter put it there or the author wrote it literally (`TsonSchemaLinker`'s
-  `checkFieldValue`, `FieldValueConformanceTest`). What is left is that check's own boundary, below.
-  `SPEC-FEEDBACK.md` #5 carries the spec-side question.
+  `checkFieldValue`, `FieldValueConformanceTest`). §5.10 states the same division — an argument is "read by
+  the position it lands in" — and §5.2's value conformance is the half named there. What is left is that
+  check's own boundary, below.
 - **Deferred design questions** — the identity-diagonal FIXED-value invariant. **Routed-value
   substitution is
   no longer one of them**: an argument bound into a routed `=` fixes the field (`REQUIRED` →

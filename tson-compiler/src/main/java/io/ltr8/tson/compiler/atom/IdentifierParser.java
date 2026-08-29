@@ -38,13 +38,12 @@ import java.text.Normalizer;
  * it, so a mixed-script name is untouched. {@code -} is exempt, being this profile's own extension rather
  * than an identifier character Unicode has an opinion about.
  *
- * <p><b>The XID profile admits ZWNJ and ZWJ</b>, both being {@code XID_Continue} -- though
- * {@code Identifier_Status} then refuses them, which is UTS #39 stating generally the rule §7.1 states for
- * those two characters by hand. {@link
- * io.ltr8.tson.compiler.lexer.Lexer} currently does not, so no unquoted token can carry one and the case is
- * unreachable through that spelling; this class is written to the property anyway, so it is already correct
- * when the lexer adopts UTS #39 §3.1.1.1's contextual rule ({@code SPEC-FEEDBACK.md} #14). Deciding it here
- * by the property rather than by what the lexer happens to permit is what keeps the two from drifting.
+ * <p><b>The XID profile admits ZWNJ and ZWJ</b>, both being {@code XID_Continue}, and so does §7.1's
+ * unquoted-token profile: a joiner continues a token, and whether it may stand in a <em>name</em> is this
+ * layer's question. {@code Identifier_Status} refuses both, and §7.7 rule 2 carves the exception back --
+ * UTS #39 §3.1.1.1's contexts, which admit a joiner where it has a shaping effect and refuse it where it is
+ * invisible. Deciding it here by the property rather than by what the lexer happens to permit is what keeps
+ * the two layers from drifting.
  *
  * <p>NFC is required as a <em>form</em>, not merely as a comparison. §2.5 and §2.6 define name identity by
  * NFC-normalised comparison, which is the harder rule and the easy one to get wrong; requiring the form

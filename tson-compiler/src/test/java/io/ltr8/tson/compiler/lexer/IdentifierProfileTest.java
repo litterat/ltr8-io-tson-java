@@ -144,9 +144,8 @@ class IdentifierProfileTest {
 
     /**
      * The joiners' counterpart to the list above: they <em>do</em> continue an unquoted token, because
-     * {@code XID_Continue} contains them. §7.1's prose excludes them by name and its own set algebra does
-     * not, and this follows the algebra ({@code SPEC-FEEDBACK.md} #14) -- the exclusion the prose wants is a
-     * name rule, and is enforced as one.
+     * {@code XID_Continue} contains them and §7.1 admits them on that basis. The rule that constrains them
+     * is a name rule (§7.7 rule 2), and is enforced as one.
      */
     @Test
     void theJoinersDoContinueAnUnquotedTokenBecauseTheProfileContainsThem() {

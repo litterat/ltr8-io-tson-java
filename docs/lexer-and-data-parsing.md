@@ -64,9 +64,9 @@ tokens, modes, or character-classification changes).
   while its prose excludes them by name. The lexer follows the algebra, and `IdentifierParser` applies UTS
   #39 §3.1.1.1's contextual rule (`JoiningControls`): a joiner is admitted where it has a shaping effect —
   Persian `کتاب<ZWNJ>ها`, a Malayalam conjunct — and refused where it is invisible, which is every Latin
-  position. That is sharper than the blanket exclusion in both directions, and it is why §7.1's own remedy
-  did not work: "MUST be quoted" governs unquoted tokens only, so quoting was the route by which
-  `"ad<ZWNJ>min"` reached a name. `SPEC-FEEDBACK.md` #14.
+  position. That is sharper than a blanket exclusion in both directions, and it is why quoting is no
+  remedy: the token profile governs unquoted tokens only, so a quoted spelling is the route by which
+  `"ad<ZWNJ>min"` would reach a name. §7.7 rule 2 requires all three conditions for that reason.
   A JDK whose Unicode version moves needs both tables re-derived; their Javadoc says how.
 - **NFC normalization** (`java.text.Normalizer`) applies to *unquoted* tokens only (§7.2.1) — quoted
   tokens preserve exact content. **Pattern_White_Space is the spec's fixed 11-character set**, hardcoded
@@ -76,9 +76,9 @@ tokens, modes, or character-classification changes).
   (item 1), *ignorable format controls* (item 2, whose note names them as exactly U+200E and U+200F), and
   horizontal space (item 3, "all other characters"). Item 2's two are allowed only in contexts I1/I2/I3 —
   adjacent to horizontal space, wherever a space could have stood, at a line boundary — "where their
-  insertion **shall have no effect on the meaning of the program**". §7.2 rule 1 lists all eleven as one set
-  and this implementation departs from it (`SPEC-FEEDBACK.md` #16): reading LRM as horizontal space is what
-  let `[1<LRM>2]` read as **two** elements, an invisible insertion changing the document's meaning.
+  insertion **shall have no effect on the meaning of the program**". §7.2 rule 1 sorts them the same three
+  ways, and §9.5 rests on it: reading LRM as horizontal space is what would let `[1<LRM>2]` read as **two**
+  elements, an invisible insertion changing the document's meaning.
   `skipWhitespace` implements R3a's own suggested strategy — ignore them when lexing, then refuse any lexical
   element containing one — as a two-character test at the run: a run holding no real horizontal space is
   refused when the code points on **either side of it** would have continued one token. That is I1 and I2
@@ -150,7 +150,7 @@ Key points:
   there knows which tokens are meant as names, and `{"first name": 1}` must keep reading as an ordinary
   record; the identifier contract is stated once on *declarations* (`TsonSchemaParser.expectTypeName`,
   `DefinitionResolver.requireIdentifier`) and data conforms by construction, a field name that is not an
-  identifier matching nothing and already being an `UNRECOGNIZED_FIELD`. `SPEC-FEEDBACK.md` #3 Step 1c.
+  identifier matching nothing and already being an `UNRECOGNIZED_FIELD`. §2.5 and §7.7 state both halves.
 - **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`.** This is a
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
   parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic).

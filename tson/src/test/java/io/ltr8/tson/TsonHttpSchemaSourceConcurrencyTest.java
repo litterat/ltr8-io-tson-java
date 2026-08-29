@@ -28,21 +28,21 @@ class TsonHttpSchemaSourceConcurrencyTest {
     private static final String HOST = "schemas.example.com";
 
     private static final String SCHEMA = """
-            !!id:"https://schemas.example.com/2026/33/app/order-1.tn"
-            !!meta:"https://tson.io/2026/33/m/meta.tn"
-            !!import:"https://tson.io/2026/33/m/core.tn"
+            !!id:"https://schemas.example.com/2026/34/app/order-1.tn"
+            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!import:"https://tson.io/2026/34/m/core.tn"
             { order => { sku: text  quantity: int32 } }""";
 
     private static final String BASE = """
-            !!id:"https://schemas.example.com/2026/33/app/base-1.tn"
-            !!meta:"https://tson.io/2026/33/m/meta.tn"
-            !!import:"https://tson.io/2026/33/m/core.tn"
+            !!id:"https://schemas.example.com/2026/34/app/base-1.tn"
+            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!import:"https://tson.io/2026/34/m/core.tn"
             { sku_code => !text ^ { min_length: 1 } }""";
 
     private static final String DERIVED = """
-            !!id:"https://schemas.example.com/2026/33/app/derived-1.tn"
-            !!meta:"https://tson.io/2026/33/m/meta.tn"
-            !!import:"https://schemas.example.com/2026/33/app/base-1.tn"
+            !!id:"https://schemas.example.com/2026/34/app/derived-1.tn"
+            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!import:"https://schemas.example.com/2026/34/app/base-1.tn"
             { boxed => { sku: sku_code } }""";
 
     private HttpServer server;
@@ -53,9 +53,9 @@ class TsonHttpSchemaSourceConcurrencyTest {
     void startServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         base = "http://127.0.0.1:" + server.getAddress().getPort();
-        serve("/2026/33/app/order-1.tn", SCHEMA);
-        serve("/2026/33/app/base-1.tn", BASE);
-        serve("/2026/33/app/derived-1.tn", DERIVED);
+        serve("/2026/34/app/order-1.tn", SCHEMA);
+        serve("/2026/34/app/base-1.tn", BASE);
+        serve("/2026/34/app/derived-1.tn", DERIVED);
         server.start();
     }
 
@@ -87,7 +87,7 @@ class TsonHttpSchemaSourceConcurrencyTest {
     @Test
     @Timeout(120)
     void concurrentFirstFetchesOfOneIdentityAllSucceed() throws Exception {
-        String reference = "https://" + HOST + "/2026/33/app/order-1.tn";
+        String reference = "https://" + HOST + "/2026/34/app/order-1.tn";
         Queue<Throwable> failures = new ConcurrentLinkedQueue<>();
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(THREADS);

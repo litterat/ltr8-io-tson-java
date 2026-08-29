@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/33/m/meta-resolved.tn"
-!!schema:"https://tson.io/2026/33/m/meta-kernel.tn"
+!!id:"https://tson.io/2026/34/m/meta-resolved.tn"
+!!schema:"https://tson.io/2026/34/m/meta-kernel.tn"
 @doc:"""
-  Resolver-output fixture for meta.tn (2026 Revision 33 draft).
+  Resolver-output fixture for meta.tn (2026 Revision 34 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
   Conventions as in meta-kernel-resolved.tn.
 
@@ -153,7 +153,7 @@
     ] }
   }
 
-  @doc:"Time constraint vocabulary. Instance is `time` in core."
+  @doc:"Time constraint vocabulary. Instance is `time` in core. `precision` bounds fractional-second digits (at most N, on the written token)."
   time_type => !type_definition {
     kind: ATOM
     constructor: true
@@ -163,11 +163,10 @@
       !record_field { name: min               type: value    state: OPTIONAL }
       !record_field { name: max               type: value    state: OPTIONAL }
       !record_field { name: precision         type: integer  state: OPTIONAL }
-      !record_field { name: require_timezone  type: boolean  state: OPTIONAL }
     ] }
   }
 
-  @doc:"Datetime constraint vocabulary. Instance is `datetime` in core."
+  @doc:"Datetime constraint vocabulary. Instance is `datetime` in core. `precision` as for `time_type`."
   datetime_type => !type_definition {
     kind: ATOM
     constructor: true
@@ -177,7 +176,6 @@
       !record_field { name: min               type: value    state: OPTIONAL }
       !record_field { name: max               type: value    state: OPTIONAL }
       !record_field { name: precision         type: integer  state: OPTIONAL }
-      !record_field { name: require_timezone  type: boolean  state: OPTIONAL }
     ] }
   }
 

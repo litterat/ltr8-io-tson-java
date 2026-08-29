@@ -26,8 +26,8 @@ class TemplateRegularityTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/regularity.tn"
-                !!meta:"https://tson.io/2026/33/m/meta.tn"
-                !!import:"https://tson.io/2026/33/m/core.tn"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
+                !!import:"https://tson.io/2026/34/m/core.tn"
                 {
                   box => <T> { v: T }
                 %s
@@ -122,7 +122,7 @@ class TemplateRegularityTest {
      * late one on an incorrect schema, so the check runs where the shape is unambiguous.
      *
      * <p>An unapplied template getting no verdict is the design's own position, not a shortfall it tolerates
-     * -- {@code SPEC-FEEDBACK.md} #5: "an unapplied template is checked no further and gets no verdict".
+     * -- §5.10: "an unapplied template is checked no further and receives no verdict".
      * `head: T` is not decoration: without it the parameter's only use would have been the missing argument
      * list, and the unused-parameter rule -- which *is* answerable from a held body -- fires first.
      */

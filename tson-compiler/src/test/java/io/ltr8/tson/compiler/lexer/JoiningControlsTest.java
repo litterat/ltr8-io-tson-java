@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * UTS #39 §3.1.1.1's three contexts, as an identifier rule ({@code SPEC-FEEDBACK.md} #14).
+ * UTS #39 §3.1.1.1's three contexts, as an identifier rule ([TSON-DATA] §7.7 rule 2).
  *
  * <p><b>Every string here is built from code points</b>, never typed: a joiner is invisible, so a literal
  * would be unreviewable and one careless paste from asserting nothing. The names say which script and which

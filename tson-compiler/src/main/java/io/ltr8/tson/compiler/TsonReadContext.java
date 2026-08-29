@@ -162,8 +162,8 @@ public interface TsonReadContext {
      *
      * <p><b>{@code tokenPolicy} is required rather than defaulted, and that is the point of its being a
      * parameter.</b> This is where every read converges, so a policy defaulted here would be one any caller
-     * could drop by saying nothing -- and {@code SPEC-FEEDBACK.md} #3 argues a security policy should be
-     * weakenable only in a way that leaves something to grep for. Naming
+     * could drop by saying nothing -- and [TSON-DATA] §8.2 requires that a relaxation be a code decision,
+     * greppable and attributable rather than ambient. Naming
      * {@link TsonUnicodePolicy#unrestricted()} is a fine answer, and the right one for a source whose events
      * did not come from document text; it is just not an answer a caller gives by accident.
      *

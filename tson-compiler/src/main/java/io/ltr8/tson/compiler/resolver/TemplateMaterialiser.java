@@ -154,7 +154,7 @@ final class TemplateMaterialiser {
     private final BiConsumer<String, TypeDefinition> publish;
 
     /**
-     * How a closed {@code instance_template} becomes an ordinary constructor body -- the constructor's own
+     * How a closed held body becomes an ordinary constructor body -- the constructor's own
      * compiled reader, the same one a written {@code !array { ... }} binds through. Using it is what makes
      * {@code min_items: "two"} an ordinary read error rather than a check this class would have to grow: the
      * bindings a template defers are exactly the ones a closed instance has always had checked for it.
@@ -388,10 +388,10 @@ final class TemplateMaterialiser {
     // ── Closing an open instance (§5.10, D7) ─────────────────────────────────────────────────────
 
     /**
-     * The entry an application of an <b>open instance</b> denotes -- a template whose body is an {@code
-     * instance_template} rather than a record. Substituting turns its bindings concrete, and the result is no
-     * longer a template at all: it is the constructor body those bindings always described, so it is bound
-     * through that constructor's own reader and the entry carries an ordinary body.
+     * The entry an application of an <b>open instance</b> denotes -- a template whose held body is a
+     * constructor application rather than a record. Substituting turns its bindings concrete, and the result
+     * is no longer a template at all: it is the constructor body those bindings always described, so it is
+     * bound through that constructor's own reader and the entry carries an ordinary body.
      *
      * <p><b>Two entries come out of it, because one cannot carry two identities.</b> The body itself is a
      * closed <em>synthetic</em>, named for the form and sourced to the constructor it builds (§8.2) -- an

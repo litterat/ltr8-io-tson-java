@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * UTS #39 §5.2's restriction levels, as a policy a caller holds ({@code SPEC-FEEDBACK.md} #3 Step 4).
+ * UTS #39 §5.2's restriction levels, as a policy a caller holds -- [TSON-DATA] §8.2's mechanism 3.
  *
  * <p><b>Two axes, not one ladder.</b> A <em>level</em> says which script combinations a unit may contain; a
  * <em>unit</em> says whether that level applies to the whole text or to each {@code _}/{@code -} delimited

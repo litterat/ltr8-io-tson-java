@@ -221,7 +221,8 @@ public final class TsonConfig {
 
     /**
      * The UTS #39 §5.2 restriction level applied to every name a schema declares -- type names, record field
-     * names, parameter names and enum members ({@code SPEC-FEEDBACK.md} #3 Step 4).
+     * names, parameter names and enum members -- [TSON-DATA] §8.2's mechanism 3, over the schema-layer
+     * scopes [TSON-SCHEMA] §11.4 names.
      *
      * <p>The default is {@link TsonUnicodePolicy#highlyRestrictive()} over a whole name: the strictest of §5.2's
      * practically deployable levels, and one it <em>names</em>, so the default is a position two
@@ -255,7 +256,7 @@ public final class TsonConfig {
 
     /**
      * UTS #39 §5.2 over <b>every token a read pulls off the stream</b>, values included
-     * ({@code SPEC-FEEDBACK.md} #3 Step 4b) -- {@link #identifierPolicy}'s peer on the other surface.
+     * ([TSON-DATA] §8.2's "Values") -- {@link #identifierPolicy}'s peer on the other surface.
      * Defaults to {@link TsonUnicodePolicy#unrestricted()}, which checks nothing.
      *
      * <p><b>The default is the opposite of the identifier default, for the same reason in each case.</b> A

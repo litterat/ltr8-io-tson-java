@@ -19,8 +19,8 @@ import java.util.Set;
  * collection, so a parameter inside {@code variants}/{@code elements}/{@code members} has nowhere to go.
  * Holding the written form instead makes substitution one rule at every depth -- rewrite the tokens that
  * resolve into {@code parameters} -- and defers binding against constructor vocabulary to materialisation,
- * the one moment it is decidable. {@code SPEC-FEEDBACK.md} #5 carries the full argument; this is a deliberate
- * divergence from Revision 33's {@code instance_template}, implemented here as proof for the next revision.
+ * the one moment it is decidable. [TSON-SCHEMA] §5.10's "Held bodies" is that rule, and §8.1 states the
+ * output form.
  *
  * <p><b>Why it is an interface declared here.</b> The held form is {@code tson-compiler}'s own schema AST, and
  * {@code tson-compiler} depends on {@code tson-schema}, not the reverse -- so this module declares the seat
@@ -32,9 +32,8 @@ import java.util.Set;
  * <p><b>It has no name of its own, by construction.</b> The implementation carries {@code @Transparent}, so
  * a written body is the application it holds and the carrier appears nowhere in it -- there is no type-ref
  * for a name to occupy, and one declared here would be inert in any case ({@code tson-bind} reads a class's
- * own annotations, not its interface's). Whether an open body <em>is</em> a {@code !template} -- a type the
- * kernel would declare, with this as its bound class -- remains open ({@code SPEC-FEEDBACK.md} #5), but what
- * a body <em>writes</em> no longer waits on it.
+ * own annotations, not its interface's). §8.1 wants exactly that: an open body needs no kernel vocabulary of
+ * its own, because it is never read as a {@code type_definition} value.
  *
  * <p><b>It never serialises.</b> An open entry's resolved form is its declaration round-tripped, not a
  * {@code type_definition} value -- which could not carry it in any case, the kernel declaring {@code body:

@@ -99,7 +99,8 @@ conforming implementations can disagree about a code point assigned between two 
 
 **One open question.** Whether `!duration` accepts ISO 8601's alternative `PnW` week form is genuinely
 ambiguous — §5.4's table shows only `PnYnMnDTnHnMnS`. This implementation rejects `PnW` as the more
-conservative of the two readings, not a confident call — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #1.
+conservative of the two readings, not a confident call — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #1, which
+Revision 34 leaves open.
 
 **`toTson`'s round trip is intentionally lossy in a few specific, documented ways.** It's a debugging
 tool, not a guaranteed-lossless serializer: a `!typeName` type-ref is only re-emitted where a value

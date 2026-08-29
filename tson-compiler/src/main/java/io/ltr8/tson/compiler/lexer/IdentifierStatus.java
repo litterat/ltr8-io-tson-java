@@ -12,10 +12,9 @@ import java.util.Arrays;
  * unlike a restriction level, this is per-character with no cross-script judgement in it, so it does not
  * reject a mixed-script name such as {@code id_}<i>пользователя</i>.
  *
- * <p>It also <b>subsumes [TSON-DATA] §7.1's hand-picked ZWNJ/ZWJ exclusion</b>, which is a single instance of
- * a rule UTS #39 states generally: both joiners are Restricted here, so a profile built on this needs no
- * special case for them (see {@code SPEC-FEEDBACK.md} #3 Step 5, and #14 for why §7.1's own exclusion sits
- * awkwardly against its set algebra).
+ * <p>It is <b>[TSON-DATA] §8.2's mechanism 2</b>, and it covers the joining controls without a special case:
+ * both are Restricted here, so a profile built on this needs no hand-picked rule for them, and what admits
+ * them where they do shaping work is §7.7 rule 2's contextual carve-out rather than the status.
  *
  * <p>This is the <b>name</b> profile's rule, not the token profile's: an unquoted <em>value</em> in a
  * historic script stays legal, because a value's content is its own.

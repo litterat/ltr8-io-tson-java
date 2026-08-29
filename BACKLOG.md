@@ -50,18 +50,18 @@ own prose (which had gone stale on at least one of them):
 ## Open form: the held template body
 
 An open entry's body is the constructor application as written, held unread until materialisation
-substitutes its parameters away — `docs/schema-resolution.md` describes it, `SPEC-FEEDBACK.md` #5 and #7 are
-the proposals it answers. What is left below are consequences of holding, not shapes outside it.
+substitutes its parameters away — §5.10's "Held bodies", with §8.1 giving the output form and §8.3 the open
+alias. `docs/schema-resolution.md` describes the implementation. What is left below are consequences of
+holding, not shapes outside it.
 
 - [ ] **A parametric enum member is classified as a type argument and fails.** `e => <M> !enum { members:
   [a b M] }` applied as `e<c>` reports `'e<c>' source has an unresolved reference 'c'`: an unquoted
   non-numeric argument rides the reference channel (§12.1's own `type-arg` rule) and `c` is an enum member,
-  not a type. §5.10 settles a parameter's kind from its *use*, and an enum member position is a use nothing
-  recognises as a value channel. Same root as the argument-kind finding above — a held body has no slot
-  types — so the two want settling together. `SPEC-FEEDBACK.md` #5 now carries it as the one position where
-  holding gives a *wrong* verdict rather than a late one, and names the two spec-side answers: make
-  `enum.members` a value channel in §5.10's kind table, or require the quoted spelling `e<"c">`. Which one
-  lands decides what is built here, so this waits on the revision rather than on effort.
+  not a type. §5.10 answers it outright — an argument is "substituted as a token and read by the position it
+  lands in", and "in an enum's member list it is a member", with this exact application as the spec's own
+  example — so the fix is to stop deciding an argument's channel at the application and let the position it
+  lands in decide, which is what a held body already makes possible. The one position where holding gives a
+  *wrong* verdict rather than a late one.
 - [ ] **Two entries for one type, where both lift channels produce the same form.** A closed lift hashes the
   *unclosed* binding record at desugar; the open lift hashes the *closed* one at materialisation — so
   `[box<text>]` written directly and `[box<T>]` closed with `T := text` land on different names. D6
@@ -73,9 +73,9 @@ the proposals it answers. What is left below are consequences of holding, not sh
   resolution that re-derives each synthetic's name from its resolved record and merges collisions — not a
   patch to naming. **Re-derive from resolved references only, leaving value tokens as written**: the two
   splits live in different channels of one derived name, so a pass that normalised the whole resolved record
-  would reach into the value channel `SPEC-FEEDBACK.md` #4 owns. **Disclosed in `SPEC-FEEDBACK.md` #5**, which asks Revision 34 to say whether D6's merge
-  is required or incidental — an implementation reading it as an optimisation skips it and gets the second
-  entry. The simple case does agree and is pinned
+  would reach into the value channel §8.2 keeps as written. **§8.2 makes the merge required, not an
+  optimisation**, and names this exact split — `[box<text>]` written directly against `[box<T>]` closed with
+  `T := text` — so this is no longer a judgement call. The simple case does agree and is pinned
   (`ContainerSugarEndToEndTest.aFormClosedFromATemplateIsTheSameEntryADirectOneProduces`): only an element
   that is itself an application splits, the closed lift hashing the binding record before its inner
   application is rewritten.
@@ -107,16 +107,6 @@ the proposals it answers. What is left below are consequences of holding, not sh
       family has no CIDR parser.
     - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
       than moving the value model's dependencies.
-- [ ] **`precision` and `require_timezone` are carried but not enforced** (`datetime`/`time`). The bodies
-  declare them — a field with no component is one this model silently loses — and the parsers refuse to
-  *read* against a schema that sets either, so the facet is a stated gap rather than a constraint quietly
-  not applied. The refusal is at read, not at load: such a schema resolves, links and compiles clean, and
-  the first document to reach the field gets `ErrorReader`'s gap and exit 70 — so it lands on whoever sends
-  data, not on the author who wrote the facet. What
-  remains is enforcement, and both halves wait on a spec answer rather than on effort: `SPEC-FEEDBACK.md` #9
-  asks what `precision` bounds (exactly N fractional digits or at most N, at the token or the value, reject
-  or truncate) and whether `require_timezone` can mean anything beside a `spec` fixed to RFC 3339, which
-  requires the offset on every value these atoms accept. Which answers land decide what is built here.
 
 ## Schema-side diagnostics
 
@@ -138,9 +128,9 @@ that question.
   whether a schema governs the document, and on the schema side a caller cannot tell a spoofing refusal from an
   ordinary schema error. Both halves want a code that says which rule fired — the confusable relation and the
   restriction level are different rules with different remedies, and neither is a statement that the schema is
-  malformed. `SPEC-FEEDBACK.md` #3 argues the distinction is normative, not cosmetic: a hygiene refusal is this
-  processor declining a schema, where a validity error is the schema being wrong, and only the second is
-  portable. Worth doing whatever the spec settles on.
+  malformed. [TSON-DATA] §8.1 now makes the distinction normative: a policy refusal is "a fifth,
+  distinguishable outcome" and MUST NOT be reported in any of the four error categories, and §8.2 requires the
+  refusal to name the UTS #39 data version. So this is a conformance gap, not a polish item.
 
 - [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
   now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against
@@ -170,6 +160,7 @@ that question.
     "which document declared this entry", and every reader is already handed its own declaration's location
     (`ValueReaderContext.locationOf`) — today only used as the seed for a value nothing encloses. A caused-by
     frame is what would consume it in the ordinary nested case.
+
 ## Write side
 
 The read/write matrix in the README makes the asymmetry plain: the read side has a schemaless→object
@@ -184,7 +175,7 @@ surface.
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
-  — the Revision 33 fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
+  — the fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
   renders none of them, so the entries would compare equal for the wrong reason;
   `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
   test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
@@ -212,9 +203,6 @@ surface.
   TSON without first building a whole tree or object — the write-direction peer of `TsonDataStream`. Closer
   than it was: the emitter now writes into any `Appendable`, so what is missing is the decision to make it
   (or an event-shaped facade over it) public API, not the streaming underneath.
-- [ ] A JSON writer (TSON data → valid JSON text) — the write-direction companion to
-  `STRUCTURED-OUTPUT.md`'s "JSON compatibility" section, tracked here alongside the general writer
-  since it's the same underlying gap (no schema-aware writer exists at all yet).
 
 ## Conformance test suite
 
@@ -255,12 +243,6 @@ Part 2, and the thin parts of Part 1.
   source. The corpus's CI is stdlib-only on purpose — an implementation-neutral corpus should not
   build one of the implementations under test — so this wants a published CLI to `npx`, which neither
   implementation has yet.
-- [ ] **Run the JSON front-end against the established JSON Parsing Test Suite** when it lands (the
-  `TsonJsonParser` tracked in `STRUCTURED-OUTPUT.md`). JEP 540 commits to exactly this for the JDK's own
-  parser — its own unit tests *plus* that external corpus, "which contains numerous edge-case inputs" —
-  and the reasoning is the same one the sibling corpus exists for: an external, language-agnostic
-  fixture set catches drift a self-authored suite agrees with. Cheap, since the corpus is pass/fail on
-  parse and the front-end's whole job is RFC 8259 conformance.
 
 ## Documentation
 
@@ -299,14 +281,6 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   `null` for both readings and `RecordTreeReader.putField` omits a `null`. Bind mode needs its own answer first
   — a Java component has no third state between "null" and "not there" — since the tree's answer should not be
   the one that happens to be reachable.
-
-- [ ] **Decide what `{}` means at an array or tuple position.** `TYPE_MISMATCH` today
-  (`ArrayAbstractReader.expectArrayStart`, `TupleAbstractReader.expectTupleStart`), which follows
-  [TSON-SCHEMA] §7.7's enumeration — "an empty record or empty map per the expected type" — and not
-  [TSON-DATA] §2.8's "the empty container of that type". `SPEC-FEEDBACK.md` #11 carries the inconsistency and
-  the reading built here; the work is whichever answer it closes on. If an empty brace becomes an empty array,
-  it has to reach `validateSize` on the way, the way `MapAbstractReader.expectMapShape` already routes it —
-  the funnel exists because the count went missing the last time a container grew an empty branch of its own.
 
 - [ ] Thread-safety **outside a read**. Concurrent *reads* through one `Tson` are safe and tested
   (`ReadPathConcurrencyTest`): the compiled readers are immutable, a `Lexer`/`TsonDataStream` is per read,
