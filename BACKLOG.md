@@ -374,6 +374,14 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
     - **Not configurable, deliberately**: skeleton distinctness (no false positives, nothing to relax),
       `Identifier_Status` as its own switch (it is what level 6 turns off), and severity — the levels are
       the severity, and a report-but-accept mode would be non-conforming while looking like a setting.
+    - **The same ladder belongs on values, defaulting to Unrestricted.** A value is unconstrained beyond the
+      token profile if unquoted and entirely unconstrained if quoted, so `аdmin` with a Cyrillic а can be a
+      *value* where it cannot be a name — the surface an application faces when it matches a value against a
+      list or renders it. Skeleton distinctness cannot help there: values form no set the rule could hold
+      over, which is exactly the setless case the restriction level exists for. Default Unrestricted because
+      data may legitimately be anything, so the default also costs nothing at read time — no scan runs.
+      Levels 5 and 6 collapse on this surface, `Identifier_Status` being a name rule (§5.2 says so).
+      Suggested surface: `nameScripts(...)` / `valueScripts(...)` over one `ScriptPolicy`, sketched in #3.
     - **The relaxation must be expressed in code, never in the environment.** A policy read from an env var
       is ambient authority: a CI config, a container image or a dependency calling `setenv` changes it with
       no diff and nothing in review, it is invisible at the call site, and it is process-global so an

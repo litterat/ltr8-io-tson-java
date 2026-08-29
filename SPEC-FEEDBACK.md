@@ -717,6 +717,60 @@ configuration hold two contradictory answers. And no severity knob: the levels *
 conforming position, where a report-but-accept mode would make the processor non-conforming while looking
 like a setting.
 
+**Step 4b — the same levels belong on values, and there the restriction level is the *only* mechanism.**
+Everything above constrains names. A **value** is unconstrained beyond §7.1's token profile if unquoted, and
+entirely unconstrained if quoted — so `аdmin` with a Cyrillic а can be a *value* wherever it cannot be a
+name. That matters: an application comparing a value against a blocklist, or rendering it to a user, faces
+the same spoofing surface §9.4 raises for names, and nothing in the series speaks to it.
+
+**Why the mechanism has to be the restriction level here, having been the wrong choice for names.** Step 2
+prefers skeleton distinctness because it is a *relation* and TSON can name the sets it holds over. Values
+have no such sets: two values in one array are not required to be distinguishable, and two values in
+different documents cannot be compared at all. So the argument that made the restriction level second-best
+for names — that a better, set-based rule was available — does not apply, and the per-string mechanism is
+what remains. This is the same reasoning that makes restriction levels right for a browser judging a domain
+name (#3's own comparison), applied to the one surface in TSON that is likewise setless.
+
+**The default must be the opposite of the names default.** A value is data, and data may legitimately be
+anything: `{ note: "Ωmega" }`, a Greek quotation, a Cyrillic display name. So **Unrestricted for values,
+Highly Restrictive for names** — the same ladder, opposite ends, for the same reason in each case. A service
+that renders untrusted values, or matches them against a list, raises the value level knowingly; nothing is
+imposed on a format that mostly carries ordinary data.
+
+**Two consequences worth stating.** Levels 5 and 6 collapse on the value surface — §5.2 says so directly
+("where there is no such identifier profile, Levels 5 and 6 are identical"), and `Identifier_Status` is a
+name rule, so a value has no identifier profile to drop. And the default costs nothing at read time: at
+Unrestricted there is no scan, so a format that carries ordinary data pays for none of this.
+
+**A suggested configuration surface**, one ladder offered twice:
+
+```java
+// The defaults, written out. Tson.builder().build() gives exactly this.
+Tson tson = Tson.builder()
+        .nameScripts(ScriptPolicy.highlyRestrictive())   // §5.2 level 3, whole name
+        .valueScripts(ScriptPolicy.unrestricted())       // data is data
+        .build();
+
+// Relaxing names: reach for the unit before the level. Per-segment still refuses
+// every within-word homograph, and admits id_пользователя and alpha_α.
+        .nameScripts(ScriptPolicy.highlyRestrictive().perSegment())
+
+// Narrower still, where a deployment knows what it is:
+        .nameScripts(ScriptPolicy.highlyRestrictive().permitting(LATIN, CYRILLIC))
+
+// The two "off" positions, named apart so neither is reached by accident:
+        .nameScripts(ScriptPolicy.scriptsUnchecked())    // level 5 — identifier profile kept
+        .nameScripts(ScriptPolicy.unrestricted())        // level 6 — profile dropped too
+
+// Tightening values, for a service that renders or matches them:
+        .valueScripts(ScriptPolicy.moderatelyRestrictive())
+        .valueScripts(ScriptPolicy.asciiOnly())
+```
+
+`ScriptPolicy` carries the level, the unit and any additional permitted script sets; `perSegment()` and
+`permitting(…)` return a modified copy, so a call site reads as one position rather than three settings.
+Every method is a *code* path, never an environment variable, for the reasons below.
+
 **On how an implementation should let it be relaxed**, since a normative rule with no escape hatch invites
 worse ones: **not through the environment.** A security policy read from an environment variable is ambient
 authority — a CI config, a container image, a shell wrapper or a dependency calling `setenv` changes it with
