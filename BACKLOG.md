@@ -220,17 +220,10 @@ surface.
 
 The corpus states its own contract now: `schemas/*.tn` (field groups, so an outcome cannot appear
 without its payload), `RUNNER.md` (normative for runners), and a `class1/`/`class2/` split. Both
-implementations pin it to a commit, and this repo runs it as a gating CI step. What is left is
-everything above Part 1.
+implementations pin it to a commit, and this repo runs it as a gating CI step. `class1/` covers the
+lexer, the parser, base type resolution, the built-in vocabulary and the reader. What is left is
+Part 2, and the thin parts of Part 1.
 
-- [ ] **A `reader` layer**, the cheaper of the two missing ones. The existing buckets stop below the
-  readers: §1.2 makes *neither* tier dedupe fields or keys, resolve an empty brace, or interpret token
-  text, so every §2.5/§2.6 rule the readers actually enforce has nowhere to be tested from outside —
-  duplicate fields, duplicate keys, NFC name identity, `{}` as the empty container of its type, the
-  absent sentinel. A `lexer`- or `parser`-bucket vector cannot fail on them: the parser accepts
-  `{ a: 1  a: 2 }` by design. The bucket wants `SchemalessTreeReader` behind it, that being the layer
-  where a Class 1 document gets its verdict, and the expected side can reuse the parser layer's own
-  document shape, post-reader.
 - [ ] **The Class 2 layers, over the spec's own §8 resolver output.** Part 2 §1.3 makes producing a
   resolved schema value a MUST and §8 fixes its serialization, so a `class2/schema/valid/` vector needs
   no invented format: the subject is a schema document and the sidecar's payload is the resolved output,
