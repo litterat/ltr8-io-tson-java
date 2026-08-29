@@ -12,10 +12,10 @@ import io.ltr8.tson.schema.meta.Token;
  * type_argument}'s value channel is bound to a {@link Token}, because §5.10 describes a type argument's
  * literal as a bare token rather than as the value it denotes, and a decoded host object cannot fill one.
  *
- * <p><b>What that choice costs is real and is not this class's to settle.</b> Identity is derived from the
- * token, so {@code vector<float32, 255>} and {@code vector<float32, 0xFF>} are two applications where §4
- * makes them one number -- see {@code SPEC-FEEDBACK.md} #4, which puts the disagreement to the spec: the
- * same slot is called a bare token in the prose and typed {@code value} in the kernel.
+ * <p><b>Keeping the spelling is what §8.2 asks for, and it does not cost identity.</b> A value argument is
+ * "recorded as written" so output round-trips it, while identity compares the value the token denotes under
+ * §4 -- so {@code vector<float32, 255>} and {@code vector<float32, 0xFF>} stay one application. The
+ * comparison is {@code NumericIdentity}'s, not this class's; this one only declines to decode.
  *
  * <p>Selected per slot rather than per type, by the bound component's own Java type -- see {@code
  * GroupUnionBindReader}. A {@code value}-typed field bound to anything else keeps {@link ValueParser}.

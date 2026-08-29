@@ -22,7 +22,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   `-foo`) which the number rule let through. Field names are the one naming position the parser leaves
   alone: `field-name` stays lexical for the Class 1 reason (`docs/lexer-and-data-parsing.md`), and
   `DefinitionResolver.requireIdentifier` applies the contract to the ones a declaration actually binds.
-  `SPEC-FEEDBACK.md` #3 Step 1b.
+  §12.1's `type-name = identifier` states it, and its note carries the field-name half.
 - **`SchemaMap.declarations` is a `Map<String, Declaration>`** (a `LinkedHashMap`, insertion order
   preserved) — §3.4.1's Pass 1 shape and the schema's own `{type_name => type_definition}`. A duplicate
   name overwrites, same "grammar layer doesn't dedupe" treatment the data grammar gives duplicate fields.
@@ -40,15 +40,15 @@ materialization, no validation (those are the resolver's/linker's jobs).
     deliberate grammar-layer deferral, classified at a later semantic layer.
 - **A `!` head behind a parameter list is the same production as one without** (§12.1's `instance =
   [type-params] "!" type-name ws core-value`) -- `vector => <T, N> !array { element_type: T  min_items: N }`.
-  Revision 33 gave it a production of its own, `instance-template`, over a payload narrower than a
-  `core-value`; that is gone with the vocabulary that motivated it (`SPEC-FEEDBACK.md` #5). `Instance` carries
+  §12.1 has one production for both, and its own note says so: "`!` opens an `instance`, with or without a
+  preceding `<…>`". `Instance` carries
   the parameter list, and `parseTypeDef` reads that list *before* dispatching on `!` -- one token then
   decides.
   - **The payload is a `core-value`, and nothing narrower.** An open entry's body is held rather than read
     against its constructor's vocabulary until materialisation substitutes, so there is no per-slot quotation
     to constrain it and a collection payload is as ordinary as a scalar one: `<T> !choice { variants:
-    [T error] }` parses and resolves, where Revision 33's `template-def` refused it: its `template_argument`
-    vocabulary had no collection case. Both it and `instance_template` are gone from the kernel here.
+    [T error] }` parses and resolves, which is §5.10's "collection-valued slots are parameterizable". The
+    kernel declares no `template_argument` or `instance_template` for a quotation to need.
   - **What it cannot spell is an application**, and neither can a closed instance: `!array { element_type:
     box<text> }` is not a `core-value`, in either form. That line falls where the grammars already divide --
     a *type* position is schema grammar and takes `box<text>` directly, while `!C value` takes data, so an
@@ -231,8 +231,8 @@ rebuilt and called a cache.
   the state and both bounds on one binding record, which is the shape the whole table is now written in. The
   read side needed nothing: `ArrayAbstractReader` already admitted `_` under `ElementState.OPTIONAL` and
   already counted it toward the bounds. **A map's value takes the same `?`** and binds the same field —
-  `map` carries an `element_state` here, which the published Revision 33 kernel does not (`SPEC-FEEDBACK.md`
-  #12) — so `{K => V}` means what `[T]` means and an author who wants absence writes it. The *key* takes
+  `map` carries an `element_state` for it (§5.3's `{K => V?}` row) — so `{K => V}` means what `[T]` means
+  and an author who wants absence writes it. The *key* takes
   none and never will: §2.9 forbids an absent key outright, so there is no state for a marker to bind.
 - **The size specifier is one rule over the `min_items`/`max_items` pair, for arrays and maps alike.** There
   is no template in between: the kernel's `array_min`/`array_max`/`array_ranged` are deleted, and each of the
@@ -308,14 +308,13 @@ rebuilt and called a cache.
       and `NumericIdentity` applies [TSON-DATA] §4.3's equivalence there, so `<255>` and `<0xFF>` are one
       application — radix, digit separators and a redundant sign falling away, and a float's written scale
       with them, while the base-type line does not (`1` is an integer and `1.0` a float under §4, so those
-      stay two). `SPEC-FEEDBACK.md` #4 carries the question to the spec, which has not settled it.
-  - **All four sugar forms lift open, collections included.** `tuple` and `choice` bind a collection
-    (`elements`, `variants`), which Revision 33 could not represent: its `template_argument` was
-    `param | value | type_ref` with no collection case, so `<T> { v: (T | text) }` was refused at the
-    declaration that wrote it (§5.10, "a deliberate boundary of this revision"). A held body is not read against that vocabulary at
-    all until materialisation substitutes, so a parameter inside a collection is a token inside an array and
-    lifts like any other. `SPEC-FEEDBACK.md` #5 carries the argument; this is a deliberate divergence from
-    Revision 33, implemented as proof for the next.
+      stay two). §8.2 states exactly that split: recorded as written, compared as the value the token
+      denotes under §4, "and no wider".
+  - **All four sugar forms lift open, collections included** — §5.10's "collection-valued slots are
+    parameterizable". `tuple` and `choice` bind a collection (`elements`, `variants`); a held body is not
+    read against the constructor's vocabulary at all until materialisation substitutes, so a parameter
+    inside a collection is a token inside an array and lifts like any other, `result => <T> ( T | error )`
+    being the spec's own example.
   - **The open form is the closed form**, which is what removed the per-slot analysis: one binding record
     serves both, since a parameter in a slot is simply the token standing there. `instance(binding,
     typeParams)` builds either, and the phase needs no rule for how to quote a parameter — only for whether

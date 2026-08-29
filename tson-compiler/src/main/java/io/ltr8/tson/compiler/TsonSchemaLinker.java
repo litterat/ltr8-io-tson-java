@@ -88,9 +88,9 @@ import java.util.Set;
  *
  * <p><b>Type-parameter exception:</b> a bare name is valid if it resolves in the schema's own
  * namespace, or if it's one of the checked entry's own declared {@code parameters} -- load-bearing
- * for every declaration that takes type parameters -- a user template ({@code box => <T> { v: T }}) and
- * the {@code instance_template} forms lifted from one -- whose own {@code source}/body positions reference
- * their own type parameter by bare name, not a real other entry.
+ * for every declaration that takes type parameters -- a user template ({@code box => <T> { v: T }}) and the
+ * open synthetics lifted from one -- whose own {@code source}/body positions reference their own type
+ * parameter by bare name, not a real other entry.
  *
  * <p><b>{@code !!import} merging (Part 2 §2.2.3).</b> The final namespace a schema is checked
  * against is built in two stages, in this order: (1) every {@code !!import}'s whole namespace, in
@@ -197,8 +197,9 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * §9.4's confusability, over the closed sets this schema actually defines ({@code SPEC-FEEDBACK.md} #3
-     * Steps 2–3): the merged namespace, and each entry's own field names, enum members and choice variants.
+     * [TSON-DATA] §8.2's name hygiene over the schema-layer scopes [TSON-SCHEMA] §11.4 names: the merged
+     * namespace, and each entry's own field names and enum members. A choice's variants are deliberately not
+     * a scope -- see the comment at the switch below.
      *
      * <p><b>The namespace check runs over {@code merged}, which is the point.</b> §2.2.3 already requires
      * imported names be "disjoint from each other and from local entries", and that disjointness is exact
@@ -1307,8 +1308,8 @@ public final class TsonSchemaLinker {
      * count or variant list -- a rule an author has to compute rather than remember. One line settles it
      * instead: a fixed or default value is available on a scalar-typed field and nowhere else. §5.6 is a
      * spelling rule for data values, not a claim that a record <em>is</em> a token, and this reads §5.2's
-     * "the value must be the field's declared type" as requiring a type a token denotes directly.
-     * {@code SPEC-FEEDBACK.md} carries the interpretation, since the spec does not settle it outright.
+     * "the value must be the field's declared type" as requiring a type a token denotes directly, which is
+     * what §5.2's "Which fields may carry a value" now states.
      */
     private static TsonSchemaValidationException notAScalarType(String entryName, RecordField field,
                                                                  Token value, Top body) {
@@ -1388,8 +1389,8 @@ public final class TsonSchemaLinker {
      * called {@code box} beside a template of that name. An application is a distinguishable shape in the
      * wire tree; a bare name is not. So that half runs where the reference is unambiguous, on the entry
      * materialisation mints -- and an unapplied template gets no verdict, which is the open form's own
-     * position rather than a shortfall ({@code SPEC-FEEDBACK.md} #5: "an unapplied template is checked no
-     * further and gets no verdict").
+     * position rather than a shortfall (§5.10: "an unapplied template is checked no further and receives no
+     * verdict").
      */
     private static void checkHeldArity(String entryName, TemplateBody held,
             Map<String, TypeDefinition> namespace, List<String> ownParameters) {

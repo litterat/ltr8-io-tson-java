@@ -64,8 +64,9 @@ import java.util.Set;
  * contributes nothing to a written body: {@code tson-bind} resolves it to the held value's own descriptor
  * with a bridge, and {@code TsonObjectWriter} writes no type-ref for it at a {@code Top} position. So a
  * template's body writes as {@code !choice { variants: [T error] }} -- the application it is -- rather than
- * as a wrapper naming a type nothing declares. Whether an open body <em>is</em> a {@code !template} the
- * kernel declares stays {@code SPEC-FEEDBACK.md} #5's to settle; what a body writes no longer waits on it.
+ * as a wrapper naming a type nothing declares -- which is what §8.1 requires: no new kernel vocabulary
+ * carries an open body, {@code type_definition.body} being declared {@code top} and a held body never read
+ * as a {@code type_definition} value at all.
  *
  * <p><b>Which costs the tag a reader would dispatch on, and nothing that depends on it.</b> A transparent
  * member of a union is selectable only where a position declares it, never by tag -- and a written body is

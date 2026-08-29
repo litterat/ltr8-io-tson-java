@@ -6,9 +6,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * §9.4's confusability, decided over a closed set of names rather than over one name
- * ({@code SPEC-FEEDBACK.md} #3 Step 2): no two names in the same scope may share a UTS #39
- * {@link Confusables#skeleton} .
+ * [TSON-DATA] §8.2's mechanism 1 -- skeleton distinctness, decided over a named scope rather than over one
+ * name: no two names in one scope may share a UTS #39 {@link Confusables#skeleton} .
  *
  * <p><b>Scope is what makes this decidable, and TSON has scopes where a general-purpose language does
  * not.</b> UTS #39's own confusable detection is a relation between strings and so answers nothing about a

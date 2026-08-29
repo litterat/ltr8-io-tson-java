@@ -376,8 +376,8 @@ class TsonSchemaParserTest {
 
     /**
      * The <b>value</b> side does admit it, marking the value OPTIONAL exactly as {@code [T?]} marks an
-     * element -- the {@code state} field the kernel gives {@code map} (issue #227, {@code SPEC-FEEDBACK.md}
-     * #12). §12.3's adjacency rule comes with it, since the value parses through the same {@code
+     * element -- the {@code state} field the kernel gives {@code map} (§5.3, issue #227). §12.3's adjacency
+     * rule comes with it, since the value parses through the same {@code
      * element-type} production every bracket position does.
      */
     @Test
@@ -597,7 +597,7 @@ class TsonSchemaParserTest {
     /**
      * A collection payload parses, which is the whole point of the production being {@code core-value}: a
      * parameter inside {@code variants} or {@code elements} is a token in an array, and the phase that would
-     * have had to classify it does not run until the parameters are gone ({@code SPEC-FEEDBACK.md} #5).
+     * have had to classify it does not run until the parameters are gone (§5.10).
      */
     @ParameterizedTest
     @ValueSource(strings = {

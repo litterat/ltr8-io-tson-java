@@ -24,7 +24,7 @@ import java.util.List;
  * whatever its parameterised body produced, which then failed at read time with the wrong verdict and the
  * wrong vocabulary: {@code box => <T> { v: T }} became an {@link ErrorReader} whose message blamed the
  * linker for not rejecting the parameter {@code T}, and {@code paged => <T> { items: [T] }} reached the
- * lifted synthetic and complained about a missing {@code instance_template} factory -- both exiting on the
+ * lifted synthetic and complained about a constructor factory it could not find -- both exiting on the
  * library's own fault code for a document that is plainly invalid. Refusing the entry itself is one place
  * and covers every position, and the parameters it names in the message are the author's own.
  *

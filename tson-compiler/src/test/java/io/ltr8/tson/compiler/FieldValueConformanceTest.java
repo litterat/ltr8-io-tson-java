@@ -176,9 +176,9 @@ class FieldValueConformanceTest {
      * rule an author computes rather than remembers.
      *
      * <p>So the answer is one line -- <b>a fixed or default value is available on a scalar-typed field and
-     * nowhere else</b> -- and it costs those two spellings. §5.6 is a spelling rule for data values, not a
-     * claim that a record <em>is</em> a token; {@code SPEC-FEEDBACK.md} carries the interpretation, since
-     * this narrows what the reader alone would accept.
+     * nowhere else</b> -- and it costs those two spellings. That is §5.2's "Which fields may carry a value"
+     * verbatim, down to the reason: §5.6 is a spelling rule for data values, not a claim that a record
+     * <em>is</em> a token.
      */
     @Test
     void aRecordOrChoiceTypedFieldIsRefusedEvenWhereAReadWouldAcceptTheToken() {

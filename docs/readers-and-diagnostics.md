@@ -78,8 +78,8 @@ is small and parsed once.)
   its comparison normalises (`Nfc.keyOf`), which is §2.6's "textual identity is the parser's minimum" read
   against a processor that decodes.
 - **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody`
-  carries an `ElementState` governing the value — `{K => V?}`, the kernel field this implementation adds
-  ahead of the spec (`SPEC-FEEDBACK.md` #12) — so `MapAbstractReader.decodedValue` gives the array element's
+  carries an `ElementState` governing the value — `{K => V?}`, §5.3's own row and the `state` field the
+  kernel gives `map` — so `MapAbstractReader.decodedValue` gives the array element's
   two answers: the sentinel under `OPTIONAL`, `FIELD_REQUIRED` under the default `REQUIRED`. It answers
   above the value's own reader, which is right to refuse the sentinel (`_` is a value of no atom type) —
   absence is the container's question, the same place `ArrayAbstractReader` asks it. The entry is present

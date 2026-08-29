@@ -146,8 +146,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     }
 
     /**
-     * A token whose script mix the read's {@code TsonUnicodePolicy} does not permit ({@code SPEC-FEEDBACK.md}
-     * #3 Step 4b, UTS #39 §5.2).
+     * A token whose script mix the read's {@code TsonUnicodePolicy} does not permit ([TSON-DATA] §8.2's
+     * "Values", UTS #39 §5.2).
      *
      * <p><b>No {@code path}, and that is not an omission.</b> The check runs where tokens leave the stream,
      * before any reader has descended into them, which is exactly what lets it see a value and a field name

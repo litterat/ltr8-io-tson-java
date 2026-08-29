@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@link TsonConfig#identifierPolicy} end to end: the level reaches the linker, and each rung of the ladder
- * changes what a schema may declare ({@code SPEC-FEEDBACK.md} #3 Step 4).
+ * changes what a schema may declare ([TSON-DATA] §8.2's mechanism 3, [TSON-SCHEMA] §11.4's scopes).
  *
  * <p>Mixed-script names are built from code points rather than typed — the subject is spellings that look
  * alike, so a literal would be unreviewable.

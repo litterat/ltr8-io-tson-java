@@ -31,12 +31,11 @@ class TsonValidateSchemaTest {
     }
 
     /**
-     * <b>A parameter inside a collection-valued slot is ordinary.</b> Revision 33 refused it at the
-     * declaration -- {@code template_argument} being a typed quotation with no collection case, so a
-     * parameter in {@code variants} or {@code elements} had no open representation to lift to. An open
-     * entry's body is held here instead, uninterpreted until materialisation substitutes, so a parameter in
-     * a collection is a token inside an array and the phase that would have had to quote it does not run.
-     * {@code SPEC-FEEDBACK.md} #5 carries the argument; this is the flagship case it turns on.
+     * <b>A parameter inside a collection-valued slot is ordinary</b> (§5.10). An open entry's body is held,
+     * uninterpreted until materialisation substitutes, so a parameter in {@code variants} or {@code elements}
+     * is a token inside an array and the phase that would have had to classify it does not run --
+     * "collection-valued slots are parameterizable", with {@code result => <T> ( T | error )} as the
+     * spec's own example and this test's flagship case.
      */
     @ParameterizedTest
     @ValueSource(strings = {

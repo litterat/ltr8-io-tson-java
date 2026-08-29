@@ -498,9 +498,9 @@ class RecordTemplateTest {
      * dependency: {@code record_field.value} must be the field's declared type, and {@code text} is not an
      * {@code int32} whether a parameter put it there or the author wrote it literally.
      *
-     * <p>So the two halves of the kind rule are answered by two different rules, which is the finding
-     * {@code SPEC-FEEDBACK.md} #5 carries: the type-position half above by an unresolved reference, this one
-     * by value conformance. Neither needs a held body to know what its slots expected. The residue value
+     * <p>So the two halves of the kind rule are answered by two different rules, which is what §5.10 states:
+     * an argument is "read by the position it lands in" -- the type-position half above by an unresolved
+     * reference, this one by §5.2's value conformance. The residue value
      * conformance does not catch -- a type name applied into a {@code text}-typed value slot -- is a value
      * slot holding a valid value, which is no error to give.
      */

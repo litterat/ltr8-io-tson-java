@@ -259,9 +259,9 @@ all, with no decoder integration required.
 
 - [ ] **A JSON object whose keys are not valid TSON *identifiers* still reads as a record, and fails only
   against a schema.** JSON keys are arbitrary strings: `{"first name": 1}`, `{"": 1}`, `{"42": 1}` are all
-  well-formed JSON objects, and none of those keys is a TSON identifier under the profile proposed in
-  `SPEC-FEEDBACK.md` #3. That costs the JSON front end nothing at Class 1, because #3 deliberately leaves
-  `field-name` lexical — the object is an ordinary record and no routing decision is needed. It surfaces only
+  well-formed JSON objects, and none of those keys is a TSON identifier under [TSON-DATA] §7.7's profile.
+  That costs the JSON front end nothing at Class 1, because §2.5 deliberately leaves `field-name` lexical —
+  the object is an ordinary record and no routing decision is needed. It surfaces only
   under a schema, where no declared field can carry such a name, so the field is `UNRECOGNIZED_FIELD`: an
   ordinary validation mismatch reported at the field, not a parse failure. The thing to get right in
   `TsonJsonParser` is therefore nothing at all — which is the point of recording it, since the tempting

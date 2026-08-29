@@ -86,7 +86,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
 
     /**
      * UTS #39 §5.2's restriction level for declared names, applied by {@link TsonSchemaLinker} wherever a
-     * schema names something ({@code SPEC-FEEDBACK.md} #3 Step 4). Held here because this registry is the
+     * schema names something ([TSON-DATA] §8.2's mechanism 3). Held here because this registry is the
      * one object every resolve and every read already passes through, so a policy set on it reaches both
      * without a second channel.
      *

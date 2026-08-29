@@ -272,7 +272,8 @@ public final class SchemalessTreeReader {
     }
 
     /**
-     * §9.4's confusability over a record's own field set ({@code SPEC-FEEDBACK.md} #3 Steps 2–3). A Class 1
+     * [TSON-DATA] §8.2's name hygiene over a record's own field set -- the one scope it names at the data
+     * layer. A Class 1
      * record is the one naming scope with no declaration behind it: under a schema the check runs once over
      * the declared names and the data conforms by construction, but a schemaless document's fields are named
      * only here, so this is where two names a reader cannot tell apart have to be caught.

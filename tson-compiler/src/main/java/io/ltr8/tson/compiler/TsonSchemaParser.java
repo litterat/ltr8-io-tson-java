@@ -760,9 +760,9 @@ public final class TsonSchemaParser extends TsonDataParser {
      *
      * <p>The value is an {@link #parseElementType}, so {@code {K => V?}} marks it OPTIONAL exactly as
      * {@code [T?]} marks an element -- §12.3's adjacency rule included, rather than restated. The key is not
-     * ({@link #rejectKeyQuestion}). This is [TSON-SCHEMA] §7.6's own permission made sayable: the value is
-     * optional there with no condition attached, which leaves an author unable to require one. See {@code
-     * SPEC-FEEDBACK.md} #12 -- §5.3 still says neither side admits the marker.
+     * ({@link #rejectKeyQuestion}), an absent key being a resolver error ([TSON-DATA] §2.9). §5.3 states
+     * both halves, and §7.6 makes an absent entry value conditional on the map's own value state rather than
+     * unconditionally permitted.
      */
     private MapRef parseMapBody() {
         TypeRef key = parseMapKey();

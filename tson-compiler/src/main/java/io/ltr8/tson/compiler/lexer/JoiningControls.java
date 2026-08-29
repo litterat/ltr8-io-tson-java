@@ -15,11 +15,11 @@ import java.util.Arrays;
  * scripts use both to control conjunct formation. §3.1.1.1 is what tells the two apart, mechanically: a
  * joiner is admitted exactly where it has a shaping effect, and refused where it is invisible.
  *
- * <p>That is the whole argument for implementing it rather than excluding the characters. An exclusion is
- * not neutral -- it makes a class of correct words unspellable as names -- and [TSON-DATA] §7.1's stated
- * remedy ("names whose orthography requires them MUST be quoted") does not work, because §7.1 governs
- * unquoted tokens only, so quoting is precisely the route by which {@code "ad<ZWNJ>min"} reaches a Latin
- * name. It forbids the safe case and permits the attack ({@code SPEC-FEEDBACK.md} #14).
+ * <p>That is the whole argument for the contextual rule rather than an exclusion, and [TSON-DATA] §7.7
+ * rule 2 requires all three conditions for it. An exclusion is not neutral -- it makes a class of correct
+ * words unspellable as names -- and quoting is no remedy, because the token profile governs unquoted tokens
+ * only, so a quoted spelling is precisely the route by which {@code "ad<ZWNJ>min"} would reach a Latin name.
+ * It forbids the safe case and permits the attack.
  *
  * <p><b>The three contexts</b>, transcribed from §3.1.1.1's own regular expressions:
  *

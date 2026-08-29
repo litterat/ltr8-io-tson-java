@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonConfig#tokenPolicy} end to end ({@code SPEC-FEEDBACK.md} #3 Step 4b): the level reaches both
+ * {@link TsonConfig#tokenPolicy} end to end ([TSON-DATA] §8.2's "Values"): the level reaches both
  * facades a {@link Tson} hands out, and its default leaves ordinary data alone.
  *
  * <p>Mixed-script spellings are built from code points rather than typed -- the subject is spellings that

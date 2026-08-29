@@ -6,9 +6,8 @@ import java.util.Map;
 
 /**
  * UTS #39 §4's {@code skeleton()} -- the mapping that decides whether two strings are confusable. Two names
- * are confusable exactly when their skeletons are equal, which is the relation [TSON-DATA] §9.4 asks a
- * processor to consider and {@code SPEC-FEEDBACK.md} #3 Step 2 makes a rule over the closed sets this series
- * already defines.
+ * are confusable exactly when their skeletons are equal, which is the relation [TSON-DATA] §8.2's
+ * mechanism 1 makes a rule over the named scopes the series already defines.
  *
  * <p><b>It is a relation, not a property</b>, and that is why it is the mechanism this implementation
  * adopts rather than a restriction level. A skeleton says nothing about one name: it fires only when two

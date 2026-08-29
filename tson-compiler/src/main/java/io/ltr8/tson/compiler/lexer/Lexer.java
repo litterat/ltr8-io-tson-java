@@ -340,16 +340,16 @@ public final class Lexer {
 
     /**
      * §7.1's {@code Continue = XID_Continue ∪ { - + . }}, as the property states it -- <b>including ZWNJ and
-     * ZWJ</b>, which {@code XID_Continue} contains and which §7.1's prose excludes by name
-     * ({@code SPEC-FEEDBACK.md} #14).
+     * ZWJ</b>, which {@code XID_Continue} contains and which §7.1 admits, relocating their safety rule to
+     * the name layer.
      *
      * <p><b>The token layer follows the property; the name layer applies the contextual rule.</b> A joiner is
      * a token character, so an unquoted <em>value</em> may contain one and its content is its own. Whether a
      * joiner may appear in a <em>name</em> is a different question, and {@code IdentifierParser} answers it
-     * with UTS #39 §3.1.1.1 -- permitted where it has a shaping effect, refused where it is invisible. That
-     * is a sharper rule than the blanket exclusion this used to carry, which forbade Persian
-     * {@code کتاب<ZWNJ>ها} while §7.1's own "MUST be quoted" remedy let {@code "ad<ZWNJ>min"} through, quoting
-     * being outside this production entirely.
+     * with UTS #39 §3.1.1.1 (§7.7 rule 2) -- permitted where it has a shaping effect, refused where it is
+     * invisible. The split is what makes a blanket exclusion unnecessary: one would forbid Persian
+     * {@code کتاب<ZWNJ>ها} and still let {@code "ad<ZWNJ>min"} reach a name through a quoted spelling, which
+     * is outside this production entirely.
      */
     private static boolean isUnquotedContinuation(int cp) {
         return Xid.isContinue(cp) || cp == '-' || cp == '+' || cp == '.';
@@ -697,7 +697,8 @@ public final class Lexer {
      * (item 3, "all other characters"). Item 2's controls "shall be allowed in the contexts UAX31-I1, UAX31-I2,
      * and UAX31-I3 ... where their insertion shall have no effect on the meaning of the program". Reading them
      * as item 3 instead is what lets {@code ad<LRM>min} lex as two tokens and {@code [1<LRM>2]} read as two
-     * elements -- an insertion that plainly changes the meaning, and invisibly. See {@code SPEC-FEEDBACK.md} #16.
+     * elements -- an insertion that plainly changes the meaning, and invisibly. §7.2 rule 1 sorts them into
+     * item 2 for that reason, and §9.5 rests on it.
      *
      * <p><b>The check is R3a's own.</b> Its note states the strategy directly: "Since these characters are
      * allowed only where a boundary would, in their absence, exist between lexical elements, an implementation

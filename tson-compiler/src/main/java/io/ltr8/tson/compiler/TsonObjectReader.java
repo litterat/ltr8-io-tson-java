@@ -145,7 +145,7 @@ public final class TsonObjectReader {
 
     /**
      * This reader with {@code policy} applied to every token it pulls -- a new reader, leaving this one unchanged
-     * ({@code SPEC-FEEDBACK.md} #3 Step 4b). Orthogonal to {@link #withSchema} and {@link #withDiagnostics},
+     * ([TSON-DATA] §8.2's "Values"). Orthogonal to {@link #withSchema} and {@link #withDiagnostics},
      * and available on a schemaless reader, which is the point: a Class 1 read has no schema and no registry,
      * and is where a value arrives least constrained.
      *

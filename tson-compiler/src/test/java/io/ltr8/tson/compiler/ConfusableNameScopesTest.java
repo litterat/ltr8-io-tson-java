@@ -13,8 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * §9.4's confusability as a rule over the closed sets the series defines ({@code SPEC-FEEDBACK.md} #3
- * Steps 2–3): no two names in one scope may share a UTS #39 skeleton.
+ * [TSON-DATA] §8.2's mechanism 1 over the schema-layer scopes [TSON-SCHEMA] §11.4 names: no two names in
+ * one scope may share a UTS #39 skeleton.
  *
  * <p><b>Every confusable pair here is built from code points</b>, never typed. That is not fussiness: the
  * two spellings are indistinguishable in an editor, so a literal would make the test unreviewable and one
@@ -82,8 +82,8 @@ class ConfusableNameScopesTest {
     /**
      * A choice's variants are <b>not</b> a scope of their own, and finding that out is worth a test. A
      * variant is a reference to a declared name, so two confusable variants are two confusable entries in
-     * the namespace — caught one level up, before any choice is looked at. `SPEC-FEEDBACK.md` #3 lists
-     * variants among its scopes; they are subsumed, and a check over them could never fire.
+     * the namespace — caught one level up, before any choice is looked at. §11.4 says so outright; a check
+     * over them could never fire.
      */
     @Test
     void confusableChoiceVariantsAreCaughtAsConfusableDeclaredNames() {
@@ -97,7 +97,7 @@ class ConfusableNameScopesTest {
      * <em>pair</em>, so no lone name is ever rejected by it.
      *
      * <p>Checked under a relaxed restriction level, because the two rules are independent and the default
-     * level does reject these names — which is the whole reason #3 keeps them as separate mechanisms rather
+     * level does reject these names — which is the whole reason §8.2 keeps them as separate mechanisms rather
      * than one. Here the level is per-segment, so it admits `id_пользователя` and this test is left
      * asserting only what it means to: that the skeleton check stays silent.
      */
