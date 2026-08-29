@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.lexer.IdentifierStatus;
 import io.ltr8.tson.compiler.lexer.Xid;
 
 import java.text.Normalizer;
@@ -31,7 +32,14 @@ import java.text.Normalizer;
  * controls, {@code Cf} format characters, emoji and unassigned code points are none of them
  * {@code XID_Continue}.
  *
- * <p><b>The profile admits ZWNJ and ZWJ</b>, both being {@code XID_Continue}. {@link
+ * <p><b>Characters must also be {@code Identifier_Status=Allowed}</b> (UTS #39 §3.1) -- a per-character
+ * narrowing that removes obsolete, technical and limited-use characters, with no cross-script judgement in
+ * it, so a mixed-script name is untouched. {@code -} is exempt, being this profile's own extension rather
+ * than an identifier character Unicode has an opinion about.
+ *
+ * <p><b>The XID profile admits ZWNJ and ZWJ</b>, both being {@code XID_Continue} -- though
+ * {@code Identifier_Status} then refuses them, which is UTS #39 stating generally the rule §7.1 states for
+ * those two characters by hand. {@link
  * io.ltr8.tson.compiler.lexer.Lexer} currently does not, so no unquoted token can carry one and the case is
  * unreachable through that spelling; this class is written to the property anyway, so it is already correct
  * when the lexer adopts UTS #39 §3.1.1.1's contextual rule ({@code SPEC-FEEDBACK.md} #14). Deciding it here
@@ -68,10 +76,18 @@ public final class IdentifierParser implements AtomType<String> {
                             ? " -- an identifier never begins with a digit or a sign" : ""),
                     EXPECTED);
         }
+        if (!IdentifierStatus.isAllowed(first)) {
+            throw new AtomParseException(at(text, first, 0) + " is Identifier_Status=Restricted (UTS #39)",
+                    EXPECTED);
+        }
         for (int i = Character.charCount(first); i < text.length(); ) {
             int cp = text.codePointAt(i);
             if (!(Xid.isContinue(cp) || cp == '-')) {
                 throw new AtomParseException(at(text, cp, i) + " cannot appear in an identifier", EXPECTED);
+            }
+            if (!IdentifierStatus.isAllowed(cp) && cp != '-') {
+                throw new AtomParseException(at(text, cp, i) + " is Identifier_Status=Restricted (UTS #39)",
+                        EXPECTED);
             }
             i += Character.charCount(cp);
         }

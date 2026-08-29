@@ -357,20 +357,14 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   restriction level for. The conformance vector
   `lexer/invalid/zwnj-inside-unquoted-token` asserts today's behaviour and flips in the same change; its
   sidecar already says the contradiction is why it exists.
-- [ ] **An `identifier` profile, and skeleton distinctness on it** (§9.4-adjacent hardening). `SPEC-FEEDBACK.md` #3
-  carries the design: names are a class the series never defines — §7.1 constrains *tokens*, which is also
-  how values are written — so define one, apply it wherever a name is declared (a schema's type names,
-  declaration field names, enum members, choice variants, and the `!!import` merge), and require that no two
-  names in one scope share a UTS #39 `skeleton()`. Needs a generated table from `confusables.txt` (6,355
-  mappings), a `Diagnostic.Code`, and vectors. Prototyped: catches every homograph pair tested, the
-  whole-script `aec`/`аес` included, with **zero** false positives over 32 names of the kind a real schema
-  declares together.
-    - **Not the restriction level, though it needs no data.** It is a per-name guess, so it misses
-      whole-script confusables and rejects ordinary names — `id_пользователя`, `url_адрес`, `api_ключ` —
-      while permitting the same mixing for Japanese (`日本語id`). A rule that taxes one script community and not
-      another gets switched off. Worth having as an **opt-in** profile, default off; not as the default rule.
-    - `Identifier_Status=Allowed` (556 ranges, 47 KB) is a cheap separable addition on the same profile, and
-      subsumes §7.1's hand-picked ZWNJ/ZWJ exclusion.
+- [ ] **The UTS #39 restriction level, opt-in and default off** — `SPEC-FEEDBACK.md` #3 Step 4, the one
+  piece of that entry not built. UTS #39 §5.2 Highly Restrictive over `Character.UnicodeScript` plus a
+  three-row augmented-set table, so **no shipped data**; what it needs is a configuration channel, and
+  neither `TsonSchemaLinker` nor `IdentifierParser` has one — `TsonSchemaLinker.link` is called from six
+  sites across three modules and `TsonConfig`'s existing flags reach the bind context, not the linker. The
+  default must be off: it rejects names that are not ambiguous with anything in the document, and it rejects
+  ordinary ones (`id_пользователя`, `url_адрес`, `api_ключ`) while permitting the same mixing for Japanese,
+  which is why #3 makes it an option rather than the rule.
 - [ ] Bidi-formatting-character surfacing outside quoted tokens (§9.5) — the sibling gap to the
   numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section; neither is enforced. Note
   this is **not** the class #14 closed: U+200E/U+200F are `Pattern_White_Space`, so they *separate* tokens

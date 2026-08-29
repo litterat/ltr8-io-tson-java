@@ -1,10 +1,10 @@
-!!id:"https://tson.io/2026/33/ltr8/cli/diagnostics-9.tn"
+!!id:"https://tson.io/2026/33/ltr8/cli/diagnostics-10.tn"
 !!meta:"https://tson.io/2026/33/m/meta.tn"
 !!import:"https://tson.io/2026/33/m/core.tn"
 @doc:"""
   This project's own schema !!id convention (see CLAUDE.md's "Project-owned schema !!id
   convention"): /2026/33 is the spec revision this schema is written against, ltr8 is the
-  publishing org, cli is this module's own schema group, and the trailing -9 is this schema's
+  publishing org, cli is this module's own schema group, and the trailing -10 is this schema's
   own version -- bumped when file_report/validation_run were added, so `validate` can name the
   file each verdict belongs to inside one document; when the fields that may have nothing to
   say became optional rather than empty; when path/schema_pointer joined them, DUPLICATE_FIELD
@@ -13,8 +13,10 @@
   beside the ordinary problems instead of aborting the pass that found them; when
   BIND_MISMATCH did, so a schema and the reading application's own classes disagreeing is not
   reported as the author's schema being wrong; and when SCHEMA_UNAVAILABLE did, so a schema no
-  source would supply is not reported as a schema that is wrong. Per that same convention's
-  "bump it, under a new name" rule, never edit a published schema's own content in place.
+  source would supply is not reported as a schema that is wrong; and when CONFUSABLE_NAMES did, so
+  two names in one scope that a reader cannot tell apart are refused rather than silently kept as
+  two names. Per that same convention's "bump it, under a new name" rule, never edit a published
+  schema's own content in place.
 
   BIND_MISMATCH is not reachable from this CLI, which reads in DOM mode and binds nothing. It is
   declared because this enum copies Diagnostic.Code, not the subset one consumer happens to emit
@@ -23,8 +25,8 @@
 {
   diagnostic_code => !enum [
     FIELD_REQUIRED FIELD_FIXED TYPE_MISMATCH WRONG_ARITY UNKNOWN_TYPE_REF ATOM_CONSTRAINT_VIOLATION
-    UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD SCHEMA_ERROR UNKNOWN_TYPE VALIDATION_ERROR
-    NOT_IMPLEMENTED BIND_MISMATCH SCHEMA_UNAVAILABLE
+    UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD CONFUSABLE_NAMES SCHEMA_ERROR UNKNOWN_TYPE
+    VALIDATION_ERROR NOT_IMPLEMENTED BIND_MISMATCH SCHEMA_UNAVAILABLE
   ]
   @doc:"""
     One problem, located at up to two ends: the value in the data (path, data_position) and the rule

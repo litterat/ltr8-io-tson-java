@@ -648,13 +648,25 @@ shared suite can carry it: a record declaring `admin` and `аdmin` rejected, one
 alone accepted, `l` beside `I` rejected. That is the first part of this topic that could ever have been
 conformance-tested.
 
-**Status against Revision 33:** open, and Steps 1–1d are **built**. The kernel carries `identifier`
+**Status against Revision 33:** open, and Steps 1–1d, 2, 3 and 5 are **built**. The kernel carries `identifier`
 (`XID_Start`-initial, `XID_Continue ∪ { - }`, NFC) with `type_name`/`field_name`/`param_name` aliasing it and
 `enum_set => !set { element_type: identifier  min_items: 1 }` feeding `enum.members`; `token`/`token_set` are
 gone. `IdentifierParser` enforces the contract where the resolved model is read back as data, and
-`DefinitionResolver` asserts it for declared field names, which the resolver builds directly. §9.4 itself is
-unchanged — one SHOULD-consider sentence, no comparison scopes, no stated action on detection — so Steps 2–5
-remain proposals, both mechanisms prototyped against the real UCD tables and neither shipped.
+`DefinitionResolver` asserts it for declared field names, which the resolver builds directly. Skeleton distinctness runs over the merged
+namespace, each record's field names and each enum's members, reported as `CONFUSABLE_NAMES`; a Class 1
+record's own fields are checked by the schemaless reader, which is the one scope with no declaration behind
+it. `Identifier_Status=Allowed` is on the profile. §9.4 itself is unchanged — one SHOULD-consider sentence,
+no comparison scopes, no stated action on detection — so what is built is this entry's proposal, not the
+spec's text.
+
+**One scope in Step 2's list turned out not to be one.** A choice's *variants* are references to declared
+names, so two confusable variants are two confusable entries in the namespace and are reported there; a
+check over variants could never fire, and the list above should drop them. Field names and enum members are
+genuine scopes because neither is a declared name.
+
+**Step 4 is not built.** The restriction level needs a configuration channel reaching `TsonSchemaLinker` and
+the identifier parser, which today have none — six call sites across three modules — and it is the one
+mechanism this entry recommends defaulting to off. Its absence changes nothing about what the others decide.
 
 Two parts of Step 1 are deliberately not built. The `field-name` production is untouched, so Class 1 field
 names stay unconstrained exactly as Step 1c intends. And the joiners' contextual rule is not implemented, so

@@ -65,6 +65,15 @@ class IdentifierParserTest {
         assertEquals("a-b", read("a-b"), "but '-' does");
     }
 
+    /** Obsolete and technical characters, which XID admits and the General Security Profile does not. */
+    @Test
+    void restrictedCharactersAreRejected() {
+        for (int cp : new int[] {0x07E8, 0xA610, 0x1B6B}) {
+            String text = "ab" + new String(Character.toChars(cp)) + "c";
+            assertTrue(rejects(text).contains("Identifier_Status=Restricted"), () -> "U+%04X".formatted(cp));
+        }
+    }
+
     /** Everything invisible falls out of XID membership rather than needing a clause of its own. */
     @Test
     void whitespaceControlsAndFormatCharactersAreRejected() {
@@ -88,15 +97,17 @@ class IdentifierParserTest {
     }
 
     /**
-     * ZWNJ and ZWJ <em>are</em> {@code XID_Continue}, so the profile admits them even though the lexer
-     * currently does not emit a token containing one. Written to the property rather than to what the lexer
-     * happens to permit, so this layer is already right when the lexer adopts UTS #39 §3.1.1.1's contextual
-     * rule (`SPEC-FEEDBACK.md` #14).
+     * ZWNJ and ZWJ are {@code XID_Continue} and {@code Identifier_Status=Restricted}, and the second decides:
+     * UTS #39 makes them Restricted by default and §3.1.1.1 an explicit exception for "an implementation
+     * ... that allows the additional characters ZWJ and ZWNJ", permitting them only where they satisfy
+     * conditions A1, A2 and B. So refusing them is the correct base rule rather than a stand-in for the
+     * lexer's own exclusion, and the contextual rule is the carve-out that re-admits them
+     * ({@code SPEC-FEEDBACK.md} #14; not implemented).
      */
     @Test
-    void theJoinersArePermittedByTheProfileEvenThoughTheLexerRefusesThem() {
+    void theJoinersAreRefusedUntilTheContextualRuleExists() {
         String zwnj = "ab" + new String(Character.toChars(0x200C)) + "c";
-        assertEquals(zwnj, read(zwnj));
+        assertTrue(rejects(zwnj).contains("Identifier_Status=Restricted"));
     }
 
     @Test

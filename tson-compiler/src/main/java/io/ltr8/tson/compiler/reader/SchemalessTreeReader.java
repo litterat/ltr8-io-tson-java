@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.atom.ValueParser;
+import io.ltr8.tson.compiler.lexer.ConfusableNames;
 import io.ltr8.tson.compiler.lexer.Nfc;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
@@ -183,6 +184,7 @@ public final class SchemalessTreeReader {
             fields.put(fieldName.name(), readNode(ctx.field(fieldName.name())));
         }
         ctx.next(); // RecordEnd
+        reportConfusableFields(ctx, fields.keySet());
         return new TsonRecord(fields, typeRef, annotations);
     }
 
@@ -274,6 +276,24 @@ public final class SchemalessTreeReader {
      * more keys equal still. So {@code 0xFF} and {@code 255} are textually distinct and one key here, which
      * is also what the host {@code Map} would have done with them.
      */
+    /**
+     * §9.4's confusability over a record's own field set ({@code SPEC-FEEDBACK.md} #3 Steps 2–3). A Class 1
+     * record is the one naming scope with no declaration behind it: under a schema the check runs once over
+     * the declared names and the data conforms by construction, but a schemaless document's fields are named
+     * only here, so this is where two names a reader cannot tell apart have to be caught.
+     *
+     * <p>Reported after the record is read, not as each field arrives: the relation is over the whole set,
+     * and a collision is a property of the pair rather than of the second name's position. Duplicates are
+     * already reported per occurrence above; this is the different rule that two <em>distinct</em> names read
+     * alike.
+     */
+    private static void reportConfusableFields(TsonReadContext ctx, Set<String> fieldNames) {
+        ConfusableNames.firstCollision(fieldNames).ifPresent(collision ->
+                ctx.field(collision.second()).report(Diagnostic.Code.CONFUSABLE_NAMES,
+                        "this record " + collision.describe(),
+                        "field names a reader can tell apart", "'" + collision.second() + "'"));
+    }
+
     private static Object keyIdentity(TsonValue key) {
         return switch (key) {
             case TsonAtom atom -> Nfc.keyOf(atom.value());
