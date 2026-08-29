@@ -70,14 +70,6 @@ class TsonSchemaLinkerTest {
                 List.of(), entries);
     }
 
-    /**
-     * An argument-bearing type-ref reaches the linker only from a parameterized declaration's own body --
-     * {@code SchemaDesugarer} (in {@code tson-compiler}) turns every other one into a real declaration before
-     * resolution ever runs, so there is nothing here to synthesize an entry for. This pins that: link carries
-     * the application through untouched and adds no entries at all. The behaviour it replaces -- seven tests
-     * over a materialisation pass that built {@code ArrayBody}/placeholder entries from hand-written per-shape
-     * assemblers -- now lives in {@code SchemaDesugarerTest}, one phase earlier and one module over.
-     */
     /** A schema with its own identity and imports, for the origin-tracking chain below. */
     private static TsonSchema schemaOf(String id, List<String> imports, Map<String, TypeDefinition> entries) {
         return new TsonSchema(id, TsonBundledSchemas.META_KERNEL_ID, imports, entries);
@@ -139,6 +131,14 @@ class TsonSchemaLinkerTest {
         assertTrue(thrown.getMessage().contains("'set' declares no type parameters"), thrown.getMessage());
     }
 
+    /**
+     * An argument-bearing type-ref reaches the linker only from a parameterized declaration's own body --
+     * {@code SchemaDesugarer} turns every other one into a real declaration before resolution ever runs, so
+     * there is nothing here to synthesize an entry for. This pins that: link carries the application through
+     * untouched and adds no entries at all. What the linker therefore does <em>not</em> do -- building the
+     * {@code ArrayBody}/placeholder entries a materialisation pass would -- is covered in {@code
+     * SchemaDesugarerTest}, one phase earlier.
+     */
     @Test
     void aTypeParameterInSourceIsValidWithoutNeedingToResolveOrMaterialize() {
         // set => <T> ~array<T> ^ {...} -- T is set's own declared parameter, not a real entry.

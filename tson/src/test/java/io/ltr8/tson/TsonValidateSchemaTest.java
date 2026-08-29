@@ -172,17 +172,16 @@ class TsonValidateSchemaTest {
 
     /**
      * <b>The converse, and the reason the offending name decides this rather than the entry.</b> A name the
-     * <em>applier</em> wrote is the applier's mistake, and both of these stay exactly where they were: no
-     * held body mentions {@code 3} or {@code some_typo}, so nothing is retargeted. Blaming the template for
-     * these would send the author to {@code box => <T> { v: T }} to look for a {@code 3} that is not there.
-     */
-    /**
-     * The literal case is refused for a sharper reason than the typo below it: {@code 3} is not an
-     * unresolved <em>name</em>, it is not a name at all, and {@code type_ref.name} is typed {@code
-     * identifier} (issue #231), so it fails where the substituted body is read against the kernel's own
-     * vocabulary rather than later at reference resolution. The verdict is the same and the explanation is
-     * better — "an identifier never begins with a digit or a sign" is actionable where "unresolved
-     * reference '3'" implied an author could go and declare one.
+     * <em>applier</em> wrote is the applier's mistake, so this stays exactly where it was written: no held
+     * body mentions {@code 3}, and nothing is retargeted. Blaming the template would send the author to
+     * {@code box => <T> { v: T }} to look for a {@code 3} that is not there.
+     *
+     * <p>The literal case is refused for a sharper reason than the typo in {@link
+     * #anUnresolvedArgumentStaysWithTheApplier}: {@code 3} is not an unresolved <em>name</em>, it is not a
+     * name at all, and {@code type_ref.name} is typed {@code identifier}, so it fails where the substituted
+     * body is read against the kernel's own vocabulary rather than later at reference resolution. The verdict
+     * is the same and the explanation is better — "an identifier never begins with a digit or a sign" is
+     * actionable where "unresolved reference '3'" implies an author could go and declare one.
      */
     @Test
     void aLiteralArgumentInATypeSlotStaysWithTheApplier() {
@@ -192,6 +191,7 @@ class TsonValidateSchemaTest {
                         + "identifier -- an identifier never begins with a digit or a sign");
     }
 
+    /** The same rule for a name that is a name: {@code some_typo} is the applier's typo, not the template's. */
     @Test
     void anUnresolvedArgumentStaysWithTheApplier() {
         assertStaysWithTheApplier("box<some_typo>",

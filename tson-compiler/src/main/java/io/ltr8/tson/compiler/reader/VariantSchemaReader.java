@@ -72,13 +72,6 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
     }
 
     /**
-     * {@inheritDoc} <p>Renames the <em>wrapped</em> reader and keeps this one's own {@code name} for
-     * dispatch: the display name is what the position wrote (§8.3's {@code @alias}), while dispatch compares
-     * against the entry's real name and its aliases. Without this the wrapper would swallow the rename and a
-     * diagnostic would report the entry a use site resolved to rather than the name the author typed --
-     * which is the rule {@link UseSite} exists to keep.
-     */
-    /**
      * The reader this guards, and a rebuilt guard around a replacement for it. Object-binding rebinds a
      * container field's reader to the component's own Java type ({@code RecordBindReader}'s rebind step),
      * which tests the reader's concrete class -- so that step has to see through this wrapper and put it
@@ -92,6 +85,13 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
         return new VariantSchemaReader(name, selfNames, replacement, subtypeNames, resolver);
     }
 
+    /**
+     * {@inheritDoc} <p>Renames the <em>wrapped</em> reader and keeps this one's own {@code name} for
+     * dispatch: the display name is what the position wrote (§8.3's {@code @alias}), while dispatch compares
+     * against the entry's real name and its aliases. Without this the wrapper would swallow the rename and a
+     * diagnostic would report the entry a use site resolved to rather than the name the author typed --
+     * which is the rule {@link UseSite} exists to keep.
+     */
     @Override
     public TsonTypeReader<?> renamed(String displayName) {
         if (!(ownParser instanceof UseSite.Renamed renameable)) {

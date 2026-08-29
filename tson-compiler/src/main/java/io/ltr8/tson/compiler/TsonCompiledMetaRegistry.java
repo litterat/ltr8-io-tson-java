@@ -85,6 +85,19 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private final Map<String, String> contentHashes = new ConcurrentHashMap<>();
 
     /**
+     * UTS #39 §5.2's restriction level for declared names, applied by {@link TsonSchemaLinker} wherever a
+     * schema names something ({@code SPEC-FEEDBACK.md} #3 Step 4). Held here because this registry is the
+     * one object every resolve and every read already passes through, so a policy set on it reaches both
+     * without a second channel.
+     *
+     * <p>The default is Highly Restrictive over a whole name -- the strictest of §5.2's practically
+     * deployable levels, and one it names, so two implementations agree on the default without reading
+     * this project's own documents. A deployment that finds it too strict reaches for the *unit* before the
+     * level: {@code perSegment()} still refuses every within-word homograph.
+     */
+    private TsonUnicodePolicy identifierPolicy = TsonUnicodePolicy.highlyRestrictive();
+
+    /**
      * The identities this thread is part-way through resolving, outermost first -- [TSON-DATA] §2.2.3's
      * import-cycle guard, and the {@code !!meta} chain's too ({@link #loadMeta} reaches every link through
      * {@link #resolveLinked}).
@@ -102,19 +115,6 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * !!meta} is strictly within one thread, so per-thread is both correct and exactly the scope of the
      * question being asked.
      */
-    /**
-     * UTS #39 §5.2's restriction level for declared names, applied by {@link TsonSchemaLinker} wherever a
-     * schema names something ({@code SPEC-FEEDBACK.md} #3 Step 4). Held here because this registry is the
-     * one object every resolve and every read already passes through, so a policy set on it reaches both
-     * without a second channel.
-     *
-     * <p>The default is Highly Restrictive over a whole name -- the strictest of §5.2's practically
-     * deployable levels, and one it names, so two implementations agree on the default without reading
-     * this project's own documents. A deployment that finds it too strict reaches for the *unit* before the
-     * level: {@code perSegment()} still refuses every within-word homograph.
-     */
-    private TsonUnicodePolicy identifierPolicy = TsonUnicodePolicy.highlyRestrictive();
-
     private final ThreadLocal<Set<String>> resolving = ThreadLocal.withInitial(LinkedHashSet::new);
 
     /**

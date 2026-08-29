@@ -388,11 +388,6 @@ final class DefinitionResolver {
     }
 
     /**
-     * §3.3.3's one hop missed: {@code annotationName} is not an entry of the governing meta-schema's own
-     * namespace. Worded from the two ways an author gets here -- a name they declared in this very schema (or
-     * imported into it), which is the near miss the rule actually catches, and a name that is simply nowhere.
-     */
-    /**
      * Checks a name the author wrote against the kernel's {@code identifier} contract (§7.1's name profile).
      * The resolver builds {@code record_field.name} and its kin directly rather than round-tripping the
      * resolved model through the compiled meta reader, so the type these positions carry -- {@code
@@ -408,6 +403,11 @@ final class DefinitionResolver {
         }
     }
 
+    /**
+     * §3.3.3's one hop missed: {@code annotationName} is not an entry of the governing meta-schema's own
+     * namespace. Worded from the two ways an author gets here -- a name they declared in this very schema (or
+     * imported into it), which is the near miss the rule actually catches, and a name that is simply nowhere.
+     */
     private TsonSchemaValidationException unresolvedAnnotation(String declaration, String annotationName) {
         boolean local = namespaceDefinitions.getTypeDefinition(annotationName) != null;
         return new TsonSchemaValidationException("'" + declaration + "': '@" + annotationName + "' does not name "

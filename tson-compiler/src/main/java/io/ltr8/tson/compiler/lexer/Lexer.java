@@ -327,7 +327,6 @@ public final class Lexer {
     }
 
     /** §7.1's {@code Start = XID_Start ∪ Nd ∪ { - + . }} -- the three extension characters are dispatched before this is reached ("Profile boundaries"). */
-    /** §7.1's {@code Start = XID_Start ∪ Nd ∪ { - + . }} -- the three extension characters are dispatched before this is reached ("Profile boundaries"). */
     private static boolean isUnquotedStart(int cp) {
         return Xid.isStart(cp) || isDecimalDigit(cp);
     }

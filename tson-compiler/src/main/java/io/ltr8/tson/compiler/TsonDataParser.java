@@ -203,26 +203,17 @@ public class TsonDataParser {
     // ── Reduction: flat TsonEvent sequence -> nested ast tree ───────────────────────────
 
     /**
-     * Rebuilds one {@code ast} value from the flat event sequence {@link TsonDataStream} produced
-     * for it. Index-based, not recursive-descent-over-tokens -- structurally the same shape the
-     * old token-cursor recursion had, just consuming {@link TsonEvent}s instead of {@link Token}s.
-     * A fresh instance per call (never shared across {@link #parseDataValue()}/{@link
-     * #parseCoreValue()}/{@link #parseAnnotation()} invocations), so nested/repeated calls from
-     * {@link TsonSchemaParser} can never corrupt one another's position.
+     * Rebuilds one {@code ast} value from the flat event sequence {@link TsonDataStream} produced for it.
+     * Index-based rather than recursive-descent over tokens, consuming {@link TsonEvent}s. A fresh instance
+     * per call (never shared across {@link #parseDataValue()}/{@link #parseCoreValue()}/{@link
+     * #parseAnnotation()}), so nested or repeated calls from {@link TsonSchemaParser} cannot corrupt one
+     * another's position.
      *
-     * <p>A non-static inner class, deliberately -- {@link #coreValue()} calls the outer instance's
-     * own {@link #recordPosition} directly, using each {@link TsonEvent}'s own {@link
-     * TsonEvent#position()} (already captured at Tier 2, by {@link TsonDataStream}) rather than
-     * threading a {@link Token}'s position through by hand the way the old, pre-streaming
-     * recursive-descent parser did.
-     */
-    /**
-     * Package-private and {@code static} (rather than a private inner class) so {@link
-     * TsonObjectReader} can reuse it to reduce a bounded event list -- e.g. one value's own captured
-     * wire annotations -- back into an {@code ast} subtree, without duplicating this reduction. Its
-     * one dependency on an enclosing parser, recording each core-value's own source position, is
-     * passed in as {@code recorder} instead: {@link TsonDataParser} supplies its own {@link
-     * #positions} map; a caller that doesn't track positions passes a no-op.
+     * <p><b>{@code static}, with its one dependency on an enclosing parser passed in.</b> Recording each
+     * core-value's own source position -- taken from the {@link TsonEvent#position()} Tier 2 already captured,
+     * never threaded through by hand -- arrives as {@code recorder}, so reducing a bounded event list back
+     * into an {@code ast} subtree needs no parser instance around it. {@link TsonDataParser} supplies its own
+     * {@link #positions} map; a caller that doesn't track positions passes a no-op.
      */
     public static final class EventReducer {
 

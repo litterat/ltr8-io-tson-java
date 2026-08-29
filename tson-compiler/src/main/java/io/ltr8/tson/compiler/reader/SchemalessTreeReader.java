@@ -263,20 +263,6 @@ public final class SchemalessTreeReader {
     }
 
     /**
-     * What {@link #readMap}'s duplicate check compares: a key's structure and decoded values, with every
-     * node's type-ref and annotations stripped. Neither is part of the key §2.6 compares -- it asks for
-     * "the same NFC-normalized string after escape processing" for a scalar and "the same structure with
-     * textually identical elements at every position" for a compound one, and a leading {@code !text} or
-     * {@code @doc} is in neither. Comparing whole {@link TsonValue} nodes instead would read {@code !text
-     * a} and {@code a} as two keys, which §2.6 says they are not.
-     *
-     * <p>Equating on the <em>decoded</em> value rather than the source text is what §2.6 asks of a reader
-     * that decodes: textual identity is the parser's minimum, "a processor that decodes values compares
-     * decoded values" is the layer above it, and a declared key type ([TSON-SCHEMA] §7.7) may only make
-     * more keys equal still. So {@code 0xFF} and {@code 255} are textually distinct and one key here, which
-     * is also what the host {@code Map} would have done with them.
-     */
-    /**
      * §9.4's confusability over a record's own field set ({@code SPEC-FEEDBACK.md} #3 Steps 2–3). A Class 1
      * record is the one naming scope with no declaration behind it: under a schema the check runs once over
      * the declared names and the data conforms by construction, but a schemaless document's fields are named
@@ -294,6 +280,20 @@ public final class SchemalessTreeReader {
                         "field names a reader can tell apart", "'" + collision.second() + "'"));
     }
 
+    /**
+     * What {@link #readMap}'s duplicate check compares: a key's structure and decoded values, with every
+     * node's type-ref and annotations stripped. Neither is part of the key §2.6 compares -- it asks for
+     * "the same NFC-normalized string after escape processing" for a scalar and "the same structure with
+     * textually identical elements at every position" for a compound one, and a leading {@code !text} or
+     * {@code @doc} is in neither. Comparing whole {@link TsonValue} nodes instead would read {@code !text
+     * a} and {@code a} as two keys, which §2.6 says they are not.
+     *
+     * <p>Equating on the <em>decoded</em> value rather than the source text is what §2.6 asks of a reader
+     * that decodes: textual identity is the parser's minimum, "a processor that decodes values compares
+     * decoded values" is the layer above it, and a declared key type ([TSON-SCHEMA] §7.7) may only make
+     * more keys equal still. So {@code 0xFF} and {@code 255} are textually distinct and one key here, which
+     * is also what the host {@code Map} would have done with them.
+     */
     private static Object keyIdentity(TsonValue key) {
         return switch (key) {
             case TsonAtom atom -> Nfc.keyOf(atom.value());

@@ -75,18 +75,6 @@ class TsonCliTest {
         assertFalse(err.contains("usage:"), err);
     }
 
-    /**
-     * The load-bearing half of the 1-vs-70 split: a run holding <em>both</em> a gap and an ordinary error is
-     * 70, not 1. Something went unchecked, so "invalid" is not a verdict that run is entitled to give, and
-     * the two codes are what let the CLI tell them apart in one pass.
-     *
-     * <p><b>Over the codes here, and end to end in {@link #aGapCostsItsOwnFieldAVerdictAndNoOthers}.</b> No
-     * <em>schema</em> reaches a gap any more -- the fixtures here used to be real, a parameter in a
-     * collection-valued slot and then a parameterized supertype and then one template applied to another,
-     * each closed in turn -- so the mixed list this method decides is reached by a <em>read</em> gap, which
-     * arrives as a {@code NOT_IMPLEMENTED} diagnostic like any other. The unit form stays because it states
-     * all three cases of the rule in one place, including the exit-1 case no gap fixture exercises.
-     */
     /** A schema that loads clean and cannot be read against: {@code precision} is carried but not enforced. */
     private static final String GAP_SCHEMA = """
             !!id:"https://example.test/cli-gap.tn"
@@ -109,7 +97,14 @@ class TsonCliTest {
      * <b>A mixed run takes the most permanent code.</b> 1 is a verdict on the document; 70 and 69 are the
      * absence of one, differing in who could not give it -- this library, or whoever was to serve the
      * schema. A gap outranks an unavailable schema because retrying fixes only the second, and a run that
-     * holds both would reach the gap again on the retry.
+     * holds both would reach the gap again on the retry. A run holding both a gap and an ordinary error is
+     * therefore 70, not 1: something went unchecked, so "invalid" is not a verdict that run is entitled to
+     * give, and the two codes are what let the CLI tell them apart in one pass.
+     *
+     * <p><b>Over the codes here, and end to end in {@link #aGapCostsItsOwnFieldAVerdictAndNoOthers}.</b> No
+     * <em>schema</em> reaches a gap, so the mixed list this decides is reached end to end by a <em>read</em>
+     * gap, arriving as a {@code NOT_IMPLEMENTED} diagnostic like any other. The unit form stays because it
+     * states all three cases of the rule in one place, including the exit-1 case no gap fixture exercises.
      */
     @Test
     void aRunHoldingMoreThanOneKindOfProblemTakesTheMostPermanentCode() {

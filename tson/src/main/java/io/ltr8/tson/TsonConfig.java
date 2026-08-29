@@ -220,26 +220,6 @@ public final class TsonConfig {
     }
 
     /**
-     * Lets a bound class hold fewer fields than the schema declares, silently -- off by default.
-     *
-     * <p>By default the two must agree, and a mismatch is a {@link
-     * io.ltr8.tson.compiler.TsonBindMismatchException} when the schema is compiled in bind mode, which is
-     * startup for anything compiling its schemas once. That default is the asymmetry between the two ways of
-     * being wrong: a strict reader that is wrong says so at startup, in one message naming both sides, and
-     * is fixed in minutes; a lenient one that is wrong drops a value from every document and surfaces much
-     * later as a field that mysteriously holds its default.
-     *
-     * <p>Leniency is a real position, not just an escape hatch -- versioned evolution, where a v1 consumer
-     * deliberately reads a v2 document and means to ignore what it does not know. This is where that
-     * intention gets written down -- and it is the only path on which a field is dropped at all, every
-     * mismatch otherwise being settled before a document exists. It is silent by necessity: reporting
-     * abandons the construction ({@code ConstructionGuard}), so a lenient reader that reported would hand
-     * back {@code null} for exactly the documents it exists to accept.
-     *
-     * <p>The narrower alternative to reaching for this is {@code @Unbound} on the one component that is the
-     * class's own business rather than the wire's.
-     */
-    /**
      * The UTS #39 §5.2 restriction level applied to every name a schema declares -- type names, record field
      * names, parameter names and enum members ({@code SPEC-FEEDBACK.md} #3 Step 4).
      *
@@ -317,6 +297,26 @@ public final class TsonConfig {
         return this;
     }
 
+    /**
+     * Lets a bound class hold fewer fields than the schema declares, silently -- off by default.
+     *
+     * <p>By default the two must agree, and a mismatch is a {@link
+     * io.ltr8.tson.compiler.TsonBindMismatchException} when the schema is compiled in bind mode, which is
+     * startup for anything compiling its schemas once. That default is the asymmetry between the two ways of
+     * being wrong: a strict reader that is wrong says so at startup, in one message naming both sides, and
+     * is fixed in minutes; a lenient one that is wrong drops a value from every document and surfaces much
+     * later as a field that mysteriously holds its default.
+     *
+     * <p>Leniency is a real position, not just an escape hatch -- versioned evolution, where a v1 consumer
+     * deliberately reads a v2 document and means to ignore what it does not know. This is where that
+     * intention gets written down -- and it is the only path on which a field is dropped at all, every
+     * mismatch otherwise being settled before a document exists. It is silent by necessity: reporting
+     * abandons the construction ({@code ConstructionGuard}), so a lenient reader that reported would hand
+     * back {@code null} for exactly the documents it exists to accept.
+     *
+     * <p>The narrower alternative to reaching for this is {@code @Unbound} on the one component that is the
+     * class's own business rather than the wire's.
+     */
     public TsonConfig lenientBinding() {
         this.strictBinding = false;
         return this;

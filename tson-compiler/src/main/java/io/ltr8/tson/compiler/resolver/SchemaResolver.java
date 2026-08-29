@@ -395,33 +395,6 @@ public final class SchemaResolver {
     }
 
     /**
-     * The placeholder a declaration that failed to resolve leaves behind, so the declarations that reference
-     * it -- and the ones merely queued after it -- still resolve instead of collapsing into a cascade of
-     * consequences of one original error. The counterpart of {@code TsonSchemaCompiler}'s {@link
-     * io.ltr8.tson.compiler.reader.ErrorReader} one phase later.
-     *
-     * <p><b>Producing one means a diagnostic has already been reported</b> (Swift's {@code ErrorType}
-     * obligation). It is not a resolution and must never be linked, registered or compiled -- guaranteed
-     * structurally rather than by inspection, because the only overload that can produce one ({@link
-     * #resolveSchema(SchemaDocument, SchemaPositions, TsonDiagnosticsReceiver)}) hands the caller a receiver whose report
-     * count is the signal to stop at the phase boundary. It carries the failed declaration's own position so
-     * anything that does surface it can still point at the source.
-     *
-     * <p><b>It keeps the failed declaration's own type parameters.</b> Answering "how many type parameters?"
-     * with zero is answering wrongly, not absorbing: a downstream {@code bl<text>} is then told that
-     * {@code bl} "declares no type parameters ... drop the argument list", which is advice that would break
-     * the schema further, the actual fix being upstream at the declaration that failed. With the arity
-     * intact the application closes against an empty body and says nothing.
-     *
-     * <p><b>An empty record, because the point is to absorb rather than to be recognised</b> -- javac's model,
-     * where the error type answers every question, rather than Swift's, where every questioner must first ask
-     * whether it is looking at one. A dependent that composes with a failed declaration ({@code parent =>
-     * child & { ... }}) then resolves cleanly, contributing no fields, instead of failing a second time and
-     * reporting a problem that is purely a consequence of the first. Getting this wrong is not a small
-     * mismatch: a `Sum`-bodied placeholder makes every dependent report too, which is the cascade the
-     * placeholder exists to prevent.
-     */
-    /**
      * One declaration's failure as a {@link Diagnostic}, the code chosen by the project's own exception
      * classification: a {@code TsonSchemaValidationException} is the author's error and an {@code
      * UnsupportedOperationException} is this library's gap, which the reader of the report needs to tell
@@ -465,6 +438,33 @@ public final class SchemaResolver {
         }
     }
 
+    /**
+     * The placeholder a declaration that failed to resolve leaves behind, so the declarations that reference
+     * it -- and the ones merely queued after it -- still resolve instead of collapsing into a cascade of
+     * consequences of one original error. The counterpart of {@code TsonSchemaCompiler}'s {@link
+     * io.ltr8.tson.compiler.reader.ErrorReader} one phase later.
+     *
+     * <p><b>Producing one means a diagnostic has already been reported</b> (Swift's {@code ErrorType}
+     * obligation). It is not a resolution and must never be linked, registered or compiled -- guaranteed
+     * structurally rather than by inspection, because the only overload that can produce one ({@link
+     * #resolveSchema(SchemaDocument, SchemaPositions, TsonDiagnosticsReceiver)}) hands the caller a receiver whose report
+     * count is the signal to stop at the phase boundary. It carries the failed declaration's own position so
+     * anything that does surface it can still point at the source.
+     *
+     * <p><b>It keeps the failed declaration's own type parameters.</b> Answering "how many type parameters?"
+     * with zero is answering wrongly, not absorbing: a downstream {@code bl<text>} is then told that
+     * {@code bl} "declares no type parameters ... drop the argument list", which is advice that would break
+     * the schema further, the actual fix being upstream at the declaration that failed. With the arity
+     * intact the application closes against an empty body and says nothing.
+     *
+     * <p><b>An empty record, because the point is to absorb rather than to be recognised</b> -- javac's model,
+     * where the error type answers every question, rather than Swift's, where every questioner must first ask
+     * whether it is looking at one. A dependent that composes with a failed declaration ({@code parent =>
+     * child & { ... }}) then resolves cleanly, contributing no fields, instead of failing a second time and
+     * reporting a problem that is purely a consequence of the first. Getting this wrong is not a small
+     * mismatch: a `Sum`-bodied placeholder makes every dependent report too, which is the cascade the
+     * placeholder exists to prevent.
+     */
     private static TypeDefinition unresolved(Optional<SourcePosition> position, List<String> parameters) {
         // An open placeholder holds its body like every other open entry, so nothing downstream has to keep
         // a second substitution path for the one shape that did not -- see SchemaDesugarer.heldEmptyRecord.

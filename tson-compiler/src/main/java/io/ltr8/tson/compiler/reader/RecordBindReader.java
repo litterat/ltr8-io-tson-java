@@ -526,17 +526,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
 
         /**
-         * The class this schema type binds to.
-         *
-         * <p><b>A missing one is a misconfiguration, not a gap.</b> It used to raise an {@code
-         * IllegalStateException}, which the compile turned into an {@code ErrorReader} and the first read of
-         * that type into "no usable compiled reader" -- a library-gap shape, for a caller who simply never
-         * mapped the type. That reading travels: a downstream service mapped it to a 501. It is the same
-         * disagreement {@link TsonBindMismatchException} already covers from the other side (a class that
-         * exists and does not fit), so it is reported the same way and at the same moment -- when the schema
-         * is compiled in bind mode, naming the type nothing resolves.
-         */
-        /**
          * The Java class {@code schemaTypeName} binds to, or {@code null} where nothing does.
          *
          * <p>{@link #descriptorFor}'s answer without its verdict: a name that binds nowhere is a
@@ -553,6 +542,16 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             }
         }
 
+        /**
+         * The class this schema type binds to.
+         *
+         * <p><b>A missing one is a misconfiguration, not a gap.</b> It is the same disagreement {@link
+         * TsonBindMismatchException} covers from the other side -- a class that exists and does not fit -- so
+         * it is raised the same way and at the same moment, when the schema is compiled in bind mode, naming
+         * the type nothing resolves. Surfacing it as a library gap instead would tell a caller who simply
+         * never mapped the type that this library cannot do the job, and that reading travels: a downstream
+         * service turns it into a 501.
+         */
         private DataClass descriptorFor(String name) {
             try {
                 return context.getDescriptor(name);
