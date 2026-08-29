@@ -7,7 +7,6 @@ import io.ltr8.tson.compiler.atom.AtomParsers;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.lexer.ConfusableNames;
-import io.ltr8.tson.compiler.config.UnicodePolicy;
 import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
@@ -155,15 +154,15 @@ public final class TsonSchemaLinker {
         }
         // The bootstrap is this library's own artifact, not user input, so it is linked under the default
         // rather than under whatever a caller configured -- a policy should not be able to break meta-kernel.
-        return linkWith(bootstrap, null, null, UnicodePolicy.highlyRestrictive());
+        return linkWith(bootstrap, null, null, TsonUnicodePolicy.highlyRestrictive());
     }
 
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
-        return linkWith(schema, loader, null, UnicodePolicy.highlyRestrictive());
+        return linkWith(schema, loader, null, TsonUnicodePolicy.highlyRestrictive());
     }
 
     /** {@link #link(TsonSchema, TsonSchemaLoader)} with the §5.2 restriction level for declared names chosen. */
-    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, UnicodePolicy identifiers) {
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, TsonUnicodePolicy identifiers) {
         return linkWith(schema, loader, null, identifiers);
     }
 
@@ -187,22 +186,16 @@ public final class TsonSchemaLinker {
      */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
                                         TsonDiagnosticsReceiver receiver) {
-        return link(schema, loader, receiver, UnicodePolicy.highlyRestrictive());
+        return link(schema, loader, receiver, TsonUnicodePolicy.highlyRestrictive());
     }
 
     /** The reporting overload with the §5.2 restriction level for declared names chosen. */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
-                                        TsonDiagnosticsReceiver receiver, UnicodePolicy identifiers) {
+                                        TsonDiagnosticsReceiver receiver, TsonUnicodePolicy identifiers) {
         Objects.requireNonNull(receiver, "receiver");
         return linkWith(schema, loader, receiver, identifiers);
     }
 
-    /**
-     * Reports {@code message} against one entry, or throws it when there is no receiver.
-     *
-     * @return {@code true} if the caller should carry on as though the check had passed -- always, since a
-     *         throw is the only other outcome. Reads as a guard at the call sites that want to skip the entry.
-     */
     /**
      * §9.4's confusability, over the closed sets this schema actually defines ({@code SPEC-FEEDBACK.md} #3
      * Steps 2–3): the merged namespace, and each entry's own field names, enum members and choice variants.
@@ -219,7 +212,7 @@ public final class TsonSchemaLinker {
      * record is the case that has no declaration, and is checked by the schemaless readers instead.
      */
     private static void checkNames(TsonDiagnosticsReceiver receiver, TsonSchema schema,
-                                   Map<String, TypeDefinition> merged, UnicodePolicy identifiers) {
+                                   Map<String, TypeDefinition> merged, TsonUnicodePolicy identifiers) {
         ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> report(receiver, schema,
                 collision.second(), merged.get(collision.second()),
                 "in the namespace of '" + schema.id() + "': " + collision.describe()));
@@ -249,6 +242,12 @@ public final class TsonSchemaLinker {
         });
     }
 
+    /**
+     * Reports {@code message} against one entry, or throws it when there is no receiver.
+     *
+     * @return {@code true} if the caller should carry on as though the check had passed -- always, since a
+     *         throw is the only other outcome. Reads as a guard at the call sites that want to skip the entry.
+     */
     private static boolean report(TsonDiagnosticsReceiver receiver, TsonSchema schema, String name,
                                   TypeDefinition def, String message) {
         if (receiver == null) {
@@ -426,7 +425,7 @@ public final class TsonSchemaLinker {
 
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
-                                             TsonDiagnosticsReceiver receiver, UnicodePolicy identifiers) {
+                                             TsonDiagnosticsReceiver receiver, TsonUnicodePolicy identifiers) {
         Map<String, String> origins = new LinkedHashMap<>();
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins);
 

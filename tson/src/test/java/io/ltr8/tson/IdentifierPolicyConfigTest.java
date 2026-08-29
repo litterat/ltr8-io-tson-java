@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.TsonSchemaSource;
-import io.ltr8.tson.compiler.config.UnicodePolicy;
+import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import org.junit.jupiter.api.Test;
 
@@ -38,14 +38,14 @@ class IdentifierPolicyConfigTest {
                 """.formatted(fieldName);
     }
 
-    private static void accepts(UnicodePolicy policy, String schema) {
+    private static void accepts(TsonUnicodePolicy policy, String schema) {
         TsonSchemaSource source = uri -> schema;
         Tson tson = (policy == null ? Tson.builder() : Tson.builder().identifierPolicy(policy))
                 .schemaSource(source).build();
         assertNotNull(tson.resolve(schema));
     }
 
-    private static String refuses(UnicodePolicy policy, String schema) {
+    private static String refuses(TsonUnicodePolicy policy, String schema) {
         TsonSchemaSource source = uri -> schema;
         Tson tson = (policy == null ? Tson.builder() : Tson.builder().identifierPolicy(policy))
                 .schemaSource(source).build();
@@ -64,29 +64,29 @@ class IdentifierPolicyConfigTest {
     /** The first relaxation to reach for: same level, applied per segment. */
     @Test
     void perSegmentAdmitsTheCompoundAndStillRefusesTheHomograph() {
-        accepts(UnicodePolicy.highlyRestrictive().perSegment(), COMPOUND);
-        assertTrue(refuses(UnicodePolicy.highlyRestrictive().perSegment(), HOMOGRAPH)
+        accepts(TsonUnicodePolicy.highlyRestrictive().perSegment(), COMPOUND);
+        assertTrue(refuses(TsonUnicodePolicy.highlyRestrictive().perSegment(), HOMOGRAPH)
                 .contains("mixes the scripts"));
     }
 
     /** Narrower still: name the combination rather than change the shape of the rule. */
     @Test
     void anExplicitlyPermittedCombinationAdmitsOnlyThat() {
-        accepts(UnicodePolicy.highlyRestrictive().permitting(LATIN, CYRILLIC), COMPOUND);
+        accepts(TsonUnicodePolicy.highlyRestrictive().permitting(LATIN, CYRILLIC), COMPOUND);
     }
 
     /** And the off positions reach the linker like any other rung. */
     @Test
     void scriptsUncheckedTurnsTheRuleOff() {
-        accepts(UnicodePolicy.scriptsUnchecked(), COMPOUND);
-        accepts(UnicodePolicy.scriptsUnchecked(), HOMOGRAPH);
+        accepts(TsonUnicodePolicy.scriptsUnchecked(), COMPOUND);
+        accepts(TsonUnicodePolicy.scriptsUnchecked(), HOMOGRAPH);
     }
 
     /** An all-Latin schema is unaffected at every rung, which is what keeps the default deployable. */
     @Test
     void anOrdinarySchemaIsUnaffected() {
-        for (UnicodePolicy policy : new UnicodePolicy[] {null, UnicodePolicy.highlyRestrictive(),
-                UnicodePolicy.highlyRestrictive().perSegment(), UnicodePolicy.asciiOnly()}) {
+        for (TsonUnicodePolicy policy : new TsonUnicodePolicy[] {null, TsonUnicodePolicy.highlyRestrictive(),
+                TsonUnicodePolicy.highlyRestrictive().perSegment(), TsonUnicodePolicy.asciiOnly()}) {
             accepts(policy, schema("order_id"));
         }
     }

@@ -133,7 +133,7 @@ that question.
 - [ ] **A name-hygiene refusal reports as `SCHEMA_ERROR` on the schema side and `CONFUSABLE_NAMES` on the data
   side.** `Diagnostic.Code.CONFUSABLE_NAMES` is emitted for exactly one scope — a Class 1 record's own field
   names, where `SchemalessTreeReader` checks them because no declaration stands behind them. Every schema-side
-  equivalent, the confusable check and the `UnicodePolicy` restriction level alike, goes through
+  equivalent, the confusable check and the `TsonUnicodePolicy` restriction level alike, goes through
   `TsonSchemaLinker`'s `report` and comes out `SCHEMA_ERROR`. So one defect carries two codes depending on
   whether a schema governs the document, and on the schema side a caller cannot tell a spoofing refusal from an
   ordinary schema error. Both halves want a code that says which rule fired — the confusable relation and the
@@ -370,7 +370,7 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   `lexer/invalid/zwnj-inside-unquoted-token` asserts today's behaviour and flips in the same change; its
   sidecar already says the contradiction is why it exists.
 - [ ] **`tokenPolicy` — the restriction level on the token surface.** `SPEC-FEEDBACK.md` #3 Step 4b, the
-  half of that step not built: `identifierPolicy` ships, `UnicodePolicy` carries the levels and the unit, and
+  half of that step not built: `identifierPolicy` ships, `TsonUnicodePolicy` carries the levels and the unit, and
   what is missing is the second channel. The identifier policy rides `TsonCompiledMetaRegistry` to the
   linker; a token policy has to reach the *reader* construction instead, including the standalone schemaless
   constructors that hold no registry. Default Unrestricted, so it costs nothing at read time and changes no

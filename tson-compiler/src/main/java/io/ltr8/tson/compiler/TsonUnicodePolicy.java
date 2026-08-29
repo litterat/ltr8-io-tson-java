@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler.config;
+package io.ltr8.tson.compiler;
 
 import java.lang.Character.UnicodeScript;
 import java.util.EnumSet;
@@ -23,13 +23,14 @@ import java.util.Set;
  * same reasoning that makes restriction levels right for a browser judging a domain name, which likewise
  * cannot enumerate what it might be confused with.
  *
- * <p>Lives here rather than beside {@code Xid} and {@code Confusables} in the internal {@code lexer}
- * package because it is <em>configuration</em>: a caller names it, so it must sit in an exported one.
+ * <p>Lives in the root package with the rest of the consumer-facing surface rather than beside {@code Xid}
+ * and {@code Confusables}, which are internal machinery in the unexported {@code lexer} package. A caller
+ * names this type at their own call site, which is the same thing that earns it the {@code Tson} prefix.
  *
  * <p>Instances are immutable; {@link #perSegment()} and {@link #permitting} return modified copies, so a
  * call site reads as one position rather than three settings.
  */
-public final class UnicodePolicy {
+public final class TsonUnicodePolicy {
 
     /** UTS #39 §5.2's levels, loosest last. */
     public enum Level {
@@ -81,39 +82,39 @@ public final class UnicodePolicy {
     private final boolean perSegment;
     private final List<Set<UnicodeScript>> permitted;
 
-    private UnicodePolicy(Level level, boolean perSegment, List<Set<UnicodeScript>> permitted) {
+    private TsonUnicodePolicy(Level level, boolean perSegment, List<Set<UnicodeScript>> permitted) {
         this.level = level;
         this.perSegment = perSegment;
         this.permitted = List.copyOf(permitted);
     }
 
-    public static UnicodePolicy of(Level level) {
-        return new UnicodePolicy(level, false, List.of());
+    public static TsonUnicodePolicy of(Level level) {
+        return new TsonUnicodePolicy(level, false, List.of());
     }
 
-    public static UnicodePolicy asciiOnly() {
+    public static TsonUnicodePolicy asciiOnly() {
         return of(Level.ASCII_ONLY);
     }
 
-    public static UnicodePolicy singleScript() {
+    public static TsonUnicodePolicy singleScript() {
         return of(Level.SINGLE_SCRIPT);
     }
 
-    public static UnicodePolicy highlyRestrictive() {
+    public static TsonUnicodePolicy highlyRestrictive() {
         return of(Level.HIGHLY_RESTRICTIVE);
     }
 
-    public static UnicodePolicy moderatelyRestrictive() {
+    public static TsonUnicodePolicy moderatelyRestrictive() {
         return of(Level.MODERATELY_RESTRICTIVE);
     }
 
     /** §5.2 level 5: no script restriction, the identifier profile kept. */
-    public static UnicodePolicy scriptsUnchecked() {
+    public static TsonUnicodePolicy scriptsUnchecked() {
         return of(Level.MINIMALLY_RESTRICTIVE);
     }
 
     /** §5.2 level 6: no script restriction and no identifier profile. See {@link Level#UNRESTRICTED}. */
-    public static UnicodePolicy unrestricted() {
+    public static TsonUnicodePolicy unrestricted() {
         return of(Level.UNRESTRICTED);
     }
 
@@ -127,8 +128,8 @@ public final class UnicodePolicy {
      * {@code _} and {@code -} are ordinary characters, and UTS #39's own {@code Toys-Я-Us} is what
      * segmenting a value would wrongly admit.
      */
-    public UnicodePolicy perSegment() {
-        return new UnicodePolicy(level, true, permitted);
+    public TsonUnicodePolicy perSegment() {
+        return new TsonUnicodePolicy(level, true, permitted);
     }
 
     /**
@@ -136,10 +137,10 @@ public final class UnicodePolicy {
      * and its siblings. The narrowest relaxation available: a deployment that knows it is Russian says
      * {@code permitting(LATIN, CYRILLIC)} rather than dropping a level and losing the rule everywhere else.
      */
-    public UnicodePolicy permitting(UnicodeScript... scripts) {
+    public TsonUnicodePolicy permitting(UnicodeScript... scripts) {
         List<Set<UnicodeScript>> extended = new java.util.ArrayList<>(permitted);
         extended.add(Set.of(scripts));
-        return new UnicodePolicy(level, perSegment, extended);
+        return new TsonUnicodePolicy(level, perSegment, extended);
     }
 
     /** Whether the check does anything at all -- an {@code UNRESTRICTED} whole-text policy scans nothing. */

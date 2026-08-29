@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.compiler.config.UnicodePolicy;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import org.junit.jupiter.api.Test;
 
@@ -32,10 +31,10 @@ class ConfusableNameScopesTest {
     private static final String ID = "https://example.test/confusable.tn";
 
     private static TsonCompiledSchema compile(String declarations) {
-        return compileWith(UnicodePolicy.highlyRestrictive(), declarations);
+        return compileWith(TsonUnicodePolicy.highlyRestrictive(), declarations);
     }
 
-    private static TsonCompiledSchema compileWith(UnicodePolicy identifiers, String declarations) {
+    private static TsonCompiledSchema compileWith(TsonUnicodePolicy identifiers, String declarations) {
         String schema = """
                 !!id:"https://example.test/confusable.tn"
                 !!meta:"https://tson.io/2026/33/m/meta.tn"
@@ -104,7 +103,7 @@ class ConfusableNameScopesTest {
      */
     @Test
     void theConfusableRuleNeverFiresOnALoneName() {
-        assertNotNull(compileWith(UnicodePolicy.highlyRestrictive().perSegment(),
+        assertNotNull(compileWith(TsonUnicodePolicy.highlyRestrictive().perSegment(),
                 "  rec => { id_" + new String(Character.toChars(0x043F))
                         + ": text  url_" + new String(Character.toChars(0x0430)) + ": text }"));
     }

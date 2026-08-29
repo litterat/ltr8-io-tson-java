@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.config.UnicodePolicy;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
@@ -114,7 +113,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * this project's own documents. A deployment that finds it too strict reaches for the *unit* before the
      * level: {@code perSegment()} still refuses every within-word homograph.
      */
-    private UnicodePolicy identifierPolicy = UnicodePolicy.highlyRestrictive();
+    private TsonUnicodePolicy identifierPolicy = TsonUnicodePolicy.highlyRestrictive();
 
     private final ThreadLocal<Set<String>> resolving = ThreadLocal.withInitial(LinkedHashSet::new);
 
@@ -183,12 +182,12 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * it itself, e.g. a test bootstrapping in isolation).
      */
     public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source) {
-        return withStandardLibrary(context, source, UnicodePolicy.highlyRestrictive());
+        return withStandardLibrary(context, source, TsonUnicodePolicy.highlyRestrictive());
     }
 
     /** The same, with {@link #identifierPolicy} chosen rather than defaulted. */
     public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source,
-                                                               UnicodePolicy identifierPolicy) {
+                                                               TsonUnicodePolicy identifierPolicy) {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
         registry.identifierPolicy = identifierPolicy;
         registry.loadStandardLibrary();
@@ -196,7 +195,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     }
 
     /** The restriction level this registry applies to declared names -- see {@link #identifierPolicy}. */
-    public UnicodePolicy identifierPolicy() {
+    public TsonUnicodePolicy identifierPolicy() {
         return identifierPolicy;
     }
 

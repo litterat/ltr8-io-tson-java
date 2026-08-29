@@ -946,7 +946,7 @@ names, so two confusable variants are two confusable entries in the namespace an
 check over variants could never fire, and the list above should drop them. Field names and enum members are
 genuine scopes because neither is a declared name.
 
-**Step 4 is built on the identifier surface and not on the token surface.** `UnicodePolicy` carries §5.2's
+**Step 4 is built on the identifier surface and not on the token surface.** `TsonUnicodePolicy` carries §5.2's
 six levels, the unit, and additional permitted script sets; `TsonConfig.identifierPolicy` reaches
 `TsonSchemaLinker` through the compiled meta registry, and the level is applied in the same pass as the
 confusable check — over the namespace, each record's field names and each enum's members. The default is

@@ -254,7 +254,7 @@ forbids — at the price of verdicts an author cannot predict (two default-`allo
 NaN however far apart their ranges sit) and a conformance bar no second implementation should have to
 match.
 
-**And the restriction level is refused per name, in the same pass** (`UnicodePolicy`, UTS #39 §5.2). The two
+**And the restriction level is refused per name, in the same pass** (`TsonUnicodePolicy`, UTS #39 §5.2). The two
 are complementary rather than overlapping: the confusable check is a *relation* and needs the whole set, so
 it can never fire on a lone name; the level is a *property* of one name, so it is what reaches a name nothing
 else in the schema resembles. Configured by `TsonConfig.identifierPolicy` and carried on
