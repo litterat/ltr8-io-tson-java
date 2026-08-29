@@ -137,17 +137,28 @@ public final class SchemalessObjectReader {
      * io.ltr8.tson.compiler.TsonDiagnosticsReceiver} gathers every problem in one pass rather than throwing
      * on the first. Frame-free: whole-document framing belongs to whoever owns the document --
      * {@link io.ltr8.tson.compiler.TsonObjectReader}, which builds the context.
+     *
+     * <p><b>A target this context cannot bind still consumes the value.</b> Every other collecting-mode
+     * failure here reports and skips, and the caller's framing counts on it: leave the value pending and the
+     * document-end pull that follows finds the root value's own first event still there, which is an internal
+     * invariant breaking on ordinary caller input rather than the report the caller asked for.
      */
     @SuppressWarnings("unchecked")
     public <T> T read(TsonReadContext ctx, Class<T> targetClass) {
         DataClass dataClass = descriptorFor(ctx, targetClass);
         if (dataClass == null) {
+            EventSkip.dataValue(ctx);
             return null;
         }
         return (T) bind(ctx, dataClass);
     }
 
-    /** Resolves {@code targetClass}'s own descriptor; a class {@code tson-bind} can't analyze (e.g. two {@code Annotations} components) is reported as a {@code SCHEMA_ERROR}, not silently. */
+    /**
+     * Resolves {@code targetClass}'s own descriptor; a class {@code tson-bind} can't analyze (e.g. two
+     * {@code Annotations} components) is reported as a {@code SCHEMA_ERROR}, not silently. Consumes nothing
+     * on failure -- each caller knows how much of the value's framing it has already taken, so the skip is
+     * theirs to make.
+     */
     private DataClass descriptorFor(TsonReadContext ctx, Class<?> targetClass) {
         try {
             return context.getDescriptor(targetClass);
