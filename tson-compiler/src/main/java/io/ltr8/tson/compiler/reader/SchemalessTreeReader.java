@@ -213,7 +213,16 @@ public final class SchemalessTreeReader {
         Set<Object> seen = new HashSet<>();
         while (!(ctx.peek() instanceof MapEnd)) {
             TsonValue key = readNode(ctx);
-            if (!seen.add(keyIdentity(key))) {
+            if (key instanceof TsonAbsent) {
+                // §2.9, and a resolver-layer constraint rather than a grammar one: the map-entry
+                // production accepts any data-value in key position, so no tier below this one can
+                // refuse it. The entry is still kept -- tree mode keeps everything it built -- and the
+                // key is left out of `seen`, since a second `_` is this same problem again and not a
+                // duplicate of a key the document meaningfully stated.
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                        "the absent sentinel '_' must not appear as a map key (§2.9)",
+                        "a real map key, never the absent sentinel '_'", "_");
+            } else if (!seen.add(keyIdentity(key))) {
                 // §2.6, the map half of readRecord's rule.
                 ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
                         "duplicate key '" + keySegment(key) + "' -- a map states each key at most once (§2.6), "

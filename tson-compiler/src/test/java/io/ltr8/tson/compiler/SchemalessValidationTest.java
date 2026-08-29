@@ -96,6 +96,17 @@ class SchemalessValidationTest {
 
     /** A built-in name is scalar-only, so one on a container is a mismatch rather than an unknown name. */
     @Test
+    void anAbsentSentinelInMapKeyPositionIsReported() {
+        // §2.9 forbids the sentinel in key position and calls it a resolver-layer constraint rather
+        // than a grammar one: the map-entry production takes any data-value there, so the reader is
+        // the first layer that can refuse it -- and Class 1 data is exactly what the rule governs.
+        List<Diagnostic> diagnostics = validate("{ _ => 1 }");
+        assertEquals(1, diagnostics.size(), diagnostics.toString());
+        assertTrue(diagnostics.get(0).message().contains("must not appear as a map key"),
+                diagnostics.get(0).message());
+    }
+
+    @Test
     void aBuiltinTypeRefOnAContainerIsReported() {
         List<Diagnostic> diagnostics = validate("!uuid { x: 1 }");
         assertEquals(1, diagnostics.size(), diagnostics.toString());

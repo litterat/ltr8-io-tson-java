@@ -736,6 +736,13 @@ aborted and the build went green while measuring nothing; that is what the varia
 **The pin is a commit, never a branch**: an upstream vector must not be able to turn this repo red with
 no change here.
 
+**The `reader` layer is where a Class 1 document gets its verdict**, and the rules §1.2 leaves to no tier
+live there and nowhere else — §2.5's unique field names, §2.6's key identity (including the decoded-value
+rule a parser cannot apply), §2.8's empty brace, §2.9's absent-key restriction. A `parser/invalid/` vector
+cannot fail on `{ a: 1  a: 2 }`; the parser accepts it by design. An error vector there states
+`category: resolver` and its subject must parse, which `checkReaderVector` asserts before asking the reader
+for a verdict.
+
 **Add test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge —
 with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, and the
 `class2/` tree is **empty**, so Part 2 work has nowhere to put a vector today and the honest move is to

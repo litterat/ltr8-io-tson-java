@@ -87,7 +87,12 @@ is small and parsed once.)
   refusal costs the value its verdict, not the entry its place; both subclasses already had the no-value
   form to put there — a `TsonAbsent` in tree mode, a `null` the bound `Map` really holds in bind mode. The
   **key** is the opposite and unconditional: §2.9 forbids the sentinel there whatever a declaration says,
-  and the parser refuses a `?` on that side for the same reason.
+  and the parser refuses a `?` on that side for the same reason. **The schemaless reader enforces it too**,
+  which is where the rule most needs enforcing: §2.9 is a Part 1 rule, so Class 1 data is exactly the case
+  it governs, and the map-entry production accepts any data-value in key position — no tier below the reader
+  can refuse one. The tree read reports and keeps the entry (tree mode keeps what it built) and leaves the
+  key out of the duplicate set, a second `_` being this same problem again rather than a repeat of a key the
+  document meaningfully stated.
   Note that §7.6 still describes the permission as *not* schema-conditional, and §5.3 still says neither
   side admits a `?`. Those two contradicted each other, which is what #12 is about; this is the reading that
   makes them consistent, built ahead of the revision that would state it.
