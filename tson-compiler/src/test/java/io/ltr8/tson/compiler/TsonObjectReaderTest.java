@@ -701,6 +701,60 @@ class TsonObjectReaderTest {
         assertTrue(problems.diagnostics().isEmpty());
     }
 
+    // ── A target class this context cannot bind ──────────────────────────
+
+    /** An interface has no constructor to bind through, so {@code tson-bind} cannot produce a descriptor for it. */
+    interface Unbindable {
+    }
+
+    /**
+     * The bind target failing to resolve is a diagnostic like any other under a collecting receiver -- so the
+     * value has to be consumed like any other, or the document-end pull that follows finds the root value's
+     * own {@code RecordStart} still pending and the caller gets an {@code IllegalStateException} about a
+     * broken internal invariant instead of the report they asked for.
+     */
+    @Test
+    void anUnbindableTargetIsReportedRatherThanBreakingTheDocumentFraming() {
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        assertNull(mapper.withDiagnostics(problems).read("{ x: 1  y: 2 }", Unbindable.class));
+        assertEquals(List.of(Diagnostic.Code.SCHEMA_ERROR),
+                problems.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    /** The leading {@code annotation* type-ref?} framing is part of the value, so it is skipped with it. */
+    @Test
+    void anUnbindableTargetConsumesTheRootValuesFramingToo() {
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        assertNull(mapper.withDiagnostics(problems).read("@doc:\"why\" !point { x: 1  y: 2 }", Unbindable.class));
+        assertEquals(List.of(Diagnostic.Code.SCHEMA_ERROR),
+                problems.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    /**
+     * Skipping the value restores the framing rather than papering over it: the document-end pull still
+     * happens, so trailing content is still rejected -- as a second diagnostic, not silence.
+     */
+    @Test
+    void anUnbindableTargetStillLeavesTrailingContentRejected() {
+        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+
+        assertNull(mapper.withDiagnostics(problems).read("{ x: 1  y: 2 } junk", Unbindable.class));
+        assertEquals(List.of(Diagnostic.Code.SCHEMA_ERROR, Diagnostic.Code.VALIDATION_ERROR),
+                problems.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    /** Fail-fast is unchanged: the first problem throws, naming the class, before framing can matter. */
+    @Test
+    void anUnbindableTargetThrowsUnderTheFailFastReceiver() {
+        TsonReadException thrown = assertThrows(TsonReadException.class,
+                () -> mapper.read("{ x: 1  y: 2 }", Unbindable.class));
+
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, thrown.diagnostic().code());
+        assertTrue(thrown.getMessage().contains(Unbindable.class.getName()), thrown.getMessage());
+    }
+
     @Test
     void preservingIgnoresATypeRefThatNamesNothing() throws DataBindException {
         TsonObjectReader lenient = mapper.preservingUnknownTypeRefs();

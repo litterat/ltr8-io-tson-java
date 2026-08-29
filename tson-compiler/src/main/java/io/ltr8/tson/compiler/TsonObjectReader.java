@@ -398,6 +398,14 @@ public final class TsonObjectReader {
     }
 
     /**
+     * The value, and the type it was read as. The name is not an aside: it is the one thing a bound object
+     * cannot supply afterwards -- a {@code DataNameBinder} maps name to class, and a binding profile lets one
+     * class serve several shapes, so class to name does not invert. {@link TsonObjectDocument} records it.
+     */
+    private record Bound<T>(T value, String typeName) {
+    }
+
+    /**
      * Binds the root value against {@code schemaUri}'s type -- {@code typeName} when {@link #readAs} supplied
      * one, else the document's own root type-ref.
      *
@@ -406,14 +414,6 @@ public final class TsonObjectReader {
      * Diagnostic}, the same promise {@code Tson#validate} makes. Where the failure is noticed before the value
      * is read, the value is skipped so the stream still lands on {@code DocumentEnd}.
      */
-    /**
-     * The value, and the type it was read as. The name is not an aside: it is the one thing a bound object
-     * cannot supply afterwards -- a {@code DataNameBinder} maps name to class, and a binding profile lets one
-     * class serve several shapes, so class to name does not invert. {@link TsonObjectDocument} records it.
-     */
-    private record Bound<T>(T value, String typeName) {
-    }
-
     private <T> Bound<T> readAgainstSchema(String schemaUri, TsonReadContext ctx, Class<T> type, String typeName) {
         RootReader root = select(schemaUri, ctx, typeName);
         if (root == null) {

@@ -355,18 +355,6 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   settles. The audit is the deliverable either way: each site, which production it
   uses, and whether the parser agrees with the grammar — `TsonSchemaParser.expectTypeName` requires
   `TokenType.UNQUOTED`, and it is worth knowing where else that is assumed.
-- [ ] **An object read whose bind target fails to resolve throws `IllegalStateException` under a collecting
-  receiver.** With the fail-fast receiver the failure is a `TsonReadException` naming the class, which is
-  right. With `withDiagnostics(collector)` the bind failure is reported instead of thrown, the read therefore
-  consumes nothing, and the `requireDocumentEnd` pull then finds the document's own `RecordStart` still
-  pending and raises `IllegalStateException: unexpected trailing event after the document's value`. So a
-  caller who asked for collection gets an internal-invariant exception rather than the report they asked for,
-  and the collected diagnostics are lost with it. Reproduces on both the standalone and the `Tson`-derived
-  object reader, on any unresolvable target; the tree path is unaffected because a tree read always consumes.
-  Per this project's exception policy an `IllegalStateException` means an internal invariant broke, and this
-  one is reachable from ordinary caller input. The fix is presumably for a reported (rather than thrown) bind
-  failure to skip the value the way every other collecting-mode failure does, so framing stays consistent.
-
 - [ ] Bidi-formatting-character surfacing outside quoted tokens (§9.5) — the sibling gap to the
   numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section; neither is enforced. Note
   this is **not** the class #14 closed: U+200E/U+200F are `Pattern_White_Space`, so they *separate* tokens

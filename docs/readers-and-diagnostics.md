@@ -206,7 +206,16 @@ is small and parsed once.)
     already had the right pointer and was still losing its position.
 - **`EventSkip`** is the shared grammar-aware "consume and discard" utility (leading annotations + an
   optional type-ref as every reader's first step; a whole value; one core-value on a shape mismatch, to
-  keep the stream correctly positioned). **`ListEventSource`** replays a pre-built event list — used for a
+  keep the stream correctly positioned). **Reporting instead of throwing obliges a reader to skip**: the
+  fail-fast receiver never returns, so a reader that reports and yields nothing without consuming is correct
+  only until a collecting receiver is handed the same document, at which point the value it declined is still
+  pending and the enclosing frame's next pull sees it. At the document boundary that pull is
+  `requireDocumentEnd`, whose belt-and-braces `IllegalStateException` then fires on ordinary caller input —
+  which is how `SchemalessObjectReader`'s unbindable-target report (a target class `tson-bind` cannot produce
+  a descriptor for) reached a caller as an internal-invariant exception with the diagnostics they asked for
+  lost inside it. Where the skip goes is a per-caller question, not `descriptorFor`'s: `read` has taken
+  nothing and skips a whole `dataValue`, while `bindUnion` has already consumed the framing to find the
+  member and skips the core-value alone. **`ListEventSource`** replays a pre-built event list — used for a
   schema default (`readSchemaDefault` wraps a literal `Token` as one synthetic event) and, via
   `DataValueEvents`, for replaying an already-resolved `DataValue` tree through a compiled reader (the one
   place `resolver` still has a `DataValue` in hand).
