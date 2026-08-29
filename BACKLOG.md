@@ -340,18 +340,18 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   a `DataBindContext` may be extended after first use, and neither shipped fetching `TsonSchemaSource` states
   what it promises a concurrent caller. None of it is hypothetical-only: the read-path half was two real defects, found by
   auditing and reproduced first try on 8 threads.
-- [ ] **Audit every `unquoted-token` reference in both grammars, and decide whether it should be `identifier`.**
-  The kernel types every name position with one atom (`token`, aliased as `type_name`/`field_name`/
-  `param_name`) — which `SPEC-FEEDBACK.md` #3 proposes replacing with a single `identifier` entry those three
-  alias, with `enum.members` moving to it as well, retiring `token` and `token_set`. The grammar
-  governs those positions with four productions: `field-name = token` admits
-  all three lexical forms, while `annotation = "@" unquoted-token`, `type-ref = "!" unquoted-token` and
-  [TSON-SCHEMA]'s `type-name = unquoted-token` admit only the bare one. So a field name may be quoted and a
-  type name may not, for no stated reason. Settling on `token` throughout is the consistent direction and
-  would let a name carrying an out-of-profile character be spelled at every position, which is what §7.1's
-  ZWNJ advice assumes is possible. **It is not a safe change on its own** — today the inconsistency is the
-  only thing confining the quoting bypass (`SPEC-FEEDBACK.md` #3, point 3) to field names, so `token`
-  everywhere widens it until `token` itself carries a contract. Sequence it behind whatever Revision 34
-  settles. The audit is the deliverable either way: each site, which production it
-  uses, and whether the parser agrees with the grammar — `TsonSchemaParser.expectTypeName` requires
-  `TokenType.UNQUOTED`, and it is worth knowing where else that is assumed.
+- [ ] **Enforce the `identifier` profile at the three naming positions that still take a bare unquoted token.** The
+  kernel carries the contract (`identifier`, with `type_name`/`field_name`/`param_name` aliasing it) and
+  `IdentifierParser` applies it where the resolved model is read back as data, but three positions check
+  `TokenType.UNQUOTED` and stop, so every name token-Start admits and identifier-Start does not passes at each:
+  **`type-ref` and `annotation` in data** (`TsonDataStream.parseTypeRefName` and its annotation frame, where
+  `SPEC-FEEDBACK.md` #3 Step 1c specifies `"!" identifier` / `"@" identifier` — `!42x` and `@x.y:1` parse today);
+  **declared type and parameter names** (`TsonSchemaParser.expectTypeName` applies only [TSON-SCHEMA] §12.1's "numbers
+  are not declarable names" rule, and `DefinitionResolver.requireIdentifier` runs for field names alone, so
+  `x.y => text` and `42x => text` resolve); and **`field-name`, which still admits `multi-line-token`**
+  (`isBareTokenType`) where Step 1c narrows it to `unquoted-token / single-line-token`. The second is the one with a
+  rule to *replace* rather than add: the identifier profile subsumes §12.1's number rule, which meta-kernel's own
+  `@doc` already says, so `requireIdentifier` stands in for `rejectNumericTypeName` instead of sitting beside it. The
+  third is a one-line tightening plus a test. Keeping `field-name` *lexical* is deliberate and stays — Class 1 field
+  names are unconstrained by design (#3 Step 1c), and the narrowing is within that decision. The audit is still the
+  deliverable: each site, which production it uses, and whether the parser agrees with the grammar.
