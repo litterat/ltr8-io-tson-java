@@ -30,8 +30,8 @@ class TsonHttpSchemaSourceTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/33/m/meta.tn"
-            !!import:"https://tson.io/2026/33/m/core.tn"
+            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!import:"https://tson.io/2026/34/m/core.tn"
             {
                 order => { sku: text  quantity: int32 }
             }""";

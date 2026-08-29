@@ -2,8 +2,10 @@ package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.meta.TimeType;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigInteger;
 import java.time.OffsetTime;
 import java.util.Optional;
 
@@ -78,5 +80,31 @@ class TimeParserTest {
     void writeRoundTripsThroughRead() {
         assertEquals("10:15:30+01:00",
                 TimeParser.UNCONSTRAINED.write(TimeParser.UNCONSTRAINED.read(token("10:15:30+01:00"))));
+    }
+
+    /**
+     * <b>{@code precision} bounds the fractional-second digits from above, on the token as written</b>
+     * (§5.5). Judged textually and never on the parsed value: {@code 10:15:30.100Z} states three digits
+     * whatever instant it denotes, and the atom is exact, so a token over the bound is refused rather than
+     * truncated to fit.
+     */
+    @Test
+    void precisionBoundsTheWrittenFractionalDigits() {
+        TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
+                Optional.of(BigInteger.valueOf(3))));
+        assertEquals(OffsetTime.parse("10:15:30Z"), type.read(token("10:15:30Z")));
+        assertEquals(OffsetTime.parse("10:15:30.123Z"), type.read(token("10:15:30.123Z")));
+        // Three written digits, one significant -- the count is of the token, not of the instant.
+        assertEquals(OffsetTime.parse("10:15:30.100Z"), type.read(token("10:15:30.100Z")));
+        assertThrows(AtomValidationException.class, () -> type.read(token("10:15:30.1234Z")));
+    }
+
+    /** {@code precision: 0} admits no fractional part at all (§5.5). */
+    @Test
+    void precisionZeroAdmitsNoFraction() {
+        TimeParser type = new TimeParser(new TimeType(Optional.empty(), Optional.empty(),
+                Optional.of(BigInteger.ZERO)));
+        assertEquals(OffsetTime.parse("10:15:30Z"), type.read(token("10:15:30Z")));
+        assertThrows(AtomValidationException.class, () -> type.read(token("10:15:30.1Z")));
     }
 }

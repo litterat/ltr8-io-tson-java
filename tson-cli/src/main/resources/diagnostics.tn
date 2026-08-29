@@ -1,9 +1,9 @@
-!!id:"https://tson.io/2026/33/ltr8/cli/diagnostics-11.tn"
-!!meta:"https://tson.io/2026/33/m/meta.tn"
-!!import:"https://tson.io/2026/33/m/core.tn"
+!!id:"https://tson.io/2026/34/ltr8/cli/diagnostics-11.tn"
+!!meta:"https://tson.io/2026/34/m/meta.tn"
+!!import:"https://tson.io/2026/34/m/core.tn"
 @doc:"""
   This project's own schema !!id convention (see CLAUDE.md's "Project-owned schema !!id
-  convention"): /2026/33 is the spec revision this schema is written against, ltr8 is the
+  convention"): /2026/34 is the spec revision this schema is written against, ltr8 is the
   publishing org, cli is this module's own schema group, and the trailing -10 is this schema's
   own version -- bumped when file_report/validation_run were added, so `validate` can name the
   file each verdict belongs to inside one document; when the fields that may have nothing to

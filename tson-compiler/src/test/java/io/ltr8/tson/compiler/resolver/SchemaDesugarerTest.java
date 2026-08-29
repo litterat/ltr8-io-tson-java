@@ -54,7 +54,7 @@ class SchemaDesugarerTest {
 
     private static SchemaDocument parse(String declarations) {
         return new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/34/m/meta-kernel.tn"
                 {
                 %s
                 }
@@ -99,7 +99,7 @@ class SchemaDesugarerTest {
     @Test
     void aRewrittenDeclarationKeepsItsSourcePosition() {
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/33/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/34/m/meta-kernel.tn"
                 {
                   plain => { a: text }
 

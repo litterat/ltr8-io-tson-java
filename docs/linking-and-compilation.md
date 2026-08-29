@@ -36,7 +36,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   schemas declaring one name is an error naming both, and a local declaration may not reuse a name the
   closure already binds — no hiding, no redefinition. Listing one schema twice, or under two spellings of
   one canonical identity, is redundant rather than an error. Because identities carry the spec revision, a
-  closure reaching both `/2026/32/m/core.tn` and `/2026/33/m/core.tn` is rejected here rather than surfacing
+  closure reaching both `/2026/32/m/core.tn` and `/2026/34/m/core.tn` is rejected here rather than surfacing
   later as a field conflict between two identically-spelled types; (2) **populate `subtypes`**
   (reverse of `supertypes`); (3) **derive `disjoint`** for every choice entry (`ChoiceDisjointness`, §5.4) —
   total and two-valued, detailed under "The disjointness derivation" below, so a linked choice always

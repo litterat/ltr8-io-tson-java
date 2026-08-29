@@ -17,15 +17,15 @@ void main() {
     Tson tson = Tson.builder().build();
 
     String schema = """
-            !!id:"https://example.com/2026/33/app/server-1.tn"
-            !!meta:"https://tson.io/2026/33/m/meta.tn"
-            !!import:"https://tson.io/2026/33/m/core.tn"
+            !!id:"https://example.com/2026/34/app/server-1.tn"
+            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!import:"https://tson.io/2026/34/m/core.tn"
             {
                 server => { hostname: text  port: int32 }
             }""";
 
     tson.resolve(schema);                       // registers it under its own !!id
-    var reader = tson.treeReader().withSchema("https://example.com/2026/33/app/server-1.tn");
+    var reader = tson.treeReader().withSchema("https://example.com/2026/34/app/server-1.tn");
 
     TsonValue server = reader.readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
     IO.println("hostname: " + server.get("hostname").asString().orElseThrow());   // web-01

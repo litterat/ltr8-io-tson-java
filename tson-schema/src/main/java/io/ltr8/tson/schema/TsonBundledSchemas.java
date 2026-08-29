@@ -37,13 +37,13 @@ public final class TsonBundledSchemas {
      * {@code TsonSchemaLinker.isMetaKernelGoverned}'s own Javadoc for why that check needs this to be
      * a specific, fixed identity rather than a structural "is this schema self-referencing" test.
      */
-    public static final String META_KERNEL_ID = "https://tson.io/2026/33/m/meta-kernel.tn";
+    public static final String META_KERNEL_ID = "https://tson.io/2026/34/m/meta-kernel.tn";
 
     /** meta's own real, published identity -- see {@code spec/m/meta.tn}'s own {@code !!id}. */
-    public static final String META_ID = "https://tson.io/2026/33/m/meta.tn";
+    public static final String META_ID = "https://tson.io/2026/34/m/meta.tn";
 
     /** core's own real, published identity -- see {@code spec/m/core.tn}'s own {@code !!id}. */
-    public static final String CORE_ID = "https://tson.io/2026/33/m/core.tn";
+    public static final String CORE_ID = "https://tson.io/2026/34/m/core.tn";
 
     /**
      * meta-kernel's own published content-hash digest -- the {@code ?sha256=} on {@code
@@ -51,13 +51,13 @@ public final class TsonBundledSchemas {
      * library holds it so a hash-pinned reference to a pre-loaded schema can be verified, and so the
      * shipped resource can be checked against its own published digest ({@link #declaredSha256}).
      */
-    public static final String META_KERNEL_SHA256 = "5c8f7830757fbf25ebb7d5da8cd87c4c12acdc68a2612a3e135211b65b6aac56";
+    public static final String META_KERNEL_SHA256 = "13de02b2f0ee17bee0337252d069d332a33cd63a8f25732fca6bfc142685357e";
 
     /** meta's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String META_SHA256 = "ff2866c0d71cfaeee837c30ccc7328ac9c790df8ea700da8d85b5c36d0efe414";
+    public static final String META_SHA256 = "a5cf63664cccaafed4b11e494fdb8b3aed0133bf47200910a039a252daed0613";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "034d76d41e3cee431ab2f484a0a18f39b6c5752f6b8a90a501cb0a7aa2ebe55a";
+    public static final String CORE_SHA256 = "c2127732df2dbac80ac4bbb7cb7d35070bfe546472368088a2f76343a8d85830";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",

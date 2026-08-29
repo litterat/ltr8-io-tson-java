@@ -36,8 +36,8 @@ class SchemaVersionProfileTest {
     /** v1 carries {@code code}; v2 drops it and adds {@code currency}. */
     private static final String V1_SCHEMA = """
             !!id:"https://example.test/order-1.tn"
-            !!meta:"https://tson.io/2026/33/m/meta.tn"
-            !!import:"https://tson.io/2026/33/m/core.tn"
+            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!import:"https://tson.io/2026/34/m/core.tn"
             {
               order => { sku: text  quantity: int32  code: int32 }
             }
@@ -45,8 +45,8 @@ class SchemaVersionProfileTest {
 
     private static final String V2_SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/33/m/meta.tn"
-            !!import:"https://tson.io/2026/33/m/core.tn"
+            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!import:"https://tson.io/2026/34/m/core.tn"
             {
               order => { sku: text  quantity: int32  currency: text }
             }

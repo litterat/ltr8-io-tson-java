@@ -2,7 +2,7 @@
 
 Issues, ambiguities, and inconsistencies found in the TSON spec while building this implementation.
 See `CLAUDE.md` for why this file exists and when to add to it. Spec quotes below are from
-2026 Revision 33 — Part 1 (https://tson.io/raw/2026/33/tson-part1-data.md) unless noted otherwise.
+2026 Revision 33 — Part 1 (https://tson.io/raw/2026/34/tson-part1-data.md) unless noted otherwise.
 
 Format per entry: spec section, the problem, the interpretation this implementation chose, and a
 suggested resolution where there is one.

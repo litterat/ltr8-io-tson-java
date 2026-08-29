@@ -44,8 +44,8 @@ class SchemaDrivenTreeAnnotationTest {
     private static final String SCHEMA_ID = "https://example.test/tree-annotations.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/tree-annotations.tn"
-            !!meta:"https://tson.io/2026/33/m/meta.tn"
-            !!import:"https://tson.io/2026/33/m/core.tn"
+            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!import:"https://tson.io/2026/34/m/core.tn"
             {
               label => @annotation text
               checked => @annotation void

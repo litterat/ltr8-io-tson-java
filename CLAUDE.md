@@ -26,9 +26,9 @@ A from-scratch Java implementation of TSON (Typed Schema Object Notation), built
 spec series (2026 revision):
 
 - Part 1 — lexer, structural grammar, base type resolution, built-in type vocabulary:
-  https://tson.io/raw/2026/33/tson-part1-data.md
+  https://tson.io/raw/2026/34/tson-part1-data.md
 - Part 2 — schema grammar, type system, resolution, linking, compilation:
-  https://tson.io/raw/2026/33/tson-part2-schema.md
+  https://tson.io/raw/2026/34/tson-part2-schema.md
 
 The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
 doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
@@ -165,7 +165,7 @@ keeps it apart. The exception classification itself is unchanged and is what pic
 `DefinitionResolver`'s Javadoc lists the exact current boundary.
 
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
-`https://tson.io/2026/33/ltr8/<group>/<name>-<version>.tn` — `/2026/33` is the spec revision, `ltr8` the
+`https://tson.io/2026/34/ltr8/<group>/<name>-<version>.tn` — `/2026/34` is the spec revision, `ltr8` the
 publishing org, `<group>` the subsystem (`cli`), `<name>-<version>` the schema name with a trailing
 integer version. Bump the version under a new name (`diagnostics-2.tn`, not an in-place edit) whenever the
 shape changes (§10's immutability rule). **Use `.tn`, not `.tn1`** — `.tn1` is a stability claim §7.1
@@ -806,11 +806,10 @@ compatibility).
   edges an open operand does and does not give. `DefinitionResolver`'s Javadoc is the exact current boundary.
   Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
-  **Gaps reaching a read still exist**, six of them, all through `ErrorReader` and all on a schema that
-  loaded clean: `unknown` and `extern` (below), and `datetime`/`time` with `precision` or `require_timezone`
-  set. Each **rides in the report as `NOT_IMPLEMENTED`**, located at the value it could not read, and costs
-  that value a verdict and nothing else's — so a gap and an ordinary error in one document both get
-  reported, and `TsonCli.exitCodeFor` lifts the run to 70.
+  **Gaps reaching a read still exist**, two of them, both through `ErrorReader` and both on a schema that
+  loaded clean: `unknown` and `extern` (below). Each **rides in the report as `NOT_IMPLEMENTED`**, located
+  at the value it could not read, and costs that value a verdict and nothing else's — so a gap and an
+  ordinary error in one document both get reported, and `TsonCli.exitCodeFor` lifts the run to 70.
 - **A container position that is an application, and what a held open body still cannot say.** §5.10
   substitution works for both template shapes: a **record** template (parameters occupying field types and
   values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T

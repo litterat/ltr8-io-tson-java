@@ -20,30 +20,10 @@ import java.util.regex.Pattern;
  * (inherited from the same {@code full-time} production). Holds a {@link DateTimeType} -- the pure
  * constraint values, unchanged by this split -- rather than declaring those fields itself.
  *
- * <p>{@code precision}/{@code require_timezone} are modelled on the body and refused here -- see the
- * constructor. Carrying them is what keeps the body faithful to the constructor's resolved shape; refusing
- * them is what keeps a schema from stating a constraint this parser would ignore.
+ * <p>{@code precision} is enforced on the token as written (§5.5), the same upper bound on fractional-second
+ * digits {@link TimeParser} applies and for the same reason.
  */
 public record DateTimeParser(DateTimeType constraints) implements AtomType<OffsetDateTime> {
-
-    public DateTimeParser {
-        // Carried on the body, unenforced here -- so a schema that sets one is refused rather than accepted
-        // and quietly ignored. An UnsupportedOperationException is the gap classification, and since a gap
-        // now travels as a Diagnostic, the author is told which declaration and why while the rest of their
-        // schema still gets its verdict.
-        if (constraints.precision().isPresent()) {
-            throw new UnsupportedOperationException("'datetime' does not enforce 'precision' yet, so a schema "
-                    + "setting it would be accepted without the constraint being applied -- the spec does not "
-                    + "say whether it bounds the fractional-second digits exactly or at most, and this "
-                    + "implementation will not guess. Drop it, or constrain the value another way");
-        }
-        if (constraints.requireTimezone().isPresent()) {
-            throw new UnsupportedOperationException("'datetime' does not enforce 'require_timezone' yet, so a "
-                    + "schema setting it would be accepted without the constraint being applied. RFC 3339 "
-                    + "requires an offset on every value this atom accepts, so 'true' is already the "
-                    + "behaviour; 'false' needs an offset-less parse this atom does not have");
-        }
-    }
 
     /** §5.4's built-in annotation name -- {@code !datetime}. */
     public static final String TYPENAME = "datetime";
@@ -52,7 +32,7 @@ public record DateTimeParser(DateTimeType constraints) implements AtomType<Offse
     public static final DateTimeParser UNCONSTRAINED = new DateTimeParser(DateTimeType.UNCONSTRAINED);
 
     public DateTimeParser(Optional<OffsetDateTime> min, Optional<OffsetDateTime> max) {
-        this(new DateTimeType(min, max, Optional.empty(), Optional.empty()));
+        this(new DateTimeType(min, max));
     }
 
     private static final Pattern DATE_TIME = Pattern.compile(
@@ -83,6 +63,7 @@ public record DateTimeParser(DateTimeType constraints) implements AtomType<Offse
     }
 
     private void validate(OffsetDateTime value, String text) {
+        FractionalSeconds.check(constraints.precision(), text, "datetime");
         constraints.min().ifPresent(m -> {
             if (value.isBefore(m)) {
                 throw new AtomValidationException("'" + text + "' is before the minimum " + m, ">= " + m);

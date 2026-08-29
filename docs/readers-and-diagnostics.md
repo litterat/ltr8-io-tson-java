@@ -598,11 +598,10 @@ error* category, so this is the same layer, not a new one.
     - **REQUIRED_FIXED / OPTIONAL_FIXED** → exempt. The schema settles the value, so a component would hold
       a constant. **This exemption is what makes strictness possible at all**: 21 of the mismatches in this
       library's own bundled binding are FIXED fields (`access_pattern`, `size_type`, an atom's `spec`).
-    - The rule bites the library first, which is the point: `datetime_type` declares `precision` and
-      `require_timezone`, so `DateTimeType`/`TimeType` now carry them — and their parsers refuse a schema
-      that *sets* one, rather than accepting it and ignoring the facet. Neither is enforced (`precision`'s
-      exact-vs-maximum semantics are unsettled by the spec; `require_timezone: false` needs an offset-less
-      parse path), and a gap saying so beats a constraint silently not applied.
+    - The rule bites the library first, which is the point: `datetime_type` declares `precision`, so
+      `DateTimeType`/`TimeType` carry it and their parsers enforce it — §5.5 makes it an upper bound on the
+      fractional-second digits of the token *as written*, checked textually because the atoms are exact and
+      nothing is ever truncated to satisfy a facet (`FractionalSeconds`).
     - The converse — a component no field fills — is refused at compile too: it reaches the constructor as
       `null` on every document. `@Unbound` is how a class says a component is its own and not the wire's,
       needed exactly once here (`TypeDefinition.position`, this implementation's own addition for

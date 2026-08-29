@@ -22,8 +22,8 @@ class TsonValidateSchemaTest {
 
     private static final String HEADER = """
             !!id:"https://example.test/validate-schema-test.tn"
-            !!meta:"https://tson.io/2026/33/m/meta.tn"
-            !!import:"https://tson.io/2026/33/m/core.tn"
+            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!import:"https://tson.io/2026/34/m/core.tn"
             """;
 
     private static List<Diagnostic> check(String body) {
@@ -446,7 +446,7 @@ class TsonValidateSchemaTest {
     void anUnloadableImportIsReportedAgainstTheDocument() {
         List<Diagnostic> problems = Tson.builder().build().validateSchema("""
                 !!id:"https://example.test/bad-import.tn"
-                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 !!import:"https://example.test/nothing-here.tn"
                 { my_int => int32 }
                 """);
@@ -465,7 +465,7 @@ class TsonValidateSchemaTest {
     void anImportWhoseTargetOwnsAnotherIdentityIsReportedAgainstTheDocument() {
         String lib = """
                 !!id:"https://example.test/its-real-name.tn"
-                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { widget => { name: text } }
                 """;
         Tson tson = Tson.builder()
@@ -479,7 +479,7 @@ class TsonValidateSchemaTest {
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/mismatched-import.tn"
-                !!meta:"https://tson.io/2026/33/m/meta.tn"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 !!import:"https://example.test/fetched-as.tn"
                 { holder => { w: widget } }
                 """);
