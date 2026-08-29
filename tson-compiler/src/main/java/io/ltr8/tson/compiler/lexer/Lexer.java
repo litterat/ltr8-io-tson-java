@@ -84,6 +84,13 @@ public final class Lexer {
     private final int[] lookaheadByteLengths = new int[4];
     private int lookaheadCount;
 
+    /**
+     * The last code point {@link #advance()} consumed, or -1 before the first -- the character on the near side
+     * of a whitespace run, which is half of what {@link #skipWhitespace} needs to decide whether an ignorable
+     * format control sits at a token boundary or inside a token.
+     */
+    private int lastCodePoint = -1;
+
     private int line;       // 1-based; also the most recently lexed token's own *end* line
     private int col;        // 1-based, counted in code points; also that token's own end column
     private int byteOffset; // 0-based UTF-8 byte offset; also that token's own end byte offset
@@ -680,10 +687,81 @@ public final class Lexer {
 
     // ── Whitespace (§7.1, §7.2 rule 1) ──────────────────────────────────
 
+    /**
+     * Consumes the run of {@code Pattern_White_Space} before a token, holding the two halves [UAX31-R3a-1]
+     * splits that property into apart.
+     *
+     * <p><b>LRM and RLM are not horizontal space.</b> R3a-1 sorts {@code Pattern_White_Space} into end-of-line
+     * (item 1), <em>ignorable format controls</em> -- the members carrying {@code Default_Ignorable_Code_Point},
+     * which the requirement's own note names as exactly U+200E and U+200F (item 2) -- and horizontal space
+     * (item 3, "all other characters"). Item 2's controls "shall be allowed in the contexts UAX31-I1, UAX31-I2,
+     * and UAX31-I3 ... where their insertion shall have no effect on the meaning of the program". Reading them
+     * as item 3 instead is what lets {@code ad<LRM>min} lex as two tokens and {@code [1<LRM>2]} read as two
+     * elements -- an insertion that plainly changes the meaning, and invisibly. See {@code SPEC-FEEDBACK.md} #16.
+     *
+     * <p><b>The check is R3a's own.</b> Its note states the strategy directly: "Since these characters are
+     * allowed only where a boundary would, in their absence, exist between lexical elements, an implementation
+     * could ignore them when lexing, and then consider as illegal any lexical element that contains them." So a
+     * control is consumed and contributes nothing, and a run holding no real space is illegal exactly when the
+     * code points on either side of it would have continued one token -- which is I1 (the run is adjacent to
+     * horizontal space) and I2 (a space could have stood here) decided by looking at two characters.
+     */
     private void skipWhitespace() {
-        while (!atEnd() && isPatternWhiteSpace(peekCodePoint())) {
+        int precedingCodePoint = lastCodePoint;
+        boolean sawHorizontalSpace = false;
+        int control = -1;
+        int controlLine = line;
+        int controlColumn = col;
+        int controlByteOffset = byteOffset;
+        while (!atEnd()) {
+            int cp = peekCodePoint();
+            if (isIgnorableFormatControl(cp)) {
+                if (control == -1) {
+                    control = cp;
+                    controlLine = line;
+                    controlColumn = col;
+                    controlByteOffset = byteOffset;
+                }
+            } else if (isPatternWhiteSpace(cp)) {
+                sawHorizontalSpace = true;
+            } else {
+                break;
+            }
             advance();
         }
+        if (control != -1 && !sawHorizontalSpace) {
+            requireTokenBoundary(precedingCodePoint, control,
+                    new Position(controlLine, controlColumn, controlByteOffset));
+        }
+    }
+
+    /**
+     * Refuses an ignorable format control that stands inside a lexical element rather than at a boundary --
+     * see {@link #skipWhitespace}. Both neighbours continuing a token is what says the two would have been one
+     * token without it; a run adjacent to real horizontal space never reaches here, that being [UAX31-I1].
+     */
+    private void requireTokenBoundary(int precedingCodePoint, int control, Position at) {
+        int following = peekCodePoint();
+        if (!continuesAToken(precedingCodePoint) || !continuesAToken(following)) {
+            return;
+        }
+        if (following == '.' && peekCodePointAt(1) == '.') {
+            return; // `..` is a token of its own (§7.2 rule 3), so the boundary is there either way
+        }
+        throw new LexException(("%s stands between '%s' and '%s', which without it are one token -- an "
+                + "ignorable format control may only stand where a token boundary already exists. Remove it, "
+                + "or quote the token to keep it as content").formatted(nameOf(control),
+                new String(Character.toChars(precedingCodePoint)), new String(Character.toChars(following))), at);
+    }
+
+    /** Whether {@code cp} would carry on an unquoted token -- the test for "these two would have been one token". */
+    private static boolean continuesAToken(int cp) {
+        return cp != -1 && isUnquotedContinuation(cp);
+    }
+
+    /** The two ignorable format controls, spelled for a message; nothing else reaches here. */
+    private static String nameOf(int control) {
+        return control == 0x200E ? "U+200E LEFT-TO-RIGHT MARK" : "U+200F RIGHT-TO-LEFT MARK";
     }
 
     private void skipSpacesTabs() {
@@ -697,11 +775,26 @@ public final class Lexer {
         }
     }
 
+    /**
+     * §7.2 rule 1's fixed eleven-character {@code Pattern_White_Space} set. What each member <em>does</em> is
+     * {@link #skipWhitespace}'s question, not this one's.
+     */
     private static boolean isPatternWhiteSpace(int cp) {
         return switch (cp) {
             case 0x0009, 0x000A, 0x000B, 0x000C, 0x000D, 0x0020, 0x0085, 0x200E, 0x200F, 0x2028, 0x2029 -> true;
             default -> false;
         };
+    }
+
+    /**
+     * The two members of {@code Pattern_White_Space} carrying {@code Default_Ignorable_Code_Point}, which
+     * [UAX31-R3a-1] item 2 makes ignorable format controls rather than horizontal space -- its own note names
+     * them: "The characters to be treated as ignorable format controls under item 2 of UAX31-R3a-1 are U+200E
+     * LEFT-TO-RIGHT MARK and U+200F RIGHT-TO-LEFT MARK." Listed rather than computed from the property, for
+     * the same reason the set above is: it is fixed, and two names read better than a table lookup.
+     */
+    private static boolean isIgnorableFormatControl(int cp) {
+        return cp == 0x200E || cp == 0x200F;
     }
 
     private static boolean isLineTerminatorCp(int cp) {
@@ -899,6 +992,7 @@ public final class Lexer {
         } else {
             col++;
         }
+        lastCodePoint = cp;
         return cp;
     }
 
