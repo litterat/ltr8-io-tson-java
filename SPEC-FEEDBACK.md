@@ -578,7 +578,7 @@ on. Sorted by what each rejects, they invert — measured, both prototyped:
 
 | | catches mixed-script (`admin`/`аdmin`) | catches whole-script (`aec`/`аес`) | rejects a *lone* legitimate name | data |
 |---|---|---|---|---|
-| Restriction level (§5.2, Highly Restrictive) | yes | **no** | **yes — see below** | none |
+| Restriction level (§5.2, Highly Restrictive) | yes | **no** | **yes over a whole name; no per segment — Step 4** | none |
 | `skeleton()` distinctness in scope | yes | **yes** | **no — needs a colliding pair** | 706 KB |
 
 The restriction level is a property of one name, so it must guess from the name alone, and it guesses wrong
@@ -626,11 +626,50 @@ The 706 KB falls on implementers, once, and can be a generated table; the altern
 on authors, in one script community, forever. If shipping the table is judged too much, the honest outcome
 is to keep §9.4 advisory rather than to adopt the cheap mechanism as a substitute — it is not one.
 
-**Step 4 — the restriction level, as an option and not a default.** Keep it available for deployments that
-want defence in depth, stated as a named profile rather than as prose (so two implementations offering it
-agree on what it means). Its right default is off: it rejects names that are not ambiguous with anything in
-the document, which is a judgement about the outside world that a format processor is not positioned to
-make.
+**Step 4 — the restriction level, per *segment*, and strict by default.** An earlier draft of this entry
+recommended keeping it opt-in and default off, because UTS #39 §5.2's levels are stated over a whole
+identifier and every one of them rejects `id_пользователя`, `url_адрес` and `api_ключ` — the Latin
+abbreviations that appear inside identifiers written in every other script. That objection is about *where*
+the level is applied, not about the level, and moving it removes the objection entirely.
+
+**Apply Highly Restrictive to each `_`/`-` delimited segment rather than to the whole name.** Programming
+identifiers are compounds, and their separators are exactly the boundaries at which a script change is
+ordinary rather than suspicious. Measured over the cases that decided the earlier recommendation:
+
+```
+                       whole name      per segment
+аdmin  pаssword  usеr   REJECT          REJECT        within-word homographs — the attack
+id_аdmin                REJECT          REJECT        one bad segment is still one bad segment
+id_пользователя         REJECT          accept        the common case for a non-Latin developer
+url_адрес  api_ключ     REJECT          accept
+alpha_α  χ_index        REJECT          accept
+日本語id  order_id       accept          accept
+```
+
+Every rejection the rule exists for survives; every false positive that made it undeployable disappears.
+Nothing is given up to the attacker, because a homograph has to sit *inside* a word to read as that word:
+spoofing `admin` needs `аdmin`, which is one segment mixing scripts, and spoofing `id_admin` needs
+`id_аdmin`, whose second segment does. What passes the script rule is a segment that is wholly one script
+and merely *looks* Latin — `id_аdмin` — and that is the whole-script case Step 2's skeleton distinctness
+catches. The two mechanisms compose: the script rule refuses mixing inside a word, the skeleton refuses
+lookalikes across a scope, and neither covers the other's case.
+
+**So it can be a MUST rather than an option**, which is the better default for a security rule and removes
+the awkwardness of a normative document specifying something it expects to be switched off.
+
+**What it still costs.** A name with no separator that legitimately mixes scripts — `идHTTP` rather than
+`ид_HTTP` — is refused, and an author writes the separator. That is a real narrowing and much smaller than
+the one it replaces, and it is worth stating rather than discovering.
+
+**On how an implementation should let it be relaxed**, since a normative rule with no escape hatch invites
+worse ones: **not through the environment.** A security policy read from an environment variable is ambient
+authority — a CI config, a container image, a shell wrapper or a dependency calling `setenv` changes it with
+no code change, no diff and nothing in review; it is invisible at the call site, process-global, so an
+embedding library cannot hold its own policy, and it appears in no artifact anyone reads. An opt-out
+expressed **in code** has the opposite properties: greppable, diffable, attributable, and scoped to the
+processor instance that holds it. With the rule strict by default, the code path is a *weakening*, which is
+the right thing to make expensive and visible — and it should be named for what it permits rather than for
+the check it disables.
 
 **Step 5 — Identifier_Status, cheaply, on the same profile.** Requiring name characters to be
 `Identifier_Status=Allowed` (556 ranges, 47 KB) subsumes §7.1's hand-picked ZWNJ/ZWJ exclusion — currently a

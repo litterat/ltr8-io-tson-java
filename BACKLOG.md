@@ -357,14 +357,21 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   restriction level for. The conformance vector
   `lexer/invalid/zwnj-inside-unquoted-token` asserts today's behaviour and flips in the same change; its
   sidecar already says the contradiction is why it exists.
-- [ ] **The UTS #39 restriction level, opt-in and default off** — `SPEC-FEEDBACK.md` #3 Step 4, the one
-  piece of that entry not built. UTS #39 §5.2 Highly Restrictive over `Character.UnicodeScript` plus a
-  three-row augmented-set table, so **no shipped data**; what it needs is a configuration channel, and
-  neither `TsonSchemaLinker` nor `IdentifierParser` has one — `TsonSchemaLinker.link` is called from six
-  sites across three modules and `TsonConfig`'s existing flags reach the bind context, not the linker. The
-  default must be off: it rejects names that are not ambiguous with anything in the document, and it rejects
-  ordinary ones (`id_пользователя`, `url_адрес`, `api_ключ`) while permitting the same mixing for Japanese,
-  which is why #3 makes it an option rather than the rule.
+- [ ] **The UTS #39 restriction level, per segment and strict by default** — `SPEC-FEEDBACK.md` #3 Step 4,
+  the one piece of that entry not built. Highly Restrictive (§5.2) applied to each `_`/`-` delimited segment
+  rather than to the whole name: no shipped data (`Character.UnicodeScript` plus a three-row augmented-set
+  table), and measured to reject every within-word homograph (`аdmin`, `pаssword`, `usеr`, `id_аdmin`) while
+  accepting the names the whole-name form made undeployable (`id_пользователя`, `url_адрес`, `api_ключ`,
+  `alpha_α`). It composes with the skeleton check rather than overlapping it — the script rule refuses
+  mixing inside a word, the skeleton refuses lookalikes across a scope.
+    - **The relaxation must be expressed in code, never in the environment.** A policy read from an env var
+      is ambient authority: a CI config, a container image or a dependency calling `setenv` changes it with
+      no diff and nothing in review, it is invisible at the call site, and it is process-global so an
+      embedding library cannot hold its own. A `TsonConfig` method is greppable, diffable and scoped to the
+      instance; name it for what it permits, not for the check it turns off.
+    - What it needs is that configuration channel, which neither `TsonSchemaLinker` nor `IdentifierParser`
+      has — `link` is called from six sites across three modules, and `TsonConfig`'s existing flags reach the
+      bind context rather than the linker. That plumbing is the work; the rule itself is about twenty lines.
 - [ ] Bidi-formatting-character surfacing outside quoted tokens (§9.5) — the sibling gap to the
   numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section; neither is enforced. Note
   this is **not** the class #14 closed: U+200E/U+200F are `Pattern_White_Space`, so they *separate* tokens
