@@ -357,13 +357,23 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   restriction level for. The conformance vector
   `lexer/invalid/zwnj-inside-unquoted-token` asserts today's behaviour and flips in the same change; its
   sidecar already says the contradiction is why it exists.
-- [ ] **The UTS #39 restriction level, per segment and strict by default** — `SPEC-FEEDBACK.md` #3 Step 4,
-  the one piece of that entry not built. Highly Restrictive (§5.2) applied to each `_`/`-` delimited segment
-  rather than to the whole name: no shipped data (`Character.UnicodeScript` plus a three-row augmented-set
-  table), and measured to reject every within-word homograph (`аdmin`, `pаssword`, `usеr`, `id_аdmin`) while
-  accepting the names the whole-name form made undeployable (`id_пользователя`, `url_адрес`, `api_ключ`,
-  `alpha_α`). It composes with the skeleton check rather than overlapping it — the script rule refuses
-  mixing inside a word, the skeleton refuses lookalikes across a scope.
+- [ ] **The UTS #39 restriction level, Highly Restrictive by default** — `SPEC-FEEDBACK.md` #3 Step 4, the
+  one piece of that entry not built. No shipped data: `Character.UnicodeScript` plus a three-row
+  augmented-set table. Two configuration axes rather than one ladder, since per-segment Highly Restrictive
+  and Moderately Restrictive are incomparable — a **level** (§5.2's own six, so the default is a named
+  standard two implementations agree on) and a **unit** (whole name, or each `_`/`-` segment). Default:
+  Highly Restrictive over the whole name; the first relaxation to offer is the *unit*, which still refuses
+  every within-word homograph (`аdmin`, `pаssword`, `id_аdmin`) while admitting `id_пользователя`,
+  `url_адрес` and `alpha_α`. It composes with the skeleton check rather than overlapping it — script inside
+  a word, skeleton across a scope.
+    - **The two "off" positions differ**: Minimally Restrictive drops the script rule and keeps the
+      identifier profile; Unrestricted drops both, taking `Identifier_Status` and the joiner exclusion with
+      it. Offering one "off" would silently give the second.
+    - A third, narrower axis worth having: an **additional permitted script set**, so a deployment that
+      knows it is Russian says `Latin + Cyrillic` rather than dropping a level everywhere.
+    - **Not configurable, deliberately**: skeleton distinctness (no false positives, nothing to relax),
+      `Identifier_Status` as its own switch (it is what level 6 turns off), and severity — the levels are
+      the severity, and a report-but-accept mode would be non-conforming while looking like a setting.
     - **The relaxation must be expressed in code, never in the environment.** A policy read from an env var
       is ambient authority: a CI config, a container image or a dependency calling `setenv` changes it with
       no diff and nothing in review, it is invisible at the call site, and it is process-global so an

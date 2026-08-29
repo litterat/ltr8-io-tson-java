@@ -626,11 +626,13 @@ The 706 KB falls on implementers, once, and can be a generated table; the altern
 on authors, in one script community, forever. If shipping the table is judged too much, the honest outcome
 is to keep §9.4 advisory rather than to adopt the cheap mechanism as a substitute — it is not one.
 
-**Step 4 — the restriction level, per *segment*, and strict by default.** An earlier draft of this entry
-recommended keeping it opt-in and default off, because UTS #39 §5.2's levels are stated over a whole
-identifier and every one of them rejects `id_пользователя`, `url_адрес` and `api_ключ` — the Latin
-abbreviations that appear inside identifiers written in every other script. That objection is about *where*
-the level is applied, not about the level, and moving it removes the objection entirely.
+**Step 4 — the restriction level: Highly Restrictive by default, with per-segment as the first
+relaxation.** An earlier draft of this entry recommended opt-in and default off, because §5.2's levels are
+stated over a whole identifier and every one of them rejects `id_пользователя`, `url_адрес` and `api_ключ` —
+the Latin abbreviations that appear inside identifiers written in every other script. The objection was
+sound and its conclusion was not: it assumed the only alternative to a strict rule is no rule. Applying the
+same level to each `_`/`-` delimited segment is a *narrower* rule, not an absent one, and it is what makes a
+strict default safe to ship.
 
 **Apply Highly Restrictive to each `_`/`-` delimited segment rather than to the whole name.** Programming
 identifiers are compounds, and their separators are exactly the boundaries at which a script change is
@@ -669,6 +671,51 @@ them (а/a, е/e, о/o, р/p, с/c; α/a, ο/o, ρ/p). So the rule is not arbitr
 the separator and a Russian one may not, and that is the residue of the objection segmentation otherwise
 removes. It is worth saying out loud in the spec rather than leaving an author to infer it from a rejection,
 because the fix is one character and the confusion otherwise is total.
+
+**Step 4's configuration surface — two dimensions, not a ladder.** It is tempting to expose one ordered
+knob from strictest to loosest. That is wrong, because per-segment Highly Restrictive and Moderately
+Restrictive are **incomparable**: the first admits `id_пользователя` (Latin and Cyrillic, but never inside
+one word) and refuses `id_हिन्दी`; the second does the opposite (Latin plus any one Recommended script
+"except Cyrillic, Greek", anywhere in the name). Neither contains the other, so they are two axes:
+
+- **level** — which script combinations a unit may contain. UTS #39 §5.2's own six, unchanged, so the
+  default is a named standard rather than a TSON invention and two implementations agree on it without
+  reading this document.
+- **unit** — whether the level is applied to the whole name or to each `_`/`-` delimited segment. A no-op at
+  ASCII-Only and at levels 5–6; it changes levels 2–4.
+
+**Recommended default: Highly Restrictive, whole name.** Strictest of the practically deployable levels, and
+a level UTS #39 names — which matters more than it first appears. A default that is TSON's own refinement
+would mean a document validating under one implementation and not another that implemented only the
+standard; a standard default interoperates, and the refinement is something a deployment opts into
+knowingly.
+
+**And the relaxation to reach for first is the unit, not the level.** Moving to per-segment keeps every
+within-word homograph refused — `аdmin`, `pаssword`, `usеr`, `id_аdmin` — while admitting the compound names
+that made the whole-name form undeployable. That is the property that makes a strict default safe to ship:
+the pressure a strict rule creates is answered by a narrower rule rather than by switching the rule off,
+which is the failure mode an earlier draft of this entry worried about and the reason it recommended
+defaulting to off.
+
+**The two "off" positions are different, and the difference matters.** §5.2 is explicit: Minimally
+Restrictive drops the script restriction while "characters in the string must also be in the identifier
+profile"; Unrestricted additionally allows characters "outside of the identifier profile" — so it discards
+`Identifier_Status` too (Step 5), and with it the obsolete and technical characters and the joiners. A
+deployment that means "stop checking scripts" wants **Minimally Restrictive**; Unrestricted is a diagnostic
+tool, and §5.2 says so. A configuration surface offering one "off" would silently give the second.
+
+**A third axis worth offering, narrower than any of the above: an additional permitted script set.** A
+deployment that knows what it is — a Russian shop, a Greek-language corpus — can say so precisely
+(`Latin + Cyrillic`) instead of dropping a level and losing the rule everywhere else. It is the same
+mechanism §5.2 already uses for Latn+Jpan and its siblings, extended by configuration rather than by
+standard, and it is the most targeted relaxation available.
+
+**What should not be configurable**, and stating it is part of the design. Skeleton distinctness has no
+false positives — it fires only on a colliding pair, so there is nothing for a deployment to be relieved of.
+`Identifier_Status` is not a separate switch: it is what level 6 turns off, and offering it twice would let a
+configuration hold two contradictory answers. And no severity knob: the levels *are* the severity, each one a
+conforming position, where a report-but-accept mode would make the processor non-conforming while looking
+like a setting.
 
 **On how an implementation should let it be relaxed**, since a normative rule with no escape hatch invites
 worse ones: **not through the environment.** A security policy read from an environment variable is ambient
