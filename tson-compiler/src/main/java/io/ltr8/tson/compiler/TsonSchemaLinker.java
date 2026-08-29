@@ -152,11 +152,18 @@ public final class TsonSchemaLinker {
                     + "TsonSchemaLinker.linkBootstrap exists specifically for that case; call "
                     + "link directly for an ordinary schema instead");
         }
-        return linkWith(bootstrap, null, null);
+        // The bootstrap is this library's own artifact, not user input, so it is linked under the default
+        // rather than under whatever a caller configured -- a policy should not be able to break meta-kernel.
+        return linkWith(bootstrap, null, null, TsonUnicodePolicy.highlyRestrictive());
     }
 
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
-        return linkWith(schema, loader, null);
+        return linkWith(schema, loader, null, TsonUnicodePolicy.highlyRestrictive());
+    }
+
+    /** {@link #link(TsonSchema, TsonSchemaLoader)} with the §5.2 restriction level for declared names chosen. */
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, TsonUnicodePolicy identifiers) {
+        return linkWith(schema, loader, null, identifiers);
     }
 
     /**
@@ -179,16 +186,16 @@ public final class TsonSchemaLinker {
      */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
                                         TsonDiagnosticsReceiver receiver) {
-        Objects.requireNonNull(receiver, "receiver");
-        return linkWith(schema, loader, receiver);
+        return link(schema, loader, receiver, TsonUnicodePolicy.highlyRestrictive());
     }
 
-    /**
-     * Reports {@code message} against one entry, or throws it when there is no receiver.
-     *
-     * @return {@code true} if the caller should carry on as though the check had passed -- always, since a
-     *         throw is the only other outcome. Reads as a guard at the call sites that want to skip the entry.
-     */
+    /** The reporting overload with the §5.2 restriction level for declared names chosen. */
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
+                                        TsonDiagnosticsReceiver receiver, TsonUnicodePolicy identifiers) {
+        Objects.requireNonNull(receiver, "receiver");
+        return linkWith(schema, loader, receiver, identifiers);
+    }
+
     /**
      * §9.4's confusability, over the closed sets this schema actually defines ({@code SPEC-FEEDBACK.md} #3
      * Steps 2–3): the merged namespace, and each entry's own field names, enum members and choice variants.
@@ -204,11 +211,17 @@ public final class TsonSchemaLinker {
      * it matches a declared one, so restricting declarations restricts the data by construction. A Class 1
      * record is the case that has no declaration, and is checked by the schemaless readers instead.
      */
-    private static void checkConfusableNames(TsonDiagnosticsReceiver receiver, TsonSchema schema,
-                                             Map<String, TypeDefinition> merged) {
+    private static void checkNames(TsonDiagnosticsReceiver receiver, TsonSchema schema,
+                                   Map<String, TypeDefinition> merged, TsonUnicodePolicy identifiers) {
         ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> report(receiver, schema,
                 collision.second(), merged.get(collision.second()),
                 "in the namespace of '" + schema.id() + "': " + collision.describe()));
+
+        // §5.2's restriction level, over the same names, in the same pass. Where the collision check above
+        // is a relation and needs the whole set, this is a property of each name on its own -- so it is the
+        // rule that reaches a name nothing else in the schema resembles.
+        merged.forEach((name, definition) -> identifiers.violation(name).ifPresent(why ->
+                report(receiver, schema, name, definition, "declared name " + why)));
 
         merged.forEach((name, definition) -> {
             Top body = definition.body();
@@ -223,9 +236,18 @@ public final class TsonSchemaLinker {
             String noun = body instanceof RecordBody ? "field names" : "members";
             ConfusableNames.firstCollision(names).ifPresent(collision -> report(receiver, schema, name,
                     definition, "'" + name + "' has " + noun + " that read alike: " + collision.describe()));
+            names.forEach(member -> identifiers.violation(member).ifPresent(why ->
+                    report(receiver, schema, name, definition, "'" + name + "' has a "
+                            + noun.substring(0, noun.length() - 1) + " where " + why)));
         });
     }
 
+    /**
+     * Reports {@code message} against one entry, or throws it when there is no receiver.
+     *
+     * @return {@code true} if the caller should carry on as though the check had passed -- always, since a
+     *         throw is the only other outcome. Reads as a guard at the call sites that want to skip the entry.
+     */
     private static boolean report(TsonDiagnosticsReceiver receiver, TsonSchema schema, String name,
                                   TypeDefinition def, String message) {
         if (receiver == null) {
@@ -403,7 +425,7 @@ public final class TsonSchemaLinker {
 
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
-                                             TsonDiagnosticsReceiver receiver) {
+                                             TsonDiagnosticsReceiver receiver, TsonUnicodePolicy identifiers) {
         Map<String, String> origins = new LinkedHashMap<>();
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins);
 
@@ -460,7 +482,7 @@ public final class TsonSchemaLinker {
 
         merged = computeSubtypes(merged, localNames);
         merged = computeDisjointness(merged);
-        checkConfusableNames(receiver, schema, merged);
+        checkNames(receiver, schema, merged, identifiers);
 
         Set<String> blamedOnce = new LinkedHashSet<>();
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {

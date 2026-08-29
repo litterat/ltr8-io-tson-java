@@ -817,6 +817,119 @@ shared suite can carry it: a record declaring `admin` and `аdmin` rejected, one
 alone accepted, `l` beside `I` rejected. That is the first part of this topic that could ever have been
 conformance-tested.
 
+### Open for discussion: which of these is a conformance requirement, and which is deployment policy
+
+Steps 1–5 say what the rules should be. None says *what kind of requirement* each is, and building all four made
+the question unavoidable: they do not have the same character, and treating them alike costs something real
+either way. Two properties separate them.
+
+**Does the verdict survive a Unicode upgrade?** §7.1 makes a promise the later steps quietly break:
+
+> Growth is monotone — characters that were lexer errors become token characters, and valid documents remain
+> valid under later versions.
+
+That rests on Unicode's stability guarantee for `XID_Start`/`XID_Continue`/`Nd`/`Pattern_White_Space`/
+`Pattern_Syntax`, which §7.1 cites directly. UTS #39 makes the opposite statement about **both** datasets Steps
+2 and 5 need:
+
+> Stability is never guaranteed between versions, although it is maintained where feasible. In particular, an
+> updated version of confusable mapping data may use a mapping for a particular character that is different
+> from the mapping used for that character in an earlier version. Thus there may be cases where X → Y in
+> Version N, and X → Z in Version N+1, where Z may or may not have mapped to Y in Version N.
+
+> The Identifier_Status does not have stability guarantees (such as "Once a character is Allowed, it will not
+> become Restricted in future versions"), because the data is changing over time as we find out more about
+> character usage.
+
+So making Step 2 or Step 5 a *validity* rule costs §7.1's monotonicity claim, and costs it in the worst
+available place: §2.2.1 content-addressed identity. A schema pinned by `?sha256=` is the same bytes forever; if
+its validity depends on data Unicode declines to freeze, those same bytes can change verdict under an
+implementation's routine UCD refresh. Making the bytes decide is the entire purpose of the pin. Step 1's profile
+has no such problem — it is built on the frozen properties, which is why §7.1 can say what it says.
+
+**Does the rule compose?** Step 2 is a relation over a set, and §2.2.3 makes that set span `!!import`. The
+consequence is demonstrable rather than theoretical — two schemas, each accepted alone, both pure Latin, both
+well inside every other rule here:
+
+```
+a.tn declares  list_item                      accepted alone
+b.tn declares  Iist_item   (capital I)        accepted alone
+b.tn importing a.tn                           REFUSED — the two share a skeleton
+```
+
+Neither author wrote a bad schema, and the fix is to rename a name in a document the importing author may
+neither control nor republish. As a validity rule this makes a schema importing two independently published,
+independently pinned schemas *impossible to write*; as a policy rule its operator relaxes the check and
+proceeds. Steps 1, 4 and 5 are properties of a single name and compose freely — Step 2 alone has this shape.
+
+**And Step 2 is not free of false positives, including in pure ASCII.** UTS #39 maps `m → rn`
+(`confusables.txt`: `006D ; 0072 006E ; MA`). Over the 234,289 pure-ASCII words in the macOS dictionary, 58
+skeleton clusters collide, every one of them through that mapping: `comer`/`corner`, `comet`/`cornet`,
+`homer`/`horner`, `yam`/`yarn`. Two innocently chosen ASCII names can therefore collide with no attacker
+anywhere. The rate is low, and a namespace holding both members of such a pair is unlikely — but "unlikely" is a
+sound basis for a default and an unsound one for a validity rule. Step 3 contrasts the closed-scope skeleton
+check favourably against the restriction level's false-positive rate; that contrast holds for the mixed-script
+names it was measured on, and not for this case.
+
+**Recommendation — two layers, and the line between them is not where the steps put it.**
+
+**Layer 1 — the identifier grammar. MUST, and it is validity.** Step 1's profile: `XID_Start`-initial,
+`XID_Continue ∪ { - }`, NFC. Determinate, local, and built on properties Unicode has frozen, so every
+implementation at every Unicode version returns the same answer. This is the only layer a pinned schema's
+verdict can safely rest on, and the one that must be identical everywhere for a schema to mean one thing.
+
+**Layer 2 — name hygiene. Implemented everywhere, enforced by default, and never validity.** Steps 2, 4 and 5.
+A conforming implementation:
+
+- MUST implement all three;
+- MUST enforce Steps 2 and 5 by default, and SHOULD default Step 4 to Highly Restrictive;
+- MUST report a Layer 2 refusal distinguishably from a validity error;
+- MUST allow a deployment to relax any of them through the implementation's own configuration, and MUST NOT
+  allow that relaxation to be silent;
+- MUST name the UTS #39 data version in a Layer 2 refusal — two implementations can legitimately disagree, and
+  the version is the only thing that explains it.
+
+A schema failing Layer 2 is **refused by this processor**, not **invalid**. That one distinction buys all four
+of: safe by default everywhere, portable verdicts where §2.2.1 needs them, an escape hatch for the import
+diamond above, and no caveat on §7.1's monotonicity.
+
+| Step | Rule | Data | Stable across UCD versions | Composes | Recommended status |
+|---|---|---|---|---|---|
+| 1 | identifier profile | `XID_*`, NFC | **yes** | yes | **MUST** — validity |
+| 5 | `Identifier_Status=Allowed` | `IdentifierStatus.txt` | no | yes | MUST implement, MUST default on — policy |
+| 2 | skeleton distinctness | `confusables.txt` | no | **no** | MUST implement, MUST default on — policy |
+| 4 | restriction level | `Script` | no | yes | MUST implement, SHOULD default Highly Restrictive — policy |
+
+Step 4 is the one whose *setting* the spec should not fix, only its vocabulary: the level and the unit are both
+deployment choices with no single right answer, and the spec's job is to define them precisely enough that two
+implementations configure comparably. Mandating the knob while leaving its position to the deployment is the
+useful half.
+
+**This revises Step 3.** Step 3 asks for "a MUST at the `!!import` merge and over one schema's declared names".
+The mechanism is right and the modality is not: the import merge is exactly where the compositional hazard
+bites, so it is the last place a hard validity rule belongs.
+
+**Four things the spec must settle either way**, each an underspecification this implementation had to guess at:
+
+1. **Do profile extension characters participate in Layer 2?** `-` is in the identifier profile, is not
+   `XID_Continue`, and has no `Identifier_Status`. This implementation exempts it. Every implementation
+   otherwise guesses, and they will not guess alike.
+2. **Does the namespace scope span `!!import`?** This implementation checks the merged namespace, which is what
+   produces the demonstration above. The answer should be yes — the diamond is precisely where a confusable pair
+   is dangerous — and that is the strongest single argument for Layer 2 being policy rather than validity.
+3. **Choice variants are not a scope**, for the reason recorded below.
+4. **Whether a Layer 2 refusal is reportable as such.** It must be, per the recommendation — and this
+   implementation does not yet do it consistently.
+
+**What the spec should not do:** pin a Unicode version (that freezes the format to a UCD release and makes every
+later script a breaking change), or permit a relaxation that leaves no trace.
+
+**Open questions before this is drafted:** whether Layer 2 belongs in the normative body at all or in Security
+Considerations carrying normative language, given it would be the first place either part states a MUST that is
+not about validity; and whether "MUST implement, MAY disable" is too heavy for a constrained implementation,
+given Step 2's 706 KB — Step 3 argues the implementer should pay that once, and the argument is unchanged, but
+it was made when the rule was going to be validity.
+
 **Status against Revision 33:** open, and Steps 1–1d, 2, 3 and 5 are **built**. The kernel carries `identifier`
 (`XID_Start`-initial, `XID_Continue ∪ { - }`, NFC) with `type_name`/`field_name`/`param_name` aliasing it and
 `enum_set => !set { element_type: identifier  min_items: 1 }` feeding `enum.members`; `token`/`token_set` are
@@ -833,14 +946,28 @@ names, so two confusable variants are two confusable entries in the namespace an
 check over variants could never fire, and the list above should drop them. Field names and enum members are
 genuine scopes because neither is a declared name.
 
-**Step 4 is not built.** The restriction level needs a configuration channel reaching `TsonSchemaLinker` and
-the identifier parser, which today have none — six call sites across three modules — and it is the one
-mechanism this entry recommends defaulting to off. Its absence changes nothing about what the others decide.
+**Step 4 is built on the identifier surface and not on the token surface.** `TsonUnicodePolicy` carries §5.2's
+six levels, the unit, and additional permitted script sets; `TsonConfig.identifierPolicy` reaches
+`TsonSchemaLinker` through the compiled meta registry, and the level is applied in the same pass as the
+confusable check — over the namespace, each record's field names and each enum's members. The default is
+Highly Restrictive over a whole name, so an ordinary compound like `id_пользователя` is refused until a
+caller reaches for `perSegment()`.
+
+`tokenPolicy` is designed above and deliberately not added: its channel is the reader construction rather
+than the registry, and a setter that silently did nothing would be worse than an absent one.
 
 Two parts of Step 1 are deliberately not built. The `field-name` production is untouched, so Class 1 field
 names stay unconstrained exactly as Step 1c intends. And the joiners' contextual rule is not implemented, so
 `Lexer` still subtracts ZWNJ/ZWJ from the token profile while `IdentifierParser` admits them: the identifier
 layer is written to the property and is already correct when the lexer catches up (#14).
+
+**Layer 2 is not yet reportable as such here.** `Diagnostic.Code.CONFUSABLE_NAMES` exists and is emitted for
+exactly one scope — a Class 1 record's own field names, checked by `SchemalessTreeReader` because no declaration
+stands behind them. Every *schema*-side Layer 2 failure, the confusable check and the restriction level alike,
+goes through `TsonSchemaLinker`'s `report`, which builds a `SCHEMA_ERROR`. So one defect carries two codes
+depending on whether a schema governs the document, and on the schema side it is indistinguishable from an
+ordinary validity error. Under the recommendation above that is the first gap to close, and it is worth closing
+whatever the spec decides — the inconsistency is this implementation's own.
 
 ## 4. A type argument's literal is called a bare token and typed `value`, and §8.2 identity depends on which
 

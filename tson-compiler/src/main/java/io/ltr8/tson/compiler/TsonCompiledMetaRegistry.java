@@ -102,6 +102,19 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * !!meta} is strictly within one thread, so per-thread is both correct and exactly the scope of the
      * question being asked.
      */
+    /**
+     * UTS #39 §5.2's restriction level for declared names, applied by {@link TsonSchemaLinker} wherever a
+     * schema names something ({@code SPEC-FEEDBACK.md} #3 Step 4). Held here because this registry is the
+     * one object every resolve and every read already passes through, so a policy set on it reaches both
+     * without a second channel.
+     *
+     * <p>The default is Highly Restrictive over a whole name -- the strictest of §5.2's practically
+     * deployable levels, and one it names, so two implementations agree on the default without reading
+     * this project's own documents. A deployment that finds it too strict reaches for the *unit* before the
+     * level: {@code perSegment()} still refuses every within-word homograph.
+     */
+    private TsonUnicodePolicy identifierPolicy = TsonUnicodePolicy.highlyRestrictive();
+
     private final ThreadLocal<Set<String>> resolving = ThreadLocal.withInitial(LinkedHashSet::new);
 
     /**
@@ -169,9 +182,21 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * it itself, e.g. a test bootstrapping in isolation).
      */
     public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source) {
+        return withStandardLibrary(context, source, TsonUnicodePolicy.highlyRestrictive());
+    }
+
+    /** The same, with {@link #identifierPolicy} chosen rather than defaulted. */
+    public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source,
+                                                               TsonUnicodePolicy identifierPolicy) {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
+        registry.identifierPolicy = identifierPolicy;
         registry.loadStandardLibrary();
         return registry;
+    }
+
+    /** The restriction level this registry applies to declared names -- see {@link #identifierPolicy}. */
+    public TsonUnicodePolicy identifierPolicy() {
+        return identifierPolicy;
     }
 
     /**
@@ -355,7 +380,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             SchemaDocument document = parser.parseSchemaDocument();
             crossCheckId(document, uri, identity);
             TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.schemaPositions());
-            return schemaRegistry.registerIfAbsent(TsonSchemaLinker.link(resolved, schemaRegistry));
+            return schemaRegistry.registerIfAbsent(
+                    TsonSchemaLinker.link(resolved, schemaRegistry, identifierPolicy));
         }
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         Optional<SchemaDocument> parsed = parser.parseSchemaDocument(problems);
@@ -368,7 +394,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         TsonSchema resolved = new SchemaResolver(this)
                 .resolveSchema(document, parser.schemaPositions(), problems);
         if (problems.isEmpty()) {
-            TsonLinkedSchema linked = TsonSchemaLinker.link(resolved, schemaRegistry, problems);
+            TsonLinkedSchema linked =
+                    TsonSchemaLinker.link(resolved, schemaRegistry, problems, identifierPolicy);
             if (problems.isEmpty()) {
                 return schemaRegistry.registerIfAbsent(linked);
             }
