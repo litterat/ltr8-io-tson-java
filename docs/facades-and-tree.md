@@ -33,11 +33,19 @@ reader axis rather than a registry one, because the surface it guards includes t
 constructors, which hold no registry at all — and a Class 1 read is exactly where a value arrives least
 constrained.
 
-`TokenPolicyEventSource` wraps the event source rather than checking inside `TsonReadContext`, and the reason
-is exactly-once: the context rewinds, and a probe context can be built over events already seen
-(`AnnotationCapture`), so a check there would report one token twice. The underlying stream produces each
-token once, so the decorator needs no set of already-reported positions. `wrap` returns the source unchanged
-when the policy checks nothing, which is the default — an ordinary read pays not even a predicate.
+**`TsonReadContext.of` takes the policy as a required parameter and installs the check itself**, so no context
+can exist whose events went unchecked — the low-level API cannot skip the policy by saying nothing, which is
+the property that makes it a policy rather than a facade convenience. Naming `unrestricted()` is a fine
+answer and the right one for a synthetic source; it is just not one a caller gives by accident. The three
+internal synthetic sites (`AnnotationCapture`, `RecordAbstractReader`, `SchemaResolver`) each pass it with the
+reason written beside them: the first two replay events the real stream already delivered, so checking again
+would report one author token twice, and the third reads a resolved schema value rather than document text.
+
+`TokenPolicyEventSource` is a decorator on the event source rather than a check inside the context, and the
+reason is exactly-once: the context rewinds, and a probe context can be built over events already seen, so a
+check there would report one token twice. The underlying stream produces each token once, so the decorator
+needs no set of already-reported positions. `wrap` returns the source unchanged when the policy checks
+nothing, which is the default — an ordinary read pays not even a predicate.
 
 The check sees the four events carrying text — a value, a field name, a type-ref, an annotation name — because
 at that layer nothing yet knows which is which. **So a name is a token**, and a token policy stricter than the

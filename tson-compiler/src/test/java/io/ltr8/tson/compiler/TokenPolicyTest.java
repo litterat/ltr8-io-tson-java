@@ -113,4 +113,37 @@ class TokenPolicyTest {
         assertNotNull(reader.withDiagnostics(new TsonDiagnosticsCollector()));
         assertEquals(1, problems(reader, "{ note: \"" + CYR_A + "\" }").size());
     }
+    /**
+     * <b>The policy is a required parameter, not a defaulted one.</b> {@code TsonReadContext.of} is where
+     * every read converges and is public API, so a default there would be a policy any caller could drop by
+     * saying nothing -- weakening with nothing left to grep for. Naming {@code unrestricted()} is a fine
+     * answer; not naming one is not an answer.
+     */
+    @Test
+    void aReadContextCannotBeBuiltWithoutNamingAPolicy() {
+        NullPointerException e = assertThrows(NullPointerException.class, () -> TsonReadContext.of(
+                new io.ltr8.tson.compiler.stream.ListEventSource(List.of()),
+                new TsonDiagnosticsCollector(), null));
+        assertTrue(e.getMessage().contains("unrestricted()"), e.getMessage());
+    }
+
+    /**
+     * And the policy really rides the context rather than the call site: a reader driven over a raw source
+     * through {@code of} is checked, which is what makes the low-level path unable to skip it silently.
+     */
+    @Test
+    void aRawContextHonoursThePolicyItWasBuiltWith() {
+        TsonDiagnosticsCollector collected = new TsonDiagnosticsCollector();
+        TsonReadContext ctx = TsonReadContext.of(new TsonDataStream("{ note: \"" + CYR_A + "\" }"),
+                collected, TsonUnicodePolicy.asciiOnly());
+        try {                                   // the raw context has no end-of-stream predicate; drain it
+            while (true) {
+                ctx.next();
+            }
+        } catch (java.util.NoSuchElementException drained) {
+            // the whole document has passed through the context, which is what the assertion needs
+        }
+        assertTrue(collected.diagnostics().stream().anyMatch(d -> d.code() == Diagnostic.Code.RESTRICTED_TOKEN),
+                collected.diagnostics().toString());
+    }
 }

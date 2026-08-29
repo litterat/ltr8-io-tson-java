@@ -956,11 +956,14 @@ caller reaches for `perSegment()`.
 **Step 4b is built too, so both surfaces now carry a policy.** `TsonConfig.tokenPolicy` defaults to
 Unrestricted and reaches both facades, with `withTokenPolicy` as the per-reader axis — it has to be a reader
 axis rather than a registry one, since the standalone schemaless constructors hold no registry and a Class 1
-read is where a value arrives least constrained. `TokenPolicyEventSource` wraps the event source, so each
-token is checked exactly once despite the read context's rewinding, and the wrapper is not installed at all
-when the policy checks nothing. Violations report as `RESTRICTED_TOKEN`, located at the token and carrying no
-`path` — there is none yet where the check runs. A per-segment policy is refused on this surface rather than
-ignored. The subsumption predicted above holds and is pinned by a test: a field name is a token, so
+read is where a value arrives least constrained. `TsonReadContext.of` takes the policy as a
+**required** parameter and installs the check itself, so no context can exist whose events went unchecked and
+the low-level API cannot drop the policy by saying nothing — naming `unrestricted()` is a fine answer, and is
+what the synthetic internal sites give, but it is not one a caller gives by accident. The check is a decorator
+on the event source so each token is judged exactly once despite the context's rewinding, and nothing is
+installed at all when the policy checks nothing. Violations report as `RESTRICTED_TOKEN`, located at the
+token and carrying no `path` — there is none yet where the check runs. A per-segment policy is refused on
+this surface rather than ignored. The subsumption predicted above holds and is pinned by a test: a field name is a token, so
 `tokenPolicy(asciiOnly())` constrains names whatever `identifierPolicy` says.
 
 Two parts of Step 1 are deliberately not built. The `field-name` production is untouched, so Class 1 field

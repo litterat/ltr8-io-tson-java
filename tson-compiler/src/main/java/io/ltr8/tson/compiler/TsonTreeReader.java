@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import java.util.Objects;
 import io.ltr8.tson.compiler.reader.EventSkip;
 import io.ltr8.tson.compiler.reader.SchemalessTreeReader;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
@@ -66,7 +67,8 @@ public final class TsonTreeReader {
     /** The schema {@link #readAs} validates against, or {@code null} until {@link #withSchema} names one. */
     private final String schemaUri;
 
-    /** UTS #39 §5.2 over every token this reader pulls -- {@code null} means the default, which checks nothing. */
+    /** UTS #39 §5.2 over every token this reader pulls. Never {@code null} -- the unset default is
+     * {@link TsonUnicodePolicy#unrestricted()}, which checks nothing. */
     private final TsonUnicodePolicy tokenPolicy;
 
     /**
@@ -82,7 +84,8 @@ public final class TsonTreeReader {
      *         bound objects this reader cannot assemble into a tree
      */
     public TsonTreeReader(TsonCompiledSchemaRegistry tree) {
-        this(requireTreeMode(tree), TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(), null);
+        this(requireTreeMode(tree), TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(),
+                TsonUnicodePolicy.unrestricted());
     }
 
     /**
@@ -106,7 +109,8 @@ public final class TsonTreeReader {
 
     /** Schemaless (Class 1) -- reads the wire structure into a tree, ignoring any {@code !!schema} the document declares. */
     public TsonTreeReader() {
-        this(null, TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(), null);
+        this(null, TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(),
+                TsonUnicodePolicy.unrestricted());
     }
 
     /** Shares {@code tree} rather than rebuilding it -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
@@ -171,7 +175,8 @@ public final class TsonTreeReader {
      *         rather than ignored, so a policy that cannot mean what it says is never silently accepted.
      */
     public TsonTreeReader withTokenPolicy(TsonUnicodePolicy policy) {
-        if (policy != null && policy.isPerSegment()) {
+        Objects.requireNonNull(policy, "policy");
+        if (policy.isPerSegment()) {
             throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
                     + "characters in a value, not word separators -- use the whole-text policy instead");
         }
@@ -283,8 +288,7 @@ public final class TsonTreeReader {
      */
     private TsonDocument readDocument(TsonDataStream stream) {
         try {
-            TsonReadContext ctx = TsonReadContext.of(
-                    TokenPolicyEventSource.wrap(stream, tokenPolicy, receiver), receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             TsonValue root = (tree == null || start.schema().isEmpty())
                     ? schemaless.read(ctx)
@@ -299,8 +303,7 @@ public final class TsonTreeReader {
 
     private TsonValue readRoot(TsonDataStream stream, boolean ignoreSchema) {
         try {
-            TsonReadContext ctx = TsonReadContext.of(
-                    TokenPolicyEventSource.wrap(stream, tokenPolicy, receiver), receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             TsonValue result = (ignoreSchema || tree == null || start.schema().isEmpty())
                     ? schemaless.read(ctx)
@@ -317,8 +320,7 @@ public final class TsonTreeReader {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
         try {
-            TsonReadContext ctx = TsonReadContext.of(
-                    TokenPolicyEventSource.wrap(stream, tokenPolicy, receiver), receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
             TsonValue result = readAgainstSchema(schemaUri, ctx, typeName);
             requireDocumentEnd(ctx);

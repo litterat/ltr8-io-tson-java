@@ -66,7 +66,8 @@ public final class TsonObjectReader {
     /** The schema {@link #readAs} validates against, or {@code null} until {@link #withSchema} names one. */
     private final String schemaUri;
 
-    /** UTS #39 §5.2 over every token this reader pulls -- {@code null} means the default, which checks nothing. */
+    /** UTS #39 §5.2 over every token this reader pulls. Never {@code null} -- the unset default is
+     * {@link TsonUnicodePolicy#unrestricted()}, which checks nothing. */
     private final TsonUnicodePolicy tokenPolicy;
 
     /**
@@ -83,7 +84,8 @@ public final class TsonObjectReader {
      */
     public TsonObjectReader(TsonCompiledSchemaRegistry bind, DataBindContext dataBindContext) {
         this(dataBindContext, new SchemalessObjectReader(dataBindContext),
-                requireBindMode(bind), TsonDiagnosticsReceiver.throwing(), null, null);
+                requireBindMode(bind), TsonDiagnosticsReceiver.throwing(), null,
+                TsonUnicodePolicy.unrestricted());
     }
 
     /**
@@ -106,7 +108,8 @@ public final class TsonObjectReader {
 
     /** Schemaless -- binds to the target class alone, ignoring any {@code !!schema} the document declares. */
     public TsonObjectReader(DataBindContext context) {
-        this(context, new SchemalessObjectReader(context), null, TsonDiagnosticsReceiver.throwing(), null, null);
+        this(context, new SchemalessObjectReader(context), null, TsonDiagnosticsReceiver.throwing(), null,
+                TsonUnicodePolicy.unrestricted());
     }
 
     /** Schemaless, over {@link TsonAtomContext#defaultContext()}. */
@@ -162,7 +165,8 @@ public final class TsonObjectReader {
      *         rather than ignored, so a policy that cannot mean what it says is never silently accepted.
      */
     public TsonObjectReader withTokenPolicy(TsonUnicodePolicy policy) {
-        if (policy != null && policy.isPerSegment()) {
+        Objects.requireNonNull(policy, "policy");
+        if (policy.isPerSegment()) {
             throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
                     + "characters in a value, not word separators -- use the whole-text policy instead");
         }
@@ -294,8 +298,7 @@ public final class TsonObjectReader {
     private <T> TsonObjectDocument<T> readDocument(TsonDataStream stream, Class<T> type) {
         Objects.requireNonNull(type, "type");
         try {
-            TsonReadContext ctx = TsonReadContext.of(
-                    TokenPolicyEventSource.wrap(stream, tokenPolicy, receiver), receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             T value;
             Optional<String> rootType = Optional.empty();
@@ -319,8 +322,7 @@ public final class TsonObjectReader {
     private <T> T readDocument(TsonDataStream stream, Class<T> type, boolean ignoreSchema) {
         Objects.requireNonNull(type, "type");
         try {
-            TsonReadContext ctx = TsonReadContext.of(
-                    TokenPolicyEventSource.wrap(stream, tokenPolicy, receiver), receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             T result = (ignoreSchema || bind == null || start.schema().isEmpty())
                     ? schemaless.read(ctx, type)
@@ -338,8 +340,7 @@ public final class TsonObjectReader {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
         try {
-            TsonReadContext ctx = TsonReadContext.of(
-                    TokenPolicyEventSource.wrap(stream, tokenPolicy, receiver), receiver);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy);
             ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
             T result = valueOf(readAgainstSchema(schemaUri, ctx, type, typeName));
             requireDocumentEnd(ctx);
