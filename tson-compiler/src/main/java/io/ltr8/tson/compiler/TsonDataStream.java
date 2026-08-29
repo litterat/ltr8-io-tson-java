@@ -442,10 +442,14 @@ public final class TsonDataStream implements TsonEventSource {
      * production that is no part of the token-stream grammar then matches its decoded text. Token-Start admits
      * {@code Nd}, {@code -}, {@code +} and {@code .} so a <em>number</em> can be an unquoted token, and those
      * reach names only because names and values share one lexical class; identifier-Start drops them.
+     *
+     * <p>Takes the text rather than a {@code TokenValue}: the form a name was spelled in is no part of the
+     * profile, and this runs on the read path, where wrapping every type-ref name in a carrier the check does
+     * not read would put an allocation per name into a document's steady-state cost.
      */
     private void requireIdentifier(Token name, String role) {
         try {
-            IdentifierParser.INSTANCE.read(new TokenValue(name.text(), formOf(name.type())));
+            IdentifierParser.validate(name.text());
         } catch (AtomTypeException e) {
             throw new TsonParseException("invalid " + role + " -- " + e.getMessage(), name.start());
         }

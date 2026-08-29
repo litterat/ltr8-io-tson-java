@@ -851,7 +851,7 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     private void requireIdentifierName(Token t) {
         try {
-            IdentifierParser.INSTANCE.read(new TokenValue(t.text(), TokenForm.UNQUOTED));
+            IdentifierParser.validate(t.text());
         } catch (AtomTypeException e) {
             throw new TsonParseException("'" + t.text() + "' is not a valid type name -- " + e.getMessage(),
                     t.start());
