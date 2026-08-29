@@ -1,8 +1,8 @@
-!!id:"https://tson.io/2026/33/m/core.tn?sha256=034d76d41e3cee431ab2f484a0a18f39b6c5752f6b8a90a501cb0a7aa2ebe55a"
-!!meta:"https://tson.io/2026/33/m/meta.tn?sha256=ff2866c0d71cfaeee837c30ccc7328ac9c790df8ea700da8d85b5c36d0efe414"
+!!id:"https://tson.io/2026/34/m/core.tn?sha256=c2127732df2dbac80ac4bbb7cb7d35070bfe546472368088a2f76343a8d85830"
+!!meta:"https://tson.io/2026/34/m/meta.tn?sha256=a5cf63664cccaafed4b11e494fdb8b3aed0133bf47200910a039a252daed0613"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
-  (2026 Revision 33 draft).
+  (2026 Revision 34 draft).
 
   Every type in core comes from a constructor defined in meta-kernel
   or meta. Atoms are uniformly defined as empty instances:

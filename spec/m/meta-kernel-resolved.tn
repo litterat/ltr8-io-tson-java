@@ -1,7 +1,7 @@
-!!id:"https://tson.io/2026/33/m/meta-kernel-resolved.tn"
-!!schema:"https://tson.io/2026/33/m/meta-kernel.tn"
+!!id:"https://tson.io/2026/34/m/meta-kernel-resolved.tn"
+!!schema:"https://tson.io/2026/34/m/meta-kernel.tn"
 @doc:"""
-  Resolver-output fixture for meta-kernel.tn (2026 Revision 33 draft).
+  Resolver-output fixture for meta-kernel.tn (2026 Revision 34 draft).
   Parse the source schema, run the resolver, canonicalise, compare.
 
   Conventions:
@@ -35,7 +35,7 @@
     required field. Within a template body `value` also carries a
     parameter, unlabelled: a token there is a parameter exactly when
     its text resolves into the enclosing entry's `parameters`
-    (Part 2 Section 8.1's shadowing rule), and a closed entry has
+    (Part 2 Section 5.10's shadowing rule), and a closed entry has
     none for one to resolve into. A parametric `= P` fixes nothing
     and stays REQUIRED until materialisation makes the value
     concrete; `~ P` yields REQUIRED_DEFAULT (Part 2 Section 5.7).
@@ -73,7 +73,7 @@
     preserves them verbatim.
   """
 !schema {
-  @doc:"Base kinds. `top` is the structural root; every type in the schema IS-A `top`."
+  @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A."
   top => !type_definition {
     kind: PRODUCT
     subtypes: [array atom choice data enum integer_type map product record reference regex_type set sum text_type tuple unit uri_type]
@@ -382,8 +382,6 @@
       !record_field { name: type         type: type_ref }
       !record_field { name: state        type: field_state  state: REQUIRED_DEFAULT  value: REQUIRED }
       !record_field { name: value        type: value  state: OPTIONAL }
-    ]
-    groups: [
     ] }
   }
 
