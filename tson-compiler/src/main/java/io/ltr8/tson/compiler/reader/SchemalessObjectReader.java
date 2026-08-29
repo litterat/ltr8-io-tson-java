@@ -17,7 +17,6 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.*;
-import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
@@ -46,7 +45,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiConsumer;
 
 /**
  * Binds a TSON document to a Java object -- schemaless (Class 1) binding driven by the target Java
@@ -98,10 +96,6 @@ import java.util.function.BiConsumer;
  * (§2.5) by overwriting as they stream, the same as {@link TsonTypeReader}'s own record readers.
  */
 public final class SchemalessObjectReader {
-
-    /** {@code EventReducer} records each core-value's own source position for error reporting; annotation capture here has no use for one. */
-    private static final BiConsumer<CoreValue, Position> NO_POSITIONS = (value, position) -> {
-    };
 
     private final DataBindContext context;
 
