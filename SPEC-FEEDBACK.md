@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The fifteen below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
+The sixteen below are what Revision 33 leaves open, renumbered from #1; the 55 raised against Revision 32 that
 it resolved are gone from here, because the spec now carries their rules and that is where the answer
 belongs. **This file is the as-built record**, not a pointer to one: where an entry proposes a design this
 implementation has built, the entry states the design, what is running, and what is not, so that a reviewer
@@ -298,8 +298,9 @@ same reason the number grammar does not.
 **One correction worth carrying into the wording, because it decides where each rule lives.** Not everything
 excluded from names is excluded for lexical reasons:
 
-- **Genuinely lexical:** whitespace, and U+200E/U+200F (LRM/RLM). These are `Pattern_White_Space`, so they
-  *terminate* an unquoted token — `ab<LRM>c` lexes as two tokens, silently, which is §9.5's concern.
+- **Genuinely lexical:** whitespace, and U+200E/U+200F (LRM/RLM) — the latter because [UAX31-R3a-1] item 2
+  makes them ignorable format controls admitted only where a token boundary already exists, so `ab<LRM>c` is
+  a lexer error rather than a name question at all (#16).
 - **Not lexical at all:** ZWNJ, ZWJ, BOM, soft hyphen, word joiner, the bidi overrides. Every one of these is
   in `XID_Continue` or was admitted by the JDK predicate this implementation used; the lexer absorbs them
   into a token happily (it did until #14). Excluding them is a *policy* decision, and stating it in §7.1 —
@@ -2165,3 +2166,120 @@ excluded-kinds list so the next example is written correctly by construction rat
 
 **Status against Revision 33:** open, new against this revision. §5.11's example is unchanged and §7.1's list
 does not mention the temporal kinds.
+
+---
+
+## 16. §7.2 rule 1 treats LRM and RLM as horizontal space; UAX #31 makes them ignorable format controls whose insertion "shall have no effect on the meaning of the program", and §9.5 documents the resulting hazard instead of removing it
+
+**Section:** Part 1 §7.2 rule 1 (the whitespace rule and its immutable eleven-character set), §9.5
+(bidirectional formatting characters); UAX #31 §4.1 (`Pattern_White_Space`, requirement R3a) and §4.1.3
+(contexts for ignorable format controls), both already normative references of Part 1.
+
+**Problem:** §7.2 rule 1 gives `Pattern_White_Space` as one flat set, every member doing one job:
+
+> **Whitespace** — Characters with the `Pattern_White_Space` property are consumed and not emitted as
+> tokens. The set is immutable: U+0009 (TAB), U+000A (LF), U+000B (VT), U+000C (FF), U+000D (CR), U+0020
+> (SPACE), U+0085 (NEL), U+200E (LRM), U+200F (RLM), U+2028 (LINE SEPARATOR), U+2029 (PARAGRAPH SEPARATOR).
+
+**UAX #31 does not give that property one job; it gives it three.** R3a-1, verbatim:
+
+> **[UAX31-R3a-1]**. *Use Pattern_White_Space characters as the set of characters interpreted as whitespace
+> in parsing, as follows:*
+>
+> 1. *A sequence of one or more of any of the following characters shall be interpreted as a sequence of one
+>    or more end of line:* U+000A, U+000B, U+000C, U+000D, U+0085, U+2028, U+2029
+> 2. *The Pattern_White_Space characters with the property Default_Ignorable_Code_Point shall be treated as
+>    ignorable format controls; they shall be allowed in the contexts UAX31-I1, UAX31-I2, and UAX31-I3
+>    defined in Section 4.1.3, Contexts for Ignorable Format Controls, where their insertion shall have no
+>    effect on the meaning of the program.*
+> 3. *All other characters in Pattern_White_Space shall be interpreted as horizontal space.*
+
+and the note immediately under it removes any question of which characters item 2 means:
+
+> The characters to be treated as ignorable format controls under item 2 of [UAX31-R3a-1] are U+200E
+> LEFT-TO-RIGHT MARK and U+200F RIGHT-TO-LEFT MARK.
+
+So the two characters §7.2 rule 1 folds into horizontal space are precisely the two UAX #31 excludes from
+it. The three contexts item 2 allows them in are **UAX31-I1** "adjacent to lexical horizontal space (within
+a sequence of lexical horizontal spaces, or at the start or end of such a sequence)", **UAX31-I2** "as
+optional space, that is, wherever horizontal space could be inserted without changing the meaning of the
+program", and **UAX31-I3** "at the start and end of a lexical line" — all three being places a boundary
+already exists, which is why item 2 can require the insertion to mean nothing.
+
+**§9.5 then states the consequence as a property of UAX #31 rather than as a departure from it:**
+
+> `Pattern_White_Space` includes two bidirectional formatting marks that are not visual whitespace — U+200E
+> (LRM) and U+200F (RLM). These are token separators per UAX #31, so a stray LRM or RLM inside what an
+> author perceives as a single identifier silently terminates the token and can alter document structure
+> invisibly. Implementations processing untrusted input SHOULD consider surfacing bidirectional formatting
+> characters outside quoted tokens.
+
+"These are token separators per UAX #31" is the sentence to change: UAX #31 says the opposite in a numbered
+requirement. The hazard §9.5 describes is real, but it is a hazard TSON creates by applying item 3 to item
+2's characters, and the remedy is item 2, not a SHOULD to surface the damage afterwards.
+
+**The damage is narrower than §9.5 suggests, and worse where it lands.** Under the flat reading a split
+token is usually caught by the grammar a moment later — a record key, a field value or a type-ref that
+splits in two produces a parse error, so the document is refused and nothing is silent. The exception is
+every position where **juxtaposition is itself the separator**, which is where a split yields a document
+that is still valid and says something else:
+
+| written (as it renders) | read as | |
+|---|---|---|
+| `[ 1<LRM>2 ]` | `[1, 2]` — two elements | silent |
+| `[ alpha<LRM>beta ]` | `[alpha, beta]` | silent |
+| `[ -1<LRM>2 ]` | `[-1, 2]` | silent |
+| `{ ad<LRM>min: 1 }` | parse error | already refused |
+| `{ x<LRM>y => 1 }` | parse error | already refused |
+| `!rec<LRM>ord { … }` | unknown type `!rec` | already refused |
+
+An array field declared `[int32]` therefore gains an element that no one wrote and no one can see, and the
+reader is behaving correctly while it happens — the bytes and the rendering simply disagree, which is the
+class of defect §9.5 exists to name.
+
+**The other ten bidirectional formatting characters need no rule at all**, which is worth saying because
+§9.5's remedy is worded over all of them. U+061C, U+202A–U+202E and U+2066–U+2069 are `Cf` and are not in
+`Pattern_White_Space`; §7.1's profile already excludes them, so they are a lexer error outside a quoted
+token today with no rule of their own — the existing `lexer/invalid/bidi-override-inside-unquoted-token`
+vector pins one. The entire question is LRM and RLM, and R3a-1 answers it.
+
+**Interpretation chosen: UAX31-R3a-1, built.** `Lexer` implements the three groups as three groups. Item 1
+and item 3's characters are unchanged. An LRM or RLM is consumed and contributes nothing, and a run of them
+holding no real horizontal space is refused when the code points on either side of it would have continued a
+single token — which is I1 and I2 decided by looking at two characters, and is R3a's own suggested strategy:
+
+> Since these characters are allowed only where a boundary would, in their absence, exist between lexical
+> elements, an implementation could ignore them when lexing, and then consider as illegal any lexical
+> element that contains them.
+
+So `[1<LRM>2]` and `ad<LRM>min` are lexer errors naming the character, the pair it stands between and its
+position; `{ a:<LRM>1 }`, `[<LRM>1 2]`, `[1<LRM> 2]`, `[1 <LRM> 2]` and an LRM at either end of a line are
+accepted and change nothing, I2/I1/I3 respectively; and inside a quoted token an LRM stays content, R3a's
+own carve-out and the remedy §7.1 already prescribes for a name that needs one. The one carve-out the
+two-character test needs is `..`: `.` is an unquoted-continuation character, so `1<LRM>..` would otherwise
+look interior when §7.2 rule 3 puts a token boundary there regardless.
+
+**This is a refusal, not a repair.** `ad<LRM>min` could in principle be *read* as the single name `admin`,
+which is what "ignore them when lexing" says on its own — but R3a's second clause is the operative one for a
+format that has to be safe to review, and a name whose bytes and rendering differ is exactly what must not
+resolve silently. It is also the same position §7.1 already takes for ZWNJ and ZWJ by a different mechanism
+(#14): the character is admitted as content where it is visible work and refused where it is invisible.
+
+**Suggested resolution — split §7.2 rule 1 the way R3a-1 splits the property, and retire §9.5's remedy.**
+Rule 1 becomes three clauses rather than one immutable list: the seven line terminators, the two ignorable
+format controls (allowed only where a token boundary already exists, with no effect on meaning), and the two
+horizontal spaces. §9.5 then has nothing left to warn about for LRM and RLM and no need to say anything
+about the other ten, which the profile already excludes; the section can go, or shrink to a note that the
+whitespace rule is where the bidi question is answered. The SHOULD should not survive in any form — it asks
+an implementation to *report* a meaning-changing insertion that the requirement it cites forbids from
+changing meaning at all.
+
+**UTS #55 is worth citing in the replacement text**, because it supplies the half a bare prohibition would
+get wrong. §3.2 recommends that languages meet R3a-1 precisely so that authors may correct display:
+"Allowing the specified ignorable format controls between lexical elements allows the author of the program
+to correct its plain-text display by inserting characters where needed". A rule that refused LRM everywhere
+outside quoted tokens would be simpler and would take that away — which is why the boundary/interior
+distinction is the rule and not a blanket ban.
+
+**Status against Revision 33:** open, new against this revision. §7.2 rule 1's list is unchanged and §9.5
+still attributes the separator reading to UAX #31.

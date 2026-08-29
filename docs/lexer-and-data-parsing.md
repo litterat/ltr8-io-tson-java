@@ -72,6 +72,23 @@ tokens, modes, or character-classification changes).
   tokens preserve exact content. **Pattern_White_Space is the spec's fixed 11-character set**, hardcoded
   (not `Character.isWhitespace`). A single leading **BOM** is stripped; U+FEFF elsewhere falls through to
   "unrecognised character" naturally.
+- **The whitespace set is three sets, not one** — [UAX31-R3a-1] sorts `Pattern_White_Space` into end-of-line
+  (item 1), *ignorable format controls* (item 2, whose note names them as exactly U+200E and U+200F), and
+  horizontal space (item 3, "all other characters"). Item 2's two are allowed only in contexts I1/I2/I3 —
+  adjacent to horizontal space, wherever a space could have stood, at a line boundary — "where their
+  insertion **shall have no effect on the meaning of the program**". §7.2 rule 1 lists all eleven as one set
+  and this implementation departs from it (`SPEC-FEEDBACK.md` #16): reading LRM as horizontal space is what
+  let `[1<LRM>2]` read as **two** elements, an invisible insertion changing the document's meaning.
+  `skipWhitespace` implements R3a's own suggested strategy — ignore them when lexing, then refuse any lexical
+  element containing one — as a two-character test at the run: a run holding no real horizontal space is
+  refused when the code points on **either side of it** would have continued one token. That is I1 and I2
+  decided locally, needing one field (`lastCodePoint`, the near neighbour) and no extra lookahead. Two
+  details are load-bearing. **The trailing controls are not consumed into the token**, so a control where
+  adjacency is required (`!type<LRM>{…}`) still leaves the positional gap §7.5's check reads — which is the
+  right answer, a space being disallowed there too. And **`..` is carved out**: `.` is an unquoted-continuation
+  character, so `1<LRM>..` would otherwise look interior when §7.2 rule 3 puts a boundary there regardless.
+  The other ten bidi formatting characters need no rule — they are `Cf`, outside `Pattern_White_Space`, and
+  the profile subtraction above already refuses them.
 - **Multi-line common-prefix stripping** (§7.2.3) compares leading-whitespace prefixes character by
   character (a tab never matches a space). **Closing-delimiter detection checks the line content *after*
   removing leading whitespace against `"""`** — getting this backwards makes every multi-line token

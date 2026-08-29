@@ -22,6 +22,15 @@ class LexerTest {
         return all.subList(0, all.size() - 1);
     }
 
+    /**
+     * Type and text only, dropping positions -- for asserting that two sources lex to the <em>same tokens</em>
+     * when one of them holds an ignorable format control, which legitimately shifts every later column and
+     * byte offset by its own width without changing a single token.
+     */
+    private static List<String> shape(String source) {
+        return tokens(source).stream().map(t -> t.type() + "(" + t.text() + ")").toList();
+    }
+
     private static void assertToken(Token t, TokenType type, String text) {
         assertEquals(type, t.type());
         assertEquals(text, t.text());
@@ -63,6 +72,97 @@ class LexerTest {
     @Test
     void absentSentinel() {
         assertToken(tokens("_").get(0), TokenType.ABSENT, "_");
+    }
+
+    // ── Ignorable format controls: LRM/RLM (UAX31-R3a-1 item 2) ─────────
+
+    /**
+     * <b>LRM and RLM are not horizontal space.</b> [UAX31-R3a-1] sorts {@code Pattern_White_Space} into
+     * end-of-line, ignorable format controls, and horizontal space, and its note names U+200E/U+200F as
+     * exactly the second group -- "where their insertion shall have no effect on the meaning of the program".
+     * Treating them as the third is what let {@code [1<LRM>2]} read as two elements: an insertion that
+     * changes the meaning, invisibly, in the one position where juxtaposition is the separator and the
+     * result is still a valid document. {@code SPEC-FEEDBACK.md} #16 carries the spec-side finding.
+     */
+    @Test
+    void anIgnorableFormatControlInsideATokenIsRefused() {
+        for (String control : List.of("\u200E", "\u200F")) {
+            LexException thrown = assertThrows(LexException.class, () -> lex("[ 1" + control + "2 ]"));
+            assertTrue(thrown.getMessage().contains("which without it are one token"), thrown.getMessage());
+        }
+    }
+
+    /** Every unquoted shape it can split, not just digits -- a name, a signed number, and a dotted token. */
+    @Test
+    void anIgnorableFormatControlIsRefusedWhicheverTokenItSplits() {
+        assertThrows(LexException.class, () -> lex("{ ad\u200Emin: 1 }"));
+        assertThrows(LexException.class, () -> lex("[ alpha\u200Ebeta ]"));
+        assertThrows(LexException.class, () -> lex("[ -1\u200E2 ]"));
+        assertThrows(LexException.class, () -> lex("[ a\u200E.b ]"));
+    }
+
+    /** A run is one control for this purpose: what decides is the pair either side of it, however long it is. */
+    @Test
+    void aRunOfIgnorableFormatControlsInsideATokenIsRefused() {
+        assertThrows(LexException.class, () -> lex("[ 1\u200E\u200E\u200F2 ]"));
+    }
+
+    /** The message names the character and the pair, none of which the author can see, and points at the control itself. */
+    @Test
+    void theRefusalNamesTheInvisibleCharacterAndItsPosition() {
+        LexException thrown = assertThrows(LexException.class, () -> lex("{ ad\u200Emin: 1 }"));
+
+        assertTrue(thrown.getMessage().contains("U+200E LEFT-TO-RIGHT MARK"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("'d' and 'm'"), thrown.getMessage());
+        assertEquals(1, thrown.position().line());
+        assertEquals(5, thrown.position().column());
+    }
+
+    /**
+     * [UAX31-I2]: wherever horizontal space could be inserted without changing the meaning. The control is
+     * consumed and contributes nothing, which is what "no effect on the meaning" asks for.
+     */
+    @Test
+    void anIgnorableFormatControlWhereASpaceCouldStandIsIgnored() {
+        assertEquals(shape("{ a: 1 }"), shape("{ a:\u200E1 }"));
+        assertEquals(shape("[ 1 2 ]"), shape("[ \u200E1 2 ]"));
+        assertEquals(shape("[ 1 ]"), shape("[ 1\u200E]"));
+    }
+
+    /** [UAX31-I1]: adjacent to horizontal space -- within a run of it, or at either end of one. */
+    @Test
+    void anIgnorableFormatControlAdjacentToHorizontalSpaceIsIgnored() {
+        List<String> equivalents = List.of("[ 1 \u200E 2 ]", "[ 1\u200E 2 ]", "[ 1 \u200E2 ]");
+        for (String source : equivalents) {
+            assertEquals(shape("[ 1 2 ]"), shape(source), source);
+        }
+    }
+
+    /** [UAX31-I3]: at the start and end of a lexical line. */
+    @Test
+    void anIgnorableFormatControlAtALineBoundaryIsIgnored() {
+        assertEquals(shape("[ 1 2 ]"), shape("\u200E[ 1 2 ]"));
+        assertEquals(shape("[ 1 2 ]"), shape("[ 1 2 ]\u200E"));
+        assertEquals(shape("{ a: 1\nb: 2 }"), shape("{ a: 1\n\u200Eb: 2 }"));
+    }
+
+    /**
+     * A quoted token is content, not a lexical element made of characters -- R3a's own carve-out ("except
+     * comments and strings"), and the remedy §7.1 already prescribes for a name that needs one.
+     */
+    @Test
+    void anIgnorableFormatControlInsideAQuotedTokenIsKept() {
+        assertToken(tokens("\"a\u200Eb\"").getFirst(), TokenType.SINGLE_LINE_STRING, "a\u200Eb");
+    }
+
+    /**
+     * {@code ..} is a token of its own (§7.2 rule 3), so a control before one stands at a boundary that was
+     * already there -- the one place the "both sides continue a token" test would otherwise overreach, {@code
+     * .} being an unquoted-continuation character.
+     */
+    @Test
+    void anIgnorableFormatControlBeforeARangeTokenIsIgnored() {
+        assertEquals(shape("1 .."), shape("1\u200E.."));
     }
 
     // ── Compound tokens ──────────────────────────────────────────────────

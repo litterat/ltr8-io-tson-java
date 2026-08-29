@@ -258,7 +258,11 @@ itself** (§9.1), code-point
 addressed (never char-addressed), with `Position` tracking line / code-point column / UTF-8 byte offset —
 counted from the input rather than re-derived from the decoded character, and malformed UTF-8 is a
 `LexException` rather than a U+FFFD substitution (§7.1: a decoder MUST NOT substitute). NFC normalization
-applies to *unquoted* tokens only; Pattern_White_Space is the spec's fixed 11-character set, hardcoded.
+applies to *unquoted* tokens only; Pattern_White_Space is the spec's fixed 11-character set, hardcoded — but
+**not one set doing one job**: UAX31-R3a-1 splits it into line terminators, *ignorable format controls*
+(U+200E/U+200F, which it names) and horizontal space, so an LRM/RLM is consumed, contributes nothing, and is
+refused where it stands inside a token rather than at a boundary — §7.2 rule 1 folds them into horizontal
+space instead, which is what let `[1<LRM>2]` read as two elements (`SPEC-FEEDBACK.md` #16).
 §7.1's UAX #31 profile is implemented exactly, not approximated: the JDK's identifier predicates are
 `ID_*` unioned with the identifier-ignorable set (all `Cf`, plus non-whitespace controls), so `Lexer`
 subtracts that set and two literal `ID_ \ XID_` tables — verified zero-over/zero-under against Unicode

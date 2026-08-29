@@ -355,7 +355,3 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   settles. The audit is the deliverable either way: each site, which production it
   uses, and whether the parser agrees with the grammar — `TsonSchemaParser.expectTypeName` requires
   `TokenType.UNQUOTED`, and it is worth knowing where else that is assumed.
-- [ ] Bidi-formatting-character surfacing outside quoted tokens (§9.5) — the sibling gap to the
-  numeric-literal length limit tracked in `STRUCTURED-OUTPUT.md`'s Tier 1 section; neither is enforced. Note
-  this is **not** the class #14 closed: U+200E/U+200F are `Pattern_White_Space`, so they *separate* tokens
-  rather than sitting inside one, and a stray LRM still splits a name silently.
