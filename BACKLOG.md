@@ -351,24 +351,10 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   would let a name carrying an out-of-profile character be spelled at every position, which is what §7.1's
   ZWNJ advice assumes is possible. **It is not a safe change on its own** — today the inconsistency is the
   only thing confining the quoting bypass (`SPEC-FEEDBACK.md` #3, point 3) to field names, so `token`
-  everywhere widens it until `token` itself carries a contract. Sequence it after the item below, or behind
-  whatever Revision 34 settles. The audit is the deliverable either way: each site, which production it
+  everywhere widens it until `token` itself carries a contract. Sequence it behind whatever Revision 34
+  settles. The audit is the deliverable either way: each site, which production it
   uses, and whether the parser agrees with the grammar — `TsonSchemaParser.expectTypeName` requires
   `TokenType.UNQUOTED`, and it is worth knowing where else that is assumed.
-- [ ] **Admit ZWNJ/ZWJ in the lexer, together with the UTS #39 §3.1.1.1 contextual check — never before it.**
-  `Lexer.isProfileContinue` subtracts the identifier-ignorable set, which removes U+200C/U+200D along with
-  the format characters; they are `XID_Continue`, so the end state is a token profile that is exactly the
-  property (`SPEC-FEEDBACK.md` #14, whose recommendation now keeps the algebra and replaces §7.1's prose).
-  Doing that alone reopens the invisible-character hole #229 closed, so it lands in one step with the
-  contextual rule — conditions A1/A2/B, under single-script and NFC. **Costed:** no UTS #39 table, but the
-  JDK exposes only two of the four properties it reads. `Joining_Type` (~777 listed code points, `T` deriving
-  from `Mn`/`Me`/`Cf`), `Canonical_Combining_Class` (64 Virama ranges plus ~335 for `ccc≠0`) and
-  `Indic_Syllabic_Category=Vowel_Dependent` all need shipping — but merged they are 397 ranges, ~1.9 KB
-  delta-encoded and under 1 KB gzipped, not the ~1,400 lines the source files spend on them. **Do not implement A1 alone**: the Arabic condition without the two Indic ones accepts
-  Persian names and refuses Malayalam ones, which is the failure mode `SPEC-FEEDBACK.md` #3 rejects the
-  restriction level for. The conformance vector
-  `lexer/invalid/zwnj-inside-unquoted-token` asserts today's behaviour and flips in the same change; its
-  sidecar already says the contradiction is why it exists.
 - [ ] **An object read whose bind target fails to resolve throws `IllegalStateException` under a collecting
   receiver.** With the fail-fast receiver the failure is a `TsonReadException` naming the class, which is
   right. With `withDiagnostics(collector)` the bind failure is reported instead of thrown, the read therefore

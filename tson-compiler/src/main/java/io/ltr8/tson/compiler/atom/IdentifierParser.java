@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.lexer.IdentifierStatus;
+import io.ltr8.tson.compiler.lexer.JoiningControls;
 import io.ltr8.tson.compiler.lexer.Xid;
 
 import java.text.Normalizer;
@@ -69,6 +70,11 @@ public final class IdentifierParser implements AtomType<String> {
         if (text.isEmpty()) {
             throw new AtomParseException("an identifier may not be empty", EXPECTED);
         }
+        // Before anything else: UTS #39 §3.1.1.1's global conditions include NFC, and JoiningControls is
+        // written to that assumption rather than re-checking it per joiner.
+        if (!Normalizer.isNormalized(text, Normalizer.Form.NFC)) {
+            throw new AtomParseException("'" + text + "' is not NFC-normalized", EXPECTED);
+        }
         int first = text.codePointAt(0);
         if (!Xid.isStart(first)) {
             throw new AtomParseException(at(text, first, 0) + " cannot start an identifier"
@@ -85,14 +91,19 @@ public final class IdentifierParser implements AtomType<String> {
             if (!(Xid.isContinue(cp) || cp == '-')) {
                 throw new AtomParseException(at(text, cp, i) + " cannot appear in an identifier", EXPECTED);
             }
-            if (!IdentifierStatus.isAllowed(cp) && cp != '-') {
+            if (cp == Xid.ZWNJ || cp == Xid.ZWJ) {
+                // Both joiners are Identifier_Status=Restricted, and UTS #39 §3.1.1.1 carves the exception:
+                // they are admitted exactly where they have a shaping effect. See JoiningControls.
+                if (!JoiningControls.permitted(text, i)) {
+                    throw new AtomParseException(at(text, cp, i) + " is a join control outside the contexts "
+                            + "UTS #39 §3.1.1.1 permits -- it has no shaping effect here, so it is invisible",
+                            EXPECTED);
+                }
+            } else if (!IdentifierStatus.isAllowed(cp) && cp != '-') {
                 throw new AtomParseException(at(text, cp, i) + " is Identifier_Status=Restricted (UTS #39)",
                         EXPECTED);
             }
             i += Character.charCount(cp);
-        }
-        if (!Normalizer.isNormalized(text, Normalizer.Form.NFC)) {
-            throw new AtomParseException("'" + text + "' is not NFC-normalized", EXPECTED);
         }
         return text;
     }

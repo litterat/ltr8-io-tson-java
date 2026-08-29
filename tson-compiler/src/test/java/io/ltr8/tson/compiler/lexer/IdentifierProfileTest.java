@@ -39,12 +39,15 @@ class IdentifierProfileTest {
     /**
      * The whole point: a format or control character does not continue an identifier. Each of these was one
      * {@code UNQUOTED} token before the fix, so this list is the regression itself.
+     *
+     * <p><b>ZWNJ and ZWJ are deliberately not in this list</b> -- they are {@code XID_Continue}, so the token
+     * layer admits them, and whether one may appear in a <em>name</em> is decided contextually one layer up
+     * (UTS #39 §3.1.1.1, {@code JoiningControlsTest}). Every other entry here is outside the property.
      */
     @Test
     void formatAndControlCharactersDoNotContinueAnUnquotedToken() {
         int[] refused = {
             0xFEFF,                     // ZWNBSP / BOM -- §7.1 names this one explicitly
-            0x200C, 0x200D,             // ZWNJ, ZWJ -- in XID_Continue, excluded by §7.1's prose
             0x00AD, 0x2060,             // SOFT HYPHEN, WORD JOINER
             0x202A, 0x202B, 0x202C, 0x202D, 0x202E,   // bidi embedding/override -- the §9.4 risk
             0x2066, 0x2067, 0x2068, 0x2069,           // bidi isolates
@@ -137,5 +140,19 @@ class IdentifierProfileTest {
     @Test
     void theSupportedUnicodeVersionIsDeclared() {
         assertEquals("16.0", Xid.UNICODE_VERSION);
+    }
+
+    /**
+     * The joiners' counterpart to the list above: they <em>do</em> continue an unquoted token, because
+     * {@code XID_Continue} contains them. §7.1's prose excludes them by name and its own set algebra does
+     * not, and this follows the algebra ({@code SPEC-FEEDBACK.md} #14) -- the exclusion the prose wants is a
+     * name rule, and is enforced as one.
+     */
+    @Test
+    void theJoinersDoContinueAnUnquotedTokenBecauseTheProfileContainsThem() {
+        for (int cp : new int[] {0x200C, 0x200D}) {
+            List<Token> tokens = tokens(midToken(cp));
+            assertEquals(1, tokens.size(), () -> "U+%04X should continue a token".formatted(cp));
+        }
     }
 }

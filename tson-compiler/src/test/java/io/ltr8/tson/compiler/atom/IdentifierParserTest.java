@@ -97,17 +97,16 @@ class IdentifierParserTest {
     }
 
     /**
-     * ZWNJ and ZWJ are {@code XID_Continue} and {@code Identifier_Status=Restricted}, and the second decides:
-     * UTS #39 makes them Restricted by default and §3.1.1.1 an explicit exception for "an implementation
-     * ... that allows the additional characters ZWJ and ZWNJ", permitting them only where they satisfy
-     * conditions A1, A2 and B. So refusing them is the correct base rule rather than a stand-in for the
-     * lexer's own exclusion, and the contextual rule is the carve-out that re-admits them
-     * ({@code SPEC-FEEDBACK.md} #14; not implemented).
+     * ZWNJ and ZWJ are {@code XID_Continue} and {@code Identifier_Status=Restricted}, and the second is the
+     * base rule: UTS #39 makes them Restricted, and §3.1.1.1 is the carve-out that re-admits them where they
+     * have a shaping effect. In Latin they never do -- {@code ab<ZWNJ>c} renders as {@code abc} -- so the
+     * carve-out cannot apply and the name is refused. {@code JoiningControlsTest} covers the contexts where
+     * it does apply.
      */
     @Test
-    void theJoinersAreRefusedUntilTheContextualRuleExists() {
+    void aJoinerInLatinIsRefusedBecauseNoContextAdmitsItThere() {
         String zwnj = "ab" + new String(Character.toChars(0x200C)) + "c";
-        assertTrue(rejects(zwnj).contains("Identifier_Status=Restricted"));
+        assertTrue(rejects(zwnj).contains("§3.1.1.1"), rejects(zwnj));
     }
 
     @Test
