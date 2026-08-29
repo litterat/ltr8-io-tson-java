@@ -333,21 +333,20 @@ public final class Lexer {
     }
 
     /**
-     * §7.1's {@code Continue = XID_Continue ∪ { - + . }}, <b>minus ZWNJ and ZWJ</b>, which the property
-     * contains and that section's prose excludes by name: "deliberately excluded ... names whose orthography
-     * requires them MUST be quoted".
+     * §7.1's {@code Continue = XID_Continue ∪ { - + . }}, as the property states it -- <b>including ZWNJ and
+     * ZWJ</b>, which {@code XID_Continue} contains and which §7.1's prose excludes by name
+     * ({@code SPEC-FEEDBACK.md} #14).
      *
-     * <p>This is the one place the two disagree, and it is deliberate rather than incidental
-     * ({@code SPEC-FEEDBACK.md} #14). The intended end state is the property as written, with the joiners
-     * refused contextually where they are actually invisible (UTS #39 §3.1.1.1) rather than everywhere; the
-     * subtraction here holds only until that rule exists, because dropping it first would re-admit an
-     * invisible character into identifiers with nothing to catch it. It is written as an explicit exclusion,
-     * not folded into {@link Xid}, so that removing it is a one-line change at the layer that owns the
-     * decision.
+     * <p><b>The token layer follows the property; the name layer applies the contextual rule.</b> A joiner is
+     * a token character, so an unquoted <em>value</em> may contain one and its content is its own. Whether a
+     * joiner may appear in a <em>name</em> is a different question, and {@code IdentifierParser} answers it
+     * with UTS #39 §3.1.1.1 -- permitted where it has a shaping effect, refused where it is invisible. That
+     * is a sharper rule than the blanket exclusion this used to carry, which forbade Persian
+     * {@code کتاب<ZWNJ>ها} while §7.1's own "MUST be quoted" remedy let {@code "ad<ZWNJ>min"} through, quoting
+     * being outside this production entirely.
      */
     private static boolean isUnquotedContinuation(int cp) {
-        return (Xid.isContinue(cp) && cp != Xid.ZWNJ && cp != Xid.ZWJ)
-                || cp == '-' || cp == '+' || cp == '.';
+        return Xid.isContinue(cp) || cp == '-' || cp == '+' || cp == '.';
     }
 
     private static boolean isDecimalDigit(int cp) {

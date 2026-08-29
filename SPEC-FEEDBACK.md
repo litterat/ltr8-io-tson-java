@@ -966,10 +966,10 @@ token and carrying no `path` — there is none yet where the check runs. A per-s
 this surface rather than ignored. The subsumption predicted above holds and is pinned by a test: a field name is a token, so
 `tokenPolicy(asciiOnly())` constrains names whatever `identifierPolicy` says.
 
-Two parts of Step 1 are deliberately not built. The `field-name` production is untouched, so Class 1 field
-names stay unconstrained exactly as Step 1c intends. And the joiners' contextual rule is not implemented, so
-`Lexer` still subtracts ZWNJ/ZWJ from the token profile while `IdentifierParser` admits them: the identifier
-layer is written to the property and is already correct when the lexer catches up (#14).
+One part of Step 1 is deliberately not built: the `field-name` production is untouched, so Class 1 field
+names stay unconstrained exactly as Step 1c intends. **The joiners' contextual rule is built** — `Lexer` no
+longer subtracts ZWNJ/ZWJ, and `JoiningControls` applies UTS #39 §3.1.1.1's three contexts to a name, which
+is the layering this step always described (#14).
 
 **Layer 2 is not yet reportable as such here.** `Diagnostic.Code.CONFUSABLE_NAMES` exists and is emitted for
 exactly one scope — a Class 1 record's own field names, checked by `SchemalessTreeReader` because no declaration
@@ -2086,9 +2086,24 @@ Suggested wording, beside the byte-order-mark paragraph:
 the ZWNJ/ZWJ paragraph quoted above addresses it directly and gives its reason. The paragraph is the answer;
 the defect is that the algebra above it says the opposite.
 
-**Status against Revision 33:** open, new against this revision. The prose reading is built and running
-here, and is pinned by conformance vectors in the sibling suite (`lexer/invalid/zwnj-inside-unquoted-token`
-among them).
+**Status against Revision 33:** open, new against this revision. **The recommendation is now what is built**:
+the lexer follows the set algebra, so a joiner continues an unquoted token, and the exclusion the prose wants
+is applied where it belongs — to a *name*, by `IdentifierParser` through `JoiningControls`, which implements
+UTS #39 §3.1.1.1's contexts A1, A2 and B under both of its global conditions. A joiner is admitted where it
+has a shaping effect (Persian `کتاب<ZWNJ>ها`, §3.1.1.1's own Malayalam conjunct, a Sinhala ZWJ) and refused
+where it is invisible, which is every Latin position — so `ad<ZWNJ>min` is still rejected, and now for the
+right reason rather than by a blanket rule that also cost Persian its spelling.
+
+All four properties ship here (`Joining_Type`, `Canonical_Combining_Class`, `Indic_Syllabic_Category=
+Vowel_Dependent`, and the `General_Category` default for Transparent), the JDK exposing none of the first
+three; that is 531 ranges, of which the Transparent default costs ten — `ArabicShaping.txt` states the rule
+in prose, so only the exceptions to it need storing. **A1 was not implemented alone**: the Arabic condition
+without the two Indic ones admits Persian and refuses Malayalam, which is the shape of failure this register
+rejects the restriction level for elsewhere.
+
+The conformance vector moved with the change: `lexer/invalid/zwnj-inside-unquoted-token` is now
+`lexer/valid/…`, and its sidecar states the layering rather than the contradiction. The §3.1.1.1 rule itself
+has no vector — it is a *name* rule, so Part 2, and the suite has no Part 2 layer to put one in.
 
 ---
 

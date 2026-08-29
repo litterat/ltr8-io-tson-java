@@ -58,11 +58,15 @@ tokens, modes, or character-classification changes).
   `XID_Start`/`XID_Continue`; the lexer's token profile adds `Nd`/`-`/`+`/`.` and subtracts the joiners,
   and the kernel's `identifier` contract (`IdentifierParser`) adds only `-` and requires NFC. Keeping the
   property in one place is what stops the two drifting — the identifier profile is written to
-  `XID_Continue`, joiners included, so it is already right when the lexer stops subtracting them.
-- **The ignorable subtraction also removes ZWNJ/ZWJ, and that is the profile, not a bug.** U+200C and
-  U+200D *are* in `XID_Continue` (Unicode 16.0 `DerivedCoreProperties.txt`), so §7.1's set algebra admits
-  them while its prose excludes them by name — "deliberately excluded … names whose orthography requires
-  them MUST be quoted". This follows the prose. `SPEC-FEEDBACK.md` #14 carries the contradiction.
+  `XID_Continue`, joiners included, and the lexer no longer subtracts them.
+- **ZWNJ/ZWJ continue a token; whether they may appear in a *name* is decided one layer up.** U+200C and
+  U+200D are in `XID_Continue` (Unicode 16.0 `DerivedCoreProperties.txt`), so §7.1's set algebra admits them
+  while its prose excludes them by name. The lexer follows the algebra, and `IdentifierParser` applies UTS
+  #39 §3.1.1.1's contextual rule (`JoiningControls`): a joiner is admitted where it has a shaping effect —
+  Persian `کتاب<ZWNJ>ها`, a Malayalam conjunct — and refused where it is invisible, which is every Latin
+  position. That is sharper than the blanket exclusion in both directions, and it is why §7.1's own remedy
+  did not work: "MUST be quoted" governs unquoted tokens only, so quoting was the route by which
+  `"ad<ZWNJ>min"` reached a name. `SPEC-FEEDBACK.md` #14.
   A JDK whose Unicode version moves needs both tables re-derived; their Javadoc says how.
 - **NFC normalization** (`java.text.Normalizer`) applies to *unquoted* tokens only (§7.2.1) — quoted
   tokens preserve exact content. **Pattern_White_Space is the spec's fixed 11-character set**, hardcoded

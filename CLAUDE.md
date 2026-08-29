@@ -262,9 +262,10 @@ applies to *unquoted* tokens only; Pattern_White_Space is the spec's fixed 11-ch
 §7.1's UAX #31 profile is implemented exactly, not approximated: the JDK's identifier predicates are
 `ID_*` unioned with the identifier-ignorable set (all `Cf`, plus non-whitespace controls), so `Lexer`
 subtracts that set and two literal `ID_ \ XID_` tables — verified zero-over/zero-under against Unicode
-16.0, which `Lexer.UNICODE_VERSION` declares. ZWNJ/ZWJ are excluded per §7.1's prose although
-`XID_Continue` admits them (`SPEC-FEEDBACK.md` #14). Errors are fail-fast (`LexException`); multi-error
-recovery is deferred.
+16.0, which `Lexer.UNICODE_VERSION` declares. ZWNJ/ZWJ continue a token, `XID_Continue` containing
+both where §7.1's prose excludes them by name; the exclusion the prose wants is a *name* rule, applied by
+`IdentifierParser` through `JoiningControls` (UTS #39 §3.1.1.1's contexts A1/A2/B) — `SPEC-FEEDBACK.md` #14.
+Errors are fail-fast (`LexException`); multi-error recovery is deferred.
 
 ### Structural parsing: Tier 2 stream + Tier 3 AST — `docs/lexer-and-data-parsing.md`
 
