@@ -204,24 +204,6 @@ surface.
   than it was: the emitter now writes into any `Appendable`, so what is missing is the decision to make it
   (or an event-shaped facade over it) public API, not the streaming underneath.
 
-## Conformance test suite
-
-The corpus states its own contract now: `schemas/*.tn` (field groups, so an outcome cannot appear
-without its payload), `RUNNER.md` (normative for runners), and a `class1/`/`class2/` split. Both
-implementations pin it to a commit, and this repo runs it as a gating CI step. `class1/` covers the
-lexer, the parser, base type resolution, the built-in vocabulary and the reader; `class2/` covers schema
-resolution, linking and validation, one layer each. `COVERAGE.md` is generated and diff-checked, so what
-is thin is a query against the corpus rather than a tally kept here.
-
-- [ ] **The `class2/link/` cases that need a second schema document.** §2.2.3's collision rules are the
-  half the layer cannot state today: one schema reached by several routes unifying, two schemas declaring
-  one name being an error, and nothing shadowing a name the closure already binds. Each needs the subject
-  to `!!import` a schema that is not one of the bundled three, and the corpus's layout admits exactly two
-  files per vector — a subject and its sidecar — so there is nowhere to put the imported document. Either
-  the layout gains a per-layer fixture directory the sidecar's `import` short names resolve against, or
-  the corpus publishes a small schema of its own beside the sidecar schemas and the short-name table
-  learns it.
-
 ## Documentation
 
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,

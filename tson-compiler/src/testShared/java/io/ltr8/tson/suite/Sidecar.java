@@ -38,14 +38,17 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 public final class Sidecar {
 
     /**
-     * Short, unversioned names a sidecar uses for the schema its subject's spliced {@code !!meta}/{@code
-     * !!import}/{@code !!schema} names, resolved off {@link TsonBundledSchemas}'s own constants -- so a
-     * revision bump touches that one class rather than every vector that mentions core.tn.
+     * The spec's own three, whose real identities carry the revision -- resolved off {@link
+     * TsonBundledSchemas}'s constants, so a revision bump touches that one class rather than every vector
+     * that mentions core.tn.
      */
-    private static final Map<String, String> SCHEMA_SHORT_NAMES = Map.of(
+    private static final Map<String, String> BUNDLED_SHORT_NAMES = Map.of(
             "meta-kernel.tn", TsonBundledSchemas.META_KERNEL_ID,
             "meta.tn", TsonBundledSchemas.META_ID,
             "core.tn", TsonBundledSchemas.CORE_ID);
+
+    /** Where the corpus publishes its own schemas -- the sidecar schemas, and the link layer's fixtures. */
+    private static final String SUITE_SCHEMAS = "https://tson.io/test-suite/schemas/";
 
     /** The outcome group's members, across every layer's sidecar schema. */
     private static final List<String> OUTCOMES = List.of("valid", "error", "schema-document", "refused");
@@ -133,14 +136,20 @@ public final class Sidecar {
         return raw.substring(0, insertAt) + directives + raw.substring(insertAt);
     }
 
-    /** The real, current identity a sidecar's short name stands for. */
+    /**
+     * The real, current identity a sidecar's short name stands for: one of the spec's own three, or a
+     * schema the corpus publishes itself, named by its path under {@code schemas/}.
+     *
+     * <p><b>A rule, not a table.</b> The three bundled names have to be listed because their identities
+     * carry the spec revision and nothing in the name says so. Everything else is derived, which is what
+     * lets the corpus grow a fixture without every runner in every language editing a constant to keep up
+     * -- and a table that has to be edited per fixture is the same drift {@code RUNNER.md} exists to stop,
+     * once per fixture rather than once. So a link-layer vector that needs a chain, a diamond, or a wide
+     * fan-in adds files and names them; no runner changes.
+     */
     public static String resolveShortName(String shortName) {
-        String resolved = SCHEMA_SHORT_NAMES.get(shortName);
-        if (resolved == null) {
-            throw new AssertionError("unknown schema short name '" + shortName + "' -- expected one of "
-                    + SCHEMA_SHORT_NAMES.keySet());
-        }
-        return resolved;
+        String bundled = BUNDLED_SHORT_NAMES.get(shortName);
+        return bundled != null ? bundled : SUITE_SCHEMAS + shortName;
     }
 
     // ── Field accessors ──────────────────────────────────────────────────

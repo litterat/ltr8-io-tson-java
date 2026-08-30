@@ -1,12 +1,15 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentHeader;
 import io.ltr8.tson.compiler.lexer.Xid;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
+import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.suite.SuiteCheckout;
 import io.ltr8.tson.suite.Sidecar;
 import io.ltr8.tson.suite.Vectors;
 import org.junit.jupiter.api.Assumptions;
@@ -14,6 +17,10 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,7 +87,30 @@ class Class2ConformanceSuiteTest {
     private static Tson newTson() {
         // The schema.meta-resolving context, because a `schema/` vector binds a resolved-form document back
         // into the value model to compare it. It changes nothing for the other two layers.
-        return Tson.builder().dataBindContext(SchemaMetaNameBinder.defaultContext()).build();
+        //
+        // The source serves the corpus's own schemas beside the bundled ones, which is what lets a subject
+        // `!!import` a fixture: the link layer's §2.2.3 vectors need a second schema document, and the
+        // corpus publishes those under its own identity prefix rather than inventing a file convention.
+        return Tson.builder()
+                .dataBindContext(SchemaMetaNameBinder.defaultContext())
+                .schemaSource(Class2ConformanceSuiteTest::fetchSuiteSchema)
+                .build();
+    }
+
+    /** The corpus's own schemas, by the path under {@code schemas/} their identity ends in. */
+    private static String fetchSuiteSchema(String uri) {
+        String prefix = "https://tson.io/test-suite/schemas/";
+        String identity = uri.startsWith("//") ? "https:" + uri : uri;
+        if (identity.startsWith(prefix)) {
+            Path file = SuiteCheckout.schemasRoot().orElseThrow().resolve(identity.substring(prefix.length()));
+            try {
+                return Files.readString(file, StandardCharsets.UTF_8);
+            } catch (IOException e) {
+                throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+                        "no such corpus schema: " + file, e);
+            }
+        }
+        return TsonBundledSchemas.fetch(identity);
     }
 
     // ── Schema-layer vectors: §8's resolved output ───────────────────────
