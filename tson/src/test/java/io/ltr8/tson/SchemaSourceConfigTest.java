@@ -1,5 +1,8 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -8,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -15,7 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@link TsonConfig#httpSchemas} and {@link TsonConfig#fileSchemas} -- the short forms of the two sources
- * this library ships, alongside {@link TsonConfig#schemaSource} rather than instead of it.
+ * this library ships, alongside {@link TsonConfig#schemaSource} rather than instead of it -- and {@link
+ * TsonSchemaSource#ofMap}, the third form, for schemas a caller already holds.
  */
 class SchemaSourceConfigTest {
 
@@ -103,5 +108,71 @@ class SchemaSourceConfigTest {
         assertTrue(assertThrows(IllegalStateException.class,
                 () -> Tson.builder().fileSchemas(HOST, dir).schemaSource(uri -> SCHEMA))
                 .getMessage().contains("not both"));
+    }
+    // --- schemas a caller already holds ---
+
+    private static final String UNPUBLISHED = """
+            !!schema:"https://schemas.example.test/unpublished-1.tn"
+            !order { sku: "ABC-1"  quantity: 3 }""";
+
+    /** The short form for a caller who already has the text: no host, no directory, no fetching. */
+    @Test
+    void ofMapServesADocumentEndToEnd() {
+        Tson tson = Tson.builder().schemaSource(TsonSchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA))).build();
+
+        assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
+    }
+
+    /**
+     * <b>And a schema it does not hold is a verdict on nothing</b> -- {@code SCHEMA_UNAVAILABLE} carrying
+     * {@code NOT_FOUND}, which is what a server routes on to answer the sender rather than blaming itself.
+     * The identity comes from the document, so this is the branch any caller can reach.
+     */
+    @Test
+    void ofMapReportsASchemaItDoesNotHoldAsUnavailable() {
+        Tson tson = Tson.builder().schemaSource(TsonSchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA))).build();
+
+        List<Diagnostic> problems = tson.validate(UNPUBLISHED);
+
+        assertEquals(1, problems.size(), problems::toString);
+        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, problems.getFirst().code());
+        assertEquals(java.util.Optional.of(TsonSchemaFetchException.Reason.NOT_FOUND),
+                problems.getFirst().fetchReason());
+    }
+
+    /**
+     * <b>The trap {@code ofMap} exists to remove.</b> {@code schemas::get} reads as a source, compiles, and
+     * serves every identity in the map -- then returns {@code null} for the one the document actually named.
+     * A {@code null} is not a way to say "cannot supply this": it carries no {@code Reason}, so a deployment
+     * refusing a reference and a host that did not answer would be indistinguishable.
+     *
+     * <p>So it is refused where the loader calls the source, naming the rule and the call the author meant.
+     * Unguarded this was a {@code NullPointerException} several frames inside the registry, nowhere near the
+     * line that caused it.
+     */
+    @Test
+    void aSourceReturningNullSaysSoRatherThanFailingDeeperIn() {
+        Map<String, String> schemas = Map.of(SCHEMA_URI, SCHEMA);
+        Tson tson = Tson.builder().schemaSource(schemas::get).build();
+
+        IllegalStateException thrown =
+                assertThrows(IllegalStateException.class, () -> tson.treeReader().read(UNPUBLISHED));
+
+        assertTrue(thrown.getMessage().contains("returned null"), thrown::getMessage);
+        assertTrue(thrown.getMessage().contains("TsonSchemaFetchException"), thrown::getMessage);
+        assertTrue(thrown.getMessage().contains("ofMap"), thrown::getMessage);
+    }
+
+    /**
+     * <b>And it stays a fault under a collector.</b> {@code validate} promises never to throw for a bad
+     * <em>document</em>, which this is not: the document is fine and the deployment's source is broken.
+     * Reporting it as {@code SCHEMA_UNAVAILABLE} would make the wrong spelling work and hide every later one.
+     */
+    @Test
+    void aSourceReturningNullIsAFaultEvenWhenCollecting() {
+        Map<String, String> schemas = Map.of(SCHEMA_URI, SCHEMA);
+        Tson tson = Tson.builder().schemaSource(schemas::get).build();
+
+        assertThrows(IllegalStateException.class, () -> tson.validate(UNPUBLISHED));
     }
 }

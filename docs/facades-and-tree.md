@@ -405,6 +405,23 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
     else out of a source is that source malfunctioning and propagates as itself. `Reason` is the part worth
     acting on: `NOT_PERMITTED` is policy and no retry helps, where `TIMEOUT`/`TRANSPORT` say the reference
     was fine and the world was not.
+  - **A `null` return is not a second way to say it, and is refused where the loader calls a source.** It
+    carries no `Reason`, so a deployment refusing a reference and a host that did not answer would arrive
+    indistinguishable — and unguarded it surfaced as a `NullPointerException` several frames inside the
+    registry, nowhere near the source that caused it. `TsonCompiledMetaRegistry.fetch` raises an
+    `IllegalStateException` naming the source and the rule, which keeps it a *fault*: a broken source is the
+    deployment's bug, not a verdict on the document that happened to name the schema, so `SchemaFailure`'s
+    default rethrows it. Treating `null` as a miss instead would make the wrong spelling work and hide every
+    later one.
+  - **`TsonSchemaSource.ofMap` is the third shipped source, and exists because the trap above has one
+    author.** `schemaSource(schemas::get)` is the natural first implementation — it compiles, serves every
+    identity in the map, and returns `null` for the rest, which the document chooses. `ofMap` is that lookup
+    done to contract: a miss is `NOT_FOUND` (this source had somewhere to look, where `registeredOnly`'s
+    `NOT_PERMITTED` means nothing was looked for), and lookup is **by canonical identity**, so a reference
+    carrying a `?sha256=` pin finds the entry registered without one. That last part is the half a raw map
+    lookup gets wrong silently: it fails only for documents that pin, which are the ones written where
+    integrity is taken seriously. Two keys canonicalizing alike are refused rather than collapsed, and the map
+    is copied.
   - **Neither verifies the `?sha256=` pin or the fetched document's `!!id`** — the loader does both, after a
     source returns, and a second implementation would only drift from it. What the loader cannot express is
     *requiring* a pin, since it verifies only one that is present; `requireContentHashPin` is that.

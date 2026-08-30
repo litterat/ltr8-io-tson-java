@@ -381,7 +381,10 @@ declares none. It's the value-returning peer of `tson.validate`:
 
 ```java
 Tson tson = Tson.builder()
-        .schemaSource(uri -> schema)       // the `server` schema from §4, served on demand by URI
+        // Schemas you already hold, keyed by identity. Not `schemas::get` -- a source says "I cannot
+        // supply that" by throwing, where a map returns null, for whichever identity the document names.
+        .schemaSource(TsonSchemaSource.ofMap(                 // the `server` schema from §4
+                Map.of("https://example.com/2026/34/app/server-1.tn", schema)))
         .build();
 
 // Self-describing: it names its own schema and root type — no other arguments needed.

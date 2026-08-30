@@ -368,9 +368,41 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
                 + "Break the cycle by moving what both need into a third schema they each import");
     }
 
+    /**
+     * The source's text for {@code uri}, with the one thing the contract cannot express in a type checked
+     * here: a {@code null} return.
+     *
+     * <p><b>{@link TsonSchemaSource} permits exactly one way to say "cannot supply this"</b>, a {@link
+     * TsonSchemaFetchException}, and that is what lets {@code SchemaFailure} tell an unavailable schema from
+     * a fault by type. A {@code null} says it a second way that carries no {@link
+     * TsonSchemaFetchException.Reason} at all, so the deployment refusing a reference and the host that did
+     * not answer arrive indistinguishable -- and unguarded it arrives instead as a {@code
+     * NullPointerException} several frames further in, nowhere near the source that caused it.
+     *
+     * <p><b>An {@link IllegalStateException}, so it stays a fault.</b> A source is the caller's own code and
+     * a broken one is a bug in the deployment, not a verdict on the document that happened to name the
+     * schema: {@code SchemaFailure}'s default rethrows it rather than reporting the document invalid, which
+     * is right, and it must not become {@code SCHEMA_UNAVAILABLE} -- treating {@code null} as a miss would
+     * make the wrong spelling work and hide every later one.
+     *
+     * <p>The trap this catches is {@code schemaSource(schemas::get)}, so the message names {@link
+     * TsonSchemaSource#ofMap} -- the thing that call meant.
+     */
+    private String fetch(String uri) {
+        String sourceText = source.fetch(uri);
+        if (sourceText == null) {
+            throw new IllegalStateException("the TsonSchemaSource " + source.getClass().getName()
+                    + " returned null for '" + uri + "'. A source signals \"cannot supply this\" by throwing "
+                    + "TsonSchemaFetchException and nothing else, so that an unavailable schema can be told "
+                    + "from a fault by type and carries a Reason saying which; null is neither. If this "
+                    + "source is a map lookup, TsonSchemaSource.ofMap(Map) is that lookup done to contract");
+        }
+        return sourceText;
+    }
+
     /** {@link #resolveLinked(String, TsonDiagnosticsReceiver)}'s body, with the cycle guard already held. */
     private TsonLinkedSchema resolveUncached(String uri, String identity, TsonDiagnosticsReceiver receiver) {
-        String sourceText = source.fetch(uri);
+        String sourceText = fetch(uri);
         // Record this identity's content hash (first resolution) and verify this reference's pin against
         // it -- §2.2.1's MUST-verify rule. A transitive pinned !!import/!!meta is verified likewise when
         // its own resolveLinked/load reaches here.
