@@ -1,6 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonReadContext;
 import org.junit.jupiter.api.Test;
 
@@ -40,7 +41,8 @@ class OutputFormatTest {
     void textIncludesThePathWhenPresent() {
         CliDiagnostic diagnostic = new CliDiagnostic(Optional.of("/value"), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.FIELD_REQUIRED, "missing",
-                Optional.of("a value"), Optional.of("(absent)"), Optional.empty(), Optional.empty());
+                Optional.of("a value"), Optional.of("(absent)"), Optional.empty(), Optional.empty(),
+                Optional.empty());
         String rendered = OutputFormat.TEXT.render(new ValidationReport(false, List.of(diagnostic)));
         assertEquals("[FIELD_REQUIRED] /value: missing", rendered);
     }
@@ -54,7 +56,8 @@ class OutputFormatTest {
     void textIncludesThePositionAlongsideThePath() {
         CliDiagnostic diagnostic = new CliDiagnostic(Optional.of("/address/city"), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.TYPE_MISMATCH,
-                "expected text", Optional.of("text"), Optional.of("42"), Optional.of("3:12:47"), Optional.empty());
+                "expected text", Optional.of("text"), Optional.of("42"), Optional.of("3:12:47"), Optional.empty(),
+                Optional.empty());
 
         assertEquals("[TYPE_MISMATCH] /address/city (3:12:47): expected text",
                 OutputFormat.TEXT.render(new ValidationReport(false, List.of(diagnostic))));
@@ -70,7 +73,7 @@ class OutputFormatTest {
         CliDiagnostic diagnostic = new CliDiagnostic(Optional.of(""), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.VALIDATION_ERROR,
                 "unterminated record", Optional.of("well-formed TSON"), Optional.of("a base-syntax error"),
-                Optional.of("2:1:7"), Optional.empty());
+                Optional.of("2:1:7"), Optional.empty(), Optional.empty());
 
         assertEquals("[VALIDATION_ERROR] (2:1:7): unterminated record",
                 OutputFormat.TEXT.render(new ValidationReport(false, List.of(diagnostic))));
@@ -86,7 +89,7 @@ class OutputFormatTest {
         assertEquals("{\"valid\":false,\"errors\":[{\"path\":null,\"schemaPointer\":null,\"schemaId\":null,"
                 + "\"code\":\"VALIDATION_ERROR\","
                 + "\"message\":\"bad \\\"quote\\\"\",\"expected\":null,\"actual\":null,"
-                + "\"dataPosition\":null,\"schemaPosition\":null}]}", rendered);
+                + "\"dataPosition\":null,\"schemaPosition\":null,\"fetchReason\":null}]}", rendered);
     }
 
     /** An empty string from {@link Diagnostic} is an absence, and crosses over as one. */
@@ -130,7 +133,8 @@ class OutputFormatTest {
     void jsonRendersPositionsWhenPresent() {
         CliDiagnostic diagnostic = new CliDiagnostic(Optional.of("/value"), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.FIELD_REQUIRED, "missing",
-                Optional.of("a value"), Optional.of("(absent)"), Optional.of("1:1:0"), Optional.of("6:3:42"));
+                Optional.of("a value"), Optional.of("(absent)"), Optional.of("1:1:0"), Optional.of("6:3:42"),
+                Optional.empty());
         String rendered = OutputFormat.JSON.render(new ValidationReport(false, List.of(diagnostic)));
         assertTrue(rendered.contains("\"dataPosition\":\"1:1:0\""), rendered);
         assertTrue(rendered.contains("\"schemaPosition\":\"6:3:42\""), rendered);
@@ -153,6 +157,43 @@ class OutputFormatTest {
         assertEquals(original, reread);
     }
 
+    /**
+     * <b>A fetch reason survives the round trip as the enum it is</b>, which is what makes carrying it
+     * structurally worth anything: a consumer of {@code --output tson} reads back {@code NOT_PERMITTED}
+     * and routes on it, where a rendered string would leave it matching on text. This is also the check
+     * that {@code fetch_reason} is really declared and really bound -- an unbound enum name would read
+     * back as something else or not at all.
+     */
+    @Test
+    void tsonOutputRoundTripsAFetchReason() {
+        ValidationReport original = new ValidationReport(false, List.of(
+                new CliDiagnostic(Optional.empty(), Optional.of(""), Optional.empty(),
+                        Diagnostic.Code.SCHEMA_UNAVAILABLE, "cannot fetch schema 'https://nope.test/s.tn'",
+                        Optional.of("a schema that can be obtained"), Optional.of("https://nope.test/s.tn"),
+                        Optional.empty(), Optional.empty(),
+                        Optional.of(TsonSchemaFetchException.Reason.NOT_PERMITTED))));
+
+        String rendered = OutputFormat.TSON.render(original);
+        Object reread = DiagnosticsSchema.compiled().get("validation_report")
+                .read(TestDocuments.document(rendered));
+
+        assertEquals(original, reread);
+        assertTrue(rendered.contains("NOT_PERMITTED"), rendered);
+    }
+
+    /** The same value in {@code --output json}, where a consumer reads a name rather than a bound enum. */
+    @Test
+    void jsonRendersTheFetchReasonAndNullWhereThereIsNone() {
+        CliDiagnostic unavailable = new CliDiagnostic(Optional.empty(), Optional.of(""), Optional.empty(),
+                Diagnostic.Code.SCHEMA_UNAVAILABLE, "cannot fetch", Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(TsonSchemaFetchException.Reason.TIMEOUT));
+
+        assertTrue(OutputFormat.JSON.render(new ValidationReport(false, List.of(unavailable)))
+                .contains("\"fetchReason\":\"TIMEOUT\""));
+        assertTrue(OutputFormat.JSON.render(ValidationReport.failed(Diagnostic.Code.TYPE_MISMATCH, "nope"))
+                .contains("\"fetchReason\":null"));
+    }
+
     @Test
     void tsonOutputRoundTripsAValidReportToo() {
         ValidationReport original = ValidationReport.ok();
@@ -170,10 +211,12 @@ class OutputFormatTest {
         ValidationReport original = new ValidationReport(false, List.of(
                 new CliDiagnostic(Optional.of("/a"), Optional.empty(), Optional.empty(),
                         Diagnostic.Code.VALIDATION_ERROR, "first problem",
-                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()),
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                        Optional.empty()),
                 new CliDiagnostic(Optional.of("/b"), Optional.empty(), Optional.empty(),
                         Diagnostic.Code.VALIDATION_ERROR, "second problem",
-                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty())));
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                        Optional.empty())));
 
         String rendered = OutputFormat.TSON.render(original);
 
@@ -207,7 +250,7 @@ class OutputFormatTest {
                 + "{\"file\":\"good.tn\",\"valid\":true,\"errors\":[]},"
                 + "{\"file\":\"bad.tn\",\"valid\":false,\"errors\":[{\"path\":null,\"schemaPointer\":null,"
                 + "\"schemaId\":null,\"code\":\"TYPE_MISMATCH\",\"message\":\"nope\",\"expected\":null,"
-                + "\"actual\":null,\"dataPosition\":null,\"schemaPosition\":null}]}"
+                + "\"actual\":null,\"dataPosition\":null,\"schemaPosition\":null,\"fetchReason\":null}]}"
                 + "],\"errors\":[]}", rendered);
     }
 
@@ -245,7 +288,7 @@ class OutputFormatTest {
                 FileReport.of("bad.tn", List.of(new CliDiagnostic(Optional.of("/a"), Optional.empty(), Optional.empty(),
                         Diagnostic.Code.FIELD_REQUIRED,
                         "missing required field 'a'", Optional.of("a value"), Optional.of("(absent)"),
-                        Optional.of("1:1:0"), Optional.of("6:3:42"))))));
+                        Optional.of("1:1:0"), Optional.of("6:3:42"), Optional.empty())))));
 
         String rendered = OutputFormat.TSON.render(original);
 
@@ -272,7 +315,7 @@ class OutputFormatTest {
         ValidationReport original = new ValidationReport(false, List.of(
                 new CliDiagnostic(Optional.of("/value"), Optional.empty(), Optional.empty(), Diagnostic.Code.FIELD_REQUIRED,
                         "missing required field 'value'", Optional.of("a value"), Optional.of("(absent)"),
-                        Optional.of("1:1:0"), Optional.of("6:3:42"))));
+                        Optional.of("1:1:0"), Optional.of("6:3:42"), Optional.empty())));
 
         String rendered = OutputFormat.TSON.render(original);
 

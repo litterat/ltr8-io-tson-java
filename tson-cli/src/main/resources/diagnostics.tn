@@ -4,19 +4,20 @@
 @doc:"""
   This project's own schema !!id convention (see CLAUDE.md's "Project-owned schema !!id
   convention"): /2026/34 is the spec revision this schema is written against, ltr8 is the
-  publishing org, cli is this module's own schema group, and the trailing -10 is this schema's
-  own version -- bumped when file_report/validation_run were added, so `validate` can name the
-  file each verdict belongs to inside one document; when the fields that may have nothing to
-  say became optional rather than empty; when path/schema_pointer joined them, DUPLICATE_FIELD
-  having been missing from diagnostic_code all along; when FIELD_FIXED joined that same enum;
-  when NOT_IMPLEMENTED did, so a construct this library has not implemented can be reported
-  beside the ordinary problems instead of aborting the pass that found them; when
-  BIND_MISMATCH did, so a schema and the reading application's own classes disagreeing is not
-  reported as the author's schema being wrong; and when SCHEMA_UNAVAILABLE did, so a schema no
-  source would supply is not reported as a schema that is wrong; and when CONFUSABLE_NAMES did, so
-  two names in one scope that a reader cannot tell apart are refused rather than silently kept as
-  two names. Per that same convention's "bump it, under a new name" rule, never edit a published
-  schema's own content in place.
+  publishing org, cli is this module's own schema group, and the trailing -11 is this schema's
+  own version.
+
+  That version is bumped on a *release*, not on a change. [TSON-SCHEMA] §10's immutability rule
+  binds a published identity: once a release of this library ships carrying this schema, the
+  document under this !!id is fixed, and a later shape change mints -12 rather than editing it.
+  Between releases -- while the build version carries -SNAPSHOT -- nothing has published this
+  identity, so this document is in development and is edited in place. Bumping per change instead
+  mints versions nobody ever consumed, one for every field added during a development cycle.
+
+  diagnostic_code and fetch_reason are hand-written copies of Diagnostic.Code and
+  TsonSchemaFetchException.Reason. DiagnosticsSchemaTest checks both copies against the Java enums
+  in both directions, which is what catches a member added to one and forgotten here -- before that
+  test existed, two such omissions were noticed only by a version bump.
 
   BIND_MISMATCH is not reachable from this CLI, which reads in DOM mode and binds nothing. It is
   declared because this enum copies Diagnostic.Code, not the subset one consumer happens to emit
@@ -28,6 +29,14 @@
     UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD CONFUSABLE_NAMES RESTRICTED_TOKEN SCHEMA_ERROR
     UNKNOWN_TYPE VALIDATION_ERROR NOT_IMPLEMENTED BIND_MISMATCH SCHEMA_UNAVAILABLE
   ]
+  @doc:"""
+    Why a schema could not be obtained, carried only beside SCHEMA_UNAVAILABLE. The code says that no
+    schema was obtained; this says by whose doing, which is the half a caller acts on: NOT_PERMITTED
+    names a reference this deployment will not fetch and NOT_FOUND one nothing serves, both the
+    document's to fix, where TRANSPORT, TIMEOUT and TOO_LARGE say the reference was fine and the
+    world was not, and only those are worth retrying.
+    """
+  fetch_reason => !enum [ NOT_PERMITTED NOT_FOUND TRANSPORT TIMEOUT TOO_LARGE ]
   @doc:"""
     One problem, located at up to two ends: the value in the data (path, data_position) and the rule
     in the schema (schema_id, schema_pointer, schema_position). Either end may be absent -- a problem
@@ -51,6 +60,7 @@
     actual: text?
     data_position: text?
     schema_position: text?
+    fetch_reason: fetch_reason?
   }
   validation_report => { valid: boolean  errors: [diagnostic] }
   file_report => { file: text  valid: boolean  errors: [diagnostic] }

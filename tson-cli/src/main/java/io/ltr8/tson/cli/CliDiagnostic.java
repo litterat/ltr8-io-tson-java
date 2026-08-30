@@ -2,6 +2,7 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.util.Optional;
@@ -24,13 +25,21 @@ import java.util.Optional;
  * convention belongs: any renderer of a diagnostic needs it, and this one is not the only renderer. The two
  * RFC 6901 pointers need no narrowing: they are already {@code Optional} at the source, because for a
  * pointer {@code ""} is not absence but the root, and a document-level schema problem genuinely carries it.
+ *
+ * <p><b>{@code fetchReason} stays the real enum</b>, for {@code code}'s own reason: enum narrowing is the
+ * proven binding path, and the value is one a consumer routes on -- {@code SCHEMA_UNAVAILABLE} says no
+ * schema was obtained, and this says whether the document named something this deployment refuses or a host
+ * simply did not answer. Rendering it as text would hand that consumer a string to match on, which is what
+ * carrying it structurally exists to avoid.
  */
 public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Optional<String> schemaPointer,
                              @Field("schema_id") Optional<String> schemaId,
                              Diagnostic.Code code, String message,
                              Optional<String> expected, Optional<String> actual,
                              @Field("data_position") Optional<String> dataPosition,
-                             @Field("schema_position") Optional<String> schemaPosition) {
+                             @Field("schema_position") Optional<String> schemaPosition,
+                             @Field("fetch_reason")
+                             Optional<TsonSchemaFetchException.Reason> fetchReason) {
 
     static CliDiagnostic from(Diagnostic diagnostic) {
         return new CliDiagnostic(diagnostic.path(), diagnostic.schemaPointer(),
@@ -38,13 +47,14 @@ public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Opti
                 diagnostic.code(), diagnostic.message(),
                 diagnostic.expectedIfStated(), diagnostic.actualIfStated(),
                 diagnostic.dataPosition().map(CliDiagnostic::render),
-                diagnostic.schemaPosition().map(CliDiagnostic::render));
+                diagnostic.schemaPosition().map(CliDiagnostic::render),
+                diagnostic.fetchReason());
     }
 
     /** A problem with no location at either end -- a usage failure, or a schema that never named itself. */
     static CliDiagnostic minimal(Diagnostic.Code code, String message) {
         return new CliDiagnostic(Optional.empty(), Optional.empty(), Optional.empty(), code, message,
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     /** The position format every rendered diagnostic uses; stated in {@code diagnostics.tn} for consumers. */

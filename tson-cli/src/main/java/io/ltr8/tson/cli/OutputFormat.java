@@ -161,6 +161,8 @@ enum OutputFormat {
                     .append(",\"actual\":").append(jsonStringOrNull(error.actual()))
                     .append(",\"dataPosition\":").append(jsonStringOrNull(error.dataPosition()))
                     .append(",\"schemaPosition\":").append(jsonStringOrNull(error.schemaPosition()))
+                    .append(",\"fetchReason\":")
+                    .append(jsonStringOrNull(error.fetchReason().map(Enum::name)))
                     .append('}');
         }
         json.append(']');

@@ -154,8 +154,8 @@ that question.
   - **Which suggests an extended output mode**, rather than making every diagnostic bigger: the default stays
     one frame, and a caller that finds an error confusing asks for the chain. That is a CLI surface question
     (`--explain`? a verbosity flag?) as much as a model one, and it interacts with `diagnostics.tn` being a
-    versioned schema — a new frame list is a shape change, so §10's immutability rule means the next version
-    under a new name, never an edit in place.
+    versioned schema — a new frame list is a shape change, so it lands in place if no release has published
+    the current `!!id`, and under the next version if one has.
   - **The input already exists and is deliberately kept for this.** `TsonLinkedSchema.entryOrigins` answers
     "which document declared this entry", and every reader is already handed its own declaration's location
     (`ValueReaderContext.locationOf`) — today only used as the seed for a value nothing encloses. A caused-by
@@ -271,15 +271,6 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       which turns this item's deferral from a shrug into a decision.
 
 ## Miscellaneous
-
-- [ ] **The CLI's own wire shape does not carry `fetchReason`.** `Diagnostic` states which of the five ways a
-  fetch failed produced a `SCHEMA_UNAVAILABLE`, so a library consumer can tell a reference this deployment
-  refuses from a host that did not answer; `CliDiagnostic` maps the components by hand and does not map that
-  one, so `--output json|tson` states only the code. A consumer of the CLI's report has the gap a consumer of
-  the library no longer has. The obstacle is §10's immutability rule rather than the mapping: `diagnostics.tn`
-  is published under its own `!!id`, so a new field means minting `diagnostics-2.tn` and moving
-  `DiagnosticsSchema`/`InitCommand`/`README.md` onto it, which is worth doing once rather than per field --
-  so this waits for a second reason to bump it, or for someone who wants it enough to bump it alone.
 
 - [ ] **A record field written `_` reads identically to one never written.** Under a schema, `{ x: _  y: "h" }`
   and `{ y: "h" }` against `x: text?` both produce a tree with no `x` at all; the same pair read schemalessly

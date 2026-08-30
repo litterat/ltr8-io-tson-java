@@ -166,8 +166,12 @@ keeps it apart. The exception classification itself is unchanged and is what pic
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
 `https://tson.io/2026/34/ltr8/<group>/<name>-<version>.tn` — `/2026/34` is the spec revision, `ltr8` the
 publishing org, `<group>` the subsystem (`cli`), `<name>-<version>` the schema name with a trailing
-integer version. Bump the version under a new name (`diagnostics-2.tn`, not an in-place edit) whenever the
-shape changes (§10's immutability rule). **Use `.tn`, not `.tn1`** — `.tn1` is a stability claim §7.1
+integer version. **The version is bumped on a release, not on a change.** §10's immutability rule binds a
+*published* identity: once a release ships carrying the schema, the document under that `!!id` is fixed and
+a later shape change mints the next version (`diagnostics-12.tn`) rather than editing it. Between releases
+— while the build version carries `-SNAPSHOT`, so nothing has published the identity — the schema is in
+development and is edited in place. Bumping per change instead mints versions nobody ever consumed, one for
+every field added during a development cycle. **Use `.tn`, not `.tn1`** — `.tn1` is a stability claim §7.1
 reserves for the eventual frozen "TSON version 1", which hasn't happened.
 
 **Line wrapping:** wrap both comments and code to 125 characters.
