@@ -33,6 +33,13 @@ final class DefaultTsonReadContext implements TsonReadContext {
         final TsonDiagnosticsReceiver receiver;
 
         /**
+         * [TSON-DATA] §8.2's mechanism 3 over the names this document carries, defaulting to Highly
+         * Restrictive as §8.2 says it SHOULD. Per read rather than per context, so every derived context
+         * checks against the one a caller named.
+         */
+        final TsonUnicodePolicy namePolicy;
+
+        /**
          * Where the cursor is: the position of the last event {@link #peek()} or {@link #next()} returned,
          * {@code null} before the first. <b>Held as the event's own {@link SourcePosition}, not wrapped</b>
          * -- {@link #position()} wraps it when asked, which is once per diagnostic, where this is assigned
@@ -53,9 +60,10 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** Where {@link #next()} records what it consumes while a lookahead is running, else {@code null}. */
         List<TsonEvent> recording;
 
-        Cursor(TsonEventSource events, TsonDiagnosticsReceiver receiver) {
+        Cursor(TsonEventSource events, TsonDiagnosticsReceiver receiver, TsonUnicodePolicy namePolicy) {
             this.events = events;
             this.receiver = receiver;
+            this.namePolicy = namePolicy;
         }
     }
 
@@ -109,7 +117,12 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver) {
-        return new DefaultTsonReadContext(new Cursor(events, receiver), null, null, null,
+        return of(events, receiver, TsonUnicodePolicy.highlyRestrictive());
+    }
+
+    static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
+                              TsonUnicodePolicy namePolicy) {
+        return new DefaultTsonReadContext(new Cursor(events, receiver, namePolicy), null, null, null,
                 Optional.empty(), Optional.empty());
     }
 
@@ -139,8 +152,12 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     /**
-     * [TSON-DATA] §8.2's mechanism 2 over the two names a Class 1 document carries -- a type-ref name and an
-     * annotation name, the positions §7.4 marks {@code identifier}.
+     * [TSON-DATA] §8.2's mechanisms <b>2 and 3</b> over the two names a Class 1 document carries -- a
+     * type-ref name and an annotation name, the positions §7.4 marks {@code identifier}.
+     *
+     * <p>Both default on, which §8.2 requires: mechanism 2 MUST default on and mechanism 3 SHOULD default to
+     * Highly Restrictive over the whole name. They are one report shape because they are one outcome -- the
+     * document is refused, and which table said so is the message's business.
      *
      * <p><b>Here rather than in {@code TsonDataStream}, because a refusal needs a receiver.</b> §8.2 makes a
      * mechanism-2 failure a policy refusal: the document is not invalid, it is refused by this processor
@@ -169,8 +186,14 @@ final class DefaultTsonReadContext implements TsonReadContext {
         if (name == null) {
             return;
         }
-        IdentifierParser.hygiene(name).ifPresent(violation -> report(Diagnostic.Code.RESTRICTED_TOKEN,
-                "the name " + violation, "a name this processor will accept", "'" + name + "'"));
+        IdentifierParser.hygiene(name).ifPresent(violation -> refuse(name, violation));
+        cursor.namePolicy.violation(name).ifPresent(violation -> refuse(name, violation));
+    }
+
+    /** One shape for both name-hygiene mechanisms: refused under a stated policy, never invalid. */
+    private void refuse(String name, String violation) {
+        report(Diagnostic.Code.RESTRICTED_TOKEN, "the name " + violation,
+                "a name this processor will accept", "'" + name + "'");
     }
 
     /**

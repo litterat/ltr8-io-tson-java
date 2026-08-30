@@ -228,12 +228,6 @@ is thin is a query against the corpus rather than a tally kept here.
   return is `List<Diagnostic>`, and a refusal is not a diagnostic in any of §8.1's four categories.
   [TSON-SCHEMA] §11.4's scopes are the same shape, so this is one decision covering the whole schema side:
   what a policy refusal looks like coming out of a schema load.
-- [ ] **§8.2's mechanism 3 is not applied to Class 1 names.** The restriction level rides `withTokenPolicy`,
-  whose default is Unrestricted — right for tokens, which §8.2 says default to Unrestricted, and wrong for
-  names, which it says default to Highly Restrictive. So a mixed-script annotation or type-ref name is
-  accepted by default where §8.2 refuses it. The schema layer already gets it right
-  (`TsonCompiledMetaRegistry.identifierPolicy`); what is missing is the same policy applied where Class 1
-  data carries a name. Blocks the corpus's `restriction-level` mechanism, which likewise has no vector.
 
 ## Documentation
 

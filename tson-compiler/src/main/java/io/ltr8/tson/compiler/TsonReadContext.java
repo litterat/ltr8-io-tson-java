@@ -187,9 +187,24 @@ public interface TsonReadContext {
      */
     static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
                               TsonUnicodePolicy tokenPolicy) {
+        return of(events, receiver, tokenPolicy, TsonUnicodePolicy.highlyRestrictive());
+    }
+
+    /**
+     * As above, naming the <b>name</b> policy too -- [TSON-DATA] §8.2's mechanism 3, applied where a type-ref
+     * or annotation name arrives rather than to every token. The two are separate because §8.2 makes them
+     * separate surfaces: a value may legitimately be anything, so tokens default to Unrestricted, while
+     * mechanism 3 SHOULD default to Highly Restrictive over a name. The overload above carries that default,
+     * so a caller that names only a token policy still gets the name surface checked.
+     */
+    static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
+                              TsonUnicodePolicy tokenPolicy, TsonUnicodePolicy namePolicy) {
         Objects.requireNonNull(tokenPolicy, "tokenPolicy -- name one, TsonUnicodePolicy.unrestricted() if "
                 + "this source's tokens are not to be checked");
-        return DefaultTsonReadContext.of(TokenPolicyEventSource.wrap(events, tokenPolicy, receiver), receiver);
+        Objects.requireNonNull(namePolicy, "namePolicy -- name one, TsonUnicodePolicy.unrestricted() if "
+                + "this source's names are not to be checked");
+        return DefaultTsonReadContext.of(TokenPolicyEventSource.wrap(events, tokenPolicy, receiver), receiver,
+                namePolicy);
     }
 
     /**
