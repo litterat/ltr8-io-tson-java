@@ -14,6 +14,7 @@ import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
+import io.ltr8.tson.compiler.lexer.Xid;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.compiler.base.BaseValue;
 import io.ltr8.tson.compiler.base.NumberForm;
@@ -75,6 +76,7 @@ import static io.ltr8.tson.suite.Sidecar.soleField;
 import static io.ltr8.tson.suite.Sidecar.subjectBytes;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -341,9 +343,57 @@ class ConformanceSuiteTest {
                 new TsonTreeReader().withDiagnostics(reported::add).read(new ByteArrayInputStream(raw));
                 assertTrue(!reported.isEmpty(),
                         "the document parses, so the reader is what must reject it -- none reported");
+                reported.forEach(diagnostic -> assertFalse(isPolicyRefusal(diagnostic.code()),
+                        "an error vector must not be satisfied by a §8.2 policy refusal: " + diagnostic));
             }
+            case "refused" -> checkRefusedVector(raw, sidecar);
             default -> fail("unknown reader-layer outcome: " + outcomeOf(sidecar));
         }
+    }
+
+    /**
+     * §8.1's fifth outcome: the document is <b>refused by this processor</b> under one of §8.2's
+     * name-hygiene mechanisms, and is not invalid.
+     *
+     * <p><b>The refusal must be distinguishable</b>, which is the whole reason the outcome exists.
+     * §8.2 keeps these checks out of validity because each reads data the Unicode Consortium declines
+     * to freeze, so a verdict can change under a routine UCD refresh while a content-addressed
+     * document must mean the same thing forever. A processor reporting a confusable pair the way it
+     * reports an out-of-range integer has not passed the vector, so this asserts the code is one of
+     * the two that mean policy and none of the four categories.
+     *
+     * <p><b>And the versions must match.</b> §8.2 says two conforming implementations may legitimately
+     * disagree on a refusal, with the UTS #39 data version the only thing that explains it -- so a
+     * vector computed against another version is {@code RUNNER.md} rule 5's fourth legitimate skip,
+     * reported rather than silent. A vector at <em>this</em> version is never skippable.
+     */
+    private static void checkRefusedVector(byte[] raw, RecordValue sidecar) throws IOException {
+        RecordValue refusal = outcomePayload(sidecar);
+        String stated = fieldText(refusal, "unicode");
+        Assumptions.assumeTrue(Xid.UNICODE_VERSION.equals(stated),
+                "vector computed against UTS #39 data for Unicode " + stated + "; this implementation "
+                        + "carries " + Xid.UNICODE_VERSION + " (§8.2: two implementations may legitimately "
+                        + "disagree, and the version is what explains it)");
+
+        // A refusal is not a parse failure: the document is well-formed and the reader refuses it.
+        new TsonDataParser(new ByteArrayInputStream(raw)).parseDocument();
+        List<Diagnostic> reported = new ArrayList<>();
+        new TsonTreeReader().withDiagnostics(reported::add).read(new ByteArrayInputStream(raw));
+
+        assertTrue(reported.stream().anyMatch(diagnostic -> isPolicyRefusal(diagnostic.code())),
+                "expected a §8.2 policy refusal (" + fieldText(refusal, "mechanism") + "); got " + reported);
+        reported.forEach(diagnostic -> assertTrue(isPolicyRefusal(diagnostic.code()),
+                "a refused document must not also be reported invalid -- §8.2's refusal MUST NOT be any "
+                        + "of §8.1's four categories: " + diagnostic));
+    }
+
+    /**
+     * The two codes that mean <em>refused under a stated policy</em> rather than <em>invalid</em>:
+     * §8.2's mechanism 1 over a named scope, and its mechanism 3 over a token. Every other code is a
+     * verdict on the document, which is exactly what a refusal is not.
+     */
+    private static boolean isPolicyRefusal(Diagnostic.Code code) {
+        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_TOKEN;
     }
 
     private static void assertReaderValueMatches(RecordValue expected, TsonValue actual) {

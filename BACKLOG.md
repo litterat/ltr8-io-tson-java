@@ -221,20 +221,20 @@ is thin is a query against the corpus rather than a tally kept here.
   the layout gains a per-layer fixture directory the sidecar's `import` short names resolve against, or
   the corpus publishes a small schema of its own beside the sidecar schemas and the short-name table
   learns it.
-- [ ] **Fill the coverage the corpus reports on itself**, working downward from the thinnest. The one
-  section still at zero is §8.2, and §9.4 has only the vector its exclusion-by-property half admits — both
-  are the same blocker: name hygiene is a policy refusal with no outcome member to state it (below).
-  A section at zero is not by itself a gap — §7.3 summarises the lexical grammar and §9.2/§9.3 assert
-  properties other sections enforce, so all three are exercised under those sections rather than their own.
-  §6 is JSON compatibility, which this implementation is not committed to; a second implementation may
-  still want those vectors, so they are the corpus's to gain, not this list's to carry.
-- [ ] **§8.2 name hygiene has no outcome to state.** §8.1 makes a policy refusal a fifth, distinguishable
-  outcome that MUST NOT be reported in any of the four categories, and the sidecar outcome group has
-  members for `valid`, `error` and `schema-document` only — so a confusable or restricted-name vector
-  cannot say what should happen to it. The group needs a `refused` member carrying the stated policy,
-  and `RUNNER.md` a rule that two conforming processors may legitimately disagree there, before §8.2 and
-  §9.4's skeleton-distinctness half can be covered at all. §9.5 needed none of it: the bidi controls are
-  excluded by profile, so every one of its rules is an ordinary lexer verdict.
+- [ ] **§8.2's mechanism 2 reports a policy refusal as a validity error.** `IdentifierParser` applies
+  §7.7's grammar and §8.2's `Identifier_Status` check in one pass and fails both the same way, so
+  `@aĲb` — a well-formed identifier carrying a `Identifier_Status=Restricted` character — comes back as a
+  parse failure and reaches a reader as `VALIDATION_ERROR`. §8.2 says outright that a refusal MUST NOT be
+  reported in any of §8.1's four categories, and being distinguishable is the entire reason the outcome
+  exists: the check reads data the UCD does not freeze, so it may never decide validity. The two checks
+  have to separate, and the refusal needs a channel out of `TsonDataStream`, which throws rather than
+  reporting — that is the work, and it is why the corpus's `identifier-status` mechanism has no vector.
+- [ ] **§8.2's mechanism 3 is not applied to Class 1 names.** The restriction level rides `withTokenPolicy`,
+  whose default is Unrestricted — right for tokens, which §8.2 says default to Unrestricted, and wrong for
+  names, which it says default to Highly Restrictive. So a mixed-script annotation or type-ref name is
+  accepted by default where §8.2 refuses it. The schema layer already gets it right
+  (`TsonCompiledMetaRegistry.identifierPolicy`); what is missing is the same policy applied where Class 1
+  data carries a name. Blocks the corpus's `restriction-level` mechanism, which likewise has no vector.
 
 ## Documentation
 

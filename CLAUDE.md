@@ -748,8 +748,19 @@ asserted at every layer**, not only the vocabulary one (the layers are pipeline 
 categories — the vocabulary layer raises `resolver` and `validation` errors and never a "vocabulary"
 one); and **position is never asserted**, implementations legitimately failing at different points
 depending on lookahead. A sidecar carries its outcome as a **field group member** (§5.11), so exactly
-one of `valid`/`error`/`schema-document` is present and the payload cannot be separated from it;
+one of `valid`/`error`/`schema-document`/`refused` is present and the payload cannot be separated from it;
 `absent`, `empty-brace` and `schema-document` carry nothing and are typed `void`, written `_`.
+
+**`refused` is §8.1's fifth outcome and is not a verdict on the document.** §8.2's name-hygiene
+mechanisms refuse without making a document invalid — each reads data the UCD does not freeze, so none of
+them may decide validity — and §8.2 says the refusal MUST NOT be reported in any of the four categories.
+`checkRefusedVector` therefore asserts both halves: that something was refused, and that *nothing* was
+reported as invalid, `CONFUSABLE_NAMES`/`RESTRICTED_TOKEN` being the two codes that mean policy. A vector
+names its mechanism and the UTS #39 data version it was computed against, and a version this
+implementation does not carry is `RUNNER.md` rule 5's fourth legitimate skip — the only one that is about
+the vector rather than the conformance class. Only mechanism 1 has vectors: the other two are
+`BACKLOG.md` items, mechanism 2 because it reports its refusal as a validity error and mechanism 3
+because it is not applied to Class 1 names at all.
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
 documentation: every sidecar read against the schema it declares, plus the negatives the groups exist
