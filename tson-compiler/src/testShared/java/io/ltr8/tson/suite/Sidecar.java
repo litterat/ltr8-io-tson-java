@@ -48,7 +48,7 @@ public final class Sidecar {
             "core.tn", TsonBundledSchemas.CORE_ID);
 
     /** The outcome group's members, across every layer's sidecar schema. */
-    private static final List<String> OUTCOMES = List.of("valid", "error", "schema-document");
+    private static final List<String> OUTCOMES = List.of("valid", "error", "schema-document", "refused");
 
     private Sidecar() {
     }
@@ -68,10 +68,10 @@ public final class Sidecar {
     }
 
     /**
-     * The name of the outcome group's present member -- {@code valid}, {@code error} or, at the parser
-     * layer, {@code schema-document}. §5.11 makes the group REQUIRED, so exactly one is present and the
-     * member label <em>is</em> the outcome: there is no separate {@code outcome} field to disagree with the
-     * payload beside it.
+     * The name of the outcome group's present member -- {@code valid}, {@code error}, the parser layer's
+     * {@code schema-document}, or the reader layer's {@code refused}. §5.11 makes the group REQUIRED, so
+     * exactly one is present and the member label <em>is</em> the outcome: there is no separate {@code
+     * outcome} field to disagree with the payload beside it.
      */
     public static String outcomeOf(RecordValue sidecar) {
         for (RecordValue.Field field : sidecar.fields()) {
