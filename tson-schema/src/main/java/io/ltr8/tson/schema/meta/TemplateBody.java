@@ -41,11 +41,13 @@ import java.util.Set;
  * nothing binds through it, and a resolved-output consumer never meets one (§1.3), which makes serializing
  * one OPTIONAL and this the option not taken.
  *
- * <p><b>And nothing else can state an open entry's resolved form either</b> ({@code SPEC-FEEDBACK.md} #4):
- * §8.1 serializes one as its declaration, while the kernel types the resolved document as {@code
- * {type_name => type_definition}}, so no document form admits both. It is why the shared corpus's
- * {@code class2/schema/} layer has no template vector and covers templates over the entries they mint
- * instead.
+ * <p><b>Which makes an open entry the one thing a value comparison cannot state.</b> The same declaration
+ * written as §8 text and read back binds an ordinary {@link RecordBody} -- {@code type_ref.name} is typed
+ * {@code identifier} and a parameter is one -- so the text agrees and the values do not. It is why the
+ * shared corpus's {@code class2/schema/} layer, which compares resolver values, has no template vector and
+ * covers templates over the entries they mint instead. §8.1 is self-contradictory about whether a {@code
+ * type_definition} may carry a parameter reference at all ({@code SPEC-FEEDBACK.md} #4), so which side
+ * should move is not settled.
  *
  * <p><b>What it is opaque to, and what it is not.</b> A held body withholds one thing: what a reference
  * <em>resolves to</em>, which no argument settles until substitution supplies them. So type-kind validation

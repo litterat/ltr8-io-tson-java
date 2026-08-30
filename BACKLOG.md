@@ -220,11 +220,14 @@ Part 2, and the thin parts of Part 1.
   the layout gains a per-layer fixture directory the sidecar's `import` short names resolve against, or
   the corpus publishes a small schema of its own beside the sidecar schemas and the short-name table
   learns it.
-- [ ] **What a template resolves to has no statement anywhere.** `SPEC-FEEDBACK.md` #4: §8.1 serializes an
-  open entry as its declaration while the kernel types the resolved document as
-  `{type_name => type_definition}`, so no document form admits one, and `class2/schema/` can state the
-  resolved form of every construct except a template. `class2/link/` states that an instantiation exists
-  and what it is named, which is not the same claim. Unblocked by whichever answer the next revision gives.
+- [ ] **A template's resolved form is stated nowhere.** `class2/schema/` compares the resolver's own value
+  against a vector's §8 output, and an open entry's body is a `HeldBody` where that output read back binds a
+  `RecordBody` — the same document, two values — so the layer states the resolved form of every construct
+  except a template, and `class2/link/` states only that an instantiation exists and what it is named.
+  Closing it means either an emitter that serializes the resolver's value so both sides are §8 text, or a
+  reader that binds a parameter-bearing body back to a held one. Which is right depends on
+  `SPEC-FEEDBACK.md` #4: §8.1 says no `type_definition` could carry a parameter reference and then specifies
+  how to read one.
 - [ ] **Fill the coverage the corpus now reports on itself.** `COVERAGE.md` is generated and
   diff-checked, and what it shows is a corpus that is 89/159 §5 vocabulary while §7.3 has no vectors at
   all, §7.5 and §2.8 have one each, and §2.9 and §6 have none. Work downward from the thinnest: the

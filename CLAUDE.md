@@ -790,11 +790,14 @@ record-shaped code and is still a resolver error. What is checked per diagnostic
 a **verdict**: `NOT_IMPLEMENTED`/`BIND_MISMATCH`/`SCHEMA_UNAVAILABLE` say the vector could not be judged, and
 letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
 
-**No `class2/schema/` subject declares a template**, and the boundary is the spec's, not this runner's:
-§8.1 serializes an open entry as its declaration rather than as a `type_definition` value, while the kernel
-types the resolved document as `{type_name => type_definition}` — so no document form admits one and nothing
-can currently state a template's resolved form (`SPEC-FEEDBACK.md` #4). Templates are covered at the `link/`
-layer instead, over the entries they mint.
+**No `class2/schema/` subject declares a template**, and the reason is where this layer compares rather
+than what §8 admits. The comparison is over the resolver's own value, and an open entry's body is a
+`HeldBody` — the application as written — where the same text read back as a `type_definition` binds an
+ordinary `RecordBody`: the two sides agree as §8 text and differ as values, and nothing here serializes the
+resolver's value to close the gap (§1.3 makes producing output OPTIONAL, and this doesn't). §8.1 is
+self-contradictory about whether a `type_definition` may carry a parameter reference at all
+(`SPEC-FEEDBACK.md` #4), which is why the answer isn't simply to write the vector. Templates are covered at
+the `link/` layer instead, over the entries they mint.
 
 **Add test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge —
 with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, so a Part 1

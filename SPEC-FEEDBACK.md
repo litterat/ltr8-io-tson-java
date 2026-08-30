@@ -166,56 +166,67 @@ sets.
 
 ---
 
-## 4. A resolved schema document has no consistent form for an open entry, so §8 output cannot state what a template resolves to
+## 4. §8.1 both forbids and specifies a parameter reference inside a `type_definition`
 
-**Section:** Part 2 §8.1 (output records), §1.3 (Class 2 conformance, "Resolved-output consumers"), §9 (the
-kernel's own `schema` declaration).
+**Section:** Part 2 §8.1 (output records, "Reading parameter references"), §5.10 (the closed-entry rule),
+§1.3 ("Resolved-output consumers").
 
-**Problem:** three statements about a resolved schema document cannot all hold of one document.
+**Problem:** §8.1 says of an open entry:
 
-1. §8.1: "An **open** entry is serialized as its declaration — `<params> !C core-value`, the held body
-   written under §5.10's one-spelling rule — rather than as a `type_definition` value."
-2. The kernel declares the document's own type as `schema => {type_name => type_definition}` (meta-kernel.tn).
-   A declaration is not a `type_definition`, so a map carrying one does not conform, and a reader reading
-   the document against the meta-schema rejects it at that entry.
-3. §1.3: "the closed-entry rule (§5.10) guarantees that the output map governing any data document carries
-   no open entries" — which, read as a property of the output map, says the case in (1) does not arise,
-   while the sentence after it repeats that "an open entry's resolved form is its declaration".
+> An **open** entry is serialized as its declaration — `<params> !C core-value`, the held body written under
+> §5.10's one-spelling rule — rather than as a `type_definition` value: its body is not read against any
+> vocabulary until materialisation, so **no `type_definition` could carry it**, and a consumer of closed
+> entries never meets one (§1.3).
 
-So for a schema declaring a template — `{ box => <T> { value: T }  text_box => box<text> }` — what §8 output
-contains for `box` is unstated. Three answers are each defensible and each contradicts one of the three:
-omit open entries from the output (contradicts §8.1); include the declaration and accept that the document
-does not conform to `schema` (contradicts §9); widen `schema`'s value type to admit both forms (a change
-nothing currently states).
+Three things in the same series say the opposite, and one of them is measurable rather than a reading.
 
-§8.1's ingest paragraph presumes the second answer — "an open entry, which ingest meets as a declaration
-rather than a `type_definition` value, is re-resolved as source" — which is a coherent design, but it needs
-`schema` to type a value that is either a `type_definition` or a declaration, and the kernel does not.
+1. **A `type_definition` demonstrably can carry it.** `box => <T> { value: T }` writes as
+   `{ kind: PRODUCT  parameters: [T]  body: !record { fields: [ { name: value  type: T } ] } }`, and this
+   implementation reads that back against meta.tn without complaint: `type_ref.name` is typed `identifier`,
+   `T` is one, and nothing in the kernel distinguishes a parameter from a type name at that position. The
+   only thing standing in the way is a sentence.
+2. **§8.1's own "Reading parameter references" specifies how to read one.** A `name` "in any `type_ref`, at
+   any depth ... resolves against the enclosing entry's `parameters` list first", and "a consumer holding an
+   entry with empty `parameters` interprets every name directly against the schema" — which is a rule about
+   what a consumer does with an entry whose `parameters` are *not* empty. If no `type_definition` could carry
+   a parameter reference, the precedence rule has no position to apply at and `type_definition.parameters`
+   has nothing to be non-empty for.
+3. **§5.10's closed-entry rule is stated as a rule on output.** "An entry whose `parameters` list is empty
+   MUST contain no parameter references anywhere ... and its body is a binding record or a `!reference`,
+   never a held application: a well-formedness rule **on resolver output** and an integrity check on ingest
+   (§8.1)." A well-formedness rule on output that says what a *closed* entry may not contain presupposes
+   output in which an open one appears.
 
-**Interpretation chosen:** this implementation does not serialize open entries at all, which §1.3 permits
-outright — "Serializing the resolved schema value as a data document is OPTIONAL". `TemplateBody` carries no
-`@Typename`, nothing binds through it, and `TypeDefinition.body` holding one is a value that never reaches a
-writer. Closed entries, the materialised instantiations included, serialize normally, and every entry of the
-three bundled schemas round-trips against `spec/m/*-resolved.tn`.
+So an implementation has to decide whether §8 output for a schema declaring templates omits those entries,
+carries them as `type_definition` values with a non-empty `parameters` list, or carries them in a
+declaration form the kernel's `schema => {type_name => type_definition}` does not type. §8.1's ingest
+paragraph assumes the third — "an open entry, which ingest meets as a declaration rather than a
+`type_definition` value, is re-resolved as source" — which would need `schema` to admit a second value shape,
+and it does not.
 
-**What it costs, concretely.** The shared conformance corpus's `class2/schema/` layer states a subject's
-resolved output in §8's own form and reads it back against meta.tn. That works for every construct except a
-template: a vector whose subject declares one has no expected side it can write, because there is no
-document form both §8.1 and the kernel admit. The layer's schema records the boundary and templates are
-covered at the corpus's `link/` layer instead, over the entries they mint — which states that the
-instantiation exists and what it is named, but not what it resolved to. **Nothing anywhere, in this
-implementation or the corpus, can currently state a template's resolved form.**
+**Interpretation chosen:** this implementation produces no §8 output at all, which §1.3 permits outright
+("Serializing the resolved schema value as a data document is OPTIONAL"), so the question is unforced here.
+What it does have is a value model in which an open entry's body is a `TemplateBody`/`HeldBody` — the
+application as written, unread until materialisation — where the same text read back as a `type_definition`
+binds an ordinary `RecordBody`. The two agree as §8 text and differ as values.
 
-**Suggested resolution:** state one of the three answers in §8.1, and make §9 agree with it. If open entries
-belong in the output — which the ingest rules assume — then `schema`'s value type has to admit them, most
-simply as a labelled choice between a `type_definition` and a held declaration, so that a resolved document
-remains readable against the meta-schema it names. If they do not, §8.1's "serialized as its declaration"
-should say instead that open entries are omitted from serialized output and recoverable only from source,
-and §1.3's "the output map ... carries no open entries" becomes a statement about the document rather than
-only about what a data-path consumer meets.
+**What it costs, concretely.** The shared conformance corpus's `class2/schema/` layer compares the
+resolver's own value against the vector's stated §8 output, read back through meta.tn. That works for every
+construct except a template, where the two sides are the same document and different values, and nothing
+here serializes the resolver's value to close the gap. So no `class2/schema/` vector declares a template,
+and what one resolves to is stated only indirectly, at the corpus's `link/` layer, over the entries it
+mints. Whether that gap is worth closing with a real §8 emitter depends on which of the three answers below
+the spec gives.
 
-**Status against Revision 34:** open, and new against this revision — §8.1's open-entry sentence and the
-`Resolved-output consumers` paragraph are both Revision 34 text, and the kernel's `schema` declaration is
-unchanged from earlier revisions.
+**Suggested resolution:** drop "so no `type_definition` could carry it" and say which of the three shapes
+output takes. The cheapest answer consistent with everything else in §8.1 is the second: an open entry is a
+`type_definition` with a non-empty `parameters` list whose `body` is the held application's own binding
+record, read under the parameter-precedence rule §8.1 already states — which needs no change to the kernel,
+keeps `schema`'s value type as it is, and makes the closed-entry rule a check over a form that exists. The
+`<params> !C core-value` spelling then belongs to schema *source*, which is where it is already written,
+rather than to output.
+
+**Status against Revision 34:** open, and new against this revision — §8.1's open-entry sentence and its
+"Reading parameter references" paragraph are both Revision 34 text.
 
 ---
