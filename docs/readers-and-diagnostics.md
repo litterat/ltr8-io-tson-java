@@ -278,6 +278,40 @@ belief, over the bind path:
   document's cost and most of *that* is one `InputStreamReader` per read — fixed cost, unrelated to
   document size, tracked in `BACKLOG.md`.
 
+## Name hygiene on the read path ([TSON-DATA] §8.2)
+
+A Class 1 document carries two names — a type-ref name and an annotation name, the positions §7.4 marks
+`identifier` — and §8.2's mechanisms 2 and 3 apply to both, **on by default**. They run in
+`DefaultTsonReadContext` as the name's event is first pulled, that being the first point on the read path
+holding a diagnostics receiver: `TsonDataStream` throws and holds none, so a check there could only say
+"invalid", which is the one thing a refusal is not. What stays in the stream is §7.7's grammar, where a
+failure really is a parse error.
+
+**Only on a freshly pulled event.** `lookingAhead` rewinds what it consumed and a reader replays it, and
+`AnnotationCapture` builds a probe context over events already seen — so checking every event would report
+one name once per lookahead that crossed it. `NameHygieneTest` counts every shape an annotation takes,
+because that is the failure that would survive every other test.
+
+**Not in `TokenPolicyEventSource`**, which is where the *token* surface's policy runs and gets exactly-once
+for free by sitting upstream of the rewind. That decorator skips itself entirely at its default —
+`unrestricted()`, which is every ordinary read — so a mechanism §8.2 defaults *on* cannot live behind it
+without making the wrapper unconditional and putting a switch per token back into the cost of a read that
+has no policy at all.
+
+**Two surfaces, two defaults, and §8.2 sets both.** `withTokenPolicy` defaults to `unrestricted()` because a
+value is data and may legitimately be anything; `withNamePolicy` defaults to Highly Restrictive over the whole
+name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able to
+relax any mechanism and requires the relaxation not be silent, and a policy read from the environment is
+invisible at the call site and absent from review. The relaxation to reach for first is the *unit*
+(`perSegment()`), which still refuses `id_pаy` while admitting `url_адрес`. A token policy stricter than the
+name policy subsumes it: a name is a token.
+
+Class 1 **field** names see neither — they are lexical rather than names (§2.5, §7.7) — and only mechanism 1,
+whose scope they are (`SchemalessTreeReader`). A refusal reports `RESTRICTED_TOKEN` or `CONFUSABLE_NAMES`,
+which is a verdict on the document like any other: the caller must change it, or relax the policy. What the
+code carries that a validity error does not is that another processor at another UTS #39 version may accept
+the same document.
+
 ## Diagnostics (`Diagnostic`, root package)
 
 `Diagnostic` is the structured value every `TsonDiagnosticsReceiver` receives, identical shape whichever

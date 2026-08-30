@@ -265,16 +265,35 @@ Restrictive are incomparable. The default is Highly Restrictive over a whole nam
 refuses `аdmin`. The bootstrap links under the default rather than under a caller's policy: a configuration
 should not be able to break meta-kernel.
 
-**Confusable names are refused per scope, not per name** (`ConfusableNames` over `Confusables.skeleton`,
-UTS #39 §4). The linker checks the merged namespace — local entries and every import's, which is where §2.2.3's
-own disjointness rule is exact equality and a confusable pair passes it by construction — plus each entry's
-record field names and enum members. A **choice's variants are deliberately not checked**: a variant is a
-reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
-there could never fire. The one scope the linker cannot reach is a Class 1 record, which has no declaration;
-`SchemalessTreeReader` checks its own field set. Being a *relation*, the rule never rejects a lone name — a
-mixed-script `id_пользователя` collides with nothing and passes, which is the property that keeps it switched
-on and the reason [TSON-DATA] §8.2 defaults it on where mechanism 3's level is the one to relax. §11.4 names
-the schema-layer scopes, variants excluded for exactly the reason above.
+**All three of §8.2's mechanisms run in one walk, over scopes** (`checkNames`). The scopes are §11.4's — the
+merged namespace, which is where §2.2.3's own disjointness rule is exact equality and a confusable pair passes
+it by construction; each entry's record field names, its groups' member labels arriving flattened among them;
+and its enum members — plus **a template's parameters, which §11.4 does not list** (`SPEC-FEEDBACK.md` #5:
+`<T, Т>` otherwise declares two parameters that render identically, and a body referencing `T` binds one of
+them with nothing in the source to say which). A **choice's variants are deliberately not checked**: a variant
+is a reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
+there could never fire.
+
+**One walk rather than one check per naming position, and that is the load-bearing part.** Mechanism 2
+(`Identifier_Status`) used to run where a name is *read* — the schema parser, `DefinitionResolver`, the atom
+vocabulary — by three exceptions and three codes, and had holes at exactly the positions only some of those
+reached: an enum member and a group's member labels got mechanisms 1 and 3 and not 2, invisibly. A scope list
+can be reviewed; three call sites cannot. What stays at the reading positions is §7.7's grammar
+(`IdentifierParser.validate`), which is validity, is stable across Unicode versions, and really is a parse
+error; `IdentifierParser.hygiene` returns mechanism 2's verdict rather than throwing, because a refusal is not
+one.
+
+**A refusal carries a policy code, not `SCHEMA_ERROR`** (`Diagnostic.ofSchemaRefusal`): `CONFUSABLE_NAMES` for
+mechanism 1, `RESTRICTED_TOKEN` for 2 and 3 — the same codes a *read* reports for the same rules, so one schema
+and one document that break the same rule come back alike. §8.2 requires a refusal be distinguishable from a
+validity error, and a consumer that has to read prose to tell them apart is what the code exists to prevent.
+It is still a verdict: the schema must change, or the deployment must relax the policy in code.
+
+The one scope the linker cannot reach is a Class 1 record, which has no declaration; `SchemalessTreeReader`
+checks its own field set, and `DefaultTsonReadContext` applies mechanisms 2 and 3 to a type-ref or annotation
+name. Being a *relation*, mechanism 1 never rejects a lone name — a mixed-script `id_пользователя` collides
+with nothing and passes, which is the property that keeps it switched on and the reason [TSON-DATA] §8.2
+defaults it on where mechanism 3's level is the one to relax.
 
 **§7.2's subsumption guard wraps every entry the rule governs** (`Subsumption`, applied at
 `TsonSchemaCompiler`'s single `build` site). At a position typed `T`, a value annotated `!S` is valid iff
