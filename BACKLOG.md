@@ -221,18 +221,20 @@ is thin is a query against the corpus rather than a tally kept here.
   the layout gains a per-layer fixture directory the sidecar's `import` short names resolve against, or
   the corpus publishes a small schema of its own beside the sidecar schemas and the short-name table
   learns it.
-- [ ] **Fill the coverage the corpus reports on itself**, working downward from the thinnest.
-  The zeroes that matter are whole sections with no vector at all, not a low count: §9.2–§9.5, and §8.2,
-  which needs a corpus change before it can have one (below). Two other zeroes are not gaps. §7.3 is a
-  summary of the lexical grammar, exercised under §7.1 and §7.2. §6 is JSON compatibility, which this
-  implementation is not committed to — a second implementation may still want those vectors, so they are
-  the corpus's to gain, not this list's to carry.
+- [ ] **Fill the coverage the corpus reports on itself**, working downward from the thinnest. The one
+  section still at zero is §8.2, and §9.4 has only the vector its exclusion-by-property half admits — both
+  are the same blocker: name hygiene is a policy refusal with no outcome member to state it (below).
+  A section at zero is not by itself a gap — §7.3 summarises the lexical grammar and §9.2/§9.3 assert
+  properties other sections enforce, so all three are exercised under those sections rather than their own.
+  §6 is JSON compatibility, which this implementation is not committed to; a second implementation may
+  still want those vectors, so they are the corpus's to gain, not this list's to carry.
 - [ ] **§8.2 name hygiene has no outcome to state.** §8.1 makes a policy refusal a fifth, distinguishable
   outcome that MUST NOT be reported in any of the four categories, and the sidecar outcome group has
   members for `valid`, `error` and `schema-document` only — so a confusable or restricted-name vector
   cannot say what should happen to it. The group needs a `refused` member carrying the stated policy,
-  and `RUNNER.md` a rule that two conforming processors may legitimately disagree there, before §8.2,
-  §9.4 and §9.5 can be covered at all.
+  and `RUNNER.md` a rule that two conforming processors may legitimately disagree there, before §8.2 and
+  §9.4's skeleton-distinctness half can be covered at all. §9.5 needed none of it: the bidi controls are
+  excluded by profile, so every one of its rules is an ordinary lexer verdict.
 
 ## Documentation
 
