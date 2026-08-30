@@ -397,7 +397,7 @@ final class DefinitionResolver {
      */
     private static void requireIdentifier(String name, String role) {
         try {
-            IdentifierParser.validate(name);
+            IdentifierParser.validateName(name);
         } catch (AtomTypeException e) {
             throw new TsonSchemaValidationException("invalid " + role + " -- " + e.getMessage());
         }

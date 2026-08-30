@@ -758,9 +758,17 @@ them may decide validity — and §8.2 says the refusal MUST NOT be reported in 
 reported as invalid, `CONFUSABLE_NAMES`/`RESTRICTED_TOKEN` being the two codes that mean policy. A vector
 names its mechanism and the UTS #39 data version it was computed against, and a version this
 implementation does not carry is `RUNNER.md` rule 5's fourth legitimate skip — the only one that is about
-the vector rather than the conformance class. Only mechanism 1 has vectors: the other two are
-`BACKLOG.md` items, mechanism 2 because it reports its refusal as a validity error and mechanism 3
-because it is not applied to Class 1 names at all.
+the vector rather than the conformance class.
+
+**Where each mechanism runs.** Mechanism 1 (skeleton distinctness) is `SchemalessTreeReader`'s, over one
+record's field names — the only scope Part 1 defines. Mechanism 2 (`Identifier_Status`) is
+`DefaultTsonReadContext`'s, over a type-ref or annotation name as its event is first pulled: **the grammar
+and the policy are separate calls**, `IdentifierParser.validate` throwing a parse error for §7.7 and
+`IdentifierParser.hygiene` returning a violation for §8.2, because a refusal must not be reported in any of
+§8.1's four categories. The joiners belong to the grammar despite being `Identifier_Status=Restricted` —
+§7.7 rule 2 makes their admission a question of form. Mechanism 3 (restriction level) reaches only the
+token surface (`TokenPolicyEventSource`, default `unrestricted()`, right for tokens) and the schema layer;
+Class 1 *names* never see it, which is a `BACKLOG.md` item, as is mechanism 2's schema-layer half.
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
 documentation: every sidecar read against the schema it declares, plus the negatives the groups exist
