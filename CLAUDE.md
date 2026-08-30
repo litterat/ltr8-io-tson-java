@@ -83,10 +83,13 @@ citations name the section instead.
 
 **The register holds what is open against the current revision, and renumbers from #1 when a revision
 closes.** It is an input to the next revision's adjudication, so its numbering is what that revision's
-change log will answer against. Entries whose resolution landed are deleted; the closing revision's change
-log in `spec/` keeps all of them under *their* numbers. **Cite the spec, not the argument that got it
-there.** Prose and Javadoc state the rule as built and name the current section that requires it; a
-`SPEC-FEEDBACK.md #N` citation is for an entry still open, where there is no section to point at yet. When
+change log will answer against. The evidence beside it is this implementation itself — an entry proposing a
+design states what is running — which is why the shared corpus's `proposed/` bucket stays empty here: the
+proposal is the code, not a vector another implementation is asked to fail. Entries whose resolution
+landed are deleted; the closing revision's change log in `spec/` keeps all of them under *their* numbers.
+**Cite the spec, not the argument that got it there.** Prose and Javadoc state the rule as built and name
+the current section that requires it; a `SPEC-FEEDBACK.md #N` citation is for an entry still open, where
+there is no section to point at yet. When
 an entry closes, the citations to it become spec citations — the reasoning has served its purpose and the
 spec now carries the rule.
 
