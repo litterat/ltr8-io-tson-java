@@ -16,7 +16,7 @@ class DiagnosticTest {
 
     private static Diagnostic with(String schemaId, String expected, String actual) {
         return new Diagnostic(Optional.of("/a"), Optional.of(""), schemaId, Diagnostic.Code.TYPE_MISMATCH,
-                "message", expected, actual, Optional.empty(), Optional.empty());
+                "message", expected, actual, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     @Test

@@ -1,6 +1,8 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -28,6 +30,34 @@ class TsonValidateSchemaTest {
 
     private static List<Diagnostic> check(String body) {
         return Tson.builder().build().validateSchema(HEADER + body);
+    }
+
+    /**
+     * <b>An {@code !!import} nobody would serve is a fetch failure with a stated reason.</b> This is the
+     * schema-document channel of the same problem a read hits, and it must answer the same way: {@code
+     * SCHEMA_UNAVAILABLE} for "no schema was obtained", and {@link TsonSchemaFetchException.Reason} for
+     * whose doing that was -- {@code NOT_PERMITTED} for a reference this deployment refuses being the
+     * author's to fix, where {@code TIMEOUT} is not. The {@code actual} half names the reference itself,
+     * since that is what the author would go and look at.
+     */
+    @Test
+    void anUnfetchableImportStatesWhyItCouldNotBeFetched() {
+        TsonSchemaSource refusing = uri -> {
+            throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_PERMITTED,
+                    "not an allowed host", null);
+        };
+        List<Diagnostic> problems = Tson.builder().schemaSource(refusing).build().validateSchema("""
+                !!id:"https://example.test/importer.tn"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
+                !!import:"https://example.test/nowhere.tn"
+                { t => text }
+                """);
+
+        assertEquals(1, problems.size(), problems::toString);
+        Diagnostic problem = problems.getFirst();
+        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, problem.code());
+        assertEquals(Optional.of(TsonSchemaFetchException.Reason.NOT_PERMITTED), problem.fetchReason());
+        assertEquals(Optional.of("https://example.test/nowhere.tn"), problem.actualIfStated());
     }
 
     /**

@@ -101,6 +101,76 @@ class TsonReadTest {
         assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, thrown.diagnostic().code());
     }
 
+    /**
+     * <b>Which of the five ways a fetch failed survives the receiver.</b> {@code SCHEMA_UNAVAILABLE} says a
+     * schema was not obtained; {@link TsonSchemaFetchException.Reason} says by whose doing, and the two are
+     * different questions: {@code NOT_PERMITTED} means this deployment refuses the reference the document
+     * named, where {@code TIMEOUT} means the reference was fine and a host was not. A consumer picking an
+     * HTTP status wants the first to be the sender's problem and the second its own dependency's, and it
+     * cannot get that from a code shared by both or from prose it would have to parse.
+     */
+    @Test
+    void aCollectedFetchFailureStatesWhichReasonItWas() {
+        for (TsonSchemaFetchException.Reason reason : TsonSchemaFetchException.Reason.values()) {
+            TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+            failing(reason).treeReader().withDiagnostics(problems).read("""
+                    !!schema:"https://example.test/not-there.tn"
+                    !point { x: 3  y: 4 }""");
+
+            Diagnostic diagnostic = problems.diagnostics().getFirst();
+            assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, diagnostic.code());
+            assertEquals(Optional.of(reason), diagnostic.fetchReason(), reason::name);
+        }
+    }
+
+    /**
+     * <b>The two channels one fetch failure travels on answer alike.</b> A fail-fast read throws the
+     * classification and a collecting read reports it, and a consumer that routes on {@code Reason} must get
+     * the same answer either way -- otherwise the same document is the sender's fault when read one way and
+     * an operator's when read the other.
+     */
+    @Test
+    void theThrownAndCollectedChannelsAgreeOnTheReason() {
+        String document = """
+                !!schema:"https://example.test/not-there.tn"
+                !point { x: 3  y: 4 }""";
+        Tson tson = failing(TsonSchemaFetchException.Reason.NOT_PERMITTED);
+
+        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tson.treeReader().read(document));
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        tson.treeReader().withDiagnostics(problems).read(document);
+
+        assertEquals(Optional.of(TsonSchemaFetchException.Reason.NOT_PERMITTED), thrown.diagnostic().fetchReason());
+        assertEquals(thrown.diagnostic().fetchReason(), problems.diagnostics().getFirst().fetchReason());
+    }
+
+    /**
+     * A schema fetch that never happened has no {@code Reason} to state, so the component is absent rather
+     * than defaulted -- the distinction is only worth anything if "not a fetch failure" is a distinguishable
+     * answer.
+     */
+    @Test
+    void aProblemThatIsNotAFetchFailureCarriesNoReason() {
+        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        tsonWithPoint().treeReader().withDiagnostics(problems).read("""
+                !!schema:"https://example.test/point-1.tn"
+                !point { x: 3  y: 99999999999999 }""");
+
+        assertEquals(Optional.empty(), problems.diagnostics().getFirst().fetchReason());
+    }
+
+    /** A {@link Tson} whose one source refuses everything for {@code reason}. */
+    private static Tson failing(TsonSchemaFetchException.Reason reason) {
+        TsonSchemaSource source = uri -> {
+            String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;
+            if (base.equals(POINT_ID)) {
+                return POINT_SCHEMA;
+            }
+            throw new TsonSchemaFetchException(uri, reason, "refused for the test", null);
+        };
+        return Tson.builder().schemaSource(source).build();
+    }
+
     @Test
     void aRootTypeRefTheSchemaDoesNotDeclareThrows() {
         TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""

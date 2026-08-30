@@ -2,6 +2,8 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 
+import java.util.Optional;
+
 /**
  * What a read reports when it cannot obtain a compiled schema for the document it is reading -- the {@link
  * Diagnostic.Code} and the {@code expected} that goes with it, chosen by what actually failed.
@@ -30,11 +32,28 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
  * and is wrong. A pinned reference whose bytes do not match its digest is the second: something was
  * obtained, and it is not what the reference named.
  *
- * @param code     what to report the failure as
- * @param expected what the read needed, for the diagnostic's {@code expected} half; its {@code actual} is
- *                 the schema URI in every case, since that is the thing that could not be obtained
+ * <p><b>The fetch branch carries one more thing than a code.</b> {@code SCHEMA_UNAVAILABLE} says the schema
+ * was not obtained; {@link TsonSchemaFetchException.Reason} says by whose doing, and a consumer picking a
+ * status needs the second as much as the first -- a reference this deployment will not fetch is the
+ * sender's mistake, where a host that did not answer is nobody's and is worth retrying. It rides here so it
+ * reaches {@link Diagnostic#fetchReason()}, which is the only channel a collecting read has; classifying to
+ * a code alone would drop it exactly where almost every read now reports.
+ *
+ * @param code        what to report the failure as
+ * @param expected    what the read needed, for the diagnostic's {@code expected} half; its {@code actual} is
+ *                    the schema URI in every case, since that is the thing that could not be obtained
+ * @param fetchReason why a fetch failed, present on that branch alone -- the other four have no sub-reason
+ *                    to state, and inventing one for them would make the component look general
  */
-record SchemaFailure(Diagnostic.Code code, String expected) {
+record SchemaFailure(Diagnostic.Code code, String expected, Optional<TsonSchemaFetchException.Reason> fetchReason) {
+
+    /** The {@code expected} every "could not be obtained" states, so both of its report sites state one thing. */
+    static final String UNAVAILABLE_EXPECTED = "a schema that can be obtained";
+
+    /** A failure with no sub-reason -- every branch but the fetch one. */
+    private SchemaFailure(Diagnostic.Code code, String expected) {
+        this(code, expected, Optional.empty());
+    }
 
     /**
      * Classifies a failure thrown while obtaining a compiled schema, rethrowing anything none of the four
@@ -52,8 +71,9 @@ record SchemaFailure(Diagnostic.Code code, String expected) {
                     new SchemaFailure(Diagnostic.Code.NOT_IMPLEMENTED, "a schema this library can compile");
             // The contract exception of TsonSchemaSource.fetch, so this branch is every source's miss and
             // no source's bug: the reference named something this deployment could not obtain.
-            case TsonSchemaFetchException ignored ->
-                    new SchemaFailure(Diagnostic.Code.SCHEMA_UNAVAILABLE, "a schema that can be obtained");
+            case TsonSchemaFetchException fetch ->
+                    new SchemaFailure(Diagnostic.Code.SCHEMA_UNAVAILABLE, UNAVAILABLE_EXPECTED,
+                            Optional.of(fetch.reason()));
             case TsonSchemaValidationException ignored ->
                     new SchemaFailure(Diagnostic.Code.SCHEMA_ERROR, "a resolvable schema");
             // [TSON-DATA] §2.2.1's integrity failure: the bytes a source returned are not the bytes the

@@ -256,7 +256,8 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     @Override
-    public void report(Diagnostic.Code code, String message, String expected, String actual) {
+    public void report(Diagnostic.Code code, String message, String expected, String actual,
+            Optional<TsonSchemaFetchException.Reason> fetchReason) {
         // All three schema-end components come from the one SchemaLocation the descent accumulated, so they
         // cannot disagree about which document to open. A read with no schema behind it carries none of them:
         // Diagnostic spells a missing identity "" and a missing pointer as an absence, since for a pointer
@@ -264,7 +265,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
         Diagnostic diagnostic = new Diagnostic(Optional.of(render(false)),
                 schemaRoot == null ? Optional.empty() : Optional.of(render(true)),
                 schemaRoot == null ? "" : schemaId, code, message, expected, actual,
-                position(), schemaRoot == null ? Optional.empty() : schemaPosition);
+                position(), schemaRoot == null ? Optional.empty() : schemaPosition, fetchReason);
         cursor.reported++;
         cursor.receiver.report(diagnostic);
     }

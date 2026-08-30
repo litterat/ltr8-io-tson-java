@@ -4,6 +4,8 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -67,6 +69,32 @@ class SchemaFailureTest {
 
         assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, SchemaFailure.of(unfetchable).code());
         assertEquals("a schema that can be obtained", SchemaFailure.of(unfetchable).expected());
+    }
+
+    /**
+     * <b>The fetch branch carries the exception's own {@code Reason} through</b>, because the code alone
+     * cannot: {@code SCHEMA_UNAVAILABLE} covers a reference this deployment refuses ({@code NOT_PERMITTED},
+     * the sender's mistake) and a host that did not answer ({@code TIMEOUT}, nobody's and worth retrying),
+     * and a consumer picking a status needs them apart. The classification is the only place that still holds
+     * the exception, so dropping it here drops it for every collecting read.
+     */
+    @Test
+    void theFetchBranchKeepsWhichReasonItWas() {
+        for (TsonSchemaFetchException.Reason reason : TsonSchemaFetchException.Reason.values()) {
+            SchemaFailure failure = SchemaFailure.of(
+                    new TsonSchemaFetchException("https://example.test/x.tn", reason, "refused", null));
+
+            assertEquals(Optional.of(reason), failure.fetchReason(), reason::name);
+        }
+    }
+
+    /** Every other branch has no sub-reason, and says so rather than defaulting to one. */
+    @Test
+    void noOtherBranchInventsAReason() {
+        assertEquals(Optional.empty(), SchemaFailure.of(new TsonBindMismatchException("x")).fetchReason());
+        assertEquals(Optional.empty(), SchemaFailure.of(new UnsupportedOperationException("x")).fetchReason());
+        assertEquals(Optional.empty(), SchemaFailure.of(new TsonSchemaValidationException("x")).fetchReason());
+        assertEquals(Optional.empty(), SchemaFailure.of(new TsonContentHashMismatchException("x")).fetchReason());
     }
 
     /**

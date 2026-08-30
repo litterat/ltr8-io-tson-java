@@ -42,6 +42,17 @@ import java.util.Optional;
  * alike, which is exactly the ambiguity the structured half exists to remove. An absent pointer means
  * this diagnostic has no such end at all; a present {@code ""} means the root.
  *
+ * <p><b>{@code fetchReason} is the one component that is not a location</b>, and it is present for exactly
+ * one code. {@link Code#SCHEMA_UNAVAILABLE} says a schema could not be obtained; {@link
+ * TsonSchemaFetchException.Reason} says whether that is the document's doing ({@code NOT_PERMITTED} names a
+ * reference this deployment will not fetch, {@code NOT_FOUND} one nothing serves) or the world's ({@code
+ * TIMEOUT}, {@code TRANSPORT}, {@code TOO_LARGE}), which is the difference between telling a sender to fix
+ * its document and telling it to try again. The code cannot carry it -- {@code Code} is closed and sorts by
+ * <em>who</em> could not check, so five members for one condition would be the wrong axis -- and {@code
+ * message} must not, since recovering it means parsing prose. It exists because the two channels one
+ * fetch failure travels on, the thrown {@link TsonSchemaFetchException} and the collected diagnostic, have
+ * to be able to answer the same question; a collecting receiver is the common path, not the edge.
+ *
  * <p>The two ends are not alternatives: a value violating {@code int32} as core.tn declares it
  * populates both, which is why this is one record with a richer location model rather than separate
  * data- and schema-diagnostic types. That also matches every comparable system -- {@code
@@ -60,7 +71,8 @@ import java.util.Optional;
  */
 public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, String schemaId, Code code,
                           String message, String expected, String actual,
-                          Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition) {
+                          Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition,
+                          Optional<TsonSchemaFetchException.Reason> fetchReason) {
 
     // ── Absence, for a renderer ──────────────────────────────────────────
     //
@@ -142,7 +154,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
             default -> throw e;
         }
         return new Diagnostic(Optional.of(""), Optional.empty(), "", Code.VALIDATION_ERROR, e.getMessage(),
-                expected, actual, Optional.ofNullable(position), Optional.empty());
+                expected, actual, Optional.ofNullable(position), Optional.empty(), Optional.empty());
     }
 
     /**
@@ -156,7 +168,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofRestrictedToken(String text, String why, SourcePosition position) {
         return new Diagnostic(Optional.empty(), Optional.empty(), "", Code.RESTRICTED_TOKEN,
                 "the token '" + text + "' " + why, "a token the Unicode policy admits", text,
-                Optional.ofNullable(position), Optional.empty());
+                Optional.ofNullable(position), Optional.empty(), Optional.empty());
     }
 
     /**
@@ -182,7 +194,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                 schemaId, Code.VALIDATION_ERROR, e.getMessage(),
                 e.expected().isEmpty() ? "well-formed TSON" : e.expected(),
                 e.actual().isEmpty() ? "a syntax error" : e.actual(),
-                Optional.empty(), Optional.ofNullable(e.position()));
+                Optional.empty(), Optional.ofNullable(e.position()), Optional.empty());
     }
 
     /**
@@ -202,7 +214,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
             default -> throw e;
         }
         return new Diagnostic(Optional.empty(), Optional.of(""), schemaId, Code.VALIDATION_ERROR, e.getMessage(),
-                "well-formed TSON", "a syntax error", Optional.empty(), Optional.ofNullable(position));
+                "well-formed TSON", "a syntax error", Optional.empty(), Optional.ofNullable(position),
+                Optional.empty());
     }
 
     /**
@@ -210,16 +223,24 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * Code#SCHEMA_UNAVAILABLE} in place of {@code SCHEMA_ERROR}, and the whole of the difference between
      * "this schema is wrong" and "nobody would give me this schema".
      *
-     * <p>Built from a {@link TsonSchemaFetchException} and from nothing else, which is what makes the
-     * distinction cheap: {@link TsonSchemaSource#fetch} names that type for "cannot supply this", so the
-     * two cases never have to be told apart by reading a message. An {@code !!import} or {@code !!meta}
-     * naming an identity no source will serve reaches this; one that resolves and then fails to link is a
-     * {@code SCHEMA_ERROR} like any other.
+     * <p><b>It takes the exception rather than its message</b>, because it is built from a {@link
+     * TsonSchemaFetchException} and from nothing else -- which is what makes the distinction cheap: {@link
+     * TsonSchemaSource#fetch} names that type for "cannot supply this", so the two cases never have to be
+     * told apart by reading a message. An {@code !!import} or {@code !!meta} naming an identity no source
+     * will serve reaches this; one that resolves and then fails to link is a {@code SCHEMA_ERROR} like any
+     * other.
+     *
+     * <p>Taking the whole exception is also what lets {@link #fetchReason} be populated at all, and the
+     * {@code expected}/{@code actual} pair with it: the reference that could not be obtained is {@code
+     * actual}, since it is the thing a consumer must look at. The alternative -- passing a flattened
+     * message -- is how this factory came to state {@link TsonSchemaFetchException.Reason}'s distinction
+     * nowhere.
      */
-    public static Diagnostic ofSchemaUnavailable(String schemaId, String declaration, String message,
-                                                 Optional<SourcePosition> position) {
+    public static Diagnostic ofSchemaUnavailable(String schemaId, String declaration,
+                                                 TsonSchemaFetchException e, Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, Code.SCHEMA_UNAVAILABLE, message, "", "", Optional.empty(), position);
+                schemaId, Code.SCHEMA_UNAVAILABLE, e.getMessage(), SchemaFailure.UNAVAILABLE_EXPECTED, e.uri(),
+                Optional.empty(), position, Optional.of(e.reason()));
     }
 
     /**
@@ -239,7 +260,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofSchemaError(String schemaId, String declaration, String message,
                                            Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, Code.SCHEMA_ERROR, message, "", "", Optional.empty(), position);
+                schemaId, Code.SCHEMA_ERROR, message, "", "", Optional.empty(), position, Optional.empty());
     }
 
     /**
@@ -258,7 +279,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofSchemaGap(String schemaId, String declaration, String message,
                                          Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, Code.NOT_IMPLEMENTED, message, "", "", Optional.empty(), position);
+                schemaId, Code.NOT_IMPLEMENTED, message, "", "", Optional.empty(), position,
+                Optional.empty());
     }
 
     /**
@@ -311,7 +333,10 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      *       will not fetch, a schema nobody registered ({@link TsonSchemaFetchException}). Nothing is
      *       wrong with the document, and nothing may be wrong with the schema either -- it was never
      *       obtained, so it was never read. Kept apart from {@code SCHEMA_ERROR} because that one is a
-     *       verdict: the schema <em>was</em> obtained and it does not resolve.</li>
+     *       verdict: the schema <em>was</em> obtained and it does not resolve. <b>"Everyone else" is
+     *       several people</b>, and {@link #fetchReason} is which: a reference this deployment refuses is
+     *       the sender's mistake where a host that timed out is nobody's, and only one of those is worth
+     *       retrying.</li>
      * </ul>
      */
     public enum Code {
