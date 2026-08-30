@@ -766,9 +766,13 @@ record's field names — the only scope Part 1 defines. Mechanism 2 (`Identifier
 and the policy are separate calls**, `IdentifierParser.validate` throwing a parse error for §7.7 and
 `IdentifierParser.hygiene` returning a violation for §8.2, because a refusal must not be reported in any of
 §8.1's four categories. The joiners belong to the grammar despite being `Identifier_Status=Restricted` —
-§7.7 rule 2 makes their admission a question of form. Mechanism 3 (restriction level) reaches only the
-token surface (`TokenPolicyEventSource`, default `unrestricted()`, right for tokens) and the schema layer;
-Class 1 *names* never see it, which is a `BACKLOG.md` item, as is mechanism 2's schema-layer half.
+§7.7 rule 2 makes their admission a question of form. Mechanism 3 (restriction level) runs at the
+same seam, over the name policy the read carries — **default Highly Restrictive, whole name**, which §8.2
+says it SHOULD be, and relaxable in code through `withNamePolicy` because §8.2 requires that and requires
+it not be ambient. It is distinct from `withTokenPolicy`, whose default is `unrestricted()`: §8.2 makes
+values and names different surfaces, a value being data that may legitimately be anything. Class 1 *field*
+names see neither mechanism 2 nor 3 — they are lexical, not names (§2.5, §7.7) — and only mechanism 1,
+whose scope they are. Mechanism 2's schema-layer half is still a `BACKLOG.md` item.
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
 documentation: every sidecar read against the schema it declares, plus the negatives the groups exist
