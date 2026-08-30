@@ -640,8 +640,11 @@ OK
   A field with nothing to say is `null`, never `""`, the two RFC 6901 pointers included: for a pointer
   `""` is the *root*, a real location a document-level problem genuinely carries, so `""` and `null` stay
   apart there. A position is `line:column:byteOffset`, the first two
-  1-based and the offset counting UTF-8 bytes from 0. The whole shape is declared as a real schema in
-  `tson-cli`'s own `diagnostics.tn`, which `--output tson` is validated against.
+  1-based and the offset counting UTF-8 bytes from 0. One field is not a location: `fetchReason` rides a
+  `SCHEMA_UNAVAILABLE` and says *why* no schema was obtained — `NOT_PERMITTED`/`NOT_FOUND` mean the document
+  named something this deployment will not fetch or nothing serves, where `TRANSPORT`/`TIMEOUT`/`TOO_LARGE`
+  mean the reference was fine and only those are worth retrying. The whole shape is declared as a real schema
+  in `tson-cli`'s own `diagnostics.tn`, which `--output tson` is validated against.
 - **`expected` is the constraint that failed, not a type name** — `<= 100`, `one of (PENDING, SHIPPED,
   DELIVERED)`, `at most 10 characters`, `an RFC 3339 date-time` — so a consumer building its own message
   (an LLM repair loop, say) never has to parse `message` to recover a bound or a member list.

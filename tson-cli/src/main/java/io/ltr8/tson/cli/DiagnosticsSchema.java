@@ -5,6 +5,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
+import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 
@@ -36,6 +37,7 @@ final class DiagnosticsSchema {
         case "validation_report" -> ValidationReport.class;
         case "diagnostic" -> CliDiagnostic.class;
         case "diagnostic_code" -> Diagnostic.Code.class;
+        case "fetch_reason" -> TsonSchemaFetchException.Reason.class;
         default -> SchemaMetaNameBinder.INSTANCE.resolve(name);
     };
 
