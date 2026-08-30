@@ -221,25 +221,15 @@ is thin is a query against the corpus rather than a tally kept here.
   the layout gains a per-layer fixture directory the sidecar's `import` short names resolve against, or
   the corpus publishes a small schema of its own beside the sidecar schemas and the short-name table
   learns it.
-- [ ] **A refusal has no outcome of its own at any API boundary.** §8.2 makes it §8.1's fifth outcome and
-  says it MUST NOT be reported in any of the four categories — the diagnostic carries a distinguishable
-  code (`RESTRICTED_TOKEN`, `CONFUSABLE_NAMES`), and every boundary above it then flattens that back into
-  "invalid". `tson validate` on a refused document exits **1**, the same as on a malformed one, because
-  `TsonCli.exitCodeFor` falls through; `Tson.validate` and `Tson.validateSchema` both return
-  `List<Diagnostic>` whose contract is that empty means fine. The codebase already has the shape for the
-  answer — `NOT_IMPLEMENTED` and `SCHEMA_UNAVAILABLE` are non-verdicts with exit codes 70 and 69 of their
-  own, and CLAUDE.md calls them out as such — so this is a fourth non-verdict wanting the same treatment.
-  Live since mechanism 3 defaulted on, which is what first made a refusal reachable without opting in.
 - [ ] **§8.2's mechanism 2 is still a validity error at the schema layer.** The Class 1 read path reports
   it as the refusal it is; the schema pipeline does not. `IdentifierParser.validateName` deliberately keeps
   grammar and policy in one throwing answer for `TsonSchemaParser` and `DefinitionResolver`, because giving
   them the right answer means giving `Tson.validateSchema` a refusal channel it has no member for — its
   return is `List<Diagnostic>`, and a refusal is not a diagnostic in any of §8.1's four categories.
-  [TSON-SCHEMA] §11.4's scopes are the same shape, so this is one change covering the whole schema side.
-  **Blocked on the entry above**: splitting the two calls at `TsonSchemaParser` and `DefinitionResolver` is
-  mechanical, and what it needs first is an answer to what a refusal does to `validateSchema`'s own rules —
-  it stops at the first phase that reports anything, and never registers a schema that reported, so a
-  refused schema would silently fail to load unless a refusal is exempt from both.
+  [TSON-SCHEMA] §11.4's scopes are the same shape, so this is one change covering the whole schema side:
+  split the calls, and report the policy half through the receiver the way the read path does. Nothing else
+  moves — a refused schema staying unregistered is right, this processor having declined it, and §8.2's
+  own answer for a deployment that needs it anyway is to relax the policy in code.
 
 ## Documentation
 

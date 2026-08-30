@@ -134,6 +134,16 @@ public final class TsonCli {
      * the schema. A script that sees 1 fixes the document, 70 files a bug, 69 checks its own configuration
      * or tries again later, and none of the three has to parse prose to find that out.
      *
+     * <p><b>A [TSON-DATA] §8.2 name-hygiene refusal is a 1</b>, and deliberately not a fourth code, though
+     * §8.2 calls it a fifth outcome that must not be reported in any of §8.1's four categories. That rule is
+     * about the lexer/parser/resolver/validation taxonomy -- which layer detected it -- and this code answers
+     * a different question: what should the caller do now. A refusal was checked and declined, so the answer
+     * is fix the document, which is what 1 means. The three that are not verdicts share the property a
+     * refusal lacks: nothing was checked, so "invalid" is a claim the run cannot make. What is genuinely
+     * portable-sensitive about a refusal -- that another processor at another UTS #39 version may accept the
+     * same document -- is carried by the diagnostic's own code and message, which is where a caller that
+     * cares can see it, and does not need an outcome of its own up here.
+     *
      * <p><b>A mixed run takes the most permanent code</b>, which is why 70 outranks 69 and both outrank 1:
      * a gap is not fixed by retrying, and retrying a run that also holds one would just reach the gap
      * again. The ordinary problems are still printed and still real either way, but something in the
