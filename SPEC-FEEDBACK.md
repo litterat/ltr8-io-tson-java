@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The three below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
+The four below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
 seventeen raised against Revision 33 are gone from here, because the spec now carries their rules and that
 is where the answer belongs. **This file is the as-built record**, not a pointer to one: where an entry
 proposes a design this implementation has built, the entry states the design, what is running, and what is
@@ -163,5 +163,70 @@ terms — a parameter-bearing form lifts to an open synthetic "whose body is the
 written, held until materialisation" — but it still mints per schema, and §9 declares no open container
 templates. This implementation mints per schema and `ContainerSugarEndToEndTest` pins the resulting entry
 sets.
+
+---
+
+## 4. §8.1 both forbids and specifies a parameter reference inside a `type_definition`
+
+**Section:** Part 2 §8.1 (output records, "Reading parameter references"), §5.10 (the closed-entry rule),
+§1.3 ("Resolved-output consumers").
+
+**Problem:** §8.1 says of an open entry:
+
+> An **open** entry is serialized as its declaration — `<params> !C core-value`, the held body written under
+> §5.10's one-spelling rule — rather than as a `type_definition` value: its body is not read against any
+> vocabulary until materialisation, so **no `type_definition` could carry it**, and a consumer of closed
+> entries never meets one (§1.3).
+
+Three things in the same series say the opposite, and one of them is measurable rather than a reading.
+
+1. **A `type_definition` demonstrably can carry it.** `box => <T> { value: T }` writes as
+   `{ kind: PRODUCT  parameters: [T]  body: !record { fields: [ { name: value  type: T } ] } }`, and this
+   implementation reads that back against meta.tn without complaint: `type_ref.name` is typed `identifier`,
+   `T` is one, and nothing in the kernel distinguishes a parameter from a type name at that position. The
+   only thing standing in the way is a sentence.
+2. **§8.1's own "Reading parameter references" specifies how to read one.** A `name` "in any `type_ref`, at
+   any depth ... resolves against the enclosing entry's `parameters` list first", and "a consumer holding an
+   entry with empty `parameters` interprets every name directly against the schema" — which is a rule about
+   what a consumer does with an entry whose `parameters` are *not* empty. If no `type_definition` could carry
+   a parameter reference, the precedence rule has no position to apply at and `type_definition.parameters`
+   has nothing to be non-empty for.
+3. **§5.10's closed-entry rule is stated as a rule on output.** "An entry whose `parameters` list is empty
+   MUST contain no parameter references anywhere ... and its body is a binding record or a `!reference`,
+   never a held application: a well-formedness rule **on resolver output** and an integrity check on ingest
+   (§8.1)." A well-formedness rule on output that says what a *closed* entry may not contain presupposes
+   output in which an open one appears.
+
+So an implementation has to decide whether §8 output for a schema declaring templates omits those entries,
+carries them as `type_definition` values with a non-empty `parameters` list, or carries them in a
+declaration form the kernel's `schema => {type_name => type_definition}` does not type. §8.1's ingest
+paragraph assumes the third — "an open entry, which ingest meets as a declaration rather than a
+`type_definition` value, is re-resolved as source" — which would need `schema` to admit a second value shape,
+and it does not.
+
+**Interpretation chosen:** this implementation produces no §8 output at all, which §1.3 permits outright
+("Serializing the resolved schema value as a data document is OPTIONAL"), so the question is unforced here.
+What it does have is a value model in which an open entry's body is a `TemplateBody`/`HeldBody` — the
+application as written, unread until materialisation — where the same text read back as a `type_definition`
+binds an ordinary `RecordBody`. The two agree as §8 text and differ as values.
+
+**What it costs, concretely.** The shared conformance corpus's `class2/schema/` layer compares the
+resolver's own value against the vector's stated §8 output, read back through meta.tn. That works for every
+construct except a template, where the two sides are the same document and different values, and nothing
+here serializes the resolver's value to close the gap. So no `class2/schema/` vector declares a template,
+and what one resolves to is stated only indirectly, at the corpus's `link/` layer, over the entries it
+mints. Whether that gap is worth closing with a real §8 emitter depends on which of the three answers below
+the spec gives.
+
+**Suggested resolution:** drop "so no `type_definition` could carry it" and say which of the three shapes
+output takes. The cheapest answer consistent with everything else in §8.1 is the second: an open entry is a
+`type_definition` with a non-empty `parameters` list whose `body` is the held application's own binding
+record, read under the parameter-precedence rule §8.1 already states — which needs no change to the kernel,
+keeps `schema`'s value type as it is, and makes the closed-entry rule a check over a form that exists. The
+`<params> !C core-value` spelling then belongs to schema *source*, which is where it is already written,
+rather than to output.
+
+**Status against Revision 34:** open, and new against this revision — §8.1's open-entry sentence and its
+"Reading parameter references" paragraph are both Revision 34 text.
 
 ---

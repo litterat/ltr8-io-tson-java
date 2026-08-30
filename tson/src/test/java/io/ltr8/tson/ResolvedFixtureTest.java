@@ -2,15 +2,10 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,35 +31,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * tree holds the decoded {@code String}, so an unquoted {@code REQUIRED} came back quoted) and reported the
  * loss as a difference against this implementation. Binding the document directly re-spells nothing.
  *
- * <p><b>What the assertions are for.</b> Every fixture entry must read back and must have a counterpart
- * here; those are absolute. What may still <em>differ</em> is pinned per schema, so a new divergence fails
- * and a closed one fails too, asking for the count to come down. The differences that remain are all one
- * deliberate thing -- see {@link #everyRemainingDifferenceIsAContainerThisResolverLifted} -- and that shape
- * is asserted rather than a list of names, so the test survives a change of synthetic naming and still
- * catches a divergence of a different kind.
+ * <p><b>What the assertions are for.</b> Every fixture entry must read back, must have a counterpart here,
+ * and must resolve to the same thing: no category of difference is expected or tolerated. What is
+ * normalised before comparing -- index order, a synthetic's content hash, this model's own source position
+ * -- is {@link ResolvedForm}'s to state, and it states it once for this and for the Class 2 conformance
+ * runner, which asks the same question of a corpus vector's expected side.
  */
 class ResolvedFixtureTest {
-
-    /**
-     * A synthetic entry's name ends in a content hash of its resolved binding record, and <b>that hash is
-     * not normative</b> -- the CR's D6 keys a closed synthetic on structural equality, "one entry per
-     * distinct concrete form schema-wide", leaving the spelling to the implementation. The fixtures write
-     * {@code xxhash} where a real one goes, so both sides are reduced to that before comparing and this
-     * stays a test of structure rather than of a hash function.
-     */
-    private static final java.util.regex.Pattern SYNTHETIC_HASH =
-            java.util.regex.Pattern.compile("_[0-9a-f]{8}$");
-
-    /** The same, unanchored -- a synthetic's name appears inside a body as well as being an entry's own. */
-    private static final java.util.regex.Pattern SYNTHETIC_HASH_ANYWHERE =
-            java.util.regex.Pattern.compile("_[0-9a-f]{8}\\b");
-
-    private static final java.util.regex.Pattern SOURCE_POSITION =
-            java.util.regex.Pattern.compile("position=Optional\\[Position\\[[^\\]]*\\]\\]");
-
-    private static String withoutHash(String name) {
-        return SYNTHETIC_HASH.matcher(name).replaceFirst("_xxhash");
-    }
 
     private static Tson tson() {
         return Tson.builder().dataBindContext(SchemaMetaNameBinder.defaultContext()).build();
@@ -77,93 +50,25 @@ class ResolvedFixtureTest {
 
     }
 
-    /**
-     * {@code supertypes}/{@code subtypes} sorted -- the "canonicalise" the fixtures' own instruction asks
-     * for before comparing. [TSON-SCHEMA] §8.2 calls both <b>name-level indexes, resolver-managed</b>: they
-     * are sets the representation happens to write as lists, so the fixture's alphabetical order and this
-     * resolver's resolution order say the same thing. Nothing else is normalised; a difference anywhere
-     * else is a real one.
-     */
-    private static TypeDefinition canonical(TypeDefinition definition) {
-        return new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
-                definition.constructor(), definition.supertypes().stream().sorted().toList(),
-                definition.subtypes().stream().sorted().toList(), definition.disjoint(), definition.body(),
-                definition.position(), definition.annotations());
-    }
-
-    /**
-     * A definition reduced to what the comparison is about: canonicalised, then with every synthetic's
-     * content hash replaced by the {@code xxhash} the fixtures write. Compared as text rather than through
-     * {@code equals} because a synthetic's name appears at any depth of a body -- as the type of a field,
-     * inside an argument list -- and normalising it in place would mean rebuilding every body shape here.
-     */
-    private static String rendered(TypeDefinition definition) {
-        String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(definition)))
-                .replaceAll("_xxhash");
-        // `position` is this model's own: an @Unbound component recording where a declaration was written,
-        // which §8's resolved form has no field for and no fixture carries. Normalised away rather than
-        // compared, exactly as TypeDefinition's own equals leaves it out.
-        return SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty");
-    }
-
     private static Comparison compare(String label, String fixtureFile, String id) throws Exception {
         return new Comparison(label, fixtureEntries(fixtureFile), ourEntries(id));
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, TypeDefinition> fixtureEntries(String file) throws Exception {
-        Map<String, TypeDefinition> bound = (Map<String, TypeDefinition>) tson().objectReader()
-                .withSchema(TsonBundledSchemas.META_ID)
-                .readAs(Files.readString(specDirectory().resolve(file)), "schema", Object.class);
+        Map<String, TypeDefinition> bound =
+                ResolvedForm.readResolved(tson(), Files.readString(specDirectory().resolve(file)));
         assertNotNull(bound, file + " did not read back at all");
         return bound;
     }
 
     /** This schema's OWN entries -- the fixture is resolver output, from before an import merged anything in. */
     private static Map<String, TypeDefinition> ourEntries(String id) {
-        var linked = tson().bindRegistry().core().resolveLinked(id);
-        Map<String, TypeDefinition> own = new LinkedHashMap<>();
-        String canonical = TsonCanonicalIdentity.canonicalize(id);
-        linked.schema().entries().forEach((name, definition) -> {
-            if (linked.originOf(name).equals(canonical)) {
-                own.put(withoutHash(name), definition);
-            }
-        });
-        return own;
+        return ResolvedForm.ownEntries(tson(), id);
     }
 
-    /**
-     * The names each fixture marks {@code @synthetic} at its schema-map key, read from the fixture's own
-     * <em>text</em>.
-     *
-     * <p>Text, and not the bound document every other comparison here uses, because a key-position annotation
-     * is dropped when a resolved-form document is read back -- the second half of {@code BACKLOG.md}'s
-     * synthetic-entry item. Both sides of a bound comparison would therefore render no annotations at all and
-     * agree for the wrong reason. Scanning the source is what makes the marker checkable against the spec's
-     * own output before that channel exists; when it does, this can read the keys like anything else.
-     */
+    /** The keys a fixture marks {@code @synthetic}, hashes normalised. */
     private static Set<String> fixtureSynthetics(String file) throws Exception {
-        Set<String> marked = new TreeSet<>();
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("@synthetic\\s+([A-Za-z0-9_]+)\\s*=>")
-                .matcher(Files.readString(specDirectory().resolve(file)));
-        while (matcher.find()) {
-            marked.add(matcher.group(1));
-        }
-        return marked;
-    }
-
-    /** The same, from this resolver: the local entries whose keys carry the marker, hashes normalised. */
-    private static Set<String> ourSynthetics(String id) {
-        var linked = tson().bindRegistry().core().resolveLinked(id);
-        var entries = linked.schema().entries();
-        String canonical = TsonCanonicalIdentity.canonicalize(id);
-        Set<String> marked = new TreeSet<>();
-        entries.forEach((name, definition) -> {
-            if (linked.originOf(name).equals(canonical) && entries.getAnnotations(name).has("synthetic")) {
-                marked.add(withoutHash(name));
-            }
-        });
-        return marked;
+        return ResolvedForm.markedSynthetics(Files.readString(specDirectory().resolve(file)));
     }
 
     /** {@code spec/m}, found by walking up rather than assumed relative to a working directory. */
@@ -236,7 +141,7 @@ class ResolvedFixtureTest {
     void everyEntryResolvesIdentically() throws Exception {
         for (Comparison comparison : all()) {
             comparison.fixture().forEach((name, fixtureDefinition) -> assertEquals(
-                    rendered(fixtureDefinition), rendered(comparison.ours().get(name)),
+                    ResolvedForm.rendered(fixtureDefinition), ResolvedForm.rendered(comparison.ours().get(name)),
                     comparison.label() + ": " + name + " does not resolve to what the fixture records"));
         }
     }
@@ -249,7 +154,7 @@ class ResolvedFixtureTest {
      * statement as the other two.
      *
      * <p>This is the one assertion here that does not go through the bound document -- see {@link
-     * #fixtureSynthetics}.
+     * ResolvedForm#markedSynthetics}.
      */
     @Test
     void theSameEntriesAreMarkedSyntheticOnBothSides() throws Exception {
@@ -259,21 +164,10 @@ class ResolvedFixtureTest {
         assertEquals(1, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks one");
 
         assertEquals(fixtureSynthetics("meta-kernel-resolved.tn"),
-                ourSynthetics(TsonBundledSchemas.META_KERNEL_ID), "meta-kernel.tn");
-        assertEquals(fixtureSynthetics("meta-resolved.tn"), ourSynthetics(TsonBundledSchemas.META_ID), "meta.tn");
-        assertEquals(fixtureSynthetics("core-resolved.tn"), ourSynthetics(TsonBundledSchemas.CORE_ID), "core.tn");
+                ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.META_KERNEL_ID), "meta-kernel.tn");
+        assertEquals(fixtureSynthetics("meta-resolved.tn"),
+                ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.META_ID), "meta.tn");
+        assertEquals(fixtureSynthetics("core-resolved.tn"),
+                ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.CORE_ID), "core.tn");
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────
-
-    /**
-     * Whether {@code name}'s disagreement is the lifting one: this side names an entry the fixture has no
-     * counterpart for, and that entry is a container. Compared through the rendered forms because the
-     * difference can sit at any depth of a body.
-     */
-    private static boolean mentionsALiftedContainer(Comparison comparison, String name, Set<String> lifted) {
-        String ours = String.valueOf(comparison.ours().get(name));
-        return lifted.stream().anyMatch(ours::contains);
-    }
-
 }

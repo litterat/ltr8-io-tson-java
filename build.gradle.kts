@@ -62,6 +62,17 @@ subprojects {
         // environment inheritance, so the daemon sees it change.
         System.getenv("TSON_REQUIRE_TEST_SUITE")?.let { environment("TSON_REQUIRE_TEST_SUITE", it) }
         System.getProperty("tson.testSuite.dir")?.let { systemProperty("tson.testSuite.dir", it) }
+
+        // The conformance corpus is a real test input that lives outside this build, so Gradle cannot
+        // see a vector change and would report the previous run's result as up to date -- a stale green
+        // over an edited corpus, which is the one thing a conformance signal must not do. Declared here
+        // with the same search order SuiteCheckout uses, so editing a vector re-runs the suite.
+        val corpus = listOfNotNull(
+            System.getProperty("tson.testSuite.dir")?.let { file(it) },
+            rootProject.file("../ltr8-io-tson-test-suite"),
+            rootProject.file(".references/ltr8-io-tson-test-suite")
+        ).firstOrNull { it.isDirectory }
+        corpus?.let { inputs.dir(it).withPathSensitivity(PathSensitivity.RELATIVE).withPropertyName("conformanceCorpus") }
     }
 
     // Every module publishes, so `./gradlew publishToMavenLocal` puts the whole set in ~/.m2 and another

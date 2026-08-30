@@ -719,13 +719,23 @@ the class and (where noted) pinned by a test; the `docs/` notes carry the full w
   (`DefinitionResolverTest.atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed`). This dependency is
   also why the writers can't move out of `tson-compiler`.
 
-## Conformance suite (`ConformanceSuiteTest`)
+## Conformance suite (`ConformanceSuiteTest`, `Class2ConformanceSuiteTest`)
 
-Separate from the fine-grained unit tests, this runs every vector in the sibling
-[ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite) repo against the real
-`Lexer`/`TsonDataParser`/`BaseTypeResolver`/`BuiltinTypeVocabulary` as JUnit 5 dynamic tests — a
-conformance/integration check against an external, language-agnostic, spec-derived fixture set, to catch
-drift against the spec.
+Separate from the fine-grained unit tests, these run every vector in the sibling
+[ltr8-io-tson-test-suite](https://github.com/litterat/ltr8-io-tson-test-suite) repo as JUnit 5 dynamic
+tests — a conformance/integration check against an external, language-agnostic, spec-derived fixture set,
+to catch drift against the spec.
+
+**Two runners, split by conformance class and therefore by module.** `ConformanceSuiteTest`
+(`tson-compiler`) runs `class1/` against the real `Lexer`/`TsonDataParser`/`BaseTypeResolver`/
+`BuiltinTypeVocabulary`. `Class2ConformanceSuiteTest` (`tson`) runs `class2/` against the `Tson` front
+door, because a Class 2 vector is about a phase boundary — did this schema resolve, did it link, does this
+document validate against it — and those boundaries are `Tson.validateSchema`/`Tson.validate`'s to own,
+not a test's to reassemble. What the two share lives in `tson-compiler/src/testShared`, added to both test
+source sets: `SuiteCheckout` (finding the corpus), `Sidecar` (reading a sidecar and splicing a subject's
+header) and `Vectors` (walking the tree). One statement of the corpus's contract rather than two, which is
+what `RUNNER.md` exists to keep from drifting — the first two runners written against its prose had already
+disagreed about what a subject even is.
 
 **The corpus states its own contract, and this runner obeys it rather than inferring it.**
 `schemas/<layer>-sidecar.tn` gives each layer's sidecar shape and every sidecar names one with
@@ -740,8 +750,13 @@ one of `valid`/`error`/`schema-document` is present and the payload cannot be se
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
 documentation: every sidecar read against the schema it declares, plus the negatives the groups exist
-for. `SidecarSchemasTest` checks the schemas themselves resolve, serving the suite's own identities
-beside the bundled ones since the layer schemas `!!import` `sidecar-common.tn`.
+for. `SidecarSchemasTest` checks the schemas themselves resolve — every `.tn` in `schemas/`, listed rather
+than named in a constant, so a layer schema added upstream is one this has to resolve — serving the suite's
+own identities beside the bundled ones since the layer schemas `!!import` `sidecar-common.tn`.
+
+**The corpus is a declared input of every `Test` task** (root `build.gradle.kts`). It lives outside this
+build, so Gradle would otherwise report the previous run as up to date over an edited vector — a stale green
+over a changed corpus, which is the one thing a conformance signal must not do.
 
 **A skip is not a pass.** `SuiteCheckout` finds the corpus — a sibling working copy first (a developer
 editing vectors must see their own edits), then the pinned copy `scripts/fetch-references.sh` fetches
@@ -759,10 +774,35 @@ cannot fail on `{ a: 1  a: 2 }`; the parser accepts it by design. An error vecto
 `category: resolver` and its subject must parse, which `checkReaderVector` asserts before asking the reader
 for a verdict.
 
+**The `class2/` layers are the three answers a Class 2 processor gives.** `schema/` needs no invented
+expectation format: §1.3 makes producing a resolved schema value a MUST and §8 fixes its serialization, so a
+valid vector's subject is a schema document and its expected side is that document's resolved output in §8's
+own form, read back through `ResolvedForm` (shared with `ResolvedFixtureTest`, which asks the same question
+of `spec/m/*-resolved.tn`) and compared entry for entry, `@synthetic` key markers included. `link/` states
+individual facts about the linked namespace — §2.2.3's import closure, §5.4's derived disjointness, §8.2's
+`subtypes` index. `validate/` is a data document against a schema that loaded, where the expected side of a
+failure is §8.1's category plus the RFC 6901 pointer into the data and nothing else.
+
+**At the schema and link layers the category is the phase's, not the diagnostic code's.** §8.1 says every
+error that makes a schema fail to load or ingest is a resolver error "however value-like the violated rule",
+so a schema-authoring mistake this library catches through the meta's own compiled reader arrives carrying a
+record-shaped code and is still a resolver error. What is checked per diagnostic instead is that each one is
+a **verdict**: `NOT_IMPLEMENTED`/`BIND_MISMATCH`/`SCHEMA_UNAVAILABLE` say the vector could not be judged, and
+letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
+
+**No `class2/schema/` subject declares a template**, and the reason is where this layer compares rather
+than what §8 admits. The comparison is over the resolver's own value, and an open entry's body is a
+`HeldBody` — the application as written — where the same text read back as a `type_definition` binds an
+ordinary `RecordBody`: the two sides agree as §8 text and differ as values, and nothing here serializes the
+resolver's value to close the gap (§1.3 makes producing output OPTIONAL, and this doesn't). §8.1 is
+self-contradictory about whether a `type_definition` may carry a parameter reference at all
+(`SPEC-FEEDBACK.md` #4), which is why the answer isn't simply to write the vector. Templates are covered at
+the `link/` layer instead, over the entries they mint.
+
 **Add test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge —
-with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, and the
-`class2/` tree is **empty**, so Part 2 work has nowhere to put a vector today and the honest move is to
-say so rather than wedge one into a Part 1 bucket. Opening those layers is its own `BACKLOG.md` item.
+with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, so a Part 1
+vector about schema resolution has nowhere to go and the honest move is to say so rather than wedge one into
+the wrong bucket.
 A vector whose sidecar carries `encoding` is fed the file's bytes unchanged (`checkEncodingVector`),
 because the ordinary string round-trip would re-encode exactly the bytes such a vector exists to test;
 an encoding this implementation does not read is skipped, not failed, which `RUNNER.md` admits as one of
@@ -778,7 +818,8 @@ No system Gradle — always use the wrapper:
 ./gradlew publishToMavenLocal     # installs every module into ~/.m2 as io.ltr8:<module>:0.34.0-SNAPSHOT
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.lexer.LexerTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonDataParserTest"
-./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.ConformanceSuiteTest"  # skipped unless ../../ltr8-io-tson-test-suite exists
+./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.ConformanceSuiteTest"  # class1; skipped unless ../../ltr8-io-tson-test-suite exists
+./gradlew :tson:test --tests "io.ltr8.tson.Class2ConformanceSuiteTest"                 # class2, same corpus
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonSchemaLinkerTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonCompiledSchemaRegistryTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.DefinitionResolverTest"

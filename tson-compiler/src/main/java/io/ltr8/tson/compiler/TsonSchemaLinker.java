@@ -523,7 +523,7 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * §3.4.1: an entry no finite document can satisfy is rejected, with the chain that has to be broken
+     * §5.10.1's productivity rule: an entry no finite document can satisfy is rejected, with the chain that has to be broken
      * (§5.10.1's productivity rule, {@link TypeInhabitance}). {@code x => { y: y }} with {@code y => { x: x }}
      * resolves and links cleanly otherwise, and fails at the first document as {@code missing required field
      * 'x'} -- blaming the data for a defect in the schema.
@@ -551,7 +551,7 @@ public final class TsonSchemaLinker {
                     .map(entry -> EntryDisplayName.of(entry, merged.get(entry), merged)).toList();
             report(receiver, schema, name, merged.get(name), "'" + name + "' can never be satisfied by any "
                     + "document: " + String.join(" needs ", chain)
-                    + ", and nothing in that chain can be left out or left empty (§3.4.1). A recursion "
+                    + ", and nothing in that chain can be left out or left empty (§5.10.1). A recursion "
                     + "terminates only where it reaches a base case -- an optional field, a possibly-empty "
                     + "container, or a choice variant that does not recur");
         }

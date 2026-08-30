@@ -1,3 +1,9 @@
+// src/testShared holds the conformance-runner support both runners need -- the corpus checkout search
+// and the sidecar-reading contract. The Class 1 runner is here (the lexer and both grammars are here);
+// the Class 2 runner is in :tson, where the front door that resolves, links and validates a schema is.
+// One source of the contract rather than two, which is what RUNNER.md exists to keep from drifting.
+sourceSets["test"].java.srcDir("src/testShared/java")
+
 dependencies {
     implementation(project(":tson-schema"))
     implementation(project(":tson-annotation"))

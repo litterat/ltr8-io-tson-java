@@ -201,7 +201,7 @@ sit at the schema layer because that is the only layer able to name request and 
 `xxhash` and compute real digests at publication, so these copies carry digests over their own bytes and
 `TsonBundledSchemas` holds those rather than tson.io's.
 
-## The inhabitance check (`TypeInhabitance`, §3.4.1, §5.10.1's productivity rule)
+## The inhabitance check (`TypeInhabitance`, §5.10.1's productivity rule)
 
 **An entry no finite document can satisfy is rejected.** `x => { y: y }` with `y => { x: x }` resolves and
 links cleanly otherwise, and fails at the first document as `missing required field 'x'` — blaming the data
