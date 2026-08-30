@@ -760,7 +760,7 @@ No system Gradle — always use the wrapper:
 ```
 ./gradlew build                   # also builds the javadoc/sources jars, so doclint runs under `build`
 ./gradlew test
-./gradlew publishToMavenLocal     # installs every module into ~/.m2 as io.ltr8:<module>:0.1.0-SNAPSHOT
+./gradlew publishToMavenLocal     # installs every module into ~/.m2 as io.ltr8:<module>:0.34.0-SNAPSHOT
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.lexer.LexerTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonDataParserTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.ConformanceSuiteTest"  # skipped unless ../../ltr8-io-tson-test-suite exists
@@ -784,7 +784,7 @@ flags for when the next question is "where".
 **Publishing is packaging, not release.** Every subproject applies `maven-publish` with a `mavenJava`
 publication (the `java` component plus sources and javadoc jars) and a POM carrying name/description/
 url/licence, so `publishToMavenLocal` gives another project on the same machine an ordinary
-`io.ltr8:tson:0.1.0-SNAPSHOT` dependency instead of an included build. **No remote repository is
+`io.ltr8:tson:0.34.0-SNAPSHOT` dependency instead of an included build. **No remote repository is
 configured, deliberately** — Maven Central needs signed artifacts and a POM with scm/developers, and
 publishing under a name is not a decision the build should make quietly. The jars carry real
 `module-info.class`es, so a consumer works on the class path or the module path; `tson-annotation` and

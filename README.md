@@ -681,7 +681,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.ltr8:tson:0.1.0-SNAPSHOT")
+    implementation("io.ltr8:tson:0.34.0-SNAPSHOT")
 }
 ```
 
