@@ -228,11 +228,17 @@ Part 2, and the thin parts of Part 1.
   reader that binds a parameter-bearing body back to a held one. Which is right depends on
   `SPEC-FEEDBACK.md` #4: §8.1 says no `type_definition` could carry a parameter reference and then specifies
   how to read one.
-- [ ] **Fill the coverage the corpus now reports on itself.** `COVERAGE.md` is generated and
-  diff-checked, and what it shows is a corpus that is 89/159 §5 vocabulary while §7.3 has no vectors at
-  all, §7.5 and §2.8 have one each, and §2.9 and §6 have none. Work downward from the thinnest: the
-  lexical grammar, §7.2's escapes and multi-line token rules, the absent sentinel, brace
-  disambiguation, adjacency, §2.4 separators, §3's annotations and directives.
+- [ ] **Fill the coverage the corpus now reports on itself.** `COVERAGE.md` is generated and diff-checked,
+  so what is thin is a query rather than a claim to keep current here — read it there and work downward.
+  The zeroes that matter are whole sections with no vector at all, not a low count: §6, §9.2–§9.5, and
+  §8.2, which needs a corpus change before it can have one (below). §7.3 is a summary of the lexical
+  grammar whose rules are exercised under §7.1 and §7.2, so its zero is not the gap it looks like.
+- [ ] **§8.2 name hygiene has no outcome to state.** §8.1 makes a policy refusal a fifth, distinguishable
+  outcome that MUST NOT be reported in any of the four categories, and the sidecar outcome group has
+  members for `valid`, `error` and `schema-document` only — so a confusable or restricted-name vector
+  cannot say what should happen to it. The group needs a `refused` member carrying the stated policy,
+  and `RUNNER.md` a rule that two conforming processors may legitimately disagree there, before §8.2,
+  §9.4 and §9.5 can be covered at all.
 - [ ] **A `class1/json/` layer** (§6). Cheap and currently empty: the two mandatory-error exceptions
   (unescaped NEL/LS/PS in a single-line token, unpaired surrogate escapes), the JSON→base-type
   mappings, and a vector pinning that `//` is *not* a comment. Distinct from the item below, which
