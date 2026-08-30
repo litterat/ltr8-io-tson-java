@@ -46,9 +46,13 @@ class SidecarSchemasTest {
     }
 
     private static List<String> schemaFiles(Path schemasRoot) {
-        try (Stream<Path> files = Files.list(schemasRoot)) {
+        // Walked rather than listed: the link layer's §2.2.3 vectors need real schemas to import, and the
+        // corpus publishes them under `schemas/fixtures/`. A fixture has to resolve on its own -- the
+        // collisions those vectors are about exist only in the importer, so a fixture that did not load
+        // would be testing the wrong failure.
+        try (Stream<Path> files = Files.walk(schemasRoot)) {
             return files.filter(p -> p.getFileName().toString().endsWith(".tn"))
-                    .map(p -> p.getFileName().toString())
+                    .map(p -> schemasRoot.relativize(p).toString())
                     .sorted()
                     .toList();
         } catch (IOException e) {
