@@ -623,9 +623,15 @@ over the kernel's vocabulary, plus `TsonAtomContext.registerDefaults` — and ar
 facades sharing this instance's registries, so a schema compiles once per `Tson`.
 `validate(String|InputStream)` *is* `treeReader()` with a collecting receiver — returns `List<Diagnostic>`
 (empty = valid) and never throws for a bad input document (a library fault still throws, deliberately).
-**Two schema sources ship** — `TsonHttpSchemaSource` (HTTPS, host allow-list) and `TsonFileSchemaSource` (a
-directory) — with `httpSchemas(…)`/`fileSchemas(host, dir)` as their one-call forms, repeatable and mutually
-exclusive with each other and with `schemaSource(…)`, the general seam. Both **deny by default**, match a host
+**Two fetching schema sources ship** — `TsonHttpSchemaSource` (HTTPS, host allow-list) and
+`TsonFileSchemaSource` (a directory) — with `httpSchemas(…)`/`fileSchemas(host, dir)` as their one-call
+forms, repeatable and mutually exclusive with each other and with `schemaSource(…)`, the general seam.
+`TsonSchemaSource.ofMap(Map)` is the non-fetching third, for schemas a caller already holds: it exists
+because `schemaSource(schemas::get)` is the natural first source and returns `null` for the identity the
+*document* chose, which the contract does not permit — a `null` carries no `Reason`. That is refused where
+the loader calls a source (`IllegalStateException`, so it stays a fault and `SchemaFailure` rethrows it),
+and `ofMap` is the same lookup done right: a miss is `NOT_FOUND`, and matching is by canonical identity, so
+a `?sha256=`-pinned reference finds the unpinned entry. Both **deny by default**, match a host
 exactly, and share `SchemaReference` for §2.2.1's rules on what an identity may be, since the reference comes
 out of a document and in a server that means a request body: the HTTP one guards SSRF (no redirects ever, size
 capped against bytes delivered), the file one arbitrary reads (containment checked *after* `toRealPath`, so

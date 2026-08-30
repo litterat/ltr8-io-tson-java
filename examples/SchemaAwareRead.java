@@ -14,9 +14,13 @@
 /// object-binding twin (see ObjectBinding.java for the binding side).
 import module io.ltr8.tson;
 
+import java.util.Map;
+
 void main() {
-    // A tiny schema, handed to the reader on demand by URI. A real app plugs in a disk/HTTP-backed
-    // source with its own fetch policy; here a one-liner just returns our schema text.
+    // A tiny schema, handed to the reader by identity. A real app plugs in a disk/HTTP-backed source
+    // with its own fetch policy; `ofMap` is the form for schemas you already hold. Note it, rather
+    // than `schemas::get`: a source says "I cannot supply that" by throwing TsonSchemaFetchException,
+    // and a map returns null instead -- for whichever identity the *document* names.
     String schema = """
             !!id:"https://example.com/2026/34/app/server-1.tn"
             !!meta:"https://tson.io/2026/34/m/meta.tn"
@@ -26,7 +30,7 @@ void main() {
             }""";
 
     Tson tson = Tson.builder()
-            .schemaSource(uri -> schema)
+            .schemaSource(TsonSchemaSource.ofMap(Map.of("https://example.com/2026/34/app/server-1.tn", schema)))
             .build();
 
     // Self-describing: the document names its own schema and root type. No other arguments needed --
