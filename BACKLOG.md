@@ -221,14 +221,13 @@ is thin is a query against the corpus rather than a tally kept here.
   the layout gains a per-layer fixture directory the sidecar's `import` short names resolve against, or
   the corpus publishes a small schema of its own beside the sidecar schemas and the short-name table
   learns it.
-- [ ] **§8.2's mechanism 2 reports a policy refusal as a validity error.** `IdentifierParser` applies
-  §7.7's grammar and §8.2's `Identifier_Status` check in one pass and fails both the same way, so
-  `@aĲb` — a well-formed identifier carrying a `Identifier_Status=Restricted` character — comes back as a
-  parse failure and reaches a reader as `VALIDATION_ERROR`. §8.2 says outright that a refusal MUST NOT be
-  reported in any of §8.1's four categories, and being distinguishable is the entire reason the outcome
-  exists: the check reads data the UCD does not freeze, so it may never decide validity. The two checks
-  have to separate, and the refusal needs a channel out of `TsonDataStream`, which throws rather than
-  reporting — that is the work, and it is why the corpus's `identifier-status` mechanism has no vector.
+- [ ] **§8.2's mechanism 2 is still a validity error at the schema layer.** The Class 1 read path reports
+  it as the refusal it is; the schema pipeline does not. `IdentifierParser.validateName` deliberately keeps
+  grammar and policy in one throwing answer for `TsonSchemaParser` and `DefinitionResolver`, because giving
+  them the right answer means giving `Tson.validateSchema` a refusal channel it has no member for — its
+  return is `List<Diagnostic>`, and a refusal is not a diagnostic in any of §8.1's four categories.
+  [TSON-SCHEMA] §11.4's scopes are the same shape, so this is one decision covering the whole schema side:
+  what a policy refusal looks like coming out of a schema load.
 - [ ] **§8.2's mechanism 3 is not applied to Class 1 names.** The restriction level rides `withTokenPolicy`,
   whose default is Unrestricted — right for tokens, which §8.2 says default to Unrestricted, and wrong for
   names, which it says default to Highly Restrictive. So a mixed-script annotation or type-ref name is

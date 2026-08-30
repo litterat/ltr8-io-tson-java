@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.lexer.JoiningControls;
 import io.ltr8.tson.compiler.lexer.Xid;
 
 import java.text.Normalizer;
+import java.util.Optional;
 
 /**
  * Parses meta-kernel's {@code identifier} instance of the {@code unit} atom constructor (§4.2, §8.1) -- the
@@ -91,30 +92,63 @@ public final class IdentifierParser implements AtomType<String> {
                             ? " -- an identifier never begins with a digit or a sign" : ""),
                     EXPECTED);
         }
-        if (!IdentifierStatus.isAllowed(first)) {
-            throw new AtomParseException(at(text, first, 0) + " is Identifier_Status=Restricted (UTS #39)",
-                    EXPECTED);
-        }
         for (int i = Character.charCount(first); i < text.length(); ) {
             int cp = text.codePointAt(i);
             if (!(Xid.isContinue(cp) || cp == '-')) {
                 throw new AtomParseException(at(text, cp, i) + " cannot appear in an identifier", EXPECTED);
             }
-            if (cp == Xid.ZWNJ || cp == Xid.ZWJ) {
-                // Both joiners are Identifier_Status=Restricted, and UTS #39 §3.1.1.1 carves the exception:
-                // they are admitted exactly where they have a shaping effect. See JoiningControls.
-                if (!JoiningControls.permitted(text, i)) {
-                    throw new AtomParseException(at(text, cp, i) + " is a join control outside the contexts "
-                            + "UTS #39 §3.1.1.1 permits -- it has no shaping effect here, so it is invisible",
-                            EXPECTED);
-                }
-            } else if (!IdentifierStatus.isAllowed(cp) && cp != '-') {
-                throw new AtomParseException(at(text, cp, i) + " is Identifier_Status=Restricted (UTS #39)",
+            if ((cp == Xid.ZWNJ || cp == Xid.ZWJ) && !JoiningControls.permitted(text, i)) {
+                throw new AtomParseException(at(text, cp, i) + " is a join control outside the contexts "
+                        + "UTS #39 §3.1.1.1 permits -- it has no shaping effect here, so it is invisible",
                         EXPECTED);
             }
             i += Character.charCount(cp);
         }
         return text;
+    }
+
+    /**
+     * The grammar <b>and</b> [TSON-DATA] §8.2's mechanism 2, for a caller that wants one answer and has
+     * nowhere to report a refusal separately -- the schema pipeline, whose naming positions are checked as
+     * a declaration is read rather than as a document is.
+     *
+     * <p><b>It is the wrong shape and it is deliberate here</b>: §8.2 says a mechanism-2 failure is a policy
+     * refusal, which MUST NOT be reported in any of §8.1's four categories, and this throws the same
+     * exception the grammar does. The read path does it properly -- {@link #hygiene} against a receiver --
+     * and doing the same for the schema layer means giving {@code validateSchema} a refusal channel it does
+     * not have. Tracked in {@code BACKLOG.md}; this keeps the check running meanwhile rather than dropping
+     * it, which is the one outcome worse than misclassifying it.
+     */
+    public static String validateName(String text) {
+        validate(text);
+        hygiene(text).ifPresent(violation -> {
+            throw new AtomParseException(violation, EXPECTED);
+        });
+        return text;
+    }
+
+    /**
+     * [TSON-DATA] §8.2's <b>mechanism 2</b>, alone: every {@code XID_Continue} character of a name must be
+     * {@code Identifier_Status=Allowed} (UTS #39 §3.1). Returns the violation rather than throwing, because
+     * it is not one -- §8.2 makes this a policy refusal, a fifth outcome that MUST NOT be reported as a
+     * validity error, and a caller holding a diagnostics receiver reports it as one.
+     *
+     * <p>Two characters are the grammar's rather than this mechanism's, though the table restricts both.
+     * {@code -} is this profile's own extension, which §8.2 says carries no {@code Identifier_Status} and
+     * participates in no mechanism. ZWNJ and ZWJ are {@code Identifier_Status=Restricted} and §7.7 rule 2
+     * carves the exception UTS #39 §3.1.1.1 defines, which makes their admission a question of <em>form</em>
+     * and so {@link #validate}'s: a joiner outside those contexts is not an identifier at all, where a
+     * restricted character is an identifier this processor declines to accept.
+     */
+    public static Optional<String> hygiene(String text) {
+        for (int i = 0; i < text.length(); ) {
+            int cp = text.codePointAt(i);
+            if (cp != '-' && cp != Xid.ZWNJ && cp != Xid.ZWJ && !IdentifierStatus.isAllowed(cp)) {
+                return Optional.of(at(text, cp, i) + " is Identifier_Status=Restricted (UTS #39)");
+            }
+            i += Character.charCount(cp);
+        }
+        return Optional.empty();
     }
 
     /** The one {@code expected} fragment this parser reports -- a grammar, per {@link AtomTypeException}'s vocabulary. */

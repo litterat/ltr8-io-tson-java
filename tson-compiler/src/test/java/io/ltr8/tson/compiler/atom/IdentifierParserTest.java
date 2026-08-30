@@ -65,13 +65,35 @@ class IdentifierParserTest {
         assertEquals("a-b", read("a-b"), "but '-' does");
     }
 
-    /** Obsolete and technical characters, which XID admits and the General Security Profile does not. */
+    /**
+     * Obsolete and technical characters, which XID admits and the General Security Profile does not -- and
+     * which are <b>refused, not rejected</b>. [TSON-DATA] §8.2 makes {@code Identifier_Status} a policy
+     * mechanism whose failure MUST NOT be reported in any of §8.1's four categories, so the grammar accepts
+     * such a name (it is a well-formed identifier) and {@link IdentifierParser#hygiene} is what declines it.
+     *
+     * <p>{@link IdentifierParser#validateName} keeps both in one throwing answer, for the schema-side
+     * callers that have nowhere to report a refusal separately; its own Javadoc says why that is a
+     * placeholder rather than a design.
+     */
     @Test
-    void restrictedCharactersAreRejected() {
+    void restrictedCharactersAreRefusedByPolicyAndNotByTheGrammar() {
         for (int cp : new int[] {0x07E8, 0xA610, 0x1B6B}) {
             String text = "ab" + new String(Character.toChars(cp)) + "c";
-            assertTrue(rejects(text).contains("Identifier_Status=Restricted"), () -> "U+%04X".formatted(cp));
+            String label = "U+%04X".formatted(cp);
+            assertEquals(text, read(text), () -> label + " is a well-formed identifier");
+            assertTrue(IdentifierParser.hygiene(text).orElseThrow(() -> new AssertionError(label))
+                    .contains("Identifier_Status=Restricted"), () -> label);
+            assertTrue(assertThrows(AtomParseException.class, () -> IdentifierParser.validateName(text))
+                    .getMessage().contains("Identifier_Status=Restricted"), () -> label);
         }
+    }
+
+    /** And the joiners stay the grammar's: §7.7 rule 2 makes their admission a question of form, not policy. */
+    @Test
+    void aJoinerOutsideItsContextIsAGrammarFailureNotARefusal() {
+        String text = "ab" + new String(Character.toChars(0x200C)) + "cd";
+        assertTrue(rejects(text).contains("join control outside the contexts"));
+        assertTrue(IdentifierParser.hygiene(text).isEmpty(), "mechanism 2 does not judge a joiner");
     }
 
     /** Everything invisible falls out of XID membership rather than needing a clause of its own. */

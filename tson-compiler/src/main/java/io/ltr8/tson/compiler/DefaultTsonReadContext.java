@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.atom.IdentifierParser;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.schema.meta.SourcePosition;
@@ -125,12 +126,51 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     @Override
     public TsonEvent next() {
-        TsonEvent e = cursor.rewound.isEmpty() ? cursor.events.next() : cursor.rewound.removeFirst();
+        boolean fresh = cursor.rewound.isEmpty();
+        TsonEvent e = fresh ? cursor.events.next() : cursor.rewound.removeFirst();
         cursor.position = e.position();
         if (cursor.recording != null) {
             cursor.recording.add(e);
         }
+        if (fresh) {
+            checkNameHygiene(e);
+        }
         return e;
+    }
+
+    /**
+     * [TSON-DATA] §8.2's mechanism 2 over the two names a Class 1 document carries -- a type-ref name and an
+     * annotation name, the positions §7.4 marks {@code identifier}.
+     *
+     * <p><b>Here rather than in {@code TsonDataStream}, because a refusal needs a receiver.</b> §8.2 makes a
+     * mechanism-2 failure a policy refusal: the document is not invalid, it is refused by this processor
+     * under a policy reading data the UCD does not freeze, and it MUST NOT be reported in any of §8.1's four
+     * categories. The stream throws {@link TsonParseException} and holds no receiver, so a check there can
+     * only say "invalid", which is the one thing this is not. The grammar stays there, where a failure
+     * really is a parse error ({@code IdentifierParser.validate}), and the policy is applied here.
+     *
+     * <p><b>Only on a freshly pulled event.</b> {@link TsonReadContext#lookingAhead} rewinds what it
+     * consumed and a reader replays it, so checking every event would report a refused name once per
+     * lookahead that crossed it. {@code NameHygieneTest} pins exactly-once across every shape an annotation
+     * takes, the nested and map-key ones included, because that is what would regress silently.
+     *
+     * <p><b>Not in {@code TokenPolicyEventSource}</b>, which is where the token surface's own policy runs and
+     * gets exactly-once for free by sitting upstream of the rewind. That decorator skips itself entirely at
+     * the default policy -- {@code unrestricted()}, which is every ordinary read -- so a mechanism §8.2
+     * defaults <em>on</em> cannot live behind it without making the wrapper unconditional and putting a
+     * switch per token back into the steady-state cost of a read that has no policy at all.
+     */
+    private void checkNameHygiene(TsonEvent event) {
+        String name = switch (event) {
+            case io.ltr8.tson.compiler.stream.TypeRef typeRef -> typeRef.name();
+            case io.ltr8.tson.compiler.stream.AnnotationStart annotation -> annotation.name();
+            default -> null;
+        };
+        if (name == null) {
+            return;
+        }
+        IdentifierParser.hygiene(name).ifPresent(violation -> report(Diagnostic.Code.RESTRICTED_TOKEN,
+                "the name " + violation, "a name this processor will accept", "'" + name + "'"));
     }
 
     /**
