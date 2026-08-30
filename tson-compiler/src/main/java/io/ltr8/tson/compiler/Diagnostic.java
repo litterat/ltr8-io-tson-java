@@ -264,6 +264,27 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     }
 
     /**
+     * A [TSON-DATA] §8.2 name-hygiene <b>refusal</b> at one declaration -- {@link #ofSchemaError}'s shape
+     * with a policy code in place of {@code SCHEMA_ERROR}. The schema is not wrong: it is refused by this
+     * processor, under a policy reading data the Unicode Consortium declines to freeze, and §8.2 says such
+     * a refusal MUST NOT be reported in any of §8.1's four categories.
+     *
+     * <p>The peer of what a read reports for the same rule, so one schema and one document that break the
+     * same rule come back under the same code. {@code code} is {@link Code#CONFUSABLE_NAMES} for §8.2's
+     * mechanism 1 and {@link Code#RESTRICTED_TOKEN} for its mechanisms 2 and 3 -- the caller picks,
+     * because the mechanism is what it knows and the code is what a consumer routes on.
+     *
+     * <p><b>It is still a verdict on the schema</b>, and a consumer treats it as one: the document must
+     * change, or the deployment must relax the policy in code. What it is not is a claim that the format
+     * says the schema is malformed, which is why it does not ride {@code SCHEMA_ERROR}.
+     */
+    public static Diagnostic ofSchemaRefusal(String schemaId, String declaration, Code code, String message,
+                                             Optional<SourcePosition> position) {
+        return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
+                schemaId, code, message, "", "", Optional.empty(), position, Optional.empty());
+    }
+
+    /**
      * A construct this library has not implemented, found at one declaration -- {@link #ofSchemaError}'s
      * shape with {@link Code#NOT_IMPLEMENTED} in place of {@code SCHEMA_ERROR}, and the whole of the
      * difference between "your schema is wrong" and "this schema could not be checked".

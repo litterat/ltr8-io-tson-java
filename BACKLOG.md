@@ -221,25 +221,6 @@ is thin is a query against the corpus rather than a tally kept here.
   the layout gains a per-layer fixture directory the sidecar's `import` short names resolve against, or
   the corpus publishes a small schema of its own beside the sidecar schemas and the short-name table
   learns it.
-- [ ] **A schema-layer name-hygiene failure is reported as a validity error, by three different codes.**
-  The read path reports both mechanisms as `RESTRICTED_TOKEN`; the schema pipeline reports neither that
-  way, and which wrong code you get depends on the naming position:
-
-  | Position | Path | Today |
-  |---|---|---|
-  | declared type name, parameter name | `TsonSchemaParser.requireIdentifierName` | `VALIDATION_ERROR` |
-  | record field name | `DefinitionResolver.requireIdentifier` | `SCHEMA_ERROR` |
-  | enum member, constructor naming slot | `IdentifierParser.read`, via the meta reader | `SCHEMA_ERROR` |
-  | any name, mechanism 3 | `TsonSchemaLinker` (`identifierPolicy`) | `SCHEMA_ERROR` |
-
-  All four want `RESTRICTED_TOKEN`, which is what the read path already reports for both mechanisms.
-
-  So a caller cannot tell a refused schema from a broken one without reading prose, which is what the code
-  exists to prevent — and the three paths disagree with each other as well as with the read path. The fix
-  is one shape at each: report the policy half through the receiver those phases already have, the way
-  `DefaultTsonReadContext` does, leaving the grammar half throwing. Nothing else moves — a refused schema
-  staying unregistered is right, this processor having declined it, and §8.2's answer for a deployment that
-  needs it anyway is to relax the policy in code.
 
 ## Documentation
 

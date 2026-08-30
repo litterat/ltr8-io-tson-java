@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomParsers;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
+import io.ltr8.tson.compiler.atom.IdentifierParser;
 import io.ltr8.tson.compiler.lexer.ConfusableNames;
 import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -214,15 +215,15 @@ public final class TsonSchemaLinker {
      */
     private static void checkNames(TsonDiagnosticsReceiver receiver, TsonSchema schema,
                                    Map<String, TypeDefinition> merged, TsonUnicodePolicy identifiers) {
-        ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> report(receiver, schema,
-                collision.second(), merged.get(collision.second()),
+        ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> refuse(receiver, schema,
+                collision.second(), merged.get(collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
                 "in the namespace of '" + schema.id() + "': " + collision.describe()));
 
-        // §5.2's restriction level, over the same names, in the same pass. Where the collision check above
-        // is a relation and needs the whole set, this is a property of each name on its own -- so it is the
-        // rule that reaches a name nothing else in the schema resembles.
-        merged.forEach((name, definition) -> identifiers.violation(name).ifPresent(why ->
-                report(receiver, schema, name, definition, "declared name " + why)));
+        // Mechanisms 2 and 3 over the same names, in the same pass. Where the collision check above is a
+        // relation and needs the whole set, these are properties of each name on its own -- so they are the
+        // rules that reach a name nothing else in the schema resembles.
+        merged.forEach((name, definition) ->
+                perName(receiver, schema, name, definition, name, "declared name ", identifiers));
 
         merged.forEach((name, definition) -> {
             Top body = definition.body();
@@ -235,12 +236,60 @@ public final class TsonSchemaLinker {
                 default -> List.of();
             };
             String noun = body instanceof RecordBody ? "field names" : "members";
-            ConfusableNames.firstCollision(names).ifPresent(collision -> report(receiver, schema, name,
-                    definition, "'" + name + "' has " + noun + " that read alike: " + collision.describe()));
-            names.forEach(member -> identifiers.violation(member).ifPresent(why ->
-                    report(receiver, schema, name, definition, "'" + name + "' has a "
-                            + noun.substring(0, noun.length() - 1) + " where " + why)));
+            checkScope(receiver, schema, name, definition, names, noun, identifiers);
+
+            // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
+            // them as one anyway -- SPEC-FEEDBACK.md #5. A parameter is a name, §11.4's own reasoning for
+            // enum members applies to it unchanged, and `<T, Т>` otherwise declares two parameters that read
+            // identically: a body referencing `T` binds one of them and a reviewer cannot see which, which
+            // is the substitution hazard §8.2 exists to refuse.
+            checkScope(receiver, schema, name, definition, definition.parameters(), "parameters", identifiers);
         });
+    }
+
+    /** One named scope ([TSON-DATA] §8.2): its own collision relation, then each name's own two rules. */
+    private static void checkScope(TsonDiagnosticsReceiver receiver, TsonSchema schema, String entry,
+                                   TypeDefinition definition, List<String> names, String noun,
+                                   TsonUnicodePolicy identifiers) {
+        ConfusableNames.firstCollision(names).ifPresent(collision -> refuse(receiver, schema, entry,
+                definition, Diagnostic.Code.CONFUSABLE_NAMES,
+                "'" + entry + "' has " + noun + " that read alike: " + collision.describe()));
+        String singular = noun.substring(0, noun.length() - 1);
+        names.forEach(member -> perName(receiver, schema, entry, definition, member,
+                "'" + entry + "' has a " + singular + " where ", identifiers));
+    }
+
+    /**
+     * §8.2's two per-name mechanisms over one name: {@code Identifier_Status} and the restriction level.
+     *
+     * <p><b>Both are here rather than at the positions that read the name</b>, which is where mechanism 2
+     * used to be -- spread over the schema parser, the definition resolver and the atom vocabulary, by three
+     * different exceptions and three different codes, with holes wherever a naming position reached only one
+     * of the three. §8.2 defines its mechanisms over named scopes and [TSON-SCHEMA] §11.4 supplies the
+     * schema layer's, so the walk that already enumerates those scopes is the one place all three belong.
+     * What stays at the reading positions is §7.7's grammar, which is validity and really is a parse error.
+     */
+    private static void perName(TsonDiagnosticsReceiver receiver, TsonSchema schema, String entry,
+                                TypeDefinition definition, String name, String prefix,
+                                TsonUnicodePolicy identifiers) {
+        IdentifierParser.hygiene(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
+                Diagnostic.Code.RESTRICTED_TOKEN, prefix + "'" + name + "': " + why));
+        identifiers.violation(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
+                Diagnostic.Code.RESTRICTED_TOKEN, prefix + why));
+    }
+
+    /**
+     * A §8.2 refusal against one entry, or a throw when there is no receiver. {@link #report}'s peer, and
+     * separate from it because the two say different things: that one is "this schema is wrong", this one is
+     * "this processor declines it", and §8.2 requires that a consumer be able to tell them apart.
+     */
+    private static void refuse(TsonDiagnosticsReceiver receiver, TsonSchema schema, String name,
+                               TypeDefinition def, Diagnostic.Code code, String message) {
+        if (receiver == null) {
+            throw new TsonSchemaValidationException(message);
+        }
+        receiver.report(Diagnostic.ofSchemaRefusal(TsonCanonicalIdentity.canonicalize(schema.id()), name,
+                code, message, def == null ? Optional.empty() : def.position()));
     }
 
     /**

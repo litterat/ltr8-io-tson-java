@@ -13,8 +13,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-DATA] §8.2's mechanism 1 over the schema-layer scopes [TSON-SCHEMA] §11.4 names: no two names in
- * one scope may share a UTS #39 skeleton.
+ * [TSON-DATA] §8.2's three name-hygiene mechanisms over the schema-layer scopes [TSON-SCHEMA] §11.4 names,
+ * plus the one this implementation adds -- a template's parameters ({@code SPEC-FEEDBACK.md} #5).
+ *
+ * <p><b>All three run in one walk</b> ({@code TsonSchemaLinker.checkNames}), which is what makes the scope
+ * list the only place a position can be forgotten. Mechanism 2 used to run at the positions that <em>read</em>
+ * a name instead -- the schema parser, the definition resolver, the atom vocabulary -- and had holes at
+ * exactly the positions only some of those reached: an enum member and a group's member labels were checked
+ * for mechanisms 1 and 3 and not for 2. Every position below is asserted for all three so that stays true.
  *
  * <p><b>Every confusable pair here is built from code points</b>, never typed. That is not fussiness: the
  * two spellings are indistinguishable in an editor, so a literal would make the test unreviewable and one
@@ -70,6 +76,47 @@ class ConfusableNameScopesTest {
     void twoFieldNamesThatReadAlikeAreRefused() {
         assertTrue(refused("  rec => { admin: text  " + CYR_A + "dmin: text }")
                 .contains("has field names that read alike"));
+    }
+
+    /**
+     * <b>A template's parameters, which §11.4 does not list as a scope</b> ({@code SPEC-FEEDBACK.md} #5).
+     * {@code <T, Т>} declares two parameters that read identically; a body referencing {@code T} binds one of
+     * them and a reviewer cannot see which, which is the substitution hazard §8.2 exists to refuse. §11.4's
+     * own reasoning for enum members applies to it unchanged.
+     */
+    @Test
+    void twoTemplateParametersThatReadAlikeAreRefused() {
+        String cyrillicCapT = new String(Character.toChars(0x0422));
+        assertTrue(refused("  box => <T, " + cyrillicCapT + "> { a: T  b: " + cyrillicCapT + " }")
+                .contains("has parameters that read alike"));
+    }
+
+    /**
+     * §8.2's <b>mechanism 2</b> at every naming position, including the two that had no check at all while it
+     * ran at the reading positions instead: an enum's members and a group's member labels.
+     *
+     * <p>{@code U+0132} is {@code XID_Continue}, so each name is a well-formed identifier and §7.7 has no
+     * complaint -- which is what makes this the policy's to catch and not the grammar's.
+     */
+    @Test
+    void aRestrictedCharacterIsRefusedAtEveryNamingPosition() {
+        String bad = "a" + new String(Character.toChars(0x0132)) + "b";
+        for (String declaration : new String[] {
+                "  " + bad + " => text",
+                "  rec => { " + bad + ": text }",
+                "  grp => { ( " + bad + ": text | ok: integer ) }",
+                "  st => !enum [" + bad + "]",
+                "  box => <" + bad + "> { v: " + bad + " }"}) {
+            assertTrue(refused(declaration).contains("Identifier_Status=Restricted"), declaration);
+        }
+    }
+
+    /** And §8.2's <b>mechanism 3</b> at the position §11.4 omits, which nothing reached before. */
+    @Test
+    void aMixedScriptParameterNameIsRefused() {
+        String mixed = "p" + CYR_A + "y";
+        assertTrue(refused("  box => <" + mixed + "> { v: " + mixed + " }")
+                .contains("HIGHLY_RESTRICTIVE"));
     }
 
     /** The members of one enum — distinct strings, so the set's own uniqueness rule cannot see them. */

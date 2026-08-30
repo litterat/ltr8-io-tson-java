@@ -71,11 +71,9 @@ class IdentifierParserTest {
      * mechanism whose failure MUST NOT be reported in any of §8.1's four categories, so the grammar accepts
      * such a name (it is a well-formed identifier) and {@link IdentifierParser#hygiene} is what declines it.
      *
-     * <p>{@link IdentifierParser#validateName} keeps both in one throwing answer, for the schema-side
-     * callers that have nowhere to report a refusal separately; its own Javadoc says why that is a
-     * placeholder rather than a design. {@link IdentifierParser#read} goes through it, so every
-     * {@code identifier}-typed position the compiled meta reader fills -- an enum's members among them --
-     * keeps mechanism 2. Only the grammar is reachable without the policy, and only by naming it.
+     * <p>Nothing here applies the policy. Every position that reads a name applies the grammar and only the
+     * grammar; §8.2's mechanisms run once per layer over the scopes §8.2 and [TSON-SCHEMA] §11.4 define --
+     * {@code TsonSchemaLinker.checkNames} for a schema, {@code DefaultTsonReadContext} for a document.
      */
     @Test
     void restrictedCharactersAreRefusedByPolicyAndNotByTheGrammar() {
@@ -85,11 +83,9 @@ class IdentifierParserTest {
             assertEquals(text, IdentifierParser.validate(text), () -> label + " is a well-formed identifier");
             assertTrue(IdentifierParser.hygiene(text).orElseThrow(() -> new AssertionError(label))
                     .contains("Identifier_Status=Restricted"), () -> label);
-            // validateName, and read() through it, keep both in one throwing answer for the schema-layer
-            // callers -- so a restricted name is still refused everywhere, just not as a *parse* failure.
-            assertTrue(assertThrows(AtomParseException.class, () -> IdentifierParser.validateName(text))
-                    .getMessage().contains("Identifier_Status=Restricted"), () -> label);
-            assertTrue(rejects(text).contains("Identifier_Status=Restricted"), () -> label + " through read()");
+            // And read() -- the atom-parser path -- is the grammar too, so a restricted name reaches the
+            // scope walk that refuses it rather than dying here as a malformed one.
+            assertEquals(text, read(text), () -> label + " through read()");
         }
     }
 

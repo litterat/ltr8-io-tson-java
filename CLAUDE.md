@@ -760,19 +760,28 @@ names its mechanism and the UTS #39 data version it was computed against, and a 
 implementation does not carry is `RUNNER.md` rule 5's fourth legitimate skip — the only one that is about
 the vector rather than the conformance class.
 
-**Where each mechanism runs.** Mechanism 1 (skeleton distinctness) is `SchemalessTreeReader`'s, over one
-record's field names — the only scope Part 1 defines. Mechanism 2 (`Identifier_Status`) is
-`DefaultTsonReadContext`'s, over a type-ref or annotation name as its event is first pulled: **the grammar
-and the policy are separate calls**, `IdentifierParser.validate` throwing a parse error for §7.7 and
-`IdentifierParser.hygiene` returning a violation for §8.2, because a refusal must not be reported in any of
-§8.1's four categories. The joiners belong to the grammar despite being `Identifier_Status=Restricted` —
-§7.7 rule 2 makes their admission a question of form. Mechanism 3 (restriction level) runs at the
-same seam, over the name policy the read carries — **default Highly Restrictive, whole name**, which §8.2
-says it SHOULD be, and relaxable in code through `withNamePolicy` because §8.2 requires that and requires
-it not be ambient. It is distinct from `withTokenPolicy`, whose default is `unrestricted()`: §8.2 makes
-values and names different surfaces, a value being data that may legitimately be anything. Class 1 *field*
-names see neither mechanism 2 nor 3 — they are lexical, not names (§2.5, §7.7) — and only mechanism 1,
-whose scope they are. Mechanism 2's schema-layer half is still a `BACKLOG.md` item.
+**The grammar runs where a name is read; the policy runs once per layer, over scopes.** That split is
+§8.2's own — §7.7 is validity, stable across Unicode versions, and a failure is a parse error; §8.2's three
+mechanisms are policy over *named scopes*, read unstable data, and a failure is a refusal. So
+`IdentifierParser.validate` is the grammar and throws, `IdentifierParser.hygiene` is mechanism 2 and
+returns, and **no position that reads a name applies a policy**. The joiners belong to the grammar despite
+being `Identifier_Status=Restricted` — §7.7 rule 2 makes their admission a question of form.
+
+Each layer has exactly one place that walks its scopes, and all three mechanisms run there:
+
+| Layer | Walk | Scopes |
+|---|---|---|
+| Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (`SPEC-FEEDBACK.md` #5) |
+| Data | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
+
+**One place is the point, not a tidiness.** Mechanism 2 used to run at the reading positions instead —
+spread over the schema parser, the definition resolver and the atom vocabulary — and had holes at exactly
+the positions only some of them reached: an enum member and a group's member labels got mechanisms 1 and 3
+and not 2. A scope list can be reviewed; three call sites cannot. Class 1 *field* names see only
+mechanism 1, being lexical rather than names (§2.5, §7.7). The name policy defaults to Highly Restrictive
+whole-name (§8.2's SHOULD) and relaxes through `withNamePolicy`, which §8.2 requires be code rather than
+ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
+may legitimately be anything.
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than
 documentation: every sidecar read against the schema it declares, plus the negatives the groups exist

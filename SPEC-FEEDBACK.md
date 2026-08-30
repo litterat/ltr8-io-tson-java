@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The four below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
+The five below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
 seventeen raised against Revision 33 are gone from here, because the spec now carries their rules and that
 is where the answer belongs. **This file is the as-built record**, not a pointer to one: where an entry
 proposes a design this implementation has built, the entry states the design, what is running, and what is
@@ -228,5 +228,49 @@ rather than to output.
 
 **Status against Revision 34:** open, and new against this revision — §8.1's open-entry sentence and its
 "Reading parameter references" paragraph are both Revision 34 text.
+
+---
+
+## 5. §11.4's scope list omits a template's parameters, so two parameters that read alike are accepted
+
+**Section:** Part 2 §11.4 (name hygiene at the schema layer), [TSON-DATA] §8.2 (the three mechanisms).
+
+**Problem:** §11.4 enumerates the schema layer's named scopes — "the members of one enum; the field names of
+one record definition (member labels of its groups included, §5.11); the declared names of one schema; and
+the merged namespace at `!!import`". A template's **parameters** are not among them, and a parameter is a
+name: §5.10 says "a parameter declaration is a bare name", and §12.1 makes it a naming position matched
+against §7.7's identifier grammar like any other.
+
+The consequence is concrete rather than doctrinal. This is accepted:
+
+```
+box => <T, Т> { a: T  b: Т }
+```
+
+Latin `T` and Cyrillic `Т` (U+0422) are two parameters that render identically. A body referencing `T` binds
+one of them, an application `box<text, integer>` fills both positionally, and no reader of the source can see
+which slot either argument reaches. That is the substitution hazard §8.2 exists to refuse, and §11.4's own
+argument for the enum-member scope — distinct strings, so the set's own uniqueness rule cannot see them —
+applies to it word for word.
+
+The two per-name mechanisms have the same gap for the same reason. §8.2 frames all three as operating "over
+named scopes", which is strictly true only of mechanism 1: `Identifier_Status` and the restriction level
+judge one name at a time and need no scope at all. But because §11.4 supplies the schema layer's scopes as a
+closed list, a name in no scope is a name no mechanism is stated to reach — so a mixed-script or
+restricted-character parameter name has no stated verdict either.
+
+**Interpretation chosen:** this implementation treats **the parameter names of one template** as a fourth
+schema-layer scope, checked by all three mechanisms in the same walk as the other three
+(`TsonSchemaLinker.checkNames`; `ConfusableNameScopesTest` pins each). `<T, Т>` is refused as a confusable
+pair, and a restricted or mixed-script parameter name is refused like any other name.
+
+**Suggested resolution:** add the parameter names of one template to §11.4's list. It is the smallest change
+that closes it, it needs no new mechanism, and the section already carries the reasoning under a different
+scope. Worth considering alongside it: §8.2's "The mechanisms operate over named scopes" over-generalises
+from mechanism 1, and saying so — that mechanisms 2 and 3 are per-name rules that apply wherever a name
+occurs, while mechanism 1 is a relation needing a scope — would make a forgotten scope cost one missing
+relation rather than three missing checks.
+
+**Status against Revision 34:** open, and new against this revision.
 
 ---

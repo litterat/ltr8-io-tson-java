@@ -64,16 +64,9 @@ public final class IdentifierParser implements AtomType<String> {
     private IdentifierParser() {
     }
 
-    /**
-     * The atom-parser path, reached wherever the compiled meta reader reads an {@code identifier}-typed
-     * position -- an enum's members, a constructor application's naming slots. {@link #validateName} rather
-     * than {@link #validate}, so those positions get [TSON-DATA] §8.2's mechanism 2 like the naming
-     * positions the parser and resolver check explicitly: this is a schema-layer caller with nowhere to
-     * report a refusal separately, and the alternative is not checking at all.
-     */
     @Override
     public String read(TokenValue token) {
-        return validateName(token.text());
+        return validate(token.text());
     }
 
     /**
@@ -111,26 +104,6 @@ public final class IdentifierParser implements AtomType<String> {
             }
             i += Character.charCount(cp);
         }
-        return text;
-    }
-
-    /**
-     * The grammar <b>and</b> [TSON-DATA] §8.2's mechanism 2, for a caller that wants one answer and has
-     * nowhere to report a refusal separately -- the schema pipeline, whose naming positions are checked as
-     * a declaration is read rather than as a document is.
-     *
-     * <p><b>It is the wrong shape and it is deliberate here</b>: §8.2 says a mechanism-2 failure is a policy
-     * refusal, which MUST NOT be reported in any of §8.1's four categories, and this throws the same
-     * exception the grammar does. The read path does it properly -- {@link #hygiene} against a receiver --
-     * and doing the same for the schema layer means giving {@code validateSchema} a refusal channel it does
-     * not have. Tracked in {@code BACKLOG.md}; this keeps the check running meanwhile rather than dropping
-     * it, which is the one outcome worse than misclassifying it.
-     */
-    public static String validateName(String text) {
-        validate(text);
-        hygiene(text).ifPresent(violation -> {
-            throw new AtomParseException(violation, EXPECTED);
-        });
         return text;
     }
 
