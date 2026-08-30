@@ -2,12 +2,14 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonDocumentHeader;
+import io.ltr8.tson.compiler.lexer.Xid;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.suite.Sidecar;
 import io.ltr8.tson.suite.Vectors;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
@@ -116,8 +118,42 @@ class Class2ConformanceSuiteTest {
                         "the entries marked @synthetic are not the ones the vector marks");
             }
             case "error" -> assertSchemaLoadFailed(sidecar, problems);
+            case "refused" -> assertSchemaRefused(sidecar, problems);
             default -> fail("unknown schema-layer outcome: " + outcomeOf(sidecar));
         }
+    }
+
+    /**
+     * §8.1's fifth outcome at the schema layer: the schema is <b>refused by this processor</b> under one of
+     * §8.2's name-hygiene mechanisms, over the scopes [TSON-SCHEMA] §11.4 supplies.
+     *
+     * <p>{@code checkRefusedVector}'s peer, asserting the same two halves for the same reason: something was
+     * refused, and nothing was reported as a verdict on the schema's correctness. A processor that reported a
+     * confusable declaration the way it reports an unresolved reference has not passed the vector -- §8.2
+     * keeps these out of validity because they read data the UCD does not freeze, and being able to tell them
+     * apart is the whole of it.
+     */
+    private static void assertSchemaRefused(RecordValue sidecar, List<Diagnostic> problems) {
+        RecordValue refusal = outcomePayload(sidecar);
+        String stated = fieldText(refusal, "unicode");
+        Assumptions.assumeTrue(Xid.UNICODE_VERSION.equals(stated),
+                "vector computed against UTS #39 data for Unicode " + stated + "; this implementation "
+                        + "carries " + Xid.UNICODE_VERSION);
+
+        assertFalse(problems.isEmpty(), "the schema is refused, but it loaded without a diagnostic");
+        assertTrue(problems.stream().anyMatch(diagnostic -> isPolicyRefusal(diagnostic.code())),
+                "expected a §8.2 refusal (" + fieldText(refusal, "mechanism") + "); got " + problems);
+        problems.forEach(diagnostic -> assertTrue(isPolicyRefusal(diagnostic.code()),
+                "a refused schema must not also be reported invalid: " + diagnostic));
+    }
+
+    /**
+     * The two codes that mean <em>refused under a stated policy</em> rather than <em>wrong</em>: §8.2's
+     * mechanism 1 over a scope, and its mechanisms 2 and 3 over a name. Every other code is a verdict on the
+     * schema, which is exactly what a refusal is not.
+     */
+    private static boolean isPolicyRefusal(Diagnostic.Code code) {
+        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_TOKEN;
     }
 
     // ── Link-layer vectors: §2.2.3, §5.4, §5.10.1, §8.2 ──────────────────

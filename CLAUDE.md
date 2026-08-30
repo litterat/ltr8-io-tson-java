@@ -751,14 +751,19 @@ depending on lookahead. A sidecar carries its outcome as a **field group member*
 one of `valid`/`error`/`schema-document`/`refused` is present and the payload cannot be separated from it;
 `absent`, `empty-brace` and `schema-document` carry nothing and are typed `void`, written `_`.
 
-**`refused` is §8.1's fifth outcome and is not a verdict on the document.** §8.2's name-hygiene
+**`refused` is §8.1's fifth outcome and is not a verdict on the document or the schema.** §8.2's name-hygiene
 mechanisms refuse without making a document invalid — each reads data the UCD does not freeze, so none of
 them may decide validity — and §8.2 says the refusal MUST NOT be reported in any of the four categories.
 `checkRefusedVector` therefore asserts both halves: that something was refused, and that *nothing* was
 reported as invalid, `CONFUSABLE_NAMES`/`RESTRICTED_TOKEN` being the two codes that mean policy. A vector
 names its mechanism and the UTS #39 data version it was computed against, and a version this
 implementation does not carry is `RUNNER.md` rule 5's fourth legitimate skip — the only one that is about
-the vector rather than the conformance class.
+the vector rather than the conformance class. It has two homes: `class1/reader/refused/` for Part 1's one
+scope, and `class2/schema/refused/` for §11.4's, where the enum-member and group-member-label vectors are
+the ones that catch a processor checking each name where it is *read* rather than where a scope is
+*walked* — the failure this implementation had. Template parameters stay out of the corpus: §11.4 does not
+list them as a scope, so a vector asserting the refusal would fail a conforming implementation
+(`SPEC-FEEDBACK.md` #5), and `ConfusableNameScopesTest` carries those cases instead.
 
 **The grammar runs where a name is read; the policy runs once per layer, over scopes.** That split is
 §8.2's own — §7.7 is validity, stable across Unicode versions, and a failure is a parse error; §8.2's three
