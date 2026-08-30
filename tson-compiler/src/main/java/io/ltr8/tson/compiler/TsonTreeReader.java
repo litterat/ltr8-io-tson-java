@@ -395,7 +395,7 @@ public final class TsonTreeReader {
             // mismatch is the reading application's, and coding them alike would make the second read as
             // the first.
             SchemaFailure failure = SchemaFailure.of(e);
-            return abandon(ctx, failure.code(), e.getMessage(), failure.expected(), schemaUri);
+            return abandon(ctx, failure, e.getMessage(), schemaUri);
         }
         if (compiled == null) {
             // Reported above; skip the value so the stream still lands on DocumentEnd.
@@ -443,6 +443,19 @@ public final class TsonTreeReader {
     private static TsonValue abandon(TsonReadContext ctx, Diagnostic.Code code, String message, String expected,
             String actual) {
         ctx.report(code, message, expected, actual);
+        EventSkip.dataValue(ctx);
+        return null;
+    }
+
+    /**
+     * {@link #abandon}, for the one failure that has something to say beyond its code: a schema that could
+     * not be obtained carries {@code TsonSchemaFetchException.Reason}, and dropping it here is dropping it
+     * everywhere, since a collecting receiver is how almost every read of a fetched schema now hears about
+     * one. The classification and the reason are one value, so they travel as one rather than as a code
+     * beside a field a later call site can forget.
+     */
+    private static TsonValue abandon(TsonReadContext ctx, SchemaFailure failure, String message, String actual) {
+        ctx.report(failure.code(), message, failure.expected(), actual, failure.fetchReason());
         EventSkip.dataValue(ctx);
         return null;
     }

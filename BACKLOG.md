@@ -272,6 +272,15 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
 
 ## Miscellaneous
 
+- [ ] **The CLI's own wire shape does not carry `fetchReason`.** `Diagnostic` states which of the five ways a
+  fetch failed produced a `SCHEMA_UNAVAILABLE`, so a library consumer can tell a reference this deployment
+  refuses from a host that did not answer; `CliDiagnostic` maps the components by hand and does not map that
+  one, so `--output json|tson` states only the code. A consumer of the CLI's report has the gap a consumer of
+  the library no longer has. The obstacle is §10's immutability rule rather than the mapping: `diagnostics.tn`
+  is published under its own `!!id`, so a new field means minting `diagnostics-2.tn` and moving
+  `DiagnosticsSchema`/`InitCommand`/`README.md` onto it, which is worth doing once rather than per field --
+  so this waits for a second reason to bump it, or for someone who wants it enough to bump it alone.
+
 - [ ] **A record field written `_` reads identically to one never written.** Under a schema, `{ x: _  y: "h" }`
   and `{ y: "h" }` against `x: text?` both produce a tree with no `x` at all; the same pair read schemalessly
   gives `TsonAbsent` and `TsonMissing`. [TSON-DATA] §2.9 makes the distinction normative — "A field or entry set

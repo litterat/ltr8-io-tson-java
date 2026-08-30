@@ -139,7 +139,22 @@ public interface TsonReadContext {
      * #schemaLocation()} and hands it to this read's {@link TsonDiagnosticsReceiver}, which decides its
      * fate -- a fail-fast receiver throws {@link TsonReadException} from here and never returns.
      */
-    void report(Diagnostic.Code code, String message, String expected, String actual);
+    default void report(Diagnostic.Code code, String message, String expected, String actual) {
+        report(code, message, expected, actual, Optional.empty());
+    }
+
+    /**
+     * {@link #report(Diagnostic.Code, String, String, String)} carrying a {@link
+     * TsonSchemaFetchException.Reason} -- the one thing about a problem that neither the code nor the
+     * location model states, and which only {@link Diagnostic.Code#SCHEMA_UNAVAILABLE} has.
+     *
+     * <p>A separate method rather than a fifth parameter on the common one: every reader in the compiled
+     * stack reports values, and none of them can ever have a fetch reason to state -- a schema that could
+     * not be fetched has no compiled readers to run. Only the facades, which catch the failure to obtain a
+     * schema at all, reach this.
+     */
+    void report(Diagnostic.Code code, String message, String expected, String actual,
+            Optional<TsonSchemaFetchException.Reason> fetchReason);
 
     /**
      * How many problems have been reported through this read so far, counting every scoped copy since they

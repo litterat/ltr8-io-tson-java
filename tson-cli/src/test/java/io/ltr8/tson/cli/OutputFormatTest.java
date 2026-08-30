@@ -93,7 +93,8 @@ class OutputFormatTest {
     @Test
     void anEmptyDiagnosticFieldBecomesAnAbsentOne() {
         CliDiagnostic converted = CliDiagnostic.from(new Diagnostic(Optional.of(""), Optional.empty(), "",
-                Diagnostic.Code.TYPE_MISMATCH, "nope", "", "", Optional.empty(), Optional.empty()));
+                Diagnostic.Code.TYPE_MISMATCH, "nope", "", "", Optional.empty(), Optional.empty(),
+                Optional.empty()));
 
         assertEquals(Optional.empty(), converted.schemaId());
         assertEquals(Optional.empty(), converted.expected());
@@ -109,7 +110,8 @@ class OutputFormatTest {
     @Test
     void aRootPointerIsAValueAndAnAbsentOneIsNot() {
         CliDiagnostic read = CliDiagnostic.from(new Diagnostic(Optional.of(""), Optional.empty(), "",
-                Diagnostic.Code.VALIDATION_ERROR, "nope", "", "", Optional.empty(), Optional.empty()));
+                Diagnostic.Code.VALIDATION_ERROR, "nope", "", "", Optional.empty(), Optional.empty(),
+                Optional.empty()));
         CliDiagnostic schema = CliDiagnostic.from(
                 Diagnostic.ofSchemaError("example.test/s.tn", "", "cannot load !!import", Optional.empty()));
 

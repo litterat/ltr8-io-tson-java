@@ -230,8 +230,9 @@ public final class Tson {
             // An !!import or !!meta naming an identity no configured source will serve. The document fails
             // either way, but it was never checked: nothing here saw the imported schema, so "this schema
             // is wrong" is a verdict this call has no grounds for. Same root pointer as the rest -- what
-            // differs is the code, which is the one thing a caller can route on.
-            problems.report(Diagnostic.ofSchemaUnavailable("", "", e.getMessage(), Optional.empty()));
+            // differs is the code and the exception's own Reason, which say respectively that no schema was
+            // obtained and whose doing that was.
+            problems.report(Diagnostic.ofSchemaUnavailable("", "", e, Optional.empty()));
         } catch (TsonSchemaValidationException e) {
             // Whatever the phases still raise rather than report: a document with no !!id, an !!import that
             // loaded and would not link, a !!meta that may not govern. Author errors about the document as

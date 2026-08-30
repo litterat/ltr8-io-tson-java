@@ -515,9 +515,14 @@ where it did not. Both run where a composite reader wires its children, so neith
 ### Diagnostics — `docs/readers-and-diagnostics.md`
 
 `Diagnostic` (root package) is one record for both data- and schema-side problems — the variation is
-locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual`, and four location
+locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual`, four location
 components matching JSON Schema 2020-12 §12's output unit (`path`, `schemaId`+`schemaPointer`, plus
-`dataPosition`/`schemaPosition`). Both RFC 6901 pointers are `Optional<String>` because `""` is the *root*,
+`dataPosition`/`schemaPosition`), and `fetchReason`, the one component that is not a location —
+`SCHEMA_UNAVAILABLE` says a schema was not obtained and `TsonSchemaFetchException.Reason` says by whose
+doing, which the closed `Code` cannot (it sorts by *who* could not check) and `message` must not (that
+means parsing prose). It is what makes the thrown and the collected channel answer one fetch failure
+alike, the collecting one being where almost every read now hears about it. Both RFC 6901 pointers are
+`Optional<String>` because `""` is the *root*,
 a location this really emits, not an absence; the three components where `""` really is absence
 (`schemaId`/`expected`/`actual`) offer `schemaIdIfKnown()`/`expectedIfStated()`/`actualIfStated()`, so a
 renderer asks rather than remembering which convention each component uses. `expected` carries the

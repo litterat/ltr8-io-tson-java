@@ -287,8 +287,9 @@ from readers;
 `SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for infrastructure-level failures, plus
 `NOT_IMPLEMENTED`/`BIND_MISMATCH`/`SCHEMA_UNAVAILABLE` — the three that are not a verdict on the document
 at all),
-`message` (hand-composed per call site), `expected`/`actual` (machine-parseable), and **four location
-components covering two ends** — the value in the data, and the rule in the schema.
+`message` (hand-composed per call site), `expected`/`actual` (machine-parseable), **four location
+components covering two ends** — the value in the data, and the rule in the schema — and `fetchReason`,
+the one component that is not a location.
 
 **The four are JSON Schema 2020-12 §12's own output unit**, deliberately: `path` is `instanceLocation` (an
 RFC 6901 pointer into the data), `schemaPointer` is `keywordLocation` (the path through the schema being
@@ -298,6 +299,25 @@ JSON Schema has no equivalent of. **One record rather than separate data- and sc
 because the variation is locational, not categorical** — a value violating `int32` as core.tn declares it
 populates both ends at once, and `javax.tools.Diagnostic`, LSP's `Diagnostic` and rustc's `DiagInner` all
 model it the same way (rustc's `MultiSpan` being the mature form of the same idea).
+
+**`fetchReason` is present for exactly one code, and exists because that code covers two different
+answers.** `SCHEMA_UNAVAILABLE` says a schema was not obtained; `TsonSchemaFetchException.Reason` says by
+whose doing — `NOT_PERMITTED` names a reference this deployment will not fetch and `NOT_FOUND` one nothing
+serves, both the document's to fix, where `TIMEOUT`/`TRANSPORT`/`TOO_LARGE` say the reference was fine and
+the world was not. That is the difference between telling a sender to correct its document and telling it to
+retry, and neither of the two places it could otherwise live will hold it: `Code` is closed and sorts by
+*who* could not check, so five members for one condition is the wrong axis, and recovering it from `message`
+means parsing prose. It is `Optional` because "not a fetch failure" has to stay a distinguishable answer.
+
+**Both channels one fetch failure travels on now answer alike**, which is the point of carrying it at all.
+A consumer that resolves its schemas at startup sees `TsonSchemaFetchException` thrown and reads
+`reason()`; one that reads through a collecting receiver — the common path for a server validating request
+bodies — sees a `Diagnostic` and never sees the exception at all. With the reason on the classification
+only, the same refused reference was the sender's mistake read one way and an operator's read the other.
+`SchemaFailure` carries it from the `catch` to the report (`TsonReadContext.report`'s five-argument form,
+which the facades alone reach — no reader in the compiled stack can have one to state, a schema that could
+not be fetched having no compiled readers to run), and `Diagnostic.ofSchemaUnavailable` takes the exception
+rather than its message so the schema-document channel states it too.
 
 Either end may be absent: a schema-side problem has no data, and a schemaless read has no schema. **Both
 pointers are `Optional<String>`, and that is load-bearing** — RFC 6901 spells "the whole document" as `""`,
@@ -641,7 +661,9 @@ error* category, so this is the same layer, not a new one.
   have resolved is unknown — `SCHEMA_ERROR` would claim a verdict on a document nothing here has seen. A
   `TsonContentHashMismatchException` *is* `SCHEMA_ERROR`, and the pair marks the line: something arrived,
   and it is not what the reference named. Each branch carries the `expected` that matches its code ("a
-  schema that can be obtained", "a schema matching its `?sha256=` pin", "a resolvable schema").
+  schema that can be obtained", "a schema matching its `?sha256=` pin", "a resolvable schema"), and the
+  fetch branch carries the exception's own `Reason` besides — the classification is the last place that
+  still holds the exception, so what it drops is dropped for every collecting read.
     - **This is `NOT_IMPLEMENTED`'s argument one step further out**: a bind mismatch is no more a verdict on
       the document than a gap is, and once the failure arrives as a `Diagnostic` there is no exception type
       left for a consumer to classify on — only the code. A consumer choosing an HTTP status wants the three
