@@ -64,9 +64,16 @@ public final class IdentifierParser implements AtomType<String> {
     private IdentifierParser() {
     }
 
+    /**
+     * The atom-parser path, reached wherever the compiled meta reader reads an {@code identifier}-typed
+     * position -- an enum's members, a constructor application's naming slots. {@link #validateName} rather
+     * than {@link #validate}, so those positions get [TSON-DATA] §8.2's mechanism 2 like the naming
+     * positions the parser and resolver check explicitly: this is a schema-layer caller with nowhere to
+     * report a refusal separately, and the alternative is not checking at all.
+     */
     @Override
     public String read(TokenValue token) {
-        return validate(token.text());
+        return validateName(token.text());
     }
 
     /**

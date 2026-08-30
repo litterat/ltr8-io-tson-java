@@ -73,18 +73,23 @@ class IdentifierParserTest {
      *
      * <p>{@link IdentifierParser#validateName} keeps both in one throwing answer, for the schema-side
      * callers that have nowhere to report a refusal separately; its own Javadoc says why that is a
-     * placeholder rather than a design.
+     * placeholder rather than a design. {@link IdentifierParser#read} goes through it, so every
+     * {@code identifier}-typed position the compiled meta reader fills -- an enum's members among them --
+     * keeps mechanism 2. Only the grammar is reachable without the policy, and only by naming it.
      */
     @Test
     void restrictedCharactersAreRefusedByPolicyAndNotByTheGrammar() {
         for (int cp : new int[] {0x07E8, 0xA610, 0x1B6B}) {
             String text = "ab" + new String(Character.toChars(cp)) + "c";
             String label = "U+%04X".formatted(cp);
-            assertEquals(text, read(text), () -> label + " is a well-formed identifier");
+            assertEquals(text, IdentifierParser.validate(text), () -> label + " is a well-formed identifier");
             assertTrue(IdentifierParser.hygiene(text).orElseThrow(() -> new AssertionError(label))
                     .contains("Identifier_Status=Restricted"), () -> label);
+            // validateName, and read() through it, keep both in one throwing answer for the schema-layer
+            // callers -- so a restricted name is still refused everywhere, just not as a *parse* failure.
             assertTrue(assertThrows(AtomParseException.class, () -> IdentifierParser.validateName(text))
                     .getMessage().contains("Identifier_Status=Restricted"), () -> label);
+            assertTrue(rejects(text).contains("Identifier_Status=Restricted"), () -> label + " through read()");
         }
     }
 
