@@ -4,6 +4,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.suite.SuiteCheckout;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
@@ -31,10 +32,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  */
 class SidecarSchemasTest {
 
-    private static final List<String> SCHEMA_FILES = List.of(
-            "sidecar-common.tn", "lexer-sidecar.tn", "parser-sidecar.tn", "reader-sidecar.tn",
-            "resolver-sidecar.tn", "vocabulary-sidecar.tn");
-
     /** The identity prefix the suite's own schemas are published under; anything else is a bundled schema. */
     private static final String SUITE_SCHEMA_PREFIX = "https://tson.io/test-suite/schemas/";
 
@@ -42,8 +39,21 @@ class SidecarSchemasTest {
     Stream<DynamicTest> sidecarSchemasResolve() {
         SuiteCheckout.assumeAvailable();
         Path schemasRoot = SuiteCheckout.schemasRoot().orElseThrow();
-        return SCHEMA_FILES.stream()
+        // Listed rather than enumerated in a constant here: a layer schema added upstream is one this
+        // has to resolve, and a hardcoded list would leave it unchecked with nothing to say so.
+        return schemaFiles(schemasRoot).stream()
                 .map(fileName -> DynamicTest.dynamicTest(fileName, () -> checkSchemaResolves(schemasRoot, fileName)));
+    }
+
+    private static List<String> schemaFiles(Path schemasRoot) {
+        try (Stream<Path> files = Files.list(schemasRoot)) {
+            return files.filter(p -> p.getFileName().toString().endsWith(".tn"))
+                    .map(p -> p.getFileName().toString())
+                    .sorted()
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private static void checkSchemaResolves(Path schemasRoot, String fileName) {

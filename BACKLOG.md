@@ -212,17 +212,19 @@ implementations pin it to a commit, and this repo runs it as a gating CI step. `
 lexer, the parser, base type resolution, the built-in vocabulary and the reader. What is left is
 Part 2, and the thin parts of Part 1.
 
-- [ ] **The Class 2 layers, over the spec's own §8 resolver output.** Part 2 §1.3 makes producing a
-  resolved schema value a MUST and §8 fixes its serialization, so a `class2/schema/valid/` vector needs
-  no invented format: the subject is a schema document and the sidecar's payload is the resolved output,
-  which the corpus can validate against meta.tn like any other document. `ResolvedFixtureTest` already
-  does this comparison against `spec/m/*-resolved.tn`, including the one normalisation `RUNNER.md`
-  states — a synthetic entry's trailing content hash is not normative (§8.2 keys identity on structure),
-  so both sides reduce it before comparing. Seed from the schema-side cases now locked inside this
-  repo's inline-string tests. Then `class2/link/` (import-closure merging and collision §2.2.3, choice
-  disjointness §5.4, inhabitance §5.10.1) and `class2/validate/`, whose expected side is the neutral
-  half of a diagnostic only: §8.1 category plus RFC 6901 data path, never messages and never positions.
-  The `meta`/`import` splice both runners already carry needs `schema` adding for the last of those.
+- [ ] **The `class2/link/` cases that need a second schema document.** §2.2.3's collision rules are the
+  half the layer cannot state today: one schema reached by several routes unifying, two schemas declaring
+  one name being an error, and nothing shadowing a name the closure already binds. Each needs the subject
+  to `!!import` a schema that is not one of the bundled three, and the corpus's layout admits exactly two
+  files per vector — a subject and its sidecar — so there is nowhere to put the imported document. Either
+  the layout gains a per-layer fixture directory the sidecar's `import` short names resolve against, or
+  the corpus publishes a small schema of its own beside the sidecar schemas and the short-name table
+  learns it.
+- [ ] **What a template resolves to has no statement anywhere.** `SPEC-FEEDBACK.md` #4: §8.1 serializes an
+  open entry as its declaration while the kernel types the resolved document as
+  `{type_name => type_definition}`, so no document form admits one, and `class2/schema/` can state the
+  resolved form of every construct except a template. `class2/link/` states that an instantiation exists
+  and what it is named, which is not the same claim. Unblocked by whichever answer the next revision gives.
 - [ ] **Fill the coverage the corpus now reports on itself.** `COVERAGE.md` is generated and
   diff-checked, and what it shows is a corpus that is 89/159 §5 vocabulary while §7.3 has no vectors at
   all, §7.5 and §2.8 have one each, and §2.9 and §6 have none. Work downward from the thinnest: the

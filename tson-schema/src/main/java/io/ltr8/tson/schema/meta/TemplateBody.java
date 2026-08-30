@@ -38,7 +38,14 @@ import java.util.Set;
  * <p><b>It never serialises.</b> An open entry's resolved form is its declaration round-tripped, not a
  * {@code type_definition} value -- which could not carry it in any case, the kernel declaring {@code body:
  * top} REQUIRED with no {@code top} an open body could be. So no implementation carries {@code @Typename},
- * nothing binds through it, and a resolved-output consumer never meets one (§1.3).
+ * nothing binds through it, and a resolved-output consumer never meets one (§1.3), which makes serializing
+ * one OPTIONAL and this the option not taken.
+ *
+ * <p><b>And nothing else can state an open entry's resolved form either</b> ({@code SPEC-FEEDBACK.md} #4):
+ * §8.1 serializes one as its declaration, while the kernel types the resolved document as {@code
+ * {type_name => type_definition}}, so no document form admits both. It is why the shared corpus's
+ * {@code class2/schema/} layer has no template vector and covers templates over the entries they mint
+ * instead.
  *
  * <p><b>What it is opaque to, and what it is not.</b> A held body withholds one thing: what a reference
  * <em>resolves to</em>, which no argument settles until substitution supplies them. So type-kind validation

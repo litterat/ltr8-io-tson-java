@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.suite;
 
 import org.junit.jupiter.api.Assumptions;
 
@@ -21,13 +21,19 @@ import static org.junit.jupiter.api.Assertions.fail;
  * editing vectors in their own checkout must see those edits, and a pinned copy shadowing them
  * would report on a corpus nobody is looking at. {@code -Dtson.testSuite.dir=...} overrides both.
  *
+ * <p><b>Shared by both runners</b>, which is why it sits in {@code src/testShared} rather than either
+ * module's own test tree: the Class 1 runner is in {@code tson-compiler}, where the lexer and both
+ * grammars are, and the Class 2 runner is in {@code tson}, where the front door that resolves, links and
+ * validates a schema is. Two copies of a checkout search is exactly the drift {@code RUNNER.md} exists to
+ * stop.
+ *
  * <p>An absent suite is a <em>skip</em>, never a failure, so a bare clone stays green. But a skip
  * nobody notices is how CI came to run none of the corpus for as long as it did, so
  * {@code TSON_REQUIRE_TEST_SUITE} inverts that: where it is set -- CI sets it -- an absent checkout
  * fails the build instead of aborting. Green then means the corpus ran, which is the only thing a
  * conformance signal is worth.
  */
-final class SuiteCheckout {
+public final class SuiteCheckout {
 
     /** Overrides the search entirely: the path to a suite checkout's own root directory. */
     private static final String OVERRIDE_PROPERTY = "tson.testSuite.dir";
@@ -42,7 +48,7 @@ final class SuiteCheckout {
      * Aborts the calling test when no checkout was found -- or fails it, where
      * {@code TSON_REQUIRE_TEST_SUITE} says the corpus was meant to be there.
      */
-    static void assumeAvailable() {
+    public static void assumeAvailable() {
         if (root().isPresent()) {
             return;
         }
@@ -55,12 +61,12 @@ final class SuiteCheckout {
     }
 
     /** The suite's {@code tests/} directory, if a checkout was found. */
-    static Optional<Path> testsRoot() {
+    public static Optional<Path> testsRoot() {
         return root().map(r -> r.resolve("tests")).filter(Files::isDirectory);
     }
 
     /** The suite's {@code schemas/} directory, if a checkout was found. */
-    static Optional<Path> schemasRoot() {
+    public static Optional<Path> schemasRoot() {
         return root().map(r -> r.resolve("schemas")).filter(Files::isDirectory);
     }
 
@@ -68,7 +74,7 @@ final class SuiteCheckout {
      * Where the search looked, for a skip message that tells the reader what to do about it rather
      * than naming one path that happened to be tried last.
      */
-    static String searchedLocations() {
+    public static String searchedLocations() {
         return candidates().stream().map(Path::toString).reduce((a, b) -> a + ", " + b).orElse("");
     }
 

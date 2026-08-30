@@ -2,6 +2,12 @@ plugins {
     id("java-library")
 }
 
+// The Class 2 conformance runner lives here rather than in :tson-compiler because what it exercises is
+// the front door: Tson.resolve/validateSchema/validate own the phase boundaries a Class 2 vector is about.
+// It shares the corpus checkout search and sidecar reading with the Class 1 runner -- see that module's
+// src/testShared, added to both test source sets rather than copied into each.
+sourceSets["test"].java.srcDir("../tson-compiler/src/testShared/java")
+
 dependencies {
     // api, not implementation -- this module's own public surface (Tson/TsonConfig in particular)
     // hands back tson-compiler/tson-schema types directly (TsonCompiledMetaSchema, TsonLinkedSchema,

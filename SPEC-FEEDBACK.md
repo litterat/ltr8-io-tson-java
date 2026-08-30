@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The three below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
+The four below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
 seventeen raised against Revision 33 are gone from here, because the spec now carries their rules and that
 is where the answer belongs. **This file is the as-built record**, not a pointer to one: where an entry
 proposes a design this implementation has built, the entry states the design, what is running, and what is
@@ -163,5 +163,59 @@ terms — a parameter-bearing form lifts to an open synthetic "whose body is the
 written, held until materialisation" — but it still mints per schema, and §9 declares no open container
 templates. This implementation mints per schema and `ContainerSugarEndToEndTest` pins the resulting entry
 sets.
+
+---
+
+## 4. A resolved schema document has no consistent form for an open entry, so §8 output cannot state what a template resolves to
+
+**Section:** Part 2 §8.1 (output records), §1.3 (Class 2 conformance, "Resolved-output consumers"), §9 (the
+kernel's own `schema` declaration).
+
+**Problem:** three statements about a resolved schema document cannot all hold of one document.
+
+1. §8.1: "An **open** entry is serialized as its declaration — `<params> !C core-value`, the held body
+   written under §5.10's one-spelling rule — rather than as a `type_definition` value."
+2. The kernel declares the document's own type as `schema => {type_name => type_definition}` (meta-kernel.tn).
+   A declaration is not a `type_definition`, so a map carrying one does not conform, and a reader reading
+   the document against the meta-schema rejects it at that entry.
+3. §1.3: "the closed-entry rule (§5.10) guarantees that the output map governing any data document carries
+   no open entries" — which, read as a property of the output map, says the case in (1) does not arise,
+   while the sentence after it repeats that "an open entry's resolved form is its declaration".
+
+So for a schema declaring a template — `{ box => <T> { value: T }  text_box => box<text> }` — what §8 output
+contains for `box` is unstated. Three answers are each defensible and each contradicts one of the three:
+omit open entries from the output (contradicts §8.1); include the declaration and accept that the document
+does not conform to `schema` (contradicts §9); widen `schema`'s value type to admit both forms (a change
+nothing currently states).
+
+§8.1's ingest paragraph presumes the second answer — "an open entry, which ingest meets as a declaration
+rather than a `type_definition` value, is re-resolved as source" — which is a coherent design, but it needs
+`schema` to type a value that is either a `type_definition` or a declaration, and the kernel does not.
+
+**Interpretation chosen:** this implementation does not serialize open entries at all, which §1.3 permits
+outright — "Serializing the resolved schema value as a data document is OPTIONAL". `TemplateBody` carries no
+`@Typename`, nothing binds through it, and `TypeDefinition.body` holding one is a value that never reaches a
+writer. Closed entries, the materialised instantiations included, serialize normally, and every entry of the
+three bundled schemas round-trips against `spec/m/*-resolved.tn`.
+
+**What it costs, concretely.** The shared conformance corpus's `class2/schema/` layer states a subject's
+resolved output in §8's own form and reads it back against meta.tn. That works for every construct except a
+template: a vector whose subject declares one has no expected side it can write, because there is no
+document form both §8.1 and the kernel admit. The layer's schema records the boundary and templates are
+covered at the corpus's `link/` layer instead, over the entries they mint — which states that the
+instantiation exists and what it is named, but not what it resolved to. **Nothing anywhere, in this
+implementation or the corpus, can currently state a template's resolved form.**
+
+**Suggested resolution:** state one of the three answers in §8.1, and make §9 agree with it. If open entries
+belong in the output — which the ingest rules assume — then `schema`'s value type has to admit them, most
+simply as a labelled choice between a `type_definition` and a held declaration, so that a resolved document
+remains readable against the meta-schema it names. If they do not, §8.1's "serialized as its declaration"
+should say instead that open entries are omitted from serialized output and recoverable only from source,
+and §1.3's "the output map ... carries no open entries" becomes a statement about the document rather than
+only about what a data-path consumer meets.
+
+**Status against Revision 34:** open, and new against this revision — §8.1's open-entry sentence and the
+`Resolved-output consumers` paragraph are both Revision 34 text, and the kernel's `schema` declaration is
+unchanged from earlier revisions.
 
 ---
