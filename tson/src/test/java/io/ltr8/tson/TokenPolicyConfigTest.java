@@ -40,7 +40,7 @@ class TokenPolicyConfigTest {
         List<Diagnostic> found = Tson.builder().tokenPolicy(TsonUnicodePolicy.asciiOnly()).build()
                 .validate(DOCUMENT);
 
-        assertEquals(List.of(Diagnostic.Code.RESTRICTED_TOKEN),
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
                 found.stream().map(Diagnostic::code).toList(), found.toString());
     }
 
@@ -54,7 +54,7 @@ class TokenPolicyConfigTest {
         Tson.builder().tokenPolicy(TsonUnicodePolicy.asciiOnly()).build()
                 .objectReader().withDiagnostics(collected).read("\"" + CYR_A + "dmin\"", String.class);
 
-        assertEquals(List.of(Diagnostic.Code.RESTRICTED_TOKEN),
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
                 collected.diagnostics().stream().map(Diagnostic::code).toList(),
                 collected.diagnostics().toString());
     }
@@ -69,7 +69,7 @@ class TokenPolicyConfigTest {
         List<Diagnostic> found = Tson.builder().tokenPolicy(TsonUnicodePolicy.asciiOnly()).build()
                 .validate("{ " + CYR_A + "dmin: 1 }");
 
-        assertEquals(List.of(Diagnostic.Code.RESTRICTED_TOKEN),
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
                 found.stream().map(Diagnostic::code).toList(), found.toString());
     }
 

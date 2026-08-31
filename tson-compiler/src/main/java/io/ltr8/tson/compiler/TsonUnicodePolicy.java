@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.lexer.Xid;
+
 import java.lang.Character.UnicodeScript;
 import java.util.EnumSet;
 import java.util.List;
@@ -7,7 +9,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * UTS #39 §5.2's restriction levels, as a policy a caller holds -- [TSON-DATA] §8.2's mechanism 3.
+ * UTS #39 §5.2's restriction levels, as a policy a caller holds -- [TSON-DATA] §8.2's restricted-script rule.
  *
  * <p><b>Two axes, not one ladder.</b> A <em>level</em> says which script combinations a unit may contain; a
  * <em>unit</em> says whether that level applies to the whole text or to each {@code _}/{@code -} delimited
@@ -16,7 +18,7 @@ import java.util.Set;
  * Cyrillic, never inside one word) and refuses Latin+Devanagari; the second does the opposite. A single
  * ordered knob cannot express both.
  *
- * <p><b>Why the level is the mechanism here at all</b>, having been the second choice for confusable
+ * <p><b>Why the level is the rule here at all</b>, having been the second choice for confusable
  * <em>names</em>: {@code ConfusableNames} is a relation and needs a set to hold over, and this is the rule
  * for the cases that have no set — one identifier judged alone, and every value in a document. It is the
  * same reasoning that makes restriction levels right for a browser judging a domain name, which likewise
@@ -132,7 +134,7 @@ public final class TsonUnicodePolicy {
     }
 
     /**
-     * This policy with one further script combination admitted, the same mechanism §5.2 uses for Latn+Jpan
+     * This policy with one further script combination admitted, the same device §5.2 uses for Latn+Jpan
      * and its siblings. The narrowest relaxation available: a deployment that knows it is Russian says
      * {@code permitting(LATIN, CYRILLIC)} rather than dropping a level and losing the rule everywhere else.
      */
@@ -140,6 +142,31 @@ public final class TsonUnicodePolicy {
         List<Set<UnicodeScript>> extended = new java.util.ArrayList<>(permitted);
         extended.add(Set.of(scripts));
         return new TsonUnicodePolicy(level, perSegment, extended);
+    }
+
+    /**
+     * The UTS #39 data version every [TSON-DATA] §8.2 name-hygiene rule is computed against, as this build
+     * carries it.
+     *
+     * <p><b>§8.2 requires a refusal to name it</b>, and the reason is that a refusal is not a verdict: the
+     * three rules read {@code confusables.txt}, {@code IdentifierStatus.txt} and the script data, none
+     * of which the Unicode Consortium freezes, so two conforming processors may legitimately disagree and
+     * the version is the only thing that explains the disagreement. Every refusal carries it ({@link
+     * Diagnostic#unicodeDataVersion()}) so a stored or forwarded one stays interpretable; this accessor is
+     * for a caller that wants it without a refusal in hand -- a server stating it once per response rather
+     * than once per problem, which is what it is: constant for the life of a process.
+     *
+     * <p>Lives here rather than beside the tables it describes because {@code io.ltr8.tson.compiler.lexer}
+     * is implementation and is not exported, so the constant is unreachable to a consumer by hand. This is
+     * the exported surface that already owns §8.2's restricted-script rule.
+     *
+     * <p><b>It is the UCD version.</b> §8.2 asks for "the UTS #39 data version" and its detection note for
+     * "the UTS #39 version they were computed against"; UTS #39's data files are versioned with the UCD
+     * release that publishes them, so the two track and this states the one that exists --
+     * {@code SPEC-FEEDBACK.md} #6.
+     */
+    public static String dataVersion() {
+        return Xid.UNICODE_VERSION;
     }
 
     /** Whether the check does anything at all -- an {@code UNRESTRICTED} whole-text policy scans nothing. */

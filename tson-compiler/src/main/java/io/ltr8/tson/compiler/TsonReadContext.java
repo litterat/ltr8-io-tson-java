@@ -157,6 +157,20 @@ public interface TsonReadContext {
             Optional<TsonSchemaFetchException.Reason> fetchReason);
 
     /**
+     * {@link #report(Diagnostic.Code, String, String, String)} for a [TSON-DATA] §8.2 name-hygiene
+     * <b>refusal</b> -- the same location model, stamped with the Unicode data version §8.2 requires a
+     * refusal to name.
+     *
+     * <p>A separate method rather than a flag on {@code report} so no call site can state a version this
+     * build does not carry, and so the ordinary report -- every reader in the compiled stack reports values
+     * and none of them refuses a name -- stays four arguments.
+     *
+     * @param code {@link Diagnostic.Code#CONFUSABLE_NAMES}, {@link Diagnostic.Code#RESTRICTED_CHARACTER} or
+     *             {@link Diagnostic.Code#RESTRICTED_SCRIPT} -- one per rule, which is where the rule lives
+     */
+    void reportRefusal(Diagnostic.Code code, String message, String expected, String actual);
+
+    /**
      * How many problems have been reported through this read so far, counting every scoped copy since they
      * share one cursor. Monotonic, and independent of what the receiver does with them, so a reader can
      * checkpoint around a child read ({@code int before = ctx.reported(); ...; if (ctx.reported() > before)})
@@ -191,10 +205,10 @@ public interface TsonReadContext {
     }
 
     /**
-     * As above, naming the <b>name</b> policy too -- [TSON-DATA] §8.2's mechanism 3, applied where a type-ref
-     * or annotation name arrives rather than to every token. The two are separate because §8.2 makes them
-     * separate surfaces: a value may legitimately be anything, so tokens default to Unrestricted, while
-     * mechanism 3 SHOULD default to Highly Restrictive over a name. The overload above carries that default,
+     * As above, naming the <b>name</b> policy too -- [TSON-DATA] §8.2's restricted-script rule, applied where a
+     * type-ref or annotation name arrives rather than to every token. The two are separate because §8.2 makes
+     * them separate surfaces: a value may legitimately be anything, so tokens default to Unrestricted, while
+     * a name's scripts SHOULD be judged at Highly Restrictive. The overload above carries that default,
      * so a caller that names only a token policy still gets the name surface checked.
      */
     static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,

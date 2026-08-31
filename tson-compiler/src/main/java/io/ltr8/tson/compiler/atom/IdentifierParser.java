@@ -108,14 +108,14 @@ public final class IdentifierParser implements AtomType<String> {
     }
 
     /**
-     * [TSON-DATA] §8.2's <b>mechanism 2</b>, alone: every {@code XID_Continue} character of a name must be
+     * [TSON-DATA] §8.2's <b>restricted-character rule</b>, alone: every {@code XID_Continue} character of a name must be
      * {@code Identifier_Status=Allowed} (UTS #39 §3.1). Returns the violation rather than throwing, because
      * it is not one -- §8.2 makes this a policy refusal, a fifth outcome that MUST NOT be reported as a
      * validity error, and a caller holding a diagnostics receiver reports it as one.
      *
-     * <p>Two characters are the grammar's rather than this mechanism's, though the table restricts both.
+     * <p>Two characters are the grammar's rather than this rule's, though the table restricts both.
      * {@code -} is this profile's own extension, which §8.2 says carries no {@code Identifier_Status} and
-     * participates in no mechanism. ZWNJ and ZWJ are {@code Identifier_Status=Restricted} and §7.7 rule 2
+     * participates in no name-hygiene rule. ZWNJ and ZWJ are {@code Identifier_Status=Restricted} and §7.7 rule 2
      * carves the exception UTS #39 §3.1.1.1 defines, which makes their admission a question of <em>form</em>
      * and so {@link #validate}'s: a joiner outside those contexts is not an identifier at all, where a
      * restricted character is an identifier this processor declines to accept.

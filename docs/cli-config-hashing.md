@@ -116,6 +116,23 @@ whether the document named something this deployment refuses (`NOT_PERMITTED`/`N
 did not answer, which is the half that decides whether retrying is worth anything. `TEXT` omits it, as it
 omits `expected`/`actual`: the stderr note already tells a person that nothing was judged.
 
+**A [TSON-DATA] §8.2 name-hygiene refusal carries the same kind of second answer**, as
+`unicode_data_version`: one flat field beside the three codes that are refusals (`CONFUSABLE_NAMES`,
+`RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT`, one per rule). §8.2 requires a refusal to name the Unicode data
+version it was computed against because §8.3 marks all three rules unstable across Unicode releases —
+two conforming processors may legitimately disagree about one name, and the version is the only thing that
+explains it. It is also the one fact a consumer cannot recover afterwards, which is why it is on the wire
+rather than left to the library call that produced it.
+
+**One field and not a policy record.** Which rule refused is the `code`, so the wire carries no second
+discriminator that could contradict it; the level, the unit and any `permitting` script set are the reading
+deployment's own configuration, known already to whoever set them and not actionable by whoever receives the
+report. That leaves `diagnostic_code` and `fetch_reason` as the schema's only hand-written enum copies —
+`DiagnosticsSchemaTest` checks both against their Java enums in both directions.
+
+**The envelope does not yet keep a refusal apart from a verdict**, and the codes are the only thing that
+does: a run whose only problem is a refusal still sets `valid: false` and exits 1. `BACKLOG.md` carries it.
+
 **70 covers both halves of the exception-classification policy's non-verdict side, printed differently.** A
 gap (`UnsupportedOperationException` — *this library hasn't implemented that yet*) renders as `not
 implemented yet: <message>` and nothing else: those messages routinely end with the way to write the thing

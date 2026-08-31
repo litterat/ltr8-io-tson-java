@@ -68,11 +68,11 @@ class IdentifierParserTest {
     /**
      * Obsolete and technical characters, which XID admits and the General Security Profile does not -- and
      * which are <b>refused, not rejected</b>. [TSON-DATA] §8.2 makes {@code Identifier_Status} a policy
-     * mechanism whose failure MUST NOT be reported in any of §8.1's four categories, so the grammar accepts
+     * rule whose failure MUST NOT be reported in any of §8.1's four categories, so the grammar accepts
      * such a name (it is a well-formed identifier) and {@link IdentifierParser#hygiene} is what declines it.
      *
      * <p>Nothing here applies the policy. Every position that reads a name applies the grammar and only the
-     * grammar; §8.2's mechanisms run once per layer over the scopes §8.2 and [TSON-SCHEMA] §11.4 define --
+     * grammar; §8.2's name-hygiene rules run once per layer over the scopes §8.2 and [TSON-SCHEMA] §11.4 define --
      * {@code TsonSchemaLinker.checkNames} for a schema, {@code DefaultTsonReadContext} for a document.
      */
     @Test
@@ -94,7 +94,8 @@ class IdentifierParserTest {
     void aJoinerOutsideItsContextIsAGrammarFailureNotARefusal() {
         String text = "ab" + new String(Character.toChars(0x200C)) + "cd";
         assertTrue(rejects(text).contains("join control outside the contexts"));
-        assertTrue(IdentifierParser.hygiene(text).isEmpty(), "mechanism 2 does not judge a joiner");
+        assertTrue(IdentifierParser.hygiene(text).isEmpty(),
+                "the restricted-character rule does not judge a joiner");
     }
 
     /** Everything invisible falls out of XID membership rather than needing a clause of its own. */

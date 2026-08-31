@@ -33,7 +33,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
         final TsonDiagnosticsReceiver receiver;
 
         /**
-         * [TSON-DATA] §8.2's mechanism 3 over the names this document carries, defaulting to Highly
+         * [TSON-DATA] §8.2's restricted-script rule over the names this document carries, defaulting to Highly
          * Restrictive as §8.2 says it SHOULD. Per read rather than per context, so every derived context
          * checks against the one a caller named.
          */
@@ -152,15 +152,15 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     /**
-     * [TSON-DATA] §8.2's mechanisms <b>2 and 3</b> over the two names a Class 1 document carries -- a
-     * type-ref name and an annotation name, the positions §7.4 marks {@code identifier}.
+     * [TSON-DATA] §8.2's <b>restricted-character and restricted-script</b> rules over the two names a Class 1
+     * document carries -- a type-ref name and an annotation name, the positions §7.4 marks {@code identifier}.
      *
-     * <p>Both default on, which §8.2 requires: mechanism 2 MUST default on and mechanism 3 SHOULD default to
-     * Highly Restrictive over the whole name. They are one report shape because they are one outcome -- the
+     * <p>Both default on, which §8.2 requires: the identifier profile MUST apply, and a name's scripts SHOULD
+     * be judged at Highly Restrictive over the whole name. They are one report shape because they are one outcome -- the
      * document is refused, and which table said so is the message's business.
      *
      * <p><b>Here rather than in {@code TsonDataStream}, because a refusal needs a receiver.</b> §8.2 makes a
-     * mechanism-2 failure a policy refusal: the document is not invalid, it is refused by this processor
+     * restricted-character failure a policy refusal: the document is not invalid, it is refused by this processor
      * under a policy reading data the UCD does not freeze, and it MUST NOT be reported in any of §8.1's four
      * categories. The stream throws {@link TsonParseException} and holds no receiver, so a check there can
      * only say "invalid", which is the one thing this is not. The grammar stays there, where a failure
@@ -173,7 +173,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
      *
      * <p><b>Not in {@code TokenPolicyEventSource}</b>, which is where the token surface's own policy runs and
      * gets exactly-once for free by sitting upstream of the rewind. That decorator skips itself entirely at
-     * the default policy -- {@code unrestricted()}, which is every ordinary read -- so a mechanism §8.2
+     * the default policy -- {@code unrestricted()}, which is every ordinary read -- so a rule §8.2
      * defaults <em>on</em> cannot live behind it without making the wrapper unconditional and putting a
      * switch per token back into the steady-state cost of a read that has no policy at all.
      */
@@ -186,14 +186,24 @@ final class DefaultTsonReadContext implements TsonReadContext {
         if (name == null) {
             return;
         }
-        IdentifierParser.hygiene(name).ifPresent(violation -> refuse(name, violation));
-        cursor.namePolicy.violation(name).ifPresent(violation -> refuse(name, violation));
+        // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile
+        // too", taking that rule with it. Script mixing gates itself inside violation().
+        if (cursor.namePolicy.appliesIdentifierProfile()) {
+            IdentifierParser.hygiene(name).ifPresent(violation ->
+                    refuse(name, violation, Diagnostic.Code.RESTRICTED_CHARACTER));
+        }
+        cursor.namePolicy.violation(name).ifPresent(violation ->
+                refuse(name, violation, Diagnostic.Code.RESTRICTED_SCRIPT));
     }
 
-    /** One shape for both name-hygiene mechanisms: refused under a stated policy, never invalid. */
-    private void refuse(String name, String violation) {
-        report(Diagnostic.Code.RESTRICTED_TOKEN, "the name " + violation,
-                "a name this processor will accept", "'" + name + "'");
+    /**
+     * One shape for both name-hygiene rules: refused under this read's <em>name</em> policy, never
+     * invalid. The rule is the code -- a character outside the identifier profile and a script the policy
+     * does not admit want different fixes, so they are two codes rather than one code and a discriminator
+     * beside it.
+     */
+    private void refuse(String name, String violation, Diagnostic.Code code) {
+        reportRefusal(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
     }
 
     /**
@@ -321,6 +331,18 @@ final class DefaultTsonReadContext implements TsonReadContext {
     @Override
     public void report(Diagnostic.Code code, String message, String expected, String actual,
             Optional<TsonSchemaFetchException.Reason> fetchReason) {
+        emit(code, message, expected, actual, fetchReason, Optional.empty());
+    }
+
+    @Override
+    public void reportRefusal(Diagnostic.Code code, String message, String expected, String actual) {
+        emit(code, message, expected, actual, Optional.empty(),
+                Optional.of(TsonUnicodePolicy.dataVersion()));
+    }
+
+    /** The one place a read builds a {@link Diagnostic}: both report entry points land here. */
+    private void emit(Diagnostic.Code code, String message, String expected, String actual,
+            Optional<TsonSchemaFetchException.Reason> fetchReason, Optional<String> unicodeDataVersion) {
         // All three schema-end components come from the one SchemaLocation the descent accumulated, so they
         // cannot disagree about which document to open. A read with no schema behind it carries none of them:
         // Diagnostic spells a missing identity "" and a missing pointer as an absence, since for a pointer
@@ -328,7 +350,8 @@ final class DefaultTsonReadContext implements TsonReadContext {
         Diagnostic diagnostic = new Diagnostic(Optional.of(render(false)),
                 schemaRoot == null ? Optional.empty() : Optional.of(render(true)),
                 schemaRoot == null ? "" : schemaId, code, message, expected, actual,
-                position(), schemaRoot == null ? Optional.empty() : schemaPosition, fetchReason);
+                position(), schemaRoot == null ? Optional.empty() : schemaPosition, fetchReason,
+                unicodeDataVersion);
         cursor.reported++;
         cursor.receiver.report(diagnostic);
     }

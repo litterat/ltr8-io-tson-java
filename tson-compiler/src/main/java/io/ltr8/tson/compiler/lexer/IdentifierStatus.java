@@ -12,7 +12,7 @@ import java.util.Arrays;
  * unlike a restriction level, this is per-character with no cross-script judgement in it, so it does not
  * reject a mixed-script name such as {@code id_}<i>пользователя</i>.
  *
- * <p>It is <b>[TSON-DATA] §8.2's mechanism 2</b>, and it covers the joining controls without a special case:
+ * <p>It is <b>[TSON-DATA] §8.2's restricted-character rule</b>, and it covers the joining controls without a special case:
  * both are Restricted here, so a profile built on this needs no hand-picked rule for them, and what admits
  * them where they do shaping work is §7.7 rule 2's contextual carve-out rather than the status.
  *

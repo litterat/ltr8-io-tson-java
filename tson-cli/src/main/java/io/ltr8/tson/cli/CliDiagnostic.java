@@ -31,6 +31,13 @@ import java.util.Optional;
  * schema was obtained, and this says whether the document named something this deployment refuses or a host
  * simply did not answer. Rendering it as text would hand that consumer a string to match on, which is what
  * carrying it structurally exists to avoid.
+ *
+ * <p><b>{@code unicode_data_version} is the same argument for the other non-location component.</b> A
+ * [TSON-DATA] §8.2 refusal is not one of §8.1's four error categories, and §8.2 requires it to name the
+ * Unicode data version it was computed against: it is the one outcome two conforming processors may
+ * legitimately disagree about, and the version is what explains the disagreement. <b>Which rule
+ * refused is the {@code code}</b> -- {@code CONFUSABLE_NAMES}, {@code RESTRICTED_CHARACTER}, {@code
+ * RESTRICTED_SCRIPT} -- so the wire carries no second discriminator that could contradict it.
  */
 public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Optional<String> schemaPointer,
                              @Field("schema_id") Optional<String> schemaId,
@@ -39,7 +46,8 @@ public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Opti
                              @Field("data_position") Optional<String> dataPosition,
                              @Field("schema_position") Optional<String> schemaPosition,
                              @Field("fetch_reason")
-                             Optional<TsonSchemaFetchException.Reason> fetchReason) {
+                             Optional<TsonSchemaFetchException.Reason> fetchReason,
+                             @Field("unicode_data_version") Optional<String> unicodeDataVersion) {
 
     static CliDiagnostic from(Diagnostic diagnostic) {
         return new CliDiagnostic(diagnostic.path(), diagnostic.schemaPointer(),
@@ -48,13 +56,14 @@ public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Opti
                 diagnostic.expectedIfStated(), diagnostic.actualIfStated(),
                 diagnostic.dataPosition().map(CliDiagnostic::render),
                 diagnostic.schemaPosition().map(CliDiagnostic::render),
-                diagnostic.fetchReason());
+                diagnostic.fetchReason(), diagnostic.unicodeDataVersion());
     }
 
     /** A problem with no location at either end -- a usage failure, or a schema that never named itself. */
     static CliDiagnostic minimal(Diagnostic.Code code, String message) {
         return new CliDiagnostic(Optional.empty(), Optional.empty(), Optional.empty(), code, message,
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty());
     }
 
     /** The position format every rendered diagnostic uses; stated in {@code diagnostics.tn} for consumers. */

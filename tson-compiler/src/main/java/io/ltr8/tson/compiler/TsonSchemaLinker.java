@@ -219,7 +219,8 @@ public final class TsonSchemaLinker {
                 collision.second(), merged.get(collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
                 "in the namespace of '" + schema.id() + "': " + collision.describe()));
 
-        // Mechanisms 2 and 3 over the same names, in the same pass. Where the collision check above is a
+        // The restricted-character and restricted-script rules over the same names, in the same pass. Where the
+        // collision check above is a
         // relation and needs the whole set, these are properties of each name on its own -- so they are the
         // rules that reach a name nothing else in the schema resembles.
         merged.forEach((name, definition) ->
@@ -260,22 +261,30 @@ public final class TsonSchemaLinker {
     }
 
     /**
-     * §8.2's two per-name mechanisms over one name: {@code Identifier_Status} and the restriction level.
+     * §8.2's two per-name rules over one name: the restricted-character rule ({@code Identifier_Status}) and
+     * the restricted-script rule (the restriction level).
      *
-     * <p><b>Both are here rather than at the positions that read the name</b>, which is where mechanism 2
+     * <p><b>Both are here rather than at the positions that read the name</b>, which is where the
+     * restricted-character rule
      * used to be -- spread over the schema parser, the definition resolver and the atom vocabulary, by three
      * different exceptions and three different codes, with holes wherever a naming position reached only one
-     * of the three. §8.2 defines its mechanisms over named scopes and [TSON-SCHEMA] §11.4 supplies the
+     * of the three. §8.2 defines its rules over named scopes and [TSON-SCHEMA] §11.4 supplies the
      * schema layer's, so the walk that already enumerates those scopes is the one place all three belong.
      * What stays at the reading positions is §7.7's grammar, which is validity and really is a parse error.
      */
     private static void perName(TsonDiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                 TypeDefinition definition, String name, String prefix,
                                 TsonUnicodePolicy identifiers) {
-        IdentifierParser.hygiene(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
-                Diagnostic.Code.RESTRICTED_TOKEN, prefix + "'" + name + "': " + why));
+        // The restricted-character rule is gated on the level: §8.2's Unrestricted "drops the profile too",
+        // taking that rule with it. Script mixing gates itself inside violation(). Each reports under its own
+        // code, since the
+        // two want different fixes -- change the character, against rename or relax the policy.
+        if (identifiers.appliesIdentifierProfile()) {
+            IdentifierParser.hygiene(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
+                    Diagnostic.Code.RESTRICTED_CHARACTER, prefix + "'" + name + "': " + why));
+        }
         identifiers.violation(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
-                Diagnostic.Code.RESTRICTED_TOKEN, prefix + why));
+                Diagnostic.Code.RESTRICTED_SCRIPT, prefix + why));
     }
 
     /**

@@ -6,10 +6,10 @@ import java.util.Map;
 
 /**
  * UTS #39 §4's {@code skeleton()} -- the mapping that decides whether two strings are confusable. Two names
- * are confusable exactly when their skeletons are equal, which is the relation [TSON-DATA] §8.2's
- * mechanism 1 makes a rule over the named scopes the series already defines.
+ * are confusable exactly when their skeletons are equal, which is the relation [TSON-DATA] §8.2 turns into
+ * a rule over the named scopes the series already defines: no two names in one scope may read alike.
  *
- * <p><b>It is a relation, not a property</b>, and that is why it is the mechanism this implementation
+ * <p><b>It is a relation, not a property</b>, and that is why it is the rule this implementation
  * adopts rather than a restriction level. A skeleton says nothing about one name: it fires only when two
  * names <em>in the same scope</em> collide, so it cannot reject `id_пользователя` or any other lone name an
  * author legitimately wrote. The per-name alternative (UTS #39 §5.2's restriction levels) rejects ordinary
