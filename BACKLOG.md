@@ -120,17 +120,15 @@ which is why they sit low. The lexer's fail-fast floor is not among them: nothin
 someone decides whether lexer errors feed the `Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds
 that question.
 
-- [ ] **A name-hygiene refusal reports as `SCHEMA_ERROR` on the schema side and `CONFUSABLE_NAMES` on the data
-  side.** `Diagnostic.Code.CONFUSABLE_NAMES` is emitted for exactly one scope — a Class 1 record's own field
-  names, where `SchemalessTreeReader` checks them because no declaration stands behind them. Every schema-side
-  equivalent, the confusable check and the `TsonUnicodePolicy` restriction level alike, goes through
-  `TsonSchemaLinker`'s `report` and comes out `SCHEMA_ERROR`. So one defect carries two codes depending on
-  whether a schema governs the document, and on the schema side a caller cannot tell a spoofing refusal from an
-  ordinary schema error. Both halves want a code that says which rule fired — the confusable relation and the
-  restriction level are different rules with different remedies, and neither is a statement that the schema is
-  malformed. [TSON-DATA] §8.1 now makes the distinction normative: a policy refusal is "a fifth,
-  distinguishable outcome" and MUST NOT be reported in any of the four error categories, and §8.2 requires the
-  refusal to name the UTS #39 data version. So this is a conformance gap, not a polish item.
+- [ ] **The CLI reports a [TSON-DATA] §8.2 refusal as `valid: false` and exits 1.** §8.1 makes a refusal a
+  fifth outcome that MUST NOT be reported in any of the four error categories, and the `Diagnostic` model
+  keeps it apart by code — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT`, which the conformance
+  runners assert never coincide with a verdict. `ValidationReport` then flattens that back: a run whose only
+  problem is a refusal sets `valid: false` and `TsonCli.exitCodeFor` returns 1, the code that means *this
+  document is invalid*. A script routing on either learns the opposite of what §8.2 says. What is needed is a
+  wire and exit-code shape that says *refused* rather than *invalid* — the report already carries the codes,
+  so the work is deciding what `valid` means beside them and which exit code a refusal-only run gets (1 is
+  taken, and 69/70 both mean "nothing was judged" by someone other than this processor).
 
 - [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
   now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against

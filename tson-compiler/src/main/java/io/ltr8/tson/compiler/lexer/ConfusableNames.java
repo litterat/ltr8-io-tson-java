@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * [TSON-DATA] §8.2's mechanism 1 -- skeleton distinctness, decided over a named scope rather than over one
+ * [TSON-DATA] §8.2's look-alike rule -- skeleton distinctness, decided over a named scope rather than over one
  * name: no two names in one scope may share a UTS #39 {@link Confusables#skeleton} .
  *
  * <p><b>Scope is what makes this decidable, and TSON has scopes where a general-purpose language does

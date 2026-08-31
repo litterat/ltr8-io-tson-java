@@ -56,7 +56,7 @@ class ConfusablesTest {
 
     /**
      * And the precision that makes this usable as a rule rather than a heuristic: names a real schema
-     * declares together do not collide. A mechanism that fired on these would be switched off.
+     * declares together do not collide. A rule that fired on these would be switched off.
      */
     @Test
     void ordinaryNamesDeclaredTogetherDoNotCollide() {

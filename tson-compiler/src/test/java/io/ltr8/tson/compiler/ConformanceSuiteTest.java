@@ -62,6 +62,7 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -353,7 +354,7 @@ class ConformanceSuiteTest {
 
     /**
      * §8.1's fifth outcome: the document is <b>refused by this processor</b> under one of §8.2's
-     * name-hygiene mechanisms, and is not invalid.
+     * name-hygiene rules, and is not invalid.
      *
      * <p><b>The refusal must be distinguishable</b>, which is the whole reason the outcome exists.
      * §8.2 keeps these checks out of validity because each reads data the Unicode Consortium declines
@@ -385,15 +386,50 @@ class ConformanceSuiteTest {
         reported.forEach(diagnostic -> assertTrue(isPolicyRefusal(diagnostic.code()),
                 "a refused document must not also be reported invalid -- §8.2's refusal MUST NOT be any "
                         + "of §8.1's four categories: " + diagnostic));
+        assertRefusalMatches(refusal, reported);
     }
 
     /**
-     * The two codes that mean <em>refused under a stated policy</em> rather than <em>invalid</em>:
-     * §8.2's mechanism 1 over a named scope, and its mechanism 3 over a token. Every other code is a
-     * verdict on the document, which is exactly what a refusal is not.
+     * The code a refusal by the rule the vector names reports.
+     *
+     * <p><b>An explicit table, not a string transformation.</b> The corpus spells §8.2's own headings
+     * ({@code sidecar-common.tn}'s {@code hygiene_mechanism}: {@code skeleton-distinctness},
+     * {@code identifier-status}, {@code restriction-level}), where this implementation names each code for
+     * what it <em>found</em> -- §8.2's vocabulary is exact and is jargon a consumer reading an error body
+     * cannot decode. The two vocabularies are deliberately different, so the mapping is written down.
+     */
+    private static Diagnostic.Code statedRule(RecordValue refusal) {
+        String stated = fieldText(refusal, "mechanism");
+        return switch (stated) {
+            case "skeleton-distinctness" -> Diagnostic.Code.CONFUSABLE_NAMES;
+            case "identifier-status" -> Diagnostic.Code.RESTRICTED_CHARACTER;
+            case "restriction-level" -> Diagnostic.Code.RESTRICTED_SCRIPT;
+            default -> throw new AssertionError("unknown §8.2 name-hygiene rule in a vector: " + stated);
+        };
+    }
+
+    /**
+     * <b>The vector names the rule it exercises, so the refusal must report the matching code</b> -- one
+     * code per rule, since the three want three different remedies and a runner checking only "some refusal
+     * happened" would pass a processor that refused for the wrong reason. <b>And every refusal must name
+     * the data version</b>, which §8.2 makes a MUST because that version is the only thing explaining a
+     * legitimate disagreement between two processors.
+     */
+    private static void assertRefusalMatches(RecordValue refusal, List<Diagnostic> reported) {
+        assertTrue(reported.stream().anyMatch(d -> d.code() == statedRule(refusal)),
+                () -> "vector names " + fieldText(refusal, "mechanism") + "; got " + reported);
+        reported.forEach(d -> assertEquals(Optional.of(fieldText(refusal, "unicode")), d.unicodeDataVersion(),
+                "§8.2: a refusal MUST name the UTS #39 data version, and this vector was computed "
+                        + "against the one this implementation carries"));
+    }
+
+    /**
+     * The three codes that mean <em>refused under a stated policy</em> rather than <em>invalid</em>, one per
+     * §8.2 rule. Every other code is a verdict on the document, which is exactly what a refusal is not.
      */
     private static boolean isPolicyRefusal(Diagnostic.Code code) {
-        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_TOKEN;
+        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_CHARACTER
+                || code == Diagnostic.Code.RESTRICTED_SCRIPT;
     }
 
     private static void assertReaderValueMatches(RecordValue expected, TsonValue actual) {

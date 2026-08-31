@@ -133,7 +133,7 @@ public final class TsonObjectReader {
 
     /**
      * This reader applying {@code policy} to the <b>names</b> a document carries -- a type-ref name and an
-     * annotation name -- instead of the default. [TSON-DATA] §8.2's mechanism 3, whose RECOMMENDED default is
+     * annotation name -- instead of the default. [TSON-DATA] §8.2's restricted-script rule, whose RECOMMENDED default is
      * Highly Restrictive over the whole name, which is what a reader carries until this is called. The peer of
      * {@link TsonTreeReader#withNamePolicy}, whose Javadoc carries the reasoning.
      */

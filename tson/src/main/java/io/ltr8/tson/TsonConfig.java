@@ -221,7 +221,7 @@ public final class TsonConfig {
 
     /**
      * The UTS #39 §5.2 restriction level applied to every name a schema declares -- type names, record field
-     * names, parameter names and enum members -- [TSON-DATA] §8.2's mechanism 3, over the schema-layer
+     * names, parameter names and enum members -- [TSON-DATA] §8.2's restricted-script rule, over the schema-layer
      * scopes [TSON-SCHEMA] §11.4 names.
      *
      * <p>The default is {@link TsonUnicodePolicy#highlyRestrictive()} over a whole name: the strictest of §5.2's
@@ -275,7 +275,7 @@ public final class TsonConfig {
      * whatever {@link #identifierPolicy} says. The setter is named for the surface it acts on rather than
      * for the values it mostly affects, so that consequence is visible where it is configured.
      *
-     * <p>The restriction level is the only mechanism available here, where for names it was the second
+     * <p>The restriction level is the only rule available here, where for names it was the second
      * choice. Skeleton distinctness is a <em>relation</em> and needs a set to hold over; values have none --
      * two values in one array need not be distinguishable, and two values in different documents cannot be
      * compared at all. The per-string rule is what remains, which is the same reason it is right for a

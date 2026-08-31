@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The five below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
+The six below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
 seventeen raised against Revision 33 are gone from here, because the spec now carries their rules and that
 is where the answer belongs. **This file is the as-built record**, not a pointer to one: where an entry
 proposes a design this implementation has built, the entry states the design, what is running, and what is
@@ -20,8 +20,6 @@ not, so that a reviewer editing the spec needs nothing beside it. **Cite the spe
 it there:** `docs/` and the Javadoc name the section that requires a behaviour, and a `SPEC-FEEDBACK.md #N`
 citation is for an entry below, where there is no section to point at yet. When an entry closes, its
 citations become spec citations and the entry is deleted — nothing here is an archive.
-
----
 
 ---
 
@@ -270,6 +268,43 @@ scope. Worth considering alongside it: §8.2's "The mechanisms operate over name
 from mechanism 1, and saying so — that mechanisms 2 and 3 are per-name rules that apply wherever a name
 occurs, while mechanism 1 is a relation needing a scope — would make a forgotten scope cost one missing
 relation rather than three missing checks.
+
+**Status against Revision 34:** open, and new against this revision.
+
+---
+
+## 6. §8.2 requires a refusal to name "the UTS #39 data version", which is not a version anything publishes
+
+**Section:** [TSON-DATA] §8.2 (name hygiene), and its "On detection" note.
+
+**Problem:** §8.2 makes a refusal reportable only "under a stated policy and a stated data version" and says
+a conforming processor "MUST name the UTS #39 data version in the refusal". Its detection note asks the same
+of a conformance suite: vectors "labelled with the UTS #39 version they were computed against". Neither
+names a version that exists as such.
+
+UTS #39 is a technical standard with its own revision number (revision 31, say), and the three files §8.2
+actually depends on — `confusables.txt`, `IdentifierStatus.txt`, and the script data behind the restriction
+levels — are not versioned by it. They are published as part of the Unicode Character Database and carry the
+**UCD** version: `confusables.txt` for Unicode 16.0, not for UTS #39 revision 31. A processor asked for "the
+UTS #39 data version" has two defensible answers that differ, and a suite vector labelled with one is
+uninterpretable to a processor that reports the other.
+
+They track in practice — a UTS #39 revision accompanies a UCD release — which is why this is a wording
+defect rather than a design one. It still decides an interoperability question: the corpus's `refused`
+vectors name a version, and the corpus's own `RUNNER.md` makes a version the processor does not carry a legitimate skip, so
+whether two implementations skip or run the same vector rides on which number both chose.
+
+**Interpretation chosen:** the **UCD version**. This implementation carries the tables for one UCD release,
+verified against `DerivedCoreProperties.txt` for that release, and states it as `16.0` — reachable as
+`TsonUnicodePolicy.dataVersion()` and carried on every refusal as `Diagnostic.unicodeDataVersion`.
+The UCD version is the one that answers the question §8.2 asks it to answer: it identifies the tables, which
+is what explains a disagreement between two processors, where a UTS #39 revision number would identify the
+prose that describes the mechanisms — stable across exactly the refreshes §8.2 exists to make visible.
+
+**Suggested resolution:** say "the Unicode Character Database version of the data files" (or "the UCD
+version") in both places, rather than "the UTS #39 data version". If a UTS #39 revision is genuinely wanted
+as well, ask for both and say so — but the one that must be there is the UCD version, since it is the one
+that changes a verdict.
 
 **Status against Revision 34:** open, and new against this revision.
 

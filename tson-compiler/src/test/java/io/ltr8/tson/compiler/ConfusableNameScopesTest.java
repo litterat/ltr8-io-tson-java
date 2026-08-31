@@ -13,14 +13,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-DATA] §8.2's three name-hygiene mechanisms over the schema-layer scopes [TSON-SCHEMA] §11.4 names,
+ * [TSON-DATA] §8.2's three name-hygiene rules over the schema-layer scopes [TSON-SCHEMA] §11.4 names,
  * plus the one this implementation adds -- a template's parameters ({@code SPEC-FEEDBACK.md} #5).
  *
  * <p><b>All three run in one walk</b> ({@code TsonSchemaLinker.checkNames}), which is what makes the scope
- * list the only place a position can be forgotten. Mechanism 2 used to run at the positions that <em>read</em>
- * a name instead -- the schema parser, the definition resolver, the atom vocabulary -- and had holes at
- * exactly the positions only some of those reached: an enum member and a group's member labels were checked
- * for mechanisms 1 and 3 and not for 2. Every position below is asserted for all three so that stays true.
+ * list the only place a position can be forgotten. The restricted-character rule used to run at the
+ * positions that <em>read</em> a name instead -- the schema parser, the definition resolver, the atom
+ * vocabulary -- and had holes at exactly the positions only some of those reached: an enum member and a
+ * group's member labels were checked for reading alike and for script mixing, and never for a restricted
+ * character. Every position below is asserted for all three so that stays true.
  *
  * <p><b>Every confusable pair here is built from code points</b>, never typed. That is not fussiness: the
  * two spellings are indistinguishable in an editor, so a literal would make the test unreviewable and one
@@ -92,7 +93,8 @@ class ConfusableNameScopesTest {
     }
 
     /**
-     * §8.2's <b>mechanism 2</b> at every naming position, including the two that had no check at all while it
+     * §8.2's <b>restricted-character rule</b> at every naming position, including the two that had no check
+     * at all while it
      * ran at the reading positions instead: an enum's members and a group's member labels.
      *
      * <p>{@code U+0132} is {@code XID_Continue}, so each name is a well-formed identifier and §7.7 has no
@@ -111,7 +113,7 @@ class ConfusableNameScopesTest {
         }
     }
 
-    /** And §8.2's <b>mechanism 3</b> at the position §11.4 omits, which nothing reached before. */
+    /** And §8.2's <b>restricted-script rule</b> at the position §11.4 omits, which nothing reached before. */
     @Test
     void aMixedScriptParameterNameIsRefused() {
         String mixed = "p" + CYR_A + "y";
@@ -144,7 +146,7 @@ class ConfusableNameScopesTest {
      * <em>pair</em>, so no lone name is ever rejected by it.
      *
      * <p>Checked under a relaxed restriction level, because the two rules are independent and the default
-     * level does reject these names — which is the whole reason §8.2 keeps them as separate mechanisms rather
+     * level does reject these names — which is the whole reason §8.2 keeps them as separate rules rather
      * than one. Here the level is per-segment, so it admits `id_пользователя` and this test is left
      * asserting only what it means to: that the skeleton check stays silent.
      */

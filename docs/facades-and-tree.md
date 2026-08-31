@@ -62,7 +62,7 @@ identifier policy subsumes it: the name has already cleared the stricter rule by
 at it. The setter is named for the surface rather than for the values it mostly affects so that this is
 visible where it is configured. Document directives are not checked: a `!!schema`/`!!id` token is a URI naming
 an external resource, §2.2.1 governs what an identity may be, and an IRI's scripts are the resource owner's
-business. The diagnostic (`RESTRICTED_TOKEN`) carries a position and no `path`, which is not an omission —
+business. The diagnostic (`RESTRICTED_SCRIPT`) carries a position and no `path`, which is not an omission —
 there is no path yet at the point the check runs. `perSegment()` is refused rather than ignored here: `_` and
 `-` are word separators by convention in a name and ordinary characters in a value, so segmenting one would
 admit UTS #39's own `Toys-Я-Us`.

@@ -45,7 +45,7 @@ class TokenPolicyTest {
                 new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
                 "{ note: \"" + CYR_A + "dmin\" }");
 
-        assertEquals(List.of(Diagnostic.Code.RESTRICTED_TOKEN),
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
                 found.stream().map(Diagnostic::code).toList(), found.toString());
         assertTrue(found.getFirst().message().contains(CYR_A + "dmin"), found.getFirst().message());
         assertTrue(found.getFirst().dataPosition().isPresent(), "the check has a position even with no path");
@@ -73,7 +73,7 @@ class TokenPolicyTest {
                 new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
                 "{ " + CYR_A + "dmin: 1 }");
 
-        assertEquals(List.of(Diagnostic.Code.RESTRICTED_TOKEN),
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
                 found.stream().map(Diagnostic::code).toList(), found.toString());
     }
 
@@ -143,7 +143,7 @@ class TokenPolicyTest {
         } catch (java.util.NoSuchElementException drained) {
             // the whole document has passed through the context, which is what the assertion needs
         }
-        assertTrue(collected.diagnostics().stream().anyMatch(d -> d.code() == Diagnostic.Code.RESTRICTED_TOKEN),
+        assertTrue(collected.diagnostics().stream().anyMatch(d -> d.code() == Diagnostic.Code.RESTRICTED_SCRIPT),
                 collected.diagnostics().toString());
     }
 }

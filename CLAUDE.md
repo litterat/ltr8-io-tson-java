@@ -524,11 +524,24 @@ where it did not. Both run where a composite reader wires its children, so neith
 `Diagnostic` (root package) is one record for both data- and schema-side problems — the variation is
 locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual`, four location
 components matching JSON Schema 2020-12 §12's output unit (`path`, `schemaId`+`schemaPointer`, plus
-`dataPosition`/`schemaPosition`), and `fetchReason`, the one component that is not a location —
-`SCHEMA_UNAVAILABLE` says a schema was not obtained and `TsonSchemaFetchException.Reason` says by whose
-doing, which the closed `Code` cannot (it sorts by *who* could not check) and `message` must not (that
-means parsing prose). It is what makes the thrown and the collected channel answer one fetch failure
-alike, the collecting one being where almost every read now hears about it. Both RFC 6901 pointers are
+`dataPosition`/`schemaPosition`), and the **two components that are not locations**, each carrying a
+distinction the closed `Code` cannot (it sorts by *who* could not check) and `message` must not (that
+means parsing prose). `fetchReason`: `SCHEMA_UNAVAILABLE` says a schema was not obtained and
+`TsonSchemaFetchException.Reason` says by whose doing. It is what makes the thrown and the collected
+channel answer one fetch failure alike, the collecting one being where almost every read now hears about
+it. `unicodeDataVersion`: §8.2's fifth outcome, on the three refusal codes and nothing else, naming the
+Unicode data version the refusal was computed against — §8.2 makes that a MUST because §8.3 marks all three
+rules unstable across releases, so two conforming processors may legitimately disagree about one name
+and the version is the only thing that explains it. `TsonUnicodePolicy.dataVersion()` is that version as a
+static accessor, the constant behind it (`Xid.UNICODE_VERSION`) being in the unexported `lexer` package and
+unreachable otherwise. **Which rule refused is the `Code`** — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/
+`RESTRICTED_SCRIPT`, one each, since the three want three different remedies and the code is what a consumer routes
+on; a discriminator beside it would restate what the code fixes and could contradict it. The policy that
+judged is deliberately carried nowhere: it is the reading deployment's own configuration.
+**What earns a component at all is one rule** — *a fact not recoverable from the
+document plus the schema* — which is why these two are the only non-location components and why an atom's
+failed bound (in the schema), a duplicate key (in the document) and the rule that fired (the code) get none;
+`tson-cli`'s wire shape applies a second filter, whether the recipient can act on it. Both RFC 6901 pointers are
 `Optional<String>` because `""` is the *root*,
 a location this really emits, not an absence; the three components where `""` really is absence
 (`schemaId`/`expected`/`actual`) offer `schemaIdIfKnown()`/`expectedIfStated()`/`actualIfStated()`, so a
@@ -752,11 +765,12 @@ one of `valid`/`error`/`schema-document`/`refused` is present and the payload ca
 `absent`, `empty-brace` and `schema-document` carry nothing and are typed `void`, written `_`.
 
 **`refused` is §8.1's fifth outcome and is not a verdict on the document or the schema.** §8.2's name-hygiene
-mechanisms refuse without making a document invalid — each reads data the UCD does not freeze, so none of
+rules refuse without making a document invalid — each reads data the UCD does not freeze, so none of
 them may decide validity — and §8.2 says the refusal MUST NOT be reported in any of the four categories.
 `checkRefusedVector` therefore asserts both halves: that something was refused, and that *nothing* was
-reported as invalid, `CONFUSABLE_NAMES`/`RESTRICTED_TOKEN` being the two codes that mean policy. A vector
-names its mechanism and the UTS #39 data version it was computed against, and a version this
+reported as invalid, `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT` being the three codes that mean
+policy, one per rule. A vector
+names the rule it exercises and the UTS #39 data version it was computed against, and a version this
 implementation does not carry is `RUNNER.md` rule 5's fourth legitimate skip — the only one that is about
 the vector rather than the conformance class. It has two homes: `class1/reader/refused/` for Part 1's one
 scope, and `class2/schema/refused/` for §11.4's, where the enum-member and group-member-label vectors are
@@ -767,23 +781,28 @@ list them as a scope, so a vector asserting the refusal would fail a conforming 
 
 **The grammar runs where a name is read; the policy runs once per layer, over scopes.** That split is
 §8.2's own — §7.7 is validity, stable across Unicode versions, and a failure is a parse error; §8.2's three
-mechanisms are policy over *named scopes*, read unstable data, and a failure is a refusal. So
-`IdentifierParser.validate` is the grammar and throws, `IdentifierParser.hygiene` is mechanism 2 and
+name-hygiene rules are policy over *named scopes*, read unstable data, and a failure is a refusal. So
+`IdentifierParser.validate` is the grammar and throws, `IdentifierParser.hygiene` is the restricted-character
+rule and
 returns, and **no position that reads a name applies a policy**. The joiners belong to the grammar despite
 being `Identifier_Status=Restricted` — §7.7 rule 2 makes their admission a question of form.
 
-Each layer has exactly one place that walks its scopes, and all three mechanisms run there:
+Each layer has exactly one place that walks its scopes, and all three rules run there — names that read
+alike (`CONFUSABLE_NAMES`), a character outside the identifier profile (`RESTRICTED_CHARACTER`), a script
+script the restriction level does not admit (`RESTRICTED_SCRIPT`, wider than a mix — at `ASCII_ONLY` a
+single-script name is refused with nothing mixed):
 
 | Layer | Walk | Scopes |
 |---|---|---|
 | Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (`SPEC-FEEDBACK.md` #5) |
 | Data | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
 
-**One place is the point, not a tidiness.** Mechanism 2 used to run at the reading positions instead —
-spread over the schema parser, the definition resolver and the atom vocabulary — and had holes at exactly
-the positions only some of them reached: an enum member and a group's member labels got mechanisms 1 and 3
-and not 2. A scope list can be reviewed; three call sites cannot. Class 1 *field* names see only
-mechanism 1, being lexical rather than names (§2.5, §7.7). The name policy defaults to Highly Restrictive
+**One place is the point, not a tidiness.** The restricted-character rule used to run at the reading
+positions instead — spread over the schema parser, the definition resolver and the atom vocabulary — and had
+holes at exactly the positions only some of them reached: an enum member and a group's member labels were
+checked for reading alike and for script mixing, and never for a restricted character. A scope list can be
+reviewed; three call sites cannot. Class 1 *field* names see only the look-alike rule, being lexical rather
+than names (§2.5, §7.7). The name policy defaults to Highly Restrictive
 whole-name (§8.2's SHOULD) and relaxes through `withNamePolicy`, which §8.2 requires be code rather than
 ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
 may legitimately be anything.

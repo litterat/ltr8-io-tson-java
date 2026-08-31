@@ -9,8 +9,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-DATA] §8.2's mechanisms 2 and 3 over the two names a Class 1 document carries -- a type-ref name
- * and an annotation name -- as a <b>policy refusal</b> rather than a validity error.
+ * [TSON-DATA] §8.2's restricted-character and restricted-script rules over the two names a Class 1 document
+ * carries -- a type-ref name and an annotation name -- as a <b>policy refusal</b> rather than a validity
+ * error.
  *
  * <p><b>The classification is the subject.</b> §8.2 keeps these checks out of validity because each reads
  * data the Unicode Consortium declines to freeze, so a verdict can change under a routine UCD refresh while
@@ -34,16 +35,22 @@ class NameHygieneTest {
         return reported;
     }
 
+    /** Either per-name rule: one code each, since the two want different fixes. */
+    private static boolean isRefusal(Diagnostic diagnostic) {
+        return diagnostic.code() == Diagnostic.Code.RESTRICTED_CHARACTER
+                || diagnostic.code() == Diagnostic.Code.RESTRICTED_SCRIPT;
+    }
+
     private static long refusals(String source) {
-        return read(source).stream().filter(d -> d.code() == Diagnostic.Code.RESTRICTED_TOKEN).count();
+        return read(source).stream().filter(NameHygieneTest::isRefusal).count();
     }
 
     @Test
     void aRestrictedCharacterInANameIsRefusedAndNotReportedInvalid() {
         List<Diagnostic> reported = read("@" + RESTRICTED_NAME + ":1 2");
         assertEquals(1, reported.size(), reported::toString);
-        assertEquals(Diagnostic.Code.RESTRICTED_TOKEN, reported.get(0).code(),
-                "§8.2's refusal is not one of §8.1's four categories");
+        assertEquals(Diagnostic.Code.RESTRICTED_CHARACTER, reported.get(0).code(),
+                "§8.2's refusal is not one of §8.1's four categories, and its code names the rule");
         assertTrue(reported.get(0).message().contains("Identifier_Status=Restricted"), reported::toString);
     }
 
@@ -55,7 +62,7 @@ class NameHygieneTest {
     void theGrammarsOwnFailuresAreStillValidityErrors() {
         for (String source : new String[] {"!42x 1", "!x.y 1", "!ab‌cd 1"}) {
             List<Diagnostic> reported = read(source);
-            assertTrue(reported.stream().noneMatch(d -> d.code() == Diagnostic.Code.RESTRICTED_TOKEN),
+            assertTrue(reported.stream().noneMatch(NameHygieneTest::isRefusal),
                     () -> source + " is malformed, not refused: " + reported);
         }
     }
@@ -75,10 +82,10 @@ class NameHygieneTest {
                 "two occurrences are two refusals -- the rule is per name, not per document");
     }
 
-    // ── Mechanism 3: the restriction level (§8.2, UTS #39 §5.2) ─────────
+    // ── The restricted-script rule: the restriction level (§8.2, UTS #39 §5.2) ─────────
 
     /**
-     * A mixed-script name is refused by default. §8.2 makes mechanism 3's RECOMMENDED default Highly
+     * A mixed-script name is refused by default. §8.2 makes the restricted-script rule's RECOMMENDED default Highly
      * Restrictive over the whole name, and a homograph reads as another name exactly by mixing scripts
      * inside one word -- Latin {@code p}, Cyrillic {@code а}, Latin {@code y}.
      */
@@ -94,7 +101,7 @@ class NameHygieneTest {
         assertEquals(1, read("@pаy:1 2").size(), "an annotation name's refusal stands alone");
     }
 
-    /** A single-script name in any script is not mixed and is not this mechanism's business. */
+    /** A single-script name in any script is not mixed and is not this rule's business. */
     @Test
     void aSingleScriptNameIsAdmittedWhateverTheScript() {
         for (String source : new String[] {"@имя:1 2", "@καλή:1 2", "@日本語:1 2", "@pay:1 2"}) {
@@ -105,7 +112,7 @@ class NameHygieneTest {
     /**
      * <b>Names only.</b> §8.2 defaults the token surface to Unrestricted because a value is data and may
      * legitimately be anything, and Class 1 field names are lexical (§2.5, §7.7) rather than names -- so
-     * neither reaches mechanism 3, however mixed its scripts.
+     * neither reaches the restricted-script rule, however mixed its scripts.
      */
     @Test
     void aValueAndAClass1FieldNameAreNotNames() {
@@ -114,7 +121,7 @@ class NameHygieneTest {
     }
 
     /**
-     * §8.2 requires that a deployment be able to relax any mechanism in code, and names the unit as the
+     * §8.2 requires that a deployment be able to relax any of the three rules in code, and names the unit as the
      * relaxation to reach for first: per segment, Highly Restrictive still refuses a within-word homograph
      * while admitting the compounds an author outside Latin script writes.
      */
@@ -140,11 +147,27 @@ class NameHygieneTest {
         assertEquals(List.of(), reported);
     }
 
+    /**
+     * <b>And it takes the restricted-character rule with it.</b> §8.2's level 6 "drops the profile too",
+     * taking that rule with it -- the one level that does, since every other one keeps {@code
+     * Identifier_Status}. A
+     * rule that ran regardless of the level would make {@code unrestricted()} a setting that does not
+     * do what it says, and would leave a deployment holding a restricted-character refusal it has no way to
+     * relax.
+     */
+    @Test
+    void unrestrictedDropsTheIdentifierProfileToo() {
+        List<Diagnostic> reported = new ArrayList<>();
+        new TsonTreeReader().withNamePolicy(TsonUnicodePolicy.unrestricted())
+                .withDiagnostics(reported::add).read("@" + RESTRICTED_NAME + ":1 2");
+        assertEquals(List.of(), reported, reported::toString);
+    }
+
     /** An ordinary document pays nothing: no name here is restricted, and none is reported. */
     @Test
     void ordinaryNamesAreUntouched() {
         assertEquals(List.of(), read("@doc:\"x\" !int32 1"));
         assertEquals(List.of(), read("{ id_пользователя: 1 }"),
-                "a mixed-script compound field name is not this mechanism's business");
+                "a mixed-script compound field name is not this rule's business");
     }
 }

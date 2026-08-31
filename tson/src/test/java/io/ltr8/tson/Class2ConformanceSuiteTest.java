@@ -1,9 +1,9 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentHeader;
-import io.ltr8.tson.compiler.lexer.Xid;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeSet;
 import java.util.stream.Stream;
 
@@ -155,7 +156,7 @@ class Class2ConformanceSuiteTest {
 
     /**
      * §8.1's fifth outcome at the schema layer: the schema is <b>refused by this processor</b> under one of
-     * §8.2's name-hygiene mechanisms, over the scopes [TSON-SCHEMA] §11.4 supplies.
+     * §8.2's name-hygiene rules, over the scopes [TSON-SCHEMA] §11.4 supplies.
      *
      * <p>{@code checkRefusedVector}'s peer, asserting the same two halves for the same reason: something was
      * refused, and nothing was reported as a verdict on the schema's correctness. A processor that reported a
@@ -166,24 +167,61 @@ class Class2ConformanceSuiteTest {
     private static void assertSchemaRefused(RecordValue sidecar, List<Diagnostic> problems) {
         RecordValue refusal = outcomePayload(sidecar);
         String stated = fieldText(refusal, "unicode");
-        Assumptions.assumeTrue(Xid.UNICODE_VERSION.equals(stated),
+        // Through the public accessor, the way a consumer of this library reads it: `Xid` is in the
+        // unexported `lexer` package, so nothing outside `tson-compiler` can name the constant by hand.
+        Assumptions.assumeTrue(TsonUnicodePolicy.dataVersion().equals(stated),
                 "vector computed against UTS #39 data for Unicode " + stated + "; this implementation "
-                        + "carries " + Xid.UNICODE_VERSION);
+                        + "carries " + TsonUnicodePolicy.dataVersion());
 
         assertFalse(problems.isEmpty(), "the schema is refused, but it loaded without a diagnostic");
         assertTrue(problems.stream().anyMatch(diagnostic -> isPolicyRefusal(diagnostic.code())),
                 "expected a §8.2 refusal (" + fieldText(refusal, "mechanism") + "); got " + problems);
         problems.forEach(diagnostic -> assertTrue(isPolicyRefusal(diagnostic.code()),
                 "a refused schema must not also be reported invalid: " + diagnostic));
+        assertRefusalMatches(refusal, problems);
     }
 
     /**
-     * The two codes that mean <em>refused under a stated policy</em> rather than <em>wrong</em>: §8.2's
-     * mechanism 1 over a scope, and its mechanisms 2 and 3 over a name. Every other code is a verdict on the
-     * schema, which is exactly what a refusal is not.
+     * The code a refusal by the rule the vector names reports.
+     *
+     * <p><b>An explicit table, not a string transformation.</b> The corpus spells §8.2's own headings
+     * ({@code sidecar-common.tn}'s {@code hygiene_mechanism}: {@code skeleton-distinctness},
+     * {@code identifier-status}, {@code restriction-level}), where this implementation names each code for
+     * what it <em>found</em> -- §8.2's vocabulary is exact and is jargon a consumer reading an error body
+     * cannot decode. The two vocabularies are deliberately different, so the mapping is written down.
+     */
+    private static Diagnostic.Code statedRule(RecordValue refusal) {
+        String stated = fieldText(refusal, "mechanism");
+        return switch (stated) {
+            case "skeleton-distinctness" -> Diagnostic.Code.CONFUSABLE_NAMES;
+            case "identifier-status" -> Diagnostic.Code.RESTRICTED_CHARACTER;
+            case "restriction-level" -> Diagnostic.Code.RESTRICTED_SCRIPT;
+            default -> throw new AssertionError("unknown §8.2 name-hygiene rule in a vector: " + stated);
+        };
+    }
+
+    /**
+     * <b>The vector names the rule it exercises, so the refusal must report the matching code</b> -- one
+     * code per rule, since the three want three different remedies and a runner checking only "some refusal
+     * happened" would pass a processor that refused for the wrong reason. <b>And every refusal must name
+     * the data version</b>, which §8.2 makes a MUST because that version is the only thing explaining a
+     * legitimate disagreement between two processors.
+     */
+    private static void assertRefusalMatches(RecordValue refusal, List<Diagnostic> reported) {
+        assertTrue(reported.stream().anyMatch(d -> d.code() == statedRule(refusal)),
+                () -> "vector names " + fieldText(refusal, "mechanism") + "; got " + reported);
+        reported.forEach(d -> assertEquals(Optional.of(fieldText(refusal, "unicode")), d.unicodeDataVersion(),
+                "§8.2: a refusal MUST name the UTS #39 data version, and this vector was computed "
+                        + "against the one this implementation carries"));
+    }
+
+    /**
+     * The three codes that mean <em>refused under a stated policy</em> rather than <em>wrong</em>, one per
+     * §8.2 rule. Every other code is a verdict on the schema, which is exactly what a refusal is not.
      */
     private static boolean isPolicyRefusal(Diagnostic.Code code) {
-        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_TOKEN;
+        return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_CHARACTER
+                || code == Diagnostic.Code.RESTRICTED_SCRIPT;
     }
 
     // ── Link-layer vectors: §2.2.3, §5.4, §5.10.1, §8.2 ──────────────────
@@ -321,7 +359,7 @@ class Class2ConformanceSuiteTest {
             case FIELD_REQUIRED, FIELD_FIXED, TYPE_MISMATCH, WRONG_ARITY, UNRECOGNIZED_FIELD,
                  ATOM_CONSTRAINT_VIOLATION, VALIDATION_ERROR -> "validation";
             case UNKNOWN_TYPE_REF, UNKNOWN_TYPE, DUPLICATE_FIELD, DUPLICATE_MAP_KEY, SCHEMA_ERROR -> "resolver";
-            case RESTRICTED_TOKEN, CONFUSABLE_NAMES -> fail(
+            case RESTRICTED_CHARACTER, RESTRICTED_SCRIPT, CONFUSABLE_NAMES -> fail(
                     "§8.2 name hygiene is a policy refusal, which §8.1 says MUST NOT be reported in any of "
                             + "the four categories: " + diagnostic);
             default -> fail("unclassified diagnostic code: " + diagnostic);

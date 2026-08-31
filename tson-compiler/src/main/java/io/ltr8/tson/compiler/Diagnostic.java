@@ -42,8 +42,12 @@ import java.util.Optional;
  * alike, which is exactly the ambiguity the structured half exists to remove. An absent pointer means
  * this diagnostic has no such end at all; a present {@code ""} means the root.
  *
- * <p><b>{@code fetchReason} is the one component that is not a location</b>, and it is present for exactly
- * one code. {@link Code#SCHEMA_UNAVAILABLE} says a schema could not be obtained; {@link
+ * <p><b>Two components are not locations</b>, {@code fetchReason} and {@code unicodeDataVersion}, each
+ * present for a closed set of codes and each carrying a fact a consumer acts on that is recoverable from
+ * neither the document nor the schema. Why, in both cases, is below.
+ *
+ * <p>{@code fetchReason} is present for exactly one code. {@link Code#SCHEMA_UNAVAILABLE} says a schema
+ * could not be obtained; {@link
  * TsonSchemaFetchException.Reason} says whether that is the document's doing ({@code NOT_PERMITTED} names a
  * reference this deployment will not fetch, {@code NOT_FOUND} one nothing serves) or the world's ({@code
  * TIMEOUT}, {@code TRANSPORT}, {@code TOO_LARGE}), which is the difference between telling a sender to fix
@@ -52,6 +56,15 @@ import java.util.Optional;
  * message} must not, since recovering it means parsing prose. It exists because the two channels one
  * fetch failure travels on, the thrown {@link TsonSchemaFetchException} and the collected diagnostic, have
  * to be able to answer the same question; a collecting receiver is the common path, not the edge.
+ *
+ * <p>{@code unicodeDataVersion} is present for the three codes that are not verdicts on the document's
+ * <em>validity</em> at all -- {@link Code#CONFUSABLE_NAMES}, {@link Code#RESTRICTED_CHARACTER} and {@link
+ * Code#RESTRICTED_SCRIPT}, [TSON-DATA] §8.2's fifth, distinguishable outcome. §8.2 requires a refusal to name the
+ * Unicode data version it was computed against, and §8.3 is why: it marks all three rules unstable
+ * across Unicode releases, so two conforming processors may legitimately disagree about one name and the
+ * version is the only thing that explains the disagreement. It is also the one fact about a refusal a
+ * consumer cannot recover from the document plus the schema -- <b>which rule fired is the code</b>, one
+ * per rule, so nothing further rides here.
  *
  * <p>The two ends are not alternatives: a value violating {@code int32} as core.tn declares it
  * populates both, which is why this is one record with a richer location model rather than separate
@@ -72,7 +85,8 @@ import java.util.Optional;
 public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, String schemaId, Code code,
                           String message, String expected, String actual,
                           Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition,
-                          Optional<TsonSchemaFetchException.Reason> fetchReason) {
+                          Optional<TsonSchemaFetchException.Reason> fetchReason,
+                          Optional<String> unicodeDataVersion) {
 
     // ── Absence, for a renderer ──────────────────────────────────────────
     //
@@ -154,21 +168,27 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
             default -> throw e;
         }
         return new Diagnostic(Optional.of(""), Optional.empty(), "", Code.VALIDATION_ERROR, e.getMessage(),
-                expected, actual, Optional.ofNullable(position), Optional.empty(), Optional.empty());
+                expected, actual, Optional.ofNullable(position), Optional.empty(), Optional.empty(),
+                Optional.empty());
     }
 
     /**
-     * A token whose script mix the read's {@code TsonUnicodePolicy} does not permit ([TSON-DATA] §8.2's
+     * A token whose scripts the read's {@code TsonUnicodePolicy} does not permit ([TSON-DATA] §8.2's
      * "Values", UTS #39 §5.2).
+     *
+     * <p><b>Always {@link Code#RESTRICTED_SCRIPT}.</b> A token is not a name, so it has no identifier profile
+     * and no scope to be distinct within; §8.2's restricted-script rule is the only one of the three a value
+     * surface can carry.
      *
      * <p><b>No {@code path}, and that is not an omission.</b> The check runs where tokens leave the stream,
      * before any reader has descended into them, which is exactly what lets it see a value and a field name
      * alike. There is no path yet to state, so the diagnostic carries the one location it really has.
      */
     public static Diagnostic ofRestrictedToken(String text, String why, SourcePosition position) {
-        return new Diagnostic(Optional.empty(), Optional.empty(), "", Code.RESTRICTED_TOKEN,
+        return new Diagnostic(Optional.empty(), Optional.empty(), "", Code.RESTRICTED_SCRIPT,
                 "the token '" + text + "' " + why, "a token the Unicode policy admits", text,
-                Optional.ofNullable(position), Optional.empty(), Optional.empty());
+                Optional.ofNullable(position), Optional.empty(), Optional.empty(),
+                Optional.of(TsonUnicodePolicy.dataVersion()));
     }
 
     /**
@@ -194,7 +214,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                 schemaId, Code.VALIDATION_ERROR, e.getMessage(),
                 e.expected().isEmpty() ? "well-formed TSON" : e.expected(),
                 e.actual().isEmpty() ? "a syntax error" : e.actual(),
-                Optional.empty(), Optional.ofNullable(e.position()), Optional.empty());
+                Optional.empty(), Optional.ofNullable(e.position()), Optional.empty(), Optional.empty());
     }
 
     /**
@@ -215,7 +235,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         }
         return new Diagnostic(Optional.empty(), Optional.of(""), schemaId, Code.VALIDATION_ERROR, e.getMessage(),
                 "well-formed TSON", "a syntax error", Optional.empty(), Optional.ofNullable(position),
-                Optional.empty());
+                Optional.empty(), Optional.empty());
     }
 
     /**
@@ -240,7 +260,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                                                  TsonSchemaFetchException e, Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
                 schemaId, Code.SCHEMA_UNAVAILABLE, e.getMessage(), SchemaFailure.UNAVAILABLE_EXPECTED, e.uri(),
-                Optional.empty(), position, Optional.of(e.reason()));
+                Optional.empty(), position, Optional.of(e.reason()), Optional.empty());
     }
 
     /**
@@ -260,7 +280,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofSchemaError(String schemaId, String declaration, String message,
                                            Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, Code.SCHEMA_ERROR, message, "", "", Optional.empty(), position, Optional.empty());
+                schemaId, Code.SCHEMA_ERROR, message, "", "", Optional.empty(), position, Optional.empty(),
+                Optional.empty());
     }
 
     /**
@@ -270,9 +291,11 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * a refusal MUST NOT be reported in any of §8.1's four categories.
      *
      * <p>The peer of what a read reports for the same rule, so one schema and one document that break the
-     * same rule come back under the same code. {@code code} is {@link Code#CONFUSABLE_NAMES} for §8.2's
-     * mechanism 1 and {@link Code#RESTRICTED_TOKEN} for its mechanisms 2 and 3 -- the caller picks,
-     * because the mechanism is what it knows and the code is what a consumer routes on.
+     * same rule come back under the same code. {@code code} is {@link Code#CONFUSABLE_NAMES} for names that
+     * read alike, {@link Code#RESTRICTED_CHARACTER} for a character outside the identifier profile and {@link
+     * Code#RESTRICTED_SCRIPT} for a script combination the restriction level does not admit -- the caller picks,
+     * because the rule is what it knows and the code is what a consumer routes on. One code per rule, so the
+     * code alone tells an author which fix applies.
      *
      * <p><b>It is still a verdict on the schema</b>, and a consumer treats it as one: the document must
      * change, or the deployment must relax the policy in code. What it is not is a claim that the format
@@ -281,7 +304,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofSchemaRefusal(String schemaId, String declaration, Code code, String message,
                                              Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, code, message, "", "", Optional.empty(), position, Optional.empty());
+                schemaId, code, message, "", "", Optional.empty(), position, Optional.empty(),
+                Optional.of(TsonUnicodePolicy.dataVersion()));
     }
 
     /**
@@ -301,7 +325,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                                          Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
                 schemaId, Code.NOT_IMPLEMENTED, message, "", "", Optional.empty(), position,
-                Optional.empty());
+                Optional.empty(), Optional.empty());
     }
 
     /**
@@ -335,6 +359,20 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * got involved. {@code SCHEMA_ERROR} means the schema is at fault and nothing else: a failure obtaining
      * a schema that is <em>not</em> the schema's fault carries its own code (below), rather than being
      * flattened into this one because it arrived through the same catch.
+     *
+     * <p><b>{@code CONFUSABLE_NAMES}, {@code RESTRICTED_CHARACTER} and {@code RESTRICTED_SCRIPT} are one code
+     * per [TSON-DATA] §8.2 name-hygiene rule</b>, and the split is what carries the rule: a refusal is §8.1's
+     * fifth outcome rather than a verdict, and the three want three different fixes -- rename one of a
+     * colliding pair, change a character outside the identifier profile, or relax the policy's level or name
+     * a script set. A consumer routes on the code, so the rule belongs in it; a second enum beside the code
+     * would only be a fact the code already fixes, free to disagree with it.
+     *
+     * <p><b>{@code RESTRICTED_SCRIPT} is a script the policy does not admit, which is wider than a mix.</b>
+     * A script <em>combination</em> is the usual finding, and at {@link TsonUnicodePolicy.Level#ASCII_ONLY}
+     * a single-script name is refused with nothing mixed at all -- so the code names what the policy would
+     * not admit rather than what the text did, and pairs with {@code RESTRICTED_CHARACTER} as the two halves
+     * of one identifier policy. It is also the one of the three a <em>value</em> can carry ({@link
+     * #ofRestrictedToken}), a token having no identifier profile and no scope to be distinct within.
      *
      * <p><b>{@code NOT_IMPLEMENTED}, {@code BIND_MISMATCH} and {@code SCHEMA_UNAVAILABLE} are the three
      * members that are not a verdict on the document.</b> Each says the thing it names could not be
@@ -371,7 +409,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         DUPLICATE_MAP_KEY,
         DUPLICATE_FIELD,
         CONFUSABLE_NAMES,
-        RESTRICTED_TOKEN,
+        RESTRICTED_CHARACTER,
+        RESTRICTED_SCRIPT,
         SCHEMA_ERROR,
         UNKNOWN_TYPE,
         VALIDATION_ERROR,

@@ -163,6 +163,8 @@ enum OutputFormat {
                     .append(",\"schemaPosition\":").append(jsonStringOrNull(error.schemaPosition()))
                     .append(",\"fetchReason\":")
                     .append(jsonStringOrNull(error.fetchReason().map(Enum::name)))
+                    .append(",\"unicodeDataVersion\":")
+                    .append(jsonStringOrNull(error.unicodeDataVersion()))
                     .append('}');
         }
         json.append(']');
@@ -172,7 +174,11 @@ enum OutputFormat {
         return value.map(OutputFormat::jsonString).orElse("null");
     }
 
-    /** Hand-rolled, deliberately minimal -- no external JSON dependency (this codebase's own hard constraint), and this CLI's own diagnostics are simple, flat strings with no need for a real JSON library's generality. */
+    /**
+     * Hand-rolled, deliberately minimal -- no external JSON dependency (this codebase's own hard
+     * constraint), and this CLI's own diagnostics are simple, flat strings with no need for a real JSON
+     * library's generality.
+     */
     private static String jsonString(String value) {
         StringBuilder escaped = new StringBuilder("\"");
         for (int i = 0; i < value.length(); i++) {

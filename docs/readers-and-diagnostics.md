@@ -281,7 +281,8 @@ belief, over the bind path:
 ## Name hygiene on the read path ([TSON-DATA] §8.2)
 
 A Class 1 document carries two names — a type-ref name and an annotation name, the positions §7.4 marks
-`identifier` — and §8.2's mechanisms 2 and 3 apply to both, **on by default**. They run in
+`identifier` — and §8.2's restricted-character and restricted-script rules apply to both, **on by default**. They
+run in
 `DefaultTsonReadContext` as the name's event is first pulled, that being the first point on the read path
 holding a diagnostics receiver: `TsonDataStream` throws and holds none, so a check there could only say
 "invalid", which is the one thing a refusal is not. What stays in the stream is §7.7's grammar, where a
@@ -294,23 +295,35 @@ because that is the failure that would survive every other test.
 
 **Not in `TokenPolicyEventSource`**, which is where the *token* surface's policy runs and gets exactly-once
 for free by sitting upstream of the rewind. That decorator skips itself entirely at its default —
-`unrestricted()`, which is every ordinary read — so a mechanism §8.2 defaults *on* cannot live behind it
+`unrestricted()`, which is every ordinary read — so a rule §8.2 defaults *on* cannot live behind it
 without making the wrapper unconditional and putting a switch per token back into the cost of a read that
 has no policy at all.
 
 **Two surfaces, two defaults, and §8.2 sets both.** `withTokenPolicy` defaults to `unrestricted()` because a
 value is data and may legitimately be anything; `withNamePolicy` defaults to Highly Restrictive over the whole
 name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able to
-relax any mechanism and requires the relaxation not be silent, and a policy read from the environment is
+relax any of the three rules and requires the relaxation not be silent, and a policy read from the
+environment is
 invisible at the call site and absent from review. The relaxation to reach for first is the *unit*
 (`perSegment()`), which still refuses `id_pаy` while admitting `url_адрес`. A token policy stricter than the
 name policy subsumes it: a name is a token.
 
-Class 1 **field** names see neither — they are lexical rather than names (§2.5, §7.7) — and only mechanism 1,
-whose scope they are (`SchemalessTreeReader`). A refusal reports `RESTRICTED_TOKEN` or `CONFUSABLE_NAMES`,
-which is a verdict on the document like any other: the caller must change it, or relax the policy. What the
-code carries that a validity error does not is that another processor at another UTS #39 version may accept
-the same document.
+Class 1 **field** names see neither — they are lexical rather than names (§2.5, §7.7) — and only the
+look-alike rule, whose scope they are (`SchemalessTreeReader`). A refusal reports one code per rule —
+`CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT` — each a verdict on the document like any other in
+that the caller must change it or relax the policy. What these codes carry that a validity error does not is
+that another processor at another Unicode version may accept the same document.
+
+**The restricted-character rule is gated on the level, as the restricted-script rule is.** §8.2's
+Unrestricted "drops the
+profile too", taking that rule with it, so `appliesIdentifierProfile()` guards the `IdentifierParser.hygiene`
+call at both walks — the read context's and the linker's. Every other level keeps the profile, the
+restricted-script rule gating itself inside `violation()`.
+
+**And the refusal names its own data version** (`unicodeDataVersion`, below). §8.2 reports a refusal under a
+*stated policy and a stated data version* and makes naming the version a MUST, because §8.3 marks all three
+rules unstable across Unicode releases — which is the whole reason a refusal is not validity.
+`PolicyRefusalTest`/`SchemaPolicyRefusalTest` pin the data and schema ends against each other.
 
 ## Diagnostics (`Diagnostic`, root package)
 
@@ -322,8 +335,9 @@ from readers;
 `NOT_IMPLEMENTED`/`BIND_MISMATCH`/`SCHEMA_UNAVAILABLE` — the three that are not a verdict on the document
 at all),
 `message` (hand-composed per call site), `expected`/`actual` (machine-parseable), **four location
-components covering two ends** — the value in the data, and the rule in the schema — and `fetchReason`,
-the one component that is not a location.
+components covering two ends** — the value in the data, and the rule in the schema — and the two components
+that are not locations, `fetchReason` and `unicodeDataVersion`. Both exist for one reason: a fact a consumer
+acts on that is recoverable from neither the document nor the schema.
 
 **The four are JSON Schema 2020-12 §12's own output unit**, deliberately: `path` is `instanceLocation` (an
 RFC 6901 pointer into the data), `schemaPointer` is `keywordLocation` (the path through the schema being
@@ -352,6 +366,56 @@ only, the same refused reference was the sender's mistake read one way and an op
 which the facades alone reach — no reader in the compiled stack can have one to state, a schema that could
 not be fetched having no compiled readers to run), and `Diagnostic.ofSchemaUnavailable` takes the exception
 rather than its message so the schema-document channel states it too.
+
+**`unicodeDataVersion` is the same argument for §8.2's fifth outcome**, present for the three codes that
+are refusals — `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT` — and no other. §8.2 requires a
+refusal to name the Unicode data version it was computed against, because §8.3 marks all three rules
+unstable across Unicode releases and that instability is what lets two conforming processors legitimately
+disagree about one name. It is the one fact about a refusal that is unrecoverable afterwards.
+`TsonUnicodePolicy.dataVersion()` is the same value as a static accessor, for a caller stating it once per
+response rather than once per problem; the constant behind it (`Xid.UNICODE_VERSION`) is in the unexported
+`lexer` package and unreachable otherwise.
+
+**Which rule refused is the code, and nothing beside it.** One code per §8.2 rule —
+`CONFUSABLE_NAMES` for skeleton distinctness, `RESTRICTED_CHARACTER` for `Identifier_Status`,
+`RESTRICTED_SCRIPT` for the restriction level — because the three want three different remedies: rename one
+of a colliding pair, change the character, or relax the level or unit or name a script set.
+`RESTRICTED_SCRIPT` says *a script this policy does not admit*, which is wider than a mix: a combination is
+the usual finding, but at `ASCII_ONLY` a single-script name is refused with nothing mixed at all, so the code
+names what the policy refused rather than what the text did. It pairs with `RESTRICTED_CHARACTER` as the two
+halves of one identifier policy. The rule belongs in the code because the
+code is what a consumer routes on; a second enum beside it would restate a fact the code already fixes and
+would be free to contradict it. The names say what each rule *found* rather than how it works, §8.2's own
+headings being exact and being jargon a consumer reading an error body cannot decode — the conformance
+runners keep an explicit table from the corpus's spec-named spelling to these, since the two vocabularies
+differ on purpose.
+
+**What is deliberately not carried is the policy that judged.** The level, the unit and any `permitting`
+script set are the reading deployment's own configuration: known already to whoever set them, and not
+actionable by whoever receives the report — the sender of a refused document cannot change them, and the
+operator who can does not need to be told. `RESTRICTED_SCRIPT` is also the one code a *value* can carry, a token
+having no identifier profile and no scope to be distinct within.
+
+### When a fact earns a component
+
+`fetchReason` and `unicodeDataVersion` are the only two non-location components, and the rule that keeps
+them from becoming a precedent for structuring every code is one line: **carry a fact as a component when it
+is not recoverable from the document plus the schema.**
+
+| Problem | Where the fact already is | Component? |
+|---|---|---|
+| Atom constraint violation | the bound is in the schema, at `schemaPointer` | no |
+| `UNRECOGNIZED_FIELD` | the alternatives are the declared field list | no |
+| `DUPLICATE_FIELD`/`DUPLICATE_MAP_KEY` | in the document, at `path` | no |
+| §8.2 refusal: which rule | it is the `Code` | no |
+| `SCHEMA_UNAVAILABLE` | nowhere — it is about the world | `fetchReason` |
+| §8.2 refusal: the Unicode tables | nowhere — it is this processor's build | `unicodeDataVersion` |
+
+Most diagnostics are about something the consumer is already holding, which is why `expected`/`actual` are
+enough for them: a rendered `<= 100` is a convenience, and the authoritative copy is a file the consumer has.
+The two exceptions are both cases where the cause lives outside both documents. A second filter applies to
+what goes on a wire: **is it actionable by whoever receives it** — which is what keeps the policy off the
+diagnostic entirely while leaving it on `TsonUnicodePolicy`, where the deployment that set it reads it.
 
 Either end may be absent: a schema-side problem has no data, and a schemaless read has no schema. **Both
 pointers are `Optional<String>`, and that is load-bearing** — RFC 6901 spells "the whole document" as `""`,

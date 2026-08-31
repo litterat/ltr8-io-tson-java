@@ -188,11 +188,11 @@ public final class TsonTreeReader {
 
     /**
      * This reader applying {@code policy} to the <b>names</b> a document carries -- a type-ref name and an
-     * annotation name -- instead of the default. [TSON-DATA] §8.2's mechanism 3, whose RECOMMENDED default is
+     * annotation name -- instead of the default. [TSON-DATA] §8.2's restricted-script rule, whose RECOMMENDED default is
      * Highly Restrictive over the whole name, which is what a reader carries until this is called.
      *
      * <p><b>Relaxing it is a code decision, and deliberately not an ambient one.</b> §8.2 requires that a
-     * deployment be able to relax any of the three mechanisms and that the relaxation not be silent: a policy
+     * deployment be able to relax any of the three rules and that the relaxation not be silent: a policy
      * read from the environment is invisible at the call site and absent from review, where one expressed here
      * is greppable, attributable, and scoped to the reader that holds it.
      *
