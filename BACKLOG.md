@@ -94,6 +94,14 @@ holding, not shapes outside it.
   cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
   carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope
   mid-document — doesn't exist anywhere in the reader stack.
+- [ ] **`complex`'s host type is unreachable from a consumer.** `ComplexParser` produces
+  `io.ltr8.tson.compiler.atom.Complex`, in a package `tson-compiler` does not export, so a `complex` value
+  can be read but never named: no `as(Complex.class)`, and no record component to bind one to. Its two peers
+  are already on the right side of that boundary — `rational` produces `schema.meta.Rational` and `duration`
+  `schema.meta.IsoDuration` — so the move is `Complex` into `schema.meta` beside them, where its own
+  `ComplexType` already sits, `ComplexParser` staying in `atom` with the other parsers. `core.tn` declares
+  `complex => !complex_type {}`, so this is a declared type of the standard library rather than a corner of
+  the vocabulary.
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
   matching that family's existing *narrowing* gap and each blocked on the same thing — `tson-schema` has no
@@ -206,7 +214,6 @@ surface.
 
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
   session-oriented internal narrative exists.
-- [ ] AI skills for using the library.
 - [ ] `@doc`-driven documentation generation (render a schema's own `@doc` annotations). The renderer is the
   whole of it — the data is reachable as
   `schema.entries().getAnnotations(name).value("doc", String.class)`, and core.tn documents every declaration.
@@ -229,6 +236,30 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
       which turns this item's deferral from a shrug into a decision.
 
 ## Miscellaneous
+
+- [ ] **`--output json` and `--output tson` spell one report two ways.** `CliDiagnostic`'s components carry
+  `@Field("schema_pointer")` and its siblings, so `--output tson` emits `snake_case` and leaves an absent
+  field out — the shape `diagnostics.tn` declares, and the one that output is validated against — while
+  `OutputFormat.renderJson` hand-writes `camelCase` and emits `null` for those same absences. A consumer who
+  parses one format and then the other finds neither key where it expects it. The TypeScript CLI writes
+  `snake_case` and omits absent fields in *both* formats (`packages/cli/src/diagnosticNode.ts`), so the two
+  implementations disagree as well, and nothing in [TSON-DATA] §8.1 fixes a CLI's wire shape to appeal to.
+  Settling it is picking one spelling for both formats — `snake_case` is the one a schema already describes
+  and the one the other implementation emits — and moving the README's documented JSON sample with it; the
+  alternative, if the JSON shape is meant to answer to a host-ecosystem convention instead, is to say so in
+  `docs/cli-config-hashing.md`, since nothing states it today.
+
+- [ ] **[TSON-DATA] §9.1's resource limits — and the `StackOverflowError` that escapes for want of them.**
+  Nothing bounds nesting depth, token length or document size. A document about 5,000 containers deep
+  overflows the stack inside `TsonDataStream.fill`, and a `StackOverflowError` is an `Error`: it passes
+  through every `catch (RuntimeException)` in the reader stack and in `TsonCli.run` alike, so `tson validate`
+  on one prints a bare JVM stack trace to stderr, nothing to stdout, and **exits 1** — the code that means
+  *your document is invalid*, which is the one verdict this case must not get. Depth is the half that is
+  reachable from a request body and wants doing first; §9.1 asks for all three and asks that they be
+  configurable, which puts the knob on `TsonConfig` beside the two Unicode policies and on the readers as a
+  derivation, the way `withTokenPolicy` already is. A document past the limit must be refused with a
+  diagnostic carrying a position, never a host `Error`. The numeric-literal length limit named in
+  `CLAUDE.md`'s "Not yet implemented" is the fourth limit of the same section and comes with it.
 
 - [ ] **A record field written `_` reads identically to one never written.** Under a schema, `{ x: _  y: "h" }`
   and `{ y: "h" }` against `x: text?` both produce a tree with no `x` at all; the same pair read schemalessly

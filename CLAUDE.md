@@ -999,6 +999,9 @@ compatibility).
   one entry, and a cache *hit* — which is every read, in a process that resolved its schemas at startup —
   takes no lock at all; `docs/linking-and-compilation.md`). What is still open is everything *outside* a read:
   registering schemas concurrently, and mutating a `DataBindContext` after use.
-- **§9.1's numeric-literal length limit** (SHOULD, DoS-hardening) — not enforced.
+- **§9.1's resource limits** (SHOULD, DoS-hardening) — none of them enforced: not nesting depth, token
+  length, document size, or numeric-literal length. Depth is the one that bites, a document a few
+  thousand containers deep overflowing the stack as an `Error` that no `catch (RuntimeException)` in
+  the reader stack or the CLI sees; `BACKLOG.md` has what enforcing them needs.
 - **JSON** — a future JSON reader is a whole separate stack (its own `JsonEventStream` and its own readers,
   deliberately not reusing the TSON readers). Not started, not backlogged.
