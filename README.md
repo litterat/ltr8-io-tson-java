@@ -6,7 +6,7 @@ one hash verifies the whole chain. The finishing touch, TSON's data format is a 
 you'll actually enjoy writing.
 
 > **Status:** first implementation of TSON, built against a working-draft spec (2026
-> revision 33). Part 1 (data format) and most of Part 2 (schema layer) are implemented; the
+> revision 34). Part 1 (data format) and most of Part 2 (schema layer) are implemented; the
 > API and the format itself may still change. See [STATUS.md](STATUS.md) for the full
 > checklist.
 
