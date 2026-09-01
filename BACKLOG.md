@@ -128,14 +128,6 @@ which is why they sit low. The lexer's fail-fast floor is not among them: nothin
 someone decides whether lexer errors feed the `Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds
 that question.
 
-- [ ] **`tson --policy <file.tn>`: configure the Unicode policy from the document `tson policy` emits.** The
-  five flags spell a level, a unit and a list of combinations per surface, which is every policy this library
-  can build except one — a *relaxed token* policy needs a level and a list the flags can express but a
-  combination of the two they cannot pair with anything else. The document is already a schema-governed record
-  with a compiled reader behind it (`diagnostics.tn`'s `policy`, bound to `CliPolicy`), so the work is the
-  round trip: read the file, refuse one that is not a `policy` document, and decide precedence against flags
-  given alongside it.
-
 - [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
   now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against
   `/person/age` lands on `age`'s line. A supertype and a choice variant are bare names in a `List<String>`
