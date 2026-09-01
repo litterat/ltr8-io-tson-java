@@ -251,10 +251,17 @@ silently skip a reference rather than fail.
 - The two families' `appendText` were character-identical and their `appendNumberAware` differed only in
   taking a `Token` or a `TokenValue`; they are one method. `MintedNames`' contract depends on the renderings
   agreeing, and a shared decision about identity kept in two places is how they stop agreeing.
-- **A hash is not normative and is not pinned by the fixtures.** `ResolvedFixtureTest` and the `class2/schema/`
-  conformance runner both normalise a synthetic's content hash to a placeholder before comparing (see
-  `ResolvedForm`), so neither can see a derived name move. Work that touches these renderings wants an
-  explicit before/after over resolved entry names, not the suite alone.
+- **A hash is not normative, so the conformance layer cannot see one move.** `ResolvedFixtureTest` and the
+  `class2/schema/` runner both reduce a synthetic's content hash to a placeholder before comparing (see
+  `ResolvedForm`) — right for a comparison against the spec's own fixtures, since §8.2 leaves the spelling to
+  the implementation, and it means neither can fail on a rendering change. What guards the renderings instead
+  is value-level: `DerivedNameTest` pins both channels, and `SchemaDesugarerTest` pins the binding side end to
+  end. The point is not that the values are required but that a change to them is deliberate — an entry name
+  is part of the resolved form, and an importing schema derives the same name for the same form.
+- **Assert a derived name by value, never by `startsWith`.** The application channel had no value-level guard
+  until `DerivedNameTest`: every assertion on an instantiation name checked the readable half
+  (`startsWith("box_text_")`), which a change to the hashed rendering passes. Perturbing
+  `canonicalApplication` alone left the whole build green.
 
 ## Materialisation (`tson-compiler/.../resolver/TemplateMaterialiser.java`)
 
