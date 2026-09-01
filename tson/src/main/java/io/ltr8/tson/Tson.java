@@ -258,6 +258,12 @@ public final class Tson {
             // differs is the code and the exception's own Reason, which say respectively that no schema was
             // obtained and whose doing that was.
             problems.report(Diagnostic.ofSchemaUnavailable("", "", e, Optional.empty()));
+        } catch (TsonBindMismatchException e) {
+            // A class bound to this schema's governing meta cannot work with it -- a Data body returning null
+            // from references(), say. The schema may be perfectly good and this call cannot say either way,
+            // so it reports the wiring mistake rather than letting a bare runtime exception past a caller who
+            // asked for a list of problems, which would read as a fault in this library.
+            problems.report(Diagnostic.ofSchemaBindMismatch("", "", e, Optional.empty()));
         } catch (TsonSchemaValidationException e) {
             // Whatever the phases still raise rather than report: a document with no !!id, an !!import that
             // loaded and would not link, a !!meta that may not govern. Author errors about the document as

@@ -7,6 +7,8 @@ import io.ltr8.tson.compiler.TsonMissingBindingException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.consumer.Operation;
+import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.consumer.Webhook;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -53,6 +55,10 @@ class MetaLayerConstructorThroughTsonTest {
                 request:  type_ref
                 response: type_ref
               }
+              webhook => ~data & {
+                path:     text
+                delivers: [type_ref]?
+              }
             }
             """;
 
@@ -87,6 +93,37 @@ class MetaLayerConstructorThroughTsonTest {
 
     private static Tson tson() {
         return Tson.builder().schemaSource(SOURCE).metaNameBinder(CONSUMER_NAMES).build();
+    }
+
+    /**
+     * <b>A wiring mistake in the caller's own class is reported to the caller, not thrown past them.</b>
+     * {@link io.ltr8.tson.consumer.Webhook} returns an OPTIONAL component straight out of {@code
+     * references()}, and the binder hands an omitted field to the constructor as {@code null} — so linking a
+     * document that writes no {@code delivers} iterates a null.
+     *
+     * <p>{@code validateSchema} promises a list of problems, so a bare {@code NullPointerException} out of
+     * the schema pipeline is the one thing it must not do: a caller collecting problems reads that as a fault
+     * in this library, and the CLI prints the please-report-it banner for a bug in the caller's own code. The
+     * schema below is perfectly good; what is wrong is one Java class.
+     */
+    @Test
+    void aBoundClassBreakingItsContractIsReportedRatherThanThrownPast() {
+        String schema = """
+                !!id:"https://example.test/hooks.tn"
+                !!meta:"https://example.test/meta-http.tn"
+                !!import:"https://tson.io/2026/34/m/core.tn"
+                {
+                  hook => !webhook { path: "/hook" }
+                }
+                """;
+
+        List<Diagnostic> problems = tson().validateSchema(schema);
+
+        assertEquals(1, problems.size(), problems::toString);
+        Diagnostic problem = problems.getFirst();
+        assertEquals(Diagnostic.Code.BIND_MISMATCH, problem.code(),
+                () -> "the reading application's mistake, not the document's: " + problem);
+        assertTrue(problem.message().contains(Webhook.class.getName()), problem::message);
     }
 
     /** The point of the whole exercise: the resolved body <em>is</em> the consumer's own class. */

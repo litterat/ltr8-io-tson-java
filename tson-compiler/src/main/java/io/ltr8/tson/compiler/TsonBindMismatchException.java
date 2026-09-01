@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler;
 
 /**
- * A governing schema and the Java class bound to it disagree about a type's fields, in a way that would
- * lose data on every document of that type.
+ * A schema and a Java class bound to it cannot work together -- the two disagree about a type's fields in a
+ * way that would lose data on every document of that type, or a class breaks a contract the schema layer
+ * relies on.
  *
  * <p><b>Raised where the two meet, not where a document is read.</b> Both halves are fixed by the time a
  * reader is built -- the schema's field set and the class's components -- so a mismatch is knowable when the
@@ -25,6 +26,13 @@ package io.ltr8.tson.compiler;
  *       {@code @Unbound} is how a class says a component is its own and not the wire's.</li>
  * </ul>
  * A FIXED field is neither: its value is settled by the schema, so a component for it would hold a constant.
+ *
+ * <p><b>The third shape is a broken contract rather than a mismatch</b>, and reaches this at link time: a
+ * {@link io.ltr8.tson.schema.meta.Data} implementation returning {@code null} from {@code references()},
+ * which the linker iterates. It is here for the reason the other two are -- the schema is fine, the class is
+ * nearly fine, and the failure is the reading application's to fix -- and it is here rather than left as the
+ * {@code NullPointerException} it would otherwise be because every channel above reads a bare runtime
+ * exception out of the schema pipeline as a fault in this library, and asks for a bug report against it.
  */
 public class TsonBindMismatchException extends RuntimeException {
 

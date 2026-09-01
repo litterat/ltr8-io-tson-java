@@ -304,6 +304,24 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     }
 
     /**
+     * A schema and a class bound to it that cannot work together -- {@link #ofSchemaError}'s shape with
+     * {@link Code#BIND_MISMATCH} in place of {@code SCHEMA_ERROR}, and the difference between "your schema is
+     * wrong" and "this application is wired wrong".
+     *
+     * <p>Built from a {@link TsonBindMismatchException} and from nothing else. It exists so a collecting
+     * caller hears about a wiring mistake in the same list as everything else rather than having it thrown
+     * past them as though it were a fault in this library: the schema may be perfectly good, and the message
+     * names one of the caller's own classes.
+     */
+    public static Diagnostic ofSchemaBindMismatch(String schemaId, String declaration,
+                                                  TsonBindMismatchException e,
+                                                  Optional<SourcePosition> position) {
+        return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
+                schemaId, Code.BIND_MISMATCH, e.getMessage(), "", "", Optional.empty(), position,
+                Optional.empty());
+    }
+
+    /**
      * A construct this library has not implemented, found at one declaration -- {@link #ofSchemaError}'s
      * shape with {@link Code#NOT_IMPLEMENTED} in place of {@code SCHEMA_ERROR}, and the whole of the
      * difference between "your schema is wrong" and "this schema could not be checked".
