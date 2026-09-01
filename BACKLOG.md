@@ -94,14 +94,6 @@ holding, not shapes outside it.
   cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
   carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope
   mid-document — doesn't exist anywhere in the reader stack.
-- [ ] **`complex`'s host type is unreachable from a consumer.** `ComplexParser` produces
-  `io.ltr8.tson.compiler.atom.Complex`, in a package `tson-compiler` does not export, so a `complex` value
-  can be read but never named: no `as(Complex.class)`, and no record component to bind one to. Its two peers
-  are already on the right side of that boundary — `rational` produces `schema.meta.Rational` and `duration`
-  `schema.meta.IsoDuration` — so the move is `Complex` into `schema.meta` beside them, where its own
-  `ComplexType` already sits, `ComplexParser` staying in `atom` with the other parsers. `core.tn` declares
-  `complex => !complex_type {}`, so this is a declared type of the standard library rather than a corner of
-  the vocabulary.
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
   matching that family's existing *narrowing* gap and each blocked on the same thing — `tson-schema` has no

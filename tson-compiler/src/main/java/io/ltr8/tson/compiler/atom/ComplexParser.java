@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.base.ComplexForm;
 import io.ltr8.tson.compiler.base.NumberForm;
 import io.ltr8.tson.compiler.base.NumberForms;
 import io.ltr8.tson.compiler.base.NumberGrammar;
+import io.ltr8.tson.schema.atom.Complex;
 
 import java.math.BigDecimal;
 import java.util.Optional;

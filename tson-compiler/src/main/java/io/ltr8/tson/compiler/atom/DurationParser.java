@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.DurationType;
-import io.ltr8.tson.schema.meta.IsoDuration;
+import io.ltr8.tson.schema.atom.IsoDuration;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

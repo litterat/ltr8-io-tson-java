@@ -17,7 +17,7 @@ Eight JPMS modules, all published together as `io.ltr8:<module>`:
 | `tson`           | `io.ltr8.tson`            | the front door: `Tson`, `TsonConfig`, the two schema sources    |
 | `tson-compiler`  | `io.ltr8.tson.compiler`   | the engine: readers, writers, `Diagnostic`, lexer, both grammars |
 | `tson-tree`      | `io.ltr8.tson.tree`       | `TsonValue` and its node types — the read output of tree mode   |
-| `tson-schema`    | `io.ltr8.tson.schema`     | the resolved-schema value model + the schema registry           |
+| `tson-schema`    | `io.ltr8.tson.schema`     | the resolved-schema value model, the atom host types, the registry |
 | `tson-bind`      | `io.ltr8.bind`            | the generic `DataValue`↔Java-object binding engine              |
 | `tson-annotation`| `io.ltr8.annotation`      | `@Typename`/`@Field`/`@Record`/… and the `Annotations` carrier  |
 | `tson-regex`     | `io.ltr8.tson.regex`      | a standalone RFC 9485 I-Regexp engine (no TSON dependency)      |

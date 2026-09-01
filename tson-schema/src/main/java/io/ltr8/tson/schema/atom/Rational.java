@@ -1,4 +1,4 @@
-package io.ltr8.tson.schema.meta;
+package io.ltr8.tson.schema.atom;
 
 import java.math.BigInteger;
 import java.util.Objects;

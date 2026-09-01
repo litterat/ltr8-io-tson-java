@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.base.NumberForm;
 import io.ltr8.tson.compiler.base.NumberGrammar;
 import io.ltr8.tson.compiler.base.RationalForm;
-import io.ltr8.tson.schema.meta.Rational;
+import io.ltr8.tson.schema.atom.Rational;
 import io.ltr8.tson.schema.meta.RationalType;
 
 import java.math.BigInteger;

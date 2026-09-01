@@ -7,6 +7,8 @@ import io.ltr8.tson.compiler.atom.DurationParser;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.atom.IsoDuration;
+import io.ltr8.tson.schema.atom.Rational;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
@@ -83,7 +85,7 @@ class AtomValueReaderTest {
     @Test
     void rational() {
         // "/" isn't a valid bare-token character in TSON's own grammar -- real data quotes it.
-        io.ltr8.tson.schema.meta.Rational expected = new io.ltr8.tson.schema.meta.Rational(
+        Rational expected = new Rational(
                 java.math.BigInteger.valueOf(2), java.math.BigInteger.valueOf(3));
         assertEquals(expected, readValue(RationalType.UNCONSTRAINED, "{ value: \"2/3\" }"));
     }
@@ -121,7 +123,7 @@ class AtomValueReaderTest {
     @Test
     void duration() {
         assertEquals("PT1H30M", DurationParser.UNCONSTRAINED.write(
-                (io.ltr8.tson.schema.meta.IsoDuration) readValue(DurationType.UNCONSTRAINED, "{ value: PT1H30M }")));
+                (IsoDuration) readValue(DurationType.UNCONSTRAINED, "{ value: PT1H30M }")));
     }
 
     @Test

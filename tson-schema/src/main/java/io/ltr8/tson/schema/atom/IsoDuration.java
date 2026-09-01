@@ -1,4 +1,6 @@
-package io.ltr8.tson.schema.meta;
+package io.ltr8.tson.schema.atom;
+
+import io.ltr8.tson.schema.meta.DurationType;
 
 import java.time.Duration;
 import java.time.Period;

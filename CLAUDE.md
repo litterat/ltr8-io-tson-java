@@ -200,9 +200,17 @@ module has a real `module-info.java`; module names mirror each module's root exp
   final `Memoized`, so laziness is confined to the cyclic edge and every other component still resolves
   eagerly. The AST is the case that needs it (`DataValue` → `CoreValue` → `RecordValue` → `ScopedValue` →
   `DataValue`), which is what lets a held template body be written at all.
-- **`tson-schema`** — **only** `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
+- **`tson-schema`** — `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
   records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
-  deliberately open branch, `Data`, which a consumer's own class implements — see below) plus the schema
+  deliberately open branch, `Data`, which a consumer's own class implements — see below), plus
+  `io.ltr8.tson.schema.atom` — the three **host value types** the built-in atoms read to (`Rational`,
+  `IsoDuration`, `Complex`), which is the question a consumer arrives with (*what do I get back from
+  `!rational`?*) and not part of §8's model. Two of them are in this module because `schema.meta` needs
+  them structurally — `RationalType`'s `min`/`max`/`multiple_of` are `Rational` values — and `Complex` is
+  here because splitting the three by whether the schema model happens to reuse one as a facet value is a
+  distinction a consumer can neither see nor predict. The parsing half stays in `tson-compiler`'s unexported
+  `atom` package, the same split `schema.meta.IntegerType` and `compiler.atom.IntegerParser` already make.
+  Plus the schema
   registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`/`TsonCanonicalIdentity`) and
   `TsonBundledSchemas`. **The linker is not here** — it is an engine, not a value model, so
   `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the pipeline; what

@@ -38,12 +38,12 @@ Verified by reading each form through `TsonTreeReader` and asking `as(Object.cla
 | `positive_integer`, `non_negative_integer`, `negative_integer`, `non_positive_integer` | `BigInteger`  |
 | `number`                                        | `BigDecimal`                                    |
 | `float32` / `float64`                           | `Float` / `Double`                              |
-| `rational`                                      | `io.ltr8.tson.schema.meta.Rational`             |
-| `complex`                                       | `io.ltr8.tson.compiler.atom.Complex` — **not exported**, so a consumer cannot name it |
+| `rational`                                      | `io.ltr8.tson.schema.atom.Rational`             |
+| `complex`                                       | `io.ltr8.tson.schema.atom.Complex`              |
 | `text`, `mac`, `cidr4`, `cidr6`, `email`, `regex` | `String`                                      |
 | `uuid`                                          | `UUID`                                          |
 | `date` / `time` / `datetime`                    | `LocalDate` / `OffsetTime` / `OffsetDateTime`   |
-| `duration`                                      | `io.ltr8.tson.schema.meta.IsoDuration`          |
+| `duration`                                      | `io.ltr8.tson.schema.atom.IsoDuration`          |
 | `uri`                                           | `URI`                                           |
 | `ipv4` / `ipv6`                                 | `Inet4Address` / `Inet6Address`                 |
 | `base64`, `base64url`, `base32`, `hex`          | `byte[]`                                        |
@@ -190,9 +190,6 @@ written, not only where the reader keeps them.
 
 ## Known rough edges
 
-- **`complex` has no nameable host type.** `io.ltr8.tson.compiler.atom.Complex` is in an unexported
-  package, so a consumer cannot declare a component of it. `rational` and `duration` do not have this
-  problem — `Rational` and `IsoDuration` live in the exported `io.ltr8.tson.schema.meta`.
 - **A class mapped by `bindings` with no `@Typename` reads but cannot be written.**
 - **`DataBindException` is checked**, on `DataBindContext`'s own descriptor API. The facade readers do
   not surface it; a hand-written binder call must handle it.
