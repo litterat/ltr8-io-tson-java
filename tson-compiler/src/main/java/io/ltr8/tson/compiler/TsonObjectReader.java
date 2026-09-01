@@ -223,6 +223,19 @@ public final class TsonObjectReader {
                 bind, receiver, schemaUri, tokenPolicy, namePolicy);
     }
 
+    /**
+     * The two Unicode policies this reader applies, and the data version behind them -- what a caller states
+     * beside the diagnostics from a read, and what a deployment publishes so a sender never writes a name
+     * that would be refused.
+     *
+     * <p>Read off the reader that judged rather than off the configuration a caller believes it set: a
+     * derived reader ({@link #withNamePolicy}, {@link #withTokenPolicy}) is exactly where the two can differ,
+     * and a response quoting the wrong one is worse than quoting none.
+     */
+    public TsonProcessorPolicy processorPolicy() {
+        return TsonProcessorPolicy.of(namePolicy, tokenPolicy);
+    }
+
     // ── Whole-document entry points ──────────────────────────────────────
 
     /** Reads {@code source}'s whole document into {@code targetClass}, fail-fast -- validated against its {@code !!schema} if this reader is schema-aware and the document declares one, schemaless otherwise. */

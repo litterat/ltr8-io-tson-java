@@ -5,7 +5,6 @@ import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -45,9 +44,6 @@ class SchemaPolicyRefusalTest {
 
         problems.forEach(problem -> assertTrue(isRefusal(problem),
                 () -> "§8.2's refusal is not one of §8.1's four categories: " + problems));
-        problems.forEach(problem -> assertEquals(Optional.of(TsonUnicodePolicy.dataVersion()),
-                problem.unicodeDataVersion(),
-                () -> "§8.2: a refusal MUST name the data version it was computed against: " + problems));
         return problems;
     }
 
@@ -100,5 +96,27 @@ class SchemaPolicyRefusalTest {
     @Test
     void aMixedScriptDeclaredNameIsRestrictedScript() {
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, soleRefusal("  p" + CYR_A + "y => text").code());
+    }
+
+    /**
+     * <b>What refused a declared name is stated by the instance, not by the diagnostic</b> -- the same answer
+     * the data end gives ({@code PolicyRefusalTest}), from the same place. §8.2 requires a refusal to be
+     * reported under a stated policy and a stated data version, and both are properties of this processor:
+     * constant across every refusal a run produces, and needed by whoever writes the next schema *before*
+     * they write it, which a component that only appears on a failure cannot supply.
+     */
+    @Test
+    void theInstanceStatesThePolicyThatRefusedTheName() {
+        Tson tson = Tson.builder().identifierPolicy(TsonUnicodePolicy.asciiOnly()).build();
+
+        assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, tson.validateSchema("""
+                !!id:"https://example.test/refusal-policy.tn"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
+                !!import:"https://tson.io/2026/34/m/core.tn"
+                { p%sy => text }
+                """.formatted(CYR_A)).getFirst().code());
+
+        assertEquals(TsonUnicodePolicy.Level.ASCII_ONLY, tson.processorPolicy().names().level());
+        assertEquals(TsonUnicodePolicy.dataVersion(), tson.processorPolicy().unicodeDataVersion());
     }
 }

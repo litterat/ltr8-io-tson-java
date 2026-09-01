@@ -14,10 +14,10 @@
   identity, so this document is in development and is edited in place. Bumping per change instead
   mints versions nobody ever consumed, one for every field added during a development cycle.
 
-  diagnostic_code and fetch_reason are hand-written copies of Diagnostic.Code and
-  TsonSchemaFetchException.Reason. DiagnosticsSchemaTest checks both copies against the Java enums
-  in both directions, which is what catches a member added to one and forgotten here -- before that
-  test existed, two such omissions were noticed only by a version bump.
+  diagnostic_code, fetch_reason and restriction_level are hand-written copies of Diagnostic.Code,
+  TsonSchemaFetchException.Reason and TsonUnicodePolicy.Level. DiagnosticsSchemaTest checks every copy
+  against the Java enum in both directions, which is what catches a member added to one and forgotten
+  here -- before that test existed, two such omissions were noticed only by a version bump.
 
   BIND_MISMATCH is not reachable from this CLI, which reads in DOM mode and binds nothing. It is
   declared because this enum copies Diagnostic.Code, not the subset one consumer happens to emit
@@ -50,20 +50,14 @@
     A position is "line:column:byte_offset", all three 1-based except byte_offset, which counts
     UTF-8 bytes from 0 ([TSON-DATA] §8.1).
 
-    unicode_data_version is carried by, and only by, the three codes that are a §8.2 name-hygiene
-    refusal rather than a verdict, one per rule: CONFUSABLE_NAMES for two names in one scope that read
-    alike, RESTRICTED_CHARACTER for a character outside the identifier profile, and RESTRICTED_SCRIPT for a
-    script the restriction level does not admit -- usually a combination, but at the ASCII-only level a
-    single script with nothing mixed, which is why the code names what was refused rather than a mix.
-
-    §8.2 requires a refusal to name the Unicode data version it was computed against,
-    because §8.3 marks all three rules unstable across Unicode releases -- two conforming
-    processors may legitimately disagree about one name, and the version is the only thing that
-    explains it. It is here rather than in message for the reason fetch_reason is: a fact belongs in
-    a field when it cannot be recovered from the document plus the schema, and a processor's own
-    Unicode tables travel nowhere else. Which rule refused is the code, so nothing else is
-    carried -- the policy that judged is the deployment's own configuration, known already to
-    whoever set it and not actionable by whoever reads the report.
+    A §8.2 name-hygiene refusal is one of these like any other problem, told apart by its code --
+    CONFUSABLE_NAMES for two names in one scope that read alike, RESTRICTED_CHARACTER for a character
+    outside the identifier profile, RESTRICTED_SCRIPT for a script the restriction level does not admit
+    (usually a combination, but at the ASCII-only level a single script with nothing mixed, which is why
+    the code names what was refused rather than a mix). It carries no field of its own: what §8.2 requires
+    a refusal to name -- the Unicode data version it was computed against -- is a fact about the
+    processor rather than about the problem, constant for every refusal in the run, so the envelope
+    states it once in `policy` and this states the remedy.
     """
   diagnostic => {
     path: text?
@@ -76,9 +70,38 @@
     data_position: text?
     schema_position: text?
     fetch_reason: fetch_reason?
-    unicode_data_version: text?
   }
-  validation_report => { valid: boolean  errors: [diagnostic] }
+  @doc:"""
+    UTS #39 §5.2's restriction levels, a hand-written copy of TsonUnicodePolicy.Level checked against it
+    by DiagnosticsSchemaTest the way diagnostic_code and fetch_reason are.
+    """
+  restriction_level => !enum [
+    ASCII_ONLY SINGLE_SCRIPT HIGHLY_RESTRICTIVE MODERATELY_RESTRICTIVE MINIMALLY_RESTRICTIVE UNRESTRICTED
+  ]
+  @doc:"""
+    One [TSON-DATA] §8.2 policy surface: the restriction level, whether it applies to each _/- delimited
+    segment rather than to the whole text, and any script combinations admitted over and above the level
+    (UTS #39 §5.2's own device for Latn+Jpan and its siblings). Each entry in `permitting` is one such
+    combination, named by java.lang.Character.UnicodeScript -- Latin, Cyrillic, Han.
+    """
+  unicode_policy => { level: restriction_level  per_segment: boolean  permitting: [[text]] }
+  @doc:"""
+    What this processor's configuration does to a document's fate, stated once per run.
+
+    §8.2's three name-hygiene rules read data the Unicode Consortium does not freeze, at a level the
+    reading deployment chooses, so the same bytes may be accepted here and refused elsewhere. This is the
+    statement of why: `names` governs declared names, field names, type-refs and annotation names, where
+    all three rules apply; `tokens` governs values, where only the restricted-script rule can, a token
+    having no identifier profile and no scope to be distinct within.
+
+    unicode_data_version is the UCD release whose tables the rules were computed against, which is the
+    version §8.2's "UTS #39 data version" means (SPEC-FEEDBACK.md #6). It is here rather than on each
+    diagnostic because it is constant for the life of the process, and because what a sender needs in
+    order not to be refused is this record *before* it writes a document -- which `tson policy` prints
+    with no document in hand.
+    """
+  policy => { names: unicode_policy  tokens: unicode_policy  unicode_data_version: text }
+  validation_report => { valid: boolean  policy: policy  errors: [diagnostic] }
   file_report => { file: text  valid: boolean  errors: [diagnostic] }
-  validation_run => { valid: boolean  files: [file_report]  errors: [diagnostic] }
+  validation_run => { valid: boolean  policy: policy  files: [file_report]  errors: [diagnostic] }
 }

@@ -57,6 +57,26 @@ final class ValidateCommand {
         // (scheme and ?sha256= stripped) and so would not be the string the author actually wrote.
         List<String> declaredIds = new ArrayList<>();
         List<ValidateInput> dataInputs = new ArrayList<>();
+
+        // The provided schemas, made available by !!id; the bundled standard library is always served
+        // underneath. Tson.validate resolves a data file's !!schema through this. Built before the files are
+        // classified because it reads `schemas` only when a document asks for one, and because the run's own
+        // policy has to come from the instance that judges -- including on a run that fails classification
+        // and judges nothing, whose report carries the same envelope as any other.
+        TsonSchemaSource source = uri -> {
+            String text = schemas.get(TsonCanonicalIdentity.canonicalize(uri));
+            if (text == null) {
+                // TsonSchemaFetchException, not an IllegalStateException: this is a source saying it cannot
+                // supply a schema, which is the one thing the fetch contract names a type for. Anything else
+                // thrown from here would be classified as a fault in this command and rethrown as one.
+                throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+                        "no schema file on the command line declares that !!id" + supplied(declaredIds), null);
+            }
+            return text;
+        };
+        Tson tson = Tson.builder().schemaSource(source).build();
+        CliPolicy policy = CliPolicy.from(tson.processorPolicy());
+
         for (ValidateInput input : inputs) {
             // Standard input is a data document by definition -- classification opens the document a second
             // time, and a stream has nothing to reopen. See ValidateInput.
@@ -68,8 +88,8 @@ final class ValidateCommand {
             try {
                 schema = isSchemaDocument(file);
             } catch (IOException e) {
-                System.out.println(format.render(ValidationRun.failed(Diagnostic.Code.VALIDATION_ERROR,
-                        cannotRead(input, e))));
+                System.out.println(format.render(ValidationRun.failed(policy,
+                        Diagnostic.Code.VALIDATION_ERROR, cannotRead(input, e))));
                 return 2;
             }
             if (schema) {
@@ -87,8 +107,8 @@ final class ValidateCommand {
                         declaredIds.add(id);
                     }
                 } catch (RuntimeException e) {
-                    System.out.println(format.render(ValidationRun.failed(Diagnostic.Code.SCHEMA_ERROR,
-                            file + ": " + e.getMessage())));
+                    System.out.println(format.render(ValidationRun.failed(policy,
+                            Diagnostic.Code.SCHEMA_ERROR, file + ": " + e.getMessage())));
                     return 2;
                 }
             } else {
@@ -97,25 +117,10 @@ final class ValidateCommand {
         }
 
         if (dataInputs.isEmpty()) {
-            System.out.println(format.render(ValidationRun.failed(Diagnostic.Code.VALIDATION_ERROR,
+            System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.VALIDATION_ERROR,
                     "no data files to validate (only schema files were given)")));
             return 2;
         }
-
-        // The provided schemas, made available by !!id; the bundled standard library is always served
-        // underneath. Tson.validate resolves a data file's !!schema through this.
-        TsonSchemaSource source = uri -> {
-            String text = schemas.get(TsonCanonicalIdentity.canonicalize(uri));
-            if (text == null) {
-                // TsonSchemaFetchException, not an IllegalStateException: this is a source saying it cannot
-                // supply a schema, which is the one thing the fetch contract names a type for. Anything else
-                // thrown from here would be classified as a fault in this command and rethrown as one.
-                throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
-                        "no schema file on the command line declares that !!id" + supplied(declaredIds), null);
-            }
-            return text;
-        };
-        Tson tson = Tson.builder().schemaSource(source).build();
 
         // Every file's report is collected before anything is printed: the envelope's own verdict is the
         // AND across the files, so there is nothing to emit until the last one is in.
@@ -136,7 +141,7 @@ final class ValidateCommand {
             reports.add(FileReport.of(dataInput.name(), errors));
         }
 
-        ValidationRun run = ValidationRun.of(reports);
+        ValidationRun run = ValidationRun.of(policy, reports);
         System.out.println(format.render(run));
         return run.valid() ? 0 : TsonCli.exitCodeFor(reports.stream()
                 .flatMap(report -> report.errors().stream()).map(CliDiagnostic::code).toList());

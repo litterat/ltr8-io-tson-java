@@ -320,9 +320,10 @@ profile too", taking that rule with it, so `appliesIdentifierProfile()` guards t
 call at both walks — the read context's and the linker's. Every other level keeps the profile, the
 restricted-script rule gating itself inside `violation()`.
 
-**And the refusal names its own data version** (`unicodeDataVersion`, below). §8.2 reports a refusal under a
-*stated policy and a stated data version* and makes naming the version a MUST, because §8.3 marks all three
-rules unstable across Unicode releases — which is the whole reason a refusal is not validity.
+**And the run names the policy and the data version it judged under** (`TsonProcessorPolicy`, below). §8.2
+reports a refusal under a *stated policy and a stated data version* and makes naming the version a MUST,
+because §8.3 marks all three rules unstable across Unicode releases. Both are stated once, off the reader
+that judged, rather than on each refusal.
 `PolicyRefusalTest`/`SchemaPolicyRefusalTest` pin the data and schema ends against each other.
 
 ## Diagnostics (`Diagnostic`, root package)
@@ -335,8 +336,8 @@ from readers;
 `NOT_IMPLEMENTED`/`BIND_MISMATCH`/`SCHEMA_UNAVAILABLE` — the three that are not a verdict on the document
 at all),
 `message` (hand-composed per call site), `expected`/`actual` (machine-parseable), **four location
-components covering two ends** — the value in the data, and the rule in the schema — and the two components
-that are not locations, `fetchReason` and `unicodeDataVersion`. Both exist for one reason: a fact a consumer
+components covering two ends** — the value in the data, and the rule in the schema — and the one component
+that is not a location, `fetchReason`. It exists for one reason: a fact a consumer
 acts on that is recoverable from neither the document nor the schema.
 
 **The four are JSON Schema 2020-12 §12's own output unit**, deliberately: `path` is `instanceLocation` (an
@@ -367,14 +368,10 @@ which the facades alone reach — no reader in the compiled stack can have one t
 not be fetched having no compiled readers to run), and `Diagnostic.ofSchemaUnavailable` takes the exception
 rather than its message so the schema-document channel states it too.
 
-**`unicodeDataVersion` is the same argument for §8.2's fifth outcome**, present for the three codes that
-are refusals — `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT` — and no other. §8.2 requires a
-refusal to name the Unicode data version it was computed against, because §8.3 marks all three rules
-unstable across Unicode releases and that instability is what lets two conforming processors legitimately
-disagree about one name. It is the one fact about a refusal that is unrecoverable afterwards.
-`TsonUnicodePolicy.dataVersion()` is the same value as a static accessor, for a caller stating it once per
-response rather than once per problem; the constant behind it (`Xid.UNICODE_VERSION`) is in the unexported
-`lexer` package and unreachable otherwise.
+**A §8.2 refusal carries no component of its own**, and the rule that keeps it out is the one that let
+`fetchReason` in. §8.2 requires a refusal to name the Unicode data version it was computed against, which is
+a fact about *this processor* rather than about the problem — see `TsonProcessorPolicy` below, which is
+where it and the policy are stated, once.
 
 **Which rule refused is the code, and nothing beside it.** One code per §8.2 rule —
 `CONFUSABLE_NAMES` for skeleton distinctness, `RESTRICTED_CHARACTER` for `Identifier_Status`,
@@ -390,17 +387,41 @@ headings being exact and being jargon a consumer reading an error body cannot de
 runners keep an explicit table from the corpus's spec-named spelling to these, since the two vocabularies
 differ on purpose.
 
-**What is deliberately not carried is the policy that judged.** The level, the unit and any `permitting`
-script set are the reading deployment's own configuration: known already to whoever set them, and not
-actionable by whoever receives the report — the sender of a refused document cannot change them, and the
-operator who can does not need to be told. `RESTRICTED_SCRIPT` is also the one code a *value* can carry, a token
-having no identifier profile and no scope to be distinct within.
+`RESTRICTED_SCRIPT` is also the one code a *value* can carry, a token having no identifier profile and no
+scope to be distinct within.
+
+## `TsonProcessorPolicy` — the configuration, stated once
+
+The two §8.2 policies (`names` and `tokens`, each a level, a unit, and any `permitting` relaxations) and the
+UCD version the rules were computed against, as one value: `Tson.processorPolicy()`, either facade's
+`processorPolicy()`, and `tson policy` on the command line, which prints it as text, JSON, or a TSON
+document. Every `tson-cli` envelope carries one in its `policy` field.
+
+**It is not a diagnostic component, and the three reasons are the shape of the whole design.**
+
+- **Cardinality.** It is constant for the life of a process. Twenty refusals in one document would carry
+  twenty copies of a string that cannot differ, and a consumer given twenty copies has to decide what a
+  disagreement between them would mean.
+- **Time.** A component on a refusal exists only once something has been refused. What a sender needs in
+  order *not* to be refused is the same fact before it writes the document — which is why the standalone
+  surface matters more than the envelope one, and why `tson policy` exists at all. A generator that reads
+  the policy first never writes the name that would be refused.
+- **Direction.** A version says what refused you; a level says what would be accepted. `16.0` is not
+  something a caller acts on, where `ASCII_ONLY` is. Two processors at one UCD version routinely disagree,
+  because the level is a local choice; two at different versions rarely do — so the half §8.2 requires is
+  the half that explains less.
+
+**Read off the reader that judged**, not rebuilt from a configuration object: a derived reader
+(`withNamePolicy`, `withTokenPolicy`) is exactly where the two can differ, and a response quoting the wrong
+one is worse than quoting none. `TsonUnicodePolicy.dataVersion()` remains the version as a static accessor;
+the constant behind it (`Xid.UNICODE_VERSION`) is in the unexported `lexer` package and unreachable
+otherwise. `SPEC-FEEDBACK.md` #14 proposes §8.2 require this shape rather than the per-refusal copy.
 
 ### When a fact earns a component
 
-`fetchReason` and `unicodeDataVersion` are the only two non-location components, and the rule that keeps
-them from becoming a precedent for structuring every code is one line: **carry a fact as a component when it
-is not recoverable from the document plus the schema.**
+`fetchReason` is the only non-location component, and the rule that keeps it from becoming a precedent for
+structuring every code is one line: **carry a fact as a component when it is not recoverable from the
+document plus the schema, and when it is a fact about the problem rather than about the processor.**
 
 | Problem | Where the fact already is | Component? |
 |---|---|---|
@@ -409,13 +430,13 @@ is not recoverable from the document plus the schema.**
 | `DUPLICATE_FIELD`/`DUPLICATE_MAP_KEY` | in the document, at `path` | no |
 | §8.2 refusal: which rule | it is the `Code` | no |
 | `SCHEMA_UNAVAILABLE` | nowhere — it is about the world | `fetchReason` |
-| §8.2 refusal: the Unicode tables | nowhere — it is this processor's build | `unicodeDataVersion` |
+| §8.2 refusal: the policy and the Unicode tables | nowhere — it is this processor's configuration | no — `TsonProcessorPolicy`, once per run |
 
 Most diagnostics are about something the consumer is already holding, which is why `expected`/`actual` are
 enough for them: a rendered `<= 100` is a convenience, and the authoritative copy is a file the consumer has.
-The two exceptions are both cases where the cause lives outside both documents. A second filter applies to
-what goes on a wire: **is it actionable by whoever receives it** — which is what keeps the policy off the
-diagnostic entirely while leaving it on `TsonUnicodePolicy`, where the deployment that set it reads it.
+The one exception is the case where the cause lives outside both documents. The last row is the second half
+of the rule: the fact is unrecoverable *and* actionable, and it is still not a component — because it belongs
+to the run rather than to the problem, so putting it here would be N copies of one answer.
 
 Either end may be absent: a schema-side problem has no data, and a schemaless read has no schema. **Both
 pointers are `Optional<String>`, and that is load-bearing** — RFC 6901 spells "the whole document" as `""`,

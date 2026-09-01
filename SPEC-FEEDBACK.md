@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The thirteen below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
+The fourteen below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
 seventeen raised against Revision 33 are gone from here, because the spec now carries their rules and that
 is where the answer belongs. **This file is the as-built record**, not a pointer to one: where an entry
 proposes a design this implementation has built, the entry states the design, what is running, and what is
@@ -296,7 +296,7 @@ whether two implementations skip or run the same vector rides on which number bo
 
 **Interpretation chosen:** the **UCD version**. This implementation carries the tables for one UCD release,
 verified against `DerivedCoreProperties.txt` for that release, and states it as `16.0` — reachable as
-`TsonUnicodePolicy.dataVersion()` and carried on every refusal as `Diagnostic.unicodeDataVersion`.
+`TsonUnicodePolicy.dataVersion()`, and carried on the run rather than on each refusal (#14).
 The UCD version is the one that answers the question §8.2 asks it to answer: it identifies the tables, which
 is what explains a disagreement between two processors, where a UTS #39 revision number would identify the
 prose that describes the mechanisms — stable across exactly the refreshes §8.2 exists to make visible.
@@ -604,5 +604,66 @@ merits.
 
 **Status against Revision 34:** open, and new against this revision — recorded as a decision to keep, pending the
 author's confirmation.
+
+---
+
+## 14. §8.2 puts the data version on each refusal and §8.1 puts a refusal on a channel of its own — both bill the sender for a round trip
+
+**Section:** [TSON-DATA] §8.2 (name hygiene: "a conforming processor MUST name the UTS #39 data version in the
+refusal"), §8.1 (the four error categories, and the fifth outcome §8.2 requires be kept out of them).
+
+**Problem:** §8.2 asks a refusal to carry a fact that does not belong to it. The Unicode data version is a property
+of the *processor* — the tables compiled into it — not of the problem it found. Three things follow, and each one
+is a cost paid by the party the report exists to help:
+
+- **Cardinality.** The version is constant for the life of a process. Twenty refusals in one document carry twenty
+  copies of a string that cannot differ, and a reader given twenty copies of one value has to decide what it would
+  mean if they ever disagreed.
+- **Time.** A component on a refusal exists only once something has been refused. What a sender needs in order not
+  to be refused is the same fact *before* it writes the document. §8.2 mandates the copy that arrives too late and
+  says nothing about the one that would have arrived in time.
+- **Direction.** The version says what refused you; it does not say what would be accepted. `16.0` is not something
+  a generator can act on. `ASCII_ONLY`, or `HIGHLY_RESTRICTIVE per segment permitting [Latin+Cyrillic]`, is — and
+  §8.2 requires none of it, though it is the half that explains a disagreement between two deployments. Two
+  processors at one UCD version routinely disagree, because the level is a local choice; two at different versions
+  rarely do.
+
+The fifth outcome is the same cost in the other channel. §8.2 says a refusal MUST NOT be reported in any of §8.1's
+four categories, which is right about the taxonomy — the four sort by which layer found a problem, and a refusal is
+not found by a layer — but a consumer reads a report to repair a document, and a repair channel split in two is
+repaired in two passes. For the use TSON is being built for, an agent generating a document against a schema, that
+is a second round trip bought with nothing: the refusal and the ordinary errors want the same edit pass, and the
+distinction §8.2 is protecting is carried perfectly well by *which rule refused*, which the report has to state
+anyway.
+
+**Interpretation chosen:** a refusal is reported like any other rejection, and the configuration is stated once.
+
+- **The refusal is an ordinary diagnostic**, told apart by its code — `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`,
+  `RESTRICTED_SCRIPT`, one per §8.2 rule, since the three want three different remedies and the code is what a
+  consumer routes on. It carries no component of its own, and it reaches the caller in the same single list, in the
+  same pass, as every other problem with the document. §8.2's separation survives where it is a claim about
+  *validity*: nothing here says a refused document is malformed, and the conformance corpus's `refused` vectors
+  still assert that a refused document reports nothing under the four categories.
+- **The version and the policies are one value** — level, unit (whole-name or per `_`/`-` segment), the script
+  combinations admitted over and above the level, for each of the two surfaces §8.2 defines, plus the UCD version
+  (#6) — stated once on the run or response that carries the diagnostics, and reachable with no document in hand at
+  all: `Tson.processorPolicy()`, either read facade's `processorPolicy()`, and `tson policy` on the command line,
+  which prints it as text, JSON, or a TSON document governed by this project's own schema.
+
+That last surface is the one that changes the economics, and it is why this entry is not merely tidying. A sender
+that reads the policy before it writes never writes the name that would be refused. A sender that learns it from a
+refusal has already spent the round trip the format exists to avoid.
+
+**Suggested resolution** (a proposal — the implementation above is running, the spec wording below is not):
+
+1. Restate §8.2's MUST as a property of the *report* rather than of the refusal: a processor MUST make available,
+   with any report containing a refusal, the data version and the policy under which it was computed, and SHOULD
+   make both available independently of any report. Requiring the policy is the substantive addition: it is what a
+   sender acts on, and today §8.2 requires only the half that a sender cannot.
+2. Drop the MUST NOT in §8.1. Let a refusal be reported alongside the four categories, distinguished by the rule
+   that refused, and keep the normative content that actually matters — that a refusal is not a claim that the
+   document is invalid, and that a conforming processor may legitimately not refuse at all.
+
+**Status against Revision 34:** open, and new against this revision.
 
 ---

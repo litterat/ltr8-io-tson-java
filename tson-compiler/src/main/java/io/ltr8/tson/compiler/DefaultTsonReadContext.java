@@ -203,7 +203,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * beside it.
      */
     private void refuse(String name, String violation, Diagnostic.Code code) {
-        reportRefusal(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
+        report(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
     }
 
     /**
@@ -328,21 +328,10 @@ final class DefaultTsonReadContext implements TsonReadContext {
         return new DefaultTsonReadContext(cursor, tail, schemaRoot, schemaId, schemaPosition, position);
     }
 
+    /** The one place a read builds a {@link Diagnostic} -- every report, refusal included, lands here. */
     @Override
     public void report(Diagnostic.Code code, String message, String expected, String actual,
             Optional<TsonSchemaFetchException.Reason> fetchReason) {
-        emit(code, message, expected, actual, fetchReason, Optional.empty());
-    }
-
-    @Override
-    public void reportRefusal(Diagnostic.Code code, String message, String expected, String actual) {
-        emit(code, message, expected, actual, Optional.empty(),
-                Optional.of(TsonUnicodePolicy.dataVersion()));
-    }
-
-    /** The one place a read builds a {@link Diagnostic}: both report entry points land here. */
-    private void emit(Diagnostic.Code code, String message, String expected, String actual,
-            Optional<TsonSchemaFetchException.Reason> fetchReason, Optional<String> unicodeDataVersion) {
         // All three schema-end components come from the one SchemaLocation the descent accumulated, so they
         // cannot disagree about which document to open. A read with no schema behind it carries none of them:
         // Diagnostic spells a missing identity "" and a missing pointer as an absence, since for a pointer
@@ -350,8 +339,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
         Diagnostic diagnostic = new Diagnostic(Optional.of(render(false)),
                 schemaRoot == null ? Optional.empty() : Optional.of(render(true)),
                 schemaRoot == null ? "" : schemaId, code, message, expected, actual,
-                position(), schemaRoot == null ? Optional.empty() : schemaPosition, fetchReason,
-                unicodeDataVersion);
+                position(), schemaRoot == null ? Optional.empty() : schemaPosition, fetchReason);
         cursor.reported++;
         cursor.receiver.report(diagnostic);
     }

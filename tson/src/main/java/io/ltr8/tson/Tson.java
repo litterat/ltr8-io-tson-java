@@ -112,6 +112,22 @@ public final class Tson {
         return new TsonTreeWriter();
     }
 
+    /**
+     * The two [TSON-DATA] §8.2 Unicode policies this instance applies -- to declared names ({@link
+     * TsonConfig#identifierPolicy}) and to token values ({@link TsonConfig#tokenPolicy}) -- and the Unicode
+     * data version they are computed against.
+     *
+     * <p><b>What a run or a response states beside its diagnostics</b>, and what a deployment can publish
+     * with no document in hand at all. §8.2's rules read data the UCD does not freeze and are applied at a
+     * level this deployment chose, so the same bytes may be accepted here and refused elsewhere; this is the
+     * only statement of why, and the only one a sender can consult <em>before</em> writing a document rather
+     * than after being refused. A reader derived with {@link TsonTreeReader#withNamePolicy} answers for
+     * itself ({@link TsonTreeReader#processorPolicy()}).
+     */
+    public TsonProcessorPolicy processorPolicy() {
+        return TsonProcessorPolicy.of(core.identifierPolicy(), tokenPolicy);
+    }
+
     /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/{@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBindContext} to customize it. */
     public DataBindContext dataBindContext() {
         return dataBindContext;

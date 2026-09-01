@@ -42,9 +42,8 @@ import java.util.Optional;
  * alike, which is exactly the ambiguity the structured half exists to remove. An absent pointer means
  * this diagnostic has no such end at all; a present {@code ""} means the root.
  *
- * <p><b>Two components are not locations</b>, {@code fetchReason} and {@code unicodeDataVersion}, each
- * present for a closed set of codes and each carrying a fact a consumer acts on that is recoverable from
- * neither the document nor the schema. Why, in both cases, is below.
+ * <p><b>One component is not a location</b>, {@code fetchReason}: it is present for a closed set of codes
+ * and carries a fact a consumer acts on that is recoverable from neither the document nor the schema.
  *
  * <p>{@code fetchReason} is present for exactly one code. {@link Code#SCHEMA_UNAVAILABLE} says a schema
  * could not be obtained; {@link
@@ -57,14 +56,15 @@ import java.util.Optional;
  * fetch failure travels on, the thrown {@link TsonSchemaFetchException} and the collected diagnostic, have
  * to be able to answer the same question; a collecting receiver is the common path, not the edge.
  *
- * <p>{@code unicodeDataVersion} is present for the three codes that are not verdicts on the document's
- * <em>validity</em> at all -- {@link Code#CONFUSABLE_NAMES}, {@link Code#RESTRICTED_CHARACTER} and {@link
- * Code#RESTRICTED_SCRIPT}, [TSON-DATA] §8.2's fifth, distinguishable outcome. §8.2 requires a refusal to name the
- * Unicode data version it was computed against, and §8.3 is why: it marks all three rules unstable
- * across Unicode releases, so two conforming processors may legitimately disagree about one name and the
- * version is the only thing that explains the disagreement. It is also the one fact about a refusal a
- * consumer cannot recover from the document plus the schema -- <b>which rule fired is the code</b>, one
- * per rule, so nothing further rides here.
+ * <p><b>A [TSON-DATA] §8.2 name-hygiene refusal carries no component of its own</b>, and the rule that
+ * keeps it out is the one that let {@code fetchReason} in. §8.2 requires a refusal to name the Unicode data
+ * version it was computed against, which is a fact about <em>this processor</em>: constant for the life of
+ * a process, so a copy on each problem is N copies of a string that cannot differ, and needed by a sender
+ * before it writes a document rather than after it is refused. It is stated once, beside the diagnostics
+ * rather than inside them ({@link TsonProcessorPolicy}), which also states the thing a version cannot --
+ * what this deployment <em>would</em> admit. What is left here is the remedy: which name failed, and
+ * <b>which rule fired, which is the code</b> ({@link Code#CONFUSABLE_NAMES}, {@link
+ * Code#RESTRICTED_CHARACTER}, {@link Code#RESTRICTED_SCRIPT}, one each).
  *
  * <p>The two ends are not alternatives: a value violating {@code int32} as core.tn declares it
  * populates both, which is why this is one record with a richer location model rather than separate
@@ -85,8 +85,7 @@ import java.util.Optional;
 public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, String schemaId, Code code,
                           String message, String expected, String actual,
                           Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition,
-                          Optional<TsonSchemaFetchException.Reason> fetchReason,
-                          Optional<String> unicodeDataVersion) {
+                          Optional<TsonSchemaFetchException.Reason> fetchReason) {
 
     // ── Absence, for a renderer ──────────────────────────────────────────
     //
@@ -168,8 +167,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
             default -> throw e;
         }
         return new Diagnostic(Optional.of(""), Optional.empty(), "", Code.VALIDATION_ERROR, e.getMessage(),
-                expected, actual, Optional.ofNullable(position), Optional.empty(), Optional.empty(),
-                Optional.empty());
+                expected, actual, Optional.ofNullable(position), Optional.empty(), Optional.empty());
     }
 
     /**
@@ -187,8 +185,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofRestrictedToken(String text, String why, SourcePosition position) {
         return new Diagnostic(Optional.empty(), Optional.empty(), "", Code.RESTRICTED_SCRIPT,
                 "the token '" + text + "' " + why, "a token the Unicode policy admits", text,
-                Optional.ofNullable(position), Optional.empty(), Optional.empty(),
-                Optional.of(TsonUnicodePolicy.dataVersion()));
+                Optional.ofNullable(position), Optional.empty(), Optional.empty());
     }
 
     /**
@@ -214,7 +211,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                 schemaId, Code.VALIDATION_ERROR, e.getMessage(),
                 e.expected().isEmpty() ? "well-formed TSON" : e.expected(),
                 e.actual().isEmpty() ? "a syntax error" : e.actual(),
-                Optional.empty(), Optional.ofNullable(e.position()), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.ofNullable(e.position()), Optional.empty());
     }
 
     /**
@@ -235,7 +232,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         }
         return new Diagnostic(Optional.empty(), Optional.of(""), schemaId, Code.VALIDATION_ERROR, e.getMessage(),
                 "well-formed TSON", "a syntax error", Optional.empty(), Optional.ofNullable(position),
-                Optional.empty(), Optional.empty());
+                Optional.empty());
     }
 
     /**
@@ -260,7 +257,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                                                  TsonSchemaFetchException e, Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
                 schemaId, Code.SCHEMA_UNAVAILABLE, e.getMessage(), SchemaFailure.UNAVAILABLE_EXPECTED, e.uri(),
-                Optional.empty(), position, Optional.of(e.reason()), Optional.empty());
+                Optional.empty(), position, Optional.of(e.reason()));
     }
 
     /**
@@ -280,8 +277,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofSchemaError(String schemaId, String declaration, String message,
                                            Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, Code.SCHEMA_ERROR, message, "", "", Optional.empty(), position, Optional.empty(),
-                Optional.empty());
+                schemaId, Code.SCHEMA_ERROR, message, "", "", Optional.empty(), position, Optional.empty());
     }
 
     /**
@@ -304,8 +300,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofSchemaRefusal(String schemaId, String declaration, Code code, String message,
                                              Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, code, message, "", "", Optional.empty(), position, Optional.empty(),
-                Optional.of(TsonUnicodePolicy.dataVersion()));
+                schemaId, code, message, "", "", Optional.empty(), position, Optional.empty());
     }
 
     /**
@@ -325,7 +320,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                                          Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
                 schemaId, Code.NOT_IMPLEMENTED, message, "", "", Optional.empty(), position,
-                Optional.empty(), Optional.empty());
+                Optional.empty());
     }
 
     /**

@@ -556,10 +556,11 @@ meta-kernel/meta.tn/core.tn library.
 ## Command-line interface
 
 The `tson-cli` module is a small, zero-dependency CLI (ajv-cli-style) for checking TSON from the shell —
-no Java to write. Three commands: **`init-example`** scaffolds an example schema + data file to start
+no Java to write. Four commands: **`init-example`** scaffolds an example schema + data file to start
 from, **`validate`** checks data files (each against the schema its own `!!schema` names, or
-schemalessly), and **`compile`** checks that a
-schema document itself resolves and compiles cleanly.
+schemalessly), **`compile`** checks that a
+schema document itself resolves and compiles cleanly, and **`policy`** prints the Unicode name/value policy
+this build applies — the one thing that can make the same document pass here and fail elsewhere.
 
 Build and install it — the installed command is `tson`:
 
@@ -575,8 +576,24 @@ write `tson` for that launcher path.
 tson init-example [<dir>]
 tson validate     [--output text|json|tson] <file>...
 tson compile      [--output text|json|tson] <schema>
+tson policy       [--output text|json|tson]
 tson hash         <file>
 ```
+
+**`tson policy`** prints the [TSON-DATA] §8.2 policy in force — the restriction level applied to names and
+to values, whether it applies per `_`/`-` segment, any script combinations specially admitted, and the
+Unicode data version behind them:
+
+```
+$ tson policy
+names:   HIGHLY_RESTRICTIVE
+tokens:  UNRESTRICTED
+unicode: 16.0
+```
+
+Every `validate`/`compile` report carries the same record in its `policy` field, so a refusal is always
+readable beside what produced it. The useful direction is the other one: read the policy *before* you
+generate, and you never write the name that would be refused.
 
 **`tson hash`** computes a document's content hash ([TSON-DATA] §2.2.1 — SHA-256 of every byte after
 the `!!id` line) and stamps it onto the `!!id` as `?sha256=<hex>`, in place. Requires an `!!id`; the id
@@ -620,7 +637,9 @@ $ tson validate person.tn ada.tn      # ada.tn = !!schema:"…/person-1.tn" !per
 OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
-{"valid":false,"files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
+{"valid":false,"policy":{"names":{"level":"HIGHLY_RESTRICTIVE","perSegment":false,"permitting":[]},
+  "tokens":{"level":"UNRESTRICTED","perSegment":false,"permitting":[]},"unicodeDataVersion":"16.0"},
+  "files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
   "schemaPointer":"/person/name","schemaId":"example.com/2026/34/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(absent)","dataPosition":"2:9:63",
@@ -643,17 +662,22 @@ OK
   A field with nothing to say is `null`, never `""`, the two RFC 6901 pointers included: for a pointer
   `""` is the *root*, a real location a document-level problem genuinely carries, so `""` and `null` stay
   apart there. A position is `line:column:byteOffset`, the first two
-  1-based and the offset counting UTF-8 bytes from 0. Two fields are not locations. `fetchReason` rides a
+  1-based and the offset counting UTF-8 bytes from 0. One field is not a location: `fetchReason` rides a
   `SCHEMA_UNAVAILABLE` and says *why* no schema was obtained — `NOT_PERMITTED`/`NOT_FOUND` mean the document
   named something this deployment will not fetch or nothing serves, where `TRANSPORT`/`TIMEOUT`/`TOO_LARGE`
-  mean the reference was fine and only those are worth retrying. `unicodeDataVersion` rides a name-hygiene
-  refusal — `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT`, one code per §8.2 rule, and
-  *not* a statement that your document is invalid — and names the Unicode data version it was computed
-  against. That matters because another processor at another Unicode version may legitimately accept the
-  same name, and the version is the only thing that explains the disagreement;
-  `TsonUnicodePolicy.dataVersion()` gives you the version without a refusal in hand. The whole shape is
+  mean the reference was fine and only those are worth retrying. A §8.2 name-hygiene refusal is an ordinary
+  diagnostic told apart by its code — `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT`, one
+  per rule — and carries nothing extra; what judged it rides on the envelope (below). The whole shape is
   declared as a real schema in `tson-cli`'s own `diagnostics.tn`, which `--output tson` is validated
   against.
+- **Every report states the policy it was judged under**, once, in `policy`: the Unicode level applied to
+  names and to values, whether it applies per `_`/`-` segment, any script combinations specially admitted,
+  and the Unicode data version behind all three. §8.2's name rules read data the Unicode Consortium does not
+  freeze, at a level *this* deployment chose, so the same document can be refused here and accepted
+  elsewhere — and that is the only place the reason lives, being in neither your document nor your schema.
+  `tson policy` prints the same record with no document in hand, which is the useful direction: read it
+  first and you never write the name that would be refused. From the library it is
+  `Tson.processorPolicy()`, or `processorPolicy()` on the reader that did the judging.
 - **`expected` is the constraint that failed, not a type name** — `<= 100`, `one of (PENDING, SHIPPED,
   DELIVERED)`, `at most 10 characters`, `an RFC 3339 date-time` — so a consumer building its own message
   (an LLM repair loop, say) never has to parse `message` to recover a bound or a member list.

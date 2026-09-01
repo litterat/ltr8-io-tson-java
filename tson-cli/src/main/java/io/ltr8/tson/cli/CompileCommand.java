@@ -29,21 +29,27 @@ final class CompileCommand {
      *         library ({@link TsonCli#exitCodeFor})
      */
     static int run(Path schemaFile, OutputFormat format) {
+        Tson tson = Tson.builder().build();
+        // Read off the Tson that judged, not rebuilt from a default: a schema's declared names face
+        // [TSON-DATA] §8.2 at link time, so this run can refuse one, and a refusal is only interpretable
+        // beside the policy that produced it.
+        CliPolicy policy = CliPolicy.from(tson.processorPolicy());
         List<Diagnostic> problems;
         try {
-            problems = Tson.builder().build().validateSchema(Io.readFile(schemaFile));
+            problems = tson.validateSchema(Io.readFile(schemaFile));
         } catch (UncheckedIOException e) {
             // Unreadable file: this file's own verdict, not a library fault. Anything else propagates to
             // TsonCli's own handler and exit 70, which is what keeps a bug distinguishable from a bad schema.
-            System.out.println(format.render(ValidationReport.failed(Diagnostic.Code.SCHEMA_ERROR, e.getMessage())));
+            System.out.println(format.render(
+                    ValidationReport.failed(policy, Diagnostic.Code.SCHEMA_ERROR, e.getMessage())));
             return 1;
         }
         if (problems.isEmpty()) {
-            System.out.println(format.render(ValidationReport.ok()));
+            System.out.println(format.render(ValidationReport.ok(policy)));
             return 0;
         }
-        System.out.println(format.render(
-                new ValidationReport(false, problems.stream().map(CliDiagnostic::from).toList())));
+        System.out.println(format.render(new ValidationReport(false, policy,
+                problems.stream().map(CliDiagnostic::from).toList())));
         return TsonCli.exitCodeFor(problems.stream().map(Diagnostic::code).toList());
     }
 }

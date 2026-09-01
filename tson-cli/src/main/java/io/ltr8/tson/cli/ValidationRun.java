@@ -21,17 +21,25 @@ import java.util.List;
  * was", and a consumer can tell the two apart without reading the messages. Shape matches {@code
  * diagnostics.tn}'s own {@code validation_run} field for field.
  *
+ * <p><b>{@code policy} is stated once here rather than on the diagnostics.</b> A [TSON-DATA] §8.2
+ * name-hygiene refusal depends on this processor's own configuration and on Unicode tables the UCD does
+ * not freeze, so the same document may be refused here and accepted elsewhere; the run says what judged it,
+ * one statement for every file in it, since the answer cannot differ between two problems in one
+ * invocation. Present on a run that refused nothing too -- what it explains is the verdict, not the
+ * refusal, and a consumer diffing two runs' reports needs it on the passing one as well.
+ *
  * <p>Public for the same reason {@link CliDiagnostic} is -- see its own Javadoc.
  */
-public record ValidationRun(boolean valid, List<FileReport> files, List<CliDiagnostic> errors) {
+public record ValidationRun(boolean valid, CliPolicy policy, List<FileReport> files,
+                            List<CliDiagnostic> errors) {
 
     /** A run that got as far as validating documents: the verdict is every file's verdict. */
-    static ValidationRun of(List<FileReport> files) {
-        return new ValidationRun(files.stream().allMatch(FileReport::valid), files, List.of());
+    static ValidationRun of(CliPolicy policy, List<FileReport> files) {
+        return new ValidationRun(files.stream().allMatch(FileReport::valid), policy, files, List.of());
     }
 
     /** A run that never reached a document -- no files, one run-level problem, and exit 2. */
-    static ValidationRun failed(Diagnostic.Code code, String message) {
-        return new ValidationRun(false, List.of(), List.of(CliDiagnostic.minimal(code, message)));
+    static ValidationRun failed(CliPolicy policy, Diagnostic.Code code, String message) {
+        return new ValidationRun(false, policy, List.of(), List.of(CliDiagnostic.minimal(code, message)));
     }
 }
