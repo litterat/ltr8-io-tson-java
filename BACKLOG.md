@@ -114,11 +114,10 @@ Parsing, desugaring, resolution and linking all report every independent problem
 `TsonDiagnosticsReceiver` (issues #3/#28/#29), whether reached by `tson compile`/`Tson.validateSchema` or by
 a *data* read whose `!!schema` names a schema that doesn't resolve — both give the same account of the same
 broken schema. `docs/readers-and-diagnostics.md`'s "Schema-side diagnostics" section describes the shape and
-the decisions behind it. The items below are refinements of a working two-ended diagnostic — how finely it
-locates itself, and whether it should carry more than one location at all — not gaps in what it reports,
-which is why they sit low. The lexer's fail-fast floor is not among them: nothing is actionable there until
-someone decides whether lexer errors feed the `Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds
-that question.
+the decisions behind it. The item below is a refinement of a working two-ended diagnostic — how finely it
+locates itself — not a gap in what it reports, which is why it sits low. The lexer's fail-fast floor is not
+on the list either: nothing is actionable there until someone decides whether lexer errors feed the
+`Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds that question.
 
 - [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
   now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against
@@ -129,25 +128,6 @@ that question.
   - Whatever carries it must be carried across a rebuild the way `RecordField.withType` is — §8.3's
     flattening walk rebuilds bodies wholesale, and a dropped position is invisible to every test, position
     being excluded from equality.
-
-- [ ] **A `caused by` frame, for when the author's location is not the whole story.** A read diagnostic now
-  locates the rule where the author can act on it (`/person/age` in their own schema) rather than at the leaf
-  the constraint came from (`/int32` in core.tn). That is the right primary frame, but the leaf is genuinely
-  informative for a *confusing* error — a deep composition, a refinement chain, a type whose bound is not
-  obvious from the field's own line — and it is currently recoverable only from `message`/`expected` prose.
-  - The shape to explore is a chain rather than a second flat pair: the primary location, then zero or more
-    `caused by` frames each carrying the same four location components, the way rustc's `MultiSpan` and JSON
-    Schema's nested `errors` both do. `Diagnostic`'s own Javadoc already cites the first of those as the
-    model this type follows.
-  - **Which suggests an extended output mode**, rather than making every diagnostic bigger: the default stays
-    one frame, and a caller that finds an error confusing asks for the chain. That is a CLI surface question
-    (`--explain`? a verbosity flag?) as much as a model one, and it interacts with `diagnostics.tn` being a
-    versioned schema — a new frame list is a shape change, so it lands in place if no release has published
-    the current `!!id`, and under the next version if one has.
-  - **The input already exists and is deliberately kept for this.** `TsonLinkedSchema.entryOrigins` answers
-    "which document declared this entry", and every reader is already handed its own declaration's location
-    (`ValueReaderContext.locationOf`) — today only used as the seed for a value nothing encloses. A caused-by
-    frame is what would consume it in the ordinary nested case.
 
 ## Write side
 
