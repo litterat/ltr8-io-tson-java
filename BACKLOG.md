@@ -47,22 +47,6 @@ own prose (which had gone stale on at least one of them):
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 
-## Open form: the held template body
-
-An open entry's body is the constructor application as written, held unread until materialisation
-substitutes its parameters away — §5.10's "Held bodies", with §8.1 giving the output form and §8.3 the open
-alias. `docs/schema-resolution.md` describes the implementation. What is left below are consequences of
-holding, not shapes outside it.
-
-- [ ] **A parametric enum member is classified as a type argument and fails.** `e => <M> !enum { members:
-  [a b M] }` applied as `e<c>` reports `'e<c>' source has an unresolved reference 'c'`: an unquoted
-  non-numeric argument rides the reference channel (§12.1's own `type-arg` rule) and `c` is an enum member,
-  not a type. §5.10 answers it outright — an argument is "substituted as a token and read by the position it
-  lands in", and "in an enum's member list it is a member", with this exact application as the spec's own
-  example — so the fix is to stop deciding an argument's channel at the application and let the position it
-  lands in decide, which is what a held body already makes possible. The one position where holding gives a
-  *wrong* verdict rather than a late one.
-
 ## Built-in types
 
 - [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
@@ -128,6 +112,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   the seam already exists and is write-direction-agnostic (`Diagnostic` carries a data path and both
   positions; nothing about `void report(Diagnostic)` assumes reading), so this is a matter of threading a
   receiver through the emitter, not designing a second error model.
+
 ## Documentation
 
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,

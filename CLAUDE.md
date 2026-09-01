@@ -413,6 +413,20 @@ application in a slot is named from an unreduced record. That form is re-derived
 one that wins: it is a function of the resolved form alone, so two schemas reaching one form by different
 spellings agree on it. Only a form whose binding held an application moves at all.
 
+**Parameter kinds (`ParameterKinds`)** are §5.10's "two parameter kinds, inferred by use", and what an
+argument is classified by. §12.1 decides an argument's channel by token shape, so an unquoted non-numeric
+argument arrives as a reference; §5.10 has it "read by the position it lands in", and the kind is what makes
+that position known at the application. A parameter's kind is the **declared type of the slot it stands in**,
+read from the constructor's own vocabulary — `array.element_type` is typed `type_ref`, `enum.members` a set
+of `identifier`, `record_field.value` a `value` — so a `type_ref` slot gives a TYPE parameter, one resolving
+to an `Atom` a VALUE parameter, and anything else (a parameter standing for a whole collection or record) is
+refused at the declaration, along with a parameter standing in both kinds of position. §9 makes the rule
+general rather than a table of kernel names: a slot holding a type reference MUST be typed `type_ref`.
+**It is a fixed point, not one walk** — meta-kernel's `type_argument` puts a parameter of *either* kind on
+the reference channel, so a parameter passed to another template takes the callee's kind at that position and
+two templates may wait on each other. An application closed on demand (a composition supertype, a refinement
+source) infers its one template itself, that template having already resolved.
+
 **Use-site flattening (`ReferenceFlattener`)** is §8.3 and the last thing resolution does: a type position
 naming a `REFERENCE` entry is rewritten to the end of its chain and keeps the name the author wrote as
 `@alias` (`type: @alias:field_name token`), which is what makes §8.2's instantiation identity a single-level
