@@ -51,8 +51,8 @@ import java.util.Set;
  * meta-schemas across separate calls -- both the compiled reader and the structure namespace have to
  * be bound to that call's own {@code metaParser}. The type-name namespace ({@code namespace}, this
  * method's own local, {@code !!import}-seeded map) is built before the {@link DefinitionResolver} it
- * feeds and passed as {@code namespace::get} -- a plain method reference onto the map, not a copy, so
- * the resolver sees each newly-added entry on the very next loop iteration.
+ * feeds and reaches it through {@link OnDemand}, a memo over that same map rather than a copy -- so the
+ * resolver sees each newly-added entry immediately, and asking for one not yet resolved resolves it.
  */
 public final class SchemaResolver {
 
@@ -112,8 +112,8 @@ public final class SchemaResolver {
      * TsonCompiledSchemaLoader} and its entries merged in, *before* any local declaration is
      * resolved. This is genuinely required, not cosmetic: unlike the structure namespace (consulted
      * only for constructor-application targets), an import's own entries feed the *type-name*
-     * namespace -- the same {@code namespace} map (exposed to {@link DefinitionResolver} as {@code
-     * namespace::get}) its own composition/refinement/atom-refinement resolution looks a
+     * namespace -- the same {@code namespace} map (exposed to {@link DefinitionResolver} through {@link
+     * OnDemand}) its own composition/refinement/atom-refinement resolution looks a
      * supertype/refinement-source straight up in, with no fallback of any kind. meta.tn's own {@code
      * date_type => ~atom & atom_specification & {...}}, composing with two meta-kernel entries it
      * only has via its own {@code !!import}, would fail to resolve at all without this. Collision
@@ -215,10 +215,9 @@ public final class SchemaResolver {
         // has to carry each one's position onto the node it produced -- see SchemaDesugarer.schemaMap. Every
         // position lookup below goes through this copy, so a rewritten declaration is located like any other.
         SchemaPositions positions = declarationPositions.copy();
+        Problems problems = new Problems(TsonCanonicalIdentity.canonicalize(id), positions, receiver);
         SchemaDocument desugared = SchemaDesugarer.desugar(document,
-                namespace.keySet(), receiver == null ? null : (declaration, error) ->
-                        receiver.report(schemaProblem(id, declaration.name(), error,
-                                positions.of(declaration))), positions);
+                namespace.keySet(), problems.collecting() ? problems::report : null, positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
         // The names desugaring generated, as opposed to the ones the author wrote. These are the schema's
         // synthetic entries (§5.3's lift rule), so they are both what carries the derived @synthetic marker
@@ -239,50 +238,8 @@ public final class SchemaResolver {
         // one declared later in the same schema (§3.4.1). Only composition supertypes and refinement/
         // atom-refinement sources consult this namespace (a field/variant/element type is carried as a bare
         // name, verified later by the linker), so those are the only edges that create a resolution
-        // dependency -- and the only recursion that cannot resolve. `resolving` catches such a cycle;
-        // ordinary recursion through field references (a linked list, or `x => { y: y }` / `y => { x: x }`)
-        // never enters it and resolves fine. `holder` breaks the construction cycle between the resolver and
-        // the on-demand getter it needs.
-        DefinitionResolver[] holder = new DefinitionResolver[1];
-        Set<String> resolving = new LinkedHashSet<>();
-        DefinitionGetter namespaceGetter = name -> {
-            TypeDefinition already = namespace.get(name);
-            if (already != null) {
-                return already;
-            }
-            SchemaMap.Declaration declaration = declarations.get(name);
-            if (declaration == null) {
-                return null; // not a local entry -- an as-yet-unverified reference the linker validates
-            }
-            if (!resolving.add(name)) {
-                throw new TsonSchemaValidationException("'" + name + "' is part of a circular composition/"
-                        + "refinement chain (" + String.join(" -> ", resolving) + " -> " + name + ") -- a "
-                        + "supertype or refinement source cannot depend, directly or transitively, on the type "
-                        + "it helps define");
-            }
-            Optional<SourcePosition> position = positions.of(declaration);
-            try {
-                TypeDefinition resolved = holder[0].resolve(declaration, position);
-                refuseHeadAbstraction(name, resolved);
-                namespace.put(name, resolved);
-                return resolved;
-            } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
-                if (receiver == null) {
-                    throw e;
-                }
-                // Report and carry on, rather than abandoning the other declarations. Catching *here*, inside
-                // the memoized getter, rather than around the driving loop below, is what makes that correct:
-                // resolution follows dependencies, not source order, so a failure often happens inside a
-                // nested resolve -- the loop would attribute it to whichever declaration triggered it, then
-                // reach the real one and report it a second time. The memo makes it exactly once, against
-                // itself. Same shape as TsonSchemaCompiler.Compilation.resolve substituting an ErrorReader.
-                receiver.report(schemaProblem(id, name, e, position));
-                namespace.put(name, unresolved(position, SchemaDesugarer.typeParams(declaration.typeDef())));
-                return namespace.get(name);
-            } finally {
-                resolving.remove(name);
-            }
-        };
+        // dependency -- and the only recursion that cannot resolve.
+        OnDemand namespaceGetter = new OnDemand(namespace, declarations, problems);
         // One materialiser for the whole schema, created before the driving loop because resolution itself
         // closes applications on demand: a supertype or refinement source has to absorb the *closed* entry's
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
@@ -293,12 +250,13 @@ public final class SchemaResolver {
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
-        holder[0] = new DefinitionResolver(
+        DefinitionResolver resolver = new DefinitionResolver(
                 (type, value) -> (Top) read(metaParser.reader(type), value),
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary.
                 (type, value) -> read(metaParser.get(type), value),
                 metaParser.schema().entries()::get, namespaceGetter, materialiser::closeApplication, positions);
+        namespaceGetter.resolveWith(resolver);
 
         for (String name : declarations.keySet()) {
             namespaceGetter.getTypeDefinition(name);
@@ -318,10 +276,8 @@ public final class SchemaResolver {
         // recursive step has no finite set of types to build, and catching it at the declaration means a
         // broken template is rejected even if nobody ever applies it. Materialisation's own depth guard
         // stays as a backstop.
-        Set<String> irregular = TemplateRegularity.check(resolvedLocals, receiver == null ? null
-                : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
-                        TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),
-                        positions.of(declarations.get(name)))));
+        Set<String> irregular = TemplateRegularity.check(resolvedLocals, problems.collecting()
+                ? (name, error) -> problems.report(declarations.get(name), error) : null);
 
         // A condemned template is replaced before materialisation, on the same terms as a declaration that
         // failed to resolve: the verdict is in, and closing an application of one only reports the same
@@ -329,42 +285,29 @@ public final class SchemaResolver {
         // happened to apply it rather than the one that wrote it. Both maps, because the two are read by
         // different halves: `materialise` walks `resolvedLocals`, while the application's head is looked up
         // through the getter over `namespace`.
-        for (String name : irregular) {
-            TypeDefinition condemned = resolvedLocals.get(name);
-            TypeDefinition placeholder = unresolved(condemned.position(), condemned.parameters());
-            resolvedLocals.put(name, placeholder);
-            namespace.put(name, placeholder);
-        }
+        condemn(irregular, resolvedLocals, namespace);
         // §5.10's parameter kinds, inferred by use, before anything closes: an argument is "read by the
         // position it lands in", and once a parameter's kind is known that position is known at the
         // application rather than after substitution. Here because it needs every declaration resolved (a
         // slot's declared type comes from the constructor's own vocabulary) and nothing yet closed.
         Set<String> unkinded = new LinkedHashSet<>();
-        materialiser.parameterKinds(ParameterKinds.inferAll(namespace, declarations.keySet(), metaParser.schema().entries()::get,
+        materialiser.parameterKinds(ParameterKinds.inferAll(namespace, declarations.keySet(),
+                metaParser.schema().entries()::get,
                 (name, error) -> {
-                    if (receiver == null) {
+                    if (!problems.collecting()) {
                         throw error;
                     }
                     unkinded.add(name);
-                    receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id), name,
-                            "'" + name + "': " + error.getMessage(), positions.of(declarations.get(name))));
+                    problems.report(declarations.get(name), "'" + name + "': " + error.getMessage(), error);
                 }));
         // Condemned on the same terms as an irregular template: the verdict is in, and closing an application
         // of a template whose parameters cannot be classified only reports the consequence -- the substituted
         // body failing its constructor's vocabulary -- against whichever entry happened to apply it.
-        for (String name : unkinded) {
-            TypeDefinition condemned = resolvedLocals.get(name);
-            TypeDefinition placeholder = unresolved(condemned.position(), condemned.parameters());
-            resolvedLocals.put(name, placeholder);
-            namespace.put(name, placeholder);
-        }
+        condemn(unkinded, resolvedLocals, namespace);
 
         Map<String, TypeDefinition> instantiations = materialiser.materialise(resolvedLocals,
-                receiver == null ? null : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
-                        TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),
-                        positions.of(declarations.get(name)))));
-        namespace.putAll(resolvedLocals);
-        namespace.putAll(instantiations);
+                problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
+        republish(namespace, resolvedLocals, instantiations);
 
         // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
         // have resolved". A form the desugar phase lifted with an application in a slot was named before that
@@ -385,8 +328,7 @@ public final class SchemaResolver {
                     resolvedLocals.put(to, eager);
                 }
             });
-            namespace.putAll(resolvedLocals);
-            namespace.putAll(instantiations);
+            republish(namespace, resolvedLocals, instantiations);
         }
 
         // §8.3, last because it needs everything above already in the namespace: a type position naming a
@@ -397,8 +339,7 @@ public final class SchemaResolver {
                 ReferenceFlattener.flatten(resolvedLocals, namespace, instantiations.keySet());
         resolvedLocals.putAll(flatLocals);
         instantiations = ReferenceFlattener.flatten(instantiations, namespace, instantiations.keySet());
-        namespace.putAll(resolvedLocals);
-        namespace.putAll(instantiations);
+        republish(namespace, resolvedLocals, instantiations);
 
         // §6: an annotation written before the declared name binds to the *name*, not to the definition,
         // and "the resolver does not hoist annotations from key to value". A resolved schema is a
@@ -418,13 +359,17 @@ public final class SchemaResolver {
             }
             Annotations nameAnnotations;
             try {
-                nameAnnotations = holder[0].annotationsFor(name, declarations.get(name).nameAnnotations());
+                nameAnnotations = resolver.annotationsFor(name, declarations.get(name).nameAnnotations());
             } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
-                if (receiver == null) {
+                if (!problems.collecting()) {
                     throw e;
                 }
-                receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id), name,
-                        e.getMessage(), positions.of(declarations.get(name))));
+                // Reported as a schema error whatever the exception's type, where every other phase lets
+                // Problems classify: a gap binding an annotation value arrives here as SCHEMA_ERROR rather
+                // than NOT_IMPLEMENTED. Left as it was rather than folded into Problems, since changing it
+                // moves a CLI exit code (1 to 70) and wants its own verdict.
+                receiver.report(Diagnostic.ofSchemaError(problems.schemaId(), name, e.getMessage(),
+                        positions.of(declarations.get(name))));
                 nameAnnotations = Annotations.empty();
             }
             // §8.2: a synthetic entry's key carries the derived @synthetic marker, and a lifted declaration
@@ -449,21 +394,147 @@ public final class SchemaResolver {
     }
 
     /**
-     * One declaration's failure as a {@link Diagnostic}, the code chosen by the project's own exception
-     * classification: a {@code TsonSchemaValidationException} is the author's error and an {@code
-     * UnsupportedOperationException} is this library's gap, which the reader of the report needs to tell
-     * apart -- one says fix your schema, the other says this could not be checked.
+     * One run's diagnostic vocabulary: the canonical schema id, the identity-keyed position table, and the
+     * receiver -- everything a phase needs to state a problem, so that no phase states it a sixth way.
      *
-     * <p>Both are reported per declaration and both leave a placeholder, so a gap in one declaration no
-     * longer costs every other declaration its verdict. The classification is unchanged; only its
-     * consequence for the pass is.
+     * <p><b>A declaration rather than a name</b> is what {@link #report} takes, because the name alone does
+     * not locate anything: a position comes from the declaration node, through the identity-keyed table a
+     * rewritten declaration is carried onto. Every caller has the node, and asking for it is what stops the
+     * lookup being spelled out at each site.
+     *
+     * <p><b>The code is chosen by the project's own exception classification</b>: a {@code
+     * TsonSchemaValidationException} is the author's error and an {@code UnsupportedOperationException} is
+     * this library's gap, which the reader of the report needs to tell apart -- one says fix your schema,
+     * the other says this could not be checked. Both are reported per declaration and both leave a
+     * placeholder, so a gap in one declaration does not cost every other declaration its verdict.
      */
-    private static Diagnostic schemaProblem(String id, String declaration, RuntimeException error,
-                                            Optional<SourcePosition> position) {
-        String schemaId = TsonCanonicalIdentity.canonicalize(id);
-        return error instanceof UnsupportedOperationException
-                ? Diagnostic.ofSchemaGap(schemaId, declaration, error.getMessage(), position)
-                : Diagnostic.ofSchemaError(schemaId, declaration, error.getMessage(), position);
+    private record Problems(String schemaId, SchemaPositions positions, TsonDiagnosticsReceiver receiver) {
+
+        /** {@code false} for the fail-fast overloads, whose callers rethrow rather than collect. */
+        boolean collecting() {
+            return receiver != null;
+        }
+
+        void report(SchemaMap.Declaration declaration, RuntimeException error) {
+            report(declaration, error.getMessage(), error);
+        }
+
+        /** The same, for a caller that has composed its own message rather than taking the exception's. */
+        void report(SchemaMap.Declaration declaration, String message, RuntimeException error) {
+            Optional<SourcePosition> position = positions.of(declaration);
+            receiver.report(error instanceof UnsupportedOperationException
+                    ? Diagnostic.ofSchemaGap(schemaId, declaration.name(), message, position)
+                    : Diagnostic.ofSchemaError(schemaId, declaration.name(), message, position));
+        }
+    }
+
+    /**
+     * Replaces each named entry with the placeholder {@link #unresolved} builds, keeping its position and its
+     * type parameters -- the same treatment a declaration that failed to resolve gets, applied to a template
+     * whose verdict is already in.
+     *
+     * <p><b>Both maps, because the two halves are read by different phases</b>: {@code materialise} walks the
+     * locals, while an application's head is looked up through the getter over the namespace. Leaving one
+     * behind would close applications against the condemned template through whichever map was missed.
+     */
+    private static void condemn(Set<String> names, Map<String, TypeDefinition> resolvedLocals,
+                                Map<String, TypeDefinition> namespace) {
+        for (String name : names) {
+            TypeDefinition condemned = resolvedLocals.get(name);
+            TypeDefinition placeholder = unresolved(condemned.position(), condemned.parameters());
+            resolvedLocals.put(name, placeholder);
+            namespace.put(name, placeholder);
+        }
+    }
+
+    /**
+     * Puts the local and materialised entries back into the namespace, which every later phase and the
+     * on-demand getter both read through. Called after each pass that rewrites either map, since the two are
+     * kept in step by hand: the namespace also holds the imported entries, so it cannot simply be replaced.
+     */
+    private static void republish(Map<String, TypeDefinition> namespace,
+                                  Map<String, TypeDefinition> resolvedLocals,
+                                  Map<String, TypeDefinition> instantiations) {
+        namespace.putAll(resolvedLocals);
+        namespace.putAll(instantiations);
+    }
+
+    /**
+     * The type-name namespace as the driving loop and every phase after it sees one: a memo over the entries,
+     * resolving a local declaration the first time it is asked for and remembering the answer.
+     *
+     * <p><b>On demand rather than in source order</b>, so a declaration may reference one declared later
+     * (§3.4.1). Only composition supertypes and refinement sources consult it -- a field, variant or element
+     * type is carried as a bare name and verified later by the linker -- so those are the only edges that
+     * create a resolution dependency, and the only recursion that cannot resolve. {@link #resolving} catches
+     * such a cycle; ordinary recursion through field references ({@code x => { y: y }} / {@code y => { x: x }})
+     * never enters it and resolves fine.
+     *
+     * <p><b>A failure is caught here, inside the memo, rather than around the driving loop.</b> Resolution
+     * follows dependencies rather than source order, so a failure often happens inside a nested resolve --
+     * the loop would attribute it to whichever declaration triggered it, then reach the real one and report
+     * it a second time. The memo makes it exactly once, against itself. Same shape as {@code
+     * TsonSchemaCompiler.Compilation.resolve} substituting an {@code ErrorReader}.
+     *
+     * <p><b>The resolver arrives after construction</b> ({@link #resolveWith}) because the two are mutually
+     * constructed: a {@link DefinitionResolver} needs this getter, and this getter calls that resolver.
+     */
+    private static final class OnDemand implements DefinitionGetter {
+
+        private final Map<String, TypeDefinition> entries;
+        private final Map<String, SchemaMap.Declaration> declarations;
+        private final Problems problems;
+
+        /** The chain currently being resolved -- a name arriving twice is a composition/refinement cycle. */
+        private final Set<String> resolving = new LinkedHashSet<>();
+
+        private DefinitionResolver resolver;
+
+        OnDemand(Map<String, TypeDefinition> entries, Map<String, SchemaMap.Declaration> declarations,
+                 Problems problems) {
+            this.entries = entries;
+            this.declarations = declarations;
+            this.problems = problems;
+        }
+
+        /** Supplies the resolver this getter drives; called once, immediately after it is built. */
+        void resolveWith(DefinitionResolver resolver) {
+            this.resolver = Objects.requireNonNull(resolver, "resolver");
+        }
+
+        @Override
+        public TypeDefinition getTypeDefinition(String name) {
+            TypeDefinition already = entries.get(name);
+            if (already != null) {
+                return already;
+            }
+            SchemaMap.Declaration declaration = declarations.get(name);
+            if (declaration == null) {
+                return null; // not a local entry -- an as-yet-unverified reference the linker validates
+            }
+            if (!resolving.add(name)) {
+                throw new TsonSchemaValidationException("'" + name + "' is part of a circular composition/"
+                        + "refinement chain (" + String.join(" -> ", resolving) + " -> " + name + ") -- a "
+                        + "supertype or refinement source cannot depend, directly or transitively, on the type "
+                        + "it helps define");
+            }
+            Optional<SourcePosition> position = problems.positions().of(declaration);
+            try {
+                TypeDefinition resolved = resolver.resolve(declaration, position);
+                refuseHeadAbstraction(name, resolved);
+                entries.put(name, resolved);
+                return resolved;
+            } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
+                if (!problems.collecting()) {
+                    throw e;
+                }
+                problems.report(declaration, e);
+                entries.put(name, unresolved(position, SchemaDesugarer.typeParams(declaration.typeDef())));
+                return entries.get(name);
+            } finally {
+                resolving.remove(name);
+            }
+        }
     }
 
     /**
@@ -521,9 +592,9 @@ public final class SchemaResolver {
      */
     private static TypeDefinition unresolved(Optional<SourcePosition> position, List<String> parameters) {
         // An open placeholder holds its body like every other open entry, so nothing downstream has to keep
-        // a second substitution path for the one shape that did not -- see SchemaDesugarer.heldEmptyRecord.
+        // a second substitution path for the one shape that did not -- see WireForm.heldEmptyRecord.
         Top body = parameters.isEmpty() ? RecordBody.of(List.of())
-                : new HeldBody(SchemaDesugarer.heldEmptyRecord());
+                : new HeldBody(WireForm.heldEmptyRecord());
         return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, false, List.of(), List.of(),
                 Optional.empty(), body, position, Annotations.empty());
     }

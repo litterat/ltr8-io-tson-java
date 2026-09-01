@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -33,15 +32,11 @@ import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
-import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.meta.ElementState;
-import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -51,7 +46,6 @@ import java.util.function.Supplier;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
@@ -129,9 +123,6 @@ final class SchemaDesugarer {
     /** §5.4's desugar target for {@code (A | B)}. */
     private static final String CHOICE = "choice";
 
-    /** §5.2's desugar target for a bare record body {@code { x: T }} -- the constructor it denotes. */
-    private static final String RECORD = "record";
-
     /** §5.10's desugar target for a partial application {@code <B> pair<text, B>} -- an alias body. */
     private static final String REFERENCE = "reference";
 
@@ -139,25 +130,13 @@ final class SchemaDesugarer {
     private static final String ELEMENT_TYPE = "element_type";
     private static final String KEY_TYPE = "key_type";
     private static final String VALUE_TYPE = "value_type";
-    private static final String STATE = "state";
     private static final String MIN_ITEMS = "min_items";
     private static final String MAX_ITEMS = "max_items";
     private static final String ELEMENTS = "elements";
     private static final String VARIANTS = "variants";
 
-    /** {@code record}'s own collection fields, and {@code record_field}'s scalar ones. */
-    private static final String FIELDS = "fields";
-    private static final String GROUPS = "groups";
-    private static final String MEMBERS = "members";
-    private static final String FIELD_NAME = "name";
-    private static final String TYPE = "type";
+    /** {@code reference}'s own member, the slot an alias body binds. */
     private static final String TARGET = "target";
-    private static final String SUPERTYPES = "supertypes";
-
-    /** {@code type_ref}'s own two fields, for the record form a slot takes when it holds an application. */
-    private static final String NAME = "name";
-    private static final String ARGUMENTS = "arguments";
-    private static final String VALUE = "value";
 
 
     /**
@@ -413,7 +392,7 @@ final class SchemaDesugarer {
                     // pair<text, B> }`, so it is written that way here and closes by the same walk as
                     // every other template. Spellable only because `reference.target` is a `type_ref`.
                     yield instance(new Binding(REFERENCE, List.of(
-                            new RecordValue.Field(TARGET, scoped(refValue(reference.ref()))))),
+                            new RecordValue.Field(TARGET, WireForm.scoped(refValue(reference.ref()))))),
                             reference.typeParams());
                 }
                 TypeRef ref = argumentsOnly(reference.ref());
@@ -564,37 +543,18 @@ final class SchemaDesugarer {
      * binds, in the order the table above lists them. Everything downstream -- the emitted {@code !C { ... }},
      * the derived entry name, the bound-coherence check -- reads this and nothing else.
      */
-    private record Binding(String head, List<RecordValue.Field> fields,
-                            Map<String, TypeRef> applicationSlots) {
-
-        Binding(String head, List<RecordValue.Field> fields) {
-            this(head, fields, Map.of());
-        }
+    private record Binding(String head, List<RecordValue.Field> fields) {
     }
 
-    /**
-     * A scalar type slot as both of the things downstream needs it as: the wire field a closed construction
-     * writes, and -- when the reference carries arguments -- the reference itself, kept whole for the open
-     * form to bind.
-     *
-     * <p><b>Why an application needs the second half.</b> A closed slot is a bare token, the positional form
-     * of a {@code type_ref} (§5.6). An application has no bare-token spelling: the entry it denotes does not
-     * exist until materialisation, one phase later. Its wire form is the record one, which keeps the name and
-     * the arguments apart -- structurally right, and what {@link #internalName} hashes -- but an open binding
-     * holds a {@code type_ref} directly rather than reading one, so it wants the reference as written.
-     */
-    private static void refSlot(String slot, TypeRef ref, List<RecordValue.Field> fields,
-            Map<String, TypeRef> applicationSlots) {
-        fields.add(new RecordValue.Field(slot, scoped(refValue(ref))));
-        if (!(ref instanceof SimpleRef)) {
-            applicationSlots.put(slot, ref);
-        }
+    /** One scalar type slot as the wire field a construction writes -- see {@link #refValue}. */
+    private static void refSlot(String slot, TypeRef ref, List<RecordValue.Field> fields) {
+        fields.add(new RecordValue.Field(slot, WireForm.scoped(refValue(ref))));
     }
 
     /**
      * What a {@code type_ref}-typed slot holds: a bare token for a plain name, {@code type_ref}'s record
      * form for an application. <b>One spelling per shape, produced in one place</b> -- a slot written two
-     * ways is a slot two phases disagree about, and {@link #internalName} hashes what is written, so a
+     * ways is a slot two phases disagree about, and {@link DerivedName#ofBinding} hashes what is written, so a
      * second spelling of one reference splits one type across two entries.
      */
     private static CoreValue refValue(TypeRef ref) {
@@ -616,16 +576,16 @@ final class SchemaDesugarer {
     private static RecordValue refRecord(GenericRef generic) {
         List<ScopedValue> arguments = new ArrayList<>();
         for (TypeArg argument : generic.args()) {
-            arguments.add(scoped(new RecordValue(List.of(switch (argument) {
+            arguments.add(WireForm.scoped(new RecordValue(List.of(switch (argument) {
                 case TypeArg.Ref reference when reference.ref() instanceof GenericRef nested ->
-                        new RecordValue.Field(NAME, scoped(refRecord(nested)));
+                        new RecordValue.Field(WireForm.NAME, WireForm.scoped(refRecord(nested)));
                 case TypeArg.Ref reference ->
-                        nameField(NAME, ((SimpleRef) reference.ref()).name());
-                case TypeArg.Value value -> new RecordValue.Field(VALUE, scoped(value.value()));
+                        WireForm.nameField(WireForm.NAME, ((SimpleRef) reference.ref()).name());
+                case TypeArg.Value value -> new RecordValue.Field(WireForm.VALUE, WireForm.scoped(value.value()));
             }))));
         }
-        return new RecordValue(List.of(nameField(NAME, generic.name()),
-                new RecordValue.Field(ARGUMENTS, scoped(new ArrayValue(arguments)))));
+        return new RecordValue(List.of(WireForm.nameField(WireForm.NAME, generic.name()),
+                new RecordValue.Field(WireForm.ARGUMENTS, WireForm.scoped(new ArrayValue(arguments)))));
     }
 
     /** One position of a tuple after expansion: the type it names, and whether it is marked {@code OPTIONAL}. */
@@ -665,13 +625,12 @@ final class SchemaDesugarer {
             return Optional.empty();
         }
         List<RecordValue.Field> fields = new ArrayList<>();
-        Map<String, TypeRef> applications = new LinkedHashMap<>();
-        refSlot(ELEMENT_TYPE, element, fields, applications);
+        refSlot(ELEMENT_TYPE, element, fields);
         if (optional) {
-            fields.add(nameField(STATE, ElementState.OPTIONAL.name()));
+            fields.add(WireForm.nameField(WireForm.STATE, ElementState.OPTIONAL.name()));
         }
         size.ifPresent(spec -> fields.addAll(sizeFields(spec, "[" + shown + "; 0..]")));
-        return Optional.of(new Binding(ARRAY, fields, applications));
+        return Optional.of(new Binding(ARRAY, fields));
     }
 
     /**
@@ -697,15 +656,14 @@ final class SchemaDesugarer {
             return Optional.empty();
         }
         List<RecordValue.Field> fields = new ArrayList<>();
-        Map<String, TypeRef> applications = new LinkedHashMap<>();
-        refSlot(KEY_TYPE, key, fields, applications);
-        refSlot(VALUE_TYPE, value, fields, applications);
+        refSlot(KEY_TYPE, key, fields);
+        refSlot(VALUE_TYPE, value, fields);
         if (optional) {
-            fields.add(nameField(STATE, ElementState.OPTIONAL.name()));
+            fields.add(WireForm.nameField(WireForm.STATE, ElementState.OPTIONAL.name()));
         }
         size.ifPresent(spec -> fields.addAll(
                 sizeFields(spec, "{" + shownRef(key) + " => " + shownRef(value) + "; 0..}")));
-        return Optional.of(new Binding(MAP, fields, applications));
+        return Optional.of(new Binding(MAP, fields));
     }
 
     /** How a map side is quoted back in the one diagnostic that shows the form. */
@@ -731,14 +689,14 @@ final class SchemaDesugarer {
         List<ScopedValue> elements = new ArrayList<>();
         for (Position position : positions) {
             List<RecordValue.Field> members = new ArrayList<>();
-            members.add(new RecordValue.Field(ELEMENT_TYPE, scoped(refValue(position.typeRef()))));
+            members.add(new RecordValue.Field(ELEMENT_TYPE, WireForm.scoped(refValue(position.typeRef()))));
             if (position.optional()) {
-                members.add(nameField(STATE, ElementState.OPTIONAL.name()));
+                members.add(WireForm.nameField(WireForm.STATE, ElementState.OPTIONAL.name()));
             }
-            elements.add(scoped(new RecordValue(members)));
+            elements.add(WireForm.scoped(new RecordValue(members)));
         }
         return Optional.of(new Binding(TUPLE,
-                List.of(new RecordValue.Field(ELEMENTS, scoped(new ArrayValue(elements))))));
+                List.of(new RecordValue.Field(ELEMENTS, WireForm.scoped(new ArrayValue(elements))))));
     }
 
     /**
@@ -762,10 +720,10 @@ final class SchemaDesugarer {
     private static Optional<Binding> choiceBinding(List<TypeRef> variants) {
         List<ScopedValue> members = new ArrayList<>();
         for (TypeRef variant : variants) {
-            members.add(scoped(refValue(variant)));
+            members.add(WireForm.scoped(refValue(variant)));
         }
         return Optional.of(new Binding(CHOICE,
-                List.of(new RecordValue.Field(VARIANTS, scoped(new ArrayValue(members))))));
+                List.of(new RecordValue.Field(VARIANTS, WireForm.scoped(new ArrayValue(members))))));
     }
 
     /**
@@ -774,7 +732,7 @@ final class SchemaDesugarer {
      * form.
      *
      * <p><b>Why here rather than in the resolver.</b> The alternative is to resolve the body and write the
-     * result back out, and it does not work: the wire form is what {@link #internalName} hashes and what
+     * result back out, and it does not work: the wire form is what {@link DerivedName#ofBinding} hashes and what
      * substitution walks, so a second producer of it is a second spelling of the same thing --
      * {@code TsonObjectWriter} states a no-argument {@code type_ref} in the explicit record form where this
      * phase states it positionally, which makes a {@code type_argument} indistinguishable from a
@@ -811,152 +769,29 @@ final class SchemaDesugarer {
                                 + "labels share the enclosing record's field namespace");
                         // A group's members are ordinary OPTIONAL fields of the record, and the group records
                         // only their names and its own state (§5.11) -- the same shape the resolver builds.
-                        fields.add(scoped(new RecordValue(List.of(
-                                nameField(FIELD_NAME, member.name()),
-                                new RecordValue.Field(TYPE, scoped(refValue(member.typeRef()))),
-                                nameField(STATE, FieldState.OPTIONAL.name()))), member.annotations()));
-                        members.add(scoped(new TokenValue(member.name(), TokenForm.UNQUOTED)));
+                        fields.add(WireForm.scoped(new RecordValue(List.of(
+                                WireForm.nameField(WireForm.NAME, member.name()),
+                                new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(member.typeRef()))),
+                                WireForm.nameField(WireForm.STATE, FieldState.OPTIONAL.name()))), member.annotations()));
+                        members.add(WireForm.scoped(new TokenValue(member.name(), TokenForm.UNQUOTED)));
                     }
                     List<RecordValue.Field> groupFields = new ArrayList<>();
-                    groupFields.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(members))));
+                    groupFields.add(new RecordValue.Field(WireForm.MEMBERS, WireForm.scoped(new ArrayValue(members))));
                     if (group.optional()) {
-                        groupFields.add(nameField(STATE, ElementState.OPTIONAL.name()));
+                        groupFields.add(WireForm.nameField(WireForm.STATE, ElementState.OPTIONAL.name()));
                     }
-                    groups.add(scoped(new RecordValue(groupFields), group.annotations()));
+                    groups.add(WireForm.scoped(new RecordValue(groupFields), group.annotations()));
                 }
             }
         }
         List<RecordValue.Field> binding = new ArrayList<>();
-        binding.add(new RecordValue.Field(FIELDS, scoped(new ArrayValue(fields))));
+        binding.add(new RecordValue.Field(WireForm.FIELDS, WireForm.scoped(new ArrayValue(fields))));
         if (!groups.isEmpty()) {
-            binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));
+            binding.add(new RecordValue.Field(WireForm.GROUPS, WireForm.scoped(new ArrayValue(groups))));
         }
-        return new Binding(RECORD, binding);
+        return new Binding(WireForm.RECORD, binding);
     }
 
-    /**
-     * The held body an <b>error placeholder</b> carries -- {@code !record { fields: [] }}, the zero-field
-     * record both absorbing stand-ins already stood for, now held like every other open body.
-     *
-     * <p><b>It exists so that "an open entry's body is held or a {@code Reference}" has no exceptions.</b>
-     * A placeholder keeps its declaration's type parameters on purpose (answering "how many?" with zero
-     * sends a downstream {@code bl<text>} to fix the wrong declaration), which used to make it the last
-     * producer of a parameterised {@code RecordBody} -- and so kept a whole second substitution path alive
-     * to serve a body that has no fields to substitute into.
-     *
-     * <p>Built structurally rather than through {@link #heldRecord}: a placeholder is what a <em>reported</em>
-     * declaration leaves behind, so the one thing it must not do is fail again, and an empty record needs
-     * neither a namespace nor a writer to state.
-     */
-    static DataValue heldEmptyRecord() {
-        return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(List.of(
-                new RecordValue.Field(FIELDS, scoped(new ArrayValue(List.of()))))));
-    }
-
-    /**
-     * The same {@code !record { … }} held body, built from a body that is <b>already resolved</b> -- the form
-     * a composition or refinement template arrives in, since both absorb fields from a source and so cannot
-     * be rewritten before there is a namespace to absorb from.
-     *
-     * <p><b>It lives here, next to {@link #recordBinding}, because the spelling is what must not fork.</b>
-     * Two producers of the held wire form are fine; two <em>spellings</em> of it are not, and that is the
-     * whole lesson of the record case. So both go through {@link #refValue} and {@link #nameField} and write
-     * the same shape: an unquoted token where the writer would quote, a bare name where the writer would
-     * state {@code { name: X  arguments: [] }}, and nothing at all where the constructor's own default says
-     * it. {@code TsonObjectWriter} cannot serve: its output is canonical-explicit and fully quoted, which is
-     * a different language from the one a held body is written in -- {@code TemplateBody.names()} and
-     * substitution both key on a token being unquoted, so a quoted body references no parameters at all.
-     *
-     * <p><b>{@code annotationValue} is the one thing this cannot do itself.</b> A resolved annotation carries
-     * its value as a <em>bound object</em> ({@code Annotation.value} is {@code Optional<Object>}), and
-     * unbinding one is exactly what an object writer is for -- so the caller passes that single leaf in and
-     * everything structural stays here.
-     */
-    static DataValue heldRecord(RecordBody body, Function<Object, DataValue> annotationValue) {
-        List<ScopedValue> fields = new ArrayList<>();
-        for (RecordField field : body.fields()) {
-            List<RecordValue.Field> members = new ArrayList<>();
-            members.add(nameField(FIELD_NAME, field.name()));
-            members.add(new RecordValue.Field(TYPE, scoped(refValue(field.type()))));
-            if (field.state() != FieldState.REQUIRED) {
-                members.add(nameField(STATE, field.state().name()));
-            }
-            // The two channels collapse into one: a literal keeps its own token form, and a routed parameter
-            // is a bare name standing where the literal would.
-            field.value().ifPresent(token -> members.add(new RecordValue.Field(VALUE,
-                    scoped(new TokenValue(token.text(), tokenForm(token.form()))))));
-            fields.add(scoped(new RecordValue(members), annotations(field.annotations(), annotationValue)));
-        }
-        List<ScopedValue> groups = new ArrayList<>();
-        for (FieldGroup group : body.groups()) {
-            List<RecordValue.Field> members = new ArrayList<>();
-            members.add(new RecordValue.Field(MEMBERS, scoped(new ArrayValue(group.members().stream()
-                    .map(member -> scoped(new TokenValue(member, TokenForm.UNQUOTED))).toList()))));
-            if (group.state() != ElementState.REQUIRED) {
-                members.add(nameField(STATE, group.state().name()));
-            }
-            groups.add(scoped(new RecordValue(members)));
-        }
-        List<RecordValue.Field> binding = new ArrayList<>();
-        if (!body.supertypes().isEmpty()) {
-            binding.add(new RecordValue.Field(SUPERTYPES, scoped(new ArrayValue(body.supertypes().stream()
-                    .map(supertype -> scoped(new TokenValue(supertype, TokenForm.UNQUOTED))).toList()))));
-        }
-        binding.add(new RecordValue.Field(FIELDS, scoped(new ArrayValue(fields))));
-        if (!groups.isEmpty()) {
-            binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));
-        }
-        return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(binding));
-    }
-
-    /** A resolved annotation carrier back in wire form, its bound value unbound by the caller's writer. */
-    private static List<Annotation> annotations(Annotations resolved, Function<Object, DataValue> annotationValue) {
-        if (resolved.values().isEmpty()) {
-            return List.of();
-        }
-        List<Annotation> written = new ArrayList<>();
-        for (io.ltr8.annotation.Annotation annotation : resolved.values()) {
-            written.add(new Annotation(annotation.name(), annotation.value().map(annotationValue)));
-        }
-        return written;
-    }
-
-    /**
-     * A resolved type reference in the held spelling: a bare name, or {@code type_ref}'s record form.
-     *
-     * <p><b>The {@code arguments().isEmpty()} branch is load-bearing, not an optimisation.</b> A held body is
-     * read by later phases as wire form, and {@code type_argument} is told from {@code type_ref} by which
-     * shape a slot carries -- so stating a no-argument reference in the record form would make the two
-     * indistinguishable to a walk that reads neither against a vocabulary, and would give one type two entry
-     * names, since a name derives from what is written. That is why {@link TemplateMaterialiser}'s
-     * substitution writes a bound reference through this rather than spelling one of its own: the open form
-     * needs one spelling however many phases produce it.
-     */
-    static CoreValue refValue(io.ltr8.tson.schema.meta.TypeRef ref) {
-        if (ref.arguments().isEmpty()) {
-            return new TokenValue(ref.name(), TokenForm.UNQUOTED);
-        }
-        List<ScopedValue> arguments = new ArrayList<>();
-        for (io.ltr8.tson.schema.meta.TypeArgument argument : ref.arguments()) {
-            arguments.add(scoped(new RecordValue(List.of(switch (argument) {
-                case io.ltr8.tson.schema.meta.TypeArgument.Ref reference ->
-                        new RecordValue.Field(NAME, scoped(refValue(reference.ref())));
-                case io.ltr8.tson.schema.meta.TypeArgument.Value literal ->
-                        new RecordValue.Field(VALUE, scoped(new TokenValue(literal.value().text(),
-                                tokenForm(literal.value().form()))));
-            }))));
-        }
-        return new RecordValue(List.of(nameField(NAME, ref.name()),
-                new RecordValue.Field(ARGUMENTS, scoped(new ArrayValue(arguments)))));
-    }
-
-    private static TokenForm tokenForm(io.ltr8.tson.schema.meta.Token.Form form) {
-        return switch (form) {
-            case UNQUOTED -> TokenForm.UNQUOTED;
-            case SINGLE_LINE_QUOTED -> TokenForm.SINGLE_LINE_QUOTED;
-            case MULTI_LINE_QUOTED -> TokenForm.MULTI_LINE_QUOTED;
-        };
-    }
 
     /**
      * §5.11's uniqueness rule, over the body this phase is rewriting: a field name is unique across a
@@ -995,13 +830,13 @@ final class SchemaDesugarer {
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), type.optional(), field.modifier(), currentParameters);
         List<RecordValue.Field> members = new ArrayList<>();
-        members.add(nameField(FIELD_NAME, field.name()));
-        members.add(new RecordValue.Field(TYPE, scoped(refValue(type.typeRef()))));
+        members.add(WireForm.nameField(WireForm.NAME, field.name()));
+        members.add(new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(type.typeRef()))));
         if (resolved.state() != FieldState.REQUIRED) {
-            members.add(nameField(STATE, resolved.state().name()));
+            members.add(WireForm.nameField(WireForm.STATE, resolved.state().name()));
         }
-        resolved.value().ifPresent(token -> members.add(new RecordValue.Field(VALUE, scoped(token))));
-        return scoped(new RecordValue(members), field.annotations());
+        resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.scoped(token))));
+        return WireForm.scoped(new RecordValue(members), field.annotations());
     }
 
     /**
@@ -1024,12 +859,12 @@ final class SchemaDesugarer {
                             + "form (§5.3). The spelling is not merely redundant: identity is structural "
                             + "(§8.2), so it lands on an entry distinct from the unconstrained one that means "
                             + "the same thing");
-            case SizeSpec.Min min -> List.of(nameField(MIN_ITEMS, min.lower()));
-            case SizeSpec.Max max -> List.of(nameField(MAX_ITEMS, max.upper()));
+            case SizeSpec.Min min -> List.of(WireForm.nameField(MIN_ITEMS, min.lower()));
+            case SizeSpec.Max max -> List.of(WireForm.nameField(MAX_ITEMS, max.upper()));
             case SizeSpec.Ranged ranged ->
-                    List.of(nameField(MIN_ITEMS, ranged.lower()), nameField(MAX_ITEMS, ranged.upper()));
+                    List.of(WireForm.nameField(MIN_ITEMS, ranged.lower()), WireForm.nameField(MAX_ITEMS, ranged.upper()));
             case SizeSpec.Exact exact ->
-                    List.of(nameField(MIN_ITEMS, exact.bound()), nameField(MAX_ITEMS, exact.bound()));
+                    List.of(WireForm.nameField(MIN_ITEMS, exact.bound()), WireForm.nameField(MAX_ITEMS, exact.bound()));
         };
     }
 
@@ -1064,26 +899,6 @@ final class SchemaDesugarer {
     private static TypeDef instance(Binding binding, List<String> typeParams) {
         return new Instance(typeParams, new DataValue(List.of(), Optional.of(binding.head()),
                 new RecordValue(binding.fields())));
-    }
-
-    /**
-     * Whether a binding's token is unambiguously a literal -- §12.1's own rule for {@code type-arg}, applied
-     * to a record this phase built rather than to one it parsed. A quoted token or one shaped like a number
-     * is a value and nothing else; every other token is carried on the reference channel, and what it turns
-     * out to be -- a type, an enum member, a parameter of the enclosing declaration -- is settled at
-     * resolution, where the parameter list and the slot's declared type are both in hand. Deciding it here
-     * instead would mean a size bound naming a parameter ({@code [text; N]}) arrived as the literal "N".
-     */
-    private static boolean isLiteral(TokenValue token) {
-        if (token.form() != TokenForm.UNQUOTED) {
-            return true;
-        }
-        try {
-            new BigInteger(token.text());
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
     }
 
     /**
@@ -1190,24 +1005,9 @@ final class SchemaDesugarer {
         for (int i = 0; i < parameters.size(); i++) {
             substitution.put(parameters.get(i), renamed.get(i));
         }
-        Map<String, TypeRef> applications = new LinkedHashMap<>();
-        binding.applicationSlots().forEach((slot, ref) -> applications.put(slot, renameRef(ref, substitution)));
         return new Binding(binding.head(), binding.fields().stream()
                 .map(field -> new RecordValue.Field(field.name(), renameScoped(field.value(), substitution)))
-                .toList(), applications);
-    }
-
-    /** An application's own arguments renamed alongside the wire record beside it, so the two stay in step. */
-    private static TypeRef renameRef(TypeRef ref, Map<String, String> substitution) {
-        if (ref instanceof SimpleRef simple) {
-            return substitution.containsKey(simple.name()) ? new SimpleRef(substitution.get(simple.name()))
-                    : simple;
-        }
-        GenericRef generic = (GenericRef) ref;
-        return new GenericRef(generic.name(), generic.args().stream().map(argument ->
-                argument instanceof TypeArg.Ref reference
-                        ? (TypeArg) new TypeArg.Ref(renameRef(reference.ref(), substitution))
-                        : argument).toList());
+                .toList());
     }
 
     private static ScopedValue renameScoped(ScopedValue scoped, Map<String, String> substitution) {
@@ -1256,154 +1056,17 @@ final class SchemaDesugarer {
         return element.typeRef() instanceof SimpleRef simple ? simple.name() : "T";
     }
 
-    private static RecordValue.Field nameField(String name, String text) {
-        return new RecordValue.Field(name, scoped(new TokenValue(text, TokenForm.UNQUOTED)));
-    }
-
-    /** A bare value in a field or element position -- no schema directive, no annotations, no type-ref of its own. */
-    private static ScopedValue scoped(CoreValue value) {
-        return scoped(value, List.of());
-    }
-
-    /**
-     * The same, carrying the annotations written on the construct it stands for. §6 puts a field's own
-     * annotations on the {@code record_field} in resolver output, and a held body reaches that through the
-     * wire value, so they travel here rather than being re-attached after the fact.
-     */
-    private static ScopedValue scoped(CoreValue value, List<Annotation> annotations) {
-        return new ScopedValue(Optional.empty(), new DataValue(annotations, Optional.empty(), value));
-    }
-
     // ── Internal names (§8.2) ────────────────────────────────────────────────────────────────────
 
-    /**
-     * {@code head_arg_arg_hash} -- §8.2's own recommendation for an internal name, "a readable head plus a
-     * structural hash". The readable half is what a diagnostic shows and what several tests recognise a form
-     * by; the hash separates forms the readable half spells alike.
-     *
-     * <p><b>The name is derived from the resolved binding record, not from the spelling that produced it.</b>
-     * That is the one identity rule for internal entries: one entry per distinct concrete form, schema-wide,
-     * so {@code [T; 3]} and {@code [T; 3..3]} collapse onto the same entry and a form arising from two
-     * different declarations is written once.
-     *
-     * <p><b>The hash runs over a rendering this class builds itself</b> ({@link #canonical}), never over the
-     * AST's own {@code toString}. Both of the JDK's ready-made answers are unusable here: {@code
-     * Record::toString}'s format is documented as "subject to change" (and shifts whenever a record's
-     * components are renamed or reordered), and {@code Record::hashCode} "need not remain consistent from one
-     * execution of an application to another execution of the same application". {@code String.hashCode} is
-     * specified exactly, so hashing a string built here is the one construction that is deterministic by
-     * contract rather than by accident.
-     *
-     * <p>That determinism is load-bearing, not cosmetic. An entry name is part of the resolved form, and an
-     * importing schema reaches an <em>imported</em> entry by deriving the same name for the same form --
-     * meta.tn's {@code extern.types: [type_name]?} landing on the entry meta-kernel already produced.
-     */
     /** Injects {@code declaration} under {@code name}, unless the same form already claimed it. */
     private void claim(String name, Binding binding, Supplier<SchemaMap.Declaration> declaration) {
-        if (minted.claim(name, canonical(binding))) {
+        if (minted.claim(name, DerivedName.canonicalBinding(binding.head(), binding.fields()))) {
             injected.put(name, declaration.get());
         }
     }
 
     private static String bindingName(Binding binding) {
-        return internalName(binding.head(), binding.fields());
-    }
-
-    /**
-     * The same derivation, over a binding record built elsewhere -- {@code TemplateMaterialiser}, closing an
-     * open form into the concrete one it always described.
-     *
-     * <p><b>Sharing the function is what makes the two channels dedupe against each other</b> (§8.2). A form
-     * written directly and the same form arriving through a materialised template are one type, so they must
-     * be one entry, and the only way that holds is for one function of one record to name both.
-     */
-    static String internalName(String head, List<RecordValue.Field> fields) {
-        Binding binding = new Binding(head, fields);
-        // The head too: a constructor name is an identifier, but a consumer's meta layer may declare one
-        // outside ASCII, and a name that mixes it with the ASCII parts below is refused by §8.2's own walk.
-        StringBuilder readable = new StringBuilder(InternalName.part(head));
-        for (RecordValue.Field field : fields) {
-            appendReadable(readable, field.value().value().coreValue());
-        }
-        return readable.append('_').append(String.format("%08x", canonical(binding).hashCode())).toString();
-    }
-
-    /** The readable half of a derived name: every scalar the binding record holds, in order, under {@code _}. */
-    private static void appendReadable(StringBuilder out, CoreValue value) {
-        switch (value) {
-            case TokenValue token -> out.append('_')
-                    .append(InternalName.part(
-                            NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED)));
-            case RecordValue record -> record.fields()
-                    .forEach(field -> appendReadable(out, field.value().value().coreValue()));
-            case ArrayValue array -> array.elements()
-                    .forEach(element -> appendReadable(out, element.value().coreValue()));
-            default -> out.append("_v");
-        }
-    }
-
-    /**
-     * The binding record rendered as one string, structurally and injectively: every value shape is written
-     * under its own tag, nested records and arrays recurse, and each piece of author text is written
-     * length-first ({@code 4:text}), so no arrangement of delimiters inside a token can spell a different
-     * record. Two renderings are equal exactly when the binding records are.
-     */
-    /** {@link #canonical} over a binding built elsewhere -- {@code TemplateMaterialiser}'s closed synthetics. */
-    static String canonicalOf(String head, List<RecordValue.Field> fields) {
-        return canonical(new Binding(head, fields));
-    }
-
-    private static String canonical(Binding binding) {
-        StringBuilder out = new StringBuilder();
-        appendText(out.append('A'), binding.head());
-        appendFields(out, binding.fields());
-        return out.toString();
-    }
-
-    private static void appendFields(StringBuilder out, List<RecordValue.Field> fields) {
-        out.append('(');
-        for (RecordValue.Field field : fields) {
-            appendText(out.append('f'), field.name());
-            appendValue(out, field.value().value().coreValue());
-        }
-        out.append(')');
-    }
-
-    private static void appendValue(StringBuilder out, CoreValue value) {
-        switch (value) {
-            case TokenValue token -> {
-                // The form by name, not ordinal: inserting a TokenForm constant would renumber every ordinal
-                // invisibly, which is the same hazard as hashing a record's toString.
-                appendText(out.append('v'), token.form().name());
-                appendNumberAware(out, token.text(), token.form() == TokenForm.UNQUOTED);
-            }
-            case RecordValue record -> appendFields(out.append('r'), record.fields());
-            case ArrayValue array -> {
-                out.append("a(");
-                array.elements().forEach(element -> appendValue(out, element.value().coreValue()));
-                out.append(')');
-            }
-            default -> out.append('?');
-        }
-    }
-
-    /** Length-first, so concatenation stays unambiguous whatever the text contains. */
-    private static void appendText(StringBuilder out, String text) {
-        out.append(text.length()).append(':').append(text);
-    }
-
-    /**
-     * A token's contribution to the hashed rendering, with §4.3's numeric equivalence applied
-     * ({@link NumericIdentity}). A number writes its base-type kind and its canonical magnitude as two
-     * fields where anything else writes its text as one; every field being length-prefixed, no token's own
-     * text can be mistaken for a tagged number.
-     */
-    private static void appendNumberAware(StringBuilder out, String text, boolean unquoted) {
-        NumericIdentity.Canonical canonical = NumericIdentity.of(text, unquoted);
-        if (canonical != null) {
-            appendText(out, canonical.kind());
-        }
-        appendText(out, canonical == null ? text : canonical.text());
+        return DerivedName.ofBinding(binding.head(), binding.fields());
     }
 
     /**

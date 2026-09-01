@@ -365,6 +365,21 @@ generic application can only be a §5.10 user-template application (§3.3.1 reso
 namespace only), and applying one is rejected at the site that writes it, an imported head included. Invalid
 sugar forms report per declaration via `DesugarFailureReporter` rather than throwing.
 
+### Shared resolver vocabulary: `WireForm`, `MetaRefs`, `DerivedName` — `docs/schema-resolution.md`
+
+Three leaf classes the phases share, each owning a fact none of them owns individually. **`WireForm`** is how
+schema vocabulary is spelled as data, in both directions — the vocabulary member names, `refValue` and its
+inverse `typeRefOf`, the held-record writers, and §5.10 substitution over a held body. A held body is written
+by two phases and read by four, and *a second opinion about what an application looks like is what makes one
+of them wrong*, so there is one. **`MetaRefs`** is the `schema.meta` reference walk (`mapRefs`/`mapBodyRefs`):
+which body shape carries which references is a fact about the value model, stated where the model is walked
+rather than in whichever caller happens to hold it — flattening, the synthetic rename and the regularity check
+all visit through it. **`DerivedName`** is §8.2's names and the renderings their hashes run over, keeping the
+two families apart: a binding record renders by field name, an application positionally, and they reuse the
+same tag letters in different roles. What is shared is each family's own rendering — `ofBinding` is called by
+*both* lift channels, which is what makes a form written directly and the same form closed from a template land
+on one entry.
+
 ### Schema resolution (`.../resolver/`) — `docs/schema-resolution.md`
 
 `DefinitionResolver` (package-private) turns one declaration into a resolved `schema.meta.TypeDefinition`;
@@ -983,7 +998,7 @@ compatibility).
   everything it refuses. A parameterized supertype resolves (`vip => <T> customer & box<T>` absorbs the
   operand's fields while the application is open, the operand contributing its own supertypes but not its
   name, a template being no type), and so does an argument that is itself an application (`box<inner<T>>` —
-  substitution writes a bound reference through `SchemaDesugarer.refValue`, which spells one carrying
+  substitution writes a bound reference through `WireForm.refValue`, which spells one carrying
   arguments in `type_ref`'s record form). `OpenOperandCompositionTest` pins both, including the two IS-A
   edges an open operand does and does not give. `DefinitionResolver`'s Javadoc is the exact current boundary.
   Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
@@ -1015,7 +1030,7 @@ compatibility).
   §5.2 says `{ x: T }` denotes `!record { fields: [ { name: x  type: T } ] }`, and `SchemaDesugarer` rewrites
   it there, where the body is written; a **composition or refinement** template is held one phase later
   (`DefinitionResolver.holdIfOpen`), because both absorb fields from a source and the form to hold is the
-  *flattened* one — but through `SchemaDesugarer.heldRecord`, so two producers of the wire form share one
+  *flattened* one — but through `WireForm.heldRecord`, so two producers of the wire form share one
   spelling. **An alias is written the same way**, and is: `uuid_pair => <B> pair<text, B>` leaves the desugar
   phase as `<B> !reference { target: pair<text, B> }`, spellable because the kernel's `reference.target` is a
   `type_ref`. So **every** open entry's body is held, with no exception — which is what lets materialisation

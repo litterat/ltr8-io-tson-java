@@ -283,11 +283,11 @@ rebuilt and called a cache.
   - **A scalar type slot may hold an application**, not just a name — which is what makes `[tree<T>; 1..]`
     and `[[T]]` lift at all. The table keeps both renderings of such a slot: the wire field a closed
     construction would write (`type_ref`'s record form, `{ name: tree  arguments: [ … ] }`, which is what
-    `internalName` hashes) and the reference *as written*, which is what an open binding holds. Only
+    `DerivedName.ofBinding` hashes) and the reference *as written*, which is what an open binding holds. Only
     `element_type`/`key_type`/`value_type` are reached this way, a named slot being the one an open binding
     can address; `tuple` and `choice` put their positions inside a collection, so they keep only the first
-    rendering — written through the same `refValue` producer, since a `[type_ref]` holds what a `type_ref`
-    holds, and rewritten a pass later by `TemplateMaterialiser.mapBodyRefs`, which maps a choice's variants
+    rendering — written through the same `WireForm.refValue` producer, since a `[type_ref]` holds what a `type_ref`
+    holds, and rewritten a pass later by `MetaRefs.mapBodyRefs`, which maps a choice's variants
     and a tuple's elements like any other reference.
     - **A slot that refuses an application does not fail where it decided.** `choiceBinding` required a bare
       name per variant, so `( box<text> | int32 )` left the *whole* choice unlifted and reached
@@ -344,20 +344,22 @@ rebuilt and called a cache.
     a wire form two later phases read, and they disagree: `TsonObjectWriter` states a no-argument `type_ref`
     in the explicit record form (`{ name: N  arguments: [] }`) where this phase states it positionally (`N`).
     That makes a `type_argument` indistinguishable from a `type_ref` application to a walk that reads neither
-    against a vocabulary — and since `internalName` hashes what is written, a second spelling is also a second
-    entry for one type. One producer, one spelling: `refValue` is the single place a type slot's shape is
-    decided.
+    against a vocabulary — and since `DerivedName.ofBinding` hashes what is written, a second spelling is also
+    a second entry for one type. One producer, one spelling: `WireForm.refValue` is the single place a type
+    slot's shape is decided.
   - **A parameter rides the ordinary `value` slot**, with §8.1's shadowing rule to tell it from a literal,
     which is why the kernel declares one `value` slot and no labelled group. §5.7's fixation then happens at
     materialisation
     (`TemplateMaterialiser.fixRoutedValues`), where the value is concrete.
-  - **A composition or refinement template is held too, but from one phase later** (`heldRecord`, called by
+  - **A composition or refinement template is held too, but from one phase later** (`WireForm.heldRecord`, called by
     `DefinitionResolver.holdIfOpen`). Both absorb fields from a source, and the form to hold is the
     *flattened* one — a §5.7 tightening entry states a modifier and no type-ref, so it is not a `record_field`
     at all until the inherited field supplies one. That needs a namespace this phase does not have, so the
-    rewrite happens in the resolver; the **spelling** stays here, which is the whole point. `heldRecord` and
-    `recordBinding` are two producers of the wire form and one producer of its spelling.
-    - **`TsonObjectWriter` cannot serve as that second producer**, which is why `heldRecord` exists rather
+    rewrite happens in the resolver; the **spelling** is `WireForm`'s, which is the whole point.
+    `WireForm.heldRecord` and this phase's `recordBinding` are two producers of the wire form and one
+    producer of its spelling — both going through `WireForm.refValue` and `WireForm.nameField` is what makes
+    that true by construction rather than by two authors agreeing.
+    - **`TsonObjectWriter` cannot serve as that second producer**, which is why `WireForm.heldRecord` exists rather
       than a round-trip. Measured against the desugar spelling it differs five ways: `{ name: "text"
       arguments: [] }` for a bare `text`, `!ref { … }` for a `type_argument`, every token quoted, `state:
       REQUIRED` written where the default covers it, and the retired `value_param` channel emitted. The

@@ -8,7 +8,6 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
@@ -302,14 +301,15 @@ final class ParameterKinds {
          * A slot typed {@code type_ref} holding an application rather than a bare name. The head is a type
          * name; each argument that names a parameter of this declaration is <b>deferred</b>, since
          * meta-kernel's {@code type_argument} puts a parameter of either kind on the reference channel.
+         *
+         * <p>The members are read through {@link WireForm}, not by matching {@code "name"} and
+         * {@code "arguments"} here: what an application looks like on the wire is one class's answer, and a
+         * walk that re-derives it is a second opinion waiting to disagree.
          */
         private void application(RecordValue application) {
-            String head = application.fields().stream().filter(f -> f.name().equals("name")).findFirst()
-                    .map(f -> f.value().value().coreValue())
+            String head = WireForm.field(application, WireForm.NAME)
                     .filter(TokenValue.class::isInstance).map(v -> ((TokenValue) v).text()).orElse(null);
-            List<RecordValue.Field> fields = application.fields();
-            Optional<CoreValue> arguments = fields.stream().filter(f -> f.name().equals("arguments"))
-                    .findFirst().map(f -> f.value().value().coreValue());
+            Optional<CoreValue> arguments = WireForm.field(application, WireForm.ARGUMENTS);
             if (head == null || arguments.isEmpty() || !(arguments.get() instanceof ArrayValue list)) {
                 return;
             }
@@ -325,7 +325,7 @@ final class ParameterKinds {
             }
             for (RecordValue.Field member : record.fields()) {
                 CoreValue value = member.value().value().coreValue();
-                if (member.name().equals("value")) {
+                if (member.name().equals(WireForm.VALUE)) {
                     continue; // a literal argument says nothing about this declaration's parameters
                 }
                 if (value instanceof TokenValue token && occurrences.declares(token.text())) {
