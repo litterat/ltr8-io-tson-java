@@ -533,7 +533,7 @@ it. **A §8.2 name-hygiene refusal is a diagnostic like any other and carries no
 refused is the `Code` — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT`, one each, since the
 three want three different remedies and the code is what a consumer routes on — and the Unicode data
 version §8.2 requires a refusal to name is a fact about the *processor*, so it is stated once beside the
-diagnostics rather than N times inside them (`TsonProcessorPolicy`, below).
+diagnostics rather than N times inside them (`TsonUnicodeProcessorPolicy`, below).
 **What earns a component at all is one rule** — *a fact not recoverable from the
 document plus the schema* — which is why `fetchReason` is the only non-location component and why an atom's
 failed bound (in the schema), a duplicate key (in the document) and the rule that fired (the code) get none;
@@ -568,8 +568,9 @@ reference to a dropped declaration on top of the real error. Namespace-level fai
 `!!import`, ineligible `!!meta`, `!!id` cross-check) still throw even with a receiver. Compilation, and the
 lexer under everything, are still fail-fast.
 
-**`TsonProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2
-policies (`names`, `tokens` — level, whole-name or per-segment unit, and any `permitting` relaxations) plus
+**`TsonUnicodeProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2
+policies (`identifierPolicy`, `tokenPolicy`, under `TsonConfig`'s own names — level, whole-name or
+per-segment unit, and any `permitting` relaxations) plus
 the UCD version, reachable as `Tson.processorPolicy()`, either facade's `processorPolicy()` (read off the
 reader that judged, since a derived reader is where the two can differ), and `tson policy` on the command
 line. It is what makes a §8.2 divergence explainable: the same bytes may be refused here and accepted
@@ -687,7 +688,7 @@ the report as codes (`NOT_IMPLEMENTED`, `SCHEMA_UNAVAILABLE`) with a stderr note
 unchanged. 70's halves print differently: a gap that escapes as an exception prints
 `not implemented yet: <message>`, whose text usually names the workaround; a fault gets the please-report-it
 banner and its stack trace. Also `tson compile`, `tson hash` (stamps a
-`?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `TsonProcessorPolicy` with no
+`?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `TsonUnicodeProcessorPolicy` with no
 document in hand, the same record every `validate`/`compile` envelope carries in its `policy` field. In
 `--output text` a run prints it only when something was actually refused; the machine formats always carry
 it, a consumer wanting one shape.

@@ -90,9 +90,10 @@
 
     §8.2's three name-hygiene rules read data the Unicode Consortium does not freeze, at a level the
     reading deployment chooses, so the same bytes may be accepted here and refused elsewhere. This is the
-    statement of why: `names` governs declared names, field names, type-refs and annotation names, where
-    all three rules apply; `tokens` governs values, where only the restricted-script rule can, a token
-    having no identifier profile and no scope to be distinct within.
+    statement of why: identifier_policy governs declared names, field names, type-refs and annotation
+    names, where all three rules apply; token_policy governs values, where only the restricted-script rule
+    can, a token having no identifier profile and no scope to be distinct within. Both keep the names
+    TsonConfig gives them, so a deployment's configuration and the report it produces are one vocabulary.
 
     unicode_data_version is the UCD release whose tables the rules were computed against, which is the
     version §8.2's "UTS #39 data version" means (SPEC-FEEDBACK.md #6). It is here rather than on each
@@ -100,7 +101,11 @@
     order not to be refused is this record *before* it writes a document -- which `tson policy` prints
     with no document in hand.
     """
-  policy => { names: unicode_policy  tokens: unicode_policy  unicode_data_version: text }
+  policy => {
+    identifier_policy: unicode_policy
+    token_policy: unicode_policy
+    unicode_data_version: text
+  }
   validation_report => { valid: boolean  policy: policy  errors: [diagnostic] }
   file_report => { file: text  valid: boolean  errors: [diagnostic] }
   validation_run => { valid: boolean  policy: policy  files: [file_report]  errors: [diagnostic] }

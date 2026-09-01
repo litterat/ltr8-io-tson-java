@@ -175,7 +175,8 @@ enum OutputFormat {
 
     /** A policy on one line: what differs between two deployments that disagree about one name. */
     private static String summary(CliPolicy policy) {
-        return "names " + summary(policy.names()) + ", tokens " + summary(policy.tokens())
+        return "identifier policy " + summary(policy.identifierPolicy())
+                + ", token policy " + summary(policy.tokenPolicy())
                 + ", Unicode " + policy.unicodeDataVersion();
     }
 
@@ -192,9 +193,9 @@ enum OutputFormat {
      * as two things to reconcile.
      */
     private static String renderText(CliPolicy policy) {
-        return "names:   " + summary(policy.names()) + System.lineSeparator()
-                + "tokens:  " + summary(policy.tokens()) + System.lineSeparator()
-                + "unicode: " + policy.unicodeDataVersion();
+        return "identifier policy: " + summary(policy.identifierPolicy()) + System.lineSeparator()
+                + "token policy:      " + summary(policy.tokenPolicy()) + System.lineSeparator()
+                + "unicode data:      " + policy.unicodeDataVersion();
     }
 
     /**
@@ -256,10 +257,10 @@ enum OutputFormat {
     }
 
     private static void jsonPolicy(StringBuilder json, CliPolicy policy) {
-        json.append("{\"names\":");
-        jsonUnicodePolicy(json, policy.names());
-        json.append(",\"tokens\":");
-        jsonUnicodePolicy(json, policy.tokens());
+        json.append("{\"identifierPolicy\":");
+        jsonUnicodePolicy(json, policy.identifierPolicy());
+        json.append(",\"tokenPolicy\":");
+        jsonUnicodePolicy(json, policy.tokenPolicy());
         json.append(",\"unicodeDataVersion\":").append(jsonString(policy.unicodeDataVersion())).append('}');
     }
 

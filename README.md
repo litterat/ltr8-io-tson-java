@@ -586,9 +586,9 @@ Unicode data version behind them:
 
 ```
 $ tson policy
-names:   HIGHLY_RESTRICTIVE
-tokens:  UNRESTRICTED
-unicode: 16.0
+identifier policy: HIGHLY_RESTRICTIVE
+token policy:      UNRESTRICTED
+unicode data:      16.0
 ```
 
 Every `validate`/`compile` report carries the same record in its `policy` field, so a refusal is always
@@ -637,8 +637,9 @@ $ tson validate person.tn ada.tn      # ada.tn = !!schema:"…/person-1.tn" !per
 OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
-{"valid":false,"policy":{"names":{"level":"HIGHLY_RESTRICTIVE","perSegment":false,"permitting":[]},
-  "tokens":{"level":"UNRESTRICTED","perSegment":false,"permitting":[]},"unicodeDataVersion":"16.0"},
+{"valid":false,"policy":{"identifierPolicy":{"level":"HIGHLY_RESTRICTIVE","perSegment":false,
+  "permitting":[]},"tokenPolicy":{"level":"UNRESTRICTED","perSegment":false,"permitting":[]},
+  "unicodeDataVersion":"16.0"},
   "files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
   "schemaPointer":"/person/name","schemaId":"example.com/2026/34/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",

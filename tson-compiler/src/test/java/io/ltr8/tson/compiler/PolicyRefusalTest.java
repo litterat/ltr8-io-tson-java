@@ -159,14 +159,14 @@ class PolicyRefusalTest {
      */
     @Test
     void theProcessorPolicyIsReachableWithoutARefusal() {
-        TsonProcessorPolicy policy = new TsonTreeReader()
+        TsonUnicodeProcessorPolicy policy = new TsonTreeReader()
                 .withTokenPolicy(TsonUnicodePolicy.asciiOnly())
                 .withNamePolicy(TsonUnicodePolicy.singleScript().perSegment())
                 .processorPolicy();
 
-        assertEquals(TsonUnicodePolicy.Level.SINGLE_SCRIPT, policy.names().level());
-        assertTrue(policy.names().isPerSegment());
-        assertEquals(TsonUnicodePolicy.Level.ASCII_ONLY, policy.tokens().level());
+        assertEquals(TsonUnicodePolicy.Level.SINGLE_SCRIPT, policy.identifierPolicy().level());
+        assertTrue(policy.identifierPolicy().isPerSegment());
+        assertEquals(TsonUnicodePolicy.Level.ASCII_ONLY, policy.tokenPolicy().level());
         assertEquals(Xid.UNICODE_VERSION, policy.unicodeDataVersion());
         assertEquals(Xid.UNICODE_VERSION, TsonUnicodePolicy.dataVersion());
     }

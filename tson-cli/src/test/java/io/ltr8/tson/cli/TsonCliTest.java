@@ -274,13 +274,13 @@ class TsonCliTest {
     @Test
     void policyPrintsTheUnicodePolicyThisBuildApplies() throws IOException {
         String text = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"policy"})));
-        assertTrue(text.contains("names:   HIGHLY_RESTRICTIVE"), text);
-        assertTrue(text.contains("tokens:  UNRESTRICTED"), text);
-        assertTrue(text.contains("unicode: " + TsonUnicodePolicy.dataVersion()), text);
+        assertTrue(text.contains("identifier policy: HIGHLY_RESTRICTIVE"), text);
+        assertTrue(text.contains("token policy:      UNRESTRICTED"), text);
+        assertTrue(text.contains("unicode data:      " + TsonUnicodePolicy.dataVersion()), text);
 
         String json = captureStdout(() ->
                 assertEquals(0, TsonCli.run(new String[] {"policy", "--output", "json"})));
-        assertTrue(json.strip().startsWith("{\"names\":{\"level\":\"HIGHLY_RESTRICTIVE\""), json);
+        assertTrue(json.strip().startsWith("{\"identifierPolicy\":{\"level\":\"HIGHLY_RESTRICTIVE\""), json);
         assertTrue(json.contains("\"unicodeDataVersion\":\"" + TsonUnicodePolicy.dataVersion() + "\""), json);
     }
 

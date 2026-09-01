@@ -61,7 +61,7 @@ import java.util.Optional;
  * version it was computed against, which is a fact about <em>this processor</em>: constant for the life of
  * a process, so a copy on each problem is N copies of a string that cannot differ, and needed by a sender
  * before it writes a document rather than after it is refused. It is stated once, beside the diagnostics
- * rather than inside them ({@link TsonProcessorPolicy}), which also states the thing a version cannot --
+ * rather than inside them ({@link TsonUnicodeProcessorPolicy}), which also states the thing a version cannot --
  * what this deployment <em>would</em> admit. What is left here is the remedy: which name failed, and
  * <b>which rule fired, which is the code</b> ({@link Code#CONFUSABLE_NAMES}, {@link
  * Code#RESTRICTED_CHARACTER}, {@link Code#RESTRICTED_SCRIPT}, one each).

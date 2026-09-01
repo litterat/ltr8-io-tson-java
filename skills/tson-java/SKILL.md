@@ -331,9 +331,10 @@ reported in any of §8.1's four error categories. In this implementation a refus
 `Diagnostic` carrying `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT` — **one code per
 rule, which is what a consumer routes on** — and nothing else.
 
-**What judged it is stated once, not per refusal**: `TsonProcessorPolicy` — the two policies (level, unit,
-any `permitting` relaxations) plus the Unicode data version — from `tson.processorPolicy()`, from
-`processorPolicy()` on the reader that judged, or from `tson policy` on the command line. Two deployments
+**What judged it is stated once, not per refusal**: `TsonUnicodeProcessorPolicy` — `identifierPolicy` and
+`tokenPolicy` (each a level, a unit, any `permitting` relaxations), under the same names that configured
+them, plus the Unicode data version — from `tson.processorPolicy()`, from `processorPolicy()` on the
+reader that judged, or from `tson policy` on the command line. Two deployments
 can legitimately disagree about one name, and this is the only statement of why; read it *before*
 generating and the disagreement never costs a round trip.
 

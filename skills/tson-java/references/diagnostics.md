@@ -83,7 +83,7 @@ What earns a component at all is one rule: **a fact not recoverable from the doc
 and about the problem rather than about the processor**. Which is why an atom's failed bound (in the
 schema), a duplicate key (in the document) and the rule that fired (the code) get none — and why a §8.2
 refusal's Unicode data version and policy get none either: they are constant for the whole run, so they
-are stated once beside the diagnostics (`TsonProcessorPolicy`, `tson policy`, and the `policy` field on
+are stated once beside the diagnostics (`TsonUnicodeProcessorPolicy`, `tson policy`, and the `policy` field on
 every `tson-cli` envelope) rather than N times inside them.
 
 **Two absence conventions, deliberately.** The two pointers are `Optional` because `""` is the *root*,

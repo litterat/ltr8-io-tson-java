@@ -121,8 +121,10 @@ omits `expected`/`actual`: the stderr note already tells a person that nothing w
 discriminator that could contradict it.
 
 **What §8.2 requires a refusal to name rides on the envelope instead**, as `policy` — a `CliPolicy` on both
-`validation_run` and `validation_report`, carrying each of the two surfaces (level, `per_segment`,
-`permitting`) and the `unicode_data_version` the rules were computed against. It is there rather than on each
+`validation_run` and `validation_report`, carrying `identifier_policy` and `token_policy` (each a level, a
+`per_segment` unit, and any `permitting` relaxations) and the `unicode_data_version` the rules were computed
+against. The two surfaces keep `TsonConfig`'s own names all the way to the wire, so what a deployment set
+and what its reports say are one vocabulary. It is there rather than on each
 diagnostic because it is a fact about the *processor*: constant for the whole run, so a per-refusal copy is N
 copies of one string; and needed by a sender *before* it writes a document rather than after being refused,
 which a channel that only opens on failure cannot give it. The level is also the half that actually explains

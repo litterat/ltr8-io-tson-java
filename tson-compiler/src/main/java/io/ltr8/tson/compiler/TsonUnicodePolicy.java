@@ -153,7 +153,7 @@ public final class TsonUnicodePolicy {
      * Consortium freezes: two conforming processors may legitimately disagree about one name, and the
      * version is the only thing that explains the disagreement.
      *
-     * <p><b>It is stated once, not once per refusal</b> ({@link TsonProcessorPolicy}, which a run or a
+     * <p><b>It is stated once, not once per refusal</b> ({@link TsonUnicodeProcessorPolicy}, which a run or a
      * response carries beside its diagnostics). It is constant for the life of a process, so a copy on each
      * problem is N copies of a string that cannot differ; and what a sender needs in order not to be refused
      * is this fact <em>before</em> it writes a document, which a channel that only opens on failure cannot
@@ -180,7 +180,7 @@ public final class TsonUnicodePolicy {
      * which is what lets a deployment <em>state</em> its configuration rather than only apply it. A document
      * one processor accepts and another refuses differs by exactly these three, and a reader of the refusal
      * has no other way to learn which one moved: the policy that judged is not in the document, not in the
-     * schema, and not in the diagnostic. See {@link TsonProcessorPolicy}, which is the three of them plus
+     * schema, and not in the diagnostic. See {@link TsonUnicodeProcessorPolicy}, which is the three of them plus
      * {@link #dataVersion()} as one value a run or a response states once.
      */
     public Level level() {

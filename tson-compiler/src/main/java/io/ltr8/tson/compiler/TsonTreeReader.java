@@ -242,8 +242,8 @@ public final class TsonTreeReader {
      * derived reader ({@link #withNamePolicy}, {@link #withTokenPolicy}) is exactly where the two can differ,
      * and a response quoting the wrong one is worse than quoting none.
      */
-    public TsonProcessorPolicy processorPolicy() {
-        return TsonProcessorPolicy.of(namePolicy, tokenPolicy);
+    public TsonUnicodeProcessorPolicy processorPolicy() {
+        return TsonUnicodeProcessorPolicy.of(namePolicy, tokenPolicy);
     }
 
     // ── Whole-document entry points ──────────────────────────────────────

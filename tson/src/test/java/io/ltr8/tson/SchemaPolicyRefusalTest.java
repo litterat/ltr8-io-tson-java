@@ -116,7 +116,8 @@ class SchemaPolicyRefusalTest {
                 { p%sy => text }
                 """.formatted(CYR_A)).getFirst().code());
 
-        assertEquals(TsonUnicodePolicy.Level.ASCII_ONLY, tson.processorPolicy().names().level());
+        assertEquals(TsonUnicodePolicy.Level.ASCII_ONLY,
+                tson.processorPolicy().identifierPolicy().level());
         assertEquals(TsonUnicodePolicy.dataVersion(), tson.processorPolicy().unicodeDataVersion());
     }
 }

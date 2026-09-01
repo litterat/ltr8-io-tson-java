@@ -1,7 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.annotation.Field;
-import io.ltr8.tson.compiler.TsonProcessorPolicy;
+import io.ltr8.tson.compiler.TsonUnicodeProcessorPolicy;
 import io.ltr8.tson.compiler.TsonUnicodePolicy;
 
 import java.lang.Character.UnicodeScript;
@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * This CLI's on-the-wire shape for {@link TsonProcessorPolicy} -- what this run's [TSON-DATA] §8.2 name
- * hygiene was judged by, stated once per {@link ValidationRun}/{@link ValidationReport} and printable on
- * its own by {@code tson policy}.
+ * This CLI's on-the-wire shape for {@link TsonUnicodeProcessorPolicy} -- what this run's [TSON-DATA] §8.2
+ * name hygiene was judged by, stated once per {@link ValidationRun}/{@link ValidationReport} and printable
+ * on its own by {@code tson policy}.
  *
  * <p><b>Why the envelope carries it and a diagnostic does not.</b> §8.2's rules read data the Unicode
  * Consortium does not freeze, at a level this deployment chose, so one processor refuses a name another
@@ -20,17 +20,21 @@ import java.util.Set;
  * policy} prints this with no document in hand. The refusal itself carries the remedy: which name, and
  * which rule, in its own {@code code}.
  *
- * <p>A separate DTO from {@link TsonProcessorPolicy} for {@link CliDiagnostic}'s own reason -- {@code
- * diagnostics.tn} declares these fields as {@code text}, and {@link UnicodeScript} is a JDK enum of some
- * 170 members that no wire schema should be restating. The scripts render by name; {@link
+ * <p>A separate DTO from {@link TsonUnicodeProcessorPolicy} for {@link CliDiagnostic}'s own reason --
+ * {@code diagnostics.tn} declares these fields as {@code text}, and {@link UnicodeScript} is a JDK enum of
+ * some 170 members that no wire schema should be restating. The scripts render by name; {@link
  * TsonUnicodePolicy.Level} stays the real enum, since enum narrowing is the proven binding path here.
+ *
+ * <p>The two surfaces keep {@code TsonConfig}'s own names, here and on the wire, so a deployment's
+ * configuration and the report it produces are one vocabulary.
  */
-public record CliPolicy(CliUnicodePolicy names, CliUnicodePolicy tokens,
+public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierPolicy,
+                        @Field("token_policy") CliUnicodePolicy tokenPolicy,
                         @Field("unicode_data_version") String unicodeDataVersion) {
 
-    static CliPolicy from(TsonProcessorPolicy policy) {
-        return new CliPolicy(CliUnicodePolicy.from(policy.names()), CliUnicodePolicy.from(policy.tokens()),
-                policy.unicodeDataVersion());
+    static CliPolicy from(TsonUnicodeProcessorPolicy policy) {
+        return new CliPolicy(CliUnicodePolicy.from(policy.identifierPolicy()),
+                CliUnicodePolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion());
     }
 
     /**

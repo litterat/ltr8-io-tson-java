@@ -113,9 +113,9 @@ public final class Tson {
     }
 
     /**
-     * The two [TSON-DATA] §8.2 Unicode policies this instance applies -- to declared names ({@link
-     * TsonConfig#identifierPolicy}) and to token values ({@link TsonConfig#tokenPolicy}) -- and the Unicode
-     * data version they are computed against.
+     * The two [TSON-DATA] §8.2 Unicode policies this instance applies -- {@link TsonConfig#identifierPolicy}
+     * over declared names and {@link TsonConfig#tokenPolicy} over token values -- and the Unicode data
+     * version they are computed against, under the names that configured them.
      *
      * <p><b>What a run or a response states beside its diagnostics</b>, and what a deployment can publish
      * with no document in hand at all. §8.2's rules read data the UCD does not freeze and are applied at a
@@ -124,8 +124,8 @@ public final class Tson {
      * than after being refused. A reader derived with {@link TsonTreeReader#withNamePolicy} answers for
      * itself ({@link TsonTreeReader#processorPolicy()}).
      */
-    public TsonProcessorPolicy processorPolicy() {
-        return TsonProcessorPolicy.of(core.identifierPolicy(), tokenPolicy);
+    public TsonUnicodeProcessorPolicy processorPolicy() {
+        return TsonUnicodeProcessorPolicy.of(core.identifierPolicy(), tokenPolicy);
     }
 
     /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/{@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBindContext} to customize it. */

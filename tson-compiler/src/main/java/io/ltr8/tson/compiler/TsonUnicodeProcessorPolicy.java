@@ -3,8 +3,9 @@ package io.ltr8.tson.compiler;
 import java.util.Objects;
 
 /**
- * What this processor's own configuration does to a document's fate -- the two {@link TsonUnicodePolicy}
- * surfaces [TSON-DATA] §8.2 defines, and the Unicode data version they were computed against.
+ * What this processor's own Unicode configuration does to a document's fate -- the two {@link
+ * TsonUnicodePolicy} surfaces [TSON-DATA] §8.2 defines, and the Unicode data version they were computed
+ * against.
  *
  * <p><b>Why this exists as a value at all.</b> §8.2's three name-hygiene rules read data the Unicode
  * Consortium declines to freeze, and the level they are applied at is the reading deployment's own choice,
@@ -29,24 +30,27 @@ import java.util.Objects;
  * {@link TsonTreeReader#processorPolicy()}, {@link TsonObjectReader#processorPolicy()}, {@code tson
  * policy}).
  *
- * <p><b>The two policies are the two surfaces, and they are not interchangeable.</b> {@code names} governs
- * declared names, field names, type-refs and annotation names, where all three of §8.2's rules apply;
- * {@code tokens} governs values, where only the restricted-script rule can -- a token has no identifier
- * profile and no scope to be distinct within. A deployment that has relaxed one has said nothing about the
- * other, which is exactly why both are stated.
+ * <p><b>The two policies are the two surfaces, and they are not interchangeable.</b> The identifier policy
+ * governs declared names, field names, type-refs and annotation names, where all three of §8.2's rules
+ * apply; the token policy governs values, where only the restricted-script rule can -- a token has no
+ * identifier profile and no scope to be distinct within. A deployment that has relaxed one has said nothing
+ * about the other, which is exactly why both are stated.
  *
- * @param names               the policy applied to names -- {@code TsonConfig.identifierPolicy}
- * @param tokens              the policy applied to token values -- {@code TsonConfig.tokenPolicy}
+ * <p>The components are named for the {@code TsonConfig} settings they report, so a configuration and the
+ * report it produces are one vocabulary and one grep.
+ *
+ * @param identifierPolicy    the policy applied to names -- {@code TsonConfig.identifierPolicy}
+ * @param tokenPolicy         the policy applied to token values -- {@code TsonConfig.tokenPolicy}
  * @param unicodeDataVersion  {@link TsonUnicodePolicy#dataVersion()}, the UCD release whose tables the
  *                            rules were computed against ({@code SPEC-FEEDBACK.md} #6 on why that is the
  *                            version §8.2's "UTS #39 data version" means)
  */
-public record TsonProcessorPolicy(TsonUnicodePolicy names, TsonUnicodePolicy tokens,
-                                  String unicodeDataVersion) {
+public record TsonUnicodeProcessorPolicy(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy tokenPolicy,
+                                         String unicodeDataVersion) {
 
-    public TsonProcessorPolicy {
-        Objects.requireNonNull(names, "names");
-        Objects.requireNonNull(tokens, "tokens");
+    public TsonUnicodeProcessorPolicy {
+        Objects.requireNonNull(identifierPolicy, "identifierPolicy");
+        Objects.requireNonNull(tokenPolicy, "tokenPolicy");
         Objects.requireNonNull(unicodeDataVersion, "unicodeDataVersion");
     }
 
@@ -57,12 +61,14 @@ public record TsonProcessorPolicy(TsonUnicodePolicy names, TsonUnicodePolicy tok
      * into this library, and a caller stating a different one would be describing a processor that does not
      * exist.
      */
-    public static TsonProcessorPolicy of(TsonUnicodePolicy names, TsonUnicodePolicy tokens) {
-        return new TsonProcessorPolicy(names, tokens, TsonUnicodePolicy.dataVersion());
+    public static TsonUnicodeProcessorPolicy of(TsonUnicodePolicy identifierPolicy,
+                                                TsonUnicodePolicy tokenPolicy) {
+        return new TsonUnicodeProcessorPolicy(identifierPolicy, tokenPolicy, TsonUnicodePolicy.dataVersion());
     }
 
     @Override
     public String toString() {
-        return "names " + names + ", tokens " + tokens + ", Unicode " + unicodeDataVersion;
+        return "identifier policy " + identifierPolicy + ", token policy " + tokenPolicy
+                + ", Unicode " + unicodeDataVersion;
     }
 }

@@ -2,7 +2,7 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonSchemaFetchException;
-import io.ltr8.tson.compiler.TsonProcessorPolicy;
+import io.ltr8.tson.compiler.TsonUnicodeProcessorPolicy;
 import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.TsonReadContext;
 import org.junit.jupiter.api.Test;
@@ -19,17 +19,19 @@ class OutputFormatTest {
 
     /**
      * The default policy pair -- Highly Restrictive over whole names, Unrestricted over tokens, which is
-     * what {@code TsonConfig} gives a run that has configured nothing. Every envelope in this file carries
+     * what {@code TsonConfig}'s own {@code identifierPolicy}/{@code tokenPolicy} give a run that has
+     * configured nothing. Every envelope in this file carries
      * one, because every envelope the CLI emits does: [TSON-DATA] §8.2's rules are the deployment's own
      * configuration, so a report that did not state them could not be interpreted anywhere but here.
      */
-    private static final CliPolicy POLICY = CliPolicy.from(TsonProcessorPolicy.of(
+    private static final CliPolicy POLICY = CliPolicy.from(TsonUnicodeProcessorPolicy.of(
             TsonUnicodePolicy.highlyRestrictive(), TsonUnicodePolicy.unrestricted()));
 
     /** {@link #POLICY} as {@code --output json} writes it -- built from the accessor, not pinned to a version. */
     private static final String POLICY_JSON =
-            "{\"names\":{\"level\":\"HIGHLY_RESTRICTIVE\",\"perSegment\":false,\"permitting\":[]},"
-                    + "\"tokens\":{\"level\":\"UNRESTRICTED\",\"perSegment\":false,\"permitting\":[]},"
+            "{\"identifierPolicy\":{\"level\":\"HIGHLY_RESTRICTIVE\",\"perSegment\":false,"
+                    + "\"permitting\":[]},\"tokenPolicy\":{\"level\":\"UNRESTRICTED\","
+                    + "\"perSegment\":false,\"permitting\":[]},"
                     + "\"unicodeDataVersion\":\"" + TsonUnicodePolicy.dataVersion() + "\"}";
 
     @Test
@@ -236,7 +238,7 @@ class OutputFormatTest {
      */
     @Test
     void tsonOutputRoundTripsARelaxedPolicy() {
-        CliPolicy relaxed = CliPolicy.from(TsonProcessorPolicy.of(
+        CliPolicy relaxed = CliPolicy.from(TsonUnicodeProcessorPolicy.of(
                 TsonUnicodePolicy.moderatelyRestrictive().perSegment()
                         .permitting(UnicodeScript.LATIN, UnicodeScript.CYRILLIC),
                 TsonUnicodePolicy.unrestricted()));
@@ -247,8 +249,8 @@ class OutputFormatTest {
                 .read(TestDocuments.document(rendered));
 
         assertEquals(original, reread);
-        assertEquals(List.of(List.of("CYRILLIC", "LATIN")), relaxed.names().permitting());
-        assertTrue(relaxed.names().perSegment());
+        assertEquals(List.of(List.of("CYRILLIC", "LATIN")), relaxed.identifierPolicy().permitting());
+        assertTrue(relaxed.identifierPolicy().perSegment());
     }
 
     /**
@@ -289,8 +291,8 @@ class OutputFormatTest {
         String refused = OutputFormat.TEXT.render(new ValidationReport(false, POLICY, List.of(
                 CliDiagnostic.minimal(Diagnostic.Code.RESTRICTED_SCRIPT, "mixes scripts"))));
         assertTrue(refused.contains("[RESTRICTED_SCRIPT] mixes scripts"), refused);
-        assertTrue(refused.contains("note: refused under names HIGHLY_RESTRICTIVE, tokens UNRESTRICTED,"
-                + " Unicode " + TsonUnicodePolicy.dataVersion()), refused);
+        assertTrue(refused.contains("note: refused under identifier policy HIGHLY_RESTRICTIVE,"
+                + " token policy UNRESTRICTED, Unicode " + TsonUnicodePolicy.dataVersion()), refused);
 
         String ordinary = OutputFormat.TEXT.render(
                 ValidationReport.failed(POLICY, Diagnostic.Code.TYPE_MISMATCH, "nope"));
@@ -309,9 +311,9 @@ class OutputFormatTest {
         assertEquals(POLICY_JSON, OutputFormat.JSON.render(POLICY));
 
         String text = OutputFormat.TEXT.render(POLICY);
-        assertEquals("names:   HIGHLY_RESTRICTIVE" + System.lineSeparator()
-                + "tokens:  UNRESTRICTED" + System.lineSeparator()
-                + "unicode: " + TsonUnicodePolicy.dataVersion(), text);
+        assertEquals("identifier policy: HIGHLY_RESTRICTIVE" + System.lineSeparator()
+                + "token policy:      UNRESTRICTED" + System.lineSeparator()
+                + "unicode data:      " + TsonUnicodePolicy.dataVersion(), text);
 
         Object reread = DiagnosticsSchema.compiled().get("policy")
                 .read(TestDocuments.document(OutputFormat.TSON.render(POLICY)));
