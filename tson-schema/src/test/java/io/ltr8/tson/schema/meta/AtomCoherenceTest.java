@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.schema.atom.Rational;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

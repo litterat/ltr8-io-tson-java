@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.schema.atom.IsoDuration;
 
 import java.util.Optional;
 

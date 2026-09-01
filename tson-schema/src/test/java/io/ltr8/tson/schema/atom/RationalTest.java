@@ -1,5 +1,4 @@
-package io.ltr8.tson.schema.meta;
-
+package io.ltr8.tson.schema.atom;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;

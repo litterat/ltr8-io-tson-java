@@ -400,8 +400,14 @@ public final class TsonBundledSchemas {
 ```
 
 `register` rejecting a duplicate identity, plus an unmodifiable `entries()`, **is** the "locked"
-guarantee. `io.ltr8.tson.schema.meta` is the resolved-schema value model — pure records, sealed
-interfaces and enums, §8's `TypeDefinition` et al. `Top` is sealed except for its one deliberately open
+guarantee.
+
+The module exports two packages. `io.ltr8.tson.schema.meta` is the resolved-schema value model — pure
+records, sealed interfaces and enums, §8's `TypeDefinition` et al. `io.ltr8.tson.schema.atom` is the three
+**host value types** the built-in atoms read to — `Rational`, `IsoDuration`, `Complex` — which is what you
+hold after reading `!rational`, `!duration` or `!complex`, and what you declare a component of to bind one.
+The parsing half of an atom stays in `tson-compiler`'s unexported `atom` package, so a consumer sees the
+values and not the readers. `Top` is sealed except for its one deliberately open
 branch, **`Data`**, which a consumer's own class implements: §4.1's fourth base kind, where an instance
 of a meta-schema's own constructor lives when the thing it describes is not a data type. A consumer
 registers such a class by carrying `@Typename` and being findable by the `metaNameBinder`;

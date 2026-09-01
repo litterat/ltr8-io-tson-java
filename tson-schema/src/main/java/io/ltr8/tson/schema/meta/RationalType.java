@@ -2,6 +2,7 @@ package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
+import io.ltr8.tson.schema.atom.Rational;
 
 import java.math.BigInteger;
 import java.util.ArrayList;

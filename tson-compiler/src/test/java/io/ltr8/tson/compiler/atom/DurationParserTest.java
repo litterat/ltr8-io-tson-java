@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.IsoDuration;
+import io.ltr8.tson.schema.atom.IsoDuration;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;

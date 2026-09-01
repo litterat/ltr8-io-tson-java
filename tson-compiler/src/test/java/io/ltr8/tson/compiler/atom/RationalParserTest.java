@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.Rational;
+import io.ltr8.tson.schema.atom.Rational;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;

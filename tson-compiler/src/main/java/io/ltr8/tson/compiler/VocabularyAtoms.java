@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.atom.*;
-import io.ltr8.tson.schema.meta.IsoDuration;
-import io.ltr8.tson.schema.meta.Rational;
+import io.ltr8.tson.schema.atom.Complex;
+import io.ltr8.tson.schema.atom.IsoDuration;
+import io.ltr8.tson.schema.atom.Rational;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;

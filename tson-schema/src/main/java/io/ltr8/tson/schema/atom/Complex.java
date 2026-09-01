@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler.atom;
+package io.ltr8.tson.schema.atom;
 
 import java.math.BigDecimal;
 
@@ -9,10 +9,11 @@ import java.math.BigDecimal;
  * other members) -- this class only implements the default ({@code NUMBER}) case, since {@code
  * complex}'s built-in instance (§5.6's {@code !complex}) is always the unconstrained {@code
  * complex_type} instance and never refines {@code component}; a schema (Part 2) narrowing it to a
- * different component type is separate, not-yet-relevant work. Unlike {@link
- * io.ltr8.tson.schema.meta.Rational}, {@code complex_type} declares no constraint fields at all, so
- * there is no separate {@code schema.meta.ComplexType} values class here -- {@link ComplexParser}
- * holds none, since it has none to hold.
+ * different component type is separate, not-yet-relevant work. {@code complex_type}'s one facet is that
+ * selector rather than a bound, so unlike {@link Rational} -- whose {@code min}/{@code max}/{@code
+ * multiple_of} are {@code Rational} values and give {@code schema.meta.RationalType} something of this type
+ * to hold -- {@code schema.meta.ComplexType} holds no value of this type at all, and {@code ComplexParser}
+ * takes no configuration from it.
  *
  * <p>Unlike {@code Rational}, there's no meta.tn1 doc calling for value-based equality here, so this
  * uses the record default (field-based, {@code BigDecimal.equals}, which is itself scale-sensitive)
@@ -24,8 +25,10 @@ import java.math.BigDecimal;
  * path. A {@code DataBridge<Complex, TheirType>} registered via {@code
  * DataBindContext.registerAtom(TheirType.class, bridge)} is the supported (and currently only) way
  * to bind {@code !complex} to a Java field -- the natural fit for an application that already has a
- * richer complex type (e.g. Apache Commons Math's {@code Complex}) -- see {@link ComplexParser}'s
- * Javadoc.
+ * richer complex type (e.g. Apache Commons Math's {@code Complex}) -- see {@code ComplexParser}'s
+ * Javadoc. It is {@code @code} rather than a link because that class is in {@code tson-compiler}'s
+ * unexported {@code atom} package: the parsing half of an atom is not on a consumer's side of the boundary,
+ * which is the split this package exists to make.
  */
 public record Complex(BigDecimal real, BigDecimal imaginary) {
 }
