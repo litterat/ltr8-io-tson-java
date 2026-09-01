@@ -130,6 +130,41 @@ class PolicyRefusalTest {
     }
 
     /**
+     * <b>A refused token is named once.</b> {@code TsonUnicodePolicy.violation} opens with the unit it
+     * refused, so a factory prefixing the text again reads {@code the token 'x' 'x' mixes the scripts ...} --
+     * on a message a consumer sees, and one this library forwards over a wire. The name path composes the
+     * same two halves correctly, which is what makes this a defect rather than a preference.
+     */
+    @Test
+    void aRefusedTokenIsNamedOnceAndReadsAsOneSentence() {
+        String mixed = "p" + CYR_A + "y";
+        Diagnostic refusal = soleRefusal(
+                new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.singleScript()),
+                "{ note: \"" + mixed + "\" }");
+
+        assertEquals("the token '" + mixed + "' mixes the scripts [LATIN, CYRILLIC], which UTS #39 §5.2's "
+                + "SINGLE_SCRIPT does not admit -- a homograph reads as another name exactly by mixing "
+                + "scripts inside one word", refusal.message());
+        assertEquals(1, refusal.message().split("'" + mixed + "'", -1).length - 1,
+                () -> "the token is named once, not twice: " + refusal.message());
+    }
+
+    /**
+     * The name surface's own composition, which the one above matches -- neither doubles its subject. An
+     * annotation name rather than a type-ref, so the read produces the refusal and nothing else: an unknown
+     * type-ref is a second diagnostic of its own.
+     */
+    @Test
+    void aRefusedNameIsNamedOnceToo() {
+        String mixed = "p" + CYR_A + "y";
+        Diagnostic refusal = soleRefusal(new TsonTreeReader(), "@" + mixed + ":1 2");
+
+        assertTrue(refusal.message().startsWith("the name '" + mixed + "' mixes"), refusal::message);
+        assertEquals(1, refusal.message().split("'" + mixed + "'", -1).length - 1,
+                () -> "the name is named once, not twice: " + refusal.message());
+    }
+
+    /**
      * <b>A refusal carries nothing an ordinary verdict does not.</b> What tells the two apart is the code,
      * which is what a consumer routes on; the [TSON-DATA] §8.2 data version and the level that judged are
      * facts about this processor, so they are read off the reader rather than off the problem, and stay one

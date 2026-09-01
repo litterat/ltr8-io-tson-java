@@ -178,13 +178,18 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * and no scope to be distinct within; §8.2's restricted-script rule is the only one of the three a value
      * surface can carry.
      *
+     * <p><b>{@code why} names the text it judged, so this does not name it again.</b> {@code
+     * TsonUnicodePolicy.violation} opens with the unit it refused ({@code 'аdmin' mixes the scripts ...}),
+     * which is what makes {@code "the token " + why} read as one sentence -- the same composition {@code
+     * DefaultTsonReadContext.refuse} uses for a name.
+     *
      * <p><b>No {@code path}, and that is not an omission.</b> The check runs where tokens leave the stream,
      * before any reader has descended into them, which is exactly what lets it see a value and a field name
      * alike. There is no path yet to state, so the diagnostic carries the one location it really has.
      */
     public static Diagnostic ofRestrictedToken(String text, String why, SourcePosition position) {
         return new Diagnostic(Optional.empty(), Optional.empty(), "", Code.RESTRICTED_SCRIPT,
-                "the token '" + text + "' " + why, "a token the Unicode policy admits", text,
+                "the token " + why, "a token the Unicode policy admits", text,
                 Optional.ofNullable(position), Optional.empty(), Optional.empty());
     }
 
