@@ -1096,7 +1096,20 @@ public final class TsonSchemaLinker {
                 // A body describing something other than a data value. Its shape is the consumer's own Java
                 // class, so nothing here can introspect it -- what it declares through `references()` is
                 // validated like any other reference, and everything else is opaque by design.
-                for (TypeRef reference : data.references()) {
+                //
+                // A null list is the reading application's mistake and is named as one. It arrives when the
+                // class returns an OPTIONAL bound component, which the binder hands to the constructor as
+                // null when the field is omitted rather than normalising it -- and iterating it here would
+                // be a NullPointerException out of the schema pipeline, which every channel above reads as
+                // a fault in this library and reports with a please-report-it banner.
+                List<TypeRef> references = data.references();
+                if (references == null) {
+                    throw new TsonBindMismatchException(data.getClass().getName() + " returned null from "
+                            + "references() for '" + entryName + "' -- return List.of() for a body that names "
+                            + "no types. A null usually means an OPTIONAL component: the binder passes an "
+                            + "omitted field as null and does not normalise it to an empty list");
+                }
+                for (TypeRef reference : references) {
                     validateTypeRef(reference, namespace, ownParameters, entryName,
                             " (!" + TsonCompiledMetaSchema.typenameOf(data) + ")");
                 }

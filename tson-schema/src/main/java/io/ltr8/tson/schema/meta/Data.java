@@ -42,6 +42,12 @@ public non-sealed interface Data extends Top {
      * are references, and asking the constructor's own declaration would only work for slots spelled
      * {@code type_ref}. An implementation holding a {@link TypeRef} component returns it here and the name
      * is checked at link time, against the same namespace every other reference is checked against.
+     *
+     * <p><b>Never {@code null} -- return {@link List#of()} for a body that names no types.</b> The case to
+     * watch is an implementation returning an OPTIONAL bound component directly: the binder hands an omitted
+     * field to the constructor as {@code null} and does not normalise it to an empty list, so
+     * {@code references()} inherits that {@code null}. Linking one is a {@code TsonBindMismatchException}
+     * naming the class, since it is the reading application's mistake rather than anything about the schema.
      */
     default List<TypeRef> references() {
         return List.of();
