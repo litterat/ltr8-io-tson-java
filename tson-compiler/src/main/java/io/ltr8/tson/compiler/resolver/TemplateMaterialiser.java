@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
@@ -179,16 +180,41 @@ final class TemplateMaterialiser {
      */
     private final Set<String> generated;
 
+    /**
+     * Each template's parameter kinds ([TSON-SCHEMA] §5.10), by entry name then parameter name -- what lets
+     * an argument be classified by the parameter it binds rather than by the shape of the token that spells
+     * it. Empty until {@code SchemaResolver} has inferred them, which it cannot do before every declaration
+     * has resolved; an application closed on demand before that point classifies as it always did.
+     */
+    private Map<String, Map<String, ParameterKinds.Kind>> parameterKinds = Map.of();
+
+    /**
+     * The same question answered one template at a time, for an application closed before the batch pass
+     * could run -- a composition supertype or a refinement source, both of which close during resolution's
+     * own driving loop. Memoised because a template is typically applied more than once.
+     */
+    private final Map<String, Map<String, ParameterKinds.Kind>> kindsOnDemand = new LinkedHashMap<>();
+
+    /** The governing meta's entries, which is where a slot's declared type is read from. */
+    private final Function<String, TypeDefinition> metaTypes;
+
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, TypeDefinition> publish) {
-        this(namespace, publish, null, Set.of());
+        this(namespace, publish, null, Set.of(), null);
     }
 
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, TypeDefinition> publish,
-            DefinitionMetaReader metaReader, Set<String> generated) {
+            DefinitionMetaReader metaReader, Set<String> generated,
+            Function<String, TypeDefinition> metaTypes) {
         this.namespace = namespace;
         this.publish = publish;
         this.metaReader = metaReader;
         this.generated = generated;
+        this.metaTypes = metaTypes;
+    }
+
+    /** The inferred kinds, once {@code SchemaResolver} has them -- see {@link #parameterKinds}. */
+    void parameterKinds(Map<String, Map<String, ParameterKinds.Kind>> kinds) {
+        this.parameterKinds = kinds;
     }
 
     /**
@@ -300,6 +326,7 @@ final class TemplateMaterialiser {
                     + " type argument" + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", but "
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
+        arguments = byParameterKind(head, template, parameters, arguments);
         String name = internalName(head, arguments);
         if (aliasClosing.contains(name)) {
             throw new TsonSchemaValidationException("'" + head + "<...>' is a reference template whose own "
@@ -825,6 +852,39 @@ final class TemplateMaterialiser {
             // substitution supplies the arguments.
             default -> body; // an atom body holds no type references
         };
+    }
+
+    /**
+     * The arguments reclassified by the kind of the parameter each binds ([TSON-SCHEMA] §5.10).
+     *
+     * <p>§12.1 decides an argument's channel by the shape of the token that spells it, so an unquoted
+     * non-numeric argument always arrives as a reference. That is the right default with nothing else known,
+     * but §5.10 says an argument is "read by the position it lands in" -- and once the parameter's kind is
+     * inferred, the position is known before substitution rather than after. An argument binding a
+     * <b>value</b> parameter becomes the token it always was: {@code e<c>} against
+     * {@code e => <M> !enum {{ members: [a b M] }}} records {@code value: c}, so nothing downstream asks the
+     * namespace for a type called {@code c}.
+     *
+     * <p>Only a bare reference converts. One carrying arguments is an application, which no value parameter
+     * could bind (§5.10 confines value parameters to scalars), and is left for the position to refuse.
+     */
+    private List<TypeArgument> byParameterKind(String head, TypeDefinition template,
+                                                List<String> parameters, List<TypeArgument> arguments) {
+        Map<String, ParameterKinds.Kind> kinds = parameterKinds.get(head);
+        if (kinds == null && metaTypes != null) {
+            kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterKinds.inferOne(template, metaTypes));
+        }
+        if (kinds == null || kinds.isEmpty()) {
+            return arguments;
+        }
+        List<TypeArgument> bound = new ArrayList<>(arguments.size());
+        for (int i = 0; i < arguments.size(); i++) {
+            bound.add(arguments.get(i) instanceof TypeArgument.Ref ref && ref.ref().arguments().isEmpty()
+                    && kinds.get(parameters.get(i)) == ParameterKinds.Kind.VALUE
+                            ? new TypeArgument.Value(new Token(ref.ref().name(), Token.Form.UNQUOTED))
+                            : arguments.get(i));
+        }
+        return bound;
     }
 
     /**

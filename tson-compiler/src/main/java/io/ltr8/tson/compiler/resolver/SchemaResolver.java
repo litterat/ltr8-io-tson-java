@@ -288,7 +288,8 @@ public final class SchemaResolver {
         // fields, and cannot wait for the batch pass below. Sharing the instance is what makes an on-demand
         // closing and a later batch closing of the same application land on one entry.
         TemplateMaterialiser materialiser = new TemplateMaterialiser(namespaceGetter, namespace::put,
-                (type, value) -> (Top) read(metaParser.reader(type), value), generated);
+                (type, value) -> (Top) read(metaParser.reader(type), value), generated,
+                metaParser.schema().entries()::get);
 
         // The same compiled reader serves both hooks; they differ in what the caller does with the result,
         // which is why they are separate types rather than one Object-returning one.
@@ -334,6 +335,30 @@ public final class SchemaResolver {
             resolvedLocals.put(name, placeholder);
             namespace.put(name, placeholder);
         }
+        // §5.10's parameter kinds, inferred by use, before anything closes: an argument is "read by the
+        // position it lands in", and once a parameter's kind is known that position is known at the
+        // application rather than after substitution. Here because it needs every declaration resolved (a
+        // slot's declared type comes from the constructor's own vocabulary) and nothing yet closed.
+        Set<String> unkinded = new LinkedHashSet<>();
+        materialiser.parameterKinds(ParameterKinds.inferAll(namespace, declarations.keySet(), metaParser.schema().entries()::get,
+                (name, error) -> {
+                    if (receiver == null) {
+                        throw error;
+                    }
+                    unkinded.add(name);
+                    receiver.report(Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(id), name,
+                            "'" + name + "': " + error.getMessage(), positions.of(declarations.get(name))));
+                }));
+        // Condemned on the same terms as an irregular template: the verdict is in, and closing an application
+        // of a template whose parameters cannot be classified only reports the consequence -- the substituted
+        // body failing its constructor's vocabulary -- against whichever entry happened to apply it.
+        for (String name : unkinded) {
+            TypeDefinition condemned = resolvedLocals.get(name);
+            TypeDefinition placeholder = unresolved(condemned.position(), condemned.parameters());
+            resolvedLocals.put(name, placeholder);
+            namespace.put(name, placeholder);
+        }
+
         Map<String, TypeDefinition> instantiations = materialiser.materialise(resolvedLocals,
                 receiver == null ? null : (name, error) -> receiver.report(Diagnostic.ofSchemaError(
                         TsonCanonicalIdentity.canonicalize(id), name, error.getMessage(),

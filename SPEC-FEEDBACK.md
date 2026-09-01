@@ -1019,3 +1019,48 @@ rather than added.
 **Status against Revision 34:** open, and new against this revision.
 
 ---
+
+## 20. §5.10 makes an ungrounded parameter an error, but its kind is forced rather than unknown
+
+**Section:** [TSON-SCHEMA] §5.10 ("Two parameter kinds, inferred by use"), §8.1 (`reference.target` is a
+`type_ref`), meta-kernel's `type_argument`.
+
+**Problem:** §5.10 infers a parameter's kind from where it is used, and then adds:
+
+> a parameter whose kind is grounded only in mutual recursion between templates, with no concrete
+> kind-determining use, is likewise a resolver error.
+
+The premise of that rule is that such a parameter has no kind. It has exactly one. §5.10 defines a value
+parameter as one "used in value positions — routed or defaulted into a field, or standing in a scalar slot of
+a held constructor body", and a concrete slot is precisely what grounding is. So a parameter with no concrete
+use anywhere in its cycle **cannot** be a value parameter, and TYPE is the only assignment consistent with
+every occurrence. The rule refuses a schema that has one reading rather than none.
+
+The case that shows it is not a corner is one the spec's own vocabulary makes unavoidable. A **reference**
+template's body *is* the application (§8.1 types `reference.target` as a `type_ref`), so there is no second
+slot a concrete use could occupy:
+
+```
+loop => <T> loop<T>
+```
+
+`T` is passed only to the parameter it is. Under §5.10 as written this is refused for having an ungrounded
+parameter — which is both true and useless, because what is wrong with the declaration is that it applies
+itself forever and denotes no type. The ungrounded verdict displaces the diagnosis the author needs, and no
+rewriting of the declaration can avoid it: grounding `T` here is not possible, only abandoning the shape.
+
+**What this implementation does:** an undetermined parameter is grounded as a type parameter
+(`ParameterKinds`), on the argument above, and the declaration is then judged on what is actually wrong with
+it. Nothing else changes: an argument bound to such a parameter keeps the reference channel §12.1 gives it,
+which is what it would have had anyway.
+
+**Suggested resolution:** drop the rule, and state the consequence instead — a parameter with no
+kind-determining use is a type parameter, since a value parameter is one that stands in a scalar slot. If the
+rule is kept because an ungrounded parameter is *suspicious* (every application of the template denotes the
+same type, so it is probably a mistake), then it is the same observation §5.10 already makes for "a declared
+parameter the body never references" and should be stated as that rule's sibling, with the reference-template
+case excepted — it is refused on the loop, not on the parameter.
+
+**Status against Revision 34:** open, and new against this revision.
+
+---

@@ -371,6 +371,27 @@ recorded open form, and replacing the application with a reference to the entry 
     schemas reaching one form by different spellings agree on it, where the eager name or the smaller of the
     two would make an entry's name depend on what appeared beside it. Only a form whose binding held an
     application moves; every other synthetic re-derives to the name it already has.
+  - **An argument is classified by the parameter it binds** (`ParameterKinds`, §5.10's "two parameter kinds,
+    inferred by use"). §12.1 decides the channel by token shape, so an unquoted non-numeric argument arrives
+    as a reference — the right default with nothing else known, and wrong for `e => <M> !enum { members:
+    [a b M] }` applied as `e<c>`, where `c` is a member. What settles it is the **declared type of the slot
+    the parameter stands in**, read from the constructor's own vocabulary: `type_ref` gives a TYPE parameter,
+    a slot resolving to an `Atom` (which covers `identifier`, `value` and every enum) a VALUE parameter.
+    §9 makes that general rather than a table of kernel names — a slot holding a type reference MUST be typed
+    `type_ref` — so an extension meta-schema's constructors classify by the same walk.
+    - **A fixed point, not one walk.** meta-kernel's own `type_argument` puts a parameter of *either* kind on
+      the reference channel ("parameters ride the reference channel because a token there is always a
+      reference"), so a parameter passed to another template says nothing locally: it takes the callee's kind
+      at that position, and two templates may wait on each other. §5.10 anticipates the cycle and makes a
+      parameter grounded only by it an error, which `BACKLOG.md` still carries.
+    - **Two declaration-time verdicts fall out**, both of which used to be per-application or absent: a
+      parameter standing for a whole collection or record (`<T> !enum { members: T }`) is neither a reference
+      nor a scalar, and a parameter standing in both kinds of position (`<T> { v: T  w: int32 ~ T }`) has no
+      argument that could satisfy both.
+    - **An application closed on demand infers its own template.** A composition supertype and a refinement
+      source close during resolution's driving loop, before the batch pass can run; the template in hand has
+      resolved by then, which is all the walk needs, so only a parameter awaiting the cross-template fixed
+      point is left undetermined there.
   - **That is where §8.2's deferred value-level check lands**, and it needs no code of its own:
     `<N> [text; N]` is a fine declaration, `<"two">` is where it stops being one, and the reader reports it
     (`'two' is not a valid integer`) exactly as it would for a written body. D7's split — binding names,
