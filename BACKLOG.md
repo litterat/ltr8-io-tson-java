@@ -281,16 +281,3 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   `null` for both readings and `RecordTreeReader.putField` omits a `null`. Bind mode needs its own answer first
   — a Java component has no third state between "null" and "not there" — since the tree's answer should not be
   the one that happens to be reachable.
-
-- [ ] Thread-safety **outside a read**. Concurrent *reads* through one `Tson` are safe and tested
-  (`ReadPathConcurrencyTest`): the compiled readers are immutable, a `Lexer`/`TsonDataStream` is per read,
-  and the two on-demand caches — the schema registry and `DataBindContext`'s descriptors — now settle a race
-  by keeping one entry instead of failing the loser. A read now also takes **no lock on the caches it hits**
-  (`TsonSchemaRegistry` is a `ConcurrentHashMap` read without a monitor; the compiled cache does a `get`
-  before `computeIfAbsent`), which measured small here — ~6% at 32 threads on 16 CPUs, nothing below that —
-  and matters at a core count this machine does not have. What is still open is deliberate mutation while others
-  read: `Tson.resolve`/`TsonSchemaRegistry.register`/`registerAtom` stay strict about duplicates (right for
-  a caller error, wrong if two threads are legitimately warming the same registry), nothing defines whether
-  a `DataBindContext` may be extended after first use, and neither shipped fetching `TsonSchemaSource` states
-  what it promises a concurrent caller. None of it is hypothetical-only: the read-path half was two real defects, found by
-  auditing and reproduced first try on 8 threads.
