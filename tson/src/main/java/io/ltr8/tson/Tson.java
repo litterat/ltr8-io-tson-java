@@ -121,7 +121,7 @@ public final class Tson {
      * with no document in hand at all. §8.2's rules read data the UCD does not freeze and are applied at a
      * level this deployment chose, so the same bytes may be accepted here and refused elsewhere; this is the
      * only statement of why, and the only one a sender can consult <em>before</em> writing a document rather
-     * than after being refused. A reader derived with {@link TsonTreeReader#withNamePolicy} answers for
+     * than after being refused. A reader derived with {@link TsonTreeReader#withIdentifierPolicy} answers for
      * itself ({@link TsonTreeReader#processorPolicy()}).
      */
     public TsonUnicodeProcessorPolicy processorPolicy() {

@@ -300,13 +300,14 @@ without making the wrapper unconditional and putting a switch per token back int
 has no policy at all.
 
 **Two surfaces, two defaults, and §8.2 sets both.** `withTokenPolicy` defaults to `unrestricted()` because a
-value is data and may legitimately be anything; `withNamePolicy` defaults to Highly Restrictive over the whole
-name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able to
+value is data and may legitimately be anything; `withIdentifierPolicy` defaults to Highly Restrictive over
+the whole name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able to
 relax any of the three rules and requires the relaxation not be silent, and a policy read from the
 environment is
 invisible at the call site and absent from review. The relaxation to reach for first is the *unit*
 (`perSegment()`), which still refuses `id_pаy` while admitting `url_адрес`. A token policy stricter than the
-name policy subsumes it: a name is a token.
+identifier policy subsumes it: a name is a token (§8.2 calls the identifier surface the "name policy"; this
+implementation says identifier throughout, following `TsonConfig.identifierPolicy`).
 
 Class 1 **field** names see neither — they are lexical rather than names (§2.5, §7.7) — and only the
 look-alike rule, whose scope they are (`SchemalessTreeReader`). A refusal reports one code per rule —
@@ -414,7 +415,7 @@ document. Every `tson-cli` envelope carries one in its `policy` field.
   the half that explains less.
 
 **Read off the reader that judged**, not rebuilt from a configuration object: a derived reader
-(`withNamePolicy`, `withTokenPolicy`) is exactly where the two can differ, and a response quoting the wrong
+(`withIdentifierPolicy`, `withTokenPolicy`) is exactly where the two can differ, and a response quoting the wrong
 one is worse than quoting none. `TsonUnicodePolicy.dataVersion()` remains the version as a static accessor;
 the constant behind it (`Xid.UNICODE_VERSION`) is in the unexported `lexer` package and unreachable
 otherwise. `SPEC-FEEDBACK.md` #14 proposes §8.2 require this shape rather than the per-refusal copy.

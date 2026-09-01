@@ -69,7 +69,7 @@ public final class TsonObjectReader {
     /** UTS #39 §5.2 over every token this reader pulls. Never {@code null} -- the unset default is
      * {@link TsonUnicodePolicy#unrestricted()}, which checks nothing. */
     private final TsonUnicodePolicy tokenPolicy;
-    private final TsonUnicodePolicy namePolicy;
+    private final TsonUnicodePolicy identifierPolicy;
 
     /**
      * Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved and
@@ -121,23 +121,23 @@ public final class TsonObjectReader {
     /** Shares {@code bind} and {@code schemaless} rather than rebuilding them -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
     private TsonObjectReader(DataBindContext dataBindContext, SchemalessObjectReader schemaless,
                              TsonCompiledSchemaRegistry bind, TsonDiagnosticsReceiver receiver, String schemaUri,
-                             TsonUnicodePolicy tokenPolicy, TsonUnicodePolicy namePolicy) {
+                             TsonUnicodePolicy tokenPolicy, TsonUnicodePolicy identifierPolicy) {
         this.dataBindContext = dataBindContext;
         this.schemaless = schemaless;
         this.bind = bind;
         this.receiver = receiver;
         this.schemaUri = schemaUri;
         this.tokenPolicy = tokenPolicy;
-        this.namePolicy = namePolicy;
+        this.identifierPolicy = identifierPolicy;
     }
 
     /**
      * This reader applying {@code policy} to the <b>names</b> a document carries -- a type-ref name and an
      * annotation name -- instead of the default. [TSON-DATA] §8.2's restricted-script rule, whose RECOMMENDED default is
      * Highly Restrictive over the whole name, which is what a reader carries until this is called. The peer of
-     * {@link TsonTreeReader#withNamePolicy}, whose Javadoc carries the reasoning.
+     * {@link TsonTreeReader#withIdentifierPolicy}, whose Javadoc carries the reasoning.
      */
-    public TsonObjectReader withNamePolicy(TsonUnicodePolicy policy) {
+    public TsonObjectReader withIdentifierPolicy(TsonUnicodePolicy policy) {
         Objects.requireNonNull(policy, "policy");
         return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, tokenPolicy, policy);
     }
@@ -153,7 +153,7 @@ public final class TsonObjectReader {
             throw new IllegalStateException("a schemaless TsonObjectReader has no schema environment to resolve '"
                     + schemaUri + "' through -- obtain one from Tson.objectReader()");
         }
-        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, tokenPolicy, namePolicy);
+        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, tokenPolicy, identifierPolicy);
     }
 
     /**
@@ -183,7 +183,7 @@ public final class TsonObjectReader {
             throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
                     + "characters in a value, not word separators -- use the whole-text policy instead");
         }
-        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, policy, namePolicy);
+        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, policy, identifierPolicy);
     }
 
     /**
@@ -204,7 +204,7 @@ public final class TsonObjectReader {
      * that carries its own receiver, and that one wins.
      */
     public TsonObjectReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
-        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, tokenPolicy, namePolicy);
+        return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, tokenPolicy, identifierPolicy);
     }
 
     /**
@@ -220,7 +220,7 @@ public final class TsonObjectReader {
      */
     public TsonObjectReader preservingUnknownTypeRefs() {
         return new TsonObjectReader(dataBindContext, SchemalessObjectReader.preserving(dataBindContext),
-                bind, receiver, schemaUri, tokenPolicy, namePolicy);
+                bind, receiver, schemaUri, tokenPolicy, identifierPolicy);
     }
 
     /**
@@ -229,11 +229,11 @@ public final class TsonObjectReader {
      * that would be refused.
      *
      * <p>Read off the reader that judged rather than off the configuration a caller believes it set: a
-     * derived reader ({@link #withNamePolicy}, {@link #withTokenPolicy}) is exactly where the two can differ,
+     * derived reader ({@link #withIdentifierPolicy}, {@link #withTokenPolicy}) is exactly where the two can differ,
      * and a response quoting the wrong one is worse than quoting none.
      */
     public TsonUnicodeProcessorPolicy processorPolicy() {
-        return TsonUnicodeProcessorPolicy.of(namePolicy, tokenPolicy);
+        return TsonUnicodeProcessorPolicy.of(identifierPolicy, tokenPolicy);
     }
 
     // ── Whole-document entry points ──────────────────────────────────────
@@ -324,7 +324,7 @@ public final class TsonObjectReader {
     private <T> TsonObjectDocument<T> readDocument(TsonDataStream stream, Class<T> type) {
         Objects.requireNonNull(type, "type");
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, namePolicy);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, identifierPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             T value;
             Optional<String> rootType = Optional.empty();
@@ -348,7 +348,7 @@ public final class TsonObjectReader {
     private <T> T readDocument(TsonDataStream stream, Class<T> type, boolean ignoreSchema) {
         Objects.requireNonNull(type, "type");
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, namePolicy);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, identifierPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             T result = (ignoreSchema || bind == null || start.schema().isEmpty())
                     ? schemaless.read(ctx, type)
@@ -366,7 +366,7 @@ public final class TsonObjectReader {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, namePolicy);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, identifierPolicy);
             ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
             T result = valueOf(readAgainstSchema(schemaUri, ctx, type, typeName));
             requireDocumentEnd(ctx);

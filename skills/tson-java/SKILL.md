@@ -354,7 +354,7 @@ what ordinary compounds need. `tokenPolicy` governs **every token a read pulls**
 than payload (a service that renders what it reads into a UI). Levels: `asciiOnly()`,
 `singleScript()`, `highlyRestrictive()`, `moderatelyRestrictive()`, `scriptsUnchecked()`,
 `unrestricted()`, plus `permitting(scripts…)`. Either is also settable per reader with
-`withNamePolicy` / `withTokenPolicy`.
+`withIdentifierPolicy` / `withTokenPolicy`.
 
 **This is a code path on purpose** — a security policy read from the environment is ambient authority,
 invisible at the call site.
@@ -442,7 +442,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | a `SCHEMA_UNAVAILABLE` read as "invalid document"               | nothing was checked                                                 | route on the code; `fetchReason` says whether to retry      |
 | `NOT_IMPLEMENTED` read as "invalid document"                    | it is a verdict on this library                                     | treat it as a bug report; the CLI exits 70                  |
 | a refusal code read as "invalid document"                       | §8.2 refusals are a fifth outcome, outside §8.1's four categories   | report it apart; relax `identifierPolicy` in code if intended |
-| relaxing name policy from an env var                            | ambient authority, invisible at the call site                       | pass `identifierPolicy` explicitly                          |
+| relaxing identifier policy from an env var                      | ambient authority, invisible at the call site                       | pass `identifierPolicy` explicitly                          |
 | a hand-written or truncated `?sha256=`                          | pins are verified on every fetched pinned reference                 | `tson hash`, or `TsonContentHash.sha256`                    |
 | `--output json` parsed as `snake_case`                          | JSON is `camelCase` with `null`s; only `--output tson` is `snake_case` | match the format you asked for                           |
 | `!!id` pinned to a different spec revision than the library     | revisions are not compatible                                        | match the library's `0.<revision>.x`                        |

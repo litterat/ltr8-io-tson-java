@@ -161,7 +161,7 @@ class PolicyRefusalTest {
     void theProcessorPolicyIsReachableWithoutARefusal() {
         TsonUnicodeProcessorPolicy policy = new TsonTreeReader()
                 .withTokenPolicy(TsonUnicodePolicy.asciiOnly())
-                .withNamePolicy(TsonUnicodePolicy.singleScript().perSegment())
+                .withIdentifierPolicy(TsonUnicodePolicy.singleScript().perSegment())
                 .processorPolicy();
 
         assertEquals(TsonUnicodePolicy.Level.SINGLE_SCRIPT, policy.identifierPolicy().level());

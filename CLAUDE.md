@@ -814,9 +814,9 @@ positions instead — spread over the schema parser, the definition resolver and
 holes at exactly the positions only some of them reached: an enum member and a group's member labels were
 checked for reading alike and for script mixing, and never for a restricted character. A scope list can be
 reviewed; three call sites cannot. Class 1 *field* names see only the look-alike rule, being lexical rather
-than names (§2.5, §7.7). The name policy defaults to Highly Restrictive
-whole-name (§8.2's SHOULD) and relaxes through `withNamePolicy`, which §8.2 requires be code rather than
-ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
+than names (§2.5, §7.7). The identifier policy defaults to Highly Restrictive
+whole-name (§8.2's SHOULD) and relaxes through `withIdentifierPolicy`, which §8.2 requires be code rather
+than ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
 may legitimately be anything.
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than

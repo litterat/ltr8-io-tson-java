@@ -204,13 +204,13 @@ public interface TsonReadContext {
      * so a caller that names only a token policy still gets the name surface checked.
      */
     static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
-                              TsonUnicodePolicy tokenPolicy, TsonUnicodePolicy namePolicy) {
+                              TsonUnicodePolicy tokenPolicy, TsonUnicodePolicy identifierPolicy) {
         Objects.requireNonNull(tokenPolicy, "tokenPolicy -- name one, TsonUnicodePolicy.unrestricted() if "
                 + "this source's tokens are not to be checked");
-        Objects.requireNonNull(namePolicy, "namePolicy -- name one, TsonUnicodePolicy.unrestricted() if "
-                + "this source's names are not to be checked");
+        Objects.requireNonNull(identifierPolicy, "identifierPolicy -- state one, TsonUnicodePolicy"
+                + ".unrestricted() if this source's names are not to be checked");
         return DefaultTsonReadContext.of(TokenPolicyEventSource.wrap(events, tokenPolicy, receiver), receiver,
-                namePolicy);
+                identifierPolicy);
     }
 
     /**

@@ -128,7 +128,7 @@ class NameHygieneTest {
     @Test
     void thePolicyRelaxesPerSegmentWithoutAdmittingAWithinWordHomograph() {
         TsonTreeReader perSegment = new TsonTreeReader()
-                .withNamePolicy(TsonUnicodePolicy.highlyRestrictive().perSegment());
+                .withIdentifierPolicy(TsonUnicodePolicy.highlyRestrictive().perSegment());
         List<Diagnostic> admitted = new ArrayList<>();
         perSegment.withDiagnostics(admitted::add).read("@url_адрес:1 2");
         assertEquals(List.of(), admitted, "a Latin abbreviation beside a name in another script");
@@ -142,7 +142,7 @@ class NameHygieneTest {
     @Test
     void thePolicyRelaxesAway() {
         List<Diagnostic> reported = new ArrayList<>();
-        new TsonTreeReader().withNamePolicy(TsonUnicodePolicy.unrestricted())
+        new TsonTreeReader().withIdentifierPolicy(TsonUnicodePolicy.unrestricted())
                 .withDiagnostics(reported::add).read("@pаy:1 2");
         assertEquals(List.of(), reported);
     }
@@ -158,7 +158,7 @@ class NameHygieneTest {
     @Test
     void unrestrictedDropsTheIdentifierProfileToo() {
         List<Diagnostic> reported = new ArrayList<>();
-        new TsonTreeReader().withNamePolicy(TsonUnicodePolicy.unrestricted())
+        new TsonTreeReader().withIdentifierPolicy(TsonUnicodePolicy.unrestricted())
                 .withDiagnostics(reported::add).read("@" + RESTRICTED_NAME + ":1 2");
         assertEquals(List.of(), reported, reported::toString);
     }

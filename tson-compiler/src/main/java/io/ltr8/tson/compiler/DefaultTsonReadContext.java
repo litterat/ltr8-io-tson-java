@@ -37,7 +37,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
          * Restrictive as §8.2 says it SHOULD. Per read rather than per context, so every derived context
          * checks against the one a caller named.
          */
-        final TsonUnicodePolicy namePolicy;
+        final TsonUnicodePolicy identifierPolicy;
 
         /**
          * Where the cursor is: the position of the last event {@link #peek()} or {@link #next()} returned,
@@ -60,10 +60,10 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** Where {@link #next()} records what it consumes while a lookahead is running, else {@code null}. */
         List<TsonEvent> recording;
 
-        Cursor(TsonEventSource events, TsonDiagnosticsReceiver receiver, TsonUnicodePolicy namePolicy) {
+        Cursor(TsonEventSource events, TsonDiagnosticsReceiver receiver, TsonUnicodePolicy identifierPolicy) {
             this.events = events;
             this.receiver = receiver;
-            this.namePolicy = namePolicy;
+            this.identifierPolicy = identifierPolicy;
         }
     }
 
@@ -121,8 +121,8 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
-                              TsonUnicodePolicy namePolicy) {
-        return new DefaultTsonReadContext(new Cursor(events, receiver, namePolicy), null, null, null,
+                              TsonUnicodePolicy identifierPolicy) {
+        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy), null, null, null,
                 Optional.empty(), Optional.empty());
     }
 
@@ -188,11 +188,11 @@ final class DefaultTsonReadContext implements TsonReadContext {
         }
         // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile
         // too", taking that rule with it. Script mixing gates itself inside violation().
-        if (cursor.namePolicy.appliesIdentifierProfile()) {
+        if (cursor.identifierPolicy.appliesIdentifierProfile()) {
             IdentifierParser.hygiene(name).ifPresent(violation ->
                     refuse(name, violation, Diagnostic.Code.RESTRICTED_CHARACTER));
         }
-        cursor.namePolicy.violation(name).ifPresent(violation ->
+        cursor.identifierPolicy.violation(name).ifPresent(violation ->
                 refuse(name, violation, Diagnostic.Code.RESTRICTED_SCRIPT));
     }
 
