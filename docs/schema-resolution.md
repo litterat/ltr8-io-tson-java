@@ -205,6 +205,57 @@ are kept in step deliberately.
   divergences from the fixture (no outer `!type_definition` tag, quoted strings for enum members, empty
   lists written rather than omitted, full `TypeRef` form) are in `DefinitionResolverTest`'s Javadoc.
 
+## Shared vocabulary: `WireForm`, `MetaRefs`, `DerivedName`
+
+Three dependency-free leaf classes the phases share. Each owns a fact that belongs to none of them
+individually, and each was previously stated inside whichever phase happened to need it first — which in two
+cases meant it was stated more than once.
+
+**`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names;
+the `scoped`/`nameField` builders every producer goes through; `refValue` and its inverse
+`typeRefOf`/`argumentOf`; the held-record writers `heldRecord`/`heldEmptyRecord`; and §5.10 `substitute` over
+a held body.
+
+- **Why one class and not a producer beside one phase and a consumer beside another.** A held body is written
+  by two phases (`SchemaDesugarer` lifting a sugar form, `DefinitionResolver` holding a composition or
+  refinement template) and read by four (`TemplateMaterialiser` closing one, `HeldBody` answering §5.10's
+  declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterKinds`
+  walking one for parameter kinds). `isApplication`'s own contract is that a held body is written by one
+  phase and read by several, so a second opinion about what an application looks like is what makes one of
+  them wrong. There were three: the writer, the reader, and `ParameterKinds` matching `name`/`arguments`
+  against its own string literals — the one that could have drifted silently, since nothing would have
+  failed, only a parameter kind quietly not inferred.
+- **`TsonObjectWriter` cannot serve any of it.** Its output is canonical-explicit and fully quoted, a
+  different language from the one a held body is written in: `TemplateBody.names()` and substitution both key
+  on a token being *unquoted*, so a quoted body references no parameters at all.
+- **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the
+  materialisation section below.
+
+**`MetaRefs`** — the `schema.meta` reference walk, `mapRefs` over a definition and `mapBodyRefs` over a body.
+Four callers use it and only one is closing a template: §8.3 flattening rewrites a use site, §8.2's synthetic
+merge renames onto a merged entry, and §5.10's regularity check uses it as a *visitor* by returning each
+reference unchanged. Which body shape carries which references is a fact about the value model, so it is
+stated where the model is walked. Visiting is rewriting with the identity function deliberately: a separate
+read-only walk would be a second list of body shapes to keep in step, and the one that fell behind would
+silently skip a reference rather than fail.
+
+**`DerivedName`** — §8.2's names and the renderings their hashes run over, in two families that stay apart:
+
+- A **binding record** names a closed form (what a sugar form lifts to, what closing an open synthetic
+  produces) and renders with its fields under their own names. An **application** names an instantiation and
+  renders positionally. The two reuse the same tag letters in different roles, so merging them would be
+  merging two questions that only look alike.
+- What must *not* fork is each family's own rendering. `ofBinding` is called by **both** lift channels, and
+  that shared call is exactly what makes a form written directly and the same form arriving through a
+  materialised template land on one entry.
+- The two families' `appendText` were character-identical and their `appendNumberAware` differed only in
+  taking a `Token` or a `TokenValue`; they are one method. `MintedNames`' contract depends on the renderings
+  agreeing, and a shared decision about identity kept in two places is how they stop agreeing.
+- **A hash is not normative and is not pinned by the fixtures.** `ResolvedFixtureTest` and the `class2/schema/`
+  conformance runner both normalise a synthetic's content hash to a placeholder before comparing (see
+  `ResolvedForm`), so neither can see a derived name move. Work that touches these renderings wants an
+  explicit before/after over resolved entry names, not the suite alone.
+
 ## Materialisation (`tson-compiler/.../resolver/TemplateMaterialiser.java`)
 
 §5.10's other half: closing a template application by substituting its arguments into the template's
@@ -298,10 +349,10 @@ recorded open form, and replacing the application with a reference to the entry 
       remains to say "close `box<text>` too, and index against the entry that mints".
       `OpenOperandCompositionTest` pins all three rows, the deliberate no included.
     - **An argument that is itself an application survives whole.** Substitution writes a bound reference
-      through `SchemaDesugarer.refValue` — positionally when it carries no arguments, in `type_ref`'s record
+      through `WireForm.refValue` — positionally when it carries no arguments, in `type_ref`'s record
       form when it does — so `box<inner<T>>` keeps `inner<T>` and the absorbing declaration's own
       materialisation closes it. Sharing that producer is the requirement rather than an economy: two
-      spellings of one form are two entries for one type, and `refValue`'s `arguments().isEmpty()` branch is
+      spellings of one form are two entries for one type, and `WireForm.refValue`'s `arguments().isEmpty()` branch is
       what §5.6's positional spelling turns on.
     - **A parameter cannot be a head.** `<T> { v: T<text> }` is refused at the declaration that writes it
       (`SchemaResolver.refuseHeadAbstraction`, over the held body's own `applications()`), because
@@ -336,7 +387,7 @@ recorded open form, and replacing the application with a reference to the entry 
     shared.
   - **There is no third case, and that is what deletes the old machinery.** Every open entry's body is a
     `HeldBody` or a `Reference` — an *error placeholder* included, which holds an empty record rather than
-    staying the one parameterised `RecordBody` left in the system (`SchemaDesugarer.heldEmptyRecord`). While
+    staying the one parameterised `RecordBody` left in the system (`WireForm.heldEmptyRecord`). While
     that one shape survived, `TemplateMaterialiser` had to keep a general substitution over *resolved* bodies
     beside the held one — `substitute`/`mapFields`/`bindValue`, ~75 lines — to serve a placeholder with no
     fields to substitute into. Holding it makes `close` total on two branches and the third an
@@ -400,7 +451,7 @@ recorded open form, and replacing the application with a reference to the entry 
   - **The form is named for itself, not for the application** (§8.2). An open synthetic's own name is
     internal and derived, so keying its instantiations on it would make identity depend on an unstable name
     — and would leave `[text]` written directly and `[T]` closed to `text` on two entries for one type. Both
-    go through `SchemaDesugarer.internalName` over the same binding record, so the two channels dedupe
+    go through `DerivedName.ofBinding` over the same binding record, so the two channels dedupe
     against each other and the closing usually finds the entry desugaring already injected.
   - **So the application gets a second entry**, a `Reference` to the form whose `source` is the application
     itself. One entry cannot carry two identities: the closure is a closed synthetic *and* an instantiation
@@ -558,7 +609,7 @@ template body, a recursive application — direct or mutual — must pass each p
 - **Mutual recursion needs reachability, not a self-edge** — neither template in an `a → b → a` cycle
   applies itself, so an application is checked whenever its head can reach the declaration it sits in.
 - **Applications nested inside arguments are checked too** (`box<deep<box<T>>>`), so the walk recurses
-  through `TypeRef.arguments`. The body walk itself is `TemplateMaterialiser.mapBodyRefs` used as a visitor,
+  through `TypeRef.arguments`. The body walk itself is `MetaRefs.mapBodyRefs` used as a visitor,
   so one place knows the shape of a body.
 - **Deliberately stricter than termination requires.** The condition that actually bounds the work is weaker
   — every argument a bare parameter reference, at any position — because arguments are only ever copied,
