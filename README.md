@@ -168,6 +168,7 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 | a data document | only what it *declares* — before reading it | **`TsonDocumentHeader.peek(…)`** | its `!!id` / `!!schema` (or `!!meta`) |
 | a data document | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
 | a data document | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
+| nothing yet | to emit TSON without building a tree or object first | **`TsonDataEmitter`** | text pushed to any `Appendable` |
 
 `tson.treeReader()` / `tson.objectReader()` and their writer peers `tson.objectWriter()` /
 `tson.treeWriter()` are the facade doors on a built `Tson`: the readers take a *self-describing* document

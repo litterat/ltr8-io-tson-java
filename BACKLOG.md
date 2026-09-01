@@ -153,9 +153,9 @@ that question.
 
 The read/write matrix in the README makes the asymmetry plain: the read side has a schemaless→object
 reader, a schemaless→tree reader, a schema-driven *validating* reader, a pull-event stream, and both
-fail-fast and collecting/diagnostics modes; the write side has only the two schemaless writers and is
-missing most of the mirror. What is left below is the schema-aware writer, diagnostics, and a public event
-surface.
+fail-fast and collecting/diagnostics modes; the write side has the two schemaless writers and the
+push emitter (`TsonDataEmitter`, the write-direction peer of `TsonDataStream`) and is missing the rest of
+the mirror. What is left below is the schema-aware writer and diagnostics.
 
 - [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
   through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
@@ -186,12 +186,6 @@ surface.
   the seam already exists and is write-direction-agnostic (`Diagnostic` carries a data path and both
   positions; nothing about `void report(Diagnostic)` assumes reading), so this is a matter of threading a
   receiver through the emitter, not designing a second error model.
-- [ ] **No public push/event writer.** The read side exposes a pull `TsonDataStream` (→ `TsonEvent`);
-  the only emitter, `TsonDataEmitter`, is internal. A public event-driven writer would let a caller emit
-  TSON without first building a whole tree or object — the write-direction peer of `TsonDataStream`. Closer
-  than it was: the emitter now writes into any `Appendable`, so what is missing is the decision to make it
-  (or an event-shaped facade over it) public API, not the streaming underneath.
-
 ## Documentation
 
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
