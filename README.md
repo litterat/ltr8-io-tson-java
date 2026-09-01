@@ -663,14 +663,14 @@ $ tson validate person.tn ada.tn      # ada.tn = !!schema:"…/person-1.tn" !per
 OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
-{"valid":false,"policy":{"identifierPolicy":{"level":"HIGHLY_RESTRICTIVE","perSegment":false,
-  "permitting":[]},"tokenPolicy":{"level":"UNRESTRICTED","perSegment":false,"permitting":[]},
-  "unicodeDataVersion":"16.0"},
+{"valid":false,"policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,
+  "permitting":[]},"token_policy":{"level":"UNRESTRICTED","per_segment":false,"permitting":[]},
+  "unicode_data_version":"16.0"},
   "files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
-  "schemaPointer":"/person/name","schemaId":"example.com/2026/34/app/person-1.tn",
+  "schema_pointer":"/person/name","schema_id":"example.com/2026/34/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
-  "expected":"a value for 'name'","actual":"(absent)","dataPosition":"2:9:63",
-  "schemaPosition":"5:5:145"}]}],"errors":[]}
+  "expected":"a value for 'name'","actual":"(absent)","data_position":"2:9:63",
+  "schema_position":"5:5:145"}]}],"errors":[]}
 
 $ tson compile person.tn
 OK
@@ -681,15 +681,18 @@ OK
   no branch on file count. The top-level `errors` carries only what stopped the run before any document
   was read (exit 2); a document that read but didn't validate reports inside its own entry (exit 1).
   `--output text` keeps the human-facing `# <file>` headers instead.
-- **A diagnostic locates a problem at up to two ends** — the value in the data (`path`, `dataPosition`)
-  and the rule in the schema (`schemaId`, `schemaPointer`, `schemaPosition`) — and either end may be
+- **Both machine formats spell one report one way** — `snake_case` keys, and a field with nothing to say
+  left out rather than written `null`. That is what `tson-cli`'s own `diagnostics.tn` declares, what
+  `--output tson` always emitted, and what the TypeScript CLI emits in both of its formats.
+- **A diagnostic locates a problem at up to two ends** — the value in the data (`path`, `data_position`)
+  and the rule in the schema (`schema_id`, `schema_pointer`, `schema_position`) — and either end may be
   absent. The schema end is the path taken through *your* schema — an `age: int32` field that violates its
   bound reports `/person/age`, not `/int32` in core.tn, because a pointer into a library file you didn't
   write and can't edit is not where you go to fix it (the constraint is still in `message` and `expected`).
-  A field with nothing to say is `null`, never `""`, the two RFC 6901 pointers included: for a pointer
-  `""` is the *root*, a real location a document-level problem genuinely carries, so `""` and `null` stay
-  apart there. A position is `line:column:byteOffset`, the first two
-  1-based and the offset counting UTF-8 bytes from 0. One field is not a location: `fetchReason` rides a
+  A field with nothing to say is omitted, never `""`, the two RFC 6901 pointers included: for a pointer
+  `""` is the *root*, a real location a document-level problem genuinely carries, so a present `""` and an
+  absent key stay apart there. A position is `line:column:byteOffset`, the first two
+  1-based and the offset counting UTF-8 bytes from 0. One field is not a location: `fetch_reason` rides a
   `SCHEMA_UNAVAILABLE` and says *why* no schema was obtained — `NOT_PERMITTED`/`NOT_FOUND` mean the document
   named something this deployment will not fetch or nothing serves, where `TRANSPORT`/`TIMEOUT`/`TOO_LARGE`
   mean the reference was fine and only those are worth retrying. A §8.2 name-hygiene refusal is an ordinary

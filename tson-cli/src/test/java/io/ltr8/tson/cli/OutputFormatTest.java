@@ -30,10 +30,10 @@ class OutputFormatTest {
 
     /** {@link #POLICY} as {@code --output json} writes it -- built from the accessor, not pinned to a version. */
     private static final String POLICY_JSON =
-            "{\"identifierPolicy\":{\"level\":\"HIGHLY_RESTRICTIVE\",\"perSegment\":false,"
-                    + "\"permitting\":[]},\"tokenPolicy\":{\"level\":\"UNRESTRICTED\","
-                    + "\"perSegment\":false,\"permitting\":[]},"
-                    + "\"unicodeDataVersion\":\"" + TsonUnicodePolicy.dataVersion() + "\"}";
+            "{\"identifier_policy\":{\"level\":\"HIGHLY_RESTRICTIVE\",\"per_segment\":false,"
+                    + "\"permitting\":[]},\"token_policy\":{\"level\":\"UNRESTRICTED\","
+                    + "\"per_segment\":false,\"permitting\":[]},"
+                    + "\"unicode_data_version\":\"" + TsonUnicodePolicy.dataVersion() + "\"}";
 
     @Test
     void parseAcceptsTheThreeKnownFormatsCaseInsensitively() {
@@ -110,10 +110,8 @@ class OutputFormatTest {
         String rendered = OutputFormat.JSON.render(
                 ValidationReport.failed(POLICY, Diagnostic.Code.VALIDATION_ERROR, "bad \"quote\""));
         assertEquals("{\"valid\":false,\"policy\":" + POLICY_JSON
-                + ",\"errors\":[{\"path\":null,\"schemaPointer\":null,\"schemaId\":null,"
-                + "\"code\":\"VALIDATION_ERROR\","
-                + "\"message\":\"bad \\\"quote\\\"\",\"expected\":null,\"actual\":null,"
-                + "\"dataPosition\":null,\"schemaPosition\":null,\"fetchReason\":null}]}", rendered);
+                + ",\"errors\":[{\"code\":\"VALIDATION_ERROR\","
+                + "\"message\":\"bad \\\"quote\\\"\"}]}", rendered);
     }
 
     /** An empty string from {@link Diagnostic} is an absence, and crosses over as one. */
@@ -161,8 +159,8 @@ class OutputFormatTest {
                 Optional.of("a value"), Optional.of("(absent)"), Optional.of("1:1:0"), Optional.of("6:3:42"),
                 Optional.empty());
         String rendered = OutputFormat.JSON.render(new ValidationReport(false, POLICY, List.of(diagnostic)));
-        assertTrue(rendered.contains("\"dataPosition\":\"1:1:0\""), rendered);
-        assertTrue(rendered.contains("\"schemaPosition\":\"6:3:42\""), rendered);
+        assertTrue(rendered.contains("\"data_position\":\"1:1:0\""), rendered);
+        assertTrue(rendered.contains("\"schema_position\":\"6:3:42\""), rendered);
     }
 
     /**
@@ -341,15 +339,15 @@ class OutputFormatTest {
 
     /** The same value in {@code --output json}, where a consumer reads a name rather than a bound enum. */
     @Test
-    void jsonRendersTheFetchReasonAndNullWhereThereIsNone() {
+    void jsonRendersTheFetchReasonAndOmitsItWhereThereIsNone() {
         CliDiagnostic unavailable = new CliDiagnostic(Optional.empty(), Optional.of(""), Optional.empty(),
                 Diagnostic.Code.SCHEMA_UNAVAILABLE, "cannot fetch", Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(TsonSchemaFetchException.Reason.TIMEOUT));
 
         assertTrue(OutputFormat.JSON.render(new ValidationReport(false, POLICY, List.of(unavailable)))
-                .contains("\"fetchReason\":\"TIMEOUT\""));
-        assertTrue(OutputFormat.JSON.render(ValidationReport.failed(POLICY, Diagnostic.Code.TYPE_MISMATCH, "nope"))
-                .contains("\"fetchReason\":null"));
+                .contains("\"fetch_reason\":\"TIMEOUT\""));
+        assertFalse(OutputFormat.JSON.render(ValidationReport.failed(POLICY, Diagnostic.Code.TYPE_MISMATCH, "nope"))
+                .contains("fetch_reason"), "an absent field is left out, not written null");
     }
 
     @Test
@@ -407,9 +405,8 @@ class OutputFormatTest {
 
         assertEquals("{\"valid\":false,\"policy\":" + POLICY_JSON + ",\"files\":["
                 + "{\"file\":\"good.tn\",\"valid\":true,\"errors\":[]},"
-                + "{\"file\":\"bad.tn\",\"valid\":false,\"errors\":[{\"path\":null,\"schemaPointer\":null,"
-                + "\"schemaId\":null,\"code\":\"TYPE_MISMATCH\",\"message\":\"nope\",\"expected\":null,"
-                + "\"actual\":null,\"dataPosition\":null,\"schemaPosition\":null,\"fetchReason\":null}]}"
+                + "{\"file\":\"bad.tn\",\"valid\":false,\"errors\":[{"
+                + "\"code\":\"TYPE_MISMATCH\",\"message\":\"nope\"}]}"
                 + "],\"errors\":[]}", rendered);
     }
 

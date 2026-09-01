@@ -227,18 +227,6 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
 
 ## Miscellaneous
 
-- [ ] **`--output json` and `--output tson` spell one report two ways.** `CliDiagnostic`'s components carry
-  `@Field("schema_pointer")` and its siblings, so `--output tson` emits `snake_case` and leaves an absent
-  field out — the shape `diagnostics.tn` declares, and the one that output is validated against — while
-  `OutputFormat.renderJson` hand-writes `camelCase` and emits `null` for those same absences. A consumer who
-  parses one format and then the other finds neither key where it expects it. The TypeScript CLI writes
-  `snake_case` and omits absent fields in *both* formats (`packages/cli/src/diagnosticNode.ts`), so the two
-  implementations disagree as well, and nothing in [TSON-DATA] §8.1 fixes a CLI's wire shape to appeal to.
-  Settling it is picking one spelling for both formats — `snake_case` is the one a schema already describes
-  and the one the other implementation emits — and moving the README's documented JSON sample with it; the
-  alternative, if the JSON shape is meant to answer to a host-ecosystem convention instead, is to say so in
-  `docs/cli-config-hashing.md`, since nothing states it today.
-
 - [ ] **[TSON-DATA] §9.1's resource limits — and the `StackOverflowError` that escapes for want of them.**
   Nothing bounds nesting depth, token length or document size. A document about 5,000 containers deep
   overflows the stack inside `TsonDataStream.fill`, and a `StackOverflowError` is an `Error`: it passes

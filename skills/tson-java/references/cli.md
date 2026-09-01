@@ -105,20 +105,19 @@ one setting.
 ## Machine-readable output
 
 `--output json` is one document per invocation, one file or twenty — a `files` array with each data file's
-own `file`/`valid`/`errors`, wrapped in the run's verdict. **Its field names are `camelCase` and an absent
-field is `null`, not omitted:**
+own `file`/`valid`/`errors`, wrapped in the run's verdict. **Both machine formats spell one report one way:
+`snake_case` keys, and a field with nothing to say left out rather than written `null`.**
 
 ```json
 {"valid":false,
- "policy":{"identifierPolicy":{"level":"HIGHLY_RESTRICTIVE","perSegment":false,"permitting":[]},
-           "tokenPolicy":{"level":"UNRESTRICTED","perSegment":false,"permitting":[]},
-           "unicodeDataVersion":"16.0"},
+ "policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,"permitting":[]},
+           "token_policy":{"level":"UNRESTRICTED","per_segment":false,"permitting":[]},
+           "unicode_data_version":"16.0"},
  "files":[{"file":"person-data.tn","valid":false,"errors":[
-   {"path":"/age","schemaPointer":"/person/age","schemaId":"example.com/…/person.tn",
+   {"path":"/age","schema_pointer":"/person/age","schema_id":"example.com/…/person.tn",
     "code":"ATOM_CONSTRAINT_VIOLATION","message":"'int32': 'thirty' is not a valid integer …",
     "expected":"an integer or based-integer form","actual":"thirty",
-    "dataPosition":"5:8:154","schemaPosition":"17:5:677",
-    "fetchReason":null}]}],
+    "data_position":"5:8:154","schema_position":"17:5:677"}]}],
  "errors":[]}
 ```
 
@@ -127,9 +126,9 @@ under, stated once because it is constant for the run and cannot differ between 
 §8.2 refusal is an ordinary diagnostic told apart by its `code` (`CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`,
 `RESTRICTED_SCRIPT`) and carries nothing extra.
 
-`--output tson` is the same record through the library's own writer and is **`snake_case` with absent fields
-omitted** (`schema_pointer`, `data_position`, `identifier_policy`) — the shape `tson-cli`'s own
-`diagnostics.tn` declares, which that output is validated against. A position is `line:column:byteOffset`,
+`--output tson` is the same record through the library's own writer — the shape `tson-cli`'s own
+`diagnostics.tn` declares, which that output is validated against, and which `--output json` now matches key
+for key. A position is `line:column:byteOffset`,
 the first two 1-based, the offset counting UTF-8 bytes from 0. The top-level `errors` carries only what
 stopped the run before any document was read.
 
@@ -137,7 +136,7 @@ stopped the run before any document was read.
 
 | You wrote                                                    | Problem                                                                | Do this instead                                       |
 | ------------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------ |
-| `--output json` parsed as `snake_case`                       | JSON is `camelCase` with `null`s; only `--output tson` is `snake_case`  | match the format you asked for                        |
+| a `null` expected where a field is absent                    | both formats omit an absent field rather than writing `null`           | test the key's presence, not its value                |
 | `--type` or `--schema`                                       | neither exists; selection is the document's own                        | put `!!schema` and a root type-ref in the data        |
 | a schema passed by filename convention                       | classification is by content (`!!meta`), and matching is by `!!id`      | check the `!!id` the schema declares                  |
 | exit `70` read as "invalid document"                         | it is a gap or a fault in this library, not a verdict                  | treat it as a bug report                              |

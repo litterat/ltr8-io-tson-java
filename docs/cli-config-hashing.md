@@ -111,7 +111,7 @@ configured source will serve arrives through `SchemaFailure` as a read diagnosti
 `Diagnostic.ofSchemaUnavailable`, located at the root pointer. So `tson validate` missing a schema file and
 `tson compile` on a schema importing something the CLI cannot fetch land on the same code, which is right:
 neither run read the thing it needed. **Both carry the exception's `Reason` through to the report**, as
-`fetch_reason`/`fetchReason` in the machine formats — 69 says no schema was obtained, and the reason says
+`fetch_reason` in both machine formats — 69 says no schema was obtained, and the reason says
 whether the document named something this deployment refuses (`NOT_PERMITTED`/`NOT_FOUND`) or a host simply
 did not answer, which is the half that decides whether retrying is worth anything. `TEXT` omits it, as it
 omits `expected`/`actual`: the stderr note already tells a person that nothing was judged.
@@ -129,6 +129,14 @@ diagnostic because it is a fact about the *processor*: constant for the whole ru
 copies of one string; and needed by a sender *before* it writes a document rather than after being refused,
 which a channel that only opens on failure cannot give it. The level is also the half that actually explains
 a disagreement — two deployments at one UCD version differ because one of them set `ASCII_ONLY`.
+
+**Both machine formats spell one report one way** — `snake_case` keys, an absent field omitted rather than
+written `null`. `--output tson` always did, being bound through `CliDiagnostic`'s `@Field` names to what
+`diagnostics.tn` declares; `--output json` hand-wrote `camelCase` with `null`s, so a consumer parsing one and
+then the other found neither key where it expected it, and the TypeScript CLI agreed with neither. Nothing in
+[TSON-DATA] §8.1 fixes a CLI's wire shape, so the tie is broken by what a schema already describes and what
+the other implementation emits. The distinction the two RFC 6901 pointers carry survives: a present `""` is
+the root, an absent key means the diagnostic has no such end.
 
 **`tson policy` is the same record with no document in hand**, which is the surface that makes a refusal
 avoidable rather than merely explicable: a generator that reads it first never writes the name that would be

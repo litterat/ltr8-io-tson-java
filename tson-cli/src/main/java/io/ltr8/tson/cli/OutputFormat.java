@@ -227,7 +227,10 @@ enum OutputFormat {
         return rendered.isEmpty() ? "(" + position.get() + ")" : rendered + " (" + position.get() + ")";
     }
 
-    /** Every {@link CliDiagnostic} field, not just {@code code}/{@code message} -- the primary alignment target this shape maps to, Pydantic v2's own {@code ValidationError.errors()} ({@code type}/{@code loc}/{@code msg}/{@code input}/{@code ctx}), needs all of it. */
+    /**
+     * Every {@link CliDiagnostic} field, not just {@code code}/{@code message}: a consumer building its own
+     * message -- an LLM repair loop, say -- acts on the located, structured half rather than on the prose.
+     */
     private static String renderJson(ValidationReport report) {
         StringBuilder json = new StringBuilder();
         json.append("{\"valid\":").append(report.valid()).append(",\"policy\":");
@@ -244,20 +247,59 @@ enum OutputFormat {
                 json.append(',');
             }
             CliDiagnostic error = errors.get(i);
-            json.append("{\"path\":").append(jsonStringOrNull(error.path()))
-                    .append(",\"schemaPointer\":").append(jsonStringOrNull(error.schemaPointer()))
-                    .append(",\"schemaId\":").append(jsonStringOrNull(error.schemaId()))
-                    .append(",\"code\":").append(jsonString(error.code().name()))
-                    .append(",\"message\":").append(jsonString(error.message()))
-                    .append(",\"expected\":").append(jsonStringOrNull(error.expected()))
-                    .append(",\"actual\":").append(jsonStringOrNull(error.actual()))
-                    .append(",\"dataPosition\":").append(jsonStringOrNull(error.dataPosition()))
-                    .append(",\"schemaPosition\":").append(jsonStringOrNull(error.schemaPosition()))
-                    .append(",\"fetchReason\":")
-                    .append(jsonStringOrNull(error.fetchReason().map(Enum::name)))
-                    .append('}');
+            JsonObject object = new JsonObject(json);
+            object.optional("path", error.path());
+            object.optional("schema_pointer", error.schemaPointer());
+            object.optional("schema_id", error.schemaId());
+            object.required("code", error.code().name());
+            object.required("message", error.message());
+            object.optional("expected", error.expected());
+            object.optional("actual", error.actual());
+            object.optional("data_position", error.dataPosition());
+            object.optional("schema_position", error.schemaPosition());
+            object.optional("fetch_reason", error.fetchReason().map(Enum::name));
+            object.end();
         }
         json.append(']');
+    }
+
+    /**
+     * One JSON object, written field by field so an absent one is left out rather than written {@code null}.
+     *
+     * <p><b>Both formats now spell one report one way</b> -- {@code snake_case}, absences omitted -- which is
+     * what {@code --output tson} always did, what {@code diagnostics.tn} declares, and what the TypeScript
+     * CLI emits in both of its formats. Two implementations of one series disagreeing about the keys of one
+     * report is a worse cost than either spelling, and nothing in [TSON-DATA] §8.1 fixes a CLI's wire shape
+     * to appeal to instead.
+     *
+     * <p>The distinction the two RFC 6901 pointers carry survives the move: a present {@code ""} is the root,
+     * which a document-level problem genuinely has, and a key that is not there means this diagnostic has no
+     * such end at all. Omission says that in the spelling the rest of this project already uses.
+     */
+    private static final class JsonObject {
+
+        private final StringBuilder json;
+        private boolean started;
+
+        JsonObject(StringBuilder json) {
+            this.json = json.append('{');
+        }
+
+        void required(String name, String value) {
+            if (started) {
+                json.append(',');
+            }
+            started = true;
+            json.append(jsonString(name)).append(':').append(jsonString(value));
+        }
+
+        void optional(String name, Optional<String> value) {
+            value.ifPresent(present -> required(name, present));
+        }
+
+        void end() {
+            json.append('}');
+        }
     }
 
     private static String renderJson(CliPolicy policy) {
@@ -267,16 +309,16 @@ enum OutputFormat {
     }
 
     private static void jsonPolicy(StringBuilder json, CliPolicy policy) {
-        json.append("{\"identifierPolicy\":");
+        json.append("{\"identifier_policy\":");
         jsonUnicodePolicy(json, policy.identifierPolicy());
-        json.append(",\"tokenPolicy\":");
+        json.append(",\"token_policy\":");
         jsonUnicodePolicy(json, policy.tokenPolicy());
-        json.append(",\"unicodeDataVersion\":").append(jsonString(policy.unicodeDataVersion())).append('}');
+        json.append(",\"unicode_data_version\":").append(jsonString(policy.unicodeDataVersion())).append('}');
     }
 
     private static void jsonUnicodePolicy(StringBuilder json, CliPolicy.CliUnicodePolicy policy) {
         json.append("{\"level\":").append(jsonString(policy.level().name()))
-                .append(",\"perSegment\":").append(policy.perSegment())
+                .append(",\"per_segment\":").append(policy.perSegment())
                 .append(",\"permitting\":[");
         for (int i = 0; i < policy.permitting().size(); i++) {
             if (i > 0) {
@@ -293,10 +335,6 @@ enum OutputFormat {
             json.append(']');
         }
         json.append("]}");
-    }
-
-    private static String jsonStringOrNull(Optional<String> value) {
-        return value.map(OutputFormat::jsonString).orElse("null");
     }
 
     /**
