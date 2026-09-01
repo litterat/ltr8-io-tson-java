@@ -47,6 +47,7 @@ import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.function.Supplier;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -200,6 +201,9 @@ final class SchemaDesugarer {
 
     /** Declarations synthesised for sugar forms encountered during the walk, keyed by their generated name. */
     private final Map<String, SchemaMap.Declaration> injected = new LinkedHashMap<>();
+
+    /** §8.2's freshness MUST over the names this pass mints -- see {@link MintedNames}. */
+    private final MintedNames minted = new MintedNames();
 
     /** This document's own declarations, for {@link #checkTemplateApplication} -- set before the walk starts. */
     private Map<String, SchemaMap.Declaration> local = Map.of();
@@ -1104,7 +1108,7 @@ final class SchemaDesugarer {
         if (parameters.isEmpty()) {
             String name = bindingName(binding);
             if (!imported.contains(name)) {
-                injected.computeIfAbsent(name, n -> new SchemaMap.Declaration(List.of(), n, List.of(),
+                claim(name, binding, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
                         instance(binding)));
             }
             return new SimpleRef(name);
@@ -1113,7 +1117,7 @@ final class SchemaDesugarer {
         Binding normalised = rename(binding, parameters, renamed);
         String name = bindingName(normalised);
         if (!imported.contains(name)) {
-            injected.computeIfAbsent(name, n -> new SchemaMap.Declaration(List.of(), n, List.of(),
+            claim(name, normalised, () -> new SchemaMap.Declaration(List.of(), name, List.of(),
                     instance(normalised, renamed)));
         }
         return new GenericRef(name, parameters.stream()
@@ -1294,6 +1298,13 @@ final class SchemaDesugarer {
      * importing schema reaches an <em>imported</em> entry by deriving the same name for the same form --
      * meta.tn's {@code extern.types: [type_name]?} landing on the entry meta-kernel already produced.
      */
+    /** Injects {@code declaration} under {@code name}, unless the same form already claimed it. */
+    private void claim(String name, Binding binding, Supplier<SchemaMap.Declaration> declaration) {
+        if (minted.claim(name, canonical(binding))) {
+            injected.put(name, declaration.get());
+        }
+    }
+
     private static String bindingName(Binding binding) {
         return internalName(binding.head(), binding.fields());
     }
@@ -1337,6 +1348,11 @@ final class SchemaDesugarer {
      * length-first ({@code 4:text}), so no arrangement of delimiters inside a token can spell a different
      * record. Two renderings are equal exactly when the binding records are.
      */
+    /** {@link #canonical} over a binding built elsewhere -- {@code TemplateMaterialiser}'s closed synthetics. */
+    static String canonicalOf(String head, List<RecordValue.Field> fields) {
+        return canonical(new Binding(head, fields));
+    }
+
     private static String canonical(Binding binding) {
         StringBuilder out = new StringBuilder();
         appendText(out.append('A'), binding.head());

@@ -128,22 +128,6 @@ which is why they sit low. The lexer's fail-fast floor is not among them: nothin
 someone decides whether lexer errors feed the `Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds
 that question.
 
-- [ ] **A minted entry name's non-collision rests on a 32-bit hash, and nothing verifies it.**
-  [TSON-SCHEMA] §8.2 makes it a MUST that an internal name collide with no declared entry and no other
-  internal one. The first half is checked — `SchemaDesugarer` inserts a derived name with `putIfAbsent` and
-  raises `IllegalStateException` when it lands on one an author wrote. The second is not: both minting sites
-  dedupe *by name* (`injected.computeIfAbsent`, `TemplateMaterialiser.materialised.containsKey`), which is
-  the memoisation that makes two `[text]` one entry and ties a recursive knot, and which would silently merge
-  two types if two different bindings ever minted one name. Nothing distinguishes "the same form again" from
-  "a collision".
-  - Two ways to close it, and they are not exclusive. **Widen the structural hash** — 64 bits of SHA-256,
-    which `TsonContentHash` already has — so the guarantee rests on the hash rather than partly on however
-    much readable text survived `InternalName`'s 64-character budget. §8.2's determinism rule is a SHOULD
-    satisfied either way; `String.hashCode` was chosen because it is specified exactly, and SHA-256 is too.
-  - **Or verify on a name hit**: compare the arriving binding against the entry already under that name and
-    raise when they differ. That is the exact statement of the MUST rather than a probability, and it costs a
-    comparison only where the memo hits.
-
 - [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
   now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against
   `/person/age` lands on `age`'s line. A supertype and a choice variant are bare names in a `List<String>`

@@ -309,16 +309,21 @@ mints 139 characters. Past the budget the readable half has stopped being readab
 reference to the entry and in §8 output. Truncation appends the hash rather than simply cutting, so two long
 texts sharing a prefix stay apart.
 
-**What is checked for collisions, and what is not.** §8.2's freshness MUST asks that an internal name collide
-with no declared entry and no other internal one. A derived name landing on a name the author wrote is
-caught — `SchemaDesugarer` inserts with `putIfAbsent` and raises `IllegalStateException`, an internal
-invariant rather than an author error. **Two minted names are not compared**: both sites dedupe by name
-(`injected.computeIfAbsent`, `materialised.containsKey`), which is exactly right when two bindings are the
-same form — it is what makes two `[text]` one entry and what ties a recursive knot — and would silently merge
-two types if two different bindings ever produced one name. So non-collision rests on the name function being
-injective, and the readable half does part of that work: the structural hash is 32 bits (`String.hashCode`,
-chosen because it is specified exactly, so two processors agree). Widening it is the way to put the guarantee
-on the hash alone.
+**Non-collision is decided, not assumed** (`MintedNames`). §8.2's freshness MUST asks that an internal name
+collide with no declared entry and no other internal one. The first half was always caught — `SchemaDesugarer`
+inserts into the document's declarations with `putIfAbsent` and raises `IllegalStateException`. The second
+half is the subtle one: **deduping by name is the identity discipline working**, since two occurrences of one
+form must land on one entry — it is what makes `[text]` written twice one type, what lets a form written out
+and the same form arriving through a template agree, and what ties a recursive template's knot — and it is
+therefore also what would hide a collision, a second arrival under a name being indistinguishable from two
+different bindings that derived one.
+
+So the derivations are compared. Both sites already render a binding canonically before hashing it, and that
+rendering is injective — two are equal exactly when the bindings are — so `MintedNames.claim` states the MUST
+exactly rather than trusting the name's own 32-bit hash, which is a rendering and was never load-bearing on
+its own. **Per phase**: desugaring and materialisation hold one each and run either side of resolution, so a
+name minted in one phase colliding with a different form in the other is not caught; the two share their
+naming functions, so such a pair would have to have collided within a phase as well to exist.
 
 **One walk rather than one check per naming position, and that is the load-bearing part.** The
 restricted-character rule
