@@ -62,23 +62,6 @@ holding, not shapes outside it.
   example — so the fix is to stop deciding an argument's channel at the application and let the position it
   lands in decide, which is what a held body already makes possible. The one position where holding gives a
   *wrong* verdict rather than a late one.
-- [ ] **Two entries for one type, where both lift channels produce the same form.** A closed lift hashes the
-  *unclosed* binding record at desugar; the open lift hashes the *closed* one at materialisation — so
-  `[box<text>]` written directly and `[box<T>]` closed with `T := text` land on different names. D6
-  anticipates exactly this ("identity is settled after Pass 2 ... eagerly-lifted synthetics that become
-  structurally identical under resolution merge into one entry") and that merge pass is not implemented; it
-  never had to be, because every form lifted before `[box<text>]` was already concrete at desugar. Down here
-  on the spec author's own call: two entries are easier to debug than a merge firing at the wrong moment, and
-  it is reachable only when both spellings appear in one schema. Doing it properly means a pass at the end of
-  resolution that re-derives each synthetic's name from its resolved record and merges collisions — not a
-  patch to naming. **Re-derive from resolved references only, leaving value tokens as written**: the two
-  splits live in different channels of one derived name, so a pass that normalised the whole resolved record
-  would reach into the value channel §8.2 keeps as written. **§8.2 makes the merge required, not an
-  optimisation**, and names this exact split — `[box<text>]` written directly against `[box<T>]` closed with
-  `T := text` — so this is no longer a judgement call. The simple case does agree and is pinned
-  (`ContainerSugarEndToEndTest.aFormClosedFromATemplateIsTheSameEntryADirectOneProduces`): only an element
-  that is itself an application splits, the closed lift hashing the binding record before its inner
-  application is rewritten.
 
 ## Built-in types
 

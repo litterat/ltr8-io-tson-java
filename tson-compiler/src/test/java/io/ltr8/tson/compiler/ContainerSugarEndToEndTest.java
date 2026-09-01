@@ -455,6 +455,59 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
+     * The same rule where the lifted form's element is itself an <b>application</b> ([TSON-SCHEMA] §8.2's own
+     * example, {@code [box<text>]} written directly against {@code [box<T>]} closed with {@code T := text}).
+     *
+     * <p>This is the case the two lift channels cannot name alike on their own. Both derive a name from the
+     * binding record with every inner form reduced to its entry name -- {@code SchemaDesugarer} gets there by
+     * lifting innermost-first, {@code TemplateMaterialiser} by closing applications before it names -- but an
+     * application has no entry until materialisation, so the desugar channel names an unreduced record and
+     * the two forms land apart. §8.2 requires the merge pass that settles it: "identity settles after Pass
+     * 2 ... eagerly-lifted synthetics that become structurally identical under resolution merge into one
+     * entry".
+     */
+    @Test
+    void aFormWhoseElementIsAnApplicationIsAlsoOneEntry() {
+        TsonCompiledSchema compiled = compile("""
+                  box    => <T> { v: T }
+                  outer  => <T> { a: [box<T>] }
+                  use    => outer<text>
+                  direct => { d: [box<text>] }""");
+
+        String direct = ((RecordBody) compiled.schema().entries().get("direct").body())
+                .fields().getFirst().type().name();
+        String closed = ((RecordBody) bodyOf(compiled, "use")).fields().getFirst().type().name();
+
+        assertEquals(closed, direct, () -> "one entry for one form: " + compiled.schema().entries().keySet());
+        // The closed form only: `array_box_p0_...` is the template's own open synthetic, which stays an entry
+        // of its own -- §8.2 gives open synthetics a separate identity rule and nothing merges them.
+        assertEquals(1, compiled.schema().entries().keySet().stream()
+                .filter(n -> n.startsWith("array_box_text")).count(),
+                () -> "one closed array_box_text entry, shared: " + compiled.schema().entries().keySet());
+    }
+
+    /**
+     * And the name they agree on is the one derived from the <b>reduced</b> record -- the surviving entry is
+     * named for the entry its element became, not for the application the author wrote. That is what makes
+     * the name a function of the resolved form alone, so two schemas reaching this form by different
+     * spellings agree on it (§8.2's determinism SHOULD, and what lets the import merge unify rather than
+     * collide).
+     */
+    @Test
+    void theSurvivingNameIsDerivedFromTheElementsOwnEntry() {
+        TsonCompiledSchema compiled = compile("""
+                  box    => <T> { v: T }
+                  direct => { d: [box<text>] }""");
+
+        String array = ((RecordBody) compiled.schema().entries().get("direct").body())
+                .fields().getFirst().type().name();
+        String element = ((ArrayBody) compiled.schema().entries().get(array).body()).elementType().name();
+
+        assertTrue(array.contains(element),
+                () -> "'" + array + "' should be derived from its element entry '" + element + "'");
+    }
+
+    /**
      * <b>Collection-valued slots are parameterizable</b> (§5.10). A held body is not read against the
      * constructor's vocabulary at all until materialisation substitutes, so a parameter inside {@code
      * choice}'s {@code variants} -- or {@code tuple}'s {@code elements} -- is a token inside an array and

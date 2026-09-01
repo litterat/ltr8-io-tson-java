@@ -358,6 +358,19 @@ recorded open form, and replacing the application with a reference to the entry 
     the desugar phase lifts innermost-first, so a form it writes already names the entry its inner form
     became, and a form closed here has to agree or `[[pixel; 3]; 3]` written out and `grid<pixel, 3>` closed
     would be two entries for one type.
+  - **The desugar channel cannot always reach that rule, and `SyntheticMerge` is where the two meet.** Both
+    channels name a form by one function of one thing — the binding record with every inner form reduced to
+    its entry name. Closing here satisfies it always; lifting innermost-first satisfies it for a nested
+    *sugar* form and cannot for a nested *application*, `box<text>` having no entry until this pass runs. So
+    a form lifted eagerly with an application in a slot is named from an unreduced record, and `[box<text>]`
+    written directly would land apart from `[box<T>]` closed with `T := text` — §8.2's own example, and the
+    split it calls the merge pass mandatory for. `SchemaResolver` re-derives each such form through
+    `TemplateMaterialiser.closedFormName` after materialisation (the moment §8.2 names: "identity settles
+    after Pass 2"), rewrites references onto the closed-record name and drops or moves the eager entry.
+    **The closed-record name wins**, being a function of the resolved form alone — which is what makes two
+    schemas reaching one form by different spellings agree on it, where the eager name or the smaller of the
+    two would make an entry's name depend on what appeared beside it. Only a form whose binding held an
+    application moves; every other synthetic re-derives to the name it already has.
   - **That is where §8.2's deferred value-level check lands**, and it needs no code of its own:
     `<N> [text; N]` is a fine declaration, `<"two">` is where it stops being one, and the reader reports it
     (`'two' is not a valid integer`) exactly as it would for a written body. D7's split — binding names,

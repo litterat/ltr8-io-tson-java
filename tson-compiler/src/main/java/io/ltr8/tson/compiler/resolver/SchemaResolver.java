@@ -341,6 +341,29 @@ public final class SchemaResolver {
         namespace.putAll(resolvedLocals);
         namespace.putAll(instantiations);
 
+        // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
+        // have resolved". A form the desugar phase lifted with an application in a slot was named before that
+        // application had an entry to be named for; every application is closed now, so it re-derives to the
+        // name the other channel already gave the same form. See SyntheticMerge.
+        Map<String, String> merged = SyntheticMerge.renames(declarations, generated, materialiser);
+        if (!merged.isEmpty()) {
+            SyntheticMerge.rewrite(resolvedLocals, merged);
+            SyntheticMerge.rewrite(instantiations, merged);
+            merged.forEach((from, to) -> {
+                // Dropped where the other channel already published the form, moved where it did not: the
+                // eager name was this schema's only one for it, and an entry nothing names is not an entry.
+                TypeDefinition eager = resolvedLocals.remove(from);
+                namespace.remove(from);
+                generated.remove(from);
+                generated.add(to);
+                if (!namespace.containsKey(to)) {
+                    resolvedLocals.put(to, eager);
+                }
+            });
+            namespace.putAll(resolvedLocals);
+            namespace.putAll(instantiations);
+        }
+
         // §8.3, last because it needs everything above already in the namespace: a type position naming a
         // REFERENCE entry is rewritten to the end of its chain and keeps the author's own name as @alias.
         // After materialisation specifically, so an alias to an application flattens onto the entry that
@@ -362,6 +385,12 @@ public final class SchemaResolver {
         // whole schema to a bad @doc.
         AnnotatedMap<String, TypeDefinition> localOnly = new AnnotatedMap<>();
         for (String name : declarations.keySet()) {
+            // A merged form is keyed by the name it merged onto, and contributes nothing at all where that
+            // name belongs to the materialised half -- the entry is there, marked, and this is its old key.
+            String key = merged.getOrDefault(name, name);
+            if (!resolvedLocals.containsKey(key)) {
+                continue;
+            }
             Annotations nameAnnotations;
             try {
                 nameAnnotations = holder[0].annotationsFor(name, declarations.get(name).nameAnnotations());
@@ -375,8 +404,8 @@ public final class SchemaResolver {
             }
             // §8.2: a synthetic entry's key carries the derived @synthetic marker, and a lifted declaration
             // has nothing else at its key -- there is no source text in front of a name nobody wrote.
-            localOnly.put(name, resolvedLocals.get(name),
-                    generated.contains(name) ? SYNTHETIC : nameAnnotations);
+            localOnly.put(key, resolvedLocals.get(key),
+                    generated.contains(key) ? SYNTHETIC : nameAnnotations);
         }
         // An entry the materialiser minted has no declared name to carry author annotations from. The
         // synthetic half of them still gets the derived marker: a template's open form closes into the same
