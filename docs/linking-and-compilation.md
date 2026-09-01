@@ -276,25 +276,30 @@ them with nothing in the source to say which). A **choice's variants are deliber
 is a reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
 there could never fire.
 
-**And the walk covers authored names only** (`authoredNames`, told apart by a missing source position — the
-same exact test `EntryDisplayName` and `reportedAgainst` use). §11.4's scopes are authored ones and
-[TSON-SCHEMA] §8.2 puts internal names outside the conformance surface, so judging a minted entry produces a
-refusal nobody can act on: an author cannot edit a name they did not write, and the only lever left is
-relaxing the policy for every real name too. It would also fire on ordinary schemas, because a derived name
-is a Latin constructor head spliced with the author's own content — `operation_путь_GET_…_bef13f0c` is a
-valid identifier refused under §8.2's recommended default for the crime of containing a Russian word. What
-does bind a minted name is the structural half, §8.2's freshness MUST that it be a valid `identifier`, and
-that is met where it is minted (`InternalName`, below).
+**A minted name is ASCII and an identifier by construction, which is what lets the walk judge it like any
+other** (`InternalName`). Both naming sites splice author-written content into the readable half —
+`SchemaDesugarer` from a lifted binding record, `TemplateMaterialiser` from an application's head and value
+arguments — so a derived name is a place where a document's own text reaches the schema namespace. Two
+requirements meet there, and the second is why meeting the first is not enough:
 
-**A minted name is an identifier by construction** (`InternalName.segment`). Both naming sites splice
-author-written content into the readable half — `SchemaDesugarer` from a lifted binding record,
-`TemplateMaterialiser` from an application's value arguments — and §7.7 admits only `XID_Continue` and `-`,
-so a `text` field holding a path put `/` in a name and made it not an identifier at all. Every run of what
-§7.7 does not admit becomes one `_`, trimmed at the edges since segments are already `_`-joined. Nothing is
-lost: identity is the structural hash beside the readable half, computed over the binding rather than over
-this text, so `1` and `1.0` still mint two entries though both now read `1` and `1_0`. An HTTP operation is
-the case that finds it — §4.1 names one as the motivating case for the `data` kind, and every realistic path
-carries a slash, so the feature's own worked example could not be templated.
+- **[TSON-SCHEMA] §8.2's freshness MUST**, that an internal name is a valid `identifier`. Splicing raw text
+  broke it outright: a `text` field holding a path put `/` in a name, and §7.7 admits only `XID_Continue` and
+  `-`. An HTTP operation is the case that finds it — §4.1 names one as the motivating case for the `data`
+  kind, and every realistic path carries a slash.
+- **§8.2's hygiene must still be able to judge the result.** Admitting every `XID_Continue` character keeps
+  the name legal and still lets author text shape it: a Cyrillic `о` in a value would sit in a namespace
+  name, and a Latin head spliced with non-Latin content is mixed-script by construction, so the walk would
+  refuse ordinary schemas — `operation_путь_GET_…_bef13f0c` is a valid identifier refused under §8.2's
+  recommended default for containing a Russian word. Exempting minted names from the walk answers that and
+  opens a worse hole: the namespace then takes on whatever a document happens to contain, unchecked.
+
+So the rule is ASCII, in three cases. What is ASCII and admitted by §7.7 is spliced verbatim — the ordinary
+case, a type name or a verb or a bound. What is ASCII but not admitted keeps its admitted characters and
+gains a hash, so `"/x"` reads `x_h00000f2f` and `1.0` reads `1_0_h0000bdb3`. Anything else is the hash alone.
+**Hashed rather than dropped**, because replacing it would collapse two different values onto one readable
+half, where a hash keeps them visibly distinct and keeps the name inspectable — a reader holding the schema
+can hash the same text and match it. Nothing identity depends on is at stake either way: that is the
+structural hash at the end, computed over the binding and never over this text.
 
 **One walk rather than one check per naming position, and that is the load-bearing part.** The
 restricted-character rule

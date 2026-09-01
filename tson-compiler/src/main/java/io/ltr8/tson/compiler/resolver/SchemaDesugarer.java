@@ -1308,7 +1308,9 @@ final class SchemaDesugarer {
      */
     static String internalName(String head, List<RecordValue.Field> fields) {
         Binding binding = new Binding(head, fields);
-        StringBuilder readable = new StringBuilder(head);
+        // The head too: a constructor name is an identifier, but a consumer's meta layer may declare one
+        // outside ASCII, and a name that mixes it with the ASCII parts below is refused by §8.2's own walk.
+        StringBuilder readable = new StringBuilder(InternalName.part(head));
         for (RecordValue.Field field : fields) {
             appendReadable(readable, field.value().value().coreValue());
         }
@@ -1319,7 +1321,7 @@ final class SchemaDesugarer {
     private static void appendReadable(StringBuilder out, CoreValue value) {
         switch (value) {
             case TokenValue token -> out.append('_')
-                    .append(InternalName.segment(
+                    .append(InternalName.part(
                             NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED)));
             case RecordValue record -> record.fields()
                     .forEach(field -> appendReadable(out, field.value().value().coreValue()));

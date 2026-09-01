@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
  * [TSON-SCHEMA] §8.2's freshness MUST — an internal name is a valid {@code identifier} — over the content
@@ -19,33 +21,50 @@ class InternalNameTest {
     private static void assertJoinsIntoAnIdentifier(String... segments) {
         StringBuilder derived = new StringBuilder("array");
         for (String segment : segments) {
-            derived.append('_').append(InternalName.segment(segment));
+            derived.append('_').append(InternalName.part(segment));
         }
         derived.append("_1f8d998a");
         assertDoesNotThrow(() -> IdentifierParser.validate(derived.toString()), derived::toString);
     }
 
+    /**
+     * ASCII that §7.7 does not admit keeps its readable characters and gains a hash -- so a path still says
+     * what it came from, and two texts that sanitise alike stay apart in the readable half rather than
+     * relying on the structural hash to tell a reader anything.
+     */
     @Test
-    void punctuationBecomesOneSeparatorAndTheEdgesAreTrimmed() {
-        assertEquals("x", InternalName.segment("/x"), "a path's leading slash joins as one separator");
-        assertEquals("a_b", InternalName.segment("a/b"));
-        assertEquals("a_b", InternalName.segment("a///b"), "a run collapses rather than repeating");
-        assertEquals("orders", InternalName.segment("\"orders\""));
-        assertEquals("", InternalName.segment("/"), "wholly unadmitted contributes only its own separator");
-        assertEquals("", InternalName.segment(""));
+    void asciiPunctuationKeepsWhatIsReadableAndGainsAHash() {
+        assertTrue(InternalName.part("/x").startsWith("x_h"), InternalName.part("/x"));
+        assertTrue(InternalName.part("a/b").startsWith("a_b_h"), InternalName.part("a/b"));
+        assertNotEquals(InternalName.part("a/b"), InternalName.part("a.b"),
+                "two texts that sanitise alike stay apart");
+        assertTrue(InternalName.part("/").startsWith("h"), "nothing readable left: the hash alone");
+        assertEquals("", InternalName.part(""));
     }
 
     /**
-     * What {@code XID_Continue} admits is copied through untouched, which is the half that matters for an
-     * author writing outside Latin script: their content survives into the readable name.
+     * <b>Nothing outside ASCII reaches the name.</b> That is what lets §8.2's hygiene walk judge a minted
+     * name like any other: an ASCII name is single-script and inside the identifier profile, so it satisfies
+     * all three rules at every restriction level. Admitting {@code XID_Continue} instead would keep the name
+     * a legal identifier and still let a document's own text shape a namespace name.
      */
     @Test
+    void nonAsciiIsHashedRatherThanSpliced() {
+        String cyrillic = InternalName.part("путь");
+        assertTrue(cyrillic.matches("h[0-9a-f]{8}"), cyrillic);
+        assertNotEquals(cyrillic, InternalName.part("адрес"), "two values stay visibly distinct");
+        // A Latin-looking Cyrillic homograph cannot ride into a name and pass for the ASCII spelling.
+        assertNotEquals("operation", InternalName.part("\u043eperation"));
+        assertTrue(InternalName.part("\u043eperation").matches("h[0-9a-f]{8}"));
+    }
+
+    /** ASCII §7.7 admits is copied through untouched: the ordinary case, and the one worth reading. */
+    @Test
     void identifierContentIsUntouched() {
-        assertEquals("order_line", InternalName.segment("order_line"));
-        assertEquals("GET", InternalName.segment("GET"));
-        assertEquals("200", InternalName.segment("200"));
-        assertEquals("some-name", InternalName.segment("some-name"), "§7.7 admits '-' as well");
-        assertEquals("путь", InternalName.segment("путь"));
+        assertEquals("order_line", InternalName.part("order_line"));
+        assertEquals("GET", InternalName.part("GET"));
+        assertEquals("200", InternalName.part("200"));
+        assertEquals("some-name", InternalName.part("some-name"), "§7.7 admits '-' as well");
     }
 
     /** The whole of the contract, over the shapes that produced a malformed name. */
@@ -56,5 +75,6 @@ class InternalNameTest {
         assertJoinsIntoAnIdentifier("https://example.test/schema.tn?sha256=abc");
         assertJoinsIntoAnIdentifier("", "/", "///");
         assertJoinsIntoAnIdentifier("путь", "/x");
+        assertJoinsIntoAnIdentifier("\u043eperation", "тип");
     }
 }

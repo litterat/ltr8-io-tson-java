@@ -3,20 +3,32 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.lexer.Xid;
 
 /**
- * The one rule every name the resolver mints must satisfy: [TSON-SCHEMA] §8.2's freshness MUST -- <em>an
- * internal name is a valid {@code identifier}</em>.
+ * The readable half of a name the resolver mints, built so the whole name is <b>ASCII and a valid {@code
+ * identifier}, whatever the author wrote</b>.
  *
- * <p>Both minting sites build the same shape, §8.2's own recommendation of a readable head plus a structural
- * hash: {@code SchemaDesugarer} for a lifted sugar form, {@code TemplateMaterialiser} for a closed template
- * application. Both splice author-written content into the readable half, and [TSON-DATA] §7.7 admits only
- * {@code XID_Continue} and {@code -} -- so a {@code text} field holding a path put {@code /} in a name and
- * made it not an identifier at all. An HTTP operation is the case that finds it, [TSON-SCHEMA] §4.1 naming
- * one as the motivating case for the {@code data} kind and every realistic path carrying a slash.
+ * <p>Both minting sites splice author-written content into that half -- {@code SchemaDesugarer} from a lifted
+ * binding record, {@code TemplateMaterialiser} from an application's head and value arguments -- which makes
+ * a derived name a place where a document's own text reaches the schema namespace. Two things follow, and
+ * the second is why the first is not enough on its own.
  *
- * <p><b>Sanitising costs nothing, which is what makes it the right fix.</b> The readable half is a
- * diagnostic convenience -- identity is carried by the structural hash beside it, computed over the binding
- * itself and not over this text -- so replacing what cannot appear in an identifier loses no information
- * that anything reads.
+ * <ul>
+ *   <li><b>[TSON-SCHEMA] §8.2's freshness MUST</b>: an internal name is a valid {@code identifier}. Splicing
+ *   raw text broke it outright -- a {@code text} field holding a path put {@code /} in a name, and
+ *   [TSON-DATA] §7.7 admits only {@code XID_Continue} and {@code -}.</li>
+ *   <li><b>§8.2's name hygiene has to be able to judge the result.</b> Admitting every {@code XID_Continue}
+ *   character would keep the name legal and still let author text shape it: a Cyrillic {@code o} in a value
+ *   would sit in a namespace name, and a Latin head spliced with non-Latin content is mixed-script by
+ *   construction -- so the hygiene walk would refuse ordinary schemas, and exempting minted names from it
+ *   would leave the namespace taking on whatever a document happened to contain. Restricting to ASCII is
+ *   what lets the walk stay on: an ASCII name is single-script and inside the identifier profile, so it
+ *   satisfies all three rules at every restriction level.</li>
+ * </ul>
+ *
+ * <p><b>What is not ASCII is hashed rather than dropped.</b> Replacing it would collapse two different values
+ * onto one readable half; hashing keeps them visibly distinct and keeps the name inspectable -- a reader who
+ * has the schema can hash the same text and match it. Nothing is lost that identity depends on either way:
+ * that is carried by the structural hash at the end, computed over the binding itself and never over this
+ * text.
  */
 final class InternalName {
 
@@ -24,36 +36,68 @@ final class InternalName {
     }
 
     /**
-     * {@code text} as one segment of a derived name: every run of characters [TSON-DATA] §7.7 does not admit
-     * becomes a single {@code _}.
+     * {@code text} as one part of a derived name -- its head, or one of its segments.
      *
-     * <p>A run rather than a character each, and trimmed at both ends, so a path {@code "/x"} reads {@code x}
-     * and joins as {@code head_x} rather than {@code head__x}: segments are already joined by {@code _}, so a
-     * replacement at an edge would only double the separator that is there. A segment that is wholly
-     * unadmitted contributes nothing beyond that separator.
+     * <p>Three cases, in the order they are tested:
      *
-     * <p><b>{@code XID_Continue} and not {@code XID_Start}</b>, because a segment is never the first thing in
-     * a derived name: the head is a constructor name, itself an identifier, so the name starts legally and
-     * every segment after it sits at a continue position.
+     * <ul>
+     *   <li><b>ASCII and admitted by §7.7</b> -- spliced verbatim. This is the ordinary case: a type name, a
+     *   verb, a bound, an enum member.</li>
+     *   <li><b>ASCII but not admitted</b> -- the admitted characters, then a hash of the whole. A path
+     *   {@code "/x"} reads {@code x_h00000f2f} and {@code 1.0} reads {@code 1_0_h0002f0a5}: the readable
+     *   part still says what it came from, and the hash keeps two texts that sanitise alike apart.</li>
+     *   <li><b>Anything else</b> -- the hash alone, so no non-ASCII character reaches the name.
+     *   Unrecognisable by design, and the price of the hygiene walk being able to run at all.</li>
+     * </ul>
+     *
+     * <p>{@code XID_Continue} rather than {@code XID_Start} for the admitted set: a head is a constructor or
+     * template name and so already starts legally, and everything after it sits at a continue position.
      */
-    static String segment(String text) {
+    static String part(String text) {
+        if (isAdmittedAscii(text)) {
+            return text;
+        }
+        return isAscii(text) ? joined(admittedOf(text), hash(text)) : hash(text);
+    }
+
+    /** Every character ASCII and admitted by [TSON-DATA] §7.7 -- the case that needs no rewriting at all. */
+    private static boolean isAdmittedAscii(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c > 0x7F || !(Xid.isContinue(c) || c == '-')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isAscii(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) > 0x7F) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The admitted characters of {@code text}, each run of the rest collapsed to one {@code _} and the edges
+     * trimmed -- parts are already joined by {@code _}, so a replacement there would only double a separator
+     * that is present.
+     */
+    private static String admittedOf(String text) {
         StringBuilder out = new StringBuilder(text.length());
         boolean replacing = false;
-        for (int i = 0; i < text.length(); ) {
-            int codePoint = text.codePointAt(i);
-            i += Character.charCount(codePoint);
-            if (Xid.isContinue(codePoint) || codePoint == '-') {
-                out.appendCodePoint(codePoint);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (Xid.isContinue(c) || c == '-') {
+                out.append(c);
                 replacing = false;
             } else if (!replacing) {
                 out.append('_');
                 replacing = true;
             }
         }
-        // This can also trim an underscore the author wrote -- '_' is XID_Continue, so `_foo` was copied
-        // through -- and that is harmless rather than merely tolerable: the readable half is a diagnostic
-        // convenience, and `_foo` and `foo` still mint distinct entries because the hash beside it runs over
-        // the binding, not over this text.
         int start = 0;
         int end = out.length();
         while (start < end && out.charAt(start) == '_') {
@@ -63,5 +107,21 @@ final class InternalName {
             end--;
         }
         return out.substring(start, end);
+    }
+
+    /**
+     * {@code h} plus eight hex digits of {@code String.hashCode}, which is specified exactly -- so two
+     * processors reading one schema derive the same name, as both minting sites already rely on for the
+     * structural hash.
+     *
+     * <p>It is a rendering, never an identity: a collision here costs legibility and nothing else, because
+     * the entry is keyed by the structural hash over its binding.
+     */
+    private static String hash(String text) {
+        return "h" + String.format("%08x", text.hashCode());
+    }
+
+    private static String joined(String admitted, String hash) {
+        return admitted.isEmpty() ? hash : admitted + "_" + hash;
     }
 }

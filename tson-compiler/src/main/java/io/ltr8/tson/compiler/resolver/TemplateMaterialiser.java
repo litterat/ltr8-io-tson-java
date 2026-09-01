@@ -800,18 +800,18 @@ final class TemplateMaterialiser {
      * specified exactly, so hashing a string built here is deterministic by contract.
      */
     private static String internalName(String head, List<TypeArgument> arguments) {
-        StringBuilder readable = new StringBuilder(head);
+        StringBuilder readable = new StringBuilder(InternalName.part(head));
         StringBuilder canonical = new StringBuilder();
         appendText(canonical.append('A'), head);
         canonical.append('(');
         for (TypeArgument argument : arguments) {
             switch (argument) {
                 case TypeArgument.Ref ref -> {
-                    readable.append('_').append(ref.ref().name());
+                    readable.append('_').append(InternalName.part(ref.ref().name()));
                     appendRef(canonical.append('r'), ref.ref());
                 }
                 case TypeArgument.Value value -> {
-                    readable.append('_').append(InternalName.segment(canonicalText(value.value())));
+                    readable.append('_').append(InternalName.part(canonicalText(value.value())));
                     // The form by name, not ordinal: inserting a constant would renumber every ordinal.
                     appendText(canonical.append('v'), value.value().form().name());
                     appendNumberAware(canonical, value.value());

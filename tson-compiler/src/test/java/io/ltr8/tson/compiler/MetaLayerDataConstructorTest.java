@@ -303,14 +303,15 @@ class MetaLayerDataConstructorTest {
      * {@code operation_/x_GET_..._bb34a349} and the linker refused it under {@code RESTRICTED_CHARACTER},
      * against a schema with nothing wrong in it.
      *
-     * <p>The Cyrillic case is why sanitising alone was not the fix: {@code operation_путь_..._bef13f0c} is a
-     * perfectly valid identifier, and was still refused under {@code RESTRICTED_SCRIPT} for mixing the Latin
-     * constructor head with the author's own word. A derived name is Latin head plus author content by
-     * construction, so that would fire on any schema written outside Latin script.
+     * <p>The Cyrillic case is why sanitising to {@code XID_Continue} was not enough: {@code
+     * operation_путь_..._bef13f0c} is a perfectly valid identifier, and was still refused under {@code
+     * RESTRICTED_SCRIPT} for mixing the Latin constructor head with the author's own word. Hashing what is
+     * not ASCII is what settles it — the name carries no author text that could mix scripts, spoof another
+     * name, or otherwise shape the namespace, so §8.2's walk stays on and passes it.
      *
      * <p>What is left after the fix is an unrelated gap this repository already knows about — a DATA-kinded
      * entry cannot be named as a type — so the assertion is that the failure is <em>not</em> a §8.2 refusal,
-     * and that the name it names is clean.
+     * and that the name it names is a clean ASCII identifier.
      */
     @Test
     void aTemplatedConstructorMintsAnIdentifierAndIsNotJudgedByNameHygiene() {
@@ -336,6 +337,8 @@ class MetaLayerDataConstructorTest {
             assertTrue(minted.find(), thrown::getMessage);
             assertDoesNotThrow(() -> IdentifierParser.validate(minted.group(1)),
                     () -> "§8.2: an internal name is a valid identifier -- got '" + minted.group(1) + "'");
+            assertTrue(minted.group(1).chars().allMatch(c -> c < 0x80),
+                    () -> "and ASCII, which is what lets §8.2's walk judge it: '" + minted.group(1) + "'");
         }
     }
 
