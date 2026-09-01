@@ -97,20 +97,35 @@ Parsing, desugaring, resolution and linking all report every independent problem
 `TsonDiagnosticsReceiver` (issues #3/#28/#29), whether reached by `tson compile`/`Tson.validateSchema` or by
 a *data* read whose `!!schema` names a schema that doesn't resolve — both give the same account of the same
 broken schema. `docs/readers-and-diagnostics.md`'s "Schema-side diagnostics" section describes the shape and
-the decisions behind it. The item below is a refinement of a working two-ended diagnostic — how finely it
-locates itself — not a gap in what it reports, which is why it sits low. The lexer's fail-fast floor is not
-on the list either: nothing is actionable there until someone decides whether lexer errors feed the
-`Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds that question.
+the decisions behind it. The items below are refinements of a working two-ended diagnostic — how finely it
+locates itself — not gaps in what it reports, which is why they sit low. The lexer's fail-fast floor is not
+among them: nothing is actionable there until someone decides whether lexer errors feed the `Diagnostic`
+model at all, and `STRUCTURED-OUTPUT.md` holds that question.
 
-- [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
-  now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against
-  `/person/age` lands on `age`'s line. A supertype and a choice variant are bare names in a `List<String>`
-  with nowhere to hang one, so a problem against either is still located at the enclosing declaration.
+- [ ] **A use site still has no position of its own.** A record field carries one (`RecordField.position`,
+  `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against `/person/age` lands on `age`'s
+  line. Nothing else does: a choice variant, an array's `element_type`, a map's `key_type`/`value_type`, a
+  tuple element and a `Reference` target are all a `TypeRef` with no position, so a problem against any of
+  them is located at the enclosing declaration.
+  - **The destination exists and is safe.** They are all one component on `schema.meta.TypeRef`, the way
+    `RecordField` took one — and `TypeRef` hand-writes `equals`/`hashCode` over `name` and `arguments`
+    alone, so a position stays out of identity by construction rather than by remembering to keep it out.
+    That matters here more than at `RecordField`: §8.2 keys instantiation identity on `TypeRef` comparison.
+  - **The cost is carrying it across a rebuild**, the way `RecordField.withType` is. Nine sites reconstruct
+    a resolved `TypeRef` — `ReferenceFlattener` ×2, `TemplateMaterialiser` ×5, `TsonSchemaLinker` ×1,
+    `SyntheticMerge` ×1 — of which two build a `source` where a position means nothing and one is
+    `checkVariantsAreDistinct`'s local comparison key, which drops annotations on purpose. So about five
+    real ones. A drop is invisible to every test, position being excluded from equality: `TypeRef` already
+    excludes `annotations` on the same terms, and a lost `@alias` is equally silent today.
   - The parser side is a third identity-keyed table in `SchemaPositions`, which is the shape it was given
-    for this; the awkward half is the destination, since neither is a record with somewhere to put it.
-  - Whatever carries it must be carried across a rebuild the way `RecordField.withType` is — §8.3's
-    flattening walk rebuilds bodies wholesale, and a dropped position is invisible to every test, position
-    being excluded from equality.
+    for this.
+
+- [ ] **A supertype has nowhere to hang a position at all**, which is what makes it the harder half of the
+  item above rather than part of it. `RecordBody.supertypes` and `TypeDefinition.supertypes`/`subtypes` are
+  `List<String>`, and §8.1 types the field `[type_name]?` — a name list on the wire, so there is no record
+  to add a component to. Whatever carries it (an `@Unbound` parallel list, or a wrapper the wire form does
+  not see) changes the shape of two `schema.meta` bodies to serve a diagnostic, and that trade is the
+  question to answer before writing any of it.
 
 ## Write side
 

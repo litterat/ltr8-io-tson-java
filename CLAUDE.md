@@ -1026,8 +1026,9 @@ compatibility).
   gap; `STRUCTURED-OUTPUT.md` holds the open question. **`schemaPosition` descends with the pointer** —
   `/person/age` carries `age`'s own line, `RecordField` holding an `@Unbound` position beside
   `TypeDefinition`'s and one `SchemaPositions` carrier threading both from the parser. What remains is the
-  same gap for a **supertype and a choice variant**, both bare names in a list with nowhere to hang one
-  (`BACKLOG.md`).
+  same gap for a **use site** — a choice variant, an element/key/value type, a tuple element and a reference
+  target are all a `TypeRef` with no position, and a **supertype** is a bare name in a `List<String>` with
+  nowhere to put one (`BACKLOG.md`).
 - **§5.10's argument-kind rule is answered by two other rules, not by the kind rule.** A held body has no
   slot types — that is what it is for — so it can never say *this slot expected a value*. Neither half needs
   it to: a literal applied where the body uses the parameter as a **type** is refused because `3` is not an
