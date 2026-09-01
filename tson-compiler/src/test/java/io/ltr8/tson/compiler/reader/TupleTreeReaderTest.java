@@ -37,8 +37,8 @@ class TupleTreeReaderTest {
         entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(),
                 List.of(), Optional.empty(), TextType.UNCONSTRAINED));
         entries.put("pair", TypeDefinition.product(body));
-        TsonSchema schema = new TsonSchema("https://example.test/s.tn1",
-                "https://example.test/meta.tn1", List.of(), entries);
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn",
+                "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         return TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }

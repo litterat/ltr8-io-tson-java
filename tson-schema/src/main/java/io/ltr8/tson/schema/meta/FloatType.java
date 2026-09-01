@@ -30,7 +30,7 @@ public record FloatType(
         @Field("allow_subnormal") boolean allowSubnormal,
         @Field("allow_negative_zero") boolean allowNegativeZero) implements Atom {
 
-    /** {@code ieee_format}'s two members §5.6 actually promotes to built-in annotations; meta.tn1 also defines BINARY16/128/256 and the decimal128-family formats, unused until a schema (Part 2) refines float_type with one of them. */
+    /** {@code ieee_format}'s two members §5.6 actually promotes to built-in annotations; meta.tn also defines BINARY16/128/256 and the decimal128-family formats, unused until a schema (Part 2) refines float_type with one of them. */
     public enum Format {
         BINARY32("float32"), BINARY64("float64");
 

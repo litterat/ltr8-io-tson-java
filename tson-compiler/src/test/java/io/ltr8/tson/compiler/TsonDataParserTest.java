@@ -82,8 +82,8 @@ class TsonDataParserTest {
 
     @Test
     void idDirectiveOnly() {
-        Document doc = parse("!!id:\"https://example.com/x.tn1\"\n_");
-        assertEquals("https://example.com/x.tn1", doc.id().orElseThrow());
+        Document doc = parse("!!id:\"https://example.com/x.tn\"\n_");
+        assertEquals("https://example.com/x.tn", doc.id().orElseThrow());
         assertTrue(doc.schema().isEmpty());
         assertInstanceOf(AbsentValue.class, doc.root().coreValue());
     }
@@ -91,20 +91,20 @@ class TsonDataParserTest {
     @Test
     void idAndSchemaDirectives() {
         Document doc = parse("""
-                !!id:"https://example.com/orders/1042.tn1"
-                !!schema:"https://example.com/order.tn1"
+                !!id:"https://example.com/orders/1042.tn"
+                !!schema:"https://example.com/order.tn"
                 Alice
                 """);
-        assertEquals("https://example.com/orders/1042.tn1", doc.id().orElseThrow());
-        assertEquals("https://example.com/order.tn1", doc.schema().orElseThrow());
+        assertEquals("https://example.com/orders/1042.tn", doc.id().orElseThrow());
+        assertEquals("https://example.com/order.tn", doc.schema().orElseThrow());
         assertEquals("Alice", token(doc.root()).text());
     }
 
     @Test
     void schemaDirectiveWithoutId() {
-        Document doc = parse("!!schema:\"https://example.com/order.tn1\" Alice");
+        Document doc = parse("!!schema:\"https://example.com/order.tn\" Alice");
         assertTrue(doc.id().isEmpty());
-        assertEquals("https://example.com/order.tn1", doc.schema().orElseThrow());
+        assertEquals("https://example.com/order.tn", doc.schema().orElseThrow());
     }
 
     @Test
@@ -116,13 +116,13 @@ class TsonDataParserTest {
 
     @Test
     void metaDirectiveIsRejectedAsSchemaDocument() {
-        assertThrows(TsonUnsupportedDocumentException.class, () -> parse("!!meta:\"https://example.com/m.tn1\" { }"));
+        assertThrows(TsonUnsupportedDocumentException.class, () -> parse("!!meta:\"https://example.com/m.tn\" { }"));
     }
 
     @Test
     void idThenMetaIsRejectedAsSchemaDocument() {
         assertThrows(TsonUnsupportedDocumentException.class,
-                () -> parse("!!id:\"https://example.com/x.tn1\"\n!!meta:\"https://example.com/m.tn1\" { }"));
+                () -> parse("!!id:\"https://example.com/x.tn\"\n!!meta:\"https://example.com/m.tn\" { }"));
     }
 
     @Test
@@ -136,7 +136,7 @@ class TsonDataParserTest {
         // across a gap, so this actually fails as "unexpected content", which is still correct:
         // it's not a valid document header either way. Use a directly-malformed but same-shape
         // case: colon not adjacent to the directive name.
-        assertThrows(TsonParseException.class, () -> parse("!!id :\"https://example.com/x.tn1\"\n_"));
+        assertThrows(TsonParseException.class, () -> parse("!!id :\"https://example.com/x.tn\"\n_"));
     }
 
     @Test
@@ -376,8 +376,8 @@ class TsonDataParserTest {
     @Test
     void arrayElementCanHaveOwnSchemaDirective() {
         ArrayValue arr = assertInstanceOf(ArrayValue.class,
-                root("[ !!schema:\"https://example.com/s.tn1\" 1 2 ]").coreValue());
-        assertEquals("https://example.com/s.tn1", arr.elements().get(0).schemaRef().orElseThrow());
+                root("[ !!schema:\"https://example.com/s.tn\" 1 2 ]").coreValue());
+        assertEquals("https://example.com/s.tn", arr.elements().get(0).schemaRef().orElseThrow());
         assertTrue(arr.elements().get(1).schemaRef().isEmpty());
     }
 
@@ -551,33 +551,33 @@ class TsonDataParserTest {
     @Test
     void schemaDirectiveOnFieldValue() {
         RecordValue rec = assertInstanceOf(RecordValue.class, root("""
-                { database: !!schema:"https://example.com/db-config.tn1" !db_config { host: db1 } }
+                { database: !!schema:"https://example.com/db-config.tn" !db_config { host: db1 } }
                 """).coreValue());
         ScopedValue fieldValue = rec.fields().get(0).value();
-        assertEquals("https://example.com/db-config.tn1", fieldValue.schemaRef().orElseThrow());
+        assertEquals("https://example.com/db-config.tn", fieldValue.schemaRef().orElseThrow());
         assertEquals("db_config", fieldValue.value().typeRef().orElseThrow());
     }
 
     @Test
     void schemaDirectiveOnMapEntryValue() {
         MapValue map = assertInstanceOf(MapValue.class,
-                root("{ k => !!schema:\"https://example.com/s.tn1\" 1 }").coreValue());
-        assertEquals("https://example.com/s.tn1", map.entries().get(0).value().schemaRef().orElseThrow());
+                root("{ k => !!schema:\"https://example.com/s.tn\" 1 }").coreValue());
+        assertEquals("https://example.com/s.tn", map.entries().get(0).value().schemaRef().orElseThrow());
     }
 
     @Test
     void otherDirectiveNamesInScopedValuePositionAreParseErrors() {
-        assertThrows(TsonParseException.class, () -> parse("{ x: !!id:\"https://example.com/x.tn1\" 1 }"));
+        assertThrows(TsonParseException.class, () -> parse("{ x: !!id:\"https://example.com/x.tn\" 1 }"));
     }
 
     @Test
     void directivesNotPermittedBeforeMapKey() {
-        assertThrows(TsonParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn1\" k => 1 }"));
+        assertThrows(TsonParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn\" k => 1 }"));
     }
 
     @Test
     void directivesNotPermittedBeforeFieldName() {
-        assertThrows(TsonParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn1\" x: 1 }"));
+        assertThrows(TsonParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn\" x: 1 }"));
     }
 
     // ── Full example document (adapted from spec §2.1) ──────────────────
@@ -585,8 +585,8 @@ class TsonDataParserTest {
     @Test
     void fullOrderDocumentFromSpec() {
         String doc = """
-                !!id:"https://example.com/orders/1042.tn1"
-                !!schema:"https://example.com/order.tn1"
+                !!id:"https://example.com/orders/1042.tn"
+                !!schema:"https://example.com/order.tn"
                 @doc:"Order record exported 2026-07-03"
                 !order {
                   order_id:  1042
@@ -604,7 +604,7 @@ class TsonDataParserTest {
                     { sku: B-205 qty: 1 price: 100.00 discount: _ }
                   ]
                   discounts: { @expires:"2026-12-31" WELCOME10 => "10%" loyalty => _ }
-                  shipping: !!schema:"https://example.com/address.tn1" !address {
+                  shipping: !!schema:"https://example.com/address.tn" !address {
                     street: "12 Byron Rd"
                     city:   London
                   }
@@ -616,8 +616,8 @@ class TsonDataParserTest {
                 """;
         Document parsed = parse(doc);
 
-        assertEquals("https://example.com/orders/1042.tn1", parsed.id().orElseThrow());
-        assertEquals("https://example.com/order.tn1", parsed.schema().orElseThrow());
+        assertEquals("https://example.com/orders/1042.tn", parsed.id().orElseThrow());
+        assertEquals("https://example.com/order.tn", parsed.schema().orElseThrow());
 
         DataValue root = parsed.root();
         assertEquals(1, root.annotations().size());
@@ -655,7 +655,7 @@ class TsonDataParserTest {
         assertEquals("expires", discounts.entries().get(0).key().annotations().get(0).name());
 
         ScopedValue shipping = order.fields().get(8).value();
-        assertEquals("https://example.com/address.tn1", shipping.schemaRef().orElseThrow());
+        assertEquals("https://example.com/address.tn", shipping.schemaRef().orElseThrow());
         assertEquals("address", shipping.value().typeRef().orElseThrow());
         RecordValue shippingRecord = assertInstanceOf(RecordValue.class, shipping.value().coreValue());
         assertEquals("street", shippingRecord.fields().get(0).name());

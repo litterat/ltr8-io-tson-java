@@ -16,7 +16,7 @@ import java.util.Optional;
  * BigDecimal}) -- see {@link Complex}'s Javadoc for why the other {@code complex_component}
  * members aren't modeled yet. No fields to configure as a result (unlike every other atom type
  * here): {@code complex_type} itself has none besides {@code component}, and {@code complex} has no
- * useful total order to bound (meta.tn1: "{@code @ordered:NONE}"), so this is a stateless singleton
+ * useful total order to bound (meta.tn: "{@code @ordered:NONE}"), so this is a stateless singleton
  * with no separate {@code schema.meta.ComplexType} values class to hold -- there's nothing to split
  * out.
  *

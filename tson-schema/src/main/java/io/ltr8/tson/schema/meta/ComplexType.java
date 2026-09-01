@@ -3,7 +3,7 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Typename;
 
 /**
- * meta.tn1's {@code complex_type} constructor ({@code complex_type => ~atom & { component:
+ * meta.tn's {@code complex_type} constructor ({@code complex_type => ~atom & { component:
  * complex_component ~ NUMBER } }): {@code component} narrows the numeric family used for the
  * real/imaginary parts, defaulting to {@code NUMBER} (the exact-decimal tier). Pure constraint
  * value, no parsing/validation behavior -- {@code tson-compiler}'s {@code ComplexParser} does the
@@ -16,7 +16,7 @@ import io.ltr8.annotation.Typename;
  * binds from the resulting bare token by ordinary name matching, the same way {@link
  * FloatType#format} already does.
  *
- * <p>{@link Component} mirrors {@code complex_component}'s own five members (meta.tn1: {@code
+ * <p>{@link Component} mirrors {@code complex_component}'s own five members (meta.tn: {@code
  * complex_component => !enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]}) -- a plain nested enum,
  * not a {@code typeName()}-mapped one like {@link FloatType.Format}/{@link BinaryType.Encoding},
  * since nothing here multiplexes a single Java class across several built-in annotation names the
@@ -29,7 +29,7 @@ public record ComplexType(Component component) implements Atom {
         INTEGER, NUMBER, RATIONAL, FLOAT32, FLOAT64
     }
 
-    /** {@code complex => !complex_type {}} -- the unconstrained complex number, core.tn1's own {@code !complex}. */
+    /** {@code complex => !complex_type {}} -- the unconstrained complex number, core.tn's own {@code !complex}. */
     public static final ComplexType UNCONSTRAINED = new ComplexType(Component.NUMBER);
 
     /**

@@ -5,7 +5,7 @@ import io.ltr8.annotation.Typename;
 import java.util.List;
 
 /**
- * meta.tn1's {@code ipv4_type} constructor (IPv4 address constraint vocabulary, RFC 3986's {@code
+ * meta.tn's {@code ipv4_type} constructor (IPv4 address constraint vocabulary, RFC 3986's {@code
  * IPv4address} production): CIDR-text network allow/deny lists. Pure constraint values, no
  * parsing/validation behavior -- {@code tson-compiler}'s {@code Ipv4Parser} does the actual
  * reading/writing, though it does not model {@code within}/{@code excluding} (see its own Javadoc).
@@ -23,7 +23,7 @@ public record Ipv4Type(String spec, List<String> within, List<String> excluding)
         excluding = excluding != null ? List.copyOf(excluding) : List.of();
     }
 
-    /** {@code ipv4 => !ipv4_type {}} -- the unconstrained IPv4 address, core.tn1's own {@code !ipv4}. */
+    /** {@code ipv4 => !ipv4_type {}} -- the unconstrained IPv4 address, core.tn's own {@code !ipv4}. */
     public static final Ipv4Type UNCONSTRAINED =
             new Ipv4Type("https://www.rfc-editor.org/rfc/rfc3986", List.of(), List.of());
 }

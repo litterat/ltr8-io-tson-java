@@ -133,7 +133,7 @@ class Ipv6ParserTest {
 
     @Test
     void rejectsZoneIdentifier() {
-        // core.tn1: zone identifiers are host-local and excluded from the contract.
+        // core.tn: zone identifiers are host-local and excluded from the contract.
         assertThrows(AtomParseException.class, () -> Ipv6Parser.UNCONSTRAINED.read(token("fe80::1%eth0")));
     }
 

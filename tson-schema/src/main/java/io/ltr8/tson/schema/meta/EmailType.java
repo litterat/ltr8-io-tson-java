@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * meta.tn1's {@code email_type} constructor (RFC 5322), composing {@code text_type}'s {@code
+ * meta.tn's {@code email_type} constructor (RFC 5322), composing {@code text_type}'s {@code
  * min_length}/{@code max_length}/{@code length}/{@code pattern}. Pure constraint values, no
  * parsing/validation behavior -- {@code tson-compiler}'s {@code EmailParser} holds one of these and does
  * the actual reading/writing.
@@ -22,7 +22,7 @@ public record EmailType(String spec, @Field("min_length") Optional<Integer> minL
                          @Field("max_length") Optional<Integer> maxLength,
                          Optional<Integer> length, Optional<String> pattern) implements Atom {
 
-    /** {@code email => !email_type {}} -- the unconstrained email address, core.tn1's own {@code !email}. */
+    /** {@code email => !email_type {}} -- the unconstrained email address, core.tn's own {@code !email}. */
     public static final EmailType UNCONSTRAINED = new EmailType(
             "https://www.rfc-editor.org/rfc/rfc5322", Optional.empty(), Optional.empty(),
             Optional.empty(), Optional.empty());

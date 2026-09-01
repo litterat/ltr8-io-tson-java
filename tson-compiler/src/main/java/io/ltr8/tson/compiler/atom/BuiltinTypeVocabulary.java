@@ -9,7 +9,7 @@ import java.util.Optional;
 
 /**
  * The built-in type vocabulary's name -&gt; {@link AtomType} table (§5) -- a hardcoded
- * transliteration of the relevant {@code core.tn1} instances, since the vocabulary is a fixed,
+ * transliteration of the relevant {@code core.tn} instances, since the vocabulary is a fixed,
  * closed set (§5.1) that a Class 1 processor never resolves via schema machinery.
  *
  * <p>Seeded with the {@code integer_type} family: §5.6 lists the full ladder, and {@code
@@ -18,7 +18,7 @@ import java.util.Optional;
  * non_negative_integer} / {@code negative_integer} / {@code non_positive_integer} bound-only
  * refinements, and omitting the other eight widths and the refinement family from §5.6's table was
  * confirmed as an oversight, not deliberate scoping -- this implementation exposes the full family
- * {@code core.tn1} defines, not just the four the current table happens to list.
+ * {@code core.tn} defines, not just the four the current table happens to list.
  *
  * <p>Also seeded with {@code decimal_type} ({@code number}), {@code float_type} ({@code float32}/
  * {@code float64}), {@code rational_type} ({@code rational}), and {@code complex_type} ({@code

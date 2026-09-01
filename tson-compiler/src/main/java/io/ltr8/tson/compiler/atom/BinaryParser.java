@@ -8,7 +8,7 @@ import java.util.HexFormat;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta.tn1's {@code binary} constructor (§5.3's four binary atoms,
+ * Parses and validates against meta.tn's {@code binary} constructor (§5.3's four binary atoms,
  * RFC 4648) -- one class, not one per encoding (an earlier version of this file *did* split it
  * into four sibling classes, one per encoding, since each encoding's decode algorithm is genuinely
  * different -- but that's the same shape of branching {@link IntegerParser} already does on {@code

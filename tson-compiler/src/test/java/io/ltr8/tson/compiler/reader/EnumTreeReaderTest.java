@@ -48,9 +48,9 @@ class EnumTreeReaderTest {
         // !!meta must be the real meta-kernel identity, not a placeholder -- this schema's own
         // locals are meta-kernel's real constructor vocabulary verbatim, plus one extra entry, so
         // TsonSchemaLinker's own "only a meta-kernel-governed schema may declare constructors" check
-        // requires it (the placeholder "meta.tn1" this used to point at was never registered in
+        // requires it (the placeholder "meta.tn" this used to point at was never registered in
         // schemaRegistry below, so it was already functionally inert either way).
-        TsonSchema schema = new TsonSchema("https://example.test/flag.tn1",
+        TsonSchema schema = new TsonSchema("https://example.test/flag.tn",
                 TsonBundledSchemas.META_KERNEL_ID, List.of(), entries);
 
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();

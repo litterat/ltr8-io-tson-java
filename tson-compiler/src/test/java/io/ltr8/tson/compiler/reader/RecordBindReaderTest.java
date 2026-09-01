@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Proves object-binding mode ({@link ValueReaderFactoryRegistry#bind}) genuinely produces real,
  * bound {@code schema.meta} Java objects -- not {@code Map<String, Object>} -- reading against the
- * real, registered {@code meta-kernel.tn1} schema, mirroring {@link MetaKernelEndToEndTest}'s own
+ * real, registered {@code meta-kernel.tn} schema, mirroring {@link MetaKernelEndToEndTest}'s own
  * DOM-mode bootstrap pattern. {@link SchemaMetaNameBinder} (a {@code Class.forName}-based lookup,
  * not a scan of any sealed hierarchy) resolves every real {@code record}-shaped entry in the
  * schema, including nested helper records like {@code integer_size} -- so {@code integer_type}
@@ -110,7 +110,7 @@ class RecordBindReaderTest {
                 new RecordField("max_length", TypeRef.of("integer"), optional, Optional.empty()),
                 new RecordField("length", TypeRef.of("integer"), optional, Optional.empty()),
                 new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty())))));
-        TsonSchema schema = new TsonSchema("https://example.test/s.tn1", "https://example.test/meta.tn1", List.of(), entries);
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.bind(context));
@@ -145,8 +145,8 @@ class RecordBindReaderTest {
                 new RecordField("length", TypeRef.of("integer"), optional, Optional.empty()),
                 new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty())))));
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(
-                new TsonLinkedSchema(new TsonSchema("https://example.test/s.tn1",
-                        "https://example.test/meta.tn1", List.of(), entries)),
+                new TsonLinkedSchema(new TsonSchema("https://example.test/s.tn",
+                        "https://example.test/meta.tn", List.of(), entries)),
                 ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()));
 
         // stating the fixed value is fine, and the bound field still gets the narrowed Integer
@@ -231,7 +231,7 @@ class RecordBindReaderTest {
                         new RecordField("length", TypeRef.of("integer"), optional, Optional.empty()),
                         new RecordField("pattern", TypeRef.of("text"), optional, Optional.empty()),
                         new RecordField("spec", TypeRef.of("text"), optional, Optional.empty())))));
-        TsonSchema schema = new TsonSchema("https://example.test/s.tn1", "https://example.test/meta.tn1", List.of(), entries);
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(linkedSchema, ValueReaderFactoryRegistry.bind(context));

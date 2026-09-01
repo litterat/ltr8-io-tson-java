@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 
 /**
  * meta-kernel's {@code complex} host value -- a real/imaginary pair. {@code complex_type.component}
- * (meta.tn1) selects the type of both parts from a closed vocabulary (default {@code NUMBER}, i.e.
+ * (meta.tn) selects the type of both parts from a closed vocabulary (default {@code NUMBER}, i.e.
  * exact {@link BigDecimal}; {@code INTEGER}/{@code RATIONAL}/{@code FLOAT32}/{@code FLOAT64} are the
  * other members) -- this class only implements the default ({@code NUMBER}) case, since {@code
  * complex}'s built-in instance (§5.6's {@code !complex}) is always the unconstrained {@code
@@ -15,7 +15,7 @@ import java.math.BigDecimal;
  * to hold -- {@code schema.meta.ComplexType} holds no value of this type at all, and {@code ComplexParser}
  * takes no configuration from it.
  *
- * <p>Unlike {@code Rational}, there's no meta.tn1 doc calling for value-based equality here, so this
+ * <p>Unlike {@code Rational}, there's no meta.tn doc calling for value-based equality here, so this
  * uses the record default (field-based, {@code BigDecimal.equals}, which is itself scale-sensitive)
  * -- each component is its own independently-exact {@code NUMBER}-typed value, preserved as written
  * the same way a bare {@code !number} is, not normalized across instances.

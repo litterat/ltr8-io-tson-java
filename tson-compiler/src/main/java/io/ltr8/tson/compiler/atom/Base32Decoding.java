@@ -8,7 +8,7 @@ package io.ltr8.tson.compiler.atom;
  * out of) an 8-bit-aligned byte stream.
  *
  * <p>Case-sensitive (uppercase only) -- unlike hex, RFC 4648 doesn't establish case-insensitivity as
- * a universal decode convention for base32's alphabet, and meta.tn1 says only that "encoding
+ * a universal decode convention for base32's alphabet, and meta.tn says only that "encoding
  * alphabets are pinned to RFC 4648" with no mention of case flexibility; a lowercase input is
  * rejected rather than silently accepted.
  *

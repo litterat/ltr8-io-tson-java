@@ -17,8 +17,8 @@ class CompileCommandTest {
 
     @Test
     void aCleanSchemaCompilesAndExitsZero(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", """
-                !!id:"https://example.test/cli-compile-ok.tn1"
+        Path schema = writeFile(dir, "schema.tn", """
+                !!id:"https://example.test/cli-compile-ok.tn"
                 !!meta:"https://tson.io/2026/34/m/meta.tn"
                 !!import:"https://tson.io/2026/34/m/core.tn"
                 {
@@ -35,8 +35,8 @@ class CompileCommandTest {
 
     @Test
     void aSchemaWithAnUnresolvableReferenceExitsOne(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "broken.tn1", """
-                !!id:"https://example.test/cli-compile-broken.tn1"
+        Path schema = writeFile(dir, "broken.tn", """
+                !!id:"https://example.test/cli-compile-broken.tn"
                 !!meta:"https://tson.io/2026/34/m/meta.tn"
                 {
                   my_int => this_type_does_not_exist
@@ -57,8 +57,8 @@ class CompileCommandTest {
      */
     @Test
     void aSchemaWhoseImportCannotBeObtainedExitsSixtyNine(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "needs-import.tn1", """
-                !!id:"https://example.test/cli-compile-import.tn1"
+        Path schema = writeFile(dir, "needs-import.tn", """
+                !!id:"https://example.test/cli-compile-import.tn"
                 !!meta:"https://tson.io/2026/34/m/meta.tn"
                 !!import:"https://example.test/nobody-serves-this.tn"
                 {
@@ -81,8 +81,8 @@ class CompileCommandTest {
      */
     @Test
     void aRefinementUsingJsonSchemaFacetNamesExitsOneAndNamesTheRealVocabulary(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "json-shaped.tn1", """
-                !!id:"https://example.test/cli-compile-json-shaped.tn1"
+        Path schema = writeFile(dir, "json-shaped.tn", """
+                !!id:"https://example.test/cli-compile-json-shaped.tn"
                 !!meta:"https://tson.io/2026/34/m/meta.tn"
                 !!import:"https://tson.io/2026/34/m/core.tn"
                 {

@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TsonTest {
 
     private static final String TINY_DOCUMENT = """
-            !!id:"https://example.test/tson-test.tn1"
+            !!id:"https://example.test/tson-test.tn"
             !!meta:"https://tson.io/2026/34/m/meta.tn"
             !!import:"https://tson.io/2026/34/m/core.tn"
             {

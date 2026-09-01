@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
  * Parses and validates against meta-kernel's {@code uuid_type} constructor (§5.5's {@code uuid}
  * atom, RFC 9562). A pure format check (§5.2: "the remaining atoms are pure format checks") unless
  * {@code version} is set, which no built-in instance does -- {@code uuid => !uuid_type {}} in
- * core.tn1 is fully unconstrained. Holds a {@link UuidType} -- the pure constraint values,
+ * core.tn is fully unconstrained. Holds a {@link UuidType} -- the pure constraint values,
  * unchanged by this split -- rather than declaring those fields itself.
  *
  * <p>{@link #read} validates the token's shape itself (RFC 9562's canonical 8-4-4-4-12 hex-and-

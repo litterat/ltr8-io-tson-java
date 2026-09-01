@@ -68,19 +68,19 @@ class TsonSchemaParserTest {
     @Test
     void parsesIdMetaAndImports() {
         SchemaDocument doc = parse("""
-                !!id:"https://example.com/x.tn1"
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
-                !!import:"https://tson.io/2026/34/m/core.tn1"
+                !!id:"https://example.com/x.tn"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
+                !!import:"https://tson.io/2026/34/m/core.tn"
                 { a => text }""");
-        assertEquals("https://example.com/x.tn1", doc.id().orElseThrow());
-        assertEquals("https://tson.io/2026/34/m/meta.tn1", doc.meta());
-        assertEquals(List.of("https://tson.io/2026/34/m/core.tn1"), doc.imports());
+        assertEquals("https://example.com/x.tn", doc.id().orElseThrow());
+        assertEquals("https://tson.io/2026/34/m/meta.tn", doc.meta());
+        assertEquals(List.of("https://tson.io/2026/34/m/core.tn"), doc.imports());
     }
 
     @Test
     void idIsOptional() {
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { a => text }""");
         assertTrue(doc.id().isEmpty());
     }
@@ -88,11 +88,11 @@ class TsonSchemaParserTest {
     @Test
     void multipleImportsPreserveOrder() {
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
-                !!import:"https://example.com/one.tn1"
-                !!import:"https://example.com/two.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
+                !!import:"https://example.com/one.tn"
+                !!import:"https://example.com/two.tn"
                 { a => text }""");
-        assertEquals(List.of("https://example.com/one.tn1", "https://example.com/two.tn1"), doc.imports());
+        assertEquals(List.of("https://example.com/one.tn", "https://example.com/two.tn"), doc.imports());
     }
 
     @Test
@@ -104,8 +104,8 @@ class TsonSchemaParserTest {
     void schemaDirectiveInHeaderIsAParseError() {
         // !!schema belongs to data documents, not schema documents (§2.2).
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
-                !!schema:"https://example.com/x.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
+                !!schema:"https://example.com/x.tn"
                 { a => text }"""));
     }
 
@@ -114,14 +114,14 @@ class TsonSchemaParserTest {
     @Test
     void emptySchemaMapIsAParseError() {
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 {}"""));
     }
 
     @Test
     void schemaLevelAnnotationBindsToTheMap() {
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 @doc:"a schema"
                 { a => text }""");
         assertEquals(1, doc.body().annotations().size());
@@ -131,7 +131,7 @@ class TsonSchemaParserTest {
     @Test
     void declarationNameAndTypeDefAnnotationsBindSeparately() {
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { @since:2025 a => @doc:"a field" text }""");
         SchemaMap.Declaration decl = doc.body().declarations().get("a");
         assertEquals("since", decl.nameAnnotations().get(0).name());
@@ -143,7 +143,7 @@ class TsonSchemaParserTest {
         // Genuine duplicate-name detection is deferred to schema resolution's Pass 1 (§3.4.1),
         // the same "grammar layer doesn't dedupe" treatment as ordinary data maps/records.
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { a => text  b => integer  a => uuid }""");
         assertEquals(List.of("a", "b"), List.copyOf(doc.body().declarations().keySet()));
         assertEquals(new SimpleRef("uuid"),
@@ -492,7 +492,7 @@ class TsonSchemaParserTest {
     @Test
     void groupWithOneMemberIsAParseError() {
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { a => { ( x: text ) } }"""));
     }
 
@@ -510,14 +510,14 @@ class TsonSchemaParserTest {
     @Test
     void choiceWithOneVariantIsAParseError() {
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { a => (text) }"""));
     }
 
     @Test
     void bareTypeRefFollowedByBraceIsAParseError() {
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { a => text { x: text } }"""));
     }
 
@@ -564,7 +564,7 @@ class TsonSchemaParserTest {
     @Test
     void trailingCommaInTupleIsAParseError() {
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { a => [text, integer,] }"""));
     }
 
@@ -676,7 +676,7 @@ class TsonSchemaParserTest {
     @Test
     void numericDeclarationNameIsAParseError() {
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { 42 => text }"""));
     }
 
@@ -691,7 +691,7 @@ class TsonSchemaParserTest {
     @ParameterizedTest
     void aDeclarationNameOutsideTheIdentifierProfileIsAParseError(String name) {
         TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { %s => text }""".formatted(name)));
         assertTrue(thrown.getMessage().contains("cannot start an identifier"), thrown.getMessage());
     }
@@ -704,7 +704,7 @@ class TsonSchemaParserTest {
     @Test
     void aDeclarationNameContainingADotIsAParseError() {
         TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { x.y => text }"""));
         assertTrue(thrown.getMessage().contains("cannot appear in an identifier"), thrown.getMessage());
     }
@@ -718,7 +718,7 @@ class TsonSchemaParserTest {
     @Test
     void aLeadingUnderscoreDeclarationNameIsAParseError() {
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { _id => text }"""));
     }
 
@@ -726,7 +726,7 @@ class TsonSchemaParserTest {
     @Test
     void aTypeParameterOutsideTheIdentifierProfileIsAParseError() {
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { box => <9t> { v: 9t } }"""));
     }
 
@@ -734,7 +734,7 @@ class TsonSchemaParserTest {
     @Test
     void aConstructorHeadOutsideTheIdentifierProfileIsAParseError() {
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { t => !9integer { min: 1 } }"""));
     }
 
@@ -746,7 +746,7 @@ class TsonSchemaParserTest {
     @ParameterizedTest
     void anIdentifierDeclarationNameParses(String name) {
         assertTrue(parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { %s => text }""".formatted(name)).body().declarations().containsKey(name));
     }
 
@@ -755,9 +755,9 @@ class TsonSchemaParserTest {
     @Test
     void section1Point6WorkedExample() {
         SchemaDocument doc = parse("""
-                !!id:"https://example.com/task.tn1"
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
-                !!import:"https://tson.io/2026/34/m/core.tn1"
+                !!id:"https://example.com/task.tn"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
+                !!import:"https://tson.io/2026/34/m/core.tn"
                 @doc:"Task-tracking example schema."
                 {
                   priority => !integer ^ { min: 1  max: 5 }
@@ -819,7 +819,7 @@ class TsonSchemaParserTest {
 
     private static SchemaMap.Declaration declOf(String declaration) {
         SchemaDocument doc = parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { %s }""".formatted(declaration));
         return doc.body().declarations().values().iterator().next();
     }
@@ -868,7 +868,7 @@ class TsonSchemaParserTest {
     void everyBrokenDeclarationIsReportedInOnePass() {
         List<Diagnostic> problems = parseCollecting("""
                 !!id:"https://example.com/x.tn"
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 {
                   first => { x: }
                   second => { y: text }
@@ -884,7 +884,7 @@ class TsonSchemaParserTest {
     void aParseThatReportedAnythingHandsBackNoDocumentEvenThoughSomeDeclarationsParsed() {
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 {
                   broken => { x: }
                   sound => { y: text }
@@ -898,7 +898,7 @@ class TsonSchemaParserTest {
     void aCleanParseThroughTheRecoveringEntryPointHandsBackTheDocument() {
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { sound => { y: text } }
                 """);
         SchemaDocument doc = parser.parseSchemaDocument(problems).orElseThrow();
@@ -910,7 +910,7 @@ class TsonSchemaParserTest {
     void everyDeclarationFailingLeavesNoSchemaMapToBuildRatherThanAnEmptyOne() {
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         TsonSchemaParser parser = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 {
                   first => { x: }
                   second => { y: }
@@ -923,7 +923,7 @@ class TsonSchemaParserTest {
     @Test
     void recoveryResynchronisesPastNestedBracketsRatherThanStoppingAtTheirClosers() {
         List<Diagnostic> problems = parseCollecting("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 {
                   broken => { a: [ text, (b | c) ] x: }
                   next => { y: }
@@ -936,7 +936,7 @@ class TsonSchemaParserTest {
     @Test
     void aDeclarationFailingBeforeItsOwnNameIsPointedAtTheDocumentRoot() {
         List<Diagnostic> problems = parseCollecting("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 {
                   "quoted" => text
                   next => text
@@ -949,7 +949,7 @@ class TsonSchemaParserTest {
     void aSchemaSyntaxDiagnosticLocatesItselfAtTheSchemaEndAndNotTheDataEnd() {
         Diagnostic d = parseCollecting("""
                 !!id:"https://example.com/x.tn"
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 {
                   broken => { x: }
                   next => text
@@ -967,7 +967,7 @@ class TsonSchemaParserTest {
     @Test
     void aMissingReceiverIsStillFailFast() {
         assertThrows(TsonParseException.class, () -> parse("""
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 {
                   broken => { x: }
                   next => text
@@ -987,7 +987,7 @@ class TsonSchemaParserTest {
     @Test
     void declarationPositionsRecordsEachDeclarationsOwnNameTokenPosition() {
         String source = """
-                !!meta:"https://tson.io/2026/34/m/meta.tn1"
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
                 {
                   first => {}
 

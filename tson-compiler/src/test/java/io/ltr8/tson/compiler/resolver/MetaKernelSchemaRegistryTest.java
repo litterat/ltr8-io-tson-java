@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Proves {@code TsonSchemaRegistry}/{@code TsonSchemaLinker} (both in {@code tson-schema}) actually work
- * end-to-end against the real {@code meta-kernel.tn1} fixture -- this test lives here, not in
+ * end-to-end against the real {@code meta-kernel.tn} fixture -- this test lives here, not in
  * {@code tson-schema}'s own test tree, because it's the only module with both {@link
  * MetaKernelBootstrapResolver} and {@code tson-schema} available (that module has no dependency on {@code
  * tson-compiler} at all).

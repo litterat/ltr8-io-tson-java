@@ -5,7 +5,7 @@ import io.ltr8.annotation.Typename;
 import java.util.List;
 
 /**
- * meta.tn1's {@code ipv6_type} constructor (IPv6 address constraint vocabulary, RFC 4291) --
+ * meta.tn's {@code ipv6_type} constructor (IPv6 address constraint vocabulary, RFC 4291) --
  * {@link Ipv4Type}'s exact IPv6 counterpart, same shape, different RFC citation. Pure constraint
  * values, no parsing/validation behavior -- {@code tson-compiler}'s {@code Ipv6Parser} does the actual
  * reading/writing, {@code within}/{@code excluding} unmodeled as in {@link Ipv4Type}. See {@link
@@ -21,7 +21,7 @@ public record Ipv6Type(String spec, List<String> within, List<String> excluding)
         excluding = excluding != null ? List.copyOf(excluding) : List.of();
     }
 
-    /** {@code ipv6 => !ipv6_type {}} -- the unconstrained IPv6 address, core.tn1's own {@code !ipv6}. */
+    /** {@code ipv6 => !ipv6_type {}} -- the unconstrained IPv6 address, core.tn's own {@code !ipv6}. */
     public static final Ipv6Type UNCONSTRAINED =
             new Ipv6Type("https://www.rfc-editor.org/rfc/rfc4291", List.of(), List.of());
 }

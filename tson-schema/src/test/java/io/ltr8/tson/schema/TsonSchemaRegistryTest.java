@@ -28,8 +28,8 @@ class TsonSchemaRegistryTest {
         entries.put("set_token", TypeDefinition.product(RecordBody.of(List.of())));
         entries.put("container", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("members", TypeRef.of("set_token"))))));
-        return new TsonSchema("https://example.test/registry-test.tn1",
-                "https://example.test/meta.tn1", List.of(), entries);
+        return new TsonSchema("https://example.test/registry-test.tn",
+                "https://example.test/meta.tn", List.of(), entries);
     }
 
     /**
@@ -50,7 +50,7 @@ class TsonSchemaRegistryTest {
         // register only stores what it was handed, entries untouched.
         assertEquals(3, registered.schema().entries().size());
 
-        Optional<TsonLinkedSchema> found = registry.get("https://example.test/registry-test.tn1");
+        Optional<TsonLinkedSchema> found = registry.get("https://example.test/registry-test.tn");
         assertTrue(found.isPresent());
         assertEquals(registered.schema().entries().keySet(), found.get().schema().entries().keySet());
     }
@@ -60,7 +60,7 @@ class TsonSchemaRegistryTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         registry.register(linkedSchema());
 
-        assertTrue(registry.get("http://example.test/registry-test.tn1").isPresent());
+        assertTrue(registry.get("http://example.test/registry-test.tn").isPresent());
     }
 
     /**
@@ -83,13 +83,13 @@ class TsonSchemaRegistryTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         TsonLinkedSchema stored = registry.registerIfAbsent(linkedSchema());
 
-        assertSame(stored, registry.get("https://example.test/registry-test.tn1").orElseThrow());
+        assertSame(stored, registry.get("https://example.test/registry-test.tn").orElseThrow());
     }
 
     @Test
     void getReturnsEmptyForAnUnregisteredIdentity() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
-        assertFalse(registry.get("https://example.test/never-registered.tn1").isPresent());
+        assertFalse(registry.get("https://example.test/never-registered.tn").isPresent());
     }
 
     /**
@@ -101,7 +101,7 @@ class TsonSchemaRegistryTest {
     @Test
     void constructingASchemaWithNoIdIsRejected() {
         assertThrows(NullPointerException.class,
-                () -> new TsonSchema(null, "https://example.test/meta.tn1", List.of(), Map.of()));
+                () -> new TsonSchema(null, "https://example.test/meta.tn", List.of(), Map.of()));
     }
 
     @Test
@@ -119,7 +119,7 @@ class TsonSchemaRegistryTest {
         registry.register(linkedSchema());
 
         TsonSchema sameIdentityDifferentScheme = new TsonSchema(
-                "http://example.test/registry-test.tn1", "https://example.test/meta.tn1",
+                "http://example.test/registry-test.tn", "https://example.test/meta.tn",
                 List.of(), Map.of());
         TsonLinkedSchema linked = new TsonLinkedSchema(sameIdentityDifferentScheme);
 

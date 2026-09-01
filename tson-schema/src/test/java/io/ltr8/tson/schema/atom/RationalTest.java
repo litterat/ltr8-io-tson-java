@@ -26,7 +26,7 @@ class RationalTest {
         assertEquals(BigInteger.ZERO, of(0, 3).numerator());
     }
 
-    // ── Value equality, not field equality (meta.tn1: "2/4 equals 1/2") ─────────────────────
+    // ── Value equality, not field equality (meta.tn: "2/4 equals 1/2") ─────────────────────
 
     @Test
     void equalValuesWithDifferentWrittenFormsAreEqual() {

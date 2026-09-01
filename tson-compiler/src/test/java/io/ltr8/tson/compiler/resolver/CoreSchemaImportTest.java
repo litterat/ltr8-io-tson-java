@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * three bundled schema documents.
  *
  * <p>Every real {@code core.tn} declaration resolves in a single source-order pass, the same way
- * meta.tn1's own 31 do -- core.tn1's own declaration order already places each dependency before its
+ * meta.tn's own 31 do -- core.tn's own declaration order already places each dependency before its
  * use, so no {@code MetaKernelBootstrapResolver}-style two-pass ordering is needed here either.
  */
 class CoreSchemaImportTest {
@@ -38,7 +38,7 @@ class CoreSchemaImportTest {
      * The registered {@link TsonSchemaRegistry} plus the exact {@link TsonCompiledMetaRegistry}
      * that loaded everything into it -- a second call reusing this same loader hits {@code
      * TsonCompiledMetaRegistry}'s own cache (see {@link TsonCompiledMetaRegistry#load}'s own case
-     * 1) rather than attempting to register {@code core.tn1} a second time, which {@link
+     * 1) rather than attempting to register {@code core.tn} a second time, which {@link
      * TsonSchemaRegistry#register} would correctly reject as a duplicate identity.
      */
     private record Loaded(TsonSchemaRegistry schemaRegistry, TsonCompiledMetaRegistry registry) {
@@ -49,7 +49,7 @@ class CoreSchemaImportTest {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(schemaRegistry, SchemaMetaNameBinder.defaultContext(), TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
-        // meta.tn1's own !!import needs meta-kernel present in the *shared* registry first --
+        // meta.tn's own !!import needs meta-kernel present in the *shared* registry first --
         // meta-kernel's own bootstrap case (loader.load(META_KERNEL_ID)) is never cached in registry
         // itself (see TsonCompiledMetaRegistry's own Javadoc), so it's registered separately,
         // resolved ordinarily against this same loader (whose own bootstrap branch supplies the
@@ -70,16 +70,16 @@ class CoreSchemaImportTest {
         TsonSchemaRegistry schemaRegistry = loadMetaKernelMetaAndCore().schemaRegistry();
 
         Optional<TsonLinkedSchema> registered = schemaRegistry.get(TsonBundledSchemas.CORE_ID);
-        assertTrue(registered.isPresent(), "expected core.tn1 to be registered");
+        assertTrue(registered.isPresent(), "expected core.tn to be registered");
 
         TsonSchema core = registered.get().schema();
-        assertEquals(48, core.entries().size(), "expected every core.tn1 declaration to resolve");
+        assertEquals(48, core.entries().size(), "expected every core.tn declaration to resolve");
 
-        // A representative spread of core.tn1's own real declarations -- atom refinements
+        // A representative spread of core.tn's own real declarations -- atom refinements
         // (int32/positive_integer) and constructor applications (hex, float32, cidr4, ipv4, complex,
-        // unknown) -- all genuinely present in the validated, registered namespace. core.tn1 declares
-        // no !!import of its own (only !!meta:"...meta.tn1"), so unlike MetaSchemaImportTest's own
-        // assertions, meta.tn1's/meta-kernel's own vocabulary (e.g. "atom", "binary") is never merged
+        // unknown) -- all genuinely present in the validated, registered namespace. core.tn declares
+        // no !!import of its own (only !!meta:"...meta.tn"), so unlike MetaSchemaImportTest's own
+        // assertions, meta.tn's/meta-kernel's own vocabulary (e.g. "atom", "binary") is never merged
         // into this schema's own entries() -- it's only reachable one hop via !!meta, and only for a
         // "source" reference (§3.3.1's structure-namespace rule), which is exactly what lets int32's
         // own `source: integer_type` validate despite integer_type living in meta-kernel, two hops up.
@@ -100,7 +100,7 @@ class CoreSchemaImportTest {
 
     /**
      * {@link TsonCompiledMetaRegistry#register} (reached via {@code loader.load}, inside {@link
-     * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn1's own 48 entries as a side
+     * #loadMetaKernelMetaAndCore}) already compiled every one of core.tn's own 48 entries as a side
      * effect of registering it -- but {@link TsonSchemaCompiler}'s own per-entry build-failure
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to
      * an {@code ErrorReader} instead (see that class's own Javadoc), only throwing once someone

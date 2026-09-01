@@ -12,7 +12,7 @@ import java.util.Optional;
  * separate raw digit strings for a caller to convert to an exact {@link java.math.BigInteger} pair.
  * {@code denominator}'s grammar ({@code nonzero-digit *( ["_"] DIGIT )}) never permits a leading
  * zero, unlike the numerator's {@code decimal-natural} (which allows the single digit {@code "0"}) --
- * denominators are always positive by construction, matching core.tn1's own description ("positive
+ * denominators are always positive by construction, matching core.tn's own description ("positive
  * nonzero denominator by grammar").
  */
 public record RationalForm(Optional<NumberForm.Sign> sign, String numerator, String denominator) {

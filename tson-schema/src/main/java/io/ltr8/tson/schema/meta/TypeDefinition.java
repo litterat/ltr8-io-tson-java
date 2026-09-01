@@ -24,7 +24,7 @@ import java.util.Optional;
  * these; plain generic binding has no such concept beyond {@code Optional.empty()}/{@code null}.
  * See {@code TsonSchema}'s and {@code DefinitionResolverTest}'s own notes for what this means in
  * practice: written output is structurally faithful but more verbose than the non-normative
- * {@code meta-kernel-resolved.tn1} fixture's own hand-authored, terser conventions.
+ * {@code meta-kernel-resolved.tn} fixture's own hand-authored, terser conventions.
  *
  * <p>{@code position} is {@code @Unbound}: §8.1's {@code type_definition} declares no such field, so no
  * schema fills it and the strict binding check would otherwise call it a mismatch. It is this

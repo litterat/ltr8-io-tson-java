@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * meta.tn1's {@code cidr4_type} constructor (IPv4-network constraint vocabulary, RFC 4632):
+ * meta.tn's {@code cidr4_type} constructor (IPv4-network constraint vocabulary, RFC 4632):
  * prefix-length bounds plus CIDR-text network lists. Pure constraint values, no parsing/validation
  * behavior -- {@code tson-compiler}'s {@code Cidr4Parser} holds one of these and does the actual
  * reading/writing, applying {@code min_prefix}/{@code max_prefix} but not {@code within}/{@code
@@ -45,7 +45,7 @@ public record Cidr4Type(String spec, @Field("min_prefix") Optional<Integer> minP
         excluding = excluding != null ? List.copyOf(excluding) : List.of();
     }
 
-    /** {@code cidr4 => !cidr4_type {}} -- the unconstrained IPv4 network, core.tn1's own {@code !cidr4}. */
+    /** {@code cidr4 => !cidr4_type {}} -- the unconstrained IPv4 network, core.tn's own {@code !cidr4}. */
     public static final Cidr4Type UNCONSTRAINED = new Cidr4Type(
             "https://www.rfc-editor.org/rfc/rfc4632", Optional.empty(), Optional.empty(), List.of(), List.of());
 

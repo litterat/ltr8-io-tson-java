@@ -96,43 +96,43 @@ class TsonDataStreamTest {
 
     @Test
     void idDirectiveOnly() {
-        List<TsonEvent> es = events("!!id:\"https://example.com/x.tn1\"\n_");
+        List<TsonEvent> es = events("!!id:\"https://example.com/x.tn\"\n_");
         DocumentStart start = (DocumentStart) es.get(0);
-        assertEquals("https://example.com/x.tn1", start.id().orElseThrow());
+        assertEquals("https://example.com/x.tn", start.id().orElseThrow());
         assertTrue(start.schema().isEmpty());
     }
 
     @Test
     void idAndSchemaDirectives() {
         List<TsonEvent> es = events("""
-                !!id:"https://example.com/orders/1042.tn1"
-                !!schema:"https://example.com/order.tn1"
+                !!id:"https://example.com/orders/1042.tn"
+                !!schema:"https://example.com/order.tn"
                 Alice
                 """);
         DocumentStart start = (DocumentStart) es.get(0);
-        assertEquals("https://example.com/orders/1042.tn1", start.id().orElseThrow());
-        assertEquals("https://example.com/order.tn1", start.schema().orElseThrow());
+        assertEquals("https://example.com/orders/1042.tn", start.id().orElseThrow());
+        assertEquals("https://example.com/order.tn", start.schema().orElseThrow());
         assertEquals("Token(Alice,UNQUOTED)", describe(es.get(1)));
     }
 
     @Test
     void schemaDirectiveWithoutId() {
-        List<TsonEvent> es = events("!!schema:\"https://example.com/order.tn1\" Alice");
+        List<TsonEvent> es = events("!!schema:\"https://example.com/order.tn\" Alice");
         DocumentStart start = (DocumentStart) es.get(0);
         assertTrue(start.id().isEmpty());
-        assertEquals("https://example.com/order.tn1", start.schema().orElseThrow());
+        assertEquals("https://example.com/order.tn", start.schema().orElseThrow());
     }
 
     @Test
     void metaDirectiveIsRejectedAsSchemaDocument() {
-        TsonDataStream stream = new TsonDataStream("!!meta:\"https://example.com/m.tn1\" { }");
+        TsonDataStream stream = new TsonDataStream("!!meta:\"https://example.com/m.tn\" { }");
         assertThrows(TsonUnsupportedDocumentException.class, stream::hasNext);
     }
 
     @Test
     void idThenMetaIsRejectedAsSchemaDocument() {
         TsonDataStream stream = new TsonDataStream(
-                "!!id:\"https://example.com/x.tn1\"\n!!meta:\"https://example.com/m.tn1\" { }");
+                "!!id:\"https://example.com/x.tn\"\n!!meta:\"https://example.com/m.tn\" { }");
         assertThrows(TsonUnsupportedDocumentException.class, stream::hasNext);
     }
 
@@ -353,9 +353,9 @@ class TsonDataStreamTest {
     @Test
     void arrayElementCanHaveOwnSchemaDirective() {
         assertEquals(List.of("DocumentStart(|)", "ArrayStart",
-                "SchemaRef(https://example.com/s.tn1)", "Token(1,UNQUOTED)", "Token(2,UNQUOTED)",
+                "SchemaRef(https://example.com/s.tn)", "Token(1,UNQUOTED)", "Token(2,UNQUOTED)",
                 "ArrayEnd", "DocumentEnd"),
-                shape("[ !!schema:\"https://example.com/s.tn1\" 1 2 ]"));
+                shape("[ !!schema:\"https://example.com/s.tn\" 1 2 ]"));
     }
 
     // ── Unterminated structures must fail fast, not hang (bounded lookahead, no infinite loop) ──
@@ -439,7 +439,7 @@ class TsonDataStreamTest {
     @Test
     void combinedSmokeTestDoesNotThrowAndBalancesEveryContainer() {
         String source = """
-                !!id:"https://example.com/orders/1.tn1"
+                !!id:"https://example.com/orders/1.tn"
                 {
                   customer: @verified !string "Alice"
                   tags: [ premium _ "gold" ]
