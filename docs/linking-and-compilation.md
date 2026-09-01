@@ -301,6 +301,25 @@ half, where a hash keeps them visibly distinct and keeps the name inspectable �
 can hash the same text and match it. Nothing identity depends on is at stake either way: that is the
 structural hash at the end, computed over the binding and never over this text.
 
+**A part is capped at 64 characters, hash included.** Nothing in the series bounds a name — §8.2 asks for
+freshness, stability and a content-derived spelling, and §7.7's grammar is unbounded — but a part is spliced
+from author-written content and `derivedName` walks a whole binding record, nested records and arrays
+included, so an unbounded rule makes name length a function of document size: a realistic REST path already
+mints 139 characters. Past the budget the readable half has stopped being readable and is only cost, at every
+reference to the entry and in §8 output. Truncation appends the hash rather than simply cutting, so two long
+texts sharing a prefix stay apart.
+
+**What is checked for collisions, and what is not.** §8.2's freshness MUST asks that an internal name collide
+with no declared entry and no other internal one. A derived name landing on a name the author wrote is
+caught — `SchemaDesugarer` inserts with `putIfAbsent` and raises `IllegalStateException`, an internal
+invariant rather than an author error. **Two minted names are not compared**: both sites dedupe by name
+(`injected.computeIfAbsent`, `materialised.containsKey`), which is exactly right when two bindings are the
+same form — it is what makes two `[text]` one entry and what ties a recursive knot — and would silently merge
+two types if two different bindings ever produced one name. So non-collision rests on the name function being
+injective, and the readable half does part of that work: the structural hash is 32 bits (`String.hashCode`,
+chosen because it is specified exactly, so two processors agree). Widening it is the way to put the guarantee
+on the hash alone.
+
 **One walk rather than one check per naming position, and that is the load-bearing part.** The
 restricted-character rule
 (`Identifier_Status`) used to run where a name is *read* — the schema parser, `DefinitionResolver`, the atom

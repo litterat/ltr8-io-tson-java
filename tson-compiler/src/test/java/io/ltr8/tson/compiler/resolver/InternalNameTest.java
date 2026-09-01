@@ -67,6 +67,41 @@ class InternalNameTest {
         assertEquals("some-name", InternalName.part("some-name"), "§7.7 admits '-' as well");
     }
 
+    /**
+     * <b>A part is bounded at 64 characters, hash included.</b> Nothing in the series bounds a name, but a
+     * part is spliced from author-written content and {@code SchemaDesugarer} walks a whole binding record —
+     * so without a cap, name length is a function of document size. Past the budget the readable half has
+     * stopped being readable and is only cost, at every reference to the entry and in §8 output.
+     *
+     * <p>Two long texts sharing a prefix stay apart, which is the reason truncation appends the hash rather
+     * than simply cutting: the entry is keyed by this name, and two forms collapsing onto one would merge
+     * two types.
+     */
+    @Test
+    void aLongPartIsTruncatedAndCarriesAHash() {
+        String longClean = "a".repeat(200);
+        String part = InternalName.part(longClean);
+
+        assertEquals(64, part.length(), part);
+        assertTrue(part.matches("a{54}_h[0-9a-f]{8}"), part);
+        assertNotEquals(part, InternalName.part("a".repeat(201)),
+                "two texts sharing the truncated prefix stay apart");
+
+        // A long path: readable while it fits, hashed for the rest.
+        String path = "/api/v2/organizations/{orgId}/repositories/{repoId}/issues/{issueId}/comments";
+        assertEquals(64, InternalName.part(path).length(), InternalName.part(path));
+        assertTrue(InternalName.part(path).startsWith("api_v2_organizations_orgId"), InternalName.part(path));
+    }
+
+    /** Exactly at the budget is still spliced whole; one past it is not. */
+    @Test
+    void theBoundaryIsSixtyFour() {
+        assertEquals("b".repeat(64), InternalName.part("b".repeat(64)));
+        assertEquals(64, InternalName.part("b".repeat(65)).length());
+        assertTrue(InternalName.part("b".repeat(65)).endsWith(
+                InternalName.part("b".repeat(65)).substring(55)), "the tail is the hash");
+    }
+
     /** The whole of the contract, over the shapes that produced a malformed name. */
     @Test
     void everySplicedShapeStillJoinsIntoAnIdentifier() {
@@ -76,5 +111,6 @@ class InternalNameTest {
         assertJoinsIntoAnIdentifier("", "/", "///");
         assertJoinsIntoAnIdentifier("путь", "/x");
         assertJoinsIntoAnIdentifier("\u043eperation", "тип");
+        assertJoinsIntoAnIdentifier("a".repeat(200), "/".repeat(200), "я".repeat(200));
     }
 }

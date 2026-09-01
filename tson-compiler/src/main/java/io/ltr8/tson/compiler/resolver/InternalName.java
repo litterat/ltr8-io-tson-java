@@ -32,6 +32,24 @@ import io.ltr8.tson.compiler.lexer.Xid;
  */
 final class InternalName {
 
+    /**
+     * The longest one part of a derived name may be, hash included.
+     *
+     * <p>Nothing in the series bounds a name: [TSON-SCHEMA] §8.2 asks for freshness, stability and a
+     * content-derived spelling, and [TSON-DATA] §7.7's grammar is unbounded. But a part is spliced from
+     * author-written content and {@code SchemaDesugarer} walks a whole binding record, nested records and
+     * arrays included, so an unbounded rule makes name length a function of document size -- a realistic REST
+     * path already mints 139 characters. Past a point the readable half has stopped being readable and is
+     * only cost: in the schema map, at every reference to the entry, and in §8 output.
+     */
+    private static final int MAX_PART = 64;
+
+    /** {@code h} plus eight hex digits, the fixed width {@link #hash} renders. */
+    private static final int HASH_WIDTH = 9;
+
+    /** What is left for readable text once a part carries a hash and the {@code _} joining the two. */
+    private static final int READABLE_BUDGET = MAX_PART - HASH_WIDTH - 1;
+
     private InternalName() {
     }
 
@@ -41,11 +59,12 @@ final class InternalName {
      * <p>Three cases, in the order they are tested:
      *
      * <ul>
-     *   <li><b>ASCII and admitted by §7.7</b> -- spliced verbatim. This is the ordinary case: a type name, a
-     *   verb, a bound, an enum member.</li>
-     *   <li><b>ASCII but not admitted</b> -- the admitted characters, then a hash of the whole. A path
-     *   {@code "/x"} reads {@code x_h00000f2f} and {@code 1.0} reads {@code 1_0_h0002f0a5}: the readable
-     *   part still says what it came from, and the hash keeps two texts that sanitise alike apart.</li>
+     *   <li><b>ASCII, admitted by §7.7, and within {@link #MAX_PART}</b> -- spliced verbatim. This is the
+     *   ordinary case: a type name, a verb, a bound, an enum member.</li>
+     *   <li><b>ASCII, but not admitted or too long</b> -- the admitted characters, truncated to the budget,
+     *   then a hash of the whole. A path {@code "/x"} reads {@code x_h00000f2f} and {@code 1.0} reads
+     *   {@code 1_0_h0002f0a5}: the readable part still says what it came from, and the hash keeps two texts
+     *   that sanitise alike -- or that share a truncated prefix -- apart.</li>
      *   <li><b>Anything else</b> -- the hash alone, so no non-ASCII character reaches the name.
      *   Unrecognisable by design, and the price of the hygiene walk being able to run at all.</li>
      * </ul>
@@ -54,10 +73,18 @@ final class InternalName {
      * template name and so already starts legally, and everything after it sits at a continue position.
      */
     static String part(String text) {
-        if (isAdmittedAscii(text)) {
+        if (isAdmittedAscii(text) && text.length() <= MAX_PART) {
             return text;
         }
-        return isAscii(text) ? joined(admittedOf(text), hash(text)) : hash(text);
+        return isAscii(text) ? joined(truncated(admittedOf(text)), hash(text)) : hash(text);
+    }
+
+    /**
+     * The readable text cut to {@link #READABLE_BUDGET}. Safe by characters rather than code points because
+     * only the ASCII branch reaches here -- what is not ASCII never contributes readable text at all.
+     */
+    private static String truncated(String admitted) {
+        return admitted.length() <= READABLE_BUDGET ? admitted : admitted.substring(0, READABLE_BUDGET);
     }
 
     /** Every character ASCII and admitted by [TSON-DATA] §7.7 -- the case that needs no rewriting at all. */
