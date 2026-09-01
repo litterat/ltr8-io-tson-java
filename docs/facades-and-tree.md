@@ -27,11 +27,17 @@ a new reader **sharing** the original's compiled-schema registry, never rebuildi
 `TsonTypeReader` from a compiled schema is the layer underneath: a strict single-method interface that
 reads one value at a cursor and polices nothing around it.
 
-**`withTokenPolicy` is the token-surface half of the Unicode policy** ([TSON-DATA] §8.2's "Values"), where
-`TsonConfig.identifierPolicy` is the declared-name half that rides the registry to the linker. It has to be a
-reader axis rather than a registry one, because the surface it guards includes the standalone schemaless
-constructors, which hold no registry at all — and a Class 1 read is exactly where a value arrives least
-constrained.
+**`withTokenPolicy` and `withIdentifierPolicy` are the two Unicode surfaces** ([TSON-DATA] §8.2's "Values"
+and its three name-hygiene mechanisms). Both have to be reader axes rather than registry ones, because the
+surface they guard includes the standalone schemaless constructors, which hold no registry at all — and a
+Class 1 read is exactly where a value arrives least constrained.
+
+**A `Tson` applies both to every reader it makes**, from `TsonConfig.tokenPolicy` and
+`TsonConfig.identifierPolicy` — the latter riding the registry to the linker *as well*, so a schema's declared
+names and a document's own type-ref and annotation names are judged under one setting. They are one processor,
+and `Tson.processorPolicy()` reports one answer for it, which is only true if one answer is what both ends
+use: a configured identifier policy that reached the linker alone would make that report name a policy no read
+had applied, which is worse than reporting none. `SchemaPolicyRefusalTest` pins the read end.
 
 **`TsonReadContext.of` takes the policy as a required parameter and installs the check itself**, so no context
 can exist whose events went unchecked — the low-level API cannot skip the policy by saying nothing, which is

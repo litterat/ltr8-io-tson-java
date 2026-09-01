@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -144,6 +145,28 @@ class PolicyRefusalTest {
         assertEquals(Diagnostic.Code.DUPLICATE_FIELD, verdict.code());
         assertEquals(refusal.fetchReason(), verdict.fetchReason(),
                 "a refusal has no component of its own to distinguish it -- the code is the distinction");
+    }
+
+    /**
+     * <b>A policy is a value, and two configured alike are equal.</b> The types that report one are records
+     * whose equality is component-wise, so without this two processors configured identically compare
+     * unequal -- the opposite of what a caller diffing two deployments is asking, and a silent wrong answer
+     * rather than a compile error.
+     */
+    @Test
+    void twoPoliciesConfiguredAlikeAreEqual() {
+        TsonUnicodePolicy one = TsonUnicodePolicy.highlyRestrictive().perSegment()
+                .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC);
+        TsonUnicodePolicy same = TsonUnicodePolicy.highlyRestrictive().perSegment()
+                .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC);
+
+        assertEquals(one, same);
+        assertEquals(one.hashCode(), same.hashCode());
+        assertEquals(TsonUnicodeProcessorPolicy.of(one, TsonUnicodePolicy.unrestricted()),
+                TsonUnicodeProcessorPolicy.of(same, TsonUnicodePolicy.unrestricted()),
+                "the record that reports them is component-wise, so it inherits this");
+        assertNotEquals(one, TsonUnicodePolicy.highlyRestrictive().perSegment());
+        assertNotEquals(TsonUnicodePolicy.highlyRestrictive(), TsonUnicodePolicy.singleScript());
     }
 
     /**

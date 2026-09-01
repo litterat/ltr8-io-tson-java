@@ -27,7 +27,8 @@ class CompileCommandTest {
                 }
                 """);
 
-        String output = captureStdout(() -> assertEquals(0, CompileCommand.run(schema, OutputFormat.TEXT)));
+        String output = captureStdout(() -> assertEquals(0,
+                CompileCommand.run(schema, OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertEquals("OK", output.strip());
     }
@@ -42,7 +43,8 @@ class CompileCommandTest {
                 }
                 """);
 
-        String output = captureStdout(() -> assertEquals(1, CompileCommand.run(schema, OutputFormat.TEXT)));
+        String output = captureStdout(() -> assertEquals(1,
+                CompileCommand.run(schema, OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("[SCHEMA_ERROR]"), output);
     }
@@ -64,7 +66,8 @@ class CompileCommandTest {
                 }
                 """);
 
-        String output = captureStdout(() -> assertEquals(69, CompileCommand.run(schema, OutputFormat.TEXT)));
+        String output = captureStdout(() -> assertEquals(69,
+                CompileCommand.run(schema, OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("[SCHEMA_UNAVAILABLE]"), output);
         assertTrue(output.contains("nobody-serves-this"), output);
@@ -87,7 +90,8 @@ class CompileCommandTest {
                 }
                 """);
 
-        String output = captureStdout(() -> assertEquals(1, CompileCommand.run(schema, OutputFormat.TEXT)));
+        String output = captureStdout(() -> assertEquals(1,
+                CompileCommand.run(schema, OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("[SCHEMA_ERROR]"), output);
         assertTrue(output.contains("/quantity_t"), output);

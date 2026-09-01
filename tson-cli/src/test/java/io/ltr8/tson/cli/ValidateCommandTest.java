@@ -46,7 +46,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->
-                assertEquals(0, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
+                assertEquals(0, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertEquals("OK", output.strip());
     }
@@ -57,7 +57,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->  // data listed before its schema
-                assertEquals(0, ValidateCommand.run(inputs(data, schema), OutputFormat.TEXT)));
+                assertEquals(0, ValidateCommand.run(inputs(data, schema), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertEquals("OK", output.strip());
     }
@@ -69,7 +69,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 99999999999999 }"));
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
+                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("[FIELD_REQUIRED]"), output);
         assertTrue(output.contains("[ATOM_CONSTRAINT_VIOLATION]"), output);
@@ -88,7 +88,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2  hallucinated_field: \"nope\" }"));
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
+                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("[UNRECOGNIZED_FIELD]"), output);
         assertTrue(output.contains("/hallucinated_field"), output);
@@ -108,7 +108,7 @@ class ValidateCommandTest {
 
         String err = captureStderr(() -> {
             String output = captureStdout(() ->
-                    assertEquals(69, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
+                    assertEquals(69, ValidateCommand.run(inputs(data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
             assertTrue(output.contains("[SCHEMA_UNAVAILABLE]"), output);
             assertTrue(output.contains("not-provided"), output);
         });
@@ -129,7 +129,7 @@ class ValidateCommandTest {
                 "!!schema:\"https://example.test/typo.tn1\"\n!my_record { a: 1  b: 2 }\n");
 
         String output = captureStdout(() ->
-                assertEquals(69, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
+                assertEquals(69, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("cannot fetch schema 'https://example.test/typo.tn1'"), output);
         assertTrue(output.contains("no schema file on the command line declares that !!id"), output);
@@ -144,7 +144,7 @@ class ValidateCommandTest {
                 "!!schema:\"https://example.test/absent.tn1\"\n!my_record { a: 1 }\n");
 
         String output = captureStdout(() ->
-                assertEquals(69, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
+                assertEquals(69, ValidateCommand.run(inputs(data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("no schema files were given"), output);
     }
@@ -156,7 +156,7 @@ class ValidateCommandTest {
                 "!!schema:\"https://example.test/cli-validate.tn1\"\n!no_such_type { a: 1  b: 2 }\n");
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
+                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("[UNKNOWN_TYPE]"), output);
     }
@@ -175,7 +175,8 @@ class ValidateCommandTest {
                 "!!schema:\"https://example.test/cli-point.tn1\"\n!point { x: 3  y: 4 }\n");
 
         String output = captureStdout(() -> assertEquals(0,
-                ValidateCommand.run(inputs(recordSchema, pointSchema, recordData, pointData), OutputFormat.TEXT)));
+                ValidateCommand.run(inputs(recordSchema, pointSchema, recordData, pointData),
+                        OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("OK"), output);
     }
@@ -187,7 +188,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", "{ id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09  n: !int32 5 }");
 
         String output = captureStdout(() ->
-                assertEquals(0, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
+                assertEquals(0, ValidateCommand.run(inputs(data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertEquals("OK", output.strip());
     }
@@ -197,7 +198,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", "{ n: !int32 twelve }");
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(inputs(data), OutputFormat.TEXT)));
+                assertEquals(1, ValidateCommand.run(inputs(data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("[ATOM_CONSTRAINT_VIOLATION]"), output);
     }
@@ -209,7 +210,7 @@ class ValidateCommandTest {
         Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
 
         String output = captureStdout(() ->
-                assertEquals(2, ValidateCommand.run(inputs(schema), OutputFormat.TEXT)));
+                assertEquals(2, ValidateCommand.run(inputs(schema), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("no data files"), output);
     }
@@ -220,7 +221,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 99999999999999  b: 2 }"));
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.JSON)));
+                assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("\"valid\":false"), output);
         assertTrue(output.contains("\"code\":\"ATOM_CONSTRAINT_VIOLATION\""), output);
@@ -238,7 +239,7 @@ class ValidateCommandTest {
         Path bad = writeFile(dir, "bad.tson", selfDescribing("{ a: 1 }"));
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(inputs(schema, good, bad), OutputFormat.JSON)));
+                assertEquals(1, ValidateCommand.run(inputs(schema, good, bad), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
 
         assertEquals(1, output.strip().lines().count(), output);
         assertFalse(output.contains("# "), output);
@@ -255,7 +256,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", "42");
 
         String output = captureStdout(() ->
-                assertEquals(0, ValidateCommand.run(inputs(data), OutputFormat.JSON)));
+                assertEquals(0, ValidateCommand.run(inputs(data), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
 
         // The policy is stated between the verdict and the files, once for the run: [TSON-DATA] §8.2's
         // rules are this deployment's configuration, and every envelope carries them whether or not it
@@ -275,7 +276,7 @@ class ValidateCommandTest {
         Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
 
         String output = captureStdout(() ->
-                assertEquals(2, ValidateCommand.run(inputs(schema), OutputFormat.JSON)));
+                assertEquals(2, ValidateCommand.run(inputs(schema), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.strip().startsWith("{\"valid\":false,\"policy\":"), output);
         assertTrue(output.contains(",\"files\":[],\"errors\":[{"), output);
@@ -290,7 +291,7 @@ class ValidateCommandTest {
         Path bad = writeFile(dir, "bad.tson", selfDescribing("{ a: 1 }"));
 
         String output = captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(inputs(schema, good, bad), OutputFormat.TEXT)));
+                assertEquals(1, ValidateCommand.run(inputs(schema, good, bad), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("# " + good), output);
         assertTrue(output.contains("# " + bad), output);
@@ -309,7 +310,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->
-                assertEquals(0, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT)));
+                assertEquals(0, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertEquals("OK", output.strip());
     }
@@ -326,7 +327,7 @@ class ValidateCommandTest {
         Path data = writeFile(dir, "data.tson", "42");   // plain -> schemaless -> valid
 
         String err = captureStderr(() ->
-                assertEquals(0, ValidateCommand.run(inputs(fake, data), OutputFormat.TEXT)));
+                assertEquals(0, ValidateCommand.run(inputs(fake, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(err.contains("not supported"), err);
         assertTrue(err.contains("core.tn"), err);
@@ -345,7 +346,7 @@ class ValidateCommandTest {
         String output = withStdin(selfDescribing("{ a: 1  b: 2 }"), () -> captureStdout(() ->
                 assertEquals(0, ValidateCommand.run(
                         List.of(new ValidateInput.OfFile(schema), new ValidateInput.OfStdin()),
-                        OutputFormat.TEXT))));
+                        OutputFormat.TEXT, PolicyOptions.DEFAULTS))));
 
         assertEquals("OK", output.strip());
     }
@@ -357,7 +358,7 @@ class ValidateCommandTest {
         String output = withStdin(selfDescribing("{ a: 1 }"), () -> captureStdout(() ->
                 assertEquals(1, ValidateCommand.run(
                         List.of(new ValidateInput.OfFile(schema), new ValidateInput.OfStdin()),
-                        OutputFormat.JSON))));
+                        OutputFormat.JSON, PolicyOptions.DEFAULTS))));
 
         assertTrue(output.contains("\"file\":\"-\",\"valid\":false"), output);
         assertTrue(output.contains("\"code\":\"FIELD_REQUIRED\""), output);
@@ -367,7 +368,8 @@ class ValidateCommandTest {
     @Test
     void aSchemaPipedInIsTreatedAsDataNotAsASchema() throws IOException {
         String output = withStdin(RECORD_SCHEMA, () -> captureStdout(() ->
-                assertEquals(1, ValidateCommand.run(List.of(new ValidateInput.OfStdin()), OutputFormat.TEXT))));
+                assertEquals(1, ValidateCommand.run(List.of(new ValidateInput.OfStdin()),
+                        OutputFormat.TEXT, PolicyOptions.DEFAULTS))));
 
         assertFalse(output.contains("no data files"), output);
         assertTrue(output.contains("["), output);   // a diagnostic, not a silent pass
@@ -377,7 +379,8 @@ class ValidateCommandTest {
     @Test
     void stdinAloneIsAValidInvocation() throws IOException {
         String output = withStdin("{ n: !int32 5 }", () -> captureStdout(() ->
-                assertEquals(0, ValidateCommand.run(List.of(new ValidateInput.OfStdin()), OutputFormat.TEXT))));
+                assertEquals(0, ValidateCommand.run(List.of(new ValidateInput.OfStdin()),
+                        OutputFormat.TEXT, PolicyOptions.DEFAULTS))));
 
         assertEquals("OK", output.strip());
     }
@@ -394,7 +397,7 @@ class ValidateCommandTest {
         Path missing = dir.resolve("not-here.tn");
 
         String output = captureStdout(() ->
-                assertEquals(2, ValidateCommand.run(inputs(missing), OutputFormat.TEXT)));
+                assertEquals(2, ValidateCommand.run(inputs(missing), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("no such file"), output);
         assertFalse(output.contains(missing + ": " + missing), output);

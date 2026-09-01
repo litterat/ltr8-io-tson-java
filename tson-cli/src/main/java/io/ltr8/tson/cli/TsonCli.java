@@ -31,9 +31,9 @@ public final class TsonCli {
     private static final String USAGE = """
             usage:
               tson init-example [<dir>]
-              tson validate [--output text|json|tson] <file|->...
-              tson compile [--output text|json|tson] <schema>
-              tson policy [--output text|json|tson]
+              tson validate [--output text|json|tson] [<policy options>] <file|->...
+              tson compile [--output text|json|tson] [<policy options>] <schema>
+              tson policy [--output text|json|tson] [<policy options>]
               tson hash <file>
 
             commands:
@@ -44,30 +44,50 @@ public final class TsonCli {
                           `-` reads one data document from standard input, reported under the name "-"
                           (a file really named - is reachable as ./-); schemas must be files
               compile     check that a schema document itself resolves and compiles
-              policy      print the Unicode name/token policy this build applies ([TSON-DATA] §8.2),
-                          which is what decides whether a name is refused here but accepted elsewhere.
-                          The same record rides on every validate report; this prints it with no
-                          document in hand, so a generator can conform before it writes
+              policy      print the [TSON-DATA] §8.2 identifier/token policy this run would apply, which
+                          is what decides whether a name is refused here but accepted elsewhere. The same
+                          record rides on every validate report; this prints it with no document in hand,
+                          so a generator can conform before it writes -- and it takes the policy options
+                          below, so it doubles as their dry run
               hash        compute a document's content hash and stamp it onto its !!id (?sha256=...)
 
             options:
               --output text|json|tson    output format (default: text)
               --help, -h                 print this help
 
+            policy options (validate, compile, policy) -- [TSON-DATA] §8.2 name hygiene, which decides
+            whether a name is refused here but accepted elsewhere. Every report states what it was judged
+            under; `tson policy` prints it with no document in hand.
+              --identifier-policy <level>   level for identifiers (default: highly-restrictive)
+              --identifier-per-segment      apply it per _/- segment rather than the whole identifier,
+                                            which admits url_адрес while still refusing id_pаy
+              --identifier-scripts <A+B>    admit one script combination over and above the level,
+                                            e.g. Latin+Cyrillic (repeatable)
+              --token-policy <level>        level for values (default: unrestricted, which scans nothing)
+              --token-scripts <A+B>         the same for values; on its own it raises the token level to
+                                            single-script, a list of combinations being no configuration
+                                            at all under a level that scans nothing (repeatable)
+
+            <level> is a UTS #39 §5.2 restriction level: ascii-only, single-script, highly-restrictive,
+            moderately-restrictive, minimally-restrictive, unrestricted. The spelling `tson policy` prints
+            (HIGHLY_RESTRICTIVE) is accepted too.
+
             exit codes: 0 ok, 1 validation/compile failure, 2 usage error,
                         69 a schema could not be obtained, 70 not implemented / internal error""";
 
     private static final String VALIDATE_USAGE =
-            "usage: tson validate [--output text|json|tson] <file|->...   (`-` reads one data document from stdin)";
+            "usage: tson validate [--output text|json|tson] [<policy options>] <file|->...   (`-` reads one"
+                    + " data document from stdin)";
 
     private static final String COMPILE_USAGE =
-            "usage: tson compile [--output text|json|tson] <schema>";
+            "usage: tson compile [--output text|json|tson] [<policy options>] <schema>";
 
     private static final String INIT_USAGE =
             "usage: tson init-example [<dir>]   (writes an example person.tn and person-data.tn; default dir: .)";
 
     private static final String POLICY_USAGE =
-            "usage: tson policy [--output text|json|tson]   (the §8.2 Unicode policy this build applies)";
+            "usage: tson policy [--output text|json|tson] [<policy options>]   (the §8.2 Unicode policy this"
+                    + " run would apply; see `tson --help` for the policy options)";
 
     private static final String HASH_USAGE =
             "usage: tson hash <file>   (stamps the document's content hash onto its !!id as ?sha256=...)";
@@ -228,6 +248,7 @@ public final class TsonCli {
             System.out.println(VALIDATE_USAGE);
             return 0;
         }
+        PolicyOptions policies = PolicyOptions.consume(args);
         OutputFormat format = OutputFormat.TEXT;
         List<ValidateInput> inputs = new ArrayList<>();
         int stdin = 0;
@@ -253,7 +274,7 @@ public final class TsonCli {
         if (inputs.isEmpty()) {
             throw new UsageException(VALIDATE_USAGE);
         }
-        return ValidateCommand.run(inputs, format);
+        return ValidateCommand.run(inputs, format, policies);
     }
 
     private static int runCompile(List<String> args) {
@@ -261,6 +282,7 @@ public final class TsonCli {
             System.out.println(COMPILE_USAGE);
             return 0;
         }
+        PolicyOptions policies = PolicyOptions.consume(args);
         OutputFormat format = OutputFormat.TEXT;
         List<Path> positional = new ArrayList<>();
 
@@ -275,7 +297,7 @@ public final class TsonCli {
         if (positional.size() != 1) {
             throw new UsageException(COMPILE_USAGE);
         }
-        return CompileCommand.run(positional.get(0), format);
+        return CompileCommand.run(positional.get(0), format, policies);
     }
 
     private static int runPolicy(List<String> args) {
@@ -283,6 +305,7 @@ public final class TsonCli {
             System.out.println(POLICY_USAGE);
             return 0;
         }
+        PolicyOptions policies = PolicyOptions.consume(args);
         OutputFormat format = OutputFormat.TEXT;
         for (int i = 0; i < args.size(); i++) {
             if (args.get(i).equals("--output")) {
@@ -291,7 +314,7 @@ public final class TsonCli {
                 throw new UsageException(POLICY_USAGE);
             }
         }
-        return PolicyCommand.run(format);
+        return PolicyCommand.run(format, policies);
     }
 
     private static String requireValue(List<String> args, int index, String flag) {

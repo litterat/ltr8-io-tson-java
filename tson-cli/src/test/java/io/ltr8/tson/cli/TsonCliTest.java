@@ -291,6 +291,59 @@ class TsonCliTest {
         assertTrue(err.contains("tson policy"), err);
     }
 
+    /**
+     * <b>{@code tson policy} takes the policy flags too, so it is the dry run for the other two commands.</b>
+     * Someone about to relax a [TSON-DATA] §8.2 rule across a CI job can see what the relaxation actually
+     * produces before pointing it at a document, which is the difference between configuring a policy and
+     * guessing at one.
+     */
+    @Test
+    void policyPrintsWhatTheFlagsWouldApply() throws IOException {
+        String out = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {
+                "policy", "--identifier-policy", "moderately-restrictive", "--identifier-per-segment",
+                "--token-scripts", "Latin+Greek"})));
+
+        assertTrue(out.contains("identifier policy: MODERATELY_RESTRICTIVE per segment"), out);
+        // The token list brought its own level: Unrestricted scans nothing, so the list would have been inert.
+        assertTrue(out.contains("token policy:      SINGLE_SCRIPT permitting [GREEK+LATIN]"), out);
+    }
+
+    /**
+     * <b>A relaxation on the command line actually changes a verdict</b>, end to end through the real
+     * dispatch. A mixed-script <em>annotation</em> name is refused under the default Highly Restrictive
+     * policy and admitted once the combination is named -- which is the whole point of the flags, and the
+     * thing that regressed silently while the configured policy reached the schema end and not the read.
+     *
+     * <p>An annotation name rather than a field name, because a Class 1 field name is lexical rather than a
+     * name (§2.5, §7.7) and faces only the look-alike rule; and rather than a type-ref, because an unknown
+     * one is a diagnostic of its own and the relaxed run here has to come back clean.
+     */
+    @Test
+    void anIdentifierScriptListAdmitsANameTheDefaultRefuses(@TempDir Path dir) throws IOException {
+        // Cyrillic а (U+0430) between two Latin letters -- built from code points, never typed.
+        String mixed = "p" + new String(Character.toChars(0x0430)) + "y";
+        Path data = writeFile(dir, "mixed.tson", "@" + mixed + ":1 2");
+
+        String refused = captureStdout(() -> assertEquals(1, TsonCli.run(new String[] {
+                "validate", data.toString()})));
+        assertTrue(refused.contains("[RESTRICTED_SCRIPT]"), refused);
+        assertTrue(refused.contains("note: refused under identifier policy HIGHLY_RESTRICTIVE"), refused);
+
+        String admitted = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {
+                "validate", "--identifier-policy", "single-script",
+                "--identifier-scripts", "Latin+Cyrillic", data.toString()})));
+        assertTrue(admitted.contains("OK"), admitted);
+        assertTrue(admitted.contains("note: judged under identifier policy SINGLE_SCRIPT"), admitted);
+    }
+
+    /** A flag whose combination configures nothing is a usage error, not a silent no-op. */
+    @Test
+    void aRelaxationThatWouldConfigureNothingIsAUsageError() throws IOException {
+        String err = captureStderr(() -> assertEquals(2, TsonCli.run(new String[] {
+                "policy", "--token-policy", "unrestricted", "--token-scripts", "Latin+Cyrillic"})));
+        assertTrue(err.contains("configure nothing"), err);
+    }
+
     @Test
     void plainDataWithNoSchemaValidatesSchemalessly(@TempDir Path dir) throws IOException {
         // A data file with no !!schema is checked schemalessly (base syntax + built-in atoms), even

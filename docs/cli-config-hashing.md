@@ -133,10 +133,31 @@ a disagreement — two deployments at one UCD version differ because one of them
 **`tson policy` is the same record with no document in hand**, which is the surface that makes a refusal
 avoidable rather than merely explicable: a generator that reads it first never writes the name that would be
 refused. `--output text` prints three lines; `json`/`tson` print the identical `policy` shape the envelopes
-carry, so a consumer parses one thing either way. In a validate run, `TEXT` prints the policy only when
-something was actually refused — a person does not want a configuration dump on every clean run, and does
-want, at the moment a name is refused, to be told the verdict came from this deployment's settings rather
-than from the file in front of them. The machine formats always carry it.
+carry, so a consumer parses one thing either way.
+
+**The three commands that judge a name take the policy flags** — `validate`, `compile`, `policy`, not
+`hash`/`init-example`. `PolicyOptions` consumes them off the argument list before each subcommand's own loop
+runs, so those loops still see only `--output` and their positionals; the pair then goes into one
+`Tson.builder()` per run, which is what makes a schema's declared names and a data document's names answer to
+one setting. §8.2 asks that a relaxation not be *silent*, and a flag written into a CI file satisfies that
+where the environment variable it warns about would not — the point of the rule is ambient authority, not the
+existence of configuration. Giving the CLI no way to configure this at all was the worse failure: it told the
+person running it which policy refused their document and left them unable to change it, they being the
+deployment the report describes.
+
+**Two rules keep a flag from meaning nothing.** `--token-scripts` alone raises the token level from its
+`UNRESTRICTED` default to `SINGLE_SCRIPT`, because `permitting(…)` is consulted only by a level that scans and
+the list would otherwise be inert — Single Script being the level at which a list of combinations *is* the
+whole configuration. And a relaxation named against a level the caller *stated* that scans nothing is a usage
+error, not a no-op: `--token-policy unrestricted --token-scripts Latin+Cyrillic` configures nothing whatever,
+and accepting it silently would leave the caller believing a restriction is in force. That is
+`withTokenPolicy`'s own habit — it refuses a per-segment token policy rather than ignoring it — which is also
+why there is no `--token-per-segment` flag: it could only ever be a usage error.
+
+**`TEXT` prints the policy when it is load-bearing** — something was refused under it, or it was configured.
+A person does not want a configuration dump on every clean run; they do want, at the moment a name is refused,
+to be told the verdict came from this deployment's settings rather than from the file in front of them, and
+they want a run that relaxed a rule to say so even when it passed. The machine formats always carry it.
 
 That makes `restriction_level` a third hand-written enum copy beside `diagnostic_code` and `fetch_reason` —
 `DiagnosticsSchemaTest` checks all three against their Java enums in both directions.
