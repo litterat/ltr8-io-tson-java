@@ -609,9 +609,9 @@ requires that relaxing a rule not be *silent*, which a flag in a CI file satisfi
 would not; `--output text` accordingly prints the policy on any run that configured one, not only on a refusal.
 
 ```
-$ tson validate names.tn                                        # id_адрес refused: mixes scripts
-$ tson validate --identifier-per-segment names.tn               # admitted: the mix is across a _ boundary
-$ tson validate --identifier-scripts Latin+Cyrillic names.tn    # admitted: the combination is named
+$ tson compile names.tn                                        # `id_адрес => text` refused: mixes scripts
+$ tson compile --identifier-per-segment names.tn               # OK: each _-delimited segment is one script
+$ tson compile --identifier-scripts Latin+Cyrillic names.tn    # OK: the combination is named
 ```
 
 Reach for the *unit* or a named combination before dropping a level — both keep the rule everywhere else.

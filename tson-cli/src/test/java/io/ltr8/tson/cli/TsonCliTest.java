@@ -255,14 +255,38 @@ class TsonCliTest {
 
     @Test
     void perCommandHelpExitsZeroToStdout() throws IOException {
-        String validate = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"validate", "--help"})));
-        assertTrue(validate.contains("tson validate"), validate);
+        for (String[] argv : new String[][] {{"init-example", "--help"}, {"validate", "--help"},
+                {"compile", "-h"}, {"policy", "--help"}, {"hash", "--help"}}) {
+            String out = captureStdout(() -> assertEquals(0, TsonCli.run(argv)));
+            assertTrue(out.contains("usage: tson " + argv[0]), argv[0] + " => " + out);
+        }
+    }
 
-        String compile = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"compile", "-h"})));
-        assertTrue(compile.contains("tson compile"), compile);
+    /**
+     * <b>Help is two levels, and each carries what the other should not.</b> The top level lists the
+     * commands; a command's own help carries its options -- including the [TSON-DATA] §8.2 policy block for
+     * the three that judge a name, and not for the two that do not. Printing everything at the top made the
+     * policy flags a wall of text in front of someone who only wanted to know what {@code hash} does.
+     */
+    @Test
+    void policyFlagsAreDocumentedByTheCommandsThatTakeThemAndNoOthers() throws IOException {
+        for (String command : new String[] {"validate", "compile", "policy"}) {
+            String out = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {command, "--help"})));
+            assertTrue(out.contains("--identifier-policy <level>"), command + " => " + out);
+            assertTrue(out.contains("--token-scripts <A+B>"), command + " => " + out);
+            assertTrue(out.contains("ascii-only, single-script"), command + " => " + out);
+        }
+        for (String command : new String[] {"hash", "init-example"}) {
+            String out = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {command, "--help"})));
+            assertFalse(out.contains("--identifier-policy"), command + " => " + out);
+        }
 
-        String policy = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"policy", "--help"})));
-        assertTrue(policy.contains("tson policy"), policy);
+        String top = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"--help"})));
+        assertFalse(top.contains("--identifier-policy"), top);
+        assertTrue(top.contains("`tson <command> --help`"), top);
+        for (String command : new String[] {"init-example", "validate", "compile", "policy", "hash"}) {
+            assertTrue(top.contains("  " + command + " "), command + " missing from the command list: " + top);
+        }
     }
 
     /**

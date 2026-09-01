@@ -21,7 +21,7 @@ Eight JPMS modules, all published together as `io.ltr8:<module>`:
 | `tson-bind`      | `io.ltr8.bind`            | the generic `DataValue`↔Java-object binding engine              |
 | `tson-annotation`| `io.ltr8.annotation`      | `@Typename`/`@Field`/`@Record`/… and the `Annotations` carrier  |
 | `tson-regex`     | `io.ltr8.tson.regex`      | a standalone RFC 9485 I-Regexp engine (no TSON dependency)      |
-| `tson-cli`       | `io.ltr8.tson.cli`        | the `tson` command (`validate`, `compile`, `hash`, `init-example`) |
+| `tson-cli`       | `io.ltr8.tson.cli`        | the `tson` command (`validate`, `compile`, `policy`, `hash`, …) |
 
 Source, issues and releases: **https://github.com/litterat/ltr8-io-tson-java** (Apache-2.0). The
 TypeScript port is [ltr8-io-tson-typescript](https://github.com/litterat/ltr8-io-tson-typescript), and
@@ -33,13 +33,11 @@ A new revision moves the minor, and the spec is a working draft with no compatib
 revisions — so a schema `!!id` pinned at `https://tson.io/2026/34/m/core.tn` is revision-specific and
 must match the library's own revision.
 
-> **Not on Maven Central.** Publishing needs signed artifacts and a fuller POM, and that is a separate
-> decision — no remote repository is configured, deliberately. To use it from another project on the
-> same machine: clone, then `./gradlew publishToMavenLocal`, which installs every module into `~/.m2`
-> under `io.ltr8` with sources and javadoc jars beside each. A consuming Gradle build then adds
-> `mavenLocal()` and takes an ordinary dependency on `io.ltr8:tson:0.34.0-SNAPSHOT` (the front door,
-> which pulls the rest in). The jars carry real `module-info.class`es, so a consumer works on the class
-> path or the module path.
+> **Not on Maven Central**, deliberately — publishing needs signed artifacts and a fuller POM, which is a
+> separate decision. To use it from another project on the same machine: clone, `./gradlew
+> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.34.0-SNAPSHOT` (the front
+> door pulls the rest in). The jars carry real `module-info.class`es, so class path or module path both
+> work.
 
 ## Workflow
 
@@ -342,74 +340,46 @@ Two policies, defaulting opposite ways for the same reason in each case:
 
 ```java
 Tson tson = Tson.builder()
-        .identifierPolicy(TsonUnicodePolicy.highlyRestrictive().perSegment())  // declared names
-        .tokenPolicy(TsonUnicodePolicy.unrestricted())                        // values
+        .identifierPolicy(TsonUnicodePolicy.highlyRestrictive().perSegment())  // names
+        .tokenPolicy(TsonUnicodePolicy.unrestricted())                         // values
         .build();
 ```
 
-`identifierPolicy` governs **declared names** and defaults to Highly Restrictive over the whole name
-(§8.2's SHOULD). Reach for `perSegment()` before loosening the level — it is the first relaxation, and
-what ordinary compounds need. `tokenPolicy` governs **every token a read pulls** and defaults to
-`unrestricted()`, a value being data that may legitimately be anything; raise it when values are more
-than payload (a service that renders what it reads into a UI). Levels: `asciiOnly()`,
-`singleScript()`, `highlyRestrictive()`, `moderatelyRestrictive()`, `scriptsUnchecked()`,
-`unrestricted()`, plus `permitting(scripts…)`. Either is also settable per reader with
-`withIdentifierPolicy` / `withTokenPolicy`.
+`identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names — and
+defaults to Highly Restrictive over the whole name (§8.2's SHOULD). Reach for `perSegment()`, or
+`permitting(scripts…)`, before loosening the level: both keep the rule everywhere else. `tokenPolicy`
+governs **every token a read pulls** and defaults to `unrestricted()`, a value being data that may
+legitimately be anything; raise it when values are more than payload (a service that renders what it
+reads into a UI). Either is also settable per reader with `withIdentifierPolicy`/`withTokenPolicy`; the
+six levels and the rest of the surface are in `references/api.md`, and the command-line flags in
+`references/cli.md`.
 
 **This is a code path on purpose** — a security policy read from the environment is ambient authority,
-invisible at the call site.
+invisible at the call site. A CLI flag is not: it is written into the CI file that runs the command.
 
 ## CLI
 
 ```bash
-./gradlew :tson-cli:installDist
-export PATH="$PWD/tson-cli/build/install/tson/bin:$PATH"
+./gradlew :tson-cli:installDist && export PATH="$PWD/tson-cli/build/install/tson/bin:$PATH"
 
-tson init-example .                                   # writes person.tn + person-data.tn
-tson validate person.tn person-data.tn                # OK
-tson validate --output json person.tn bad-data.tn
-tson compile person.tn                                # does the schema itself resolve and compile?
-tson hash person.tn                                   # stamp ?sha256=… onto its own !!id, in place
+tson init-example .                     # writes person.tn + person-data.tn to start from
+tson validate person.tn data.tn         # also --output json|tson; `-` reads stdin
+tson compile person.tn                  # does the schema itself resolve and compile?
+tson policy                             # the §8.2 Unicode policy this run would apply
+tson hash person.tn                     # stamp ?sha256=… onto its own !!id, in place
 ```
 
-|                       |                                                                                                     |
-| --------------------- | ----------------------------------------------------------------------------------------------------- |
-| Commands              | `validate`, `compile`, `hash`, `init-example`                                                       |
-| Arguments             | **a flat file list** — each auto-classified as schema (its header carries `!!meta`) or data, by content, never by filename |
-| Schema selection      | entirely the data's own: its `!!schema` names the schema, its root type-ref (`!person`) the type. There is no `--type`, and no `--schema` |
-| `-`                   | reads one data document from stdin, at most once, always data (a file really named `-` is `./-`)     |
-| `--output`            | `text` (default), `json`, `tson`                                                                    |
-| Exit codes            | `0` valid · `1` a document is invalid · `2` usage · `69` a schema nothing would supply · `70` library gap or fault |
+**A flat file list**, each auto-classified as schema or data by content and never by filename; selection
+is entirely the data's own `!!schema` plus its root type-ref, so there is no `--type` and no `--schema`.
+Nothing is fetched over the network. Exit codes: `0` valid · `1` a document is invalid · `2` usage ·
+`69` a schema nothing would supply · `70` a library gap or fault — the last two being the *absence* of a
+verdict rather than one.
 
-**The CLI fetches nothing** — schemas come from the files you list, and one it cannot match is
-`SCHEMA_UNAVAILABLE` and exit 69, not a verdict on your data. `69` and `70` are deliberately kept apart
-from `1`: `1` is a verdict on the document, the other two are the *absence* of one, naming who could not
-give it. `TsonCli.exitCodeFor` lifts a run to whichever is most permanent — 70 over 69 over 1.
-`validate` collects every problem in a file in one pass.
+`tson --help` lists the commands; `tson <command> --help` carries that command's own options, including
+the [TSON-DATA] §8.2 policy flags for the three that judge a name.
 
-### Machine-readable output
-
-`--output json` is one document per invocation, one file or twenty — a `files` array with each data
-file's own `file`/`valid`/`errors`, wrapped in the run's verdict. **Its field names are `camelCase` and
-an absent field is `null`, not omitted:**
-
-```json
-{"valid":false,"files":[{"file":"person-data.tn","valid":false,"errors":[
-  {"path":"/age","schemaPointer":"/person/age","schemaId":"example.com/…/person.tn",
-   "code":"ATOM_CONSTRAINT_VIOLATION","message":"'int32': 'thirty' is not a valid integer …",
-   "expected":"an integer or based-integer form","actual":"thirty",
-   "dataPosition":"5:8:154","schemaPosition":"17:5:677",
-   "fetchReason":null}]}],"errors":[]}
-```
-
-Every envelope also carries `policy` — the §8.2 policy the run was judged under — between `valid` and
-`files`. `tson policy` prints the same record on its own.
-
-`--output tson` is the same record through the library's own writer and is **`snake_case` with absent
-fields omitted** (`schema_pointer`, `data_position`) — the shape `tson-cli`'s own `diagnostics.tn`
-declares, which that output is validated against. A position is `line:column:byteOffset`, the first two
-1-based, the offset counting UTF-8 bytes from 0. The top-level `errors` carries only what stopped the
-run before any document was read.
+**`references/cli.md` has the rest** — every flag, the policy options and the rules that keep one from
+meaning nothing, the `--output json`/`tson` shapes field by field, and the CLI's own pitfalls.
 
 ## Streaming and allocation
 
@@ -444,7 +414,6 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | a refusal code read as "invalid document"                       | §8.2 refusals are a fifth outcome, outside §8.1's four categories   | report it apart; relax `identifierPolicy` in code if intended |
 | relaxing identifier policy from an env var                      | ambient authority, invisible at the call site                       | pass `identifierPolicy` explicitly                          |
 | a hand-written or truncated `?sha256=`                          | pins are verified on every fetched pinned reference                 | `tson hash`, or `TsonContentHash.sha256`                    |
-| `--output json` parsed as `snake_case`                          | JSON is `camelCase` with `null`s; only `--output tson` is `snake_case` | match the format you asked for                           |
 | `!!id` pinned to a different spec revision than the library     | revisions are not compatible                                        | match the library's `0.<revision>.x`                        |
 | `.tn1`                                                          | a stability claim §7.1 reserves for a frozen version 1              | `.tn`                                                       |
 
@@ -453,6 +422,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 - `references/api.md` — the public surface module by module, with signatures.
 - `references/bindings.md` — the binding layer: annotations, the atom→Java type table, strictness, profiles.
 - `references/diagnostics.md` — every `Diagnostic.Code`, the exception hierarchy, CLI exit codes.
+- `references/cli.md` — the `tson` command: every flag, the Unicode policy options, the output shapes.
 
 ## Try it without a build tool
 
