@@ -32,7 +32,7 @@ spec series (2026 revision):
 
 The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
 doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
-copy. `spec/` holds local snapshots (revision 33) for quick reference: `spec/tson-part1-data.md`,
+copy. `spec/` holds local snapshots of the current revision for quick reference: `spec/tson-part1-data.md`,
 `spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core}.tn` (the spec's own bundled schema
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not

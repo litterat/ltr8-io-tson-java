@@ -306,8 +306,10 @@ relax any of the three rules and requires the relaxation not be silent, and a po
 environment is
 invisible at the call site and absent from review. The relaxation to reach for first is the *unit*
 (`perSegment()`), which still refuses `id_pаy` while admitting `url_адрес`. A token policy stricter than the
-identifier policy subsumes it: a name is a token (§8.2 calls the identifier surface the "name policy"; this
-implementation says identifier throughout, following `TsonConfig.identifierPolicy`).
+identifier policy subsumes it: a name is a token — which §8.2 asks an implementation's documentation to say,
+and this is where it is said. §8.2 calls the identifier surface the "name policy", once and undefined; this
+implementation says *identifier* throughout, §7.7 being where that term is defined
+(`SPEC-FEEDBACK.md` #15).
 
 Class 1 **field** names see neither — they are lexical rather than names (§2.5, §7.7) — and only the
 look-alike rule, whose scope they are (`SchemalessTreeReader`). A refusal reports one code per rule —
