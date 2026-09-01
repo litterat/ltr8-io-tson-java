@@ -403,6 +403,16 @@ and binds through its constructor's own reader; a **reference** template — §5
 `uuid_pair => <B> pair<uuid, B>` — composes its argument list into the application it names and mints no
 entry of its own, so a chain of aliases collapses to the one type at the end of it.
 
+**The synthetic merge (`SyntheticMerge`)** is §8.2's required pass, run between materialisation and
+flattening — the moment that section names, "identity settles after Pass 2". Both lift channels name a closed
+form by one function of one thing: the binding record with **every inner form reduced to its entry name**.
+Closing reaches that always; desugaring reaches it for a nested sugar form (it lifts innermost-first) and
+cannot for a nested application, `box<text>` having no entry yet — so a form lifted eagerly with an
+application in a slot is named from an unreduced record. That form is re-derived here through
+`TemplateMaterialiser.closedFormName` and its references rewritten onto the closed-record name, which is the
+one that wins: it is a function of the resolved form alone, so two schemas reaching one form by different
+spellings agree on it. Only a form whose binding held an application moves at all.
+
 **Use-site flattening (`ReferenceFlattener`)** is §8.3 and the last thing resolution does: a type position
 naming a `REFERENCE` entry is rewritten to the end of its chain and keeps the name the author wrote as
 `@alias` (`type: @alias:field_name token`), which is what makes §8.2's instantiation identity a single-level

@@ -533,6 +533,26 @@ final class TemplateMaterialiser {
     }
 
     /**
+     * What a closed form is called once every application inside it is an entry name -- the derivation {@link
+     * #closeHeldTemplate} already names by, offered to {@link SyntheticMerge} so the other lift channel's
+     * products can be re-derived against it.
+     *
+     * <p>Both channels aim at one rule: name the binding record with every inner form reduced to its entry
+     * name. {@code SchemaDesugarer} reaches it by lifting innermost-first, and cannot where an inner form is
+     * an <em>application</em>, which has no entry until this pass runs. So the name settles here, after
+     * materialisation, which is the moment [TSON-SCHEMA] §8.2 names -- "identity settles after Pass 2, when
+     * references have resolved".
+     *
+     * <p>Safe to call once {@link #materialise} has returned: every application this reaches was closed then,
+     * so {@link #close} answers from its memo rather than minting anything.
+     */
+    String closedFormName(String head, List<RecordValue.Field> fields) {
+        CoreValue wire = closeApplications(new RecordValue(fields));
+        return SchemaDesugarer.internalName(head,
+                wire instanceof RecordValue record ? record.fields() : List.of());
+    }
+
+    /**
      * Every application still written in {@code type_ref}'s record form, closed to a bare reference to the
      * entry it denotes -- the inverse of the shape {@code SchemaDesugarer} writes when a slot holds one.
      *
@@ -764,8 +784,15 @@ final class TemplateMaterialiser {
 
     // ── Structural walks ─────────────────────────────────────────────────────────────────────────
 
-    /** Every {@link TypeRef} a definition holds, mapped -- {@code source}, and whatever its body carries. */
-    private static TypeDefinition mapRefs(TypeDefinition definition, UnaryOperator<TypeRef> map) {
+    /**
+     * Every {@link TypeRef} a definition holds, mapped -- {@code source}, and whatever its body carries.
+     *
+     * <p>Package-visible for {@link SyntheticMerge}, which rewrites references onto a merged entry by the
+     * same walk. {@code supertypes} is a name list rather than a type-ref channel and is deliberately not
+     * covered: a composition operand is a named reference or an application (§5.7, §5.8), so a supertype
+     * names a declared or an <em>instantiation</em> entry, never a synthetic one.
+     */
+    static TypeDefinition mapRefs(TypeDefinition definition, UnaryOperator<TypeRef> map) {
         Optional<TypeRef> source = definition.source().map(map);
         return new TypeDefinition(source, definition.kind(), definition.parameters(),
                 definition.constructor(), definition.supertypes(), definition.subtypes(),
