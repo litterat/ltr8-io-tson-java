@@ -37,7 +37,7 @@ import java.util.Set;
  * source (§5.8's supertypes, §5.7's refinement source), so the form to hold is the <em>flattened</em> one --
  * a §5.7 tightening entry states a modifier and no type-ref, and is not a {@code record_field} at all until
  * the inherited field supplies one. So {@code DefinitionResolver} resolves the body against the namespace and
- * then writes it back through {@code SchemaDesugarer.heldRecord}, which is the same spelling by construction.
+ * then writes it back through {@code WireForm.heldRecord}, which is the same spelling by construction.
  * A parameterized <b>atom refinement</b> is not a form at all: §12.1 gives {@code atom-refinement} no
  * parameter list, a refinement of an atom instance having no parameter to take.
  *
@@ -101,8 +101,8 @@ public record HeldBody(DataValue application) implements TemplateBody {
      */
     private static void collectApplications(CoreValue value, List<TypeRef> into) {
         switch (value) {
-            case RecordValue record when TemplateMaterialiser.isApplication(record) ->
-                    into.add(TemplateMaterialiser.typeRefOf(record));
+            case RecordValue record when WireForm.isApplication(record) ->
+                    into.add(WireForm.typeRefOf(record));
             case RecordValue record -> record.fields()
                     .forEach(field -> collectApplications(field.value().value().coreValue(), into));
             case ArrayValue array -> array.elements()

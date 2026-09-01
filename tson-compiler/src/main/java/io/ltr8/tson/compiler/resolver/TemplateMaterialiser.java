@@ -7,7 +7,6 @@ import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
-import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -64,7 +63,7 @@ import java.util.function.UnaryOperator;
  *
  * <p><b>So the three cases are told apart by the constructor head, not by the body's shape.</b> Every open
  * entry's body is a {@link HeldBody} -- a record, composition or refinement template, a sugar form's lift,
- * an alias, and an error placeholder alike ({@code SchemaDesugarer.heldEmptyRecord}). {@code record} closes
+ * an alias, and an error placeholder alike ({@code WireForm.heldEmptyRecord}). {@code record} closes
  * to the instantiation, {@code reference} to a name, everything else to a synthetic.
  *
  * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application recorded in
@@ -88,10 +87,6 @@ final class TemplateMaterialiser {
      */
     private final DefinitionGetter namespace;
 
-    /** {@code type_ref}'s own member names -- the one place a held token's channel still matters. */
-    private static final String NAME = "name";
-    private static final String VALUE = "value";
-    private static final String ARGUMENTS = "arguments";
 
     /** The constructor a held record template carries -- its closure is the instantiation itself. */
     private static final String RECORD = "record";
@@ -382,7 +377,7 @@ final class TemplateMaterialiser {
                 return name;
             }
             // Every open entry's body is held -- a record, composition or refinement template, a sugar
-            // form's lift, an alias, and an error placeholder alike (SchemaDesugarer.heldEmptyRecord). The
+            // form's lift, an alias, and an error placeholder alike (WireForm.heldEmptyRecord). The
             // three branches above are the whole of §12.1's open form, told apart by the head they carry
             // rather than by what shape the body arrived in. So this is a broken invariant, not an author
             // error and not a gap.
@@ -472,10 +467,10 @@ final class TemplateMaterialiser {
      */
     private String closeHeldAlias(String head, TypeDefinition template, HeldBody open,
             Map<String, TypeArgument> bindings) {
-        CoreValue substituted = substitute(open.application().coreValue(), head, template.parameters(),
+        CoreValue substituted = WireForm.substitute(open.application().coreValue(), head, template.parameters(),
                 bindings);
         CoreValue closed = closeApplications(substituted);
-        CoreValue target = closed instanceof RecordValue record ? field(record, TARGET).orElse(null) : null;
+        CoreValue target = closed instanceof RecordValue record ? WireForm.field(record, TARGET).orElse(null) : null;
         if (!(target instanceof TokenValue token)) {
             throw new IllegalStateException("'" + head + "<...>' is an alias whose target did not close to a "
                     + "name: " + target + " -- SchemaDesugarer writes `!reference { target: <type_ref> }` and "
@@ -511,7 +506,7 @@ final class TemplateMaterialiser {
         // slot holds (`tree<p0>` becoming `tree<text>`), and a parameter inside a collection are all the same
         // thing here -- a token in a tree -- because the body was never read against the constructor's
         // vocabulary in the first place.
-        CoreValue substituted = substitute(open.application().coreValue(), head, template.parameters(), bindings);
+        CoreValue substituted = WireForm.substitute(open.application().coreValue(), head, template.parameters(), bindings);
         CoreValue wire = closeApplications(substituted);
         try {
             return new Closed(wire, metaReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
@@ -578,165 +573,16 @@ final class TemplateMaterialiser {
      */
     private CoreValue closeApplications(CoreValue value) {
         return switch (value) {
-            case RecordValue record when isApplication(record) ->
-                    new TokenValue(close(typeRefOf(record)).name(), TokenForm.UNQUOTED);
+            case RecordValue record when WireForm.isApplication(record) ->
+                    new TokenValue(close(WireForm.typeRefOf(record)).name(), TokenForm.UNQUOTED);
             case RecordValue record -> new RecordValue(record.fields().stream()
                     .map(field -> new RecordValue.Field(field.name(),
-                            rescope(field.value(), closeApplications(field.value().value().coreValue()))))
+                            WireForm.rescope(field.value(), closeApplications(field.value().value().coreValue()))))
                     .toList());
             case ArrayValue array -> new ArrayValue(array.elements().stream()
-                    .map(element -> rescope(element, closeApplications(element.value().coreValue()))).toList());
+                    .map(element -> WireForm.rescope(element, closeApplications(element.value().coreValue()))).toList());
             default -> value;
         };
-    }
-
-    /**
-     * {@code type_ref}'s record form is the one shape carrying both members; a bare name is a token, and a
-     * {@code type_argument} carries {@code name} or {@code value} but never {@code arguments}. Package-visible
-     * so {@link HeldBody} recognises an application by the same test that closes one -- a held body is written
-     * by one phase and read by two, and a second opinion about what an application looks like is what makes
-     * one of them wrong.
-     */
-    static boolean isApplication(RecordValue record) {
-        return field(record, NAME).isPresent() && field(record, ARGUMENTS).isPresent();
-    }
-
-    /** {@code { name: head  arguments: [ ... ] }} back as the reference it spells. */
-    static TypeRef typeRefOf(RecordValue record) {
-        CoreValue name = field(record, NAME).orElseThrow();
-        String head = name instanceof TokenValue token ? token.text()
-                : typeRefOf((RecordValue) name).name();
-        List<TypeArgument> arguments = new ArrayList<>();
-        if (field(record, ARGUMENTS).orElseThrow() instanceof ArrayValue array) {
-            for (ScopedValue element : array.elements()) {
-                arguments.add(argumentOf((RecordValue) element.value().coreValue()));
-            }
-        }
-        return new TypeRef(head, arguments);
-    }
-
-    /** One argument record: {@code value} carries a literal, {@code name} a reference, simple or compound. */
-    private static TypeArgument argumentOf(RecordValue argument) {
-        Optional<CoreValue> literal = field(argument, VALUE);
-        if (literal.isPresent()) {
-            TokenValue token = (TokenValue) literal.get();
-            return new TypeArgument.Value(new Token(token.text(), switch (token.form()) {
-                case UNQUOTED -> Token.Form.UNQUOTED;
-                case SINGLE_LINE_QUOTED -> Token.Form.SINGLE_LINE_QUOTED;
-                case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
-            }));
-        }
-        CoreValue name = field(argument, NAME).orElseThrow();
-        return new TypeArgument.Ref(name instanceof TokenValue token ? TypeRef.of(token.text())
-                : typeRefOf((RecordValue) name));
-    }
-
-    private static Optional<CoreValue> field(RecordValue record, String name) {
-        return record.fields().stream().filter(f -> f.name().equals(name))
-                .map(f -> f.value().value().coreValue()).findFirst();
-    }
-
-    /**
-     * The held body with every token naming one of the template's parameters replaced by the argument applied
-     * for it -- at any depth, in a value slot, a type slot, an argument list, or inside a collection alike.
-     *
-     * <p><b>A held token needs no channel label, and that is the whole economy of holding.</b> A typed open
-     * vocabulary has to record which kind of thing each slot was bound to, because a bare token in a value
-     * slot is a literal and nothing else; here the body is uninterpreted until this substitution finishes, so
-     * §8.1's shadowing rule decides it -- a token that resolves into {@code parameters} is a parameter, and
-     * anything else is what it looks like. The one place the channel still shows is inside a {@code type_ref}
-     * record, whose {@code name} member takes a reference: a parameter there bound to a literal moves to the
-     * {@code value} member, since an argument list distinguishes the two by which member holds it.
-     *
-     * <p><b>An argument may itself be open, and that is a supported use rather than an accident.</b>
-     * {@code DefinitionResolver} substitutes an operand's held body with the arguments an enclosing
-     * declaration wrote, which may be that declaration's own parameters -- the result is a held body still
-     * carrying them, absorbed as fields and closed when the enclosing declaration is. Nothing here has to
-     * know: a binding is a {@link TypeArgument} either way, and this walk never asks whether the token it
-     * writes is concrete.
-     */
-    static CoreValue substitute(CoreValue value, String head, List<String> parameters,
-            Map<String, TypeArgument> bindings) {
-        return switch (value) {
-            case TokenValue token when token.form() == TokenForm.UNQUOTED
-                    && parameters.contains(token.text()) ->
-                    argumentValue(argumentFor(token.text(), head, bindings));
-            case ArrayValue array -> new ArrayValue(array.elements().stream()
-                    .map(element -> rescope(element, substitute(element.value().coreValue(), head, parameters,
-                            bindings))).toList());
-            case RecordValue record -> new RecordValue(record.fields().stream()
-                    .map(field -> substituteField(field, head, parameters, bindings)).toList());
-            default -> value;
-        };
-    }
-
-    /**
-     * One field of a held record, with {@code type_ref}'s own {@code name}/{@code value} split honoured: a
-     * {@code name} member bound to a value argument is that argument's literal on the {@code value} member,
-     * because §8.1 tells a reference argument from a literal one by which member carries it.
-     */
-    private static RecordValue.Field substituteField(RecordValue.Field field, String head,
-            List<String> parameters, Map<String, TypeArgument> bindings) {
-        CoreValue held = field.value().value().coreValue();
-        if (NAME.equals(field.name()) && held instanceof TokenValue token
-                && token.form() == TokenForm.UNQUOTED && parameters.contains(token.text())
-                && argumentFor(token.text(), head, bindings) instanceof TypeArgument.Value literal) {
-            return new RecordValue.Field(VALUE, rescope(field.value(), argumentValue(literal)));
-        }
-        return new RecordValue.Field(field.name(),
-                rescope(field.value(), substitute(held, head, parameters, bindings)));
-    }
-
-    private static TypeArgument argumentFor(String parameter, String head, Map<String, TypeArgument> bindings) {
-        TypeArgument argument = bindings.get(parameter);
-        if (argument == null) {
-            // A parameter of an enclosing template, still open: this application is not the one that closes
-            // it. Nothing today reaches here -- an application is closed only once every argument is concrete
-            // -- and saying so is what keeps that true rather than assuming it.
-            throw new UnsupportedOperationException("'" + head + "<...>' holds the parameter '" + parameter
-                    + "', which this application does not supply, and closing an open form onto another open "
-                    + "form is not implemented (§5.10)");
-        }
-        return argument;
-    }
-
-    /**
-     * One argument in the held spelling, standing where the parameter it binds stood.
-     *
-     * <p>A <b>literal</b> is its own token. A <b>reference</b> goes through {@link SchemaDesugarer#refValue},
-     * which spells a no-argument one positionally (§5.6, where a reference and a literal look alike) and one
-     * carrying arguments in {@code type_ref}'s own record form. Writing the head name alone would be the
-     * shorter code and is wrong: {@code box<inner<T>>} would put {@code inner} where {@code inner<T>} belongs
-     * and drop the argument list with no diagnostic, because a token has nowhere to keep it.
-     *
-     * <p><b>Reusing the desugarer's producer is the requirement, not the convenience.</b> Two spellings of
-     * one form are two entries for one type, an entry name deriving from what is written -- so the phase that
-     * substitutes and the phase that lifts have to agree down to whether a no-argument reference is a token
-     * or a record. Sharing the function is what makes that true by construction.
-     *
-     * <p>Every slot a parameter can occupy takes either spelling: a field's {@code type}, an {@code
-     * element_type}, a {@code variants}/{@code elements} entry, and {@code type_argument}'s own {@code name}
-     * member are all typed {@code type_ref}. The one position that would not is a {@code type_ref}'s
-     * <em>head</em> -- {@code type_ref.name} is a {@code type_name} -- and a parameter cannot stand there:
-     * {@code T<text>} applies a parameter, which is no form §12.1 has.
-     */
-    private static CoreValue argumentValue(TypeArgument argument) {
-        return switch (argument) {
-            case TypeArgument.Ref reference -> SchemaDesugarer.refValue(reference.ref());
-            case TypeArgument.Value value -> new TokenValue(value.value().text(),
-                    switch (value.value().form()) {
-                        case UNQUOTED -> TokenForm.UNQUOTED;
-                        case SINGLE_LINE_QUOTED -> TokenForm.SINGLE_LINE_QUOTED;
-                        case MULTI_LINE_QUOTED -> TokenForm.MULTI_LINE_QUOTED;
-                    });
-        };
-    }
-
-    /** The same scoped value carrying a rewritten core value -- annotations and type-ref kept as written. */
-    private static ScopedValue rescope(ScopedValue original, CoreValue rewritten) {
-        DataValue value = original.value();
-        return new ScopedValue(original.schemaRef(),
-                new DataValue(value.annotations(), value.typeRef(), rewritten));
     }
 
     /**

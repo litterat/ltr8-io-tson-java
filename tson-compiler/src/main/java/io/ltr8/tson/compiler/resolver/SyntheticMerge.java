@@ -118,7 +118,7 @@ final class SyntheticMerge {
      */
     private static boolean holdsApplication(CoreValue value) {
         return switch (value) {
-            case RecordValue record -> TemplateMaterialiser.isApplication(record)
+            case RecordValue record -> WireForm.isApplication(record)
                     || record.fields().stream().anyMatch(f -> holdsApplication(f.value().value().coreValue()));
             case ArrayValue array ->
                     array.elements().stream().anyMatch(e -> holdsApplication(e.value().coreValue()));

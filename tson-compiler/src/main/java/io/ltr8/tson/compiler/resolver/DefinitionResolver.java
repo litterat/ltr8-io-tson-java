@@ -435,7 +435,7 @@ final class DefinitionResolver {
                 // Only an error placeholder is both parameterised and still a bare RecordDef here -- the
                 // desugar phase rewrote every real record template into the `!record { ... }` §5.2 says it
                 // denotes. Holding it anyway is what leaves no parameterised RecordBody anywhere, so
-                // materialisation needs only the one substitution path. See SchemaDesugarer.heldEmptyRecord.
+                // materialisation needs only the one substitution path. See WireForm.heldEmptyRecord.
                 return holdIfOpen(name, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters,
                         constructor, List.of(), List.of(), Optional.empty(), body));
             }
@@ -488,8 +488,7 @@ final class DefinitionResolver {
      * source (§5.8's supertypes, §5.7's refinement source), and the form to hold is the <em>flattened</em>
      * one: a §5.7 tightening entry states a modifier and no type-ref, which is not a {@code record_field} at
      * all until the inherited field supplies one. So the rewrite has to happen where a namespace is in hand,
-     * which is here -- but the <em>spelling</em> stays {@code SchemaDesugarer}'s, through {@link
-     * SchemaDesugarer#heldRecord}, because two spellings of the held form is the one thing this design cannot
+     * which is here -- but the <em>spelling</em> stays {@code SchemaDesugarer}'s, through {@link WireForm#heldRecord}, because two spellings of the held form is the one thing this design cannot
      * survive.
      *
      * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom
@@ -500,9 +499,9 @@ final class DefinitionResolver {
             return resolved;
         }
         if (record.fields().isEmpty() && record.groups().isEmpty() && record.supertypes().isEmpty()) {
-            return resolved.withBody(new HeldBody(SchemaDesugarer.heldEmptyRecord()));
+            return resolved.withBody(new HeldBody(WireForm.heldEmptyRecord()));
         }
-        return resolved.withBody(new HeldBody(SchemaDesugarer.heldRecord(record,
+        return resolved.withBody(new HeldBody(WireForm.heldRecord(record,
                 value -> annotationWireValue(name, value))));
     }
 
@@ -1395,7 +1394,7 @@ final class DefinitionResolver {
             bindings.put(template.parameters().get(i), typeArgument(application.args().get(i)));
         }
         DataValue body = held.application();
-        CoreValue substituted = TemplateMaterialiser.substitute(body.coreValue(), head,
+        CoreValue substituted = WireForm.substitute(body.coreValue(), head,
                 template.parameters(), bindings);
         Top absorbed = bindAtomInstance(name, new DataValue(body.annotations(), body.typeRef(), substituted));
         if (!(absorbed instanceof RecordBody record)) {
