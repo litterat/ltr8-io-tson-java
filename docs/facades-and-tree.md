@@ -369,9 +369,16 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   (demanding exactness would reject `0.1`) but rejects a magnitude that can't be finite, so nothing ever
   reads back as `Infinity`. Text is never parsed: `"42"` is a string per §4.4. A test asserting *which*
   host type a reader produced must therefore use `as(Class)`, not `asInt()`.
-- **Read-side only, deliberately.** There are no copy-on-write transforms and no builders; construction is
-  the static `of(...)` factories. `TsonTreeWriter` already closes the read→edit→write loop, so an editing
-  API waits on a concrete produce/edit use case (`BACKLOG.md`).
+- **Read-side only, deliberately, and deferred until required.** There are no copy-on-write transforms and
+  no builders — `TsonRecord.with`/`without`, `TsonArray.with`/`plus`/`without`, `TsonRecord.builder()`, a
+  pointer-based `set("/a/b", value)` — and construction is the static `of(...)` factories. All of it would be
+  pure `tson-tree` work with no compiler dependency, so the module is ready for it; what is missing is a
+  concrete produce/edit use case, and `TsonTreeWriter` already closes the read→edit→write loop without one.
+  **JEP 540 reached the same conclusion independently**, which is what makes this a decision rather than a
+  shrug: it ships no transformation API and no builders at all, construction being static `of(...)` factories
+  as here, and its Risks section defers the area outright — "During the incubation period, we will gather
+  more information about use cases involving generating and transforming JSON documents, in order to evolve
+  these areas of the API."
 
 ## Front door: `Tson`/`TsonConfig` (`tson` module)
 

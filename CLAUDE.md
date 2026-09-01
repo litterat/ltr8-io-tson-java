@@ -659,7 +659,8 @@ read failure. Under a schema `null` stays ordinary text — §7.3's concession i
 Two accessor families with different questions: `as(Class)`/`asString`/…
 **cast** ("what host type did the read produce?"), `asInt`/`asLong`/`asDouble` **convert** ("what number is
 this?") — a test asserting which host type a reader produced must use `as(Class)`. Read-side only; no
-builders or transforms yet.
+builders or transforms, deferred until a concrete produce/edit use case exists rather than pending
+(`docs/facades-and-tree.md`).
 **`TsonDocument(id, schema, root)` is the model's document** — the counterpart of `ast.Document`, since §2.2
 makes a header a property of the document and not of its root value. No `meta` component: that would be a
 *schema* document, whose model is `schema.meta`, and `TsonDocumentHeader` (which carries all three) answers

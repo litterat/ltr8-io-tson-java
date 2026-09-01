@@ -118,23 +118,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
   session-oriented internal narrative exists.
 
-## Tree model (`TsonValue`)
-
-The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tree model" section. What's left:
-
-- [ ] **Copy-on-write transforms + builders (parked).** The "new tree from old" editing half —
-  `TsonRecord.with(name, value)`/`without(name)`, `TsonArray.with(i, value)`/`plus(value)`/`without(i)`,
-  `TsonRecord.builder()`, and a pointer-based `set("/a/b", value) → new tree`. All pure `tson-tree`
-  operations (no compiler dependency), so they belong in that module. Deferred until there's a concrete
-  produce/edit use case: `TsonTreeWriter` already closes the read→edit→write loop, so these have a real
-  payoff when wanted, but block nothing now.
-    - **Nothing to copy from JEP 540, and that is the useful part.** It ships no transformation API and no
-      builders at all — construction is static `of(...)` factories, which `tson-tree` already matches — and
-      its Risks section defers the area outright: "During the incubation period, we will gather more
-      information about use cases involving generating and transforming JSON documents, in order to evolve
-      these areas of the API." The JDK reached the same "wait for real use cases" conclusion independently,
-      which turns this item's deferral from a shrug into a decision.
-
 ## Miscellaneous
 
 - [ ] **[TSON-DATA] §9.1's resource limits — and the `StackOverflowError` that escapes for want of them.**
