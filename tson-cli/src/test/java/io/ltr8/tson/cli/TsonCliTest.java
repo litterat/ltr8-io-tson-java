@@ -304,8 +304,8 @@ class TsonCliTest {
 
         String json = captureStdout(() ->
                 assertEquals(0, TsonCli.run(new String[] {"policy", "--output", "json"})));
-        assertTrue(json.strip().startsWith("{\"identifierPolicy\":{\"level\":\"HIGHLY_RESTRICTIVE\""), json);
-        assertTrue(json.contains("\"unicodeDataVersion\":\"" + TsonUnicodePolicy.dataVersion() + "\""), json);
+        assertTrue(json.strip().startsWith("{\"identifier_policy\":{\"level\":\"HIGHLY_RESTRICTIVE\""), json);
+        assertTrue(json.contains("\"unicode_data_version\":\"" + TsonUnicodePolicy.dataVersion() + "\""), json);
     }
 
     /** A stray argument is a usage error, the same as anywhere else -- this command takes only {@code --output}. */
