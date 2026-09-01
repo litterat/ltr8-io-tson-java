@@ -12,11 +12,14 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The fifteen below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
+The nineteen below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
 seventeen raised against Revision 33 are gone from here, because the spec now carries their rules and that
 is where the answer belongs. **This file is the as-built record**, not a pointer to one: where an entry
 proposes a design this implementation has built, the entry states the design, what is running, and what is
-not, so that a reviewer editing the spec needs nothing beside it. **Cite the spec, not the argument that got
+not, so that a reviewer editing the spec needs nothing beside it. **Where the evidence is a consumer of this
+library rather than this library** — #16 through #19 were found building the HTTP layer in
+`ltr8-io-tson-java-http`, and this register is the collection point for all of it — the entry says so and
+states what is running there on the same terms. **Cite the spec, not the argument that got
 it there:** `docs/` and the Javadoc name the section that requires a behaviour, and a `SPEC-FEEDBACK.md #N`
 citation is for an entry below, where there is no section to point at yet. When an entry closes, its
 citations become spec citations and the entry is deleted — nothing here is an archive.
@@ -711,6 +714,307 @@ policy subsumes it." Every other use of "name" in §8.2 stands.
 it was judged under. If that lands, these two terms stop being prose and become field names on a wire that two
 implementations are meant to agree about — and each will have picked its own, from a phrase the specification used
 once and never defined.
+
+**Status against Revision 34:** open, and new against this revision.
+
+---
+
+## 16. §8.2's policy has no artifact, and the two obvious homes are both wrong
+
+**Section:** [TSON-DATA] §8.2 (name hygiene), with consequences for [TSON-SCHEMA] §3.5 (schema immutability)
+and [TSON-DATA] §2.2.1 (canonical identity).
+
+**Problem:** Revision 34 makes name hygiene a policy layer that MUST be implemented and is enforced by
+default, with a restriction level, a unit, and an optional script set — and says nothing about where that
+configuration lives or how a counterparty learns it. The series now has a security control with no artifact.
+That would be a reasonable thing for a data format to leave alone, except that §8.2 also makes a refusal a
+fifth, distinguishable outcome reported "under a stated policy and a stated data version", which presumes the
+policy is something nameable. It is worth saying what it may not be, at least.
+
+**It may not be the schema**, and orthogonality is not the reason. Two stronger ones:
+
+- **Self-certification.** If a schema declared its own strictness, the artifact being checked would choose the
+  check, and a homograph-laden schema would declare the level that admits it. A policy the subject selects is
+  a preference.
+- **Immutability.** §3.5 makes a published schema immutable and §2.2.1 lets it be hash-pinned, while strictness
+  must move — `confusables.txt` updates, threat models change, a service starts rendering values it used only
+  to log. Raising a policy would mint a new identity, and every document pinning the old one would keep the old
+  policy for good. Nobody raises a control that costs that.
+
+A third reason is specific to §8.3's own table: **skeleton distinctness does not compose across `!!import`**.
+The policy is therefore not a property of one schema at all but of the merged namespace at the importing site,
+and no schema is in a position to declare it.
+
+**Nor an API description**, which in the consuming project is itself a schema governed by a meta layer and so
+inherits both objections whole. It also puts policy in a *contract*: raising a token policy would mean
+publishing a new description, which is the friction that gets a control switched off.
+
+**What is missing is a third artifact kind, and it already has a homeless occupant.** §2.2.1 evicted the port
+from identity — "no port (default or otherwise)" — and never said where location went. A **deployment
+descriptor** is what that has been trying to be: location, fetch allow-lists and host mappings, and the two
+§8.2 policies. It should be **data, not a schema**, and that line is worth stating in the series: an API
+description must be a schema because `request: order` is a type reference the resolver resolves (§4.1's `data`
+kind, §9's `type_ref` rule), where a deployment descriptor references no types — a level is an enum member, a
+host is text, and even a per-schema policy holds *identities*, which are URIs.
+
+| Artifact | Kind | Shared with counterparties | Immutable |
+|---|---|---|---|
+| Schema | schema | yes, by identity | yes (§3.5) |
+| API description | schema (holds type refs) | yes, by identity | yes |
+| Deployment descriptor | **data** (holds no type refs) | no — see discovery below | **no** |
+
+**Two constraints would have to be normative, or self-certification returns by the back door.** *Named at the
+call site, never discovered* — a runtime that loads whatever descriptor is on its path lets a container image
+swap change a security policy with no code diff. And *never resolvable by identity* — no `!!import` of a
+descriptor and no document able to name one, since the moment a document can point at one it selects its own
+enforcement level.
+
+**Discovery is the half a format can usefully standardise.** A counterparty has a legitimate question — what
+will this endpoint accept? — and three answers with different standing. **The refusal is the authority**, being
+the only report that cannot be stale, which is presumably why §8.2 puts the policy there. **A `.well-known`
+path (RFC 8615) for the origin's acceptance profile** is the neat one: in this series everything with an
+identity is served at its identity's path, and a deployment descriptor is precisely the artifact that must
+*not* have an identity, so a well-known path is the right shape for it for the same reason it is the wrong
+shape for a schema — but what is published there must be a *projection*, since fetch allow-lists and host
+mappings are internal topology. **Not the API description**, which advertises a mutable policy from an
+immutable artifact. Per-endpoint policy is the awkward case, a well-known document being origin-scoped: the
+honest answer is probably that the profile advertises the origin's default and the refusal reports what
+actually applied.
+
+**Interpretation chosen:** both policies are code calls on `TsonConfig` (`identifierPolicy`, `tokenPolicy`),
+with no artifact of any kind, and the consuming HTTP project leaves them at this library's defaults with its
+position written down in prose rather than expressed in a document. **The reporting half is no longer open
+here**: what §8.2 requires a refusal to name is now a machine-readable value on the run or response that
+carries the diagnostics (`TsonUnicodeProcessorPolicy`, and `policy` on the CLI's own envelopes) rather than
+prose in a message — #14 has that argument and what it changed.
+
+**Suggested resolution** (a proposal — the reporting half above is running, the artifact below is not): name
+the third artifact kind, say that it is data rather than a schema and why, and make the two constraints
+normative. Failing that, at minimum say in §8.2 that the policy is *not* a property of a schema and not
+carried by one, which is the half that stops an implementer reaching for the wrong home.
+
+**Status against Revision 34:** open, and new against this revision — Revision 34 is what introduced the
+policy layer that has nowhere to live.
+
+---
+
+## 17. A document that cannot carry `!!schema` has no way to name the schema that governs it
+
+**Section:** [TSON-DATA] §6 (JSON compatibility) and §7.1 (encoding, normalization, and media type), with
+§2.2.1 (canonical identity) for the conflict rule.
+
+**Problem:** §6 makes every valid JSON document a valid TSON document, and the format's stated target use is
+validating generated structured output against a schema. But `!!schema` is TSON directive syntax and a JSON
+document cannot carry one — so across the entire JSON-compatible surface there is no in-band way to say which
+schema governs the document. §7.1 already legislates for HTTP (`application/tson; version=1`, "if
+disambiguation is needed in HTTP contexts") and stops exactly before the parameter that would answer this.
+
+**A stronger reason turned up than JSON compatibility**, building version routing: an intermediary routing
+between two servers by schema cannot parse the body to find out which one. nginx, Envoy, API gateways and CDNs
+route on headers and paths and none of them parse bodies — that is a layering violation before it is anything
+else — and `Content-Encoding: gzip` makes it impossible rather than merely rude. The honest limit is that a
+header does not save the *origin* from peeking, since if header and body can disagree the endpoint must still
+read the directive to check; the saving is at the network, and at a JSON body, where the header is the only
+possible source and there is nothing to check against. CloudEvents is the precedent: `dataschema` is a context
+attribute that its HTTP binding maps to a `ce-dataschema` header precisely so intermediaries can handle a
+message without opening it.
+
+**Interpretation chosen:** the consuming HTTP project implements the header as `TSON-Schema` and treats it as
+a *projection* of `!!schema` rather than an alternative to it — an RFC 9651 structured field whose Item is an
+**sf-string**, so the value is quoted, which also matches `!!schema`, whose argument must be quoted for the
+same reason (a URI contains `:` and `/` and falls outside §7.1's unquoted-token profile). It may appear
+alongside the directive, and the two must then agree by canonical identity (§2.2.1 — scheme and any `?sha256=`
+pin do not count). It is defined for a body of any media type, which is what gives a JSON payload a channel at
+all. A body naming no schema by either channel stays schemaless Class 1 and valid TSON; rejecting one is
+**endpoint policy**, not a property of the media type. `TsonSchemaVersions` refuses a document that names no
+version rather than guessing one. A companion `TSON-Accept-Schema` — an sf-list of sf-strings with `;q=`,
+`Accept` to the first field's `Content-Type` — carries which versions a client can read *back*, a second field
+rather than a second meaning because one message routinely asks both at once.
+
+**Suggested resolution:** define the field in the series, or say why not. Four points are worth carrying
+whatever is decided:
+
+1. **The conflict rule has a precedent in this same spec and should follow it.** §2.2.1 on content hashes:
+   "two that declare different hashes are in conflict — at most one describes the real bytes — and a consumer
+   that observes both MUST report an error rather than choosing between them." A header and a directive naming
+   different schemas is the same situation, and silent precedence is how a document gets validated against a
+   schema nobody intended.
+2. **sf-string, not sf-token, and the quotes are load-bearing in a way testing will not reveal.** RFC 9651's
+   `sf-token` production is `( ALPHA / "*" ) *( tchar / ":" / "/" )`, which an unpinned `https://` URL
+   satisfies completely — so a loosely defined field parses fine in every test anyone writes, and then someone
+   pins a schema: `?sha256=…` contains `?` and `=`, neither a tchar, and the unquoted form stops parsing for
+   exactly the references §2.2.1 encourages as the strongest integrity control.
+3. **Naming has a defined procedure**: RFC 9110 §16.3's field-name registry, which admits *provisional*
+   registration on expert review — suitable for a working revision — and RFC 6648, which rules out
+   `X-TSON-Schema` as a BCP rather than a style opinion. `Content-Schema` claims general-purpose territory for
+   a whole-industry concern; `ce-dataschema` asserts the message is a CloudEvent, which a plain TSON request
+   is not. Registering a field name alongside the `application/tson` media type the spec already intends to
+   register is coherent rather than extra machinery.
+4. **What it must not become**: a way to validate a document against a schema its author did not choose. The
+   field states what the *sender* claims governs the body; it is not an instruction to the receiver to apply a
+   schema of its own choosing to an unmarked document, which is how a payload gets interpreted under a
+   contract nobody agreed to.
+
+**Status against Revision 34:** open. This revision left §6 alone and rewrote §7.1 around the identifier layer
+rather than the media type, so neither gained a way to name a governing schema out of band.
+
+---
+
+## 18. No shorthand for a template application at a `type_ref` slot in data
+
+**Section:** [TSON-SCHEMA] §5.6 (the positional form) and §8.1 (`type_ref`'s canonical form).
+
+**Problem:** The meta-kernel's `type_ref` is explicit and this implementation matches it: at a `type_ref`-typed
+slot a bare token fills `name`, and a braced record is the explicit form, canonical output using the bare token
+whenever `arguments` is absent. So a *schema* can write `page<order>`, but a **data** payload at a `type_ref`
+slot — an `!operation { … }` governed by a consumer's meta layer — must write
+
+```tson
+body: { name: page  arguments: [ { name: order } ] }
+```
+
+because `page<order>` in that position is a *parse* error (`adjacent values must be separated by whitespace, a
+comma, or both`), `<` never being data syntax.
+
+**This is by design and the spec is not wrong.** What is worth raising is whether the design is intended to
+cost this much at the one place it now shows up. §5.6's positional form was written for the argument-free case,
+and the `data` base kind has since created a class of documents — data-in-a-schema, describing types — where
+the *with-arguments* case is routine rather than exotic. An API description applying `page<order>` at four
+endpoints writes the braced form four times, or names four aliases.
+
+Worth reading alongside it, because it answers a neighbouring question and is easily mistaken for this one:
+§8.1 explains why the *arguments* are braced — `type_argument` has no REQUIRED field, so a bare token cannot
+self-classify as reference or literal and its braced record is load-bearing rather than ceremony. That is
+sound, and it is one level down from the cost reported here, which is the **application** at the `type_ref`
+slot, where `name` is REQUIRED and the positional form does apply in a schema and cannot be written in data.
+
+**Interpretation chosen:** the explicit braced record, as the kernel requires. Measured in the consuming HTTP
+project, whose `UpstreamGapsTest.aTemplateApplicationAtATypeRefSlotInDataNeedsTheBracedForm` asserts both
+spellings — the braced record resolves, the sugar does not parse.
+
+**Suggested resolution**, in preference order:
+
+1. **Leave it, and say so.** Add a sentence to §8.1 noting that the sugar is schema syntax only, so a
+   data-position reference with arguments uses the explicit record. Costs nothing and stops the next
+   implementer discovering it by parse error, which is how it was found.
+2. **Recommend the alias.** `order_page => page<order>` is one line, reads better than either alternative, and
+   gives the application an identity. If that is the intended answer, §8.2 is the place to say so. One
+   diagnostic point comes with it: a bad argument in the *alias* form is reported against the entry the
+   template materialised (`'array_no_such_eb84587b' element_type has an unresolved reference 'no_such'`) where
+   the inline form names the operation — so if (2) is the recommended spelling, that message is the one to
+   improve, the author having written `order_page => page<no_such>` and been shown a synthetic name they have
+   never seen.
+3. **Extend the sugar to data position.** Real ergonomics, and a real cost: `<` becomes meaningful in data, at
+   exactly one slot type, decided by the governing schema. Probably not worth it — noted for completeness
+   rather than recommended, and it would have to reach a record §8.1 argues must stay braced.
+
+**Status against Revision 34:** open. This revision reworked §8.1 heavily — held bodies, `reference.target`
+widened to a `type_ref` — and left the positional-form paragraph byte-identical.
+
+---
+
+## 19. A namespace should be a value — the kernel's 2×2 has an empty cell
+
+**Section:** [TSON-SCHEMA] §2.1 (the schema body is `map<type_name, type_definition>`), §2.2.3 (the flat
+namespace), §4.1 (kinds, and the `data` kind's motivating case), §5.7–§5.9 (the three operators), §5.10
+(templates), §8 (resolver output); [TSON-DATA] §2.6 (map keys are values), §7.7 (identifier grammar).
+
+**This is a proposal, not a defect report.** Everything below is a design the author may well not take; it is
+recorded because it was arrived at by measurement, it explains several open items at once, and the argument is
+easier to weigh written down than reconstructed. The spec is internally consistent on every point it touches.
+
+**The hit.** A service wants to declare a method once, on an interface, and bind it to HTTP in a separate
+declaration — possibly a separate document — that *refers* to it:
+
+```
+orders-1.tn      place_order  => !method { request: order  response: order }
+orders-api-1.tn  create_order => !binding { method: place_order  verb: POST  path: "/orders" }
+```
+
+That second line needs one entry to name another, and §4.1 makes a `kind: DATA` entry something that can be
+declared and applied but never named — field type, element type, variant, argument, composition operand,
+refinement source, all refused. So the kind introduced for exactly this case (§4.1: "an HTTP operation binding
+request and response types by name is the motivating case") has no reference form, and the binding can only
+name its method as a `type_name` token the resolver treats as data: `method: plaec_order` resolves clean and is
+caught by nothing but the consumer.
+
+**A method is better as a type, and that is the first sign.** Modelled under plain meta.tn, with no meta layer
+and no `~` at all:
+
+```
+service-1.tn   method => <Req, Resp> { request: Req  response: Resp?  safe: boolean ~ false  idempotent: boolean ~ false }
+               http   => { verb: http_verb  path: text  status: status_code ~ 200 }
+orders-1.tn    place_order  => method<order, order> & { errors: [sku_not_found]? }
+orders-api.tn  create_order => place_order & http & { verb: = POST  path: = "/orders"  status: = 201 }
+```
+
+Measured: `create_order` resolves with `supertypes: [place_order, method<order, order>, http]` and `verb`,
+`path`, `status` as `REQUIRED_FIXED`; `!create_order { request: { sku: A-100  quantity: 2 } }` reads as a valid
+value; the same value with `verb: GET` is refused. The operation IS-A its method, the compiler checks the
+reference, and a plan step is a value of the method type — the thing a `data` entry can never be. One rule met
+on the way is correct and worth a sentence in §5.8: `place_order => method<order, order>` alone is an alias to
+an instantiation and has no vocabulary body to compose with; it needs a trailing `& { … }`.
+
+So the motivating case for `data` is served *better* by a record type. Either the kind needs a reference form,
+or the case does not need the kind — and the second reading opens onto something larger.
+
+**The missing primitive, in a 2×2 the kernel already three-quarters fills:**
+
+| | values are **data** | values are **declarations** |
+|---|---|---|
+| keys are **names** | record — `{ name: value }` | schema — `{ name => type }` |
+| keys are **data** | map — `{ key => value }` | **empty** — `{ "/orders" => type }` |
+
+What a service description wants is the fourth cell: a **keyed set of declarations whose keys are values**.
+The primitive is one thing — **a namespace is a value**, with a key type, a member bound, and a scope, of which
+`schema` is the instance with key type `type_name`, member bound `top`, and the document as its scope. Then
+`interface => !namespace { member: method }` and `api => !namespace { key_type: route member: resource }` —
+OpenAPI's paths → verbs → operation structure arrived at from the key types rather than copied. A body would be
+a record, a binding, a choice, *or a namespace*: a new body kind, not a new entry kind.
+
+**Four things fall out, and together they are the argument.**
+
+1. **Referenceability follows the key type, not the kind.** A member of a `type_name`-keyed namespace is a type
+   one can name; a member of a route-keyed one is anonymous and does not need a name — HTTP addresses it by
+   route. That removes the invented operation name beside the method, and dissolves the question of minting an
+   identifier from a path: a key that is data was never required to be an identifier.
+2. **The three operators already mean the right things.** `&` on records is "merge disjoint keyed sets, then
+   add" — on namespaces that is `extends`. `^` is "tighten members in place" — pin `idempotent` across an
+   interface. `-` is "remove members" — a subset exposure that today has no spelling at all. When all three
+   acquire an obvious, useful meaning on a construct without being redefined, the construct is usually right.
+   A record is the namespace whose key type is `field_name`.
+3. **Templates over namespaces are the payoff at the right level.** `crud => <T> !interface { create =>
+   method<T, T>  get => method<id, T> }` and `orders => crud<order>` — legal because the members are types and
+   the application materialises a namespace. The repetition an API description suffers is per *interface*, and
+   that is where the template belongs.
+4. **The `data` kind may have nothing left to do.** With methods and operations as types and groupings as
+   namespaces, the one case §4.1 names for `data` is covered. Worth confirming as a consequence rather than
+   assuming as a premise — the part of this most likely to be wrong.
+
+**The costs, each a decision only the author can make.** A **third grammar recursion point**: §1 says the
+schema grammar imports the value grammar at exactly two points, deliberately, and a constructor payload
+admitting a declaration block is a third, in the other direction — worth stating as a principle change rather
+than letting in quietly. **Scoping**: lexical resolution outward, qualified names inward, which [TSON-DATA]
+§7.7 does not admit today (`identifier-continue = XID_Continue / "-"`, no `.`), so a `qualified-name`
+production at type-ref and `!name` positions is the small version; §2.2.3's flat rule becomes "one qualified
+name denotes one type", and §8.2's skeleton distinctness becomes per-scope, which §8.3 already half-says by
+declining to compose it across `!!import`. **Imports flat or named**: the minimal design keeps `!!import` flat
+and scopes only declared blocks, where the full design makes every import a named namespace, which is a module
+system and a separate decision. **Resolver output goes recursive**: keep the nesting, since a router iterating
+a route-keyed map *is* the point, and §1.3's closed-entry guarantee holds per scope as it holds per document
+today. **What is a route key**: a structured key (§2.6 already admits any value) or two nested levels with
+simple key types — nested is cleaner, matches how HTTP is organised, and means an `http` record loses `verb`
+and `path` as fields because the keys carry them, which answers the one smell the method-as-type measurement
+showed: schema facts declared as fields are injected into every instance, and a plan step should not carry its
+own URL.
+
+**Interpretation chosen:** nothing that presumes the answer. The consuming project's description stays a schema
+under a `~data &` meta layer, a two-declaration binding names its method by `type_name` with the reader
+checking it at startup, and the method-as-type shape is measured and kept as a probe rather than adopted.
+
+**Suggested resolution:** none requested — a direction rather than a request, filed so the 2×2 and the operator
+argument are on record where the next revision is designed. The two are what make the primitive look inevitable
+rather than added.
 
 **Status against Revision 34:** open, and new against this revision.
 
