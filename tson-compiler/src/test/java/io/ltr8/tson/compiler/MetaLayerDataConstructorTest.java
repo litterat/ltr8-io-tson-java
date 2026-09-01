@@ -20,9 +20,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.ltr8.tson.compiler.atom.IdentifierParser;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -289,6 +294,52 @@ class MetaLayerDataConstructorTest {
         assertNotNull(linked("withrefs", """
                 hook => !webhook { path: "/hook"  delivers: [ search_request ] }""")
                 .schema().entries().get("hook"));
+    }
+
+    /**
+     * <b>A templated constructor whose content carries punctuation mints a name that is still an
+     * identifier</b> ([TSON-SCHEMA] §8.2's freshness MUST), and <b>§8.2's name-hygiene policy does not judge
+     * it</b> — the two halves of one defect. Before, {@code path: "/x"} produced
+     * {@code operation_/x_GET_..._bb34a349} and the linker refused it under {@code RESTRICTED_CHARACTER},
+     * against a schema with nothing wrong in it.
+     *
+     * <p>The Cyrillic case is why sanitising to {@code XID_Continue} was not enough: {@code
+     * operation_путь_..._bef13f0c} is a perfectly valid identifier, and was still refused under {@code
+     * RESTRICTED_SCRIPT} for mixing the Latin constructor head with the author's own word. Hashing what is
+     * not ASCII is what settles it — the name carries no author text that could mix scripts, spoof another
+     * name, or otherwise shape the namespace, so §8.2's walk stays on and passes it.
+     *
+     * <p>What is left after the fix is an unrelated gap this repository already knows about — a DATA-kinded
+     * entry cannot be named as a type — so the assertion is that the failure is <em>not</em> a §8.2 refusal,
+     * and that the name it names is a clean ASCII identifier.
+     */
+    @Test
+    void aTemplatedConstructorMintsAnIdentifierAndIsNotJudgedByNameHygiene() {
+        for (String path : new String[] {"/x", "путь"}) {
+            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                    () -> linked("minted" + path.hashCode(), """
+                            fetch    => <T> !operation {
+                                path: "%s"  method: "GET"  request: T  response: T
+                              }
+                            getOrder => fetch<search_request>""".formatted(path)));
+
+            assertFalse(thrown.getMessage().contains("Identifier_Status"),
+                    () -> "no restricted-character refusal on a name nobody wrote: " + thrown.getMessage());
+            assertFalse(thrown.getMessage().contains("mixes the scripts"),
+                    () -> "no restricted-script refusal either: " + thrown.getMessage());
+            assertTrue(thrown.getMessage().contains("describes something other than a data value"),
+                    () -> "what is left is the DATA-reference gap, not a name problem: " + thrown.getMessage());
+
+            // That gap's message names the minted entry, which is where §8.2's freshness MUST can be read
+            // off directly -- and it has to be asserted separately, because the scoping change alone makes
+            // the *refusal* disappear whether or not the name is well formed.
+            Matcher minted = Pattern.compile("names '([^']+)'").matcher(thrown.getMessage());
+            assertTrue(minted.find(), thrown::getMessage);
+            assertDoesNotThrow(() -> IdentifierParser.validate(minted.group(1)),
+                    () -> "§8.2: an internal name is a valid identifier -- got '" + minted.group(1) + "'");
+            assertTrue(minted.group(1).chars().allMatch(c -> c < 0x80),
+                    () -> "and ASCII, which is what lets §8.2's walk judge it: '" + minted.group(1) + "'");
+        }
     }
 
     /** {@link Data#references()} reaches the linker, so a name that resolves to nothing is an author error. */

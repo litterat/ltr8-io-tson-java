@@ -817,6 +817,16 @@ single-script name is refused with nothing mixed):
 | Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (`SPEC-FEEDBACK.md` #5) |
 | Data | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
 
+**A minted name is judged by the same walk, and is built so it can be.** A derived name splices
+author-written content into its readable half, so `InternalName` restricts that half to **ASCII**: what §7.7
+admits is spliced, other ASCII keeps its admitted characters and gains a hash (`"/x"` → `x_h00000f2f`), and
+anything else is the hash alone. That satisfies §8.2's freshness MUST — an internal name is a valid
+`identifier` — and, because an ASCII name is single-script and inside the identifier profile, it also passes
+all three hygiene rules at every level. Admitting `XID_Continue` instead would keep the name legal while
+letting a document's own text shape a namespace name, and would refuse any schema written outside Latin
+script; exempting minted names from the walk would answer that by leaving the hole open.
+`docs/linking-and-compilation.md` has the detail.
+
 **One place is the point, not a tidiness.** The restricted-character rule used to run at the reading
 positions instead — spread over the schema parser, the definition resolver and the atom vocabulary — and had
 holes at exactly the positions only some of them reached: an enum member and a group's member labels were

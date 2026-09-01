@@ -8,6 +8,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -110,6 +112,12 @@ class NumericArgumentIdentityTest {
      * <b>The equivalence stops at the base type, and deliberately.</b> §4 resolves {@code 1} to an integer
      * and {@code 1.0} to a float, so they are two values however equal their magnitudes -- merging them
      * would be an equivalence this implementation invented rather than one §4.3 states.
+     *
+     * <p><b>The float's point cannot appear in a name</b>, [TSON-DATA] §7.7 not admitting {@code .} and
+     * [TSON-SCHEMA] §8.2 requiring a minted name to be an identifier, so {@code 1.0} reads as its digits
+     * plus a hash of the text they came from ({@code InternalName}). Both halves earn their place here: the
+     * digits say which entry this is, and the hash is what keeps {@code 1.0} apart from a hypothetical
+     * {@code 1_0} in the readable name rather than only in the structural hash at the end.
      */
     @Test
     void anIntegerAndAFloatOfOneMagnitudeStayApart() {
@@ -118,9 +126,11 @@ class NumericArgumentIdentityTest {
                   u   => { a: box<float64, 1>  b: box<float64, 1.0> }"""));
 
         assertEquals(2, derived.size(), derived::toString);
-        assertTrue(derived.stream().anyMatch(n -> n.startsWith("box_float64_1_")), derived::toString);
-        assertTrue(derived.stream().anyMatch(n -> n.startsWith("box_float64_1.0_")),
-                () -> "and the readable half says which is which: " + derived);
+        Set<String> readable = derived.stream().map(n -> n.substring(0, n.lastIndexOf('_')))
+                .collect(Collectors.toSet());
+        assertTrue(readable.contains("box_float64_1"), () -> "the integer reads plainly: " + derived);
+        assertTrue(readable.stream().anyMatch(n -> n.matches("box_float64_1_0_h[0-9a-f]{8}")),
+                () -> "and the float as its digits plus a hash of '1.0': " + derived);
     }
 
     /** §4.4: a quoted token is a string whatever it spells, so nothing about it is numeric. */

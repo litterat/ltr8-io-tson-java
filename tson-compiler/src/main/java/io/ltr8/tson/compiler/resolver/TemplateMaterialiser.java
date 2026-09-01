@@ -104,6 +104,9 @@ final class TemplateMaterialiser {
     /** The entries produced, keyed by their derived internal name, in creation order. */
     private final Map<String, TypeDefinition> materialised = new LinkedHashMap<>();
 
+    /** §8.2's freshness MUST over the names this class mints -- see {@link MintedNames}. */
+    private final MintedNames minted = new MintedNames();
+
     /**
      * Which of {@link #materialised} are <b>synthetic</b> entries rather than instantiation entries -- the
      * closed forms {@link #closeHeldTemplate} mints, which are indistinguishable from the entry a
@@ -305,8 +308,12 @@ final class TemplateMaterialiser {
                     + "type; recursion belongs in a record, tuple or choice body, where a field can carry it");
         }
         if (materialised.containsKey(name) || !closing.add(name)) {
-            return name; // already built, or under construction -- the knot-tying case
+            // Already built, or under construction -- the knot-tying case. Either way it must be *this*
+            // application, not another that derived the same name.
+            minted.claim(name, canonicalOf(head, arguments));
+            return name;
         }
+        minted.claim(name, canonicalOf(head, arguments));
         if (closing.size() > MAX_CLOSING_DEPTH) {
             closing.remove(name);
             // Named for the *outermost* head, which is the one the author wrote; the head in hand here is
@@ -417,6 +424,7 @@ final class TemplateMaterialiser {
         List<RecordValue.Field> fields =
                 closed.wire() instanceof RecordValue record ? record.fields() : List.of();
         String formName = SchemaDesugarer.internalName(target, fields);
+        minted.claim(formName, SchemaDesugarer.canonicalOf(target, fields));
         if (namespace.getTypeDefinition(formName) != null) {
             return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
         }
@@ -800,26 +808,41 @@ final class TemplateMaterialiser {
      * specified exactly, so hashing a string built here is deterministic by contract.
      */
     private static String internalName(String head, List<TypeArgument> arguments) {
-        StringBuilder readable = new StringBuilder(head);
+        StringBuilder readable = new StringBuilder(InternalName.part(head));
+        for (TypeArgument argument : arguments) {
+            switch (argument) {
+                case TypeArgument.Ref ref -> readable.append('_').append(InternalName.part(ref.ref().name()));
+                case TypeArgument.Value value ->
+                        readable.append('_').append(InternalName.part(canonicalText(value.value())));
+            }
+        }
+        return readable.append('_')
+                .append(String.format("%08x", canonicalOf(head, arguments).hashCode())).toString();
+    }
+
+    /**
+     * The application rendered structurally and injectively -- what the name's hash runs over, and what
+     * {@link #claim} compares when two applications arrive under one name.
+     *
+     * <p>Split from {@link #internalName} rather than built beside it so the rendering is stated once: it is
+     * the thing that decides whether two applications are the same application, and a second copy free to
+     * drift from the first would decide it differently in the two places that ask.
+     */
+    private static String canonicalOf(String head, List<TypeArgument> arguments) {
         StringBuilder canonical = new StringBuilder();
         appendText(canonical.append('A'), head);
         canonical.append('(');
         for (TypeArgument argument : arguments) {
             switch (argument) {
-                case TypeArgument.Ref ref -> {
-                    readable.append('_').append(ref.ref().name());
-                    appendRef(canonical.append('r'), ref.ref());
-                }
+                case TypeArgument.Ref ref -> appendRef(canonical.append('r'), ref.ref());
                 case TypeArgument.Value value -> {
-                    readable.append('_').append(canonicalText(value.value()));
                     // The form by name, not ordinal: inserting a constant would renumber every ordinal.
                     appendText(canonical.append('v'), value.value().form().name());
                     appendNumberAware(canonical, value.value());
                 }
             }
         }
-        canonical.append(')');
-        return readable.append('_').append(String.format("%08x", canonical.toString().hashCode())).toString();
+        return canonical.append(')').toString();
     }
 
     private static void appendRef(StringBuilder out, TypeRef ref) {
