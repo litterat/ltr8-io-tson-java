@@ -248,6 +248,14 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
 
 ## Miscellaneous
 
+- [ ] **`Diagnostic.ofRestrictedToken` names the token twice.** It builds its message as
+  `"the token '" + text + "' " + why`, and `TsonUnicodePolicy.violation` already opens by naming the text it
+  judged — so a refused value reads *"the token 'аdmin' 'аdmin' mixes the scripts [LATIN, CYRILLIC], which
+  UTS #39 §5.2's SINGLE_SCRIPT does not admit"*. The name path next to it is already right
+  (`DefaultTsonReadContext.refuse` does `"the name " + violation`), so the fix is to match it: `"the token "
+  + why`. One line, on a message a client sees over the wire — noticed by the HTTP project reading a real
+  refusal off it.
+
 - [ ] **`--output json` and `--output tson` spell one report two ways.** `CliDiagnostic`'s components carry
   `@Field("schema_pointer")` and its siblings, so `--output tson` emits `snake_case` and leaves an absent
   field out — the shape `diagnostics.tn` declares, and the one that output is validated against — while
