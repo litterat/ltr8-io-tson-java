@@ -41,7 +41,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -564,31 +563,12 @@ final class SchemaDesugarer {
      * binds, in the order the table above lists them. Everything downstream -- the emitted {@code !C { ... }},
      * the derived entry name, the bound-coherence check -- reads this and nothing else.
      */
-    private record Binding(String head, List<RecordValue.Field> fields,
-                            Map<String, TypeRef> applicationSlots) {
-
-        Binding(String head, List<RecordValue.Field> fields) {
-            this(head, fields, Map.of());
-        }
+    private record Binding(String head, List<RecordValue.Field> fields) {
     }
 
-    /**
-     * A scalar type slot as both of the things downstream needs it as: the wire field a closed construction
-     * writes, and -- when the reference carries arguments -- the reference itself, kept whole for the open
-     * form to bind.
-     *
-     * <p><b>Why an application needs the second half.</b> A closed slot is a bare token, the positional form
-     * of a {@code type_ref} (§5.6). An application has no bare-token spelling: the entry it denotes does not
-     * exist until materialisation, one phase later. Its wire form is the record one, which keeps the name and
-     * the arguments apart -- structurally right, and what {@link #internalName} hashes -- but an open binding
-     * holds a {@code type_ref} directly rather than reading one, so it wants the reference as written.
-     */
-    private static void refSlot(String slot, TypeRef ref, List<RecordValue.Field> fields,
-            Map<String, TypeRef> applicationSlots) {
+    /** One scalar type slot as the wire field a construction writes -- see {@link #refValue}. */
+    private static void refSlot(String slot, TypeRef ref, List<RecordValue.Field> fields) {
         fields.add(new RecordValue.Field(slot, scoped(refValue(ref))));
-        if (!(ref instanceof SimpleRef)) {
-            applicationSlots.put(slot, ref);
-        }
     }
 
     /**
@@ -665,13 +645,12 @@ final class SchemaDesugarer {
             return Optional.empty();
         }
         List<RecordValue.Field> fields = new ArrayList<>();
-        Map<String, TypeRef> applications = new LinkedHashMap<>();
-        refSlot(ELEMENT_TYPE, element, fields, applications);
+        refSlot(ELEMENT_TYPE, element, fields);
         if (optional) {
             fields.add(nameField(STATE, ElementState.OPTIONAL.name()));
         }
         size.ifPresent(spec -> fields.addAll(sizeFields(spec, "[" + shown + "; 0..]")));
-        return Optional.of(new Binding(ARRAY, fields, applications));
+        return Optional.of(new Binding(ARRAY, fields));
     }
 
     /**
@@ -697,15 +676,14 @@ final class SchemaDesugarer {
             return Optional.empty();
         }
         List<RecordValue.Field> fields = new ArrayList<>();
-        Map<String, TypeRef> applications = new LinkedHashMap<>();
-        refSlot(KEY_TYPE, key, fields, applications);
-        refSlot(VALUE_TYPE, value, fields, applications);
+        refSlot(KEY_TYPE, key, fields);
+        refSlot(VALUE_TYPE, value, fields);
         if (optional) {
             fields.add(nameField(STATE, ElementState.OPTIONAL.name()));
         }
         size.ifPresent(spec -> fields.addAll(
                 sizeFields(spec, "{" + shownRef(key) + " => " + shownRef(value) + "; 0..}")));
-        return Optional.of(new Binding(MAP, fields, applications));
+        return Optional.of(new Binding(MAP, fields));
     }
 
     /** How a map side is quoted back in the one diagnostic that shows the form. */
@@ -1067,26 +1045,6 @@ final class SchemaDesugarer {
     }
 
     /**
-     * Whether a binding's token is unambiguously a literal -- §12.1's own rule for {@code type-arg}, applied
-     * to a record this phase built rather than to one it parsed. A quoted token or one shaped like a number
-     * is a value and nothing else; every other token is carried on the reference channel, and what it turns
-     * out to be -- a type, an enum member, a parameter of the enclosing declaration -- is settled at
-     * resolution, where the parameter list and the slot's declared type are both in hand. Deciding it here
-     * instead would mean a size bound naming a parameter ({@code [text; N]}) arrived as the literal "N".
-     */
-    private static boolean isLiteral(TokenValue token) {
-        if (token.form() != TokenForm.UNQUOTED) {
-            return true;
-        }
-        try {
-            new BigInteger(token.text());
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    /**
      * A binding hoisted into its own declaration and replaced by a reference to it, or {@code unexpanded} when
      * the form did not reduce.
      */
@@ -1190,24 +1148,9 @@ final class SchemaDesugarer {
         for (int i = 0; i < parameters.size(); i++) {
             substitution.put(parameters.get(i), renamed.get(i));
         }
-        Map<String, TypeRef> applications = new LinkedHashMap<>();
-        binding.applicationSlots().forEach((slot, ref) -> applications.put(slot, renameRef(ref, substitution)));
         return new Binding(binding.head(), binding.fields().stream()
                 .map(field -> new RecordValue.Field(field.name(), renameScoped(field.value(), substitution)))
-                .toList(), applications);
-    }
-
-    /** An application's own arguments renamed alongside the wire record beside it, so the two stay in step. */
-    private static TypeRef renameRef(TypeRef ref, Map<String, String> substitution) {
-        if (ref instanceof SimpleRef simple) {
-            return substitution.containsKey(simple.name()) ? new SimpleRef(substitution.get(simple.name()))
-                    : simple;
-        }
-        GenericRef generic = (GenericRef) ref;
-        return new GenericRef(generic.name(), generic.args().stream().map(argument ->
-                argument instanceof TypeArg.Ref reference
-                        ? (TypeArg) new TypeArg.Ref(renameRef(reference.ref(), substitution))
-                        : argument).toList());
+                .toList());
     }
 
     private static ScopedValue renameScoped(ScopedValue scoped, Map<String, String> substitution) {
@@ -1276,6 +1219,17 @@ final class SchemaDesugarer {
 
     // ── Internal names (§8.2) ────────────────────────────────────────────────────────────────────
 
+    /** Injects {@code declaration} under {@code name}, unless the same form already claimed it. */
+    private void claim(String name, Binding binding, Supplier<SchemaMap.Declaration> declaration) {
+        if (minted.claim(name, canonical(binding))) {
+            injected.put(name, declaration.get());
+        }
+    }
+
+    private static String bindingName(Binding binding) {
+        return internalName(binding.head(), binding.fields());
+    }
+
     /**
      * {@code head_arg_arg_hash} -- §8.2's own recommendation for an internal name, "a readable head plus a
      * structural hash". The readable half is what a diagnostic shows and what several tests recognise a form
@@ -1297,25 +1251,12 @@ final class SchemaDesugarer {
      * <p>That determinism is load-bearing, not cosmetic. An entry name is part of the resolved form, and an
      * importing schema reaches an <em>imported</em> entry by deriving the same name for the same form --
      * meta.tn's {@code extern.types: [type_name]?} landing on the entry meta-kernel already produced.
-     */
-    /** Injects {@code declaration} under {@code name}, unless the same form already claimed it. */
-    private void claim(String name, Binding binding, Supplier<SchemaMap.Declaration> declaration) {
-        if (minted.claim(name, canonical(binding))) {
-            injected.put(name, declaration.get());
-        }
-    }
-
-    private static String bindingName(Binding binding) {
-        return internalName(binding.head(), binding.fields());
-    }
-
-    /**
-     * The same derivation, over a binding record built elsewhere -- {@code TemplateMaterialiser}, closing an
-     * open form into the concrete one it always described.
      *
-     * <p><b>Sharing the function is what makes the two channels dedupe against each other</b> (§8.2). A form
-     * written directly and the same form arriving through a materialised template are one type, so they must
-     * be one entry, and the only way that holds is for one function of one record to name both.
+     * <p><b>It is shared with {@code TemplateMaterialiser}</b>, which names a binding record it built while
+     * closing an open form into the concrete one it always described. Sharing the function is what makes the
+     * two channels dedupe against each other (§8.2): a form written directly and the same form arriving
+     * through a materialised template are one type, so they must be one entry, and the only way that holds
+     * is for one function of one record to name both.
      */
     static String internalName(String head, List<RecordValue.Field> fields) {
         Binding binding = new Binding(head, fields);
@@ -1342,17 +1283,17 @@ final class SchemaDesugarer {
         }
     }
 
+    /** {@link #canonical} over a binding built elsewhere -- {@code TemplateMaterialiser}'s closed synthetics. */
+    static String canonicalOf(String head, List<RecordValue.Field> fields) {
+        return canonical(new Binding(head, fields));
+    }
+
     /**
      * The binding record rendered as one string, structurally and injectively: every value shape is written
      * under its own tag, nested records and arrays recurse, and each piece of author text is written
      * length-first ({@code 4:text}), so no arrangement of delimiters inside a token can spell a different
      * record. Two renderings are equal exactly when the binding records are.
      */
-    /** {@link #canonical} over a binding built elsewhere -- {@code TemplateMaterialiser}'s closed synthetics. */
-    static String canonicalOf(String head, List<RecordValue.Field> fields) {
-        return canonical(new Binding(head, fields));
-    }
-
     private static String canonical(Binding binding) {
         StringBuilder out = new StringBuilder();
         appendText(out.append('A'), binding.head());

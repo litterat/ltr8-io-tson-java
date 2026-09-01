@@ -14,7 +14,6 @@ import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
@@ -30,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -162,10 +162,6 @@ final class TemplateMaterialiser {
      * compiled reader, the same one a written {@code !array { ... }} binds through. Using it is what makes
      * {@code min_items: "two"} an ordinary read error rather than a check this class would have to grow: the
      * bindings a template defers are exactly the ones a closed instance has always had checked for it.
-     *
-     * <p>{@code null} for a caller with no compiled meta reader to offer -- every hand-built test fixture,
-     * and the bootstrap. Closing an open <em>instance</em> template then fails loudly instead of silently
-     * producing an entry with an unread body; a record template needs none of this and is unaffected.
      */
     private final DefinitionMetaReader metaReader;
 
@@ -198,18 +194,14 @@ final class TemplateMaterialiser {
     /** The governing meta's entries, which is where a slot's declared type is read from. */
     private final Function<String, TypeDefinition> metaTypes;
 
-    TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, TypeDefinition> publish) {
-        this(namespace, publish, null, Set.of(), null);
-    }
-
     TemplateMaterialiser(DefinitionGetter namespace, BiConsumer<String, TypeDefinition> publish,
             DefinitionMetaReader metaReader, Set<String> generated,
             Function<String, TypeDefinition> metaTypes) {
-        this.namespace = namespace;
-        this.publish = publish;
-        this.metaReader = metaReader;
-        this.generated = generated;
-        this.metaTypes = metaTypes;
+        this.namespace = Objects.requireNonNull(namespace, "namespace");
+        this.publish = Objects.requireNonNull(publish, "publish");
+        this.metaReader = Objects.requireNonNull(metaReader, "metaReader");
+        this.generated = Objects.requireNonNull(generated, "generated");
+        this.metaTypes = Objects.requireNonNull(metaTypes, "metaTypes");
     }
 
     /** The inferred kinds, once {@code SchemaResolver} has them -- see {@link #parameterKinds}. */
@@ -521,10 +513,6 @@ final class TemplateMaterialiser {
         // vocabulary in the first place.
         CoreValue substituted = substitute(open.application().coreValue(), head, template.parameters(), bindings);
         CoreValue wire = closeApplications(substituted);
-        if (metaReader == null) {
-            throw new IllegalStateException("'" + head + "<...>' closes to a '" + target + "' body, and this "
-                    + "materialiser was built without a compiled meta reader to bind it through");
-        }
         try {
             return new Closed(wire, metaReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
         } catch (TsonReadException e) {
@@ -763,52 +751,6 @@ final class TemplateMaterialiser {
                 false, List.of(), List.of(), Optional.empty(), new Reference(TypeRef.of(formName)));
     }
 
-    /**
-     * A type-ref with each parameter reference replaced by the argument bound to it.
-     *
-     * <p><b>It recurses into arguments</b>, which is what makes recursion work: the head of {@code chain<T>}
-     * is {@code chain}, not a parameter, so binding only the outer name would leave {@code T} in place and
-     * mint an entry per level. §5.10 admits no head abstraction ({@code v: T<...>} is not spellable), so a
-     * parameter is always a whole ref -- but it may be a whole ref sitting in an argument list.
-     */
-    private static TypeRef bindRef(TypeRef ref, Map<String, TypeArgument> bindings) {
-        TypeArgument bound = bindings.get(ref.name());
-        if (bound != null) {
-            if (bound instanceof TypeArgument.Ref reference) {
-                return reference.ref();
-            }
-            // A value argument reaching a type position: the applied signature disagrees with the body's use
-            // of the parameter. §5.10 infers a parameter's kind from its use, so this is the author's error.
-            throw new TsonSchemaValidationException("'" + ref.name() + "' is used as a type but a value was "
-                    + "applied for it (§5.10)");
-        }
-        if (ref.arguments().isEmpty()) {
-            return ref;
-        }
-        List<TypeArgument> arguments = new ArrayList<>();
-        for (TypeArgument argument : ref.arguments()) {
-            arguments.add(bindArgument(argument, bindings));
-        }
-        return new TypeRef(ref.name(), arguments);
-    }
-
-    /**
-     * One argument of an application inside a template body, with a parameter replaced by whatever was bound
-     * to it -- <b>on the channel it was bound on</b>, which is what separates this from {@link #bindRef}.
-     * An argument list is the one position where a type and a value are equally at home, so a value parameter
-     * passed straight through ({@code array_p0<N>} inside {@code <N> { a: [text; N] } }) stays a value; a
-     * parameter in any other position is a type by construction, and a value arriving there is the error
-     * {@link #bindRef} reports.
-     */
-    private static TypeArgument bindArgument(TypeArgument argument, Map<String, TypeArgument> bindings) {
-        if (!(argument instanceof TypeArgument.Ref nested)) {
-            return argument;
-        }
-        TypeArgument bound = bindings.get(nested.ref().name());
-        return bound != null && nested.ref().arguments().isEmpty() ? bound
-                : new TypeArgument.Ref(bindRef(nested.ref(), bindings));
-    }
-
     // ── Structural walks ─────────────────────────────────────────────────────────────────────────
 
     /**
@@ -871,7 +813,7 @@ final class TemplateMaterialiser {
     private List<TypeArgument> byParameterKind(String head, TypeDefinition template,
                                                 List<String> parameters, List<TypeArgument> arguments) {
         Map<String, ParameterKinds.Kind> kinds = parameterKinds.get(head);
-        if (kinds == null && metaTypes != null) {
+        if (kinds == null) {
             kinds = kindsOnDemand.computeIfAbsent(head, ignored -> ParameterKinds.inferOne(template, metaTypes));
         }
         if (kinds == null || kinds.isEmpty()) {

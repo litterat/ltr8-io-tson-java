@@ -8,7 +8,6 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;

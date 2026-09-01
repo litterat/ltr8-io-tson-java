@@ -26,7 +26,6 @@ import io.ltr8.tson.compiler.ast.schema.RefinedDef;
 import io.ltr8.tson.compiler.ast.schema.ReferenceTypeDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
-import io.ltr8.tson.compiler.ast.schema.SizeSpec;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
@@ -40,10 +39,8 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
-import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
@@ -233,10 +230,11 @@ import java.util.Set;
 final class DefinitionResolver {
 
     /**
-     * The kernel's own reference type, which is what a constructor's <em>type</em> slots are declared as --
-     * the one slot kind an instance template's binding fills through the reference channel (§8.1).
+     * The kernel's alias constructor -- §5.10's partial application, {@code <B> pair<uuid, B>}, whose held
+     * body is a {@code !reference { target: ... }} and whose entry is {@link TypeKind#REFERENCE} rather than
+     * the constructor's own kind.
      */
-    private static final String TYPE_REF = "type_ref";
+    private static final String REFERENCE = "reference";
 
     /**
      * Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see
@@ -285,20 +283,8 @@ final class DefinitionResolver {
      */
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, DefinitionGetter metaDefinitions,
                         DefinitionGetter namespaceDefinitions) {
-        this(definitionMetaReader, null, metaDefinitions, namespaceDefinitions, null);
-    }
-
-    DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
-                        DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions) {
-        this(definitionMetaReader, Objects.requireNonNull(annotationValueReader, "annotationValueReader"),
-                metaDefinitions, namespaceDefinitions, null);
-    }
-
-    DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
-                        DefinitionGetter metaDefinitions, DefinitionGetter namespaceDefinitions,
-                        ApplicationCloser applicationCloser) {
-        this(definitionMetaReader, annotationValueReader, metaDefinitions, namespaceDefinitions,
-                applicationCloser, SchemaPositions.none());
+        this(definitionMetaReader, null, metaDefinitions, namespaceDefinitions, null,
+                SchemaPositions.none());
     }
 
     DefinitionResolver(DefinitionMetaReader definitionMetaReader, AnnotationValueReader annotationValueReader,
@@ -602,8 +588,6 @@ final class DefinitionResolver {
      * <p>A positional payload (§5.6) carries no field names, so neither check applies to it; the reader
      * settles it at materialisation like any other positional form.
      */
-    private static final String REFERENCE = "reference";
-
     private TypeDefinition resolveInstanceTemplate(String name, Instance template) {
         String target = template.target();
         TypeDefinition constructor = resolveConstructorTarget(name, target);
@@ -736,9 +720,10 @@ final class DefinitionResolver {
      * wrote can fail.
      *
      * <p>A non-{@link Atom} body is not reachable here -- {@link #resolveAtomRefinement} has already
-     * rejected a source that isn't an atom-family instance, and the merged value binds through that
-     * same source's own constructor -- so it is left alone rather than guarded, the same treatment
-     * every other structurally-impossible case in this class gets.
+     * rejected a source that isn't an atom-family instance, and the merged value binds through that same
+     * source's own constructor. The guard below returns rather than throwing for that reason: there is no
+     * narrowing question to ask, and a body that reached here anyway is one of the two constructors'
+     * problem, not this check's.
      */
     private void checkNarrows(String name, String sourceName, Top sourceBody, Top refinedBody) {
         if (!(sourceBody instanceof Atom sourceAtom) || !(refinedBody instanceof Atom refinedAtom)) {
@@ -960,8 +945,6 @@ final class DefinitionResolver {
             case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
         };
     }
-
-    // ── Declaration-level array size sugar (§5.3, §5.10) ──────────────────
 
     // ── Composition (§5.8) and subtraction (§5.9) ─────────────────────────
 
@@ -1826,20 +1809,14 @@ final class DefinitionResolver {
     }
 
     /**
-     * A field/group-member's type-ref: a bare simple reference, a generic application ({@code
-     * enum}'s own {@code members: set<token>}, resolved the same way a refinement source's
-     * arguments are, via {@link #resolveSimpleTypeArg(TypeArg)} -- only a simple, non-nested
-     * argument is supported so far, same limit as elsewhere), or the inline array sugar {@code [T]}
-     * (§5.3), which resolves to {@code { name: array  arguments: [ { name: T } ] } } -- §5.3's
-     * structural representation of an inline application.
+     * A field/group-member's type-ref, as one of the two shapes that reach resolution: a bare
+     * {@link SimpleRef}, or a {@link GenericRef} -- a §5.10 application, or a constructor's own generic
+     * vocabulary such as {@code enum}'s {@code members: set<token>}.
      *
-     * <p><b>That last branch is unreachable through the ordinary pipeline</b>: {@link SchemaDesugarer}
-     * materialises an entry for every application and leaves a bare reference behind, so this method
-     * sees {@link SimpleRef} where §5.3 would put a structural {@code type_ref}. The materialising
-     * choice is §8.2's own ("every application materialises") -- and {@code type_argument}
-     * binds positionally against the head's declared parameters and so cannot carry a vocabulary field
-     * no parameter routes. The branch is kept because it is the shape the structural form takes, and
-     * because a caller reaching this resolver without the desugar pass still resolves.
+     * <p><b>A container sugar form is the third case and is refused</b>, because by this phase every one of
+     * them should already be an entry: {@link SchemaDesugarer} lifts each to a declaration and leaves a bare
+     * reference behind. One arriving here means either that the phase was skipped, or that the form holds a
+     * position the desugar table cannot reduce to a name -- see the branch's own comment.
      */
     private io.ltr8.tson.schema.meta.TypeRef resolveTypeRef(TypeRef ref) {
         if (ref instanceof SimpleRef simple) {
@@ -1867,8 +1844,6 @@ final class DefinitionResolver {
                     + "skipped or a position inside it is an application, which has no entry to name until "
                     + "it is materialised: " + ref);
         }
-        throw new UnsupportedOperationException(
-                "only simple (non-generic) type-refs, generic applications of one, and inline arrays of one "
-                        + "are resolved so far: " + ref);
+        throw new IllegalStateException("unhandled type-ref shape: " + ref);
     }
 }
