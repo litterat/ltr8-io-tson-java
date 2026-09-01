@@ -8,6 +8,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -110,6 +112,11 @@ class NumericArgumentIdentityTest {
      * <b>The equivalence stops at the base type, and deliberately.</b> §4 resolves {@code 1} to an integer
      * and {@code 1.0} to a float, so they are two values however equal their magnitudes -- merging them
      * would be an equivalence this implementation invented rather than one §4.3 states.
+     *
+     * <p><b>The float's point reads as {@code _}</b>, since [TSON-DATA] §7.7 does not admit {@code .} in an
+     * identifier and [TSON-SCHEMA] §8.2 requires a minted name to be one ({@code InternalName}). The two
+     * entries stay apart on the hash, which is what carries identity; the readable half still tells a reader
+     * which is which, in the spelling an identifier permits.
      */
     @Test
     void anIntegerAndAFloatOfOneMagnitudeStayApart() {
@@ -118,8 +125,8 @@ class NumericArgumentIdentityTest {
                   u   => { a: box<float64, 1>  b: box<float64, 1.0> }"""));
 
         assertEquals(2, derived.size(), derived::toString);
-        assertTrue(derived.stream().anyMatch(n -> n.startsWith("box_float64_1_")), derived::toString);
-        assertTrue(derived.stream().anyMatch(n -> n.startsWith("box_float64_1.0_")),
+        assertEquals(Set.of("box_float64_1", "box_float64_1_0"),
+                derived.stream().map(n -> n.substring(0, n.lastIndexOf('_'))).collect(Collectors.toSet()),
                 () -> "and the readable half says which is which: " + derived);
     }
 

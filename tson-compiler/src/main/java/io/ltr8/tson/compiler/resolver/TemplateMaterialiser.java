@@ -811,7 +811,7 @@ final class TemplateMaterialiser {
                     appendRef(canonical.append('r'), ref.ref());
                 }
                 case TypeArgument.Value value -> {
-                    readable.append('_').append(canonicalText(value.value()));
+                    readable.append('_').append(InternalName.segment(canonicalText(value.value())));
                     // The form by name, not ordinal: inserting a constant would renumber every ordinal.
                     appendText(canonical.append('v'), value.value().form().name());
                     appendNumberAware(canonical, value.value());

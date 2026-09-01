@@ -817,6 +817,13 @@ single-script name is refused with nothing mixed):
 | Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (`SPEC-FEEDBACK.md` #5) |
 | Data | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
 
+**A minted name is judged by neither walk.** §11.4's scopes are authored and §8.2 puts internal names
+outside the conformance surface, so a refusal on a name the resolver derived is one nobody can act on — and
+since a derived name is a Latin constructor head spliced with the author's own content, it would fire on any
+schema written outside Latin script. What binds a minted name instead is §8.2's freshness MUST, that it be a
+valid `identifier`, met by construction where it is minted (`InternalName`); `docs/linking-and-compilation.md`
+has both halves.
+
 **One place is the point, not a tidiness.** The restricted-character rule used to run at the reading
 positions instead — spread over the schema parser, the definition resolver and the atom vocabulary — and had
 holes at exactly the positions only some of them reached: an enum member and a group's member labels were

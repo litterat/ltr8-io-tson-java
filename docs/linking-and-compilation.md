@@ -276,6 +276,26 @@ them with nothing in the source to say which). A **choice's variants are deliber
 is a reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
 there could never fire.
 
+**And the walk covers authored names only** (`authoredNames`, told apart by a missing source position — the
+same exact test `EntryDisplayName` and `reportedAgainst` use). §11.4's scopes are authored ones and
+[TSON-SCHEMA] §8.2 puts internal names outside the conformance surface, so judging a minted entry produces a
+refusal nobody can act on: an author cannot edit a name they did not write, and the only lever left is
+relaxing the policy for every real name too. It would also fire on ordinary schemas, because a derived name
+is a Latin constructor head spliced with the author's own content — `operation_путь_GET_…_bef13f0c` is a
+valid identifier refused under §8.2's recommended default for the crime of containing a Russian word. What
+does bind a minted name is the structural half, §8.2's freshness MUST that it be a valid `identifier`, and
+that is met where it is minted (`InternalName`, below).
+
+**A minted name is an identifier by construction** (`InternalName.segment`). Both naming sites splice
+author-written content into the readable half — `SchemaDesugarer` from a lifted binding record,
+`TemplateMaterialiser` from an application's value arguments — and §7.7 admits only `XID_Continue` and `-`,
+so a `text` field holding a path put `/` in a name and made it not an identifier at all. Every run of what
+§7.7 does not admit becomes one `_`, trimmed at the edges since segments are already `_`-joined. Nothing is
+lost: identity is the structural hash beside the readable half, computed over the binding rather than over
+this text, so `1` and `1.0` still mint two entries though both now read `1` and `1_0`. An HTTP operation is
+the case that finds it — §4.1 names one as the motivating case for the `data` kind, and every realistic path
+carries a slash, so the feature's own worked example could not be templated.
+
 **One walk rather than one check per naming position, and that is the load-bearing part.** The
 restricted-character rule
 (`Identifier_Status`) used to run where a name is *read* — the schema parser, `DefinitionResolver`, the atom

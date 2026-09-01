@@ -1319,7 +1319,8 @@ final class SchemaDesugarer {
     private static void appendReadable(StringBuilder out, CoreValue value) {
         switch (value) {
             case TokenValue token -> out.append('_')
-                    .append(NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED));
+                    .append(InternalName.segment(
+                            NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED)));
             case RecordValue record -> record.fields()
                     .forEach(field -> appendReadable(out, field.value().value().coreValue()));
             case ArrayValue array -> array.elements()

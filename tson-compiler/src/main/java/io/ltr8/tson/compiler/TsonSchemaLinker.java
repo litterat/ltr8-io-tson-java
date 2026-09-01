@@ -215,7 +215,9 @@ public final class TsonSchemaLinker {
      */
     private static void checkNames(TsonDiagnosticsReceiver receiver, TsonSchema schema,
                                    Map<String, TypeDefinition> merged, TsonUnicodePolicy identifiers) {
-        ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> refuse(receiver, schema,
+        Map<String, TypeDefinition> authored = authoredNames(merged);
+
+        ConfusableNames.firstCollision(authored.keySet()).ifPresent(collision -> refuse(receiver, schema,
                 collision.second(), merged.get(collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
                 "in the namespace of '" + schema.id() + "': " + collision.describe()));
 
@@ -223,7 +225,7 @@ public final class TsonSchemaLinker {
         // collision check above is a
         // relation and needs the whole set, these are properties of each name on its own -- so they are the
         // rules that reach a name nothing else in the schema resembles.
-        merged.forEach((name, definition) ->
+        authored.forEach((name, definition) ->
                 perName(receiver, schema, name, definition, name, "declared name ", identifiers));
 
         merged.forEach((name, definition) -> {
@@ -272,6 +274,36 @@ public final class TsonSchemaLinker {
      * schema layer's, so the walk that already enumerates those scopes is the one place all three belong.
      * What stays at the reading positions is §7.7's grammar, which is validity and really is a parse error.
      */
+    /**
+     * The entries whose names an author wrote, which are the only ones [TSON-DATA] §8.2's policy judges.
+     *
+     * <p><b>A minted name is not in any scope §8.2 names.</b> [TSON-SCHEMA] §11.4's scopes are authored --
+     * one enum's members, one schema's declared names, the merged namespace at {@code !!import} -- and
+     * §8.2 puts internal names outside the conformance surface entirely. Judging one anyway produces a
+     * refusal nobody can act on: the author cannot edit a name they did not write, and the only lever left
+     * is relaxing the policy for every real name too.
+     *
+     * <p><b>And it would fire on ordinary schemas.</b> A derived name is a Latin constructor head spliced
+     * with the author's own content, so any non-Latin text in a lifted form or a closed application makes it
+     * mixed-script by construction: {@code operation_путь_GET_..._bef13f0c} is a perfectly valid identifier
+     * refused under §8.2's recommended default, for writing a Russian string. The rule that does apply to a
+     * minted name is structural and stable -- §8.2's freshness MUST, that it be a valid {@code identifier} --
+     * and that is met by construction where it is minted ({@code InternalName}).
+     *
+     * <p>Told apart by a missing source position, the same exact test {@code EntryDisplayName} and {@link
+     * #reportedAgainst} already use: a declaration parsed from a document carries the position of its own
+     * name token, and an entry the resolver mints has nothing to carry.
+     */
+    private static Map<String, TypeDefinition> authoredNames(Map<String, TypeDefinition> merged) {
+        Map<String, TypeDefinition> authored = new LinkedHashMap<>();
+        merged.forEach((name, definition) -> {
+            if (definition.position().isPresent()) {
+                authored.put(name, definition);
+            }
+        });
+        return authored;
+    }
+
     private static void perName(TsonDiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                 TypeDefinition definition, String name, String prefix,
                                 TsonUnicodePolicy identifiers) {
