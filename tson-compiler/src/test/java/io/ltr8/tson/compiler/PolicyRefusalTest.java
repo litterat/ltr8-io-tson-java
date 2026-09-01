@@ -45,10 +45,7 @@ class PolicyRefusalTest {
     private static Diagnostic soleRefusal(TsonTreeReader reader, String document) {
         List<Diagnostic> reported = read(reader, document);
         assertEquals(1, reported.size(), reported::toString);
-        Diagnostic refusal = reported.getFirst();
-        assertEquals(Optional.of(Xid.UNICODE_VERSION), refusal.unicodeDataVersion(),
-                () -> "§8.2: a refusal MUST name the data version it was computed against: " + refusal);
-        return refusal;
+        return reported.getFirst();
     }
 
     /**
@@ -99,8 +96,6 @@ class PolicyRefusalTest {
                 reported.stream().map(Diagnostic::code).toList(), reported::toString);
         assertTrue(reported.stream().anyMatch(d -> d.path().isEmpty()),
                 () -> "the token surface reports before any path exists: " + reported);
-        reported.forEach(d -> assertEquals(Optional.of(Xid.UNICODE_VERSION), d.unicodeDataVersion(),
-                () -> "both surfaces judge against the same tables: " + reported));
     }
 
     /**
@@ -109,7 +104,7 @@ class PolicyRefusalTest {
      * of the three codes a value surface can produce.
      */
     @Test
-    void aRefusedValueIsRestrictedScriptAndNamesTheVersion() {
+    void aRefusedValueIsRestrictedScript() {
         Diagnostic refusal = soleRefusal(
                 new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
                 "{ note: \"p" + CYR_A + "y\" }");
@@ -133,24 +128,46 @@ class PolicyRefusalTest {
         assertTrue(refusal.message().contains("not ASCII"), refusal::message);
     }
 
-    /** An ordinary verdict carries no version: it is a statement about the document, not about our tables. */
+    /**
+     * <b>A refusal carries nothing an ordinary verdict does not.</b> What tells the two apart is the code,
+     * which is what a consumer routes on; the [TSON-DATA] §8.2 data version and the level that judged are
+     * facts about this processor, so they are read off the reader rather than off the problem, and stay one
+     * statement however many names a document gets refused for.
+     */
     @Test
-    void aVerdictCarriesNoDataVersion() {
-        List<Diagnostic> reported = read(new TsonTreeReader(), "{ a: 1  a: 2 }");
+    void aRefusalIsShapedLikeAnyOtherDiagnostic() {
+        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly());
+        Diagnostic refusal = soleRefusal(reader, "{ note: \"" + CYR_A + "\" }");
+        Diagnostic verdict = read(new TsonTreeReader(), "{ a: 1  a: 2 }").getFirst();
 
-        assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD),
-                reported.stream().map(Diagnostic::code).toList(), reported::toString);
-        assertEquals(Optional.empty(), reported.getFirst().unicodeDataVersion());
+        assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, refusal.code());
+        assertEquals(Diagnostic.Code.DUPLICATE_FIELD, verdict.code());
+        assertEquals(refusal.fetchReason(), verdict.fetchReason(),
+                "a refusal has no component of its own to distinguish it -- the code is the distinction");
     }
 
     /**
-     * <b>The data version is reachable without a refusal in hand</b>, which is the half a static accessor
-     * exists for: it is constant for the life of a process, so a server states it once per response rather
-     * than once per problem. It is unreachable any other way -- {@code io.ltr8.tson.compiler.lexer} is
-     * implementation and is not exported, so a consumer cannot read {@code Xid.UNICODE_VERSION} by hand.
+     * <b>The policy is reachable without a refusal in hand, off the reader that would do the refusing.</b>
+     * That is what makes a §8.2 divergence explainable at all: the level, the unit and the data version are
+     * this deployment's own configuration, in neither the document nor the schema, and constant for the life
+     * of a process -- so they are stated once beside a run's diagnostics, and available before a document is
+     * written at all. Read off the reader rather than a config object because a derived reader is exactly
+     * where the two can differ.
+     *
+     * <p>The version is unreachable any other way: {@code io.ltr8.tson.compiler.lexer} is implementation and
+     * is not exported, so a consumer cannot read {@code Xid.UNICODE_VERSION} by hand.
      */
     @Test
-    void theDataVersionIsReachableWithoutARefusal() {
+    void theProcessorPolicyIsReachableWithoutARefusal() {
+        TsonUnicodeProcessorPolicy policy = new TsonTreeReader()
+                .withTokenPolicy(TsonUnicodePolicy.asciiOnly())
+                .withIdentifierPolicy(TsonUnicodePolicy.singleScript().perSegment())
+                .processorPolicy();
+
+        assertEquals(TsonUnicodePolicy.Level.SINGLE_SCRIPT, policy.identifierPolicy().level());
+        assertTrue(policy.identifierPolicy().isPerSegment());
+        assertEquals(TsonUnicodePolicy.Level.ASCII_ONLY, policy.tokenPolicy().level());
+        assertEquals(Xid.UNICODE_VERSION, policy.unicodeDataVersion());
         assertEquals(Xid.UNICODE_VERSION, TsonUnicodePolicy.dataVersion());
     }
 }

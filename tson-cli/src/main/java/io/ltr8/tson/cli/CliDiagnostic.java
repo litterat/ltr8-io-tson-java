@@ -32,12 +32,12 @@ import java.util.Optional;
  * simply did not answer. Rendering it as text would hand that consumer a string to match on, which is what
  * carrying it structurally exists to avoid.
  *
- * <p><b>{@code unicode_data_version} is the same argument for the other non-location component.</b> A
- * [TSON-DATA] §8.2 refusal is not one of §8.1's four error categories, and §8.2 requires it to name the
- * Unicode data version it was computed against: it is the one outcome two conforming processors may
- * legitimately disagree about, and the version is what explains the disagreement. <b>Which rule
- * refused is the {@code code}</b> -- {@code CONFUSABLE_NAMES}, {@code RESTRICTED_CHARACTER}, {@code
- * RESTRICTED_SCRIPT} -- so the wire carries no second discriminator that could contradict it.
+ * <p><b>A [TSON-DATA] §8.2 name-hygiene refusal is one of these like any other problem</b>, and carries
+ * nothing extra. Which rule refused is the {@code code} -- {@code CONFUSABLE_NAMES}, {@code
+ * RESTRICTED_CHARACTER}, {@code RESTRICTED_SCRIPT}, one each -- so the wire needs no second discriminator
+ * that could contradict it; and the Unicode data version §8.2 requires a refusal to name is a fact about
+ * the processor rather than about the problem, so the envelope states it once ({@link CliPolicy}) instead
+ * of every refusal restating one constant.
  */
 public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Optional<String> schemaPointer,
                              @Field("schema_id") Optional<String> schemaId,
@@ -46,8 +46,7 @@ public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Opti
                              @Field("data_position") Optional<String> dataPosition,
                              @Field("schema_position") Optional<String> schemaPosition,
                              @Field("fetch_reason")
-                             Optional<TsonSchemaFetchException.Reason> fetchReason,
-                             @Field("unicode_data_version") Optional<String> unicodeDataVersion) {
+                             Optional<TsonSchemaFetchException.Reason> fetchReason) {
 
     static CliDiagnostic from(Diagnostic diagnostic) {
         return new CliDiagnostic(diagnostic.path(), diagnostic.schemaPointer(),
@@ -56,14 +55,13 @@ public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Opti
                 diagnostic.expectedIfStated(), diagnostic.actualIfStated(),
                 diagnostic.dataPosition().map(CliDiagnostic::render),
                 diagnostic.schemaPosition().map(CliDiagnostic::render),
-                diagnostic.fetchReason(), diagnostic.unicodeDataVersion());
+                diagnostic.fetchReason());
     }
 
     /** A problem with no location at either end -- a usage failure, or a schema that never named itself. */
     static CliDiagnostic minimal(Diagnostic.Code code, String message) {
         return new CliDiagnostic(Optional.empty(), Optional.empty(), Optional.empty(), code, message,
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     /** The position format every rendered diagnostic uses; stated in {@code diagnostics.tn} for consumers. */

@@ -37,7 +37,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
          * Restrictive as §8.2 says it SHOULD. Per read rather than per context, so every derived context
          * checks against the one a caller named.
          */
-        final TsonUnicodePolicy namePolicy;
+        final TsonUnicodePolicy identifierPolicy;
 
         /**
          * Where the cursor is: the position of the last event {@link #peek()} or {@link #next()} returned,
@@ -60,10 +60,10 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** Where {@link #next()} records what it consumes while a lookahead is running, else {@code null}. */
         List<TsonEvent> recording;
 
-        Cursor(TsonEventSource events, TsonDiagnosticsReceiver receiver, TsonUnicodePolicy namePolicy) {
+        Cursor(TsonEventSource events, TsonDiagnosticsReceiver receiver, TsonUnicodePolicy identifierPolicy) {
             this.events = events;
             this.receiver = receiver;
-            this.namePolicy = namePolicy;
+            this.identifierPolicy = identifierPolicy;
         }
     }
 
@@ -121,8 +121,8 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
-                              TsonUnicodePolicy namePolicy) {
-        return new DefaultTsonReadContext(new Cursor(events, receiver, namePolicy), null, null, null,
+                              TsonUnicodePolicy identifierPolicy) {
+        return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy), null, null, null,
                 Optional.empty(), Optional.empty());
     }
 
@@ -188,11 +188,11 @@ final class DefaultTsonReadContext implements TsonReadContext {
         }
         // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile
         // too", taking that rule with it. Script mixing gates itself inside violation().
-        if (cursor.namePolicy.appliesIdentifierProfile()) {
+        if (cursor.identifierPolicy.appliesIdentifierProfile()) {
             IdentifierParser.hygiene(name).ifPresent(violation ->
                     refuse(name, violation, Diagnostic.Code.RESTRICTED_CHARACTER));
         }
-        cursor.namePolicy.violation(name).ifPresent(violation ->
+        cursor.identifierPolicy.violation(name).ifPresent(violation ->
                 refuse(name, violation, Diagnostic.Code.RESTRICTED_SCRIPT));
     }
 
@@ -203,7 +203,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * beside it.
      */
     private void refuse(String name, String violation, Diagnostic.Code code) {
-        reportRefusal(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
+        report(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
     }
 
     /**
@@ -328,21 +328,10 @@ final class DefaultTsonReadContext implements TsonReadContext {
         return new DefaultTsonReadContext(cursor, tail, schemaRoot, schemaId, schemaPosition, position);
     }
 
+    /** The one place a read builds a {@link Diagnostic} -- every report, refusal included, lands here. */
     @Override
     public void report(Diagnostic.Code code, String message, String expected, String actual,
             Optional<TsonSchemaFetchException.Reason> fetchReason) {
-        emit(code, message, expected, actual, fetchReason, Optional.empty());
-    }
-
-    @Override
-    public void reportRefusal(Diagnostic.Code code, String message, String expected, String actual) {
-        emit(code, message, expected, actual, Optional.empty(),
-                Optional.of(TsonUnicodePolicy.dataVersion()));
-    }
-
-    /** The one place a read builds a {@link Diagnostic}: both report entry points land here. */
-    private void emit(Diagnostic.Code code, String message, String expected, String actual,
-            Optional<TsonSchemaFetchException.Reason> fetchReason, Optional<String> unicodeDataVersion) {
         // All three schema-end components come from the one SchemaLocation the descent accumulated, so they
         // cannot disagree about which document to open. A read with no schema behind it carries none of them:
         // Diagnostic spells a missing identity "" and a missing pointer as an absence, since for a pointer
@@ -350,8 +339,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
         Diagnostic diagnostic = new Diagnostic(Optional.of(render(false)),
                 schemaRoot == null ? Optional.empty() : Optional.of(render(true)),
                 schemaRoot == null ? "" : schemaId, code, message, expected, actual,
-                position(), schemaRoot == null ? Optional.empty() : schemaPosition, fetchReason,
-                unicodeDataVersion);
+                position(), schemaRoot == null ? Optional.empty() : schemaPosition, fetchReason);
         cursor.reported++;
         cursor.receiver.report(diagnostic);
     }

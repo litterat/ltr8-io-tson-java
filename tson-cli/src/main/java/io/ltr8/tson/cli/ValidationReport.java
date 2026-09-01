@@ -13,15 +13,19 @@ import java.util.List;
  * diagnostics.tn}'s own {@code validation_report} field for field (see {@link OutputFormat}), so
  * {@code TsonObjectWriter#toTson} and that schema's own compiled reader agree.
  *
+ * <p><b>{@code policy} is here for the reason it is on {@link ValidationRun}</b>: a schema's own declared
+ * names face [TSON-DATA] §8.2 at link time, so {@code compile} can refuse one, and a refusal is only
+ * interpretable beside the policy that produced it.
+ *
  * <p>Public for the same reason {@link CliDiagnostic} is -- see its own Javadoc.
  */
-public record ValidationReport(boolean valid, List<CliDiagnostic> errors) {
+public record ValidationReport(boolean valid, CliPolicy policy, List<CliDiagnostic> errors) {
 
-    static ValidationReport ok() {
-        return new ValidationReport(true, List.of());
+    static ValidationReport ok(CliPolicy policy) {
+        return new ValidationReport(true, policy, List.of());
     }
 
-    static ValidationReport failed(Diagnostic.Code code, String message) {
-        return new ValidationReport(false, List.of(CliDiagnostic.minimal(code, message)));
+    static ValidationReport failed(CliPolicy policy, Diagnostic.Code code, String message) {
+        return new ValidationReport(false, policy, List.of(CliDiagnostic.minimal(code, message)));
     }
 }

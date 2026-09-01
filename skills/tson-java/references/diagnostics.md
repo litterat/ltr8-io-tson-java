@@ -60,8 +60,7 @@ public record Diagnostic(
         String actual,
         Optional<SourcePosition> dataPosition,
         Optional<SourcePosition> schemaPosition,
-        Optional<TsonSchemaFetchException.Reason> fetchReason,
-        Optional<String> unicodeDataVersion) {
+        Optional<TsonSchemaFetchException.Reason> fetchReason) {
 
     Optional<String> schemaIdIfKnown();
     Optional<String> expectedIfStated();
@@ -73,17 +72,19 @@ The four location components match JSON Schema 2020-12 §12's output unit — wh
 the schema — so one record renders both data-side and schema-side problems; the variation between them
 is locational, not categorical.
 
-**Two components are not locations**, and each carries a distinction the closed `Code` cannot and
+**One component is not a location**, and it carries a distinction the closed `Code` cannot and
 `message` must not:
 
 - `fetchReason` — `NOT_PERMITTED` / `NOT_FOUND` mean the document named something this deployment will
   not fetch or nothing serves; `TRANSPORT` / `TIMEOUT` / `TOO_LARGE` mean the reference was fine and
   only those are worth retrying.
-- `unicodeDataVersion` — on the three refusal codes and nowhere else.
 
-What earns a component at all is one rule: **a fact not recoverable from the document plus the
-schema**. Which is why an atom's failed bound (in the schema), a duplicate key (in the document) and
-the rule that fired (the code) get none.
+What earns a component at all is one rule: **a fact not recoverable from the document plus the schema,
+and about the problem rather than about the processor**. Which is why an atom's failed bound (in the
+schema), a duplicate key (in the document) and the rule that fired (the code) get none — and why a §8.2
+refusal's Unicode data version and policy get none either: they are constant for the whole run, so they
+are stated once beside the diagnostics (`TsonUnicodeProcessorPolicy`, `tson policy`, and the `policy` field on
+every `tson-cli` envelope) rather than N times inside them.
 
 **Two absence conventions, deliberately.** The two pointers are `Optional` because `""` is the *root*,
 a location this really emits. `schemaId`/`expected`/`actual` use `""` and offer the three

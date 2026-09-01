@@ -2,6 +2,7 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.compiler.Diagnostic;
 
+import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -259,6 +260,35 @@ class TsonCliTest {
 
         String compile = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"compile", "-h"})));
         assertTrue(compile.contains("tson compile"), compile);
+
+        String policy = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"policy", "--help"})));
+        assertTrue(policy.contains("tson policy"), policy);
+    }
+
+    /**
+     * <b>{@code tson policy} answers with no document in hand</b>, which is the whole of why it exists: a
+     * generator that reads the [TSON-DATA] §8.2 policy before it writes never writes the name that would be
+     * refused, where one that learns it from a refusal has already spent a round trip. Exit 0 always -- the
+     * question is about this processor, and it has an answer whatever the state of anyone's documents.
+     */
+    @Test
+    void policyPrintsTheUnicodePolicyThisBuildApplies() throws IOException {
+        String text = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"policy"})));
+        assertTrue(text.contains("identifier policy: HIGHLY_RESTRICTIVE"), text);
+        assertTrue(text.contains("token policy:      UNRESTRICTED"), text);
+        assertTrue(text.contains("unicode data:      " + TsonUnicodePolicy.dataVersion()), text);
+
+        String json = captureStdout(() ->
+                assertEquals(0, TsonCli.run(new String[] {"policy", "--output", "json"})));
+        assertTrue(json.strip().startsWith("{\"identifierPolicy\":{\"level\":\"HIGHLY_RESTRICTIVE\""), json);
+        assertTrue(json.contains("\"unicodeDataVersion\":\"" + TsonUnicodePolicy.dataVersion() + "\""), json);
+    }
+
+    /** A stray argument is a usage error, the same as anywhere else -- this command takes only {@code --output}. */
+    @Test
+    void policyRejectsAPositionalArgument() throws IOException {
+        String err = captureStderr(() -> assertEquals(2, TsonCli.run(new String[] {"policy", "please"})));
+        assertTrue(err.contains("tson policy"), err);
     }
 
     @Test

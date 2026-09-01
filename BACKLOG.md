@@ -128,16 +128,6 @@ which is why they sit low. The lexer's fail-fast floor is not among them: nothin
 someone decides whether lexer errors feed the `Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds
 that question.
 
-- [ ] **The CLI reports a [TSON-DATA] §8.2 refusal as `valid: false` and exits 1.** §8.1 makes a refusal a
-  fifth outcome that MUST NOT be reported in any of the four error categories, and the `Diagnostic` model
-  keeps it apart by code — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT`, which the conformance
-  runners assert never coincide with a verdict. `ValidationReport` then flattens that back: a run whose only
-  problem is a refusal sets `valid: false` and `TsonCli.exitCodeFor` returns 1, the code that means *this
-  document is invalid*. A script routing on either learns the opposite of what §8.2 says. What is needed is a
-  wire and exit-code shape that says *refused* rather than *invalid* — the report already carries the codes,
-  so the work is deciding what `valid` means beside them and which exit code a refusal-only run gets (1 is
-  taken, and 69/70 both mean "nothing was judged" by someone other than this processor).
-
 - [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
   now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against
   `/person/age` lands on `age`'s line. A supertype and a choice variant are bare names in a `List<String>`

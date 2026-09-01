@@ -32,7 +32,7 @@ spec series (2026 revision):
 
 The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
 doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
-copy. `spec/` holds local snapshots (revision 33) for quick reference: `spec/tson-part1-data.md`,
+copy. `spec/` holds local snapshots of the current revision for quick reference: `spec/tson-part1-data.md`,
 `spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core}.tn` (the spec's own bundled schema
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not
@@ -524,22 +524,18 @@ where it did not. Both run where a composite reader wires its children, so neith
 `Diagnostic` (root package) is one record for both data- and schema-side problems — the variation is
 locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual`, four location
 components matching JSON Schema 2020-12 §12's output unit (`path`, `schemaId`+`schemaPointer`, plus
-`dataPosition`/`schemaPosition`), and the **two components that are not locations**, each carrying a
+`dataPosition`/`schemaPosition`), and the **one component that is not a location**, carrying a
 distinction the closed `Code` cannot (it sorts by *who* could not check) and `message` must not (that
 means parsing prose). `fetchReason`: `SCHEMA_UNAVAILABLE` says a schema was not obtained and
 `TsonSchemaFetchException.Reason` says by whose doing. It is what makes the thrown and the collected
 channel answer one fetch failure alike, the collecting one being where almost every read now hears about
-it. `unicodeDataVersion`: §8.2's fifth outcome, on the three refusal codes and nothing else, naming the
-Unicode data version the refusal was computed against — §8.2 makes that a MUST because §8.3 marks all three
-rules unstable across releases, so two conforming processors may legitimately disagree about one name
-and the version is the only thing that explains it. `TsonUnicodePolicy.dataVersion()` is that version as a
-static accessor, the constant behind it (`Xid.UNICODE_VERSION`) being in the unexported `lexer` package and
-unreachable otherwise. **Which rule refused is the `Code`** — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/
-`RESTRICTED_SCRIPT`, one each, since the three want three different remedies and the code is what a consumer routes
-on; a discriminator beside it would restate what the code fixes and could contradict it. The policy that
-judged is deliberately carried nowhere: it is the reading deployment's own configuration.
+it. **A §8.2 name-hygiene refusal is a diagnostic like any other and carries nothing extra**: which rule
+refused is the `Code` — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT`, one each, since the
+three want three different remedies and the code is what a consumer routes on — and the Unicode data
+version §8.2 requires a refusal to name is a fact about the *processor*, so it is stated once beside the
+diagnostics rather than N times inside them (`TsonUnicodeProcessorPolicy`, below).
 **What earns a component at all is one rule** — *a fact not recoverable from the
-document plus the schema* — which is why these two are the only non-location components and why an atom's
+document plus the schema* — which is why `fetchReason` is the only non-location component and why an atom's
 failed bound (in the schema), a duplicate key (in the document) and the rule that fired (the code) get none;
 `tson-cli`'s wire shape applies a second filter, whether the recipient can act on it. Both RFC 6901 pointers are
 `Optional<String>` because `""` is the *root*,
@@ -571,6 +567,19 @@ and the recovering parse hands back no document at all, since resolving a half-d
 reference to a dropped declaration on top of the real error. Namespace-level failures (unloadable
 `!!import`, ineligible `!!meta`, `!!id` cross-check) still throw even with a receiver. Compilation, and the
 lexer under everything, are still fail-fast.
+
+**`TsonUnicodeProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2
+policies (`identifierPolicy`, `tokenPolicy`, under `TsonConfig`'s own names — level, whole-name or
+per-segment unit, and any `permitting` relaxations) plus
+the UCD version, reachable as `Tson.processorPolicy()`, either facade's `processorPolicy()` (read off the
+reader that judged, since a derived reader is where the two can differ), and `tson policy` on the command
+line. It is what makes a §8.2 divergence explainable: the same bytes may be refused here and accepted
+elsewhere, and the reason is in neither the document nor the schema. It is deliberately **not** a diagnostic
+component — the fact is constant for a run, so a per-refusal copy is N copies of one string; it arrives only
+on failure, where what a sender needs is the rule *before* it writes; and a version says what refused you
+where a level says what would be accepted. That last is why the standalone surface matters more than the
+envelope one: a generator that reads the policy first never writes the name that would be refused, which is
+the round trip the format exists to avoid. `SPEC-FEEDBACK.md` #14 proposes §8.2 ask for this shape.
 
 ### Read facades and writers — `docs/facades-and-tree.md`
 
@@ -679,7 +688,10 @@ the report as codes (`NOT_IMPLEMENTED`, `SCHEMA_UNAVAILABLE`) with a stderr note
 unchanged. 70's halves print differently: a gap that escapes as an exception prints
 `not implemented yet: <message>`, whose text usually names the workaround; a fault gets the please-report-it
 banner and its stack trace. Also `tson compile`, `tson hash` (stamps a
-`?sha256=` pin idempotently), `tson init-example`.
+`?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `TsonUnicodeProcessorPolicy` with no
+document in hand, the same record every `validate`/`compile` envelope carries in its `policy` field. In
+`--output text` a run prints it only when something was actually refused; the machine formats always carry
+it, a consumer wanting one shape.
 `TsonBundledSchemas` serves the three bundled schemas' identities, text (copied from `spec/m/` at build
 time) and published digests. `TsonContentHash` hashes every byte past the `!!id` line; pins are
 verification metadata, not identity, checked through the loader on every fetched pinned reference. The
@@ -802,9 +814,9 @@ positions instead — spread over the schema parser, the definition resolver and
 holes at exactly the positions only some of them reached: an enum member and a group's member labels were
 checked for reading alike and for script mixing, and never for a restricted character. A scope list can be
 reviewed; three call sites cannot. Class 1 *field* names see only the look-alike rule, being lexical rather
-than names (§2.5, §7.7). The name policy defaults to Highly Restrictive
-whole-name (§8.2's SHOULD) and relaxes through `withNamePolicy`, which §8.2 requires be code rather than
-ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
+than names (§2.5, §7.7). The identifier policy defaults to Highly Restrictive
+whole-name (§8.2's SHOULD) and relaxes through `withIdentifierPolicy`, which §8.2 requires be code rather
+than ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
 may legitimately be anything.
 
 `SidecarSchemaReadTest` is the other half and is what makes `schemas/` validation rather than

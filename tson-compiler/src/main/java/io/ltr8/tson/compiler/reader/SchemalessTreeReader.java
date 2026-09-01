@@ -285,7 +285,7 @@ public final class SchemalessTreeReader {
      */
     private static void reportConfusableFields(TsonReadContext ctx, Set<String> fieldNames) {
         ConfusableNames.firstCollision(fieldNames).ifPresent(collision ->
-                ctx.field(collision.second()).reportRefusal(Diagnostic.Code.CONFUSABLE_NAMES,
+                ctx.field(collision.second()).report(Diagnostic.Code.CONFUSABLE_NAMES,
                         "this record " + collision.describe(),
                         "field names a reader can tell apart", "'" + collision.second() + "'"));
     }

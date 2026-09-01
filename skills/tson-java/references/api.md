@@ -112,7 +112,7 @@ public final class TsonTreeReader {
     public TsonTreeReader withSchema(String schemaUri);
     public TsonTreeReader withDiagnostics(TsonDiagnosticsReceiver receiver);
     public TsonTreeReader withTokenPolicy(TsonUnicodePolicy policy);
-    public TsonTreeReader withNamePolicy(TsonUnicodePolicy policy);
+    public TsonTreeReader withIdentifierPolicy(TsonUnicodePolicy policy);
     public TsonTreeReader preservingUnknownTypeRefs();
 
     public TsonValue    read(String|InputStream source);        // honours the document's own !!schema

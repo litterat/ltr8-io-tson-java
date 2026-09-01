@@ -62,7 +62,6 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -411,16 +410,17 @@ class ConformanceSuiteTest {
     /**
      * <b>The vector names the rule it exercises, so the refusal must report the matching code</b> -- one
      * code per rule, since the three want three different remedies and a runner checking only "some refusal
-     * happened" would pass a processor that refused for the wrong reason. <b>And every refusal must name
-     * the data version</b>, which §8.2 makes a MUST because that version is the only thing explaining a
-     * legitimate disagreement between two processors.
+     * happened" would pass a processor that refused for the wrong reason.
+     *
+     * <p><b>The data version §8.2 requires a refusal to name is the processor's, not the diagnostic's</b>
+     * ({@link TsonUnicodePolicy#dataVersion()}, which the caller has already matched against the vector's
+     * own {@code unicode} field before running it -- a version this implementation does not carry is a
+     * legitimate skip). It is constant for every refusal in a run, so it is stated once beside the
+     * diagnostics rather than stamped onto each of them.
      */
     private static void assertRefusalMatches(RecordValue refusal, List<Diagnostic> reported) {
         assertTrue(reported.stream().anyMatch(d -> d.code() == statedRule(refusal)),
                 () -> "vector names " + fieldText(refusal, "mechanism") + "; got " + reported);
-        reported.forEach(d -> assertEquals(Optional.of(fieldText(refusal, "unicode")), d.unicodeDataVersion(),
-                "§8.2: a refusal MUST name the UTS #39 data version, and this vector was computed "
-                        + "against the one this implementation carries"));
     }
 
     /**

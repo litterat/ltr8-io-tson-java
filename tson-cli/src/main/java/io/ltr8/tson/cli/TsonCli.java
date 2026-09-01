@@ -33,6 +33,7 @@ public final class TsonCli {
               tson init-example [<dir>]
               tson validate [--output text|json|tson] <file|->...
               tson compile [--output text|json|tson] <schema>
+              tson policy [--output text|json|tson]
               tson hash <file>
 
             commands:
@@ -43,6 +44,10 @@ public final class TsonCli {
                           `-` reads one data document from standard input, reported under the name "-"
                           (a file really named - is reachable as ./-); schemas must be files
               compile     check that a schema document itself resolves and compiles
+              policy      print the Unicode name/token policy this build applies ([TSON-DATA] §8.2),
+                          which is what decides whether a name is refused here but accepted elsewhere.
+                          The same record rides on every validate report; this prints it with no
+                          document in hand, so a generator can conform before it writes
               hash        compute a document's content hash and stamp it onto its !!id (?sha256=...)
 
             options:
@@ -60,6 +65,9 @@ public final class TsonCli {
 
     private static final String INIT_USAGE =
             "usage: tson init-example [<dir>]   (writes an example person.tn and person-data.tn; default dir: .)";
+
+    private static final String POLICY_USAGE =
+            "usage: tson policy [--output text|json|tson]   (the §8.2 Unicode policy this build applies)";
 
     private static final String HASH_USAGE =
             "usage: tson hash <file>   (stamps the document's content hash onto its !!id as ?sha256=...)";
@@ -88,9 +96,11 @@ public final class TsonCli {
                 case "init-example" -> runInit(rest);
                 case "validate" -> runValidate(rest);
                 case "compile" -> runCompile(rest);
+                case "policy" -> runPolicy(rest);
                 case "hash" -> runHash(rest);
                 default -> {
-                    System.err.println("unknown command '" + subcommand + "' -- expected init-example, validate, compile, or hash");
+                    System.err.println("unknown command '" + subcommand
+                            + "' -- expected init-example, validate, compile, policy, or hash");
                     System.err.println(USAGE);
                     yield 2;
                 }
@@ -140,9 +150,10 @@ public final class TsonCli {
      * a different question: what should the caller do now. A refusal was checked and declined, so the answer
      * is fix the document, which is what 1 means. The three that are not verdicts share the property a
      * refusal lacks: nothing was checked, so "invalid" is a claim the run cannot make. What is genuinely
-     * portable-sensitive about a refusal -- that another processor at another UTS #39 version may accept the
-     * same document -- is carried by the diagnostic's own code and message, which is where a caller that
-     * cares can see it, and does not need an outcome of its own up here.
+     * portable-sensitive about a refusal -- that another deployment may accept the same document -- is
+     * carried by the diagnostic's own code and by the run's own {@link CliPolicy}, which together say which
+     * rule refused and under what configuration; neither needs an outcome of its own up here.
+     * {@code SPEC-FEEDBACK.md} #14 proposes §8.2 stop asking for the separate channel.
      *
      * <p><b>A mixed run takes the most permanent code</b>, which is why 70 outranks 69 and both outrank 1:
      * a gap is not fixed by retrying, and retrying a run that also holds one would just reach the gap
@@ -265,6 +276,22 @@ public final class TsonCli {
             throw new UsageException(COMPILE_USAGE);
         }
         return CompileCommand.run(positional.get(0), format);
+    }
+
+    private static int runPolicy(List<String> args) {
+        if (hasHelpFlag(args)) {
+            System.out.println(POLICY_USAGE);
+            return 0;
+        }
+        OutputFormat format = OutputFormat.TEXT;
+        for (int i = 0; i < args.size(); i++) {
+            if (args.get(i).equals("--output")) {
+                format = OutputFormat.parse(requireValue(args, ++i, "--output"));
+            } else {
+                throw new UsageException(POLICY_USAGE);
+            }
+        }
+        return PolicyCommand.run(format);
     }
 
     private static String requireValue(List<String> args, int index, String flag) {

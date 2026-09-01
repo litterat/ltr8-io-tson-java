@@ -143,6 +143,12 @@ public interface TsonReadContext {
         report(code, message, expected, actual, Optional.empty());
     }
 
+    // A [TSON-DATA] §8.2 name-hygiene refusal reports through this same method, and has no channel of its
+    // own: what distinguishes it is its `code` (CONFUSABLE_NAMES / RESTRICTED_CHARACTER / RESTRICTED_SCRIPT,
+    // one per rule), which is what a consumer routes on. The Unicode data version §8.2 requires a refusal to
+    // name is a fact about this processor rather than about the problem, so it is stated once per run beside
+    // the diagnostics -- TsonUnicodeProcessorPolicy -- rather than stamped onto each one.
+
     /**
      * {@link #report(Diagnostic.Code, String, String, String)} carrying a {@link
      * TsonSchemaFetchException.Reason} -- the one thing about a problem that neither the code nor the
@@ -155,20 +161,6 @@ public interface TsonReadContext {
      */
     void report(Diagnostic.Code code, String message, String expected, String actual,
             Optional<TsonSchemaFetchException.Reason> fetchReason);
-
-    /**
-     * {@link #report(Diagnostic.Code, String, String, String)} for a [TSON-DATA] §8.2 name-hygiene
-     * <b>refusal</b> -- the same location model, stamped with the Unicode data version §8.2 requires a
-     * refusal to name.
-     *
-     * <p>A separate method rather than a flag on {@code report} so no call site can state a version this
-     * build does not carry, and so the ordinary report -- every reader in the compiled stack reports values
-     * and none of them refuses a name -- stays four arguments.
-     *
-     * @param code {@link Diagnostic.Code#CONFUSABLE_NAMES}, {@link Diagnostic.Code#RESTRICTED_CHARACTER} or
-     *             {@link Diagnostic.Code#RESTRICTED_SCRIPT} -- one per rule, which is where the rule lives
-     */
-    void reportRefusal(Diagnostic.Code code, String message, String expected, String actual);
 
     /**
      * How many problems have been reported through this read so far, counting every scoped copy since they
@@ -212,13 +204,13 @@ public interface TsonReadContext {
      * so a caller that names only a token policy still gets the name surface checked.
      */
     static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
-                              TsonUnicodePolicy tokenPolicy, TsonUnicodePolicy namePolicy) {
+                              TsonUnicodePolicy tokenPolicy, TsonUnicodePolicy identifierPolicy) {
         Objects.requireNonNull(tokenPolicy, "tokenPolicy -- name one, TsonUnicodePolicy.unrestricted() if "
                 + "this source's tokens are not to be checked");
-        Objects.requireNonNull(namePolicy, "namePolicy -- name one, TsonUnicodePolicy.unrestricted() if "
-                + "this source's names are not to be checked");
+        Objects.requireNonNull(identifierPolicy, "identifierPolicy -- state one, TsonUnicodePolicy"
+                + ".unrestricted() if this source's names are not to be checked");
         return DefaultTsonReadContext.of(TokenPolicyEventSource.wrap(events, tokenPolicy, receiver), receiver,
-                namePolicy);
+                identifierPolicy);
     }
 
     /**

@@ -148,13 +148,17 @@ public final class TsonUnicodePolicy {
      * The UTS #39 data version every [TSON-DATA] §8.2 name-hygiene rule is computed against, as this build
      * carries it.
      *
-     * <p><b>§8.2 requires a refusal to name it</b>, and the reason is that a refusal is not a verdict: the
-     * three rules read {@code confusables.txt}, {@code IdentifierStatus.txt} and the script data, none
-     * of which the Unicode Consortium freezes, so two conforming processors may legitimately disagree and
-     * the version is the only thing that explains the disagreement. Every refusal carries it ({@link
-     * Diagnostic#unicodeDataVersion()}) so a stored or forwarded one stays interpretable; this accessor is
-     * for a caller that wants it without a refusal in hand -- a server stating it once per response rather
-     * than once per problem, which is what it is: constant for the life of a process.
+     * <p><b>§8.2 requires a refusal to name it</b>, and the reason is that the three rules read {@code
+     * confusables.txt}, {@code IdentifierStatus.txt} and the script data, none of which the Unicode
+     * Consortium freezes: two conforming processors may legitimately disagree about one name, and the
+     * version is the only thing that explains the disagreement.
+     *
+     * <p><b>It is stated once, not once per refusal</b> ({@link TsonUnicodeProcessorPolicy}, which a run or a
+     * response carries beside its diagnostics). It is constant for the life of a process, so a copy on each
+     * problem is N copies of a string that cannot differ; and what a sender needs in order not to be refused
+     * is this fact <em>before</em> it writes a document, which a channel that only opens on failure cannot
+     * give it. What the refusal itself carries is the remedy -- which name, which rule, and what the policy
+     * would admit.
      *
      * <p>Lives here rather than beside the tables it describes because {@code io.ltr8.tson.compiler.lexer}
      * is implementation and is not exported, so the constant is unreachable to a consumer by hand. This is
@@ -167,6 +171,32 @@ public final class TsonUnicodePolicy {
      */
     public static String dataVersion() {
         return Xid.UNICODE_VERSION;
+    }
+
+    /**
+     * The UTS #39 §5.2 restriction level this policy applies.
+     *
+     * <p>With {@link #isPerSegment()} and {@link #permittedScripts()}, the whole of what this policy is --
+     * which is what lets a deployment <em>state</em> its configuration rather than only apply it. A document
+     * one processor accepts and another refuses differs by exactly these three, and a reader of the refusal
+     * has no other way to learn which one moved: the policy that judged is not in the document, not in the
+     * schema, and not in the diagnostic. See {@link TsonUnicodeProcessorPolicy}, which is the three of them plus
+     * {@link #dataVersion()} as one value a run or a response states once.
+     */
+    public Level level() {
+        return level;
+    }
+
+    /**
+     * The script combinations this policy admits over and above its {@link #level()}, in the order {@link
+     * #permitting} added them -- empty for a policy that has taken no such relaxation.
+     *
+     * <p>The narrowest relaxation available is also the one most likely to explain a disagreement between
+     * two deployments, since a level is usually left at the default and a {@code permitting(LATIN,
+     * CYRILLIC)} is by definition a local decision.
+     */
+    public List<Set<UnicodeScript>> permittedScripts() {
+        return permitted;
     }
 
     /** Whether the check does anything at all -- an {@code UNRESTRICTED} whole-text policy scans nothing. */

@@ -116,19 +116,30 @@ whether the document named something this deployment refuses (`NOT_PERMITTED`/`N
 did not answer, which is the half that decides whether retrying is worth anything. `TEXT` omits it, as it
 omits `expected`/`actual`: the stderr note already tells a person that nothing was judged.
 
-**A [TSON-DATA] §8.2 name-hygiene refusal carries the same kind of second answer**, as
-`unicode_data_version`: one flat field beside the three codes that are refusals (`CONFUSABLE_NAMES`,
-`RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT`, one per rule). §8.2 requires a refusal to name the Unicode data
-version it was computed against because §8.3 marks all three rules unstable across Unicode releases —
-two conforming processors may legitimately disagree about one name, and the version is the only thing that
-explains it. It is also the one fact a consumer cannot recover afterwards, which is why it is on the wire
-rather than left to the library call that produced it.
+**A [TSON-DATA] §8.2 name-hygiene refusal is a diagnostic like any other**, told apart by its `code` alone
+(`CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT`, one per rule), so the wire carries no second
+discriminator that could contradict it.
 
-**One field and not a policy record.** Which rule refused is the `code`, so the wire carries no second
-discriminator that could contradict it; the level, the unit and any `permitting` script set are the reading
-deployment's own configuration, known already to whoever set them and not actionable by whoever receives the
-report. That leaves `diagnostic_code` and `fetch_reason` as the schema's only hand-written enum copies —
-`DiagnosticsSchemaTest` checks both against their Java enums in both directions.
+**What §8.2 requires a refusal to name rides on the envelope instead**, as `policy` — a `CliPolicy` on both
+`validation_run` and `validation_report`, carrying `identifier_policy` and `token_policy` (each a level, a
+`per_segment` unit, and any `permitting` relaxations) and the `unicode_data_version` the rules were computed
+against. The two surfaces keep `TsonConfig`'s own names all the way to the wire, so what a deployment set
+and what its reports say are one vocabulary. It is there rather than on each
+diagnostic because it is a fact about the *processor*: constant for the whole run, so a per-refusal copy is N
+copies of one string; and needed by a sender *before* it writes a document rather than after being refused,
+which a channel that only opens on failure cannot give it. The level is also the half that actually explains
+a disagreement — two deployments at one UCD version differ because one of them set `ASCII_ONLY`.
+
+**`tson policy` is the same record with no document in hand**, which is the surface that makes a refusal
+avoidable rather than merely explicable: a generator that reads it first never writes the name that would be
+refused. `--output text` prints three lines; `json`/`tson` print the identical `policy` shape the envelopes
+carry, so a consumer parses one thing either way. In a validate run, `TEXT` prints the policy only when
+something was actually refused — a person does not want a configuration dump on every clean run, and does
+want, at the moment a name is refused, to be told the verdict came from this deployment's settings rather
+than from the file in front of them. The machine formats always carry it.
+
+That makes `restriction_level` a third hand-written enum copy beside `diagnostic_code` and `fetch_reason` —
+`DiagnosticsSchemaTest` checks all three against their Java enums in both directions.
 
 **The envelope does not yet keep a refusal apart from a verdict**, and the codes are the only thing that
 does: a run whose only problem is a refusal still sets `valid: false` and exits 1. `BACKLOG.md` carries it.
