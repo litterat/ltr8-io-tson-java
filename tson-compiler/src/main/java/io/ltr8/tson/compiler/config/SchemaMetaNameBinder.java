@@ -15,7 +15,7 @@ import java.util.Set;
  * mangling of the schema type name (e.g. {@code "integer_size"} -> {@code IntegerSize}, {@code
  * "record_field"} -> {@code RecordField}), which holds directly for every genuine
  * constraint-vocabulary/helper record in that package, with one confirmed exception (found by
- * actually running this against the real, registered meta-kernel.tn1 fixture, not guessed in
+ * actually running this against the real, registered meta-kernel.tn fixture, not guessed in
  * advance): {@link #ALIASES}.
  *
  * <p>Meta-kernel's own description of a composite constructor's shape (e.g. {@code record =>

@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 
 /**
  * meta-kernel's {@code ipv4_type} constructor (§5.5's {@code ipv4} atom, RFC 3986's {@code
- * IPv4address} production -- core.tn1: "dotted-quad per the RFC 3986 IPv4address production").
+ * IPv4address} production -- core.tn: "dotted-quad per the RFC 3986 IPv4address production").
  *
  * <p><b>Deliberately does not delegate parsing to {@link java.net.InetAddress}.</b> Confirmed
  * empirically before writing this: {@code InetAddress.ofLiteral} -- the no-DNS, literal-only entry
@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  * java.net.InetAddress#getByAddress(byte[])} -- a pure bytes-to-object call with no parsing, no
  * reinterpretation, and (per its own Javadoc) no name-service lookup.
  *
- * <p>{@code within}/{@code excluding} (meta.tn1's {@code ipv4_type}) are not modeled -- no built-in
+ * <p>{@code within}/{@code excluding} (meta.tn's {@code ipv4_type}) are not modeled -- no built-in
  * instance sets either, and set-membership/non-overlap against an array of other addresses or CIDR
  * blocks is a materially bigger piece of work than a scalar constraint, left for later.
  */

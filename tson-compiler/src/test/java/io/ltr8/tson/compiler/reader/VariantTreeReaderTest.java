@@ -60,7 +60,7 @@ class VariantTreeReaderTest {
                 RecordBody.of(List.of(RecordField.required("sides", TypeRef.of("integer"))))));
         entries.put("triangle", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
                 List.of("shape"), List.of(), Optional.empty(), RecordBody.of(List.of())));
-        return new TsonSchema("https://example.test/s.tn1", "https://example.test/meta.tn1",
+        return new TsonSchema("https://example.test/s.tn", "https://example.test/meta.tn",
                 List.of(), entries);
     }
 

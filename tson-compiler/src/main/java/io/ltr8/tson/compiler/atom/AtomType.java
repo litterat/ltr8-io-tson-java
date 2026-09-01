@@ -9,7 +9,7 @@ import io.ltr8.tson.compiler.ast.TokenValue;
  * {@link IntegerParser}. A single instance is a fully-parameterized *instance* of that constructor,
  * exactly mirroring the schema's own constructor/instance split: {@code int32}'s entry in the
  * built-in map is one {@code IntegerParser} constructed with {@code size = {bits: 32, signed: true}},
- * the same way {@code core.tn1} writes {@code int32 => !integer ^ { size: { bits: 32 signed: true
+ * the same way {@code core.tn} writes {@code int32 => !integer ^ { size: { bits: 32 signed: true
  * } } }.
  *
  * <p>{@link #read(TokenValue)} returns the atom's own canonical host value (this atom's natural

@@ -372,8 +372,8 @@ class TsonCliTest {
     void plainDataWithNoSchemaValidatesSchemalessly(@TempDir Path dir) throws IOException {
         // A data file with no !!schema is checked schemalessly (base syntax + built-in atoms), even
         // when schema files are also present. A plain, well-formed value is valid.
-        Path schema = writeFile(dir, "schema.tn1", """
-                !!id:"https://example.test/cli-arg-test.tn1"
+        Path schema = writeFile(dir, "schema.tn", """
+                !!id:"https://example.test/cli-arg-test.tn"
                 !!meta:"https://tson.io/2026/34/m/meta.tn"
                 !!import:"https://tson.io/2026/34/m/core.tn"
                 { my_int => int32 }
@@ -388,14 +388,14 @@ class TsonCliTest {
 
     @Test
     void validateEndToEndThroughMainDispatchExitsZeroForValidData(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", """
-                !!id:"https://example.test/cli-arg-test-2.tn1"
+        Path schema = writeFile(dir, "schema.tn", """
+                !!id:"https://example.test/cli-arg-test-2.tn"
                 !!meta:"https://tson.io/2026/34/m/meta.tn"
                 !!import:"https://tson.io/2026/34/m/core.tn"
                 { my_int => int32 }
                 """);
         Path data = writeFile(dir, "data.tson", """
-                !!schema:"https://example.test/cli-arg-test-2.tn1"
+                !!schema:"https://example.test/cli-arg-test-2.tn"
                 !my_int 42
                 """);
 
@@ -408,13 +408,13 @@ class TsonCliTest {
     /** {@code -} is standard input all the way through {@code main}'s own dispatch, not just in the command. */
     @Test
     void dashReadsOneDataDocumentFromStandardInput(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", """
-                !!id:"https://example.test/cli-stdin.tn1"
+        Path schema = writeFile(dir, "schema.tn", """
+                !!id:"https://example.test/cli-stdin.tn"
                 !!meta:"https://tson.io/2026/34/m/meta.tn"
                 !!import:"https://tson.io/2026/34/m/core.tn"
                 { my_int => int32 }
                 """);
-        String data = "!!schema:\"https://example.test/cli-stdin.tn1\"\n!my_int 42\n";
+        String data = "!!schema:\"https://example.test/cli-stdin.tn\"\n!my_int 42\n";
 
         String out = withStdin(data, () -> captureStdout(() -> assertEquals(0,
                 TsonCli.run(new String[] {"validate", "--output", "json", schema.toString(), "-"}))));

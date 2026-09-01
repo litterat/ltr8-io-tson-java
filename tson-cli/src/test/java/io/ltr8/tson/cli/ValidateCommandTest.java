@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ValidateCommandTest {
 
     private static final String RECORD_SCHEMA = """
-            !!id:"https://example.test/cli-validate.tn1"
+            !!id:"https://example.test/cli-validate.tn"
             !!meta:"https://tson.io/2026/34/m/meta.tn"
             !!import:"https://tson.io/2026/34/m/core.tn"
             {
@@ -35,14 +35,14 @@ class ValidateCommandTest {
             """;
 
     private static String selfDescribing(String body) {
-        return "!!schema:\"https://example.test/cli-validate.tn1\"\n!my_record " + body + "\n";
+        return "!!schema:\"https://example.test/cli-validate.tn\"\n!my_record " + body + "\n";
     }
 
     // --- schema-driven (data carries !!schema) ---
 
     @Test
     void selfDescribingDataValidatesAgainstItsDeclaredSchema(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->
@@ -53,7 +53,7 @@ class ValidateCommandTest {
 
     @Test
     void fileOrderDoesNotMatter(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2 }"));
 
         String output = captureStdout(() ->  // data listed before its schema
@@ -64,7 +64,7 @@ class ValidateCommandTest {
 
     @Test
     void aFileWithMultipleProblemsReportsEveryOneOfThem(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
         // "b" missing, "a" out of int32 range -- two independent problems in one file.
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 99999999999999 }"));
 
@@ -84,7 +84,7 @@ class ValidateCommandTest {
      */
     @Test
     void aFieldTheSchemaDoesNotDeclareIsInvalid(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 1  b: 2  hallucinated_field: \"nope\" }"));
 
         String output = captureStdout(() ->
@@ -104,7 +104,7 @@ class ValidateCommandTest {
     @Test
     void aDeclaredSchemaThatWasNotProvidedIsUnavailableRatherThanAVerdict(@TempDir Path dir) throws IOException {
         Path data = writeFile(dir, "data.tson",
-                "!!schema:\"https://example.test/not-provided.tn1\"\n!my_record { a: 1  b: 2 }\n");
+                "!!schema:\"https://example.test/not-provided.tn\"\n!my_record { a: 1  b: 2 }\n");
 
         String err = captureStderr(() -> {
             String output = captureStdout(() ->
@@ -124,16 +124,16 @@ class ValidateCommandTest {
      */
     @Test
     void anUnmatchedSchemaSaysWhatTheSuppliedFilesDeclare(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);   // declares .../cli-validate.tn1
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);   // declares .../cli-validate.tn
         Path data = writeFile(dir, "data.tson",
-                "!!schema:\"https://example.test/typo.tn1\"\n!my_record { a: 1  b: 2 }\n");
+                "!!schema:\"https://example.test/typo.tn\"\n!my_record { a: 1  b: 2 }\n");
 
         String output = captureStdout(() ->
                 assertEquals(69, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
-        assertTrue(output.contains("cannot fetch schema 'https://example.test/typo.tn1'"), output);
+        assertTrue(output.contains("cannot fetch schema 'https://example.test/typo.tn'"), output);
         assertTrue(output.contains("no schema file on the command line declares that !!id"), output);
-        assertTrue(output.contains("the schema files given declare: https://example.test/cli-validate.tn1"),
+        assertTrue(output.contains("the schema files given declare: https://example.test/cli-validate.tn"),
                 output);
     }
 
@@ -141,7 +141,7 @@ class ValidateCommandTest {
     @Test
     void anUnmatchedSchemaWithNoSchemaFilesSaysSo(@TempDir Path dir) throws IOException {
         Path data = writeFile(dir, "data.tson",
-                "!!schema:\"https://example.test/absent.tn1\"\n!my_record { a: 1 }\n");
+                "!!schema:\"https://example.test/absent.tn\"\n!my_record { a: 1 }\n");
 
         String output = captureStdout(() ->
                 assertEquals(69, ValidateCommand.run(inputs(data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
@@ -151,9 +151,9 @@ class ValidateCommandTest {
 
     @Test
     void aRootTypeRefTheSchemaDoesNotDeclareIsAnUnknownType(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
         Path data = writeFile(dir, "data.tson",
-                "!!schema:\"https://example.test/cli-validate.tn1\"\n!no_such_type { a: 1  b: 2 }\n");
+                "!!schema:\"https://example.test/cli-validate.tn\"\n!no_such_type { a: 1  b: 2 }\n");
 
         String output = captureStdout(() ->
                 assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
@@ -163,16 +163,16 @@ class ValidateCommandTest {
 
     @Test
     void twoSchemasAndTwoDataFilesEachPickTheirOwn(@TempDir Path dir) throws IOException {
-        Path recordSchema = writeFile(dir, "record.tn1", RECORD_SCHEMA);
-        Path pointSchema = writeFile(dir, "point.tn1", """
-                !!id:"https://example.test/cli-point.tn1"
+        Path recordSchema = writeFile(dir, "record.tn", RECORD_SCHEMA);
+        Path pointSchema = writeFile(dir, "point.tn", """
+                !!id:"https://example.test/cli-point.tn"
                 !!meta:"https://tson.io/2026/34/m/meta.tn"
                 !!import:"https://tson.io/2026/34/m/core.tn"
                 { point => { x: int32  y: int32 } }
                 """);
         Path recordData = writeFile(dir, "rec.tson", selfDescribing("{ a: 1  b: 2 }"));
         Path pointData = writeFile(dir, "pt.tson",
-                "!!schema:\"https://example.test/cli-point.tn1\"\n!point { x: 3  y: 4 }\n");
+                "!!schema:\"https://example.test/cli-point.tn\"\n!point { x: 3  y: 4 }\n");
 
         String output = captureStdout(() -> assertEquals(0,
                 ValidateCommand.run(inputs(recordSchema, pointSchema, recordData, pointData),
@@ -207,7 +207,7 @@ class ValidateCommandTest {
 
     @Test
     void onlySchemaFilesGivenIsAUsageError(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
 
         String output = captureStdout(() ->
                 assertEquals(2, ValidateCommand.run(inputs(schema), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
@@ -217,7 +217,7 @@ class ValidateCommandTest {
 
     @Test
     void jsonOutputIsWellShaped(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
         Path data = writeFile(dir, "data.tson", selfDescribing("{ a: 99999999999999  b: 2 }"));
 
         String output = captureStdout(() ->
@@ -234,7 +234,7 @@ class ValidateCommandTest {
      */
     @Test
     void multiFileJsonOutputIsOneParseableDocument(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
         Path good = writeFile(dir, "good.tson", selfDescribing("{ a: 1  b: 2 }"));
         Path bad = writeFile(dir, "bad.tson", selfDescribing("{ a: 1 }"));
 
@@ -273,7 +273,7 @@ class ValidateCommandTest {
      */
     @Test
     void aRunLevelFailureKeepsTheEnvelopeWithNoFilesInIt(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
 
         String output = captureStdout(() ->
                 assertEquals(2, ValidateCommand.run(inputs(schema), OutputFormat.JSON, PolicyOptions.DEFAULTS)));
@@ -286,7 +286,7 @@ class ValidateCommandTest {
     /** Text keeps the per-file header, and keeps printing it only when there is more than one file. */
     @Test
     void textStillLabelsEachFileWhenThereIsMoreThanOne(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
         Path good = writeFile(dir, "good.tson", selfDescribing("{ a: 1  b: 2 }"));
         Path bad = writeFile(dir, "bad.tson", selfDescribing("{ a: 1 }"));
 
@@ -302,8 +302,8 @@ class ValidateCommandTest {
     void aSchemaPinnedByItsOwnHashResolvesAgainstAPlainReference(@TempDir Path dir) throws IOException {
         // The schema's !!id carries a ?sha256= pin; the data's !!schema is plain. Matching is by
         // canonical identity (the hash is not identity), so it still validates.
-        Path schema = writeFile(dir, "schema.tn1",
-                "!!id:\"https://example.test/cli-validate.tn1?sha256=" + "a".repeat(64) + "\"\n"
+        Path schema = writeFile(dir, "schema.tn",
+                "!!id:\"https://example.test/cli-validate.tn?sha256=" + "a".repeat(64) + "\"\n"
                         + "!!meta:\"https://tson.io/2026/34/m/meta.tn\"\n"
                         + "!!import:\"https://tson.io/2026/34/m/core.tn\"\n"
                         + "{ my_record => { a: int32  b: int32 } }\n");
@@ -341,7 +341,7 @@ class ValidateCommandTest {
      */
     @Test
     void aDataDocumentPipedInValidatesAgainstASchemaFile(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
 
         String output = withStdin(selfDescribing("{ a: 1  b: 2 }"), () -> captureStdout(() ->
                 assertEquals(0, ValidateCommand.run(
@@ -353,7 +353,7 @@ class ValidateCommandTest {
 
     @Test
     void aPipedDocumentThatDoesNotValidateReportsUnderTheNameDash(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "schema.tn1", RECORD_SCHEMA);
+        Path schema = writeFile(dir, "schema.tn", RECORD_SCHEMA);
 
         String output = withStdin(selfDescribing("{ a: 1 }"), () -> captureStdout(() ->
                 assertEquals(1, ValidateCommand.run(

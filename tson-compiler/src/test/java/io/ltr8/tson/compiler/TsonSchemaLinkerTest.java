@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Hand-built schemas only -- {@code tson-schema} has no dependency on {@code tson-compiler}, so it
  * can't reach {@code MetaKernelBootstrapResolver} for a real fixture (see {@code MetaKernelSchemaRegistryTest}
- * in {@code tson-compiler} for the real end-to-end check against meta-kernel.tn1 itself).
+ * in {@code tson-compiler} for the real end-to-end check against meta-kernel.tn itself).
  *
  */
 class TsonSchemaLinkerTest {
@@ -66,7 +66,7 @@ class TsonSchemaLinkerTest {
      * compares against that exact identity, not merely "is this schema self-referencing."
      */
     private static TsonSchema schemaOf(Map<String, TypeDefinition> entries) {
-        return new TsonSchema("https://example.test/s.tn1", TsonBundledSchemas.META_KERNEL_ID,
+        return new TsonSchema("https://example.test/s.tn", TsonBundledSchemas.META_KERNEL_ID,
                 List.of(), entries);
     }
 
@@ -110,7 +110,7 @@ class TsonSchemaLinkerTest {
     void anUnmergedEntryOriginatesInTheSchemaHoldingIt() {
         TsonLinkedSchema linked = new TsonLinkedSchema(schemaOf(Map.of("local", emptyRecord())));
 
-        assertEquals("https://example.test/s.tn1", linked.originOf("local"));
+        assertEquals("https://example.test/s.tn", linked.originOf("local"));
     }
 
     /**
@@ -270,7 +270,7 @@ class TsonSchemaLinkerTest {
         AnnotatedMap<String, TypeDefinition> entries = AnnotatedMap.of(nonDisjointChoice());
         entries = entries.withAnnotations("contact", disjointMarker());
 
-        TsonSchema schema = new TsonSchema("https://example.test/s.tn1", TsonBundledSchemas.META_KERNEL_ID,
+        TsonSchema schema = new TsonSchema("https://example.test/s.tn", TsonBundledSchemas.META_KERNEL_ID,
                 List.of(), entries, false);
         assertThrows(TsonSchemaValidationException.class, () -> TsonSchemaLinker.link(schema, null));
     }
@@ -418,14 +418,14 @@ class TsonSchemaLinkerTest {
     void mergesImportedEntriesBeforeLocalOnesAndValidatesTheWhole() {
         TsonLinkedSchema imported = new TsonLinkedSchema(schemaOf(Map.of("imported_a", emptyRecord())));
         Map<String, TsonLinkedSchema> byIdentity =
-                Map.of(TsonCanonicalIdentity.canonicalize("https://example.test/import.tn1"), imported);
+                Map.of(TsonCanonicalIdentity.canonicalize("https://example.test/import.tn"), imported);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
         localEntries.put("local_a", TypeDefinition.product(
                 RecordBody.of(List.of(RecordField.required("field", TypeRef.of("imported_a"))))));
-        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
-                "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"), localEntries);
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn",
+                "https://example.test/meta.tn", List.of("https://example.test/import.tn"), localEntries);
 
         TsonLinkedSchema result = TsonSchemaLinker.link(local, loader);
 
@@ -435,8 +435,8 @@ class TsonSchemaLinkerTest {
     @Test
     void rejectsAnImportThatIsNotRegistered() {
         TsonSchemaLoader loader = id -> Optional.empty();
-        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
-                "https://example.test/meta.tn1", List.of("https://example.test/missing.tn1"), Map.of());
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn",
+                "https://example.test/meta.tn", List.of("https://example.test/missing.tn"), Map.of());
 
         assertThrows(TsonSchemaValidationException.class, () -> TsonSchemaLinker.link(local, loader));
     }
@@ -445,11 +445,11 @@ class TsonSchemaLinkerTest {
     void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
         TsonLinkedSchema imported = new TsonLinkedSchema(schemaOf(Map.of("shared_name", emptyRecord())));
         Map<String, TsonLinkedSchema> byIdentity =
-                Map.of(TsonCanonicalIdentity.canonicalize("https://example.test/import.tn1"), imported);
+                Map.of(TsonCanonicalIdentity.canonicalize("https://example.test/import.tn"), imported);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
-        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
-                "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"),
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn",
+                "https://example.test/meta.tn", List.of("https://example.test/import.tn"),
                 Map.of("shared_name", emptyRecord()));
 
         assertThrows(TsonSchemaValidationException.class, () -> TsonSchemaLinker.link(local, loader));
@@ -464,7 +464,7 @@ class TsonSchemaLinkerTest {
     void rejectsAMetaTargetThatIsNotItselfGovernedByTheMetaKernel() {
         // a plain type library: its own !!meta is an ordinary meta, so it declares no constructors
         TsonLinkedSchema library = new TsonLinkedSchema(new TsonSchema("https://example.test/lib.tn",
-                "https://example.test/meta.tn1", List.of(), Map.of("uuid", unitEntry())));
+                "https://example.test/meta.tn", List.of(), Map.of("uuid", unitEntry())));
         Map<String, TsonLinkedSchema> byIdentity =
                 Map.of(TsonCanonicalIdentity.canonicalize("https://example.test/lib.tn"), library);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
@@ -557,14 +557,14 @@ class TsonSchemaLinkerTest {
                 List.of("imported_base"), List.of(), Optional.empty(), RecordBody.of(List.of())));
         TsonSchema imported = schemaOf(importedEntries);
         Map<String, TsonLinkedSchema> byIdentity = Map.of(
-                TsonCanonicalIdentity.canonicalize("https://example.test/import.tn1"), new TsonLinkedSchema(imported));
+                TsonCanonicalIdentity.canonicalize("https://example.test/import.tn"), new TsonLinkedSchema(imported));
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         Map<String, TypeDefinition> localEntries = new LinkedHashMap<>();
         localEntries.put("local_child", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
                 List.of("imported_base"), List.of(), Optional.empty(), RecordBody.of(List.of())));
-        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
-                "https://example.test/meta.tn1", List.of("https://example.test/import.tn1"), localEntries);
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn",
+                "https://example.test/meta.tn", List.of("https://example.test/import.tn"), localEntries);
 
         TsonLinkedSchema result = TsonSchemaLinker.link(local, loader);
 
@@ -583,25 +583,25 @@ class TsonSchemaLinkerTest {
         // identity-based rule (§2.2.3). The ids have to differ for this to be the case under
         // test at all; two copies claiming one id are one schema reached twice, which unifies (below).
         TsonLinkedSchema importedOne = new TsonLinkedSchema(
-                schemaOf("https://example.test/import-one.tn1", List.of(), Map.of("shared_name", emptyRecord())),
-                Map.of("shared_name", TsonCanonicalIdentity.canonicalize("https://example.test/import-one.tn1")));
+                schemaOf("https://example.test/import-one.tn", List.of(), Map.of("shared_name", emptyRecord())),
+                Map.of("shared_name", TsonCanonicalIdentity.canonicalize("https://example.test/import-one.tn")));
         TsonLinkedSchema importedTwo = new TsonLinkedSchema(
-                schemaOf("https://example.test/import-two.tn1", List.of(), Map.of("shared_name", emptyRecord())),
-                Map.of("shared_name", TsonCanonicalIdentity.canonicalize("https://example.test/import-two.tn1")));
+                schemaOf("https://example.test/import-two.tn", List.of(), Map.of("shared_name", emptyRecord())),
+                Map.of("shared_name", TsonCanonicalIdentity.canonicalize("https://example.test/import-two.tn")));
         Map<String, TsonLinkedSchema> byIdentity = Map.of(
-                TsonCanonicalIdentity.canonicalize("https://example.test/import-one.tn1"), importedOne,
-                TsonCanonicalIdentity.canonicalize("https://example.test/import-two.tn1"), importedTwo);
+                TsonCanonicalIdentity.canonicalize("https://example.test/import-one.tn"), importedOne,
+                TsonCanonicalIdentity.canonicalize("https://example.test/import-two.tn"), importedTwo);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
-        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
-                "https://example.test/meta.tn1",
-                List.of("https://example.test/import-one.tn1", "https://example.test/import-two.tn1"), Map.of());
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn",
+                "https://example.test/meta.tn",
+                List.of("https://example.test/import-one.tn", "https://example.test/import-two.tn"), Map.of());
 
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> TsonSchemaLinker.link(local, loader));
         assertTrue(thrown.getMessage().contains("shared_name"), thrown::getMessage);
-        assertTrue(thrown.getMessage().contains("import-one.tn1")
-                && thrown.getMessage().contains("import-two.tn1"), thrown::getMessage);
+        assertTrue(thrown.getMessage().contains("import-one.tn")
+                && thrown.getMessage().contains("import-two.tn"), thrown::getMessage);
     }
 
     /**
@@ -612,32 +612,32 @@ class TsonSchemaLinkerTest {
      */
     @Test
     void unifiesOneSchemaReachedThroughTwoImportRoutes() {
-        TsonSchema shared = schemaOf("https://example.test/shared.tn1", List.of(),
+        TsonSchema shared = schemaOf("https://example.test/shared.tn", List.of(),
                 Map.of("shared_name", emptyRecord()));
         // The origins map link() really produces: every entry recorded under the canonical identity of the
         // schema that declared it, its own locals included. The one-arg constructor would leave it empty and
         // fall back to the raw !!id, which is not what a registered schema ever looks like.
         TsonLinkedSchema sharedLinked = new TsonLinkedSchema(shared,
-                Map.of("shared_name", TsonCanonicalIdentity.canonicalize("https://example.test/shared.tn1")));
+                Map.of("shared_name", TsonCanonicalIdentity.canonicalize("https://example.test/shared.tn")));
         TsonLinkedSchema viaB = new TsonLinkedSchema(
-                schemaOf("https://example.test/b.tn1", List.of("https://example.test/shared.tn1"),
+                schemaOf("https://example.test/b.tn", List.of("https://example.test/shared.tn"),
                         Map.of("shared_name", emptyRecord(), "b_type", emptyRecord())),
-                Map.of("shared_name", TsonCanonicalIdentity.canonicalize("https://example.test/shared.tn1")));
+                Map.of("shared_name", TsonCanonicalIdentity.canonicalize("https://example.test/shared.tn")));
         Map<String, TsonLinkedSchema> byIdentity = Map.of(
-                TsonCanonicalIdentity.canonicalize("https://example.test/shared.tn1"), sharedLinked,
-                TsonCanonicalIdentity.canonicalize("https://example.test/b.tn1"), viaB);
+                TsonCanonicalIdentity.canonicalize("https://example.test/shared.tn"), sharedLinked,
+                TsonCanonicalIdentity.canonicalize("https://example.test/b.tn"), viaB);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
-        TsonSchema local = new TsonSchema("https://example.test/importer.tn1",
-                "https://example.test/meta.tn1",
-                List.of("https://example.test/shared.tn1", "https://example.test/b.tn1"), Map.of());
+        TsonSchema local = new TsonSchema("https://example.test/importer.tn",
+                "https://example.test/meta.tn",
+                List.of("https://example.test/shared.tn", "https://example.test/b.tn"), Map.of());
 
         TsonLinkedSchema linked = TsonSchemaLinker.link(local, loader);
 
         assertTrue(linked.schema().entries().containsKey("shared_name"));
         assertTrue(linked.schema().entries().containsKey("b_type"));
         // The declaring schema, not the intermediary that passed it along.
-        assertEquals(TsonCanonicalIdentity.canonicalize("https://example.test/shared.tn1"),
+        assertEquals(TsonCanonicalIdentity.canonicalize("https://example.test/shared.tn"),
                 linked.originOf("shared_name"));
     }
 }

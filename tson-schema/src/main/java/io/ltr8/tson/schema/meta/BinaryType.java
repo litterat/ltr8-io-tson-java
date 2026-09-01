@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * meta.tn1's {@code binary} constructor (§5.3's four binary atoms, RFC 4648) -- one class, not one
+ * meta.tn's {@code binary} constructor (§5.3's four binary atoms, RFC 4648) -- one class, not one
  * per encoding: {@code binary}'s only field beyond the RFC pin is {@code encoding: binary_encoding},
  * a closed four-value enum, exactly the same shape as {@link IntegerType}'s {@code size} or {@link
  * FloatType}'s {@code format} -- a single constructor parameterized by one of its own fields, not
@@ -19,9 +19,9 @@ import java.util.Optional;
  * {@code binary_type} like every other constructor. The
  * {@code @Typename} below is {@code "binary"} to match, not {@code "binary_type"}.
  *
- * <p>{@code minLength}/{@code maxLength} are modeled for structural fidelity (meta.tn1 defines
+ * <p>{@code minLength}/{@code maxLength} are modeled for structural fidelity (meta.tn defines
  * them on the constructor) but unexercised by any built-in instance, the same as {@link
- * FloatType}'s bounds -- {@code base64 => !binary BASE64} and its three siblings in core.tn1 are all
+ * FloatType}'s bounds -- {@code base64 => !binary BASE64} and its three siblings in core.tn are all
  * unconstrained beyond {@code encoding}.
  *
  * <p>Also an {@link Atom} variant: {@code base64 => !binary BASE64} and its

@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Verifies the bootstrap against meta-kernel.tn1 as packaged on the classpath (see this module's
+ * Verifies the bootstrap against meta-kernel.tn as packaged on the classpath (see this module's
  * {@code build.gradle.kts}): the header directives carry straight through, the 36 declarations
  * {@code DefinitionResolver} already resolves via ordinary schema-grammar resolution are all present,
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,

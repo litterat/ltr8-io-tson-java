@@ -35,7 +35,7 @@ import java.util.function.UnaryOperator;
  * ChoiceReader#FACTORY} -- see that class's own Javadoc for why it has no {@code
  * DataClassUnion}-bounded counterpart the way {@code record} does.
  *
- * <p><b>Every {@code ~}-marked constructor meta-kernel.tn1/meta.tn1 declare has an entry</b> --
+ * <p><b>Every {@code ~}-marked constructor meta-kernel.tn/meta.tn declare has an entry</b> --
  * verified against both files directly, not assumed. Two of them (see {@link #notImplemented}'s own
  * call sites, deliberately grouped at the bottom of {@link #baseFactories} rather than interleaved
  * with the working entries above) still have no compiled reader at all -- {@code extern} and {@code
@@ -109,7 +109,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
             ValueReaderFactory choice) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
 
-        // meta-kernel.tn1
+        // meta-kernel.tn
         factories.put("unit", unitFactory);
         factories.put("integer_type", leaf.apply(AtomTypeReader.INTEGER_TYPE));
         factories.put("text_type", leaf.apply(AtomTypeReader.TEXT_TYPE));
@@ -123,7 +123,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("enum", leaf.apply(enumFactory));
         factories.put("choice", choice);
 
-        // meta.tn1
+        // meta.tn
         factories.put("binary", leaf.apply(AtomTypeReader.BINARY));
         factories.put("float_type", leaf.apply(AtomTypeReader.FLOAT_TYPE));
         factories.put("decimal_type", leaf.apply(AtomTypeReader.DECIMAL_TYPE));
@@ -144,7 +144,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         // Sugar/alias names -- not their own `~`-marked constructors, kept for lookup convenience only.
 
         // ---- Not implemented yet -- every entry below is a real `~`-marked constructor from
-        // ---- meta-kernel.tn1/meta.tn1 with no compiled reader at all. Registered to ErrorReader so a
+        // ---- meta-kernel.tn/meta.tn with no compiled reader at all. Registered to ErrorReader so a
         // ---- schema declaring one still compiles; only reading a value against one actually fails.
         factories.put("extern", notImplemented("extern"));
         factories.put("unknown_type", notImplemented("unknown_type"));

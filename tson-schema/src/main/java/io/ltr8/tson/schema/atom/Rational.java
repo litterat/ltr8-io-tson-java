@@ -10,7 +10,7 @@ import java.util.Objects;
  * not {@code tson-compiler}, because {@code RationalType}'s own {@code min}/{@code max}/{@code
  * multipleOf} constraint fields are typed as this.
  *
- * <p><b>Not normalized, but compared by value.</b> meta.tn1's own doc for {@code rational_type} is
+ * <p><b>Not normalized, but compared by value.</b> meta.tn's own doc for {@code rational_type} is
  * explicit: "the token is preserved as written and 2/4 round-trips as 2/4... equality and
  * constraints operate on the value (2/4 equals 1/2)." That's why this can't use the record default
  * {@code equals}/{@code hashCode} -- those are field-based ({@code 2/4} and {@code 1/2} would

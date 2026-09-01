@@ -114,7 +114,7 @@ public final class SchemaResolver {
      * only for constructor-application targets), an import's own entries feed the *type-name*
      * namespace -- the same {@code namespace} map (exposed to {@link DefinitionResolver} as {@code
      * namespace::get}) its own composition/refinement/atom-refinement resolution looks a
-     * supertype/refinement-source straight up in, with no fallback of any kind. meta.tn1's own {@code
+     * supertype/refinement-source straight up in, with no fallback of any kind. meta.tn's own {@code
      * date_type => ~atom & atom_specification & {...}}, composing with two meta-kernel entries it
      * only has via its own {@code !!import}, would fail to resolve at all without this. Collision
      * handling mirrors {@code TsonSchemaLinker.mergeImports}'s own rule exactly: a name declared by

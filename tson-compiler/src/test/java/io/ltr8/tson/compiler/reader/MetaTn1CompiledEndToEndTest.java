@@ -19,17 +19,17 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * The same proof {@link MetaKernelEndToEndTest} gives for meta-kernel.tn1, one rung up the schema
- * ladder: compiles the ENTIRE real, registered {@code meta.tn1} (meta-kernel + meta.tn1, chained
+ * The same proof {@link MetaKernelEndToEndTest} gives for meta-kernel.tn, one rung up the schema
+ * ladder: compiles the ENTIRE real, registered {@code meta.tn} (meta-kernel + meta.tn, chained
  * the way {@code io.ltr8.tson.compiler.resolver.MetaSchemaImportTest} registers them) and
- * reads real TSON data text against one of meta.tn1's own genuinely useful record types.
+ * reads real TSON data text against one of meta.tn's own genuinely useful record types.
  */
 class MetaTn1CompiledEndToEndTest {
 
     /**
-     * Resolving meta.tn1 itself now goes through {@code resolveSchema}/{@code bindAtomInstance}, which
+     * Resolving meta.tn itself now goes through {@code resolveSchema}/{@code bindAtomInstance}, which
      * needs an object-binding-mode compiled reader for meta-kernel (its own Instance declarations,
-     * e.g. {@code binary_encoding => !enum [...]}, go through it) -- so meta.tn1's own resolution
+     * e.g. {@code binary_encoding => !enum [...]}, go through it) -- so meta.tn's own resolution
      * step below is object mode internally, even though the *outer* compile this test itself
      * exercises stays DOM mode (a separate, fresh compilation of the final, already-resolved {@code
      * TsonSchema}, unrelated to how it got resolved).
@@ -67,12 +67,12 @@ class MetaTn1CompiledEndToEndTest {
     }
 
     /**
-     * {@code meta.tn1} declares 31 entries of its own, but the *registered* schema this compiles --
+     * {@code meta.tn} declares 31 entries of its own, but the *registered* schema this compiles --
      * the one a real reader actually needs, since it's what {@link TsonSchemaCompiler#compile} accepts
-     * -- also carries meta-kernel's own entries (merged in via meta.tn1's real {@code !!import}) plus
+     * -- also carries meta-kernel's own entries (merged in via meta.tn's real {@code !!import}) plus
      * whatever array-sugar materialization synthesized, matching {@code MetaSchemaImportTest}'s own
      * counts. Every one of them still compiles cleanly with the same registry this whole atom-family
-     * + composite factory set already proves against meta-kernel.tn1 in {@link
+     * + composite factory set already proves against meta-kernel.tn in {@link
      * MetaKernelEndToEndTest}.
      */
     @Test

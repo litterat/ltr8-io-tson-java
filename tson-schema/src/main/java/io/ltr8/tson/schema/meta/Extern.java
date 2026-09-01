@@ -6,7 +6,7 @@ import java.net.URI;
 import java.util.List;
 
 /**
- * meta.tn1's {@code extern} constructor ({@code extern => ~sum & { schema: uri  types:
+ * meta.tn's {@code extern} constructor ({@code extern => ~sum & { schema: uri  types:
  * [type_name]? } }) -- a reference to a type (or the whole vocabulary) declared in a separate,
  * externally-governed schema, named by its own {@code !!id} rather than resolved through the
  * current schema's own namespace.

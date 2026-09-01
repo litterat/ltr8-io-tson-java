@@ -195,7 +195,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     // ── resolveSchema(SchemaDocument)'s own validate-then-derive behavior ──
 
     private static final String MINI_DOCUMENT = """
-            !!id:"https://example.test/mini.tn1"
+            !!id:"https://example.test/mini.tn"
             !!meta:"https://tson.io/2026/34/m/meta.tn"
             {
               void => !unit {}
@@ -207,7 +207,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
-        // "unit" is neither local to mini.tn1 nor imported by it -- only reachable if resolveSchema
+        // "unit" is neither local to mini.tn nor imported by it -- only reachable if resolveSchema
         // itself derived the structure namespace from the loader's own meta.tn entry (which in
         // turn carries meta-kernel's own entries, merged in via meta.tn's real !!import).
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
@@ -248,7 +248,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     private static final String MINI_DOCUMENT_MALFORMED_ID = """
-            !!id:"mini.tn1"
+            !!id:"mini.tn"
             !!meta:"https://tson.io/2026/34/m/meta.tn"
             {
               void => !unit {}
@@ -260,13 +260,13 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument malformedIdDocument = new TsonSchemaParser(MINI_DOCUMENT_MALFORMED_ID).parseSchemaDocument();
 
-        // "mini.tn1" alone is a syntactically valid relative-reference URI, but has no scheme --
+        // "mini.tn" alone is a syntactically valid relative-reference URI, but has no scheme --
         // TsonCanonicalIdentity.canonicalize's own rejection, surfaced here via TsonCanonicalIdentity.validate.
         assertThrows(TsonSchemaValidationException.class, () -> resolver.resolveSchema(malformedIdDocument));
     }
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
-            !!id:"https://example.test/mini.tn1"
+            !!id:"https://example.test/mini.tn"
             !!meta:"https://tson.io/2026/34/m/meta.tn"
             !!import:"meta-kernel.tn"
             {
@@ -285,7 +285,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
-            !!id:"https://example.test/mini.tn1"
+            !!id:"https://example.test/mini.tn"
             !!meta:"https://tson.io/2026/34/m/meta.tn"
             !!import:"https://tson.io/2026/34/m/meta-kernel.tn"
             {
@@ -312,7 +312,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
-            !!id:"https://example.test/mini.tn1"
+            !!id:"https://example.test/mini.tn"
             !!meta:"https://tson.io/2026/34/m/meta.tn"
             !!import:"https://tson.io/2026/34/m/meta-kernel.tn"
             {
@@ -335,7 +335,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
-            !!id:"https://example.test/mini.tn1"
+            !!id:"https://example.test/mini.tn"
             !!meta:"https://tson.io/2026/34/m/meta.tn"
             !!import:"https://tson.io/2026/34/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/34/m/meta.tn"

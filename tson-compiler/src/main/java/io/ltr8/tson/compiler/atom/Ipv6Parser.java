@@ -8,7 +8,7 @@ import java.util.regex.Pattern;
 
 /**
  * meta-kernel's {@code ipv6_type} constructor (§5.5's {@code ipv6} atom, RFC 4291 §2.2's text
- * representation -- core.tn1: "IPv6 address, RFC 4291 §2.2 text representation. Zone identifiers
+ * representation -- core.tn: "IPv6 address, RFC 4291 §2.2 text representation. Zone identifiers
  * (RFC 4007, {@code fe80::1%eth0}) are host-local and excluded from the contract.").
  *
  * <p>Same reasoning as {@link Ipv4Parser}: this does not hand the token's text to {@code
@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
  *
  * <p>Zone identifiers ({@code %eth0}) need no special-case rejection: {@code %} simply isn't in
  * this grammar's character set, so a zone suffix fails as an ordinary malformed group -- matching
- * core.tn1's exclusion of them from the contract.
+ * core.tn's exclusion of them from the contract.
  *
  * <p>Unlike {@link Ipv4Parser}'s decimal octets, a hex group's leading zeros are not rejected --
  * RFC 4291 §2.2 defines a group as "one to four hexadecimal digits", a digit *count* restriction,
@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  * "0000:0000:0000:0000:0000:0000:0000:0001"} is exactly as valid as {@code "::1"}, just not
  * canonical form (RFC 5952 governs canonical *output*, not input acceptance).
  *
- * <p>{@code within}/{@code excluding} (meta.tn1's {@code ipv6_type}) are not modeled, for the same
+ * <p>{@code within}/{@code excluding} (meta.tn's {@code ipv6_type}) are not modeled, for the same
  * reason as {@link Ipv4Parser}: deferred, not scoped out.
  *
  * <p><b>Deliberately uses {@code Inet6Address.getByAddress(String, byte[], int)}, not the generic

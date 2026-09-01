@@ -17,7 +17,7 @@ import java.time.Period;
  * for its half instead of rebuilding it. Lives in {@code schema.meta}, not {@code tson-compiler},
  * because {@code DurationType}'s own {@code min}/{@code max} constraint fields are typed as this.
  *
- * <p>Not {@link Comparable} -- core.tn1 marks {@code duration}'s ordering {@code @ordered:PARTIAL}
+ * <p>Not {@link Comparable} -- core.tn marks {@code duration}'s ordering {@code @ordered:PARTIAL}
  * precisely because a calendar-based duration ({@code P1M}, one calendar month) has no fixed length
  * to compare against a clock-based one (`P1M` may be 28-31 days depending on when it's applied) --
  * min/max bounds on {@code duration_type} are modeled on {@link DurationType} for structural fidelity
