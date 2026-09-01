@@ -1017,8 +1017,11 @@ compatibility).
   open**: concurrent reads through one `Tson` are safe (the
   readers are immutable, the lexer/stream are per-read, both on-demand caches settle a race by keeping
   one entry, and a cache *hit* — which is every read, in a process that resolved its schemas at startup —
-  takes no lock at all; `docs/linking-and-compilation.md`). What is still open is everything *outside* a read:
-  registering schemas concurrently, and mutating a `DataBindContext` after use.
+  takes no lock at all; `docs/linking-and-compilation.md`), and **both halves are now stated on `Tson` and
+  `TsonConfig` themselves** rather than only in the design notes — a consumer reads the front door, not
+  `docs/`, and that guarantee is what decides between one instance and one per request
+  (`SharedInstanceConcurrencyTest` pins it at that surface). What is still open is everything *outside* a
+  read: registering schemas concurrently, and mutating a `DataBindContext` after use.
 - **§9.1's resource limits** (SHOULD, DoS-hardening) — none of them enforced: not nesting depth, token
   length, document size, or numeric-literal length. Depth is the one that bites, a document a few
   thousand containers deep overflowing the stack as an `Error` that no `catch (RuntimeException)` in

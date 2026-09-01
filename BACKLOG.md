@@ -128,16 +128,6 @@ which is why they sit low. The lexer's fail-fast floor is not among them: nothin
 someone decides whether lexer errors feed the `Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds
 that question.
 
-- [ ] **The thread-safety contract is stated nowhere in the library's own Javadoc.** Neither `Tson` nor
-  `TsonConfig` says a word about concurrency, while `docs/linking-and-compilation.md` and the `tson-java`
-  skill both state the contract confidently: concurrent *reads* through one `Tson` are safe (the readers are
-  immutable, the lexer and stream are per-read, both on-demand caches settle a race by keeping one entry, and
-  a cache hit takes no lock), while registering schemas concurrently is not, and neither is mutating a
-  `DataBindContext` after use. A consumer reads the front door, not the design notes, so the one guarantee
-  that decides whether they build one instance at startup or one per request is invisible where they are
-  looking. Put it on `Tson`'s class Javadoc, with the "resolve at startup, then read" shape it implies, and on
-  `TsonConfig` for the context half. Raised by the HTTP project building on this library.
-
 - [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
   now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against
   `/person/age` lands on `age`'s line. A supertype and a choice variant are bare names in a `List<String>`

@@ -29,6 +29,23 @@ import java.util.Optional;
  * TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
  * }</pre>
  *
+ * <p><b>Build one and share it.</b> An instance is immutable and <b>safe to read through from any number of
+ * threads</b> -- which is the point of building one, since a schema compiles once per instance and a
+ * per-request {@code Tson} re-bootstraps the standard library and recompiles every schema. Everything a read
+ * touches is either immutable or per-read: the compiled readers hold no mutable state, a {@code Lexer} and
+ * its stream are built per read and shared with nothing, and the two caches a read passes through are
+ * concurrent maps whose hits take no lock. Even the first concurrent use of a schema this instance has not
+ * seen is safe: two threads may both do the resolution work, and the caches settle it by keeping one entry
+ * and handing it to both -- <b>work can be duplicated on a race, state never is</b>.
+ *
+ * <p><b>Registering is not part of that guarantee.</b> {@link #resolve} and {@link #validateSchema} mutate
+ * this instance's registry, and registering one identity explicitly twice is an error however many threads
+ * are involved -- so two threads resolving the same schema is a race one of them loses, not a way to warm a
+ * cache. Resolve every schema the process needs at startup, then read; a {@link
+ * io.ltr8.bind.DataBindContext} must likewise not be mutated once reads are running through it. The design
+ * note {@code docs/linking-and-compilation.md} has the mechanics, and {@code ReadPathConcurrencyTest} pins
+ * the read-path half.
+ *
  * <p><b>The read mode is which registry you hold, not a parameter.</b> {@link #treeRegistry()} reads into an
  * immutable, queryable {@code TsonValue} (structure-preserving, typed leaves -- the recommended default);
  * {@link #bindRegistry()} reads to real Java objects (bound via {@link #dataBindContext()}). Both sit over one shared, bind-mode
