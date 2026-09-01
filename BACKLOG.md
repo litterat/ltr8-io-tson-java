@@ -47,6 +47,27 @@ own prose (which had gone stale on at least one of them):
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 
+- [ ] **A derived entry name splices a field's text in verbatim, so punctuation stops it being an
+  identifier.** [TSON-SCHEMA] §8.2 makes it a MUST — "an internal name is a valid `identifier`" — and
+  [TSON-DATA] §7.7 admits only `XID_Continue` and `-`. `SchemaDesugarer.appendReadable` appends
+  `token.text()` unfiltered, so a `text` field holding a path mints
+  `operation_GET_/x_200_order_found_1f8d998a`, whose `/` is not an identifier character. Confined to
+  templated applications: a declaration's own body resolves in place under the name its author wrote.
+  - The fix is to make the derivation produce an identifier by construction — replacing a run of
+    non-`XID_Continue` characters with `_` costs nothing, since the readable head is a diagnostic
+    convenience and the `%08x` structural hash beside it already carries identity. An assertion that a
+    minted name matches §7.7 is what would stop the next such slip.
+  - **The second decision is whether §8.2's name hygiene should reach minted names at all.**
+    `TsonSchemaLinker.checkNames` walks the whole merged namespace, so today the malformed name surfaces
+    as a `RESTRICTED_CHARACTER` refusal — one nobody can act on, since no author wrote the name, the
+    document cannot be edited to satisfy it, and the only lever is relaxing the policy wholesale. §11.4's
+    scopes are authored ones, and §8.2 puts internal names outside the conformance surface, so this is
+    this library's call rather than the spec's.
+  - It makes the `data` kind's own motivating example untemplatable — §4.1 names an HTTP operation binding
+    request and response types, and an operation's path contains slashes. Raised by the HTTP project
+    building on this library, which pins both halves in
+    `UpstreamGapsTest.aGeneratedEntryNameSplicesPunctuationAndStopsBeingAnIdentifier`.
+
 ## Open form: the held template body
 
 An open entry's body is the constructor application as written, held unread until materialisation
