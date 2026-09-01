@@ -140,6 +140,10 @@ public final class TsonConfig {
      * Unrelated to (and never overrides) the object-binding-mode context {@link #build()} always uses
      * internally to resolve the standard library itself -- see {@link Tson}'s own Javadoc for why that
      * one's mode is fixed, and {@link #metaNameBinder} for the one thing about it a consumer may extend.
+     *
+     * <p><b>A context handed here must not be mutated once reads are running through it.</b> Its descriptor
+     * cache is concurrent and the first concurrent bind of one class is safe, but adding bindings to a live
+     * context is outside what the read path guarantees -- wire it up before the first read, as with schemas.
      */
     public TsonConfig dataBindContext(DataBindContext dataBindContext) {
         this.dataBindContext = dataBindContext;
