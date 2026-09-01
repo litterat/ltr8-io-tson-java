@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.schema.TsonSchemaValidationException;
-import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -9,15 +8,11 @@ import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TupleElement;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -33,7 +28,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 
 /**
  * §5.10 materialisation: closes a template application by substituting its arguments into the template's
@@ -68,7 +62,7 @@ import java.util.function.UnaryOperator;
  *
  * <p><b>Identity (§8.2).</b> An instantiation entry is keyed on the flattened application recorded in
  * {@code source}, so two {@code box<text>} anywhere in the schema land on one entry. The derived name is
- * built by {@link #internalName} from the application itself, which is what makes that dedup fall out of
+ * built by {@link DerivedName#ofApplication} from the application itself, which is what makes that dedup fall out of
  * naming rather than needing a second table.
  *
  * <p><b>Knot-tying.</b> The memo entry is registered <em>before</em> the body is substituted, so a
@@ -264,7 +258,7 @@ final class TemplateMaterialiser {
 
     /** One definition with every application inside it closed. */
     private TypeDefinition rewrite(TypeDefinition definition) {
-        return mapRefs(definition, this::close);
+        return MetaRefs.mapRefs(definition, this::close);
     }
 
     /**
@@ -314,7 +308,7 @@ final class TemplateMaterialiser {
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
         arguments = byParameterKind(head, template, parameters, arguments);
-        String name = internalName(head, arguments);
+        String name = DerivedName.ofApplication(head, arguments);
         if (aliasClosing.contains(name)) {
             throw new TsonSchemaValidationException("'" + head + "<...>' is a reference template whose own "
                     + "body applies it again, so composing it never reaches a type with a body (§5.10). The "
@@ -324,10 +318,10 @@ final class TemplateMaterialiser {
         if (materialised.containsKey(name) || !closing.add(name)) {
             // Already built, or under construction -- the knot-tying case. Either way it must be *this*
             // application, not another that derived the same name.
-            minted.claim(name, canonicalOf(head, arguments));
+            minted.claim(name, DerivedName.canonicalApplication(head, arguments));
             return name;
         }
-        minted.claim(name, canonicalOf(head, arguments));
+        minted.claim(name, DerivedName.canonicalApplication(head, arguments));
         if (closing.size() > MAX_CLOSING_DEPTH) {
             closing.remove(name);
             // Named for the *outermost* head, which is the one the author wrote; the head in hand here is
@@ -437,8 +431,8 @@ final class TemplateMaterialiser {
         // `grid<pixel, 3>` closed would be two entries for one type.
         List<RecordValue.Field> fields =
                 closed.wire() instanceof RecordValue record ? record.fields() : List.of();
-        String formName = SchemaDesugarer.internalName(target, fields);
-        minted.claim(formName, SchemaDesugarer.canonicalOf(target, fields));
+        String formName = DerivedName.ofBinding(target, fields);
+        minted.claim(formName, DerivedName.canonicalBinding(target, fields));
         if (namespace.getTypeDefinition(formName) != null) {
             return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
         }
@@ -558,7 +552,7 @@ final class TemplateMaterialiser {
      */
     String closedFormName(String head, List<RecordValue.Field> fields) {
         CoreValue wire = closeApplications(new RecordValue(fields));
-        return SchemaDesugarer.internalName(head,
+        return DerivedName.ofBinding(head,
                 wire instanceof RecordValue record ? record.fields() : List.of());
     }
 
@@ -567,7 +561,7 @@ final class TemplateMaterialiser {
      * entry it denotes -- the inverse of the shape {@code SchemaDesugarer} writes when a slot holds one.
      *
      * <p>It runs on the wire value rather than on the body read from it because the <em>name</em> depends on
-     * it: {@code SchemaDesugarer.internalName} reads the slots as written, and the desugar phase expands
+     * it: {@code DerivedName.ofBinding} reads the slots as written, and the desugar phase expands
      * innermost-first, so by the time it names an outer form the inner one is already a bare name. Closing
      * here in the same order is what makes the two phases agree on what a form is called.
      */
@@ -595,51 +589,6 @@ final class TemplateMaterialiser {
     private static TypeDefinition instantiationOf(String head, List<TypeArgument> arguments, String formName) {
         return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE, List.of(),
                 false, List.of(), List.of(), Optional.empty(), new Reference(TypeRef.of(formName)));
-    }
-
-    // ── Structural walks ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Every {@link TypeRef} a definition holds, mapped -- {@code source}, and whatever its body carries.
-     *
-     * <p>Package-visible for {@link SyntheticMerge}, which rewrites references onto a merged entry by the
-     * same walk. {@code supertypes} is a name list rather than a type-ref channel and is deliberately not
-     * covered: a composition operand is a named reference or an application (§5.7, §5.8), so a supertype
-     * names a declared or an <em>instantiation</em> entry, never a synthetic one.
-     */
-    static TypeDefinition mapRefs(TypeDefinition definition, UnaryOperator<TypeRef> map) {
-        Optional<TypeRef> source = definition.source().map(map);
-        return new TypeDefinition(source, definition.kind(), definition.parameters(),
-                definition.constructor(), definition.supertypes(), definition.subtypes(),
-                definition.disjoint(), mapBodyRefs(definition.body(), map), definition.position(),
-                definition.annotations());
-    }
-
-    /**
-     * Package-visible so {@code TemplateRegularity} can walk a body by the same code that rewrites one --
-     * a body shape added here must not need remembering in a second place.
-     */
-    static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map) {
-        return switch (body) {
-            case RecordBody record -> new RecordBody(record.supertypes(),
-                    record.fields().stream().map(field -> field.withType(map.apply(field.type()))).toList(),
-                    record.groups());
-            case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.state(),
-                    array.unordered(), array.uniqueItems(), array.minItems(), array.maxItems());
-            case MapBody mapBody -> new MapBody(map.apply(mapBody.keyType()), map.apply(mapBody.valueType()),
-                    mapBody.state(), mapBody.minItems(), mapBody.maxItems());
-            case TupleBody tuple -> new TupleBody(tuple.elements().stream()
-                    .map(element -> new TupleElement(map.apply(element.elementType()), element.state())).toList());
-            case ChoiceBody choice -> new ChoiceBody(choice.variants().stream().map(map).toList());
-            // An alias's target maps like any other reference, arguments and all -- which is what lets a
-            // closed alias follow its own `source` onto the entry materialisation minted for it, and a
-            // partial application keep the arguments it binds.
-            case Reference reference -> new Reference(map.apply(reference.target()));
-            // A held body maps nothing: its references are tokens that have not been resolved against
-            // anything yet, and rewriting one would be rewriting a name whose meaning is not settled until
-            // substitution supplies the arguments.
-            default -> body; // an atom body holds no type references
-        };
     }
 
     /**
@@ -675,87 +624,4 @@ final class TemplateMaterialiser {
         return bound;
     }
 
-    /**
-     * {@code head_arg_arg_hash} -- §8.2's own recommendation for an internal name, "a readable head plus a
-     * structural hash", and the same construction {@code SchemaDesugarer} uses for an injected sugar form.
-     * The hash runs over a rendering built here, never over a record's {@code toString} (documented as
-     * subject to change) or its {@code hashCode} (free to differ between runs): {@code String.hashCode} is
-     * specified exactly, so hashing a string built here is deterministic by contract.
-     */
-    private static String internalName(String head, List<TypeArgument> arguments) {
-        StringBuilder readable = new StringBuilder(InternalName.part(head));
-        for (TypeArgument argument : arguments) {
-            switch (argument) {
-                case TypeArgument.Ref ref -> readable.append('_').append(InternalName.part(ref.ref().name()));
-                case TypeArgument.Value value ->
-                        readable.append('_').append(InternalName.part(canonicalText(value.value())));
-            }
-        }
-        return readable.append('_')
-                .append(String.format("%08x", canonicalOf(head, arguments).hashCode())).toString();
-    }
-
-    /**
-     * The application rendered structurally and injectively -- what the name's hash runs over, and what
-     * {@link #claim} compares when two applications arrive under one name.
-     *
-     * <p>Split from {@link #internalName} rather than built beside it so the rendering is stated once: it is
-     * the thing that decides whether two applications are the same application, and a second copy free to
-     * drift from the first would decide it differently in the two places that ask.
-     */
-    private static String canonicalOf(String head, List<TypeArgument> arguments) {
-        StringBuilder canonical = new StringBuilder();
-        appendText(canonical.append('A'), head);
-        canonical.append('(');
-        for (TypeArgument argument : arguments) {
-            switch (argument) {
-                case TypeArgument.Ref ref -> appendRef(canonical.append('r'), ref.ref());
-                case TypeArgument.Value value -> {
-                    // The form by name, not ordinal: inserting a constant would renumber every ordinal.
-                    appendText(canonical.append('v'), value.value().form().name());
-                    appendNumberAware(canonical, value.value());
-                }
-            }
-        }
-        return canonical.append(')').toString();
-    }
-
-    private static void appendRef(StringBuilder out, TypeRef ref) {
-        appendText(out.append('n'), ref.name());
-        out.append('(');
-        for (TypeArgument argument : ref.arguments()) {
-            switch (argument) {
-                case TypeArgument.Ref nested -> appendRef(out.append('r'), nested.ref());
-                case TypeArgument.Value value -> {
-                    appendText(out.append('v'), value.value().form().name());
-                    appendNumberAware(out, value.value());
-                }
-            }
-        }
-        out.append(')');
-    }
-
-    /** Length-first, so concatenation stays unambiguous whatever the text contains. */
-    private static void appendText(StringBuilder out, String text) {
-        out.append(text.length()).append(':').append(text);
-    }
-
-    /** A value argument's readable segment, with §4.3's numeric equivalence applied ({@link NumericIdentity}). */
-    private static String canonicalText(Token token) {
-        return NumericIdentity.textOf(token.text(), token.form() == Token.Form.UNQUOTED);
-    }
-
-    /**
-     * A value argument's contribution to the hashed rendering. A number writes its base-type kind and its
-     * canonical magnitude as two fields where anything else writes its text as one; every field being
-     * length-prefixed, no token's own text can be mistaken for a tagged number.
-     */
-    private static void appendNumberAware(StringBuilder out, Token token) {
-        NumericIdentity.Canonical canonical =
-                NumericIdentity.of(token.text(), token.form() == Token.Form.UNQUOTED);
-        if (canonical != null) {
-            appendText(out, canonical.kind());
-        }
-        appendText(out, canonical == null ? token.text() : canonical.text());
-    }
 }

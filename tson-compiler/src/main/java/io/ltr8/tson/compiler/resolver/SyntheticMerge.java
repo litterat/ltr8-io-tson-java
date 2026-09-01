@@ -86,7 +86,7 @@ final class SyntheticMerge {
      */
     static void rewrite(Map<String, TypeDefinition> entries, Map<String, String> renames) {
         for (Map.Entry<String, TypeDefinition> entry : entries.entrySet()) {
-            entry.setValue(TemplateMaterialiser.mapRefs(entry.getValue(), ref -> rename(ref, renames)));
+            entry.setValue(MetaRefs.mapRefs(entry.getValue(), ref -> rename(ref, renames)));
         }
     }
 

@@ -64,7 +64,7 @@ final class ReferenceFlattener {
         if (definition.body() instanceof Reference) {
             return definition; // an alias entry records the hop; see this class's own note
         }
-        Top body = TemplateMaterialiser.mapBodyRefs(definition.body(), ref -> flattenRef(ref, namespace, minted));
+        Top body = MetaRefs.mapBodyRefs(definition.body(), ref -> flattenRef(ref, namespace, minted));
         return body == definition.body() ? definition : definition.withBody(body);
     }
 

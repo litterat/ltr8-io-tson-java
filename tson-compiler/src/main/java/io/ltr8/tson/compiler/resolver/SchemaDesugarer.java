@@ -554,7 +554,7 @@ final class SchemaDesugarer {
     /**
      * What a {@code type_ref}-typed slot holds: a bare token for a plain name, {@code type_ref}'s record
      * form for an application. <b>One spelling per shape, produced in one place</b> -- a slot written two
-     * ways is a slot two phases disagree about, and {@link #internalName} hashes what is written, so a
+     * ways is a slot two phases disagree about, and {@link DerivedName#ofBinding} hashes what is written, so a
      * second spelling of one reference splits one type across two entries.
      */
     private static CoreValue refValue(TypeRef ref) {
@@ -732,7 +732,7 @@ final class SchemaDesugarer {
      * form.
      *
      * <p><b>Why here rather than in the resolver.</b> The alternative is to resolve the body and write the
-     * result back out, and it does not work: the wire form is what {@link #internalName} hashes and what
+     * result back out, and it does not work: the wire form is what {@link DerivedName#ofBinding} hashes and what
      * substitution walks, so a second producer of it is a second spelling of the same thing --
      * {@code TsonObjectWriter} states a no-argument {@code type_ref} in the explicit record form where this
      * phase states it positionally, which makes a {@code type_argument} indistinguishable from a
@@ -1060,130 +1060,13 @@ final class SchemaDesugarer {
 
     /** Injects {@code declaration} under {@code name}, unless the same form already claimed it. */
     private void claim(String name, Binding binding, Supplier<SchemaMap.Declaration> declaration) {
-        if (minted.claim(name, canonical(binding))) {
+        if (minted.claim(name, DerivedName.canonicalBinding(binding.head(), binding.fields()))) {
             injected.put(name, declaration.get());
         }
     }
 
     private static String bindingName(Binding binding) {
-        return internalName(binding.head(), binding.fields());
-    }
-
-    /**
-     * {@code head_arg_arg_hash} -- §8.2's own recommendation for an internal name, "a readable head plus a
-     * structural hash". The readable half is what a diagnostic shows and what several tests recognise a form
-     * by; the hash separates forms the readable half spells alike.
-     *
-     * <p><b>The name is derived from the resolved binding record, not from the spelling that produced it.</b>
-     * That is the one identity rule for internal entries: one entry per distinct concrete form, schema-wide,
-     * so {@code [T; 3]} and {@code [T; 3..3]} collapse onto the same entry and a form arising from two
-     * different declarations is written once.
-     *
-     * <p><b>The hash runs over a rendering this class builds itself</b> ({@link #canonical}), never over the
-     * AST's own {@code toString}. Both of the JDK's ready-made answers are unusable here: {@code
-     * Record::toString}'s format is documented as "subject to change" (and shifts whenever a record's
-     * components are renamed or reordered), and {@code Record::hashCode} "need not remain consistent from one
-     * execution of an application to another execution of the same application". {@code String.hashCode} is
-     * specified exactly, so hashing a string built here is the one construction that is deterministic by
-     * contract rather than by accident.
-     *
-     * <p>That determinism is load-bearing, not cosmetic. An entry name is part of the resolved form, and an
-     * importing schema reaches an <em>imported</em> entry by deriving the same name for the same form --
-     * meta.tn's {@code extern.types: [type_name]?} landing on the entry meta-kernel already produced.
-     *
-     * <p><b>It is shared with {@code TemplateMaterialiser}</b>, which names a binding record it built while
-     * closing an open form into the concrete one it always described. Sharing the function is what makes the
-     * two channels dedupe against each other (§8.2): a form written directly and the same form arriving
-     * through a materialised template are one type, so they must be one entry, and the only way that holds
-     * is for one function of one record to name both.
-     */
-    static String internalName(String head, List<RecordValue.Field> fields) {
-        Binding binding = new Binding(head, fields);
-        // The head too: a constructor name is an identifier, but a consumer's meta layer may declare one
-        // outside ASCII, and a name that mixes it with the ASCII parts below is refused by §8.2's own walk.
-        StringBuilder readable = new StringBuilder(InternalName.part(head));
-        for (RecordValue.Field field : fields) {
-            appendReadable(readable, field.value().value().coreValue());
-        }
-        return readable.append('_').append(String.format("%08x", canonical(binding).hashCode())).toString();
-    }
-
-    /** The readable half of a derived name: every scalar the binding record holds, in order, under {@code _}. */
-    private static void appendReadable(StringBuilder out, CoreValue value) {
-        switch (value) {
-            case TokenValue token -> out.append('_')
-                    .append(InternalName.part(
-                            NumericIdentity.textOf(token.text(), token.form() == TokenForm.UNQUOTED)));
-            case RecordValue record -> record.fields()
-                    .forEach(field -> appendReadable(out, field.value().value().coreValue()));
-            case ArrayValue array -> array.elements()
-                    .forEach(element -> appendReadable(out, element.value().coreValue()));
-            default -> out.append("_v");
-        }
-    }
-
-    /** {@link #canonical} over a binding built elsewhere -- {@code TemplateMaterialiser}'s closed synthetics. */
-    static String canonicalOf(String head, List<RecordValue.Field> fields) {
-        return canonical(new Binding(head, fields));
-    }
-
-    /**
-     * The binding record rendered as one string, structurally and injectively: every value shape is written
-     * under its own tag, nested records and arrays recurse, and each piece of author text is written
-     * length-first ({@code 4:text}), so no arrangement of delimiters inside a token can spell a different
-     * record. Two renderings are equal exactly when the binding records are.
-     */
-    private static String canonical(Binding binding) {
-        StringBuilder out = new StringBuilder();
-        appendText(out.append('A'), binding.head());
-        appendFields(out, binding.fields());
-        return out.toString();
-    }
-
-    private static void appendFields(StringBuilder out, List<RecordValue.Field> fields) {
-        out.append('(');
-        for (RecordValue.Field field : fields) {
-            appendText(out.append('f'), field.name());
-            appendValue(out, field.value().value().coreValue());
-        }
-        out.append(')');
-    }
-
-    private static void appendValue(StringBuilder out, CoreValue value) {
-        switch (value) {
-            case TokenValue token -> {
-                // The form by name, not ordinal: inserting a TokenForm constant would renumber every ordinal
-                // invisibly, which is the same hazard as hashing a record's toString.
-                appendText(out.append('v'), token.form().name());
-                appendNumberAware(out, token.text(), token.form() == TokenForm.UNQUOTED);
-            }
-            case RecordValue record -> appendFields(out.append('r'), record.fields());
-            case ArrayValue array -> {
-                out.append("a(");
-                array.elements().forEach(element -> appendValue(out, element.value().coreValue()));
-                out.append(')');
-            }
-            default -> out.append('?');
-        }
-    }
-
-    /** Length-first, so concatenation stays unambiguous whatever the text contains. */
-    private static void appendText(StringBuilder out, String text) {
-        out.append(text.length()).append(':').append(text);
-    }
-
-    /**
-     * A token's contribution to the hashed rendering, with §4.3's numeric equivalence applied
-     * ({@link NumericIdentity}). A number writes its base-type kind and its canonical magnitude as two
-     * fields where anything else writes its text as one; every field being length-prefixed, no token's own
-     * text can be mistaken for a tagged number.
-     */
-    private static void appendNumberAware(StringBuilder out, String text, boolean unquoted) {
-        NumericIdentity.Canonical canonical = NumericIdentity.of(text, unquoted);
-        if (canonical != null) {
-            appendText(out, canonical.kind());
-        }
-        appendText(out, canonical == null ? text : canonical.text());
+        return DerivedName.ofBinding(binding.head(), binding.fields());
     }
 
     /**

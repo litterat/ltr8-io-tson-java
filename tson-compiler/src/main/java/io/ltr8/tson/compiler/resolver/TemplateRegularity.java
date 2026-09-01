@@ -155,7 +155,7 @@ final class TemplateRegularity {
      * Every application a template's body writes, including ones nested inside another application's
      * arguments ({@code box<chain<T>>} at a field position applies both).
      *
-     * <p>The body walk is {@code TemplateMaterialiser.mapBodyRefs}, used as a visitor by returning each ref
+     * <p>The body walk is {@code MetaRefs.mapBodyRefs}, used as a visitor by returning each ref
      * unchanged -- one place knows the shape of a body, so a new body type cannot be handled here and
      * forgotten there.
      */
@@ -168,7 +168,7 @@ final class TemplateRegularity {
             held.applications().forEach(ref -> collect(ref, found));
             return found;
         }
-        TemplateMaterialiser.mapBodyRefs(template.body(), ref -> {
+        MetaRefs.mapBodyRefs(template.body(), ref -> {
             collect(ref, found);
             return ref;
         });
