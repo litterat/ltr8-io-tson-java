@@ -502,8 +502,15 @@ is the single construction site, so there is nowhere else for a mismatched pair 
 **`schemaPosition` descends with the pointer** — `/person/age` carries `age`'s own line and column, not the
 enclosing declaration's, because `RecordField` carries a position of its own beside `TypeDefinition`'s. Both
 are populated because `SchemaResolver.resolveSchema` threads `TsonSchemaParser.schemaPositions()` down to
-`DefinitionResolver` — one `SchemaPositions` carrier rather than a parameter per kind, since a supertype and
-a choice variant are the same gap still open.
+`DefinitionResolver` — one `SchemaPositions` carrier rather than a parameter per kind.
+
+**Inside a declaration's own body the position stays the declaration's, and that is the granularity, not a
+gap.** A choice variant and a supertype have no position of their own, so `'method' lists the variant 'card'
+twice` is located at `method`'s head line rather than at the second `card`. The schema-side *pointer* names
+the same unit for the same reason — `/method`, the failing declaration, because a schema problem is about the
+declaration itself and no validation path led to it — so the two agree, and a finer position without a finer
+pointer would make them disagree. What locates the author inside the declaration is the message, which names
+the offending token.
 
 - **A position table is identity-keyed, so every phase that rebuilds a node has to carry it over**, and
   three do. `SchemaDesugarer` re-registers a rebuilt *declaration* and a rebuilt *field* (any record holding

@@ -1019,16 +1019,18 @@ compatibility).
   host-bits-zero rules on top. **`email` is
   a built-in of §5.5 like its siblings**, and its format check is the subset §5.5 pins: the
   `dot-atom "@" dot-atom` core, without quoted local parts, domain literals or comments.
-- **Schema-side diagnostics** — parsing, desugaring, resolution and linking all report through a
-  `TsonDiagnosticsReceiver` (see `docs/readers-and-diagnostics.md`), and read- and schema-side diagnostics
-  now populate the same four location components. Throw-site classification is done across the whole schema
-  pipeline. The lexer stays fail-fast on purpose and is the floor under schema-parse recovery — not a tracked
-  gap; `STRUCTURED-OUTPUT.md` holds the open question. **`schemaPosition` descends with the pointer** —
+- **Schema-side diagnostics** — **none outstanding**; what follows is the boundary. Parsing, desugaring,
+  resolution and linking all report through a `TsonDiagnosticsReceiver` (see
+  `docs/readers-and-diagnostics.md`), and read- and schema-side diagnostics now populate the same four
+  location components. Throw-site classification is done across the whole schema pipeline. The lexer stays
+  fail-fast on purpose and is the floor under schema-parse recovery — not a tracked gap;
+  `STRUCTURED-OUTPUT.md` holds the open question. **`schemaPosition` descends with the pointer** —
   `/person/age` carries `age`'s own line, `RecordField` holding an `@Unbound` position beside
-  `TypeDefinition`'s and one `SchemaPositions` carrier threading both from the parser. What remains is the
-  same gap for a **use site** — a choice variant, an element/key/value type, a tuple element and a reference
-  target are all a `TypeRef` with no position, and a **supertype** is a bare name in a `List<String>` with
-  nowhere to put one (`BACKLOG.md`).
+  `TypeDefinition`'s and one `SchemaPositions` carrier threading both from the parser. **Inside a
+  declaration's own body the position is the declaration's**, deliberately: a choice variant and a supertype
+  have none of their own, and the schema-side pointer names that same unit (`/method`, the failing
+  declaration), so the two agree on granularity where a finer position alone would not. The message is what
+  names the offending token.
 - **§5.10's argument-kind rule is answered by two other rules, not by the kind rule.** A held body has no
   slot types — that is what it is for — so it can never say *this slot expected a value*. Neither half needs
   it to: a literal applied where the body uses the parameter as a **type** is refused because `3` is not an
