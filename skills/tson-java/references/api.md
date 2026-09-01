@@ -207,6 +207,21 @@ public record Position(int line, int column, int byteOffset) implements SourcePo
 public record SchemaLocation(…)             // id + pointer + position, accumulated as a read descends
 ```
 
+```java
+public record TsonUnicodeProcessorPolicy(TsonUnicodePolicy identifierPolicy,
+                                         TsonUnicodePolicy tokenPolicy,
+                                         String unicodeDataVersion) {
+    public static TsonUnicodeProcessorPolicy of(TsonUnicodePolicy identifier, TsonUnicodePolicy token);
+}
+```
+
+**What a report is read against, stated once.** [TSON-DATA] §8.2's rules read Unicode data the Consortium
+does not freeze, at a level this deployment chose, so the same document can be refused here and accepted
+elsewhere — and that reason is in neither the document nor the schema. `Tson.processorPolicy()` gives it, and
+so does `processorPolicy()` on either read facade, which is the one to use when a derived reader may have
+changed a policy. A refusal carries **no** copy of its own: it is constant for a run, and what a sender needs
+in order not to be refused is this record *before* it writes. `tson policy` prints it from the shell.
+
 ### Unicode policy
 
 ```java
@@ -226,10 +241,13 @@ public final class TsonUnicodePolicy {
     public TsonUnicodePolicy permitting(UnicodeScript... scripts);
 
     public static String dataVersion();                        // the Unicode data version, e.g. "16.0"
+    public Level level();                                      // the three below are the whole of a policy
+    public boolean isPerSegment();
+    public List<Set<UnicodeScript>> permittedScripts();
     public boolean checksScripts();
     public boolean appliesIdentifierProfile();
-    public boolean isPerSegment();
     public Optional<String> violation(String text);
+    // equals/hashCode are by value: two policies configured alike are equal
 }
 ```
 

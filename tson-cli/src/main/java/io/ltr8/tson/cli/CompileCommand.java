@@ -28,8 +28,8 @@ final class CompileCommand {
      *         could not be obtained, so it was never wholly read, 70 a construct in it is a gap in this
      *         library ({@link TsonCli#exitCodeFor})
      */
-    static int run(Path schemaFile, OutputFormat format) {
-        Tson tson = Tson.builder().build();
+    static int run(Path schemaFile, OutputFormat format, PolicyOptions policies) {
+        Tson tson = policies.applyTo(Tson.builder()).build();
         // Read off the Tson that judged, not rebuilt from a default: a schema's declared names face
         // [TSON-DATA] §8.2 at link time, so this run can refuse one, and a refusal is only interpretable
         // beside the policy that produced it.

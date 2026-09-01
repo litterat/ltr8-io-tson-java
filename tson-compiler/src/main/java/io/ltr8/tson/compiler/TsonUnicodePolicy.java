@@ -336,6 +336,25 @@ public final class TsonUnicodePolicy {
         return seen;
     }
 
+    /**
+     * Two policies are equal when they would judge every text alike -- the level, the unit, and the admitted
+     * combinations in the order {@link #permitting} added them.
+     *
+     * <p>A policy is a value, and the types that report one are records ({@link TsonUnicodeProcessorPolicy})
+     * whose own equality is component-wise: without this, two processors configured identically compare
+     * unequal, which is the opposite of what a caller comparing two deployments' configurations is asking.
+     */
+    @Override
+    public boolean equals(Object o) {
+        return o instanceof TsonUnicodePolicy other && level == other.level && perSegment == other.perSegment
+                && permitted.equals(other.permitted);
+    }
+
+    @Override
+    public int hashCode() {
+        return java.util.Objects.hash(level, perSegment, permitted);
+    }
+
     @Override
     public String toString() {
         return level + (perSegment ? " per segment" : "") + (permitted.isEmpty() ? "" : " permitting " + permitted);

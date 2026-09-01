@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -298,6 +299,24 @@ class OutputFormatTest {
                 ValidationReport.failed(POLICY, Diagnostic.Code.TYPE_MISMATCH, "nope"));
         assertEquals("[TYPE_MISMATCH] nope", ordinary);
         assertEquals("OK", OutputFormat.TEXT.render(ValidationReport.ok(POLICY)));
+    }
+
+    /**
+     * <b>And on a clean run whose policy was configured</b>, which is the case [TSON-DATA] §8.2's
+     * non-silence rule is actually about: a run given {@code --identifier-policy unrestricted} that printed
+     * {@code OK} and nothing else would have relaxed a security rule invisibly. The default stays quiet --
+     * a person does not want a configuration dump on every green run, and nothing was relaxed.
+     */
+    @Test
+    void textPrintsANonDefaultPolicyEvenWhenNothingWasRefused() {
+        CliPolicy relaxed = CliPolicy.from(TsonUnicodeProcessorPolicy.of(
+                TsonUnicodePolicy.scriptsUnchecked(), TsonUnicodePolicy.unrestricted()));
+
+        String rendered = OutputFormat.TEXT.render(ValidationReport.ok(relaxed));
+
+        assertTrue(rendered.startsWith("OK"), rendered);
+        assertTrue(rendered.contains("note: judged under identifier policy MINIMALLY_RESTRICTIVE"), rendered);
+        assertFalse(rendered.contains("refused"), rendered);
     }
 
     /**

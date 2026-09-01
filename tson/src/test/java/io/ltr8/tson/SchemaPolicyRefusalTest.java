@@ -120,4 +120,31 @@ class SchemaPolicyRefusalTest {
                 tson.processorPolicy().identifierPolicy().level());
         assertEquals(TsonUnicodePolicy.dataVersion(), tson.processorPolicy().unicodeDataVersion());
     }
+
+    /**
+     * <b>The identifier policy this instance was configured with reaches a <em>read</em>, not only the
+     * linker.</b> §8.2's rules run once per layer -- over declared names when a schema links, over a
+     * document's own type-ref and annotation names when it is read -- and both layers are this one
+     * processor, so both answer to one setting. A configuration that reached only the schema end would make
+     * {@link Tson#processorPolicy()} state a policy no read had used, which is worse than stating none: the
+     * report exists precisely to explain a refusal, and it would be explaining it wrongly.
+     */
+    @Test
+    void theConfiguredIdentifierPolicyReachesAReadAndNotOnlyTheLinker() {
+        String document = "!p" + CYR_A + "y 1";
+
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT, Diagnostic.Code.UNKNOWN_TYPE_REF),
+                Tson.builder().build().validate(document).stream().map(Diagnostic::code).toList(),
+                "the default policy refuses a mixed-script type-ref");
+
+        List<Diagnostic> relaxed = Tson.builder()
+                .identifierPolicy(TsonUnicodePolicy.highlyRestrictive()
+                        .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC))
+                .build()
+                .validate(document);
+
+        assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
+                relaxed.stream().map(Diagnostic::code).toList(),
+                () -> "the relaxation this instance was built with governs the read too: " + relaxed);
+    }
 }

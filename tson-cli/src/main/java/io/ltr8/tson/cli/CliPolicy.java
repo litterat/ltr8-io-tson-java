@@ -32,6 +32,24 @@ public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierP
                         @Field("token_policy") CliUnicodePolicy tokenPolicy,
                         @Field("unicode_data_version") String unicodeDataVersion) {
 
+    /**
+     * The policy a run that passed no flag is judged under -- what {@link OutputFormat#TEXT} compares against
+     * to decide whether a person needs to be told the policy at all.
+     */
+    private static final CliPolicy DEFAULTS = from(TsonUnicodeProcessorPolicy.of(
+            PolicyOptions.DEFAULTS.identifierPolicy(), PolicyOptions.DEFAULTS.tokenPolicy()));
+
+    /**
+     * Whether this is what a run configures by saying nothing.
+     *
+     * <p>A non-default policy is worth stating even on a clean run: [TSON-DATA] §8.2 requires that a
+     * relaxation not be silent, and a run that passed {@code --identifier-policy unrestricted} and printed
+     * {@code OK} would be exactly that. The machine formats carry {@code policy} either way.
+     */
+    boolean isDefault() {
+        return equals(DEFAULTS);
+    }
+
     static CliPolicy from(TsonUnicodeProcessorPolicy policy) {
         return new CliPolicy(CliUnicodePolicy.from(policy.identifierPolicy()),
                 CliUnicodePolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion());

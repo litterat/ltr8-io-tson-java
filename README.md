@@ -575,9 +575,16 @@ write `tson` for that launcher path.
 ```
 tson init-example [<dir>]
 tson validate     [--output text|json|tson] <file>...
-tson compile      [--output text|json|tson] <schema>
-tson policy       [--output text|json|tson]
+tson compile      [--output text|json|tson] [<policy options>] <schema>
+tson policy       [--output text|json|tson] [<policy options>]
 tson hash         <file>
+
+policy options (validate, compile, policy):
+  --identifier-policy <level>   level for identifiers (default: highly-restrictive)
+  --identifier-per-segment      apply it per _/- segment rather than the whole identifier
+  --identifier-scripts <A+B>    admit one script combination over the level (repeatable)
+  --token-policy <level>        level for values (default: unrestricted, which scans nothing)
+  --token-scripts <A+B>         the same for values (repeatable)
 ```
 
 **`tson policy`** prints the [TSON-DATA] §8.2 policy in force — the restriction level applied to names and
@@ -594,6 +601,25 @@ unicode data:      16.0
 Every `validate`/`compile` report carries the same record in its `policy` field, so a refusal is always
 readable beside what produced it. The useful direction is the other one: read the policy *before* you
 generate, and you never write the name that would be refused.
+
+**The policy options change it.** A `<level>` is one of UTS #39 §5.2's six — `ascii-only`, `single-script`,
+`highly-restrictive`, `moderately-restrictive`, `minimally-restrictive`, `unrestricted` — and the spelling
+`tson policy` prints (`HIGHLY_RESTRICTIVE`) is accepted too, so its output is usable as its input. §8.2
+requires that relaxing a rule not be *silent*, which a flag in a CI file satisfies and an environment variable
+would not; `--output text` accordingly prints the policy on any run that configured one, not only on a refusal.
+
+```
+$ tson compile names.tn                                        # `id_адрес => text` refused: mixes scripts
+$ tson compile --identifier-per-segment names.tn               # OK: each _-delimited segment is one script
+$ tson compile --identifier-scripts Latin+Cyrillic names.tn    # OK: the combination is named
+```
+
+Reach for the *unit* or a named combination before dropping a level — both keep the rule everywhere else.
+`--token-scripts` on its own raises the token level from `unrestricted` to `single-script`, since a list of
+combinations is no configuration at all under a level that scans nothing; naming a level that scans nothing
+*and* a relaxation is a usage error rather than a silent no-op. There is no `--token-per-segment`: `_` and `-`
+are ordinary characters in a value, so the library refuses such a policy outright. The flags apply to one
+`Tson` per run, so a schema's declared names and your data's names are judged alike.
 
 **`tson hash`** computes a document's content hash ([TSON-DATA] §2.2.1 — SHA-256 of every byte after
 the `!!id` line) and stamps it onto the `!!id` as `?sha256=<hex>`, in place. Requires an `!!id`; the id

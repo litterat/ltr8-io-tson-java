@@ -14,6 +14,13 @@ import java.util.List;
  * deliberately, matching this codebase's own "no external runtime dependencies" constraint; the
  * flag set is small and fixed enough that a real parsing library buys nothing here.
  *
+ * <p><b>Help is two levels, and the split is what keeps either readable.</b> {@code tson --help} lists the
+ * commands and nothing else; {@code tson <command> --help} gives that command what it needs -- what it does,
+ * its own options, its exit codes, and the shared {@code POLICY_OPTIONS} block for the three that judge a
+ * name. A single page carrying all of it made the policy flags a wall of text in front of someone who only
+ * wanted to know what {@code hash} does. A usage <em>error</em> still prints the short one-line usage plus
+ * the command list, since what a caller needs there is the shape of the invocation they got wrong.
+ *
  * <p>Exit codes are Unix-conventional: 0 valid/compiled cleanly (or an explicit {@code --help}), 1 a
  * real validation/compile failure, 2 a usage error (bad arguments, a file that can't be read), and 70
  * ({@code EX_SOFTWARE}) this library failing to reach a verdict rather than anything wrong with the input --
@@ -29,48 +36,146 @@ import java.util.List;
 public final class TsonCli {
 
     private static final String USAGE = """
-            usage:
-              tson init-example [<dir>]
-              tson validate [--output text|json|tson] <file|->...
-              tson compile [--output text|json|tson] <schema>
-              tson policy [--output text|json|tson]
-              tson hash <file>
+            usage: tson <command> [options]
 
             commands:
-              init-example        write an example schema + data file to try, then edit and re-run validate
-              validate    validate data documents; each file is auto-classified as a schema or data
-                          document, and a data file's !!schema selects its schema and its root type-ref
-                          (!person) the type (or, with no !!schema, a base-syntax + built-in-type check).
-                          `-` reads one data document from standard input, reported under the name "-"
-                          (a file really named - is reachable as ./-); schemas must be files
-              compile     check that a schema document itself resolves and compiles
-              policy      print the Unicode name/token policy this build applies ([TSON-DATA] §8.2),
-                          which is what decides whether a name is refused here but accepted elsewhere.
-                          The same record rides on every validate report; this prints it with no
-                          document in hand, so a generator can conform before it writes
-              hash        compute a document's content hash and stamp it onto its !!id (?sha256=...)
+              init-example [<dir>]                 write an example schema + data file to try
+              validate [<options>] <file|->...     validate data documents against the schemas they name
+              compile [<options>] <schema>         check that a schema document resolves and compiles
+              policy [<options>]                   print the Unicode policy this run would apply
+              hash <file>                          stamp a document's content hash onto its own !!id
 
             options:
               --output text|json|tson    output format (default: text)
-              --help, -h                 print this help
+              --help, -h                 this help; `tson <command> --help` for a command's own options
 
             exit codes: 0 ok, 1 validation/compile failure, 2 usage error,
                         69 a schema could not be obtained, 70 not implemented / internal error""";
 
+    /**
+     * The [TSON-DATA] §8.2 flags, printed by the help of each command that takes them.
+     *
+     * <p>Here rather than in the top-level usage because that is a list of commands, and a caller who has
+     * chosen one wants its options and not everything the tool can do. Three commands share the block, so it
+     * is stated once -- a second copy is a second thing to keep true.
+     */
+    private static final String POLICY_OPTIONS = """
+            policy options -- [TSON-DATA] §8.2 name hygiene, which is what decides whether a name is
+            refused here but accepted elsewhere. Every report states what it was judged under.
+              --identifier-policy <level>   level for identifiers (default: highly-restrictive)
+              --identifier-per-segment      apply it per _/- segment rather than the whole identifier,
+                                            which admits url_адрес while still refusing id_pаy
+              --identifier-scripts <A+B>    admit one script combination over and above the level,
+                                            e.g. Latin+Cyrillic (repeatable)
+              --token-policy <level>        level for values (default: unrestricted, which scans nothing)
+              --token-scripts <A+B>         the same for values; on its own it raises the token level to
+                                            single-script, a list of combinations being no configuration
+                                            at all under a level that scans nothing (repeatable)
+
+            <level> is a UTS #39 §5.2 restriction level: ascii-only, single-script, highly-restrictive,
+            moderately-restrictive, minimally-restrictive, unrestricted. The spelling `tson policy` prints
+            (HIGHLY_RESTRICTIVE) is accepted too, so its output is usable as its input.
+
+            Reach for the unit or a named combination before dropping a level: both keep the rule
+            everywhere else. `tson policy` with the same flags prints what they would apply.""";
+
     private static final String VALIDATE_USAGE =
-            "usage: tson validate [--output text|json|tson] <file|->...   (`-` reads one data document from stdin)";
+            "usage: tson validate [--output text|json|tson] [<policy options>] <file|->...   (`-` reads one"
+                    + " data document from stdin)";
+
+    private static final String VALIDATE_HELP = """
+            usage: tson validate [--output text|json|tson] [<policy options>] <file|->...
+
+            Validates data documents. Each file is auto-classified as a schema document (its header
+            carries !!meta) or a data document, by content and never by filename, so the order of the
+            arguments does not matter. A data file's own !!schema selects the schema and its root
+            type-ref (!person) the type; a file with no !!schema gets a base-syntax and built-in-type
+            check instead. There is no --type and no --schema, and nothing is fetched over the network:
+            a schema no file here declares is reported as SCHEMA_UNAVAILABLE, which is exit 69 and not a
+            verdict on your document.
+
+            `-` reads one data document from standard input, at most once, always data, and is reported
+            under the name "-" (a file really named - is reachable as ./-). Schemas must be files.
+
+            options:
+              --output text|json|tson    output format (default: text)
+
+            """ + POLICY_OPTIONS + """
+
+
+            exit codes: 0 every data file valid, 1 at least one invalid, 2 usage error,
+                        69 a schema nothing would supply, 70 a gap in this library or a fault""";
 
     private static final String COMPILE_USAGE =
-            "usage: tson compile [--output text|json|tson] <schema>";
+            "usage: tson compile [--output text|json|tson] [<policy options>] <schema>";
+
+    private static final String COMPILE_HELP = """
+            usage: tson compile [--output text|json|tson] [<policy options>] <schema>
+
+            Resolves, links, registers and compiles one schema document and reports whether it did so
+            cleanly -- every problem it has at the first phase that finds any, each naming the
+            declaration it came from and where that declaration is in the source. Needs no --type: this
+            checks the whole document, not one type against a value.
+
+            options:
+              --output text|json|tson    output format (default: text)
+
+            """ + POLICY_OPTIONS + """
+
+
+            exit codes: 0 compiled cleanly, 1 it did not, 2 usage error, 69 an !!import or !!meta of its
+                        own could not be obtained, 70 a gap in this library or a fault""";
 
     private static final String INIT_USAGE =
             "usage: tson init-example [<dir>]   (writes an example person.tn and person-data.tn; default dir: .)";
 
+    private static final String INIT_HELP = """
+            usage: tson init-example [<dir>]
+
+            Writes an example schema (person.tn) and a data document that validates against it
+            (person-data.tn) into <dir>, defaulting to the current directory. Edit either and re-run
+            `tson validate person.tn person-data.tn` to see what changes. Refuses to overwrite an
+            existing file.""";
+
     private static final String POLICY_USAGE =
-            "usage: tson policy [--output text|json|tson]   (the §8.2 Unicode policy this build applies)";
+            "usage: tson policy [--output text|json|tson] [<policy options>]   (the §8.2 Unicode policy this"
+                    + " run would apply; see `tson policy --help` for the policy options)";
+
+    private static final String POLICY_HELP = """
+            usage: tson policy [--output text|json|tson] [<policy options>]
+
+            Prints the [TSON-DATA] §8.2 identifier and token policy this run would apply, and the Unicode
+            data version behind them -- what decides whether a name is refused here but accepted
+            elsewhere, which is in neither your document nor your schema. The same record rides on every
+            validate and compile report; this prints it with no document in hand, so a generator can
+            conform before it writes rather than after being refused.
+
+            It takes the policy options itself, so it doubles as their dry run: `tson policy
+            --identifier-policy ascii-only` prints exactly what a validate under that flag would apply.
+
+            options:
+              --output text|json|tson    output format (default: text)
+
+            """ + POLICY_OPTIONS + """
+
+
+            Exit code is always 0: this is a question about this processor, and it has an answer whatever
+            the state of anyone's documents.""";
 
     private static final String HASH_USAGE =
             "usage: tson hash <file>   (stamps the document's content hash onto its !!id as ?sha256=...)";
+
+    private static final String HASH_HELP = """
+            usage: tson hash <file>
+
+            Computes the document's content hash ([TSON-DATA] §2.2.1 -- SHA-256 over every byte after the
+            !!id line) and stamps it onto that !!id as ?sha256=<hex>, in place and idempotently. Requires
+            an !!id; the id line is excluded from the hash, which is what lets a document carry its own.
+
+            A pinned reference is verified on use: if a data file's !!schema, or a schema's !!import or
+            !!meta, carries ?sha256=..., validate hashes what it obtained and errors on a mismatch. The
+            pin is not identity, so a pinned reference and a plain one still resolve to the same
+            schema.""";
 
     private TsonCli() {
     }
@@ -202,7 +307,7 @@ public final class TsonCli {
 
     private static int runInit(List<String> args) {
         if (hasHelpFlag(args)) {
-            System.out.println(INIT_USAGE);
+            System.out.println(INIT_HELP);
             return 0;
         }
         if (args.size() > 1) {
@@ -214,7 +319,7 @@ public final class TsonCli {
 
     private static int runHash(List<String> args) {
         if (hasHelpFlag(args)) {
-            System.out.println(HASH_USAGE);
+            System.out.println(HASH_HELP);
             return 0;
         }
         if (args.size() != 1) {
@@ -225,9 +330,10 @@ public final class TsonCli {
 
     private static int runValidate(List<String> args) {
         if (hasHelpFlag(args)) {
-            System.out.println(VALIDATE_USAGE);
+            System.out.println(VALIDATE_HELP);
             return 0;
         }
+        PolicyOptions policies = PolicyOptions.consume(args);
         OutputFormat format = OutputFormat.TEXT;
         List<ValidateInput> inputs = new ArrayList<>();
         int stdin = 0;
@@ -253,14 +359,15 @@ public final class TsonCli {
         if (inputs.isEmpty()) {
             throw new UsageException(VALIDATE_USAGE);
         }
-        return ValidateCommand.run(inputs, format);
+        return ValidateCommand.run(inputs, format, policies);
     }
 
     private static int runCompile(List<String> args) {
         if (hasHelpFlag(args)) {
-            System.out.println(COMPILE_USAGE);
+            System.out.println(COMPILE_HELP);
             return 0;
         }
+        PolicyOptions policies = PolicyOptions.consume(args);
         OutputFormat format = OutputFormat.TEXT;
         List<Path> positional = new ArrayList<>();
 
@@ -275,14 +382,15 @@ public final class TsonCli {
         if (positional.size() != 1) {
             throw new UsageException(COMPILE_USAGE);
         }
-        return CompileCommand.run(positional.get(0), format);
+        return CompileCommand.run(positional.get(0), format, policies);
     }
 
     private static int runPolicy(List<String> args) {
         if (hasHelpFlag(args)) {
-            System.out.println(POLICY_USAGE);
+            System.out.println(POLICY_HELP);
             return 0;
         }
+        PolicyOptions policies = PolicyOptions.consume(args);
         OutputFormat format = OutputFormat.TEXT;
         for (int i = 0; i < args.size(); i++) {
             if (args.get(i).equals("--output")) {
@@ -291,7 +399,7 @@ public final class TsonCli {
                 throw new UsageException(POLICY_USAGE);
             }
         }
-        return PolicyCommand.run(format);
+        return PolicyCommand.run(format, policies);
     }
 
     private static String requireValue(List<String> args, int index, String flag) {

@@ -13,6 +13,10 @@ import io.ltr8.tson.Tson;
  * spent a round trip, which is exactly the round trip TSON's one-shot aim exists to remove. The same record
  * rides on every {@link ValidationRun}, so a report and this command state one fact one way.
  *
+ * <p>Takes the same policy flags {@code validate} and {@code compile} do, so it doubles as their dry run:
+ * {@code tson policy --identifier-policy ascii-only} prints exactly what a validate under those flags would
+ * apply.
+ *
  * <p>Exit 0 always: this is a question about this processor, and it has an answer whatever the state of
  * anyone's documents.
  */
@@ -21,8 +25,11 @@ final class PolicyCommand {
     private PolicyCommand() {
     }
 
-    static int run(OutputFormat format) {
-        System.out.println(format.render(CliPolicy.from(Tson.builder().build().processorPolicy())));
+    static int run(OutputFormat format, PolicyOptions policies) {
+        // Through a real Tson rather than from the flags directly: this prints what a read would actually be
+        // judged under, which is the question, and the two would only ever agree by inspection otherwise.
+        Tson tson = policies.applyTo(Tson.builder()).build();
+        System.out.println(format.render(CliPolicy.from(tson.processorPolicy())));
         return 0;
     }
 }

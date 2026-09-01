@@ -255,14 +255,38 @@ class TsonCliTest {
 
     @Test
     void perCommandHelpExitsZeroToStdout() throws IOException {
-        String validate = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"validate", "--help"})));
-        assertTrue(validate.contains("tson validate"), validate);
+        for (String[] argv : new String[][] {{"init-example", "--help"}, {"validate", "--help"},
+                {"compile", "-h"}, {"policy", "--help"}, {"hash", "--help"}}) {
+            String out = captureStdout(() -> assertEquals(0, TsonCli.run(argv)));
+            assertTrue(out.contains("usage: tson " + argv[0]), argv[0] + " => " + out);
+        }
+    }
 
-        String compile = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"compile", "-h"})));
-        assertTrue(compile.contains("tson compile"), compile);
+    /**
+     * <b>Help is two levels, and each carries what the other should not.</b> The top level lists the
+     * commands; a command's own help carries its options -- including the [TSON-DATA] §8.2 policy block for
+     * the three that judge a name, and not for the two that do not. Printing everything at the top made the
+     * policy flags a wall of text in front of someone who only wanted to know what {@code hash} does.
+     */
+    @Test
+    void policyFlagsAreDocumentedByTheCommandsThatTakeThemAndNoOthers() throws IOException {
+        for (String command : new String[] {"validate", "compile", "policy"}) {
+            String out = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {command, "--help"})));
+            assertTrue(out.contains("--identifier-policy <level>"), command + " => " + out);
+            assertTrue(out.contains("--token-scripts <A+B>"), command + " => " + out);
+            assertTrue(out.contains("ascii-only, single-script"), command + " => " + out);
+        }
+        for (String command : new String[] {"hash", "init-example"}) {
+            String out = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {command, "--help"})));
+            assertFalse(out.contains("--identifier-policy"), command + " => " + out);
+        }
 
-        String policy = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"policy", "--help"})));
-        assertTrue(policy.contains("tson policy"), policy);
+        String top = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"--help"})));
+        assertFalse(top.contains("--identifier-policy"), top);
+        assertTrue(top.contains("`tson <command> --help`"), top);
+        for (String command : new String[] {"init-example", "validate", "compile", "policy", "hash"}) {
+            assertTrue(top.contains("  " + command + " "), command + " missing from the command list: " + top);
+        }
     }
 
     /**
@@ -289,6 +313,59 @@ class TsonCliTest {
     void policyRejectsAPositionalArgument() throws IOException {
         String err = captureStderr(() -> assertEquals(2, TsonCli.run(new String[] {"policy", "please"})));
         assertTrue(err.contains("tson policy"), err);
+    }
+
+    /**
+     * <b>{@code tson policy} takes the policy flags too, so it is the dry run for the other two commands.</b>
+     * Someone about to relax a [TSON-DATA] §8.2 rule across a CI job can see what the relaxation actually
+     * produces before pointing it at a document, which is the difference between configuring a policy and
+     * guessing at one.
+     */
+    @Test
+    void policyPrintsWhatTheFlagsWouldApply() throws IOException {
+        String out = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {
+                "policy", "--identifier-policy", "moderately-restrictive", "--identifier-per-segment",
+                "--token-scripts", "Latin+Greek"})));
+
+        assertTrue(out.contains("identifier policy: MODERATELY_RESTRICTIVE per segment"), out);
+        // The token list brought its own level: Unrestricted scans nothing, so the list would have been inert.
+        assertTrue(out.contains("token policy:      SINGLE_SCRIPT permitting [GREEK+LATIN]"), out);
+    }
+
+    /**
+     * <b>A relaxation on the command line actually changes a verdict</b>, end to end through the real
+     * dispatch. A mixed-script <em>annotation</em> name is refused under the default Highly Restrictive
+     * policy and admitted once the combination is named -- which is the whole point of the flags, and the
+     * thing that regressed silently while the configured policy reached the schema end and not the read.
+     *
+     * <p>An annotation name rather than a field name, because a Class 1 field name is lexical rather than a
+     * name (§2.5, §7.7) and faces only the look-alike rule; and rather than a type-ref, because an unknown
+     * one is a diagnostic of its own and the relaxed run here has to come back clean.
+     */
+    @Test
+    void anIdentifierScriptListAdmitsANameTheDefaultRefuses(@TempDir Path dir) throws IOException {
+        // Cyrillic а (U+0430) between two Latin letters -- built from code points, never typed.
+        String mixed = "p" + new String(Character.toChars(0x0430)) + "y";
+        Path data = writeFile(dir, "mixed.tson", "@" + mixed + ":1 2");
+
+        String refused = captureStdout(() -> assertEquals(1, TsonCli.run(new String[] {
+                "validate", data.toString()})));
+        assertTrue(refused.contains("[RESTRICTED_SCRIPT]"), refused);
+        assertTrue(refused.contains("note: refused under identifier policy HIGHLY_RESTRICTIVE"), refused);
+
+        String admitted = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {
+                "validate", "--identifier-policy", "single-script",
+                "--identifier-scripts", "Latin+Cyrillic", data.toString()})));
+        assertTrue(admitted.contains("OK"), admitted);
+        assertTrue(admitted.contains("note: judged under identifier policy SINGLE_SCRIPT"), admitted);
+    }
+
+    /** A flag whose combination configures nothing is a usage error, not a silent no-op. */
+    @Test
+    void aRelaxationThatWouldConfigureNothingIsAUsageError() throws IOException {
+        String err = captureStderr(() -> assertEquals(2, TsonCli.run(new String[] {
+                "policy", "--token-policy", "unrestricted", "--token-scripts", "Latin+Cyrillic"})));
+        assertTrue(err.contains("configure nothing"), err);
     }
 
     @Test

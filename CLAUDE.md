@@ -688,10 +688,18 @@ the report as codes (`NOT_IMPLEMENTED`, `SCHEMA_UNAVAILABLE`) with a stderr note
 unchanged. 70's halves print differently: a gap that escapes as an exception prints
 `not implemented yet: <message>`, whose text usually names the workaround; a fault gets the please-report-it
 banner and its stack trace. Also `tson compile`, `tson hash` (stamps a
-`?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `TsonUnicodeProcessorPolicy` with no
-document in hand, the same record every `validate`/`compile` envelope carries in its `policy` field. In
-`--output text` a run prints it only when something was actually refused; the machine formats always carry
-it, a consumer wanting one shape.
+`?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `TsonUnicodeProcessorPolicy`
+with no document in hand, the same record every `validate`/`compile` envelope carries in its `policy` field.
+**Those three commands also take the policy flags** (`PolicyOptions`, which consumes them so each subcommand's
+own loop still sees only `--output` and positionals): `--identifier-policy`/`--token-policy` take a level in
+either spelling the CLI prints or a person types, `--identifier-per-segment` the unit, and
+`--identifier-scripts`/`--token-scripts` a `Latin+Cyrillic` combination, repeatable. Two rules keep a flag from
+meaning nothing: **`--token-scripts` alone raises the token level** to `SINGLE_SCRIPT` (its `UNRESTRICTED`
+default scans nothing, so the list would be inert), and a relaxation named against a *stated* level that scans
+nothing is a usage error rather than a no-op — `withTokenPolicy`'s own habit of refusing a policy that cannot
+mean what it says. There is no `--token-per-segment`; the library refuses one. In `--output text` a run prints
+the policy when it refused something **or** when it configured one (§8.2 requires a relaxation not be silent);
+the machine formats always carry it, a consumer wanting one shape.
 `TsonBundledSchemas` serves the three bundled schemas' identities, text (copied from `spec/m/` at build
 time) and published digests. `TsonContentHash` hashes every byte past the `!!id` line; pins are
 verification metadata, not identity, checked through the loader on every fetched pinned reference. The

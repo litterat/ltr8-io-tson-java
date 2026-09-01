@@ -86,9 +86,15 @@ public final class Tson {
      * (via {@link #dataBindContext()}), validating against a self-describing document's {@code !!schema},
      * schemaless when it declares none. Built over {@link #bindRegistry()}, so every reader from this
      * instance shares one compiled-schema cache: a schema is compiled once here, not once per reader.
+     *
+     * <p><b>Both [TSON-DATA] §8.2 policies come from this instance</b>, {@link TsonConfig#identifierPolicy}
+     * included -- a reader built here judges the names in a document under the same policy the linker judged
+     * the schema's declared names under. They are one processor, and {@link #processorPolicy()} reports one
+     * answer for it, which is only true if one answer is what both ends use.
      */
     public TsonObjectReader objectReader() {
-        return new TsonObjectReader(bind, dataBindContext).withTokenPolicy(tokenPolicy);
+        return new TsonObjectReader(bind, dataBindContext)
+                .withTokenPolicy(tokenPolicy).withIdentifierPolicy(core.identifierPolicy());
     }
 
     /**
@@ -97,9 +103,12 @@ public final class Tson {
      * schemaless when it declares none. The tree-producing peer of {@link #objectReader()}, and built over
      * {@link #treeRegistry()} on the same shared-cache terms -- which is what keeps {@link #validate}, which
      * makes a reader per call, from recompiling the schema for every document it checks.
+     *
+     * <p>Carries both §8.2 policies from this instance, for the reason {@link #objectReader()} states.
      */
     public TsonTreeReader treeReader() {
-        return new TsonTreeReader(tree).withTokenPolicy(tokenPolicy);
+        return new TsonTreeReader(tree)
+                .withTokenPolicy(tokenPolicy).withIdentifierPolicy(core.identifierPolicy());
     }
 
     /** A fresh, schemaless (Class 1) {@link TsonObjectWriter} bound to {@link #dataBindContext()} -- the inverse of {@link #objectReader()}. */

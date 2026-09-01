@@ -83,7 +83,7 @@ enum OutputFormat {
             }
             text.append(renderText(file.valid(), file.errors())).append(System.lineSeparator());
         }
-        text.append(refusalNote(run.policy(), run.files().stream()
+        text.append(policyNote(run.policy(), run.files().stream()
                 .flatMap(file -> file.errors().stream()).toList()));
         return text.toString().stripTrailing();
     }
@@ -119,7 +119,7 @@ enum OutputFormat {
 
     private static String renderText(ValidationReport report) {
         return (renderText(report.valid(), report.errors()) + System.lineSeparator()
-                + refusalNote(report.policy(), report.errors())).stripTrailing();
+                + policyNote(report.policy(), report.errors())).stripTrailing();
     }
 
     /**
@@ -151,20 +151,30 @@ enum OutputFormat {
     }
 
     /**
-     * The policy that judged, printed only when this run actually refused something.
+     * The policy that judged, printed when it is load-bearing: something was refused under it, or it is not
+     * the one a run configures by saying nothing.
      *
      * <p>{@link #JSON} and {@link #TSON} carry {@code policy} unconditionally, because a machine consumer
-     * wants one shape; a person does not want a configuration dump on every clean run. What they do want,
-     * at exactly the moment a name is refused, is to know that the verdict came from this deployment's
-     * settings and not from the document -- which is the one case where "why does it pass on my machine" has
-     * an answer that is not in the file they are looking at.
+     * wants one shape; a person does not want a configuration dump on every clean run. The two cases where
+     * they do want it are different questions with different answers:
+     *
+     * <ul>
+     *   <li><b>Something was refused.</b> The verdict came from this deployment's settings rather than from
+     *   the document -- the one case where "why does it pass on my machine" has an answer that is not in the
+     *   file they are looking at.</li>
+     *   <li><b>The policy was configured.</b> [TSON-DATA] §8.2 requires that a relaxation not be silent, and
+     *   a run given {@code --identifier-policy unrestricted} that printed {@code OK} and nothing else would
+     *   be exactly that.</li>
+     * </ul>
      */
-    private static String refusalNote(CliPolicy policy, List<CliDiagnostic> errors) {
-        if (errors.stream().noneMatch(error -> isRefusal(error.code()))) {
+    private static String policyNote(CliPolicy policy, List<CliDiagnostic> errors) {
+        boolean refused = errors.stream().anyMatch(error -> isRefusal(error.code()));
+        if (!refused && policy.isDefault()) {
             return "";
         }
-        return "note: refused under " + summary(policy) + " -- this processor's own configuration, not a"
-                + " property of your document. `tson policy` prints it in full.";
+        return "note: " + (refused ? "refused" : "judged") + " under " + summary(policy) + " -- this"
+                + " processor's own configuration, not a property of your document. `tson policy` prints it"
+                + " in full.";
     }
 
     /** [TSON-DATA] §8.2's three name-hygiene rules, one code each -- the outcomes {@link CliPolicy} explains. */

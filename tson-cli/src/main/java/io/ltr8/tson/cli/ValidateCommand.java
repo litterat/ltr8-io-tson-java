@@ -50,7 +50,7 @@ final class ValidateCommand {
      *         69 a document whose schema no file here declares, 70 a document that could not be checked at
      *         all because a construct in its schema is a gap in this library ({@link TsonCli#exitCodeFor})
      */
-    static int run(List<ValidateInput> inputs, OutputFormat format) {
+    static int run(List<ValidateInput> inputs, OutputFormat format, PolicyOptions policies) {
         Map<String, String> schemas = new HashMap<>();
         // The !!id each schema file declares, verbatim and in argument order -- what an unmatched
         // !!schema is reported against. Kept apart from the lookup map, whose keys are canonicalized
@@ -74,7 +74,10 @@ final class ValidateCommand {
             }
             return text;
         };
-        Tson tson = Tson.builder().schemaSource(source).build();
+        // One Tson for the whole run, so the identifier policy governs the schema files' own declared names
+        // at link time and the data documents' names at read time alike -- it is one processor, and a flag
+        // that reached only one of the two ends would be a trap.
+        Tson tson = policies.applyTo(Tson.builder().schemaSource(source)).build();
         CliPolicy policy = CliPolicy.from(tson.processorPolicy());
 
         for (ValidateInput input : inputs) {
