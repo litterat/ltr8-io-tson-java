@@ -12,7 +12,7 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The six below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
+The thirteen below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
 seventeen raised against Revision 33 are gone from here, because the spec now carries their rules and that
 is where the answer belongs. **This file is the as-built record**, not a pointer to one: where an entry
 proposes a design this implementation has built, the entry states the design, what is running, and what is
@@ -307,5 +307,302 @@ as well, ask for both and say so — but the one that must be there is the UCD v
 that changes a verdict.
 
 **Status against Revision 34:** open, and new against this revision.
+
+---
+
+## 7. `null` is a second spelling of absence that only Class 1 can see — proposal: remove it, leaving `_`
+
+**Section:** §4.1 (null), §4.5 (resolution order), §2.9 (the absent sentinel), §7.7 rule 3 (no reserved words),
+the JSON interoperability note under §9; Part 2 §4.2 (`value`, `void`), §7.3 (`null` at `void`-typed positions),
+§5.4 (why a variant may not resolve to `void`), §9 (the `_`/`null` distinction restated).
+
+**Problem:** §4.1 makes `null` a base value and insists it is "distinct from the absent sentinel `_`: null is a
+value that can be stored and transmitted; `_` indicates that no value occupies a position." §2.9, Part 2 §5.4 and
+Part 2 §9 each restate the distinction, §5.4 calling it one "the format draws deliberately". Read against Part 2
+§7.3, the distinction is narrower than the prose suggests:
+
+- **Schemaless**, and at a `value`-typed position (Part 2 §4.2), `null` resolves to the null base value and is
+  distinct from `_`.
+- **Under a schema**, `null` "has no special status" (§7.3): at a `text` position it is the string `null`, at an
+  `int32` position it is a type error — **except** at a position whose type carries the `void` contract, where it
+  is "accepted as an equivalent spelling of `_` and normalised to absence".
+
+So the moment a schema is in scope, `null` is either ordinary text or a synonym for `_`. The value the four
+sections defend exists only in Class 1 reads and in `value`-typed escape hatches, and a Class 2 processor — the
+kind Part 2 exists to specify — never sees it. That is a concept costing four paragraphs of prose, a step in §4.5's
+order, and a concession paragraph in §7.3 to deliver a distinction the format's main mode cannot observe.
+
+Its justification is the JSON note under §9: "JSON `null` maps to the TSON null base type, not to the absent
+sentinel." But under a schema that mapping does not hold either — a JSON document with `"name": null` for an
+optional `text` field reads as the string `null`, silently, under Revision 34 as written. The JSON-superset
+property `null` was kept for is therefore already a Class 1-only property. Part 1's own framing is one schema over
+many formats, and a JSON reader is a separate stack in every implementation that has one; JSON compatibility is
+that reader's job — JSON `null` maps to absence in the *model*, where the position's state decides whether absence
+is admitted — and does not need the TSON notation to carry a keyword for it.
+
+Two smaller consequences of keeping it:
+
+- **A `null` map key is legal where a `_` key is not** (§2.9 forbids the absent sentinel as a key; `null` is a
+  value, so `{ null => 1 }` is well-formed). An implementation that models the two as one node then cannot tell
+  the keys apart — this one keys both on the same absent identity — and an implementation that models them as
+  two has a node type whose only observable role is this key.
+- **`null` is the one word §7.7 rule 3 has to explain away.** "There are no reserved words … `true`, `false`, and
+  `null` are identifiers like any other" is true of names and false of Class 1 values, where §4.5 needs "to
+  represent the string `"null"` in schemaless TSON, use quotes." `_` makes no such demand on names: it is
+  `XID_Continue` only, so no identifier begins with it, and the reservation is lexical rather than a word.
+
+**Interpretation chosen:** Revision 34 as written — this is a proposal, not a resolved ambiguity. `BaseTypeResolver`
+runs §4.5's order with `null` first; `ValueParser` reads it at a `value`-typed position; `VoidReader` applies §7.3's
+concession, for the unquoted token only; `TsonDataEmitter.nullValue()` writes it. What the implementation
+*models* is the other half of the evidence: the read output has **one** no-value node, `TsonAbsent`, carrying `_`,
+the `null` token where §4 applies, and a collecting-mode read failure alike, with no separate null node — because
+no consumer of the tree had a use for the difference, so there was nothing to model. When the first
+implementation quietly merges two things the spec calls distinct, the spec is describing a distinction it does not
+have. What is **not** running is the removal itself: `null` is still resolved, still emitted, and the corpus's
+`class1/resolver/valid/null-keyword` vector still expects the null base value.
+
+**Suggested resolution:** remove `null` from the notation. Concretely:
+
+- Part 1: delete §4.1; §4.5's order becomes boolean → number → string; drop the "distinct from … null" clauses in
+  §2.9 and §4.4 and the "use quotes" sentence; §7.7 rule 3 then holds without qualification. The JSON note under §9
+  changes from a mapping to a statement of scope: a JSON document containing `null` is not a TSON document, and a
+  processor that reads JSON does so through a JSON reader that maps `null` to absence. That is a *softer* claim
+  than the current SHOULD ("accept any valid JSON document"), and it should be made in those words rather than
+  left as a silent narrowing.
+- Part 2: `value` in §4.2 admits boolean, integer, float and string; `void`'s parenthetical and the §7.3 concession
+  paragraph go, `void` admitting `_` alone; §5.4's rationale for refusing `(T | void)` loses the "absent-versus-null"
+  clause and gets simpler, not weaker; §9's restatement goes with it.
+- Nothing lexical moves: `null` was never a token class, so §1.3's lexer freeze holds and the unquoted token `null`
+  is a string, as `frobnicate` is.
+
+The one thing the removal changes for a document is that a bare `null` in schemaless data becomes the string
+`null` rather than an error. It would be a mistake to guard that with a reserved word — a parse error on unquoted
+`null` reintroduces exactly what §7.7 rule 3 removed, for the sake of one JSON habit that the JSON reader is the
+right place to serve. The cost worth naming instead is the structured-output case: a model emitting `null` by JSON
+reflex into a `text` position gets the string `null` silently, where an `int32` position refuses it loudly. That
+case is already the behaviour under a schema in Revision 34, and it is the case that argues for routing model
+output through a JSON reader rather than for a keyword in the notation.
+
+**Status against Revision 34:** open, and new against this revision — a proposal rather than an ambiguity, and
+one this implementation has not built ahead of the spec, since a base-resolution change is a Part 1 change and
+Part 1 is frozen until the revision that makes it.
+
+---
+
+## 8. Removing `null` (#7) falsifies §6 and principle 5 — remove both, and the rules that exist only for them
+
+**Section:** §1.2 principle 5 (JSON compatibility), §6 (TSON and JSON), §7.2.2 (the escape table and the surrogate
+rules), §7.1 (byte order mark), §7.7 rule 3 (no reserved words); the JSON note under [TSON-SCHEMA] §9.
+
+**Problem:** §6 states that "every valid JSON document outside those exceptions is a valid TSON document, and the
+extensions are additive — no JSON construct changes meaning under TSON", and principle 5 that "valid JSON is a subset
+of valid TSON at the structural level". Once `null` is a string (#7), both are false on the first JSON document that
+contains one, and the SHOULD that follows them — "a TSON parser SHOULD accept any valid JSON document" — asks a
+parser to accept a document it will silently misread. So §6 and principle 5 cannot survive #7 as written, and the
+question this entry records is what else was there only because of them. Five rules cite JSON as their reason, or
+have no other:
+
+1. **The `\/` escape** (§7.2.2). The table itself labels it "(JSON compat)"; a solidus needs no escaping anywhere
+   else in the format.
+2. **`\uXXXX` and the surrogate-pair rules** (§7.2.2; §6 exception 2). A four-hex-digit escape cannot name a
+   supplementary character, so the format inherits JSON's UTF-16 workaround — a surrogate pair — and then needs
+   three MUST clauses to forbid the ill-formed halves JSON permits, plus §6's second exception to explain why TSON
+   is stricter than RFC 8259 here. All of that is the escape form's own consequence. One escape naming a scalar
+   value directly — `\u{1F600}`, the form Rust, JavaScript and Swift use — deletes the pairing rules outright:
+   "TSON strings are well-formed Unicode scalar sequences" stops being a rule the lexer enforces and becomes a
+   property the grammar cannot violate.
+3. **§6 exception 1** (raw NEL/LS/PS inside a single-line token). Without §6 it is not an exception to anything —
+   it is §7.2.2's rule, stated once.
+4. **"Decoders MUST accept" a leading byte order mark** (§7.1, cited from §6 as JSON compatibility). RFC 8259 §8.1
+   is where that posture comes from, and even there it is a MAY. Windows editors still emit one, so accepting it is
+   the practical choice — but it should be stated as an encoding courtesy of §7.1's own, not carried by §6.
+5. **`\b` and `\f`** (§7.2.2). JSON's, and written by hand approximately never. No consequence either way; listed
+   because the table should be reviewed as a whole once `\/` and the surrogate form go.
+
+Item 2 is the one that touches the lexer, which §1.3 declares "complete and frozen for the whole series". Principle
+7 says a 2026-series revision "may change anything", so it is permitted — but it wants doing in the same revision
+as #7, before anything is published against the frozen claim.
+
+**Interpretation chosen:** Revision 34 as written, in full. `Lexer` decodes `\/`, `\b`, `\f`, `\s` and `\uXXXX`,
+pairs surrogate escapes and refuses an unpaired one ("high surrogate escape not followed by a low surrogate
+escape"), and discards a single leading U+FEFF without counting it toward any position. `TsonDataStream` accepts
+commas and quoted field names as §2.4 and §2.5 admit them. Nothing here is built ahead of the spec.
+
+**Suggested resolution:** delete §6 and principle 5. Replace the JSON note under [TSON-SCHEMA] §9 with a statement
+of scope: a JSON document is read through a JSON reader, which maps JSON `null` to absence and JSON numbers to
+`number`, and is not a TSON document. Then take items 1–3 as written, restate item 4 under §7.1 on its own
+authority, and decide item 5 with the table in front of you. **What is JSON-shaped and should stay**, so that the
+removal is not read as a mandate to look different: `"`-delimited strings; `[ ]` arrays; `{ name: value }` records;
+the `\n \r \t \\ \"` escapes; base type resolution as a mechanism — Class 1 is a real mode (configuration, ad hoc
+data) and only `null` was an accommodation; the `number` exact type and the rule that an unadorned numeric token
+names it; and, on the implementation side, RFC 6901 pointers and JSON Schema 2020-12's output shape in diagnostics,
+which are tooling interoperability and no part of the notation. The notation is JSON-*like* by design; what goes is
+the claim to be a JSON *superset*, and the rules that only that claim required.
+
+**Status against Revision 34:** open, and new against this revision — consequent on #7, and a proposal rather than
+an ambiguity. Entries #9–#13 are the design choices JSON shaped that are worth a decision of their own once the
+superset claim is gone; each is recorded separately because each can be answered separately.
+
+---
+
+## 9. A Class 1 field name is lexical for JSON's sake — proposal: a field name is an identifier at every layer
+
+**Section:** §2.5 (record), §7.7 rule 3 (last clause), §7.7's "record field names are lexical at this layer", §8.2
+(name hygiene, the field-name scope), §7.4 (`field-name = unquoted-token / single-line-token`).
+
+**Problem:** §2.5 makes a field name at the data layer "lexical: any token the production admits names a field, and
+`{ "first name": 1 }` is an ordinary record", with the identifier grammar constraining only *declared* names. The
+reason is JSON: an object key is an arbitrary string, and a superset had to admit one. The design carries the cost
+in three places. There are two name rules — a declared name is an identifier, a Class 1 field name is anything — and
+the text has to say where each applies. Name hygiene runs differently by conformance class: §8.2's restricted-character
+and restricted-script rules apply to identifiers, so a Class 1 record's field names see only the look-alike rule,
+and an implementation has to know that a record's fields are policed under a schema and not without one. And §7.7
+rule 3 needs a carve-out — "a schemaless record may still carry a field spelled `"_"` or `"_id"`, because Class 1
+field names are lexical" — for names no declared field can bear.
+
+The format already has the right answer to "a key that is not a name". A record's fields are the named members of
+a shape, which is what makes them declarable; arbitrary string keys are what a **map** is for, and `{ "Content-Type"
+=> "text/plain" }` is the honest spelling of that data today. Once no JSON object has to parse as a record, nothing
+requires a record to admit a key a schema could never declare.
+
+**Interpretation chosen:** Revision 34 as written. `TsonDataStream.isFieldNameTokenType` admits an unquoted or
+single-line token as a field name and matches nothing against the identifier grammar there — deliberately, per
+§2.5; `SchemalessTreeReader.reportConfusableFields` runs the look-alike rule over a schemaless record's field names
+and nothing else, per §8.2. Under a schema, a field name conforms by construction, which is the half that would not
+change.
+
+**Suggested resolution:** make `field-name` an identifier position at every layer — the production keeps its two
+spellings (quoting is still how a name containing nothing outside the profile is written when it would otherwise
+resolve as a number, §7.1's "quoting by kind") and the decoded text is matched against §7.7 as an annotation name's
+is. Consequences, all deletions: §2.5's "lexical" paragraph; §7.7's "record field names are lexical at this layer"
+and rule 3's `"_"`/`"_id"` carve-out; §8.2's field-name distinction, so one walk polices every named scope and
+[TSON-DATA] §1.5's Class 1 MUST ("the name-hygiene checks of §8.2 over each record's own field names") stops needing to
+say which checks. A record whose key is not a name is a parse error, and the diagnostic can say what the author
+wants: a map.
+
+**Status against Revision 34:** open, and new against this revision — consequent on #8, a proposal rather than an
+ambiguity, and the one of #9–#13 this implementation would recommend taking.
+
+---
+
+## 10. Optional commas and the trailing-separator ban are the JSON-superset shape — proposal: one consistent position
+
+**Section:** §1.2 principle 4 (minimal required syntax), §2.4 ("Separators"), §7.4.
+
+**Problem:** §2.4 admits whitespace, a comma, or both as a separator and forbids a trailing one: "`[1, 2, 3,]` and
+`{ x: 1, }` are parse errors — and the rule applies throughout the series". Both halves are the superset's: the
+comma is admitted so that JSON's separators parse (principle 4 calls commas "optional where the structure is
+unambiguous", which is the superset's framing of a separator the format does not need), and the trailing ban is
+RFC 8259's, inherited whole. The result is a position that is neither of the two consistent ones. Either the format
+has a separator, whitespace, and no comma rule at all; or it has commas as a first-class separator, in which case
+the one rule about them that every JSON author has wished away — no trailing comma — is a rule TSON chose to keep
+with no JSON contract to honour.
+
+**Interpretation chosen:** Revision 34 as written: `TsonDataStream.consumeSeparatorOrCloseCheck` accepts
+whitespace, a comma or both, requires at least one between adjacent values, and refuses a separator before a
+closing delimiter ("a trailing separator is not permitted before …").
+
+**Suggested resolution:** take one of the two, and this implementation's preference is the first. **(a) Drop the
+comma.** Whitespace is the separator, the trailing-separator rule has nothing to apply to, and §7.4 loses a
+production. It is what principle 4 says it wants, reached by removing a rule rather than reversing one; what it
+costs is a long inline array reading `[1 2 3 4]` rather than `[1, 2, 3, 4]`, which the format already admits and
+which every other position in the format already reads. **(b) Keep the comma and permit a trailing one.** The
+lesser change, and the one to make if the comma stays: the ban exists only where a comma is *the* separator and a
+trailing one would be a missing element, which in TSON it never is. Either is better than the current shape, and
+"the rule applies throughout the series" means the choice reaches [TSON-SCHEMA] §12.1's separators too.
+
+**Status against Revision 34:** open, and new against this revision — consequent on #8, and a proposal.
+
+---
+
+## 11. `true` and `false` keep keyword status under base type resolution — does #7's argument reach them?
+
+**Section:** §4.2 (boolean), §4.5 (resolution order), §7.7 rule 3; [TSON-SCHEMA] §7.3 and the `boolean` enum.
+
+**Problem:** #7's argument against `null` applies to `true` and `false` in part. Under a schema they have no special
+status either: `boolean` is the kernel's `!enum [true false]`, read as an identity check of the token's text against
+the member names, and §7.3 says so. So they are keywords in exactly one mode, Class 1, and §7.7 rule 3 has to explain
+that "there is no keyword list" while §4.5 keeps two exact keyword matches ahead of the number grammar.
+
+The argument stops short, and the entry records where. A boolean is a value with a type that a Class 1 read
+genuinely produces and a consumer genuinely stores, where `null` was a value nothing downstream could use; and the
+distinction between `true` and `"true"` is the one place §2.4's "form is not meaning" makes form *mean* something —
+"the string `true`, not the boolean" — which is the same distinction `42` and `"42"` draw and is not JSON's. Removing
+them would leave Class 1 with no boolean at all, which is a loss, not a simplification.
+
+**Interpretation chosen:** Revision 34 as written: `BaseTypeResolver` matches `true` and `false` before the number
+grammar, and a schema-typed position hands the token to its declared type.
+
+**Suggested resolution:** keep them, and say why in §4.2 in the terms above, so that #7's removal is not read as
+half of a pattern. §4.5's order becomes boolean → number → string, and §7.7 rule 3 then has two words to explain
+rather than three — a sentence, since both are members of a kernel enum and that is the whole of their status under
+a schema.
+
+**Status against Revision 34:** open, and new against this revision — recorded so that the decision is a decision;
+this implementation recommends keeping them.
+
+---
+
+## 12. A near-miss numeric token falls through to string — should it be a Class 1 error instead?
+
+**Section:** §4.3 (numbers, "leading zeros MUST NOT be used"), §4.4 (string, "including near-miss numeric forms such
+as `007` and `1.2.3`"), §4.5, §7.6 (`decimal-natural`, "no leading zeros").
+
+**Problem:** The leading-zero prohibition is RFC 8259's number grammar, and TSON's base resolution turned it — with
+every other near-miss — into silent fallthrough: `007`, `1.2.3`, `5.` and `1__0` are strings. §4.4 is explicit that
+"there are no exceptions: every string-resolving token is one whose complete text failed the null, boolean, and
+number rules". The design is coherent — every token resolves to something, and a resolver never refuses — but the
+outcome is the hazard #7 names for `null` at a `text` position, arriving on data that is common rather than
+reflexive: a `007` postcode, a `1.2.3` version, a `5.` typo, each of which reads without complaint as the string the
+author did not mean. With no JSON grammar to be a superset of, the question is open whether a token that *begins*
+like a number and fails the grammar should be a string or a Class 1 resolver error, the way a token that begins
+like a number and fails an atom's contract already is under a schema (§5.2).
+
+The two answers are both defensible, which is why this is a decision to record rather than a proposal. Fallthrough
+keeps §4 total and keeps `A-100`, `v1.2.3` and `2025-03-13` unquoted — a rule sharp enough to catch `007` has to say
+why `v1.2.3` is not a near-miss, and "starts with a digit or a sign" is that rule's likely shape. An error makes the
+common mistakes loud at the cost of that rule and of quoting `007` when the string is meant, which §4.5's "use
+quotes" already asks for `null`.
+
+**Interpretation chosen:** Revision 34 as written: `NumberScanner.decimalNatural` refuses a leading zero, the
+`number` production fails, and `BaseTypeResolver` resolves the token to a string.
+
+**Suggested resolution:** decide, and record the decision in §4.4 either way. If fallthrough stays, say in §4.4 that
+it is deliberate and what a schema is for; if a near-miss becomes an error, define near-miss by the token's first
+character (`Nd`, `+`, `-` or `.` at Start, the four extensions §7.1 admits for the number grammar's sake) so that
+`v1.2.3` and `A-100` are untouched, and list `.` alone as the boundary case, since `.5` is a number and `.name` is
+a string today.
+
+**Status against Revision 34:** open, and new against this revision — a decision to record, with no recommendation
+stronger than "not by default".
+
+---
+
+## 13. Records and maps share `{ }` because JSON objects do — is §2.8 worth its dispatch?
+
+**Section:** §2.8 (brace disambiguation and empty braces), §2.5, §2.6; [TSON-SCHEMA] §7.7 ("Empty braces").
+
+**Problem:** A record and a map share the brace form because a JSON object is `{ … }` and a record is what a JSON
+object becomes. The whole of §2.8 exists to pay for that sharing: a parser consumes one data value and inspects the
+next token to learn which structure it is in; the first field name is checked to be a bare token at that point and
+nowhere else; an empty `{}` is neither and is "deferred to the resolver", where [TSON-SCHEMA] §7.7 resolves it by the
+expected type; and a schema's own grammar imports the dispatch ([TSON-SCHEMA] §12.2 states its lookahead budget). A
+distinct map delimiter would delete the section and the empty-brace concept with it.
+
+**Interpretation chosen:** Revision 34 as written: `TsonDataStream` implements §2.8's dispatch with one consumed
+token plus one of lookahead, `EmptyBrace` is a distinct event and AST node, and `RecordAbstractReader`,
+`MapAbstractReader` and `TupleAbstractReader` each resolve it against their own type ([TSON-SCHEMA] §7.7), with
+`SchemalessTreeReader` taking the empty record by default.
+
+**Suggested resolution:** keep it, and this entry is the record that keeping it was decided rather than inherited.
+`{ k => v }` reads well, the dispatch is one token deep and stated as such, and an empty brace resolving by expected
+type is exactly right under a schema, which is the mode the format is for. The cost of a new delimiter — every map
+in every document and schema, and a second bracket pair for authors to learn — is out of proportion to a section
+that costs a parser a saved token. It is listed because it is the last place where JSON's shape is load-bearing in
+the grammar, and the one item here where the recommendation is that the JSON-derived choice stands on its own
+merits.
+
+**Status against Revision 34:** open, and new against this revision — recorded as a decision to keep, pending the
+author's confirmation.
 
 ---

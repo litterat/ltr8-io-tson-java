@@ -317,9 +317,11 @@ public final class SchemalessTreeReader {
             case TsonMap map -> map.entries().stream()
                     .map(entry -> List.of(keyIdentity(entry.key()), keyIdentity(entry.value()))).toList();
             // No payload to compare: the kind is the whole identity, and a distinct constant per kind keeps
-            // a no-value key apart from a quoted "null" that base resolution made an ordinary string. A `_`
-            // key and a `null` key share this identity, since the tree spells both as absence -- a further
-            // case of the decoded-vs-textual divergence #43 already argues, alongside `0xFF`/`255`.
+            // a no-value key apart from a quoted "null" that base resolution made an ordinary string. Inside
+            // a compound key, a `_` element and a `null` element share this identity (a bare `_` key never
+            // reaches here -- readMap refuses it first, §2.9), so `[_ 1]` and `[null 1]` are one key. §2.6's
+            // decoded-value layer does not ask for that -- §4.1 keeps null and absence distinct -- it falls
+            // out of the tree spelling both as absence, the one-node model SPEC-FEEDBACK.md #7 argues from.
             case TsonAbsent ignored -> KeyKind.ABSENT;
             case TsonMissing ignored -> KeyKind.MISSING;
         };
