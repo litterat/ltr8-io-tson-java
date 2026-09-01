@@ -237,7 +237,7 @@ public final class TsonUnicodePolicy {
     public static TsonUnicodePolicy scriptsUnchecked();
     public static TsonUnicodePolicy unrestricted();            // the token default
 
-    public TsonUnicodePolicy perSegment();                     // reach for this before loosening the level
+    public TsonUnicodePolicy perSegment();                     // identifiers only -- tokenPolicy throws on one
     public TsonUnicodePolicy permitting(UnicodeScript... scripts);
 
     public static String dataVersion();                        // the Unicode data version, e.g. "16.0"

@@ -128,6 +128,28 @@ which is why they sit low. The lexer's fail-fast floor is not among them: nothin
 someone decides whether lexer errors feed the `Diagnostic` model at all, and `STRUCTURED-OUTPUT.md` holds
 that question.
 
+- [ ] **The thread-safety contract is stated nowhere in the library's own Javadoc.** Neither `Tson` nor
+  `TsonConfig` says a word about concurrency, while `docs/linking-and-compilation.md` and the `tson-java`
+  skill both state the contract confidently: concurrent *reads* through one `Tson` are safe (the readers are
+  immutable, the lexer and stream are per-read, both on-demand caches settle a race by keeping one entry, and
+  a cache hit takes no lock), while registering schemas concurrently is not, and neither is mutating a
+  `DataBindContext` after use. A consumer reads the front door, not the design notes, so the one guarantee
+  that decides whether they build one instance at startup or one per request is invisible where they are
+  looking. Put it on `Tson`'s class Javadoc, with the "resolve at startup, then read" shape it implies, and on
+  `TsonConfig` for the context half. Raised by the HTTP project building on this library.
+
+- [ ] **`Data.references()` returning `null` is an NPE out of `Tson.resolve` that reads as a library fault.**
+  `TsonSchemaLinker` iterates it directly, and the interface's Javadoc says "empty by default" without saying
+  it may not be `null` — so a consumer whose `Data` implementation returns an *optional* bound component
+  (which arrives as `null` when the field is omitted, the binder not normalising it) gets a
+  `NullPointerException` from the schema pipeline. Nothing catches it as a consumer error: `validateSchema`
+  classifies `TsonSchemaFetchException` and `TsonSchemaValidationException` and rethrows the rest as faults,
+  so the CLI prints the please-report-it banner and exits 70 for a bug in the calling class. It belongs with
+  `BIND_MISMATCH` — a misconfiguration in the reading application, not a verdict on the document and not a
+  gap. The work is deciding whether the interface defends the contract (treat `null` as empty, and say so) or
+  reports it (a diagnostic naming the class that returned it); the second is more useful and is the same
+  choice `TsonMissingBindingException` already made. Raised by the HTTP project building on this library.
+
 - [ ] **A supertype and a choice variant still have no position of their own.** A record field carries one
   now (`RecordField.position`, `@Unbound`, threaded through `SchemaPositions`), so a diagnostic against
   `/person/age` lands on `age`'s line. A supertype and a choice variant are bare names in a `List<String>`

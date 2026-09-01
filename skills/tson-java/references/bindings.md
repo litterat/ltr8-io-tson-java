@@ -79,6 +79,23 @@ rather than replacing it, so the kernel's names still resolve first.
 `bindings`/`profile` are mutually exclusive with `dataBindContext(…)` — a context is built or given, not
 both, and a profile is fixed when a context is built.
 
+**Writing a binder rather than a map.** `DataNameBinder` is a one-method interface, and the implementation
+a consumer usually wants is already there — mangle the schema's `snake_case` name to `PascalCase` and try
+`Class.forName` against each package in turn, first match wins:
+
+```java
+new DataNameBinder.DefaultDataNameBinder(Set.of("com.example.api"), Map.of())
+```
+
+The second argument is aliases, applied *before* the mangling, for the names that do not follow the
+convention. This is what `metaNameBinder(…)` usually receives.
+
+**Components bind by exact name — there is no `snake_case` ↔ `camelCase` conversion.** A `request_stream`
+field needs a `request_stream` component, or `@Field("request_stream")` on whatever the component is really
+called. The mangling above is for **type** names only, which is the trap: a schema's `order_line` finds
+`OrderLine` on its own, and that same schema's `order_line` *field* will not find an `orderLine`
+component.
+
 **This direction is for reading.** Writing resolves a value's type name from its class's own
 `@Typename`, so a class mapped here without one reads but cannot be written.
 
@@ -100,6 +117,17 @@ sends them. A FIXED field is exempt, the schema settling its value.
 - `TsonConfig.lenientBinding()` opts out wholesale, and is silent.
 - `TsonMissingBindingException` (a subclass) covers a schema type with **no** class at all, and is
   deferred to the first read of that type — a schema legitimately declares types a consumer never binds.
+
+**A bound class guards its own optional lists.** An omitted optional field arrives as `null` and the binder
+does not normalise it to an empty list. A *required* one never reaches the constructor at all — the read
+reports `FIELD_REQUIRED` and abandons construction first — so a null guard on a required component is
+guarding against something that cannot happen, and defaulting one is masking a violation the read already
+caught.
+
+The place this bites is `Data.references()`, whose default returns `List.of()`: an implementation that
+returns an optional component instead, unguarded, hands the linker a `null` it iterates — and the resulting
+`NullPointerException` comes out of `Tson.resolve` looking like a fault in the library rather than a bug in
+the calling class. Return `list == null ? List.of() : list`.
 
 ## Binding profiles
 

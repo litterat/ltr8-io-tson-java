@@ -246,6 +246,11 @@ TsonValue value = tson.treeReader().withSchema(versionFor(peeked.header()))
 
 Only the read-ahead is buffered (one decoder chunk), never the document.
 
+**Test a peek against a stream that cannot rewind.** `ByteArrayInputStream` supports mark/reset, so a peek
+that ate the body still looks intact through one — and a real request body then arrives truncated in
+production with a green suite behind it. Test with a stream whose `markSupported()` is `false`; a consuming
+project shipped exactly that bug.
+
 ## Fetching schemas
 
 Out of the box a `Tson` serves only the three bundled schemas: `TsonSchemaSource.registeredOnly()` is
@@ -350,7 +355,11 @@ defaults to Highly Restrictive over the whole name (§8.2's SHOULD). Reach for `
 `permitting(scripts…)`, before loosening the level: both keep the rule everywhere else. `tokenPolicy`
 governs **every token a read pulls** and defaults to `unrestricted()`, a value being data that may
 legitimately be anything; raise it when values are more than payload (a service that renders what it
-reads into a UI). Either is also settable per reader with `withIdentifierPolicy`/`withTokenPolicy`; the
+reads into a UI). A token policy **may not be per-segment** and `tokenPolicy` throws
+`IllegalArgumentException` on one rather than ignoring it: `_` and `-` are ordinary characters in a value
+rather than word separators, and UTS #39's own `Toys-Я-Us` is the spoof segmenting one would admit. Note
+also that a token policy stricter than the identifier policy **subsumes it** — the token scan runs before
+anything knows which tokens are names. Either is also settable per reader with `withIdentifierPolicy`/`withTokenPolicy`; the
 six levels and the rest of the surface are in `references/api.md`, and the command-line flags in
 `references/cli.md`.
 
