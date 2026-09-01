@@ -267,6 +267,17 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     }
 
     /**
+     * {@code null}, which is all a bound object has: a Java component holds no third state between "set to
+     * nothing" and "never set", so a field written {@code _} and one never written arrive alike. Tree mode
+     * keeps [TSON-DATA] §2.9's distinction ({@code RecordTreeReader}); here it has nowhere to live, and
+     * inventing somewhere would be a change to what a consumer's own class means.
+     */
+    @Override
+    Object statedAbsentValue() {
+        return null;
+    }
+
+    /**
      * The schema-driven child reader {@link RecordAbstractReader}'s own constructor already built
      * (via {@code resolver.resolve(field.type().name())}) has no visibility into what Java
      * collection shape the *consuming* field actually wants -- for a synthesized, materialized

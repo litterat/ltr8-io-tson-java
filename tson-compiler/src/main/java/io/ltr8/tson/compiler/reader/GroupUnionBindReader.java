@@ -40,6 +40,12 @@ import java.util.Map;
  */
 final class GroupUnionBindReader extends RecordAbstractReader<Object> {
 
+    /** {@code null}, a bind-mode reader having nowhere to put §2.9's "present with an absent value". */
+    @Override
+    Object statedAbsentValue() {
+        return null;
+    }
+
     /** Schema field name → the union member that field selects, already resolved. */
     private final Map<String, DataClassRecord> members;
 

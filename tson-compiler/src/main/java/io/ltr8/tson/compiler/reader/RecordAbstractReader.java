@@ -365,6 +365,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     final Object valueForStatedAbsentField(int schemaIndex, TsonReadContext ctx) {
         RecordField schema = fields.get(schemaIndex).schema();
+        if (schema.state() == FieldState.OPTIONAL) {
+            // [TSON-DATA] §2.9: "A field or entry set to `_` is present with an absent value -- distinct from
+            // not appearing at all." Answering `valueForAbsentField`'s `null` here would collapse the two,
+            // and the state is the one where both are legal, so it is the only one where the distinction has
+            // anything to carry.
+            return statedAbsentValue();
+        }
         if (schema.state() == FieldState.REQUIRED_DEFAULT) {
             ctx.schemaField(schema.name(), schema.position()).report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
                     "'" + schema.name() + "' on '" + displayName + "' is always filled from the schema and cannot be "
@@ -374,6 +381,19 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         }
         return valueForAbsentField(schemaIndex, ctx);
     }
+
+    /**
+     * The no-value form this reader's own output mode uses for a field the document wrote {@code _} at.
+     *
+     * <p>Per subclass because the two modes can represent different things. A tree has a node for it
+     * ({@code TsonAbsent}), so it keeps [TSON-DATA] §2.9's distinction between a field written {@code _} and
+     * one never written -- which an array element and a tuple slot already keep, leaving the record the one
+     * container of the four that dropped it. A bound object has no third state between {@code null} and a
+     * component that was never set, so bind mode answers {@code null} and the two collapse there; that is a
+     * limit of the target, not a reading of §2.9, and it is why this is a subclass's answer rather than one
+     * shared here.
+     */
+    abstract Object statedAbsentValue();
 
     /**
      * The value a field takes when the document never stated it -- §5.2's five states answered in one place,

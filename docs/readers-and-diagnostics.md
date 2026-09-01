@@ -153,6 +153,14 @@ is small and parsed once.)
   `SchemalessTreeReader.keyIdentity`
   does the stripping explicitly; the other two readers compare bound host values, which strips both by
   construction.
+- **A written `_` at an `OPTIONAL` field is present with an absent value** (§2.9: "distinct from not
+  appearing at all"), and tree mode keeps that: `{ x: _ }` reads with `x` a `TsonAbsent` where `{ }` reads
+  with no `x` at all, and `TsonTreeWriter` writes the first back as `_`. It is the mode's own answer
+  (`statedAbsentValue`, per subclass) because bind mode has nowhere to put it — a Java component has no third
+  state between "set to nothing" and "never set", so both readings arrive as `null` there. A limit of the
+  target rather than a reading of §2.9, and the reason the tree's answer is not aligned down to it. An array
+  element and a tuple slot already kept the distinction; the record was the one container of the four that
+  dropped it.
 - **A written `_` at a `REQUIRED_DEFAULT` field is an error**, where plain omission still injects the
   default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 makes an explicit `_` a
   validation error at every REQUIRED-family field — "`_` asserts absence at a position the schema always
