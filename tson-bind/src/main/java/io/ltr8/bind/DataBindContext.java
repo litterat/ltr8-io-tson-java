@@ -268,16 +268,32 @@ public class DataBindContext {
 		return getDescriptor(target);
 	}
 
+	/**
+	 * A cheap pre-check, for a caller that would otherwise do expensive work before {@link #register}
+	 * refuses it. It is not the guarantee: {@code register} states that atomically, since between this and
+	 * the put another thread may have claimed the key.
+	 */
 	private <T> void checkExists(Type targetClass) throws DataBindException {
 		if (descriptors.containsKey(targetClass)) {
 			throw new DataBindException(String.format("Class already registered: %s", targetClass.getTypeName()));
 		}
 	}
 
+	/**
+	 * Claims {@code targetClass} for {@code descriptor}, or refuses because something else already holds it.
+	 *
+	 * <p><b>{@code putIfAbsent} rather than a check and a put</b>, which is the same guarantee stated
+	 * atomically. Under the split form two threads registering one class both passed the check and the
+	 * second silently overwrote the first -- so a duplicate registration that is an error on one thread
+	 * became a silent replacement on two, and whichever descriptor lost had already been handed out by
+	 * {@link #getDescriptor}. It is the third instance of the shape {@code TsonSchemaRegistry.register} and
+	 * {@code getDescriptor} were already fixed for: check the map, do the work, then write without looking
+	 * again.
+	 */
 	private <T> void register(Type targetClass, DataClass descriptor) throws DataBindException {
-		checkExists(targetClass);
-
-		descriptors.put(targetClass, descriptor);
+		if (descriptors.putIfAbsent(targetClass, descriptor) != null) {
+			throw new DataBindException(String.format("Class already registered: %s", targetClass.getTypeName()));
+		}
 	}
 
 
