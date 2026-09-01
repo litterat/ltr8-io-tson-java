@@ -204,9 +204,6 @@ surface.
 
 - [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
   session-oriented internal narrative exists.
-- [ ] `@doc`-driven documentation generation (render a schema's own `@doc` annotations). The renderer is the
-  whole of it — the data is reachable as
-  `schema.entries().getAnnotations(name).value("doc", String.class)`, and core.tn documents every declaration.
 
 ## Tree model (`TsonValue`)
 
@@ -238,13 +235,3 @@ The tree model itself is built and described in `docs/facades-and-tree.md`'s "Tr
   derivation, the way `withTokenPolicy` already is. A document past the limit must be refused with a
   diagnostic carrying a position, never a host `Error`. The numeric-literal length limit named in
   `CLAUDE.md`'s "Not yet implemented" is the fourth limit of the same section and comes with it.
-
-- [ ] **A record field written `_` reads identically to one never written.** Under a schema, `{ x: _  y: "h" }`
-  and `{ y: "h" }` against `x: text?` both produce a tree with no `x` at all; the same pair read schemalessly
-  gives `TsonAbsent` and `TsonMissing`. [TSON-DATA] §2.9 makes the distinction normative — "A field or entry set
-  to `_` is **present with an absent value** — distinct from not appearing at all" — and an array element and a
-  tuple slot already keep it, as a `TsonAbsent` placeholder that round-trips back through `TsonTreeWriter`. So
-  the record is the one container of the four that drops it: `valueForAbsentField`'s `OPTIONAL` case answers
-  `null` for both readings and `RecordTreeReader.putField` omits a `null`. Bind mode needs its own answer first
-  — a Java component has no third state between "null" and "not there" — since the tree's answer should not be
-  the one that happens to be reachable.

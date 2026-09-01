@@ -511,7 +511,10 @@ note: a stated FIXED value is checked, not obeyed; an omitted `OPTIONAL_FIXED` f
 inconsistency; records are closed under their type (§7.2, `UNRECOGNIZED_FIELD` — the same line polices
 schema authoring through the meta's compiled reader); repeated fields/map keys are errors (§2.5/§2.6) with
 last-value-wins recovery underneath; map-key identity is the decoded host value, type-ref and annotations
-stripped (§2.6); a written `_` at `REQUIRED_DEFAULT` is an error where omission injects silently; `{}` is
+stripped (§2.6); a written `_` at an `OPTIONAL` field is §2.9's *present with an absent value* and tree mode
+keeps it (`TsonAbsent` against a missing field), where bind mode collapses both to `null` for want of a third
+state — `RecordAbstractReader.statedAbsentValue` is the per-mode answer; a written `_` at `REQUIRED_DEFAULT`
+is an error where omission injects silently; `{}` is
 the empty container of the position's own type (§2.8), so a zero-entry map faces `min_items` like any
 other value; and a reader names itself in a message by what the author wrote, never by a
 content-derived entry name — `EntryDisplayName` renders a minted entry as the sugar or application that

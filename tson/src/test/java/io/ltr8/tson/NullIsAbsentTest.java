@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -84,6 +85,46 @@ class NullIsAbsentTest {
         TsonValue node = tson().treeReader().read("{ a: null }");
 
         assertEquals("{ a: _ }", new TsonTreeWriter().toTson(node));
+    }
+
+    // ── Under a schema: a field written `_` is present, and one never written is not ──
+
+    /**
+     * <b>[TSON-DATA] §2.9's distinction, kept by the tree.</b> "A field or entry set to {@code _} is present
+     * with an absent value — distinct from not appearing at all." Both readings used to produce a tree with
+     * no {@code nickname} at all, so a document that said something about the field and one that said nothing
+     * read alike — the record being the one container of the four that dropped it, where an array element and
+     * a tuple slot already kept it.
+     *
+     * <p>{@code get} answers the two apart without throwing, which is the whole of the tree model's
+     * navigation contract: a written {@code _} is a {@code TsonAbsent} that is present, and a field never
+     * written is a {@code TsonMissing} carrying the pointer of the step that failed.
+     *
+     * <p><b>Bind mode still collapses them</b>, and deliberately: a Java component has no third state between
+     * "set to nothing" and "never set", so both readings arrive as {@code null}. That is a limit of the
+     * target rather than a reading of §2.9 -- {@code RecordBindReader.statedAbsentValue} says so -- and it is
+     * why the tree's answer is a subclass's rather than one shared between them.
+     */
+    @Test
+    void underASchemaAFieldWrittenAbsentIsPresentAndOneNeverWrittenIsNot() {
+        TsonValue written = readPerson("nickname: _");
+        TsonValue omitted = readPerson("");
+
+        assertTrue(written.get("nickname").isAbsent(),
+                () -> "written '_': present with an absent value -- " + written);
+        assertTrue(omitted.get("nickname").isMissing(),
+                () -> "never written: not there at all -- " + omitted);
+        assertFalse(written.get("nickname").isMissing(), written::toString);
+    }
+
+    /** And it survives the round trip, which is what makes the distinction usable rather than merely read. */
+    @Test
+    void underASchemaAFieldWrittenAbsentWritesBackAsTheSentinel() {
+        String rewritten = new TsonTreeWriter().toTson(readPerson("nickname: _"));
+
+        assertTrue(rewritten.contains("nickname: _"), rewritten);
+        assertFalse(new TsonTreeWriter().toTson(readPerson("")).contains("nickname"),
+                "and a field never written stays out of the output");
     }
 
     // ── Under a schema: §7.3, the position's own type decides ──
