@@ -322,32 +322,60 @@ class LexerTest {
 
     @Test
     void allSingleCharEscapes() {
-        String source = "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t \\s\"";
-        String expected = "\" \\ / \b \f \n \r \t  "; // trailing \s decodes to a literal space
+        String source = "\"\\\" \\\\ \\b \\f \\n \\r \\t \\s\"";
+        String expected = "\" \\ \b \f \n \r \t  "; // trailing \s decodes to a literal space
         assertToken(tokens(source).get(0), TokenType.SINGLE_LINE_STRING, expected);
+    }
+
+    /** A solidus needs no escaping, so it has no escape: the sequence is invalid, not a synonym for {@code /}. */
+    @Test
+    void solidusEscapeIsLexError() {
+        assertThrows(LexException.class, () -> lex("\"\\/\""));
+        assertToken(tokens("\"a/b\"").get(0), TokenType.SINGLE_LINE_STRING, "a/b");
     }
 
     @Test
     void unicodeEscapeBmp() {
         assertToken(tokens("\"\\u0041\"").get(0), TokenType.SINGLE_LINE_STRING, "A");
+        assertToken(tokens("\"\\u{41}\"").get(0), TokenType.SINGLE_LINE_STRING, "A");
     }
 
+    /**
+     * The braced form is the only way to name a supplementary character, and the reason both forms exist: four
+     * hex digits cannot reach past the BMP, and pairing two escapes to get there is what brought the three
+     * surrogate rules with it.
+     */
     @Test
-    void unicodeEscapeSurrogatePair() {
-        // U+1F600 GRINNING FACE, encoded as a UTF-16 surrogate pair escape.
-        Token t = tokens("\"\\uD83D\\uDE00\"").get(0);
+    void unicodeEscapeSupplementary() {
+        Token t = tokens("\"\\u{1F600}\"").get(0);       // U+1F600 GRINNING FACE
         assertEquals(TokenType.SINGLE_LINE_STRING, t.type());
         assertEquals(0x1F600, t.text().codePointAt(0));
+        assertEquals(1, t.text().codePointCount(0, t.text().length()));
+
+        // Plane 14: the invisible characters a document has reason to write visibly rather than embed.
+        assertEquals(0xE0100, tokens("\"\\u{E0100}\"").get(0).text().codePointAt(0));
     }
 
+    /**
+     * One rule covers both forms: the value denoted must be a Unicode scalar value. So a surrogate is refused
+     * however it is spelled, and there is nothing left to pair -- an escape names a character or it names
+     * nothing.
+     */
     @Test
-    void loneHighSurrogateEscapeIsLexError() {
+    void aSurrogateEscapeIsALexErrorInEitherForm() {
         assertThrows(LexException.class, () -> lex("\"\\uD800\""));
+        assertThrows(LexException.class, () -> lex("\"\\uDC00\""));
+        assertThrows(LexException.class, () -> lex("\"\\u{D800}\""));
+        assertThrows(LexException.class, () -> lex("\"\\uD83D\\uDE00\""));   // the pair spelling, no longer a pair
     }
 
     @Test
-    void loneLowSurrogateEscapeIsLexError() {
-        assertThrows(LexException.class, () -> lex("\"\\uDC00\""));
+    void malformedBracedUnicodeEscapeIsLexError() {
+        assertThrows(LexException.class, () -> lex("\"\\u{}\""));            // no digits
+        assertThrows(LexException.class, () -> lex("\"\\u{41\""));           // unterminated
+        assertThrows(LexException.class, () -> lex("\"\\u{1234567}\""));     // more than six digits
+        assertThrows(LexException.class, () -> lex("\"\\u{110000}\""));      // above U+10FFFF
+        assertThrows(LexException.class, () -> lex("\"\\u{4G}\""));          // not hex
     }
 
     @Test

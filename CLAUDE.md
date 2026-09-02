@@ -60,8 +60,9 @@ those entries state what is *running* rather than what is *proposed* — the bra
 to `main` when the spec lands and not before: `main` is the reference implementation of the published
 revision, and merging a divergence early costs it the one signal it exists to give. The sibling corpus has a
 branch of the same name and moves with this one, `SUITE_PIN` following it. Landed here so far: **#7, `null`
-removed from the notation.** §1.3's Part 1 freeze is a claim about the published revision, which `main` keeps;
-it does not hold on this branch.
+removed from the notation**, and **#8, the JSON-superset claim and the rules that existed only for it**.
+§1.3's Part 1 freeze is a claim about the published revision, which `main` keeps; it does not hold on this
+branch, and #8's escape-table change is the first thing to rely on that.
 
 **Status:** Part 2's grammar, resolution, linking, and Class 2 compilation
 all work: the three bundled schemas resolve/register/compile in full, user schemas governed by them
@@ -275,9 +276,10 @@ note named at the head of each.
 
 ### Lexer (`tson-compiler/.../lexer/`) — `docs/lexer-and-data-parsing.md`
 
-`Lexer` is a single hand-written scanner producing `Token`s off `nextToken()` (never a batch), **complete
-and frozen for the whole series** (§1.3). Constructed from an `InputStream` whose **UTF-8 it decodes
-itself** (§9.1), code-point
+`Lexer` is a single hand-written scanner producing `Token`s off `nextToken()` (never a batch) — **frozen for
+the whole series on `main`** (§1.3), and reopened on this branch by #8's escape-table change, which principle 7
+permits and which wants doing before anything is published against the frozen claim. Constructed from an
+`InputStream` whose **UTF-8 it decodes itself** (§9.1), code-point
 addressed (never char-addressed), with `Position` tracking line / code-point column / UTF-8 byte offset —
 counted from the input rather than re-derived from the decoded character, and malformed UTF-8 is a
 `LexException` rather than a U+FFFD substitution (§7.1: a decoder MUST NOT substitute). NFC normalization
@@ -287,6 +289,12 @@ applies to *unquoted* tokens only; Pattern_White_Space is the spec's fixed 11-ch
 refused where it stands inside a token rather than at a boundary — §7.2 rule 1 folds them into horizontal
 space would be what let `[1<LRM>2]` read as two elements, which is why §7.2 rule 1 sorts them apart and
 §9.5 rests on it.
+**The escape table is `\" \\ \b \f \n \r \t \s` plus two `\u` forms, and one rule covers both**: `\uXXXX` and
+`\u{1*6HEXDIG}` are two spellings of one number, checked by asking whether the value denoted is a Unicode scalar
+value — so a surrogate is refused either way and there is nothing to pair, which is the whole of what UTF-16
+pairing's three MUST clauses used to do. The braced form is what makes the one rule sufficient (four hex digits
+cannot reach past the BMP, and plane 14's invisible characters are the ones worth writing visibly). **There is
+no `\/`**, and a leading BOM is still stripped on §7.1's own authority rather than as a debt to another format.
 §7.1's UAX #31 profile is implemented exactly, not approximated: the JDK's identifier predicates are
 `ID_*` unioned with the identifier-ignorable set (all `Cf`, plus non-whitespace controls), so `Lexer`
 subtracts that set and two literal `ID_ \ XID_` tables — verified zero-over/zero-under against Unicode
@@ -308,7 +316,8 @@ layers. **A name is the one exception, and §7.6 is the precedent**: `type-ref =
 `IdentifierParser` the way a number's text is matched against the number grammar — a production that is no
 part of the token-stream grammar, over a token the lexer has already produced. `field-name` stays lexical
 (`unquoted-token / single-line-token`, where a map key keeps all three forms), the identifier contract being
-stated once on declarations so Class 1 data keeps JSON compatibility and conforms by construction.
+stated once on declarations, with data conforming by construction — whether it should stay lexical now that no
+JSON object has to parse as a record is `SPEC-FEEDBACK.md` #9's question.
 `!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException` (a
 schema document is unsupported, not malformed).
 

@@ -42,6 +42,16 @@ tokens, modes, or character-classification changes).
   token's lines are checked individually (`decodeAllEscapes` returns its argument when it finds none), since
   one token may hold both kinds of line. Halves the per-character cost of lexing a long quoted token
   (10.5 → 5.8 bytes per character of input, which `AllocationHarnessTest` pins).
+- **The escape table is `\" \\ \b \f \n \r \t \s` plus two `\u` forms, and one rule covers both of those.**
+  `\uXXXX` and `\u{1*6HEXDIG}` are two spellings of one number, checked by asking whether the value denoted is a
+  **Unicode scalar value** — so a surrogate is refused in either form and there is nothing to pair. That single
+  rule replaces the three MUST clauses UTF-16 pairing needed, and the braced form is what makes it sufficient:
+  four hex digits cannot reach past the BMP, so without it the format would either keep the pairing rules or lose
+  the ability to escape a supplementary character at all — which costs something real, plane 14 holding the
+  variation selectors and tag characters a document has reason to write visibly rather than embed invisibly.
+  **There is no `\/`**: a solidus needs no escaping anywhere in the format, and the reason it was admitted (a JSON
+  document parsing unchanged) is a claim the format no longer makes. A **leading BOM** is still stripped, on
+  §7.1's own authority as an encoding courtesy rather than a debt to another format.
 - **`Token` is a flat record of six raw `int` coordinates plus type/text**, not nested `Position` objects,
   to keep allocation off the high-throughput read path; `start()`/`end()` materialize a `Position` on
   demand.
@@ -93,7 +103,8 @@ tokens, modes, or character-classification changes).
   character (a tab never matches a space). **Closing-delimiter detection checks the line content *after*
   removing leading whitespace against `"""`** — getting this backwards makes every multi-line token
   spuriously "unterminated"; this bug happened once and is guarded by `LexerTest`.
-- When embedding BOM/NEL/LINE SEPARATOR/PARAGRAPH SEPARATOR in tests or source, use `\uXXXX` escapes — the
+- When embedding BOM/NEL/LINE SEPARATOR/PARAGRAPH SEPARATOR in tests or source, use `\uXXXX` escapes (and
+  `\u{...}` past the BMP) — the
   literal invisible character is an editing hazard and exactly the confusable-character risk §9.4 warns
   about.
 - Errors are **fail-fast** (`LexException`, unchecked), not the spec's "SHOULD continue to report multiple

@@ -229,6 +229,12 @@ Concrete items and decisions:
 
 ### JSON compatibility
 
+**This section is now the whole of it.** The notation no longer claims to be a JSON superset — §6 and
+principle 5 go with `SPEC-FEEDBACK.md` #8 — so reading JSON is a reader's job rather than a property of the
+grammar, which is what the items below already assumed. Nothing here weakens; what changes is that a
+`TsonJsonParser` is the only place JSON compatibility lives, and it is free to map JSON's constructs rather
+than having to agree with TSON's by construction.
+
 Worth calling out as arguably the **most immediately practical** path to Tier 1, not just a nice
 interop feature: most LLM APIs' own "JSON mode"/"structured output"/tool-use features (OpenAI,
 Anthropic, Gemini) constrain generation to plain JSON today, not to an arbitrary custom format —

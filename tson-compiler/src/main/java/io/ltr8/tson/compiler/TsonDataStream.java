@@ -428,9 +428,10 @@ public final class TsonDataStream implements TsonEventSource {
     /**
      * {@code field-name = unquoted-token / single-line-token} (§7.4). Narrower than {@link #isBareTokenType},
      * which stays the map-key shape: a key is a value (§2.6) and takes all three forms, where a name takes the
-     * two a name is ever written in. The production stays <em>lexical</em> on purpose -- a quoted field name is
-     * ordinary, so a Class 1 document keeps JSON compatibility and the identifier contract is stated once, on
-     * declarations, with data conforming by construction.
+     * two a name is ever written in. The production stays <em>lexical</em> because §7.4 writes it that way: a
+     * quoted field name is ordinary, and the identifier contract is stated once, on declarations, with data
+     * conforming by construction. Whether it should stay lexical now that no JSON object has to parse as a
+     * record is {@code SPEC-FEEDBACK.md} #9's question, not this class's.
      */
     private static boolean isFieldNameTokenType(TokenType type) {
         return type == TokenType.UNQUOTED || type == TokenType.SINGLE_LINE_STRING;
