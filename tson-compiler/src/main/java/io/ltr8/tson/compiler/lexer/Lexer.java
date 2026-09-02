@@ -114,7 +114,9 @@ public final class Lexer {
 
     /**
      * A single leading BOM is discarded invisibly -- not counted toward {@link #line}/{@link #col}/{@link
-     * #byteOffset}, matching §7.1. A BOM anywhere else outside a quoted token is "an unrecognised character
+     * #byteOffset}, matching §7.1. Accepting one is an encoding courtesy on §7.1's own authority and not a
+     * debt to any other format: editors still emit it, and a document that opens with one is otherwise
+     * well-formed UTF-8. A BOM anywhere else outside a quoted token is "an unrecognised character
      * and a lexer error": between tokens it reaches the dispatch's own fallthrough, and <em>inside</em> an
      * unquoted token {@link #isProfileContinue} refuses it, which is not free -- the JDK identifier predicate
      * admits it, and did until issue #229.
@@ -604,7 +606,14 @@ public final class Lexer {
         return sb.toString();
     }
 
-    /** Decodes one escape sequence starting at {@code text.charAt(i) == '\\'}. Returns the index after it. */
+    /**
+     * Decodes one escape sequence starting at {@code text.charAt(i) == '\\'}. Returns the index after it.
+     *
+     * <p>The table is {@code \" \\ \b \f \n \r \t \s} plus the two <code>&#92;u</code> forms
+     * ({@link #decodeUnicodeEscape}). <b>There is no {@code \/}</b>: a solidus needs no escaping anywhere in
+     * the format, and the one reason it was ever admitted -- a JSON document had to parse unchanged -- is a
+     * claim the format no longer makes.
+     */
     private int decodeEscapeSequence(String text, int i, StringBuilder sb) {
         int n = text.length();
         i++; // skip backslash
@@ -618,9 +627,6 @@ public final class Lexer {
                 return i + 1;
             case '\\':
                 sb.append('\\');
-                return i + 1;
-            case '/':
-                sb.append('/');
                 return i + 1;
             case 'b':
                 sb.append('\b');
@@ -647,27 +653,54 @@ public final class Lexer {
         }
     }
 
+    /**
+     * <code>&#92;u ( 4HEXDIG / "{" 1*6HEXDIG "}" )</code> (§7.2.2) -- two spellings of one number, checked by one
+     * rule: <b>the value denoted must be a Unicode scalar value</b>. So a surrogate code point is refused in
+     * either form, and there is nothing to pair: an escape names a character or it names nothing.
+     *
+     * <p>The braced form is what makes that one rule sufficient. Four hex digits cannot reach past the BMP,
+     * so a format offering only them must either borrow UTF-16's pairing (three rules about how two escapes
+     * combine, and the ill-formed halves each can be) or give up escaping a supplementary character at all --
+     * which is the one that costs something real, plane 14 holding the variation selectors and tag characters
+     * a document has every reason to write visibly rather than embed invisibly.
+     */
     private int decodeUnicodeEscape(String text, int idx, StringBuilder sb) {
-        int[] r1 = readHex4(text, idx);
-        int cu = r1[0];
-        int next = r1[1];
-        if (Character.isHighSurrogate((char) cu)) {
-            if (next + 1 < text.length() && text.charAt(next) == '\\' && text.charAt(next + 1) == 'u') {
-                int[] r2 = readHex4(text, next + 2);
-                int cu2 = r2[0];
-                if (!Character.isLowSurrogate((char) cu2)) {
-                    throw errorAtTokenStart("high surrogate escape not followed by a low surrogate escape");
-                }
-                sb.append((char) cu).append((char) cu2);
-                return r2[1];
+        int[] parsed = text.startsWith("{", idx) ? readHexBraced(text, idx + 1) : readHex4(text, idx);
+        int value = parsed[0];
+        if (value >= Character.MIN_SURROGATE && value <= Character.MAX_SURROGATE) {
+            throw errorAtTokenStart(
+                    "U+%04X is a surrogate code point, which is not a Unicode scalar value".formatted(value));
+        }
+        sb.appendCodePoint(value);
+        return parsed[1];
+    }
+
+    /** {@code 1*6HEXDIG "}"} -- at most six digits because U+10FFFF is six, and the value must be in range. */
+    private int[] readHexBraced(String text, int idx) {
+        int value = 0;
+        int digits = 0;
+        int i = idx;
+        while (i < text.length() && text.charAt(i) != '}') {
+            int digit = Character.digit(text.charAt(i), 16);
+            if (digit < 0) {
+                throw errorAtTokenStart("invalid hex digit in unicode escape");
             }
-            throw errorAtTokenStart("high surrogate escape not followed by a low surrogate escape");
+            if (++digits > 6) {
+                throw errorAtTokenStart("unicode escape has more than six hex digits");
+            }
+            value = (value << 4) | digit;
+            i++;
         }
-        if (Character.isLowSurrogate((char) cu)) {
-            throw errorAtTokenStart("lone low surrogate escape");
+        if (i >= text.length()) {
+            throw errorAtTokenStart("unterminated unicode escape: no closing '}'");
         }
-        sb.append((char) cu);
-        return next;
+        if (digits == 0) {
+            throw errorAtTokenStart("unicode escape has no hex digits");
+        }
+        if (value > Character.MAX_CODE_POINT) {
+            throw errorAtTokenStart("unicode escape is above the maximum code point U+10FFFF");
+        }
+        return new int[]{value, i + 1};
     }
 
     private int[] readHex4(String text, int idx) {

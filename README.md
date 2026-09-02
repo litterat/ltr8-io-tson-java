@@ -2,8 +2,8 @@
 
 A Java implementation of [TSON](https://tson.io) (Typed Schema Object Notation) — a schema system with immutable, hash-pinned
 schemas whose definitions are themselves data. A document names its schema, the schema names its meta-schema;
-one hash verifies the whole chain. The finishing touch, TSON's data format is a Unicode-first superset of JSON
-you'll actually enjoy writing.
+one hash verifies the whole chain. The finishing touch, TSON's data format is a Unicode-first notation you'll
+actually enjoy writing — JSON-like in shape, and not a superset of it.
 
 > **Status:** first implementation of TSON, built against a working-draft spec (2026
 > revision 34). Part 1 (data format) and most of Part 2 (schema layer) are implemented; the

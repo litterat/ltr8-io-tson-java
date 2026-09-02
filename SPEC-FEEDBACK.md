@@ -444,25 +444,64 @@ Item 2 is the one that touches the lexer, which §1.3 declares "complete and fro
 7 says a 2026-series revision "may change anything", so it is permitted — but it wants doing in the same revision
 as #7, before anything is published against the frozen claim.
 
-**Interpretation chosen:** Revision 34 as written, in full. `Lexer` decodes `\/`, `\b`, `\f`, `\s` and `\uXXXX`,
-pairs surrogate escapes and refuses an unpaired one ("high surrogate escape not followed by a low surrogate
-escape"), and discards a single leading U+FEFF without counting it toward any position. `TsonDataStream` accepts
-commas and quoted field names as §2.4 and §2.5 admit them. Nothing here is built ahead of the spec.
+**Interpretation chosen — and built.** This implementation has removed the superset claim and the four rules
+that carried it, and the description below is of running code. `Lexer` no longer decodes `\/`; `\b`, `\f` and
+`\s` stay; and the two `\u` forms are checked by one rule. A leading BOM is still discarded, now on §7.1's own
+authority. §6 exception 1 needs nothing here — the lexer always implemented §7.2.2's rule, the exception being
+prose about why TSON differs from RFC 8259 rather than a behaviour.
 
-**Suggested resolution:** delete §6 and principle 5. Replace the JSON note under [TSON-SCHEMA] §9 with a statement
-of scope: a JSON document is read through a JSON reader, which maps JSON `null` to absence and JSON numbers to
-`number`, and is not a TSON document. Then take items 1–3 as written, restate item 4 under §7.1 on its own
-authority, and decide item 5 with the table in front of you. **What is JSON-shaped and should stay**, so that the
-removal is not read as a mandate to look different: `"`-delimited strings; `[ ]` arrays; `{ name: value }` records;
-the `\n \r \t \\ \"` escapes; base type resolution as a mechanism — Class 1 is a real mode (configuration, ad hoc
-data) and only `null` was an accommodation; the `number` exact type and the rule that an unadorned numeric token
-names it; and, on the implementation side, RFC 6901 pointers and JSON Schema 2020-12's output shape in diagnostics,
-which are tooling interoperability and no part of the notation. The notation is JSON-*like* by design; what goes is
-the claim to be a JSON *superset*, and the rules that only that claim required.
+**Item 2, as built: both escape forms, one rule.** `\uXXXX` stays and is restricted to non-surrogate scalars;
+`\u{1*6HEXDIG}` is added. They are two spellings of one number, and the check is the same for both — *the value
+denoted must be a Unicode scalar value*. All three surrogate MUST clauses and every line of pairing logic are
+gone: an escape names a character or it names nothing, and a document spelling an emoji as a surrogate pair now
+gets two errors rather than one character.
 
-**Status against Revision 34:** open, and new against this revision — consequent on #7, and a proposal rather than
-an ambiguity. Entries #9–#13 are the design choices JSON shaped that are worth a decision of their own once the
-superset claim is gone; each is recorded separately because each can be answered separately.
+The choice between adding the braced form and merely restricting the four-digit one is worth recording, because
+minimality argues for the second and this implementation took the first. **Both delete the pairing rules**, so
+this entry's own complaint cannot decide between them. What separates them is that restricting `\uXXXX` alone
+*removes a capability Revision 34 has*: with no braced form and no pairs there is no way to escape a
+supplementary character at all, only to embed the literal one. The concrete cost is plane 14 — the variation
+selectors (U+E0100–U+E01EF) and tag characters (U+E0020–U+E007F) are invisible, legitimate document content,
+and a four-hex-only format can express them only by embedding the invisible character. An ASCII-safe generator
+loses the same ability, which pairs give it today.
+
+**The braced form costs a production and no rule**, which is the shape worth putting to a reviewer: Revision 34
+has one spelling plus three MUST clauses about how two escapes combine, and this has two spellings and one
+predicate. The grammar gets simpler while gaining a form. There is no ambiguity — the `{` decides at the first
+character after `u`. And two spellings of one scalar is not #7 in miniature: `null` and `_` had different
+resolution paths and were answerable differently by a schema, where `\u0041` and `\u{41}` decode to the identical
+scalar and nothing above the lexer can tell them apart — the relationship §4.3 already requires between `255`
+and `0xFF`.
+
+**Suggested resolution:** delete §6 and principle 5. Replace the JSON note under [TSON-SCHEMA] §9 with a
+statement of scope: a JSON document is read through a JSON reader, which maps JSON `null` to absence and JSON
+numbers to `number`, and is not a TSON document. Then:
+
+- **Item 1**: delete `\/` from §7.2.2's table.
+- **Item 2**: state the escape as `"\u" ( 4HEXDIG / "{" 1*6HEXDIG "}" )` with one constraint — the value denoted
+  is a Unicode scalar value. §7.2.2's three surrogate MUST clauses and §6's second exception go with it.
+  "TSON strings are well-formed Unicode scalar sequences" stops being a rule a lexer enforces and becomes a
+  property the grammar cannot violate.
+- **Item 3**: fold §6 exception 1 into §7.2.2, where it is the rule and not an exception.
+- **Item 4**: restate BOM acceptance under §7.1 as an encoding courtesy on its own authority. RFC 8259 §8.1,
+  where the posture comes from, has it as a MAY.
+- **Item 5**: `\b` and `\f` stay. Dropping them is one more thing an existing document can trip over for no
+  benefit, and the table was reviewed as a whole to say so.
+
+**What is JSON-shaped and should stay**, so the removal is not read as a mandate to look different:
+`"`-delimited strings; `[ ]` arrays; `{ name: value }` records; the `\n \r \t \\ \"` escapes; base type
+resolution as a mechanism — Class 1 is a real mode (configuration, ad hoc data) and only `null` was an
+accommodation; the `number` exact type and the rule that an unadorned numeric token names it; and, on the
+implementation side, RFC 6901 pointers and JSON Schema 2020-12's output shape in diagnostics, which are tooling
+interoperability and no part of the notation. The notation is JSON-*like* by design; what goes is the claim to
+be a JSON *superset*, and the rules that only that claim required.
+
+**Status against Revision 34:** open, and new against this revision — consequent on #7, and one this
+implementation has now built and is running, on the `r2026-35-proposal` branch. It is the first change to rely
+on principle 7 against §1.3's lexer freeze, which is why it wanted doing in the same revision as #7 rather than
+after something is published against the frozen claim. Entries #9–#13 are the design choices JSON shaped that
+are worth a decision of their own once the superset claim is gone; each is recorded separately because each can
+be answered separately.
 
 ---
 
