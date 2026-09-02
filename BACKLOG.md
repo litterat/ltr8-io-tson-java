@@ -56,34 +56,28 @@ own prose (which had gone stale on at least one of them):
   `'ts' requires unique elements`. The fix is a value-equality contract for the atom rather than a
   `byte[]` comparison at each call site, since the same contract decides a `FIXED` value check and a map
   key; and it has to answer the case-and-spelling question with it — `"abcd"` and `"ABCD"` are one octet
-  string, and `base64`/`base64url`/`base32`/`hex` are four instances of one `binary` constructor over one
-  value space. What the spec owes here is `SPEC-FEEDBACK.md` #28; the comparison being absent entirely is
+  string, and `base64`/`base64url`/`base32`/`hex` are four refinements of `bytes` over one value space,
+  differing only in a lexical selector. What the spec owes here is `SPEC-FEEDBACK.md` #28; the comparison being absent entirely is
   this implementation's own.
 
-- [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
-  `ErrorReader`), pinned down exactly by
-  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom
-  grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
-  the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
-  question about where that dispatch lives.
-- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the item above, and a different kind of gap
-  again. `Extern` (`schema.meta`) is a record-only placeholder with no
-  parsing/validation behavior at all (its own Javadoc says so explicitly: "not to add real
-  cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
-  carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope
-  mid-document — doesn't exist anywhere in the reader stack.
+- [ ] **`scoped` has no reader, so core's `declared`/`extern`/`dynamic` compile to `ErrorReader`**
+  ([TSON-SCHEMA] §7.8), pinned by `CoreSchemaImportTest.exactlyTheScopedInstancesCompileToAnErrorReader`.
+  Not an unwritten atom grammar and not three gaps: one piece of machinery every scoped instance shares —
+  a reader over the `SchemaRef` event `TsonDataStream` already emits at every position [TSON-DATA] §2.3
+  admits one. The value names its own type; the instance's `scope` says which namespaces that name may
+  resolve in, and `schemas` narrows the foreign ones. For an `EXTERN` value that is §7.8's scope push as
+  written — load through the ordinary loader, push, resolve the `!type` in it, validate in full, pop — so a
+  schema nothing would supply stays one of the five `SCHEMA_*` codes rather than becoming a verdict. The
+  grammar half is done; the read half is the work.
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
-  (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
+  (issue #50) now rejects an atom body whose own facets admit nothing, but two gaps are left, each
   matching that family's existing *narrowing* gap and each blocked on the same thing — `tson-schema` has no
   dependency on a parser for the values involved:
-    - `duration_type`'s bounds are unparsed ISO 8601 text. `"P1M"` vs `"P30D"` does not order lexically, so
-      judging them as strings would call a coherent body empty. Needs `DurationParser`/`IsoDuration`, which
-      live in `tson-compiler`.
     - `pattern` emptiness — a regex matching no string at all, or none of a permitted length. Needs
       `tson-regex`, the same boundary the narrowing check's containment gap sits behind.
     - CIDR `within`/`excluding` admitting no network between them. Needs real containment arithmetic; the
       family has no CIDR parser.
-    - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
+    - The natural fix for both is the same one the narrowing check would want: an injected oracle, rather
       than moving the value model's dependencies.
 
 ## Write side
@@ -100,8 +94,8 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
-  — the fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
-  renders none of them, so the entries would compare equal for the wrong reason;
+  — the fixtures carry `@synthetic` on the keys the resolver minted and `@doc` on many more, and the bound
+  side renders none of them, so the entries would compare equal for the wrong reason;
   `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
   test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
   only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers
@@ -142,15 +136,3 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   derivation, the way `withTokenPolicy` already is. A document past the limit must be refused with a
   diagnostic carrying a position, never a host `Error`. The numeric-literal length limit named in
   `CLAUDE.md`'s "Not yet implemented" is the fourth limit of the same section and comes with it.
-
-## Revision 35 proposal (`r2026-35-proposal` branch only)
-
-- [ ] **Re-stamp the three bundled schemas for the notation changes this branch makes.** `spec/m/meta-kernel.tn`
-  documents `value`'s own inhabitants as "null, boolean, integer, float, string" and `void`'s prose names `null` as
-  an accepted spelling; both are false once `null` leaves the notation. The edit is prose inside a published
-  artifact, so it carries the whole re-stamp: `tson hash` bottom-up (kernel, then meta, then core), the matching
-  `*-resolved.tn` fixture entries, and the published digests in `TsonBundledSchemas`, `InitCommand` and
-  `README.md`. **Blocked on the spec revision publishing the new artifacts** — stamping ahead of it mints digests
-  for documents nobody has published, where Revision 34's are the ones `main` must go on serving. Until then this
-  branch leaves all three untouched, and the divergence is behavioural (`ValueParser`, `VoidReader`) rather than
-  declared.
