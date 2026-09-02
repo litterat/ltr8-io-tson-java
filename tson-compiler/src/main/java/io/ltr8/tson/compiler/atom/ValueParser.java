@@ -14,11 +14,13 @@ import java.math.BigInteger;
  * the "escape hatch primitive": per its own kernel doc, "the result of base type resolution
  * ([TSON-DATA] §4) applied to a source token, with no further interpretation... the host runtime is
  * responsible for type-checking values at use site." Unlike {@link IdentifierParser} (raw lexical text,
- * unconstrained) this actually runs {@link BaseTypeResolver} -- null/boolean/number/string, §4.5's
+ * unconstrained) this actually runs {@link BaseTypeResolver} -- boolean/number/string, §4.5's
  * fixed order -- and narrows the result to the natural Java host type each {@link BaseValue}
- * variant implies: {@code null}, {@link Boolean}, {@link BigInteger}/{@link BigDecimal} (or {@link
- * Double} for the two special numeric forms, {@code .nan}/{@code .inf}, which have no exact
- * intermediate), or {@link String}. No caller-specified target -- {@code value} is declared to have
+ * variant implies: {@link Boolean}, {@link BigInteger}/{@link BigDecimal} (or {@link Double} for the
+ * two special numeric forms, {@code .nan}/{@code .inf}, which have no exact intermediate), or
+ * {@link String}. <b>None of them is {@code null}</b>: §4 resolves three classes and absence is not
+ * one of them, so a {@code value}-typed position holding {@code _} is an absent position rather than a
+ * value this parser ever reads or writes. No caller-specified target -- {@code value} is declared to have
  * no constraint vocabulary and is explicitly "not narrowable" (its own kernel doc), so there is only
  * ever the one, natural representation.
  *
@@ -42,7 +44,8 @@ public final class ValueParser implements AtomType<Object> {
 
     private static Object narrow(BaseValue value) {
         return switch (value) {
-            case BaseValue.NullValue ignored -> null;
+            // Unreachable: BaseTypeResolver resolves a token, and no token is the absent sentinel.
+            case BaseValue.AbsentValue ignored -> throw new IllegalStateException("base resolution produced absence");
             case BaseValue.BooleanValue b -> b.value();
             case BaseValue.StringValue s -> s.text();
             case BaseValue.NumberValue n -> narrowNumber(n.form());
@@ -70,7 +73,8 @@ public final class ValueParser implements AtomType<Object> {
     @Override
     public String write(Object value) {
         return switch (value) {
-            case null -> "null";
+            // `value` has no null inhabitant to write: absence is `_`, and an emitter writes it as absence.
+            case null -> throw new IllegalArgumentException("the absent sentinel is not a 'value'; emit '_' instead");
             case Boolean b -> b.toString();
             case Double d when d.isNaN() -> ".nan";
             case Double d when d == Double.POSITIVE_INFINITY -> ".inf";

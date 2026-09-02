@@ -86,7 +86,7 @@ import java.util.Set;
  * answers to {@code tags} -- and {@link #preserving} is the way to ask for it anyway.
  *
  * <p>With no type-ref, binding falls through to plain untyped resolution: {@link BaseTypeResolver} (which
- * of null/boolean/number/string) then {@link AtomBinder} (that shape into whatever concrete Java type the
+ * of boolean/number/string) then {@link AtomBinder} (that shape into whatever concrete Java type the
  * target field declares). Both paths share the same final narrowing step ({@code NumberNarrowing}), so a
  * plain {@code 42} and a {@code !uint8 42} bind identically regardless of which path found them.
  *
@@ -228,7 +228,7 @@ public final class SchemalessObjectReader {
         TsonEvent e = ctx.peek();
         if (e instanceof AbsentEvent) {
             ctx.next();
-            return bindBaseValue(ctx, new BaseValue.NullValue(), dataClass.dataClass());
+            return bindBaseValue(ctx, new BaseValue.AbsentValue(), dataClass.dataClass());
         }
         if (!(e instanceof TokenEvent token)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),

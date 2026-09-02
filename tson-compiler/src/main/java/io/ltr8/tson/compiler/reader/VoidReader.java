@@ -4,9 +4,7 @@ import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
 
@@ -20,14 +18,11 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
  * <p>Reads to plain Java {@code null} -- "the host value is absent" has no more specific natural
  * representation.
  *
- * <p><b>The unquoted token {@code null} is accepted as an equivalent spelling of {@code _}</b> and
- * normalized to absence, which is [TSON-SCHEMA] §7.3's one concession to {@code null} under a schema. It is
- * local to this contract and deliberately so: {@code void} has a single inhabitant, so no
- * absence-vs-value distinction is lost, and §7.3 is explicit that this "does not change {@code null}'s
- * meaning elsewhere". Every other position hands the token to its own declared atom, where {@code null} is
- * ordinary text. This is also what makes JSON-shaped data readable under a schema: a JSON {@code null} at a
- * {@code void} position is absence, and anywhere else it must satisfy the declared type. Anything else is
- * rejected outright.
+ * <p><b>{@code _} is the only spelling accepted</b>, the unquoted token {@code null} included: absence has
+ * one spelling in the notation, so there is no second one for this contract to admit. The token {@code null}
+ * is ordinary text here as it is at every other position, and fails this reader the way {@code frobnicate}
+ * does. A JSON document's {@code null} reaches absence through a JSON reader, which maps it in the model,
+ * where the position's own state decides whether absence is admitted at all.
  */
 final class VoidReader implements TsonTypeReader<Object> {
 
@@ -42,7 +37,7 @@ final class VoidReader implements TsonTypeReader<Object> {
         ctx = ctx.underDeclaration(schemaLocation);
         EventSkip.annotationsAndTypeRef(ctx);
         TsonEvent e = ctx.peek();
-        if (!(e instanceof AbsentEvent) && !isNullSpelling(e)) {
+        if (!(e instanceof AbsentEvent)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected the absent sentinel '_' for void, found " + TypeRefCheck.describe(e),
                     "the absent sentinel '_'", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
@@ -50,14 +45,5 @@ final class VoidReader implements TsonTypeReader<Object> {
         }
         ctx.next();
         return null;
-    }
-
-    /**
-     * §7.3's concession: the <em>unquoted</em> token {@code null}, and only that. A quoted {@code "null"} is
-     * a string by [TSON-DATA] §4.4 and stays one here -- the concession is about the spelling of absence,
-     * not about any token whose text happens to read that way.
-     */
-    private static boolean isNullSpelling(TsonEvent e) {
-        return e instanceof TokenEvent token && token.form() == TokenForm.UNQUOTED && token.text().equals("null");
     }
 }

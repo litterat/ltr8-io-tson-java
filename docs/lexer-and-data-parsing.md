@@ -124,7 +124,7 @@ Key points:
 - **Layering is deliberately incomplete, matching §1.2's division of labor.** Neither tier deduplicates
   record fields or map keys ("last value wins" is a resolver rule, §2.5/§2.6), NFC-normalizes field names,
   rejects `_` as a map key (§2.9), resolves `EmptyBrace` to a record/typed container (§2.8), or interprets
-  `TokenValue` text as null/boolean/number/string (base type resolution, below). These are intentional
+  `TokenValue` text as boolean/number/string (base type resolution, below). These are intentional
   gaps, not omissions.
 - **§3.2's three type-expression forms are refused by name, not by the separation rule.** Array brackets,
   type arguments and the `?` suffix "exist only within the [TSON-SCHEMA] type-definition grammar, and their
@@ -159,7 +159,7 @@ Key points:
 
 ## Base type resolution (`tson-compiler/.../base/`)
 
-`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (null → boolean → number → string,
+`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (boolean → number → string,
 §4.5) for untyped tokens. `NumberGrammar.tryParse` recognizes the `number` production (§7.6).
 
 - **Identification is separate from binding to a host numeric type.** `NumberGrammar` decides which of the
@@ -197,14 +197,15 @@ Key points:
       the spec requires it to accept; it was written down here as a defect once, before being checked
       against §7.4.
       `FieldValueConformanceTest.aQuotedNumericIsAValueOfAnIntegerFieldBecauseFormIsNotMeaning` pins it.
-- **§4's applicability clause is load-bearing, and `BaseValue.NullValue` is where it shows.** Base
-  resolution runs only where no declared type is in scope, so the `null` token identifies as a value on
-  exactly one path: schemaless data, plus `value`-typed positions, whose atom contract *is* "run base
-  resolution". Under a schema every other position hands the token to its own declared atom and `null` is
-  ordinary text ([TSON-SCHEMA] §7.3) — which is why nothing normalizes `null` in the lexer or in
-  `TsonDataStream`, where it would strip `null` out of the token vocabulary for `enum`/`token`/FIXED-`text`
-  positions too. The tree model spells the null base value `TsonAbsent` (`docs/facades-and-tree.md`); bind
-  mode binds it to Java `null`.
+- **There is no `null`, and the order has three steps rather than four.** Absence has one spelling, `_`,
+  and it is lexical: the lexer gives it `TokenType.ABSENT`, the stream an `AbsentEvent` and the parser an
+  `ast.AbsentValue`, so it is never a `TokenValue` and no order here could reach it. The unquoted token
+  `null` is the string `null`, as `frobnicate` is — §7.7 rule 3 holds with no word to except, and the
+  token stays available to `enum`/`token`/FIXED-`text` positions like any other. `BaseValue` carries an
+  `AbsentValue` member all the same, and `BaseTypeResolver` never returns it: binding an identified value
+  to a host type is one switch (`AtomBinder.bind`), and a schemaless bind reaching `_` needs a way into
+  it. A JSON document's `null` reaches absence through a JSON reader, which maps it in the model, where
+  the position's own state decides whether absence is admitted at all.
 - **§9.1's numeric-literal length limit** (SHOULD, 4096 digits, DoS-hardening) is **not enforced** — noted
   so it isn't mistaken for an oversight.
 

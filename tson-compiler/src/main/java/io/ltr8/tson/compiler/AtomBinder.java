@@ -10,7 +10,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 /**
- * Binds an identified {@link BaseValue} (§4's null/boolean/number/string classification) to a
+ * Binds an identified {@link BaseValue} (§4's boolean/number/string classification, plus the absent
+ * sentinel) to a
  * concrete Java atom type -- the "binding" half of base type resolution that was deliberately
  * left undone when {@code BaseTypeResolver}/{@code NumberForm} were built: identification
  * determines which of the four grammar forms a token is and extracts its raw structural
@@ -36,16 +37,17 @@ public final class AtomBinder {
 
     public static Object bind(BaseValue value, Class<?> target) throws DataBindException {
         return switch (value) {
-            case BaseValue.NullValue ignored -> bindNull(target);
+            case BaseValue.AbsentValue ignored -> bindAbsent(target);
             case BaseValue.BooleanValue b -> bindBoolean(b.value(), target);
             case BaseValue.StringValue s -> bindString(s.text(), target);
             case BaseValue.NumberValue n -> bindNumber(n.form(), target);
         };
     }
 
-    private static Object bindNull(Class<?> target) throws DataBindException {
+    /** {@code _} binds to {@code null}, the host's only no-value representation -- so no primitive can take it. */
+    private static Object bindAbsent(Class<?> target) throws DataBindException {
         if (target.isPrimitive()) {
-            throw new DataBindException("cannot bind null to primitive type " + target);
+            throw new DataBindException("cannot bind the absent sentinel '_' to primitive type " + target);
         }
         return null;
     }

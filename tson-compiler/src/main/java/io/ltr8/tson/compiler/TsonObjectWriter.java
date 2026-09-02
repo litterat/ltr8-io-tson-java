@@ -223,7 +223,7 @@ public final class TsonObjectWriter {
             header.emit(writer);
             rootTypeName.ifPresent(writer::typeRef);
             if (value == null) {
-                writer.nullValue();
+                writer.absentValue();
                 return;
             }
             DataClass dataClass = context.getDescriptor(value.getClass());
@@ -236,8 +236,8 @@ public final class TsonObjectWriter {
     // ── Core dispatch ────────────────────────────────────────────────────
 
     /**
-     * {@code null} (the base type, distinct from omitting the field entirely -- see {@link
-     * #writeRecord}) aside: a bridge, if present, is unwrapped once, up front -- covers plain Java
+     * A host {@code null} aside -- which writes {@code _}, the absent sentinel, and reaches here only where
+     * there is no field to omit it from (see {@link #writeRecord}): a bridge, if present, is unwrapped once, up front -- covers plain Java
      * {@code enum}s and {@code Rational}/{@code Complex}/{@code IsoDuration} reached through a
      * caller's own {@code DataBridge} (all via {@code DataBindContext#registerAtom(Class,
      * DataBridge)}, which always attaches to a {@code DataClassAtom}), and, in principle, a {@code
@@ -271,7 +271,7 @@ public final class TsonObjectWriter {
             throws DataBindException {
         try {
             if (value == null) {
-                writer.nullValue();
+                writer.absentValue();
                 return;
             }
             if (dataClass instanceof DataClassAnnotated boxed) {

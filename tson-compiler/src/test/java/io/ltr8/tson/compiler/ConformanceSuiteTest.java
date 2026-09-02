@@ -510,7 +510,6 @@ class ConformanceSuiteTest {
         RecordValue.Field member = soleField(expected, "base-value");
         CoreValue payload = member.value().value().coreValue();
         switch (member.name()) {
-            case "null" -> assertInstanceOf(BaseValue.NullValue.class, actual, "base-value kind 'null'");
             case "boolean" -> {
                 BaseValue.BooleanValue bv = assertInstanceOf(BaseValue.BooleanValue.class, actual, "base-value kind 'boolean'");
                 assertEquals(((TokenValue) payload).text().equals("true"), bv.value(), "boolean value");

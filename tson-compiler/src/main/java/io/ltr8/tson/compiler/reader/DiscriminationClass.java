@@ -37,7 +37,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The granularity at which TSON text discriminates an untagged value: [TSON-DATA] §4's four scalar
+ * The granularity at which TSON text discriminates an untagged value: [TSON-DATA] §4's three scalar
  * base-type classes plus the two container delimiter forms. One class function serves both §5.4 consumers --
  * {@code ChoiceDisjointness} derives a choice's {@code disjoint} fact as "every variant classifies, and no
  * class repeats", and {@link ChoiceReader} recovers an untagged value to the variant of its own class -- so
@@ -50,9 +50,9 @@ import java.util.Set;
  */
 public enum DiscriminationClass {
 
-    NULL, BOOLEAN, NUMBER, STRING, BRACE, BRACKET;
+    BOOLEAN, NUMBER, STRING, BRACE, BRACKET;
 
-    /** The four §4 scalar classes -- what {@link #ofValue} can produce, and what untagged token recovery handles. */
+    /** The three §4 scalar classes -- what {@link #ofValue} can produce, and what untagged token recovery handles. */
     public boolean scalar() {
         return this != BRACE && this != BRACKET;
     }
@@ -132,7 +132,6 @@ public enum DiscriminationClass {
     /** The base-type class of a §4-resolved host value (as {@link ValueParser} produces). Always scalar. */
     static DiscriminationClass ofValue(Object hostValue) {
         return switch (hostValue) {
-            case null -> NULL;
             case Boolean ignored -> BOOLEAN;
             case BigInteger ignored -> NUMBER;
             case BigDecimal ignored -> NUMBER;

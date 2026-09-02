@@ -48,7 +48,7 @@ Verified by reading each form through `TsonTreeReader` and asking `as(Object.cla
 | `ipv4` / `ipv6`                                 | `Inet4Address` / `Inet6Address`                 |
 | `base64`, `base64url`, `base32`, `hex`          | `byte[]`                                        |
 | an untyped token (§4 base resolution)           | `Boolean`, `BigInteger`, `BigDecimal`, `String` |
-| `_`, and `null` where §4 applies                | a `TsonAbsent` node / `null`                    |
+| `_` (the only no-value spelling)                | a `TsonAbsent` node / `null`                    |
 
 An integer's host type is the **narrowest** that holds its declared range, so `int8` never hands back a
 `BigInteger` for a value that fits a `Byte`. `unknown` and `extern` have no parser — a schema declaring

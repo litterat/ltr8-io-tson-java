@@ -367,7 +367,7 @@ which look at the reader it wraps — the first or a diagnostic names the entry 
 alias, the second or a bound `Map` field silently loses its rebinding.
 
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
-§4's four scalar classes — `null`, `boolean`, `number` (every numeric family: an `integer` and a `decimal`
+§4's three scalar classes — `boolean`, `number` (every numeric family: an `integer` and a `decimal`
 are one class, so never disjoint), `string` (every text-form family: `text`, enums by their members' shared
 class — so `[true false]` is boolean-class — `uuid`, `date`, `binary`, …) — plus `brace` (records **and**
 maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a

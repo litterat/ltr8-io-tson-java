@@ -19,11 +19,15 @@ class BaseTypeResolverTest {
         return resolve(text, TokenForm.UNQUOTED);
     }
 
-    // ── null / boolean ───────────────────────────────────────────────────
+    // ── boolean ──────────────────────────────────────────────────────────
 
+    /**
+     * There is no {@code null}: §4 resolves three classes, and the token falls through to string the way
+     * {@code frobnicate} does. Absence has one spelling, {@code _}, which is lexical and never a token.
+     */
     @Test
-    void unquotedNullResolvesToNull() {
-        assertInstanceOf(BaseValue.NullValue.class, resolveUnquoted("null"));
+    void unquotedNullResolvesToString() {
+        assertEquals("null", ((BaseValue.StringValue) resolveUnquoted("null")).text());
     }
 
     @Test
@@ -33,10 +37,8 @@ class BaseTypeResolverTest {
     }
 
     @Test
-    void nullAndBooleanAreCaseSensitive() {
-        // Spec §4.1/§4.2: "case-sensitive, lowercase only". No, Yes, on, off, True, FALSE etc. are not recognised.
-        assertInstanceOf(BaseValue.StringValue.class, resolveUnquoted("Null"));
-        assertInstanceOf(BaseValue.StringValue.class, resolveUnquoted("NULL"));
+    void booleanIsCaseSensitive() {
+        // Spec §4.2: "case-sensitive, lowercase only". No, Yes, on, off, True, FALSE etc. are not recognised.
         assertInstanceOf(BaseValue.StringValue.class, resolveUnquoted("True"));
         assertInstanceOf(BaseValue.StringValue.class, resolveUnquoted("FALSE"));
         assertInstanceOf(BaseValue.StringValue.class, resolveUnquoted("yes"));
