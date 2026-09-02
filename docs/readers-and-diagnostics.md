@@ -344,12 +344,11 @@ one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`FIELD_FIXED`/`TYPE_MISMA
 `UNKNOWN_TYPE_REF`/`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY`/`DUPLICATE_FIELD`
 from readers;
 `SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for infrastructure-level failures, plus
-`NOT_IMPLEMENTED`/`BIND_MISMATCH`/`SCHEMA_UNAVAILABLE` — the three that are not a verdict on the document
-at all),
-`message` (hand-composed per call site), `expected`/`actual` (machine-parseable), **four location
-components covering two ends** — the value in the data, and the rule in the schema — and the one component
-that is not a location, `fetchReason`. It exists for one reason: a fact a consumer
-acts on that is recoverable from neither the document nor the schema.
+`NOT_IMPLEMENTED`/`BIND_MISMATCH` and the five `SCHEMA_*` fetch codes — the members that are not a verdict
+on the document at all, which `Code.verdict()` answers),
+`message` (hand-composed per call site), `expected`/`actual` (machine-parseable) and **four location
+components covering two ends** — the value in the data, and the rule in the schema. Every component is a
+location; the one fact that is not, why a schema could not be obtained, is carried by the code itself.
 
 **The four are JSON Schema 2020-12 §12's own output unit**, deliberately: `path` is `instanceLocation` (an
 RFC 6901 pointer into the data), `schemaPointer` is `keywordLocation` (the path through the schema being
@@ -360,16 +359,20 @@ because the variation is locational, not categorical** — a value violating `in
 populates both ends at once, and `javax.tools.Diagnostic`, LSP's `Diagnostic` and rustc's `DiagInner` all
 model it the same way (rustc's `MultiSpan` being the mature form of the same idea).
 
-**`fetchReason` is present for exactly one code, and exists because that code covers two different
-answers.** `SCHEMA_UNAVAILABLE` says a schema was not obtained; `TsonSchemaFetchException.Reason` says by
-whose doing — `NOT_PERMITTED` names a reference this deployment will not fetch and `NOT_FOUND` one nothing
-serves, both the document's to fix, where `TIMEOUT`/`TRANSPORT`/`TOO_LARGE` say the reference was fine and
-the world was not. That is the difference between telling a sender to correct its document and telling it to
-retry, and neither of the two places it could otherwise live will hold it: `Code` is closed and sorts by
-*who* could not check, so five members for one condition is the wrong axis, and recovering it from `message`
-means parsing prose. It is `Optional` because "not a fetch failure" has to stay a distinguishable answer.
+**A fetch failure is five codes, not one code and a field.** `SCHEMA_NOT_PERMITTED` names a reference this
+deployment will not fetch and `SCHEMA_NOT_FOUND` one nothing serves, both the document's to fix, where
+`SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT`/`SCHEMA_TOO_LARGE` say the reference was fine and the world was not.
+That is the difference between telling a sender to correct its document and telling it to retry, and it is a
+question consumers *route* on — so it lives where routing values live. A field beside the code was a second
+carrier for one fact, and it cost a `Diagnostic` component, a second `TsonReadContext.report` overload
+existing only to carry it, a `SchemaFailure` component, a `CliDiagnostic` component and a hand-copied enum
+in `diagnostics.tn`.
 
-**Both channels one fetch failure travels on now answer alike**, which is the point of carrying it at all.
+**Five rather than two** (a "permanent" and a "transient" code) because consumers cut the same five
+differently: a command line by whether a rerun could help, an HTTP surface by whose doing it was. One code
+per reason keeps every partition derivable and privileges none. `TsonSchemaFetchException.Reason` remains the
+throwing channel's own vocabulary and the single input to `Diagnostic.Code.of`, so the two channels one fetch
+failure travels on cannot disagree.
 A consumer that resolves its schemas at startup sees `TsonSchemaFetchException` thrown and reads
 `reason()`; one that reads through a collecting receiver — the common path for a server validating request
 bodies — sees a `Diagnostic` and never sees the exception at all. With the reason on the classification
@@ -379,8 +382,8 @@ which the facades alone reach — no reader in the compiled stack can have one t
 not be fetched having no compiled readers to run), and `Diagnostic.ofSchemaUnavailable` takes the exception
 rather than its message so the schema-document channel states it too.
 
-**A §8.2 refusal carries no component of its own**, and the rule that keeps it out is the one that let
-`fetchReason` in. §8.2 requires a refusal to name the Unicode data version it was computed against, which is
+**A §8.2 refusal carries no component of its own**, by the same rule that puts a fetch failure's cause in
+the code. §8.2 requires a refusal to name the Unicode data version it was computed against, which is
 a fact about *this processor* rather than about the problem — see `TsonUnicodeProcessorPolicy` below, which is
 where it and the policy are stated, once.
 
@@ -432,9 +435,10 @@ otherwise. `SPEC-FEEDBACK.md` #14 proposes §8.2 require this shape rather than 
 
 ### When a fact earns a component
 
-`fetchReason` is the only non-location component, and the rule that keeps it from becoming a precedent for
-structuring every code is one line: **carry a fact as a component when it is not recoverable from the
-document plus the schema, and when it is a fact about the problem rather than about the processor.**
+Every component is now a location, and the rule that keeps it that way is one line: **carry a fact as a
+component when it is not recoverable from the document plus the schema, when it is a fact about the problem
+rather than about the processor, and when it is not something the consumer routes on** — a routing question
+belongs in the `Code`, which is what a consumer already switches over.
 
 | Problem | Where the fact already is | Component? |
 |---|---|---|
@@ -442,7 +446,7 @@ document plus the schema, and when it is a fact about the problem rather than ab
 | `UNRECOGNIZED_FIELD` | the alternatives are the declared field list | no |
 | `DUPLICATE_FIELD`/`DUPLICATE_MAP_KEY` | in the document, at `path` | no |
 | §8.2 refusal: which rule | it is the `Code` | no |
-| `SCHEMA_UNAVAILABLE` | nowhere — it is about the world | `fetchReason` |
+| why a schema was not obtained | nowhere — it is about the world | no — it is the `Code`, one per reason |
 | §8.2 refusal: the policy and the Unicode tables | nowhere — it is this processor's configuration | no — `TsonUnicodeProcessorPolicy`, once per run |
 
 Most diagnostics are about something the consumer is already holding, which is why `expected`/`actual` are
@@ -803,9 +807,10 @@ error* category, so this is the same layer, not a new one.
   `TsonMissingBindingException` subclass included) is `BIND_MISMATCH`: the schema is fine, the class is
   fine, and the reading application pointed them at each other by mistake, so the message names one of
   *its* classes and the document may be perfectly valid. An `UnsupportedOperationException` is
-  `NOT_IMPLEMENTED`, the same code a gap gets everywhere else. A `TsonSchemaFetchException` is
-  `SCHEMA_UNAVAILABLE`: no source would supply the schema, so it was never read, and whether it would even
-  have resolved is unknown — `SCHEMA_ERROR` would claim a verdict on a document nothing here has seen. A
+  `NOT_IMPLEMENTED`, the same code a gap gets everywhere else. A `TsonSchemaFetchException` is one of the
+  five `SCHEMA_*` codes, by its own `Reason`: no source would supply the schema, so it was never read, and
+  whether it would even have resolved is unknown — `SCHEMA_ERROR` would claim a verdict on a document
+  nothing here has seen. A
   `TsonContentHashMismatchException` *is* `SCHEMA_ERROR`, and the pair marks the line: something arrived,
   and it is not what the reference named. Each branch carries the `expected` that matches its code ("a
   schema that can be obtained", "a schema matching its `?sha256=` pin", "a resolvable schema"), and the
@@ -823,10 +828,11 @@ error* category, so this is the same layer, not a new one.
       either every fault reads as a bad schema or every source that spells a miss that way crashes the read.
       A source failing any other way is that source malfunctioning, and surfaces as the exception it threw:
       `Tson.validate` promises a bad *document* never throws, and a bad *source* is not a document.
-    - **Three codes are now not a verdict on the document**, and they differ in *who* could not give one:
-      `NOT_IMPLEMENTED` (this library), `BIND_MISMATCH` (the reading application), `SCHEMA_UNAVAILABLE`
-      (whoever was to serve the schema). The CLI's exit codes follow them one for one — 70, no CLI path,
-      69 — and a mixed run takes the most permanent, since retrying fixes only the last.
+    - **Seven codes are not a verdict on the document** (`Code.verdict()`), and they differ in *who* could
+      not give one: `NOT_IMPLEMENTED` (this library), `BIND_MISMATCH` (the reading application), and the five
+      `SCHEMA_*` codes (whoever was to serve the schema). The CLI's exit codes follow — 70, 78, and 69 or 75
+      by whether a rerun could help — and a mixed run ranks by who must act first, permanence breaking the
+      tie between ranks where nobody present can act: 70 > 78 > 69 > 75 > 1.
 - **What still throws even with a receiver:** an `!!import` that won't load, a `!!meta` that may not
   govern, or a reference whose target owns a different `!!id` than it was fetched under (§2.2.1's
   cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Those make the namespace itself unusable rather

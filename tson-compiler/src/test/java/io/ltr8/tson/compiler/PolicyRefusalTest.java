@@ -178,8 +178,8 @@ class PolicyRefusalTest {
 
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, refusal.code());
         assertEquals(Diagnostic.Code.DUPLICATE_FIELD, verdict.code());
-        assertEquals(refusal.fetchReason(), verdict.fetchReason(),
-                "a refusal has no component of its own to distinguish it -- the code is the distinction");
+        assertTrue(refusal.code().verdict() && verdict.code().verdict(),
+                "a refusal was checked and declined -- the sender still holds the fix");
     }
 
     /**

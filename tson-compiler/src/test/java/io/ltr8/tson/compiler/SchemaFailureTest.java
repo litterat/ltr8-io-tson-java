@@ -4,9 +4,11 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
+import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -67,16 +69,16 @@ class SchemaFailureTest {
         TsonSchemaFetchException unfetchable = new TsonSchemaFetchException("https://example.test/x.tn",
                 TsonSchemaFetchException.Reason.TIMEOUT, "no answer in 5s", null);
 
-        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, SchemaFailure.of(unfetchable).code());
+        assertEquals(Diagnostic.Code.SCHEMA_TIMEOUT, SchemaFailure.of(unfetchable).code());
         assertEquals("a schema that can be obtained", SchemaFailure.of(unfetchable).expected());
     }
 
     /**
-     * <b>The fetch branch carries the exception's own {@code Reason} through</b>, because the code alone
-     * cannot: {@code SCHEMA_UNAVAILABLE} covers a reference this deployment refuses ({@code NOT_PERMITTED},
-     * the sender's mistake) and a host that did not answer ({@code TIMEOUT}, nobody's and worth retrying),
-     * and a consumer picking a status needs them apart. The classification is the only place that still holds
-     * the exception, so dropping it here drops it for every collecting read.
+     * <b>The fetch branch carries which way it failed in the code itself.</b> A reference this deployment
+     * refuses ({@code NOT_PERMITTED}, the sender's mistake) and a host that did not answer ({@code TIMEOUT},
+     * nobody's and worth retrying) are different codes, because a consumer picking a status or an exit code
+     * needs them apart and the code is what it routes on. This classification is the only place that still
+     * holds the exception, so a reason collapsed here is collapsed for every collecting read.
      */
     @Test
     void theFetchBranchKeepsWhichReasonItWas() {
@@ -84,17 +86,27 @@ class SchemaFailureTest {
             SchemaFailure failure = SchemaFailure.of(
                     new TsonSchemaFetchException("https://example.test/x.tn", reason, "refused", null));
 
-            assertEquals(Optional.of(reason), failure.fetchReason(), reason::name);
+            assertEquals(Diagnostic.Code.of(reason), failure.code(), reason::name);
+            assertFalse(failure.code().verdict(), reason::name);
         }
     }
 
-    /** Every other branch has no sub-reason, and says so rather than defaulting to one. */
+    /** No two reasons share a code, or the split would be decorative. */
     @Test
-    void noOtherBranchInventsAReason() {
-        assertEquals(Optional.empty(), SchemaFailure.of(new TsonBindMismatchException("x")).fetchReason());
-        assertEquals(Optional.empty(), SchemaFailure.of(new UnsupportedOperationException("x")).fetchReason());
-        assertEquals(Optional.empty(), SchemaFailure.of(new TsonSchemaValidationException("x")).fetchReason());
-        assertEquals(Optional.empty(), SchemaFailure.of(new TsonContentHashMismatchException("x")).fetchReason());
+    void everyReasonHasItsOwnCode() {
+        assertEquals(TsonSchemaFetchException.Reason.values().length,
+                Arrays.stream(TsonSchemaFetchException.Reason.values())
+                        .map(Diagnostic.Code::of).distinct().count());
+    }
+
+    /** Every other branch states a code of its own, and none of them is a fetch code. */
+    @Test
+    void noOtherBranchLandsOnAFetchCode() {
+        for (RuntimeException e : List.of(new TsonBindMismatchException("x"), new UnsupportedOperationException("x"),
+                new TsonSchemaValidationException("x"), new TsonContentHashMismatchException("x"))) {
+            assertFalse(Arrays.stream(TsonSchemaFetchException.Reason.values())
+                    .map(Diagnostic.Code::of).toList().contains(SchemaFailure.of(e).code()), e::toString);
+        }
     }
 
     /**

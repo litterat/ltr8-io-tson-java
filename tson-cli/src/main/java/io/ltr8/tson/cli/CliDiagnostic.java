@@ -2,7 +2,6 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.tson.compiler.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.schema.meta.SourcePosition;
 
 import java.util.Optional;
@@ -26,11 +25,10 @@ import java.util.Optional;
  * RFC 6901 pointers need no narrowing: they are already {@code Optional} at the source, because for a
  * pointer {@code ""} is not absence but the root, and a document-level schema problem genuinely carries it.
  *
- * <p><b>{@code fetchReason} stays the real enum</b>, for {@code code}'s own reason: enum narrowing is the
- * proven binding path, and the value is one a consumer routes on -- {@code SCHEMA_UNAVAILABLE} says no
- * schema was obtained, and this says whether the document named something this deployment refuses or a host
- * simply did not answer. Rendering it as text would hand that consumer a string to match on, which is what
- * carrying it structurally exists to avoid.
+ * <p><b>Why a schema was not obtained is the {@code code}</b>, not a field beside it. The five
+ * {@code SCHEMA_*} members say whether the document named something this deployment refuses, or a host
+ * simply did not answer -- a value a consumer routes on, so it lives where routing values live. A second
+ * discriminator could contradict the first.
  *
  * <p><b>A [TSON-DATA] §8.2 name-hygiene refusal is one of these like any other problem</b>, and carries
  * nothing extra. Which rule refused is the {@code code} -- {@code CONFUSABLE_NAMES}, {@code
@@ -44,9 +42,7 @@ public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Opti
                              Diagnostic.Code code, String message,
                              Optional<String> expected, Optional<String> actual,
                              @Field("data_position") Optional<String> dataPosition,
-                             @Field("schema_position") Optional<String> schemaPosition,
-                             @Field("fetch_reason")
-                             Optional<TsonSchemaFetchException.Reason> fetchReason) {
+                             @Field("schema_position") Optional<String> schemaPosition) {
 
     static CliDiagnostic from(Diagnostic diagnostic) {
         return new CliDiagnostic(diagnostic.path(), diagnostic.schemaPointer(),
@@ -54,14 +50,13 @@ public record CliDiagnostic(Optional<String> path, @Field("schema_pointer") Opti
                 diagnostic.code(), diagnostic.message(),
                 diagnostic.expectedIfStated(), diagnostic.actualIfStated(),
                 diagnostic.dataPosition().map(CliDiagnostic::render),
-                diagnostic.schemaPosition().map(CliDiagnostic::render),
-                diagnostic.fetchReason());
+                diagnostic.schemaPosition().map(CliDiagnostic::render));
     }
 
     /** A problem with no location at either end -- a usage failure, or a schema that never named itself. */
     static CliDiagnostic minimal(Diagnostic.Code code, String message) {
         return new CliDiagnostic(Optional.empty(), Optional.empty(), Optional.empty(), code, message,
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     /** The position format every rendered diagnostic uses; stated in {@code diagnostics.tn} for consumers. */

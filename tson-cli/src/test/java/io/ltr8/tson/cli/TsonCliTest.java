@@ -108,15 +108,28 @@ class TsonCliTest {
      */
     @Test
     void aRunHoldingMoreThanOneKindOfProblemTakesTheMostPermanentCode() {
-        assertEquals(70, TsonCli.exitCodeFor(List.of(
-                Diagnostic.Code.NOT_IMPLEMENTED, Diagnostic.Code.SCHEMA_ERROR)));
-        assertEquals(70, TsonCli.exitCodeFor(List.of(
-                Diagnostic.Code.NOT_IMPLEMENTED, Diagnostic.Code.SCHEMA_UNAVAILABLE)));
+        // Each rank alone, then beaten by the one above it: 70 > 78 > 69 > 75 > 1.
         assertEquals(70, TsonCli.exitCodeFor(List.of(Diagnostic.Code.NOT_IMPLEMENTED)));
-        assertEquals(69, TsonCli.exitCodeFor(List.of(
-                Diagnostic.Code.SCHEMA_UNAVAILABLE, Diagnostic.Code.SCHEMA_ERROR)));
-        assertEquals(69, TsonCli.exitCodeFor(List.of(Diagnostic.Code.SCHEMA_UNAVAILABLE)));
+        assertEquals(78, TsonCli.exitCodeFor(List.of(Diagnostic.Code.BIND_MISMATCH)));
+        assertEquals(69, TsonCli.exitCodeFor(List.of(Diagnostic.Code.SCHEMA_NOT_PERMITTED)));
+        assertEquals(75, TsonCli.exitCodeFor(List.of(Diagnostic.Code.SCHEMA_TIMEOUT)));
         assertEquals(1, TsonCli.exitCodeFor(List.of(Diagnostic.Code.SCHEMA_ERROR)));
+
+        assertEquals(70, TsonCli.exitCodeFor(List.of(
+                Diagnostic.Code.NOT_IMPLEMENTED, Diagnostic.Code.BIND_MISMATCH)));
+        assertEquals(78, TsonCli.exitCodeFor(List.of(
+                Diagnostic.Code.BIND_MISMATCH, Diagnostic.Code.SCHEMA_NOT_FOUND)));
+        assertEquals(69, TsonCli.exitCodeFor(List.of(
+                Diagnostic.Code.SCHEMA_NOT_FOUND, Diagnostic.Code.SCHEMA_TIMEOUT)));
+        assertEquals(75, TsonCli.exitCodeFor(List.of(
+                Diagnostic.Code.SCHEMA_UNREACHABLE, Diagnostic.Code.SCHEMA_ERROR)));
+
+        // Every fetch code lands in one of the two ranks -- no reason falls through to "checked and rejected".
+        for (io.ltr8.tson.compiler.TsonSchemaFetchException.Reason reason
+                : io.ltr8.tson.compiler.TsonSchemaFetchException.Reason.values()) {
+            int code = TsonCli.exitCodeFor(List.of(Diagnostic.Code.of(reason)));
+            assertTrue(code == 69 || code == 75, () -> reason + " fell through to " + code);
+        }
     }
 
     /**
@@ -419,7 +432,7 @@ class TsonCliTest {
         String out = withStdin(data, () -> captureStdout(() -> assertEquals(0,
                 TsonCli.run(new String[] {"validate", "--output", "json", schema.toString(), "-"}))));
 
-        assertTrue(out.contains("\"file\":\"-\",\"valid\":true"), out);
+        assertTrue(out.contains("\"file\":\"-\",\"outcome\":\"VALID\""), out);
     }
 
     /**

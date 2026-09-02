@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -98,16 +99,16 @@ class TsonReadTest {
         TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }"""));
-        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, thrown.diagnostic().code());
+        assertEquals(Diagnostic.Code.SCHEMA_NOT_FOUND, thrown.diagnostic().code());
     }
 
     /**
-     * <b>Which of the five ways a fetch failed survives the receiver.</b> {@code SCHEMA_UNAVAILABLE} says a
-     * schema was not obtained; {@link TsonSchemaFetchException.Reason} says by whose doing, and the two are
-     * different questions: {@code NOT_PERMITTED} means this deployment refuses the reference the document
-     * named, where {@code TIMEOUT} means the reference was fine and a host was not. A consumer picking an
-     * HTTP status wants the first to be the sender's problem and the second its own dependency's, and it
-     * cannot get that from a code shared by both or from prose it would have to parse.
+     * <b>Which of the five ways a fetch failed survives the receiver.</b> Each reason has its own code:
+     * {@code SCHEMA_NOT_PERMITTED} means this deployment refuses the reference the document named, where
+     * {@code SCHEMA_TIMEOUT} means the reference was fine and a host was not. A consumer picking an HTTP
+     * status or an exit code wants the first to be the sender's problem and the second its own dependency's,
+     * and it cannot get that from one code shared by both, or from prose it would have to parse. None of the
+     * five is a verdict on the document -- the schema was never read.
      */
     @Test
     void aCollectedFetchFailureStatesWhichReasonItWas() {
@@ -118,15 +119,15 @@ class TsonReadTest {
                     !point { x: 3  y: 4 }""");
 
             Diagnostic diagnostic = problems.diagnostics().getFirst();
-            assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, diagnostic.code());
-            assertEquals(Optional.of(reason), diagnostic.fetchReason(), reason::name);
+            assertEquals(Diagnostic.Code.of(reason), diagnostic.code(), reason::name);
+            assertFalse(diagnostic.code().verdict(), reason::name);
         }
     }
 
     /**
      * <b>The two channels one fetch failure travels on answer alike.</b> A fail-fast read throws the
-     * classification and a collecting read reports it, and a consumer that routes on {@code Reason} must get
-     * the same answer either way -- otherwise the same document is the sender's fault when read one way and
+     * classification and a collecting read reports it, and a consumer routing on the code must get the same
+     * answer either way -- otherwise the same document is the sender's fault when read one way and
      * an operator's when read the other.
      */
     @Test
@@ -140,8 +141,8 @@ class TsonReadTest {
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         tson.treeReader().withDiagnostics(problems).read(document);
 
-        assertEquals(Optional.of(TsonSchemaFetchException.Reason.NOT_PERMITTED), thrown.diagnostic().fetchReason());
-        assertEquals(thrown.diagnostic().fetchReason(), problems.diagnostics().getFirst().fetchReason());
+        assertEquals(Diagnostic.Code.SCHEMA_NOT_PERMITTED, thrown.diagnostic().code());
+        assertEquals(thrown.diagnostic().code(), problems.diagnostics().getFirst().code());
     }
 
     /**
@@ -156,7 +157,7 @@ class TsonReadTest {
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""");
 
-        assertEquals(Optional.empty(), problems.diagnostics().getFirst().fetchReason());
+        assertTrue(problems.diagnostics().getFirst().code().verdict());
     }
 
     /** A {@link Tson} whose one source refuses everything for {@code reason}. */
@@ -297,7 +298,7 @@ class TsonReadTest {
         List<Case> cases = List.of(
                 new Case("""
                         !!schema:"https://example.test/not-there.tn"
-                        !point { x: 3  y: 4 }""", Diagnostic.Code.SCHEMA_UNAVAILABLE),
+                        !point { x: 3  y: 4 }""", Diagnostic.Code.SCHEMA_NOT_FOUND),
                 new Case("""
                         !!schema:"https://example.test/point-1.tn"
                         { x: 3  y: 4 }""", Diagnostic.Code.VALIDATION_ERROR),

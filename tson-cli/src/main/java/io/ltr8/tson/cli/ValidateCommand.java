@@ -146,7 +146,7 @@ final class ValidateCommand {
 
         ValidationRun run = ValidationRun.of(policy, reports);
         System.out.println(format.render(run));
-        return run.valid() ? 0 : TsonCli.exitCodeFor(reports.stream()
+        return run.outcome() == Outcome.VALID ? 0 : TsonCli.exitCodeFor(reports.stream()
                 .flatMap(report -> report.errors().stream()).map(CliDiagnostic::code).toList());
     }
 

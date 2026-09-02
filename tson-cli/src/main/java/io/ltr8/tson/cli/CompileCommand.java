@@ -48,8 +48,8 @@ final class CompileCommand {
             System.out.println(format.render(ValidationReport.ok(policy)));
             return 0;
         }
-        System.out.println(format.render(new ValidationReport(false, policy,
-                problems.stream().map(CliDiagnostic::from).toList())));
+        List<CliDiagnostic> errors = problems.stream().map(CliDiagnostic::from).toList();
+        System.out.println(format.render(new ValidationReport(Outcome.of(errors), policy, errors)));
         return TsonCli.exitCodeFor(problems.stream().map(Diagnostic::code).toList());
     }
 }

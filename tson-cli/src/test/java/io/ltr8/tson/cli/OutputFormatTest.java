@@ -63,9 +63,8 @@ class OutputFormatTest {
     void textIncludesThePathWhenPresent() {
         CliDiagnostic diagnostic = new CliDiagnostic(Optional.of("/value"), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.FIELD_REQUIRED, "missing",
-                Optional.of("a value"), Optional.of("(absent)"), Optional.empty(), Optional.empty(),
-                Optional.empty());
-        String rendered = OutputFormat.TEXT.render(new ValidationReport(false, POLICY, List.of(diagnostic)));
+                Optional.of("a value"), Optional.of("(absent)"), Optional.empty(), Optional.empty());
+        String rendered = OutputFormat.TEXT.render(new ValidationReport(Outcome.INVALID, POLICY, List.of(diagnostic)));
         assertEquals("[FIELD_REQUIRED] /value: missing", rendered);
     }
 
@@ -78,11 +77,10 @@ class OutputFormatTest {
     void textIncludesThePositionAlongsideThePath() {
         CliDiagnostic diagnostic = new CliDiagnostic(Optional.of("/address/city"), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.TYPE_MISMATCH,
-                "expected text", Optional.of("text"), Optional.of("42"), Optional.of("3:12:47"), Optional.empty(),
-                Optional.empty());
+                "expected text", Optional.of("text"), Optional.of("42"), Optional.of("3:12:47"), Optional.empty());
 
         assertEquals("[TYPE_MISMATCH] /address/city (3:12:47): expected text",
-                OutputFormat.TEXT.render(new ValidationReport(false, POLICY, List.of(diagnostic))));
+                OutputFormat.TEXT.render(new ValidationReport(Outcome.INVALID, POLICY, List.of(diagnostic))));
     }
 
     /**
@@ -95,10 +93,10 @@ class OutputFormatTest {
         CliDiagnostic diagnostic = new CliDiagnostic(Optional.of(""), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.VALIDATION_ERROR,
                 "unterminated record", Optional.of("well-formed TSON"), Optional.of("a base-syntax error"),
-                Optional.of("2:1:7"), Optional.empty(), Optional.empty());
+                Optional.of("2:1:7"), Optional.empty());
 
         assertEquals("[VALIDATION_ERROR] (2:1:7): unterminated record",
-                OutputFormat.TEXT.render(new ValidationReport(false, POLICY, List.of(diagnostic))));
+                OutputFormat.TEXT.render(new ValidationReport(Outcome.INVALID, POLICY, List.of(diagnostic))));
     }
 
     /**
@@ -109,7 +107,7 @@ class OutputFormatTest {
     void jsonRendersAWellShapedObject() {
         String rendered = OutputFormat.JSON.render(
                 ValidationReport.failed(POLICY, Diagnostic.Code.VALIDATION_ERROR, "bad \"quote\""));
-        assertEquals("{\"valid\":false,\"policy\":" + POLICY_JSON
+        assertEquals("{\"outcome\":\"INVALID\",\"policy\":" + POLICY_JSON
                 + ",\"errors\":[{\"code\":\"VALIDATION_ERROR\","
                 + "\"message\":\"bad \\\"quote\\\"\"}]}", rendered);
     }
@@ -118,8 +116,7 @@ class OutputFormatTest {
     @Test
     void anEmptyDiagnosticFieldBecomesAnAbsentOne() {
         CliDiagnostic converted = CliDiagnostic.from(new Diagnostic(Optional.of(""), Optional.empty(), "",
-                Diagnostic.Code.TYPE_MISMATCH, "nope", "", "", Optional.empty(), Optional.empty(),
-                Optional.empty()));
+                Diagnostic.Code.TYPE_MISMATCH, "nope", "", "", Optional.empty(), Optional.empty()));
 
         assertEquals(Optional.empty(), converted.schemaId());
         assertEquals(Optional.empty(), converted.expected());
@@ -135,8 +132,7 @@ class OutputFormatTest {
     @Test
     void aRootPointerIsAValueAndAnAbsentOneIsNot() {
         CliDiagnostic read = CliDiagnostic.from(new Diagnostic(Optional.of(""), Optional.empty(), "",
-                Diagnostic.Code.VALIDATION_ERROR, "nope", "", "", Optional.empty(), Optional.empty(),
-                Optional.empty()));
+                Diagnostic.Code.VALIDATION_ERROR, "nope", "", "", Optional.empty(), Optional.empty()));
         CliDiagnostic schema = CliDiagnostic.from(
                 Diagnostic.ofSchemaError("example.test/s.tn", "", "cannot load !!import", Optional.empty()));
 
@@ -148,7 +144,7 @@ class OutputFormatTest {
 
     @Test
     void jsonRendersAnEmptyErrorsArrayForAValidReport() {
-        assertEquals("{\"valid\":true,\"policy\":" + POLICY_JSON + ",\"errors\":[]}",
+        assertEquals("{\"outcome\":\"VALID\",\"policy\":" + POLICY_JSON + ",\"errors\":[]}",
                 OutputFormat.JSON.render(ValidationReport.ok(POLICY)));
     }
 
@@ -156,9 +152,8 @@ class OutputFormatTest {
     void jsonRendersPositionsWhenPresent() {
         CliDiagnostic diagnostic = new CliDiagnostic(Optional.of("/value"), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.FIELD_REQUIRED, "missing",
-                Optional.of("a value"), Optional.of("(absent)"), Optional.of("1:1:0"), Optional.of("6:3:42"),
-                Optional.empty());
-        String rendered = OutputFormat.JSON.render(new ValidationReport(false, POLICY, List.of(diagnostic)));
+                Optional.of("a value"), Optional.of("(absent)"), Optional.of("1:1:0"), Optional.of("6:3:42"));
+        String rendered = OutputFormat.JSON.render(new ValidationReport(Outcome.INVALID, POLICY, List.of(diagnostic)));
         assertTrue(rendered.contains("\"data_position\":\"1:1:0\""), rendered);
         assertTrue(rendered.contains("\"schema_position\":\"6:3:42\""), rendered);
     }
@@ -184,17 +179,16 @@ class OutputFormatTest {
      * <b>A fetch reason survives the round trip as the enum it is</b>, which is what makes carrying it
      * structurally worth anything: a consumer of {@code --output tson} reads back {@code NOT_PERMITTED}
      * and routes on it, where a rendered string would leave it matching on text. This is also the check
-     * that {@code fetch_reason} is really declared and really bound -- an unbound enum name would read
+     * that the fetch codes are really declared and really bound -- an unbound enum name would read
      * back as something else or not at all.
      */
     @Test
     void tsonOutputRoundTripsAFetchReason() {
-        ValidationReport original = new ValidationReport(false, POLICY, List.of(
+        ValidationReport original = new ValidationReport(Outcome.INVALID, POLICY, List.of(
                 new CliDiagnostic(Optional.empty(), Optional.of(""), Optional.empty(),
-                        Diagnostic.Code.SCHEMA_UNAVAILABLE, "cannot fetch schema 'https://nope.test/s.tn'",
+                        Diagnostic.Code.SCHEMA_NOT_PERMITTED, "cannot fetch schema 'https://nope.test/s.tn'",
                         Optional.of("a schema that can be obtained"), Optional.of("https://nope.test/s.tn"),
-                        Optional.empty(), Optional.empty(),
-                        Optional.of(TsonSchemaFetchException.Reason.NOT_PERMITTED))));
+                        Optional.empty(), Optional.empty())));
 
         String rendered = OutputFormat.TSON.render(original);
         Object reread = DiagnosticsSchema.compiled().get("validation_report")
@@ -214,11 +208,10 @@ class OutputFormatTest {
      */
     @Test
     void tsonOutputRoundTripsARefusalAndTheRunsPolicy() {
-        ValidationReport original = new ValidationReport(false, POLICY, List.of(
+        ValidationReport original = new ValidationReport(Outcome.INVALID, POLICY, List.of(
                 new CliDiagnostic(Optional.empty(), Optional.of("/admin"), Optional.empty(),
                         Diagnostic.Code.RESTRICTED_SCRIPT, "declared name mixes scripts",
-                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                        Optional.empty())));
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty())));
 
         String rendered = OutputFormat.TSON.render(original);
         Object reread = DiagnosticsSchema.compiled().get("validation_report")
@@ -261,9 +254,9 @@ class OutputFormatTest {
     void jsonStatesThePolicyOnceAndNotOnEachDiagnostic() {
         CliDiagnostic refused = new CliDiagnostic(Optional.empty(), Optional.empty(), Optional.empty(),
                 Diagnostic.Code.CONFUSABLE_NAMES, "reads alike", Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty());
 
-        String rendered = OutputFormat.JSON.render(new ValidationReport(false, POLICY, List.of(refused)));
+        String rendered = OutputFormat.JSON.render(new ValidationReport(Outcome.INVALID, POLICY, List.of(refused)));
 
         assertEquals(1, count(rendered, TsonUnicodePolicy.dataVersion()), rendered);
         assertTrue(rendered.contains("\"policy\":" + POLICY_JSON), rendered);
@@ -287,7 +280,7 @@ class OutputFormatTest {
      */
     @Test
     void textPrintsThePolicyOnlyWhenSomethingWasRefused() {
-        String refused = OutputFormat.TEXT.render(new ValidationReport(false, POLICY, List.of(
+        String refused = OutputFormat.TEXT.render(new ValidationReport(Outcome.INVALID, POLICY, List.of(
                 CliDiagnostic.minimal(Diagnostic.Code.RESTRICTED_SCRIPT, "mixes scripts"))));
         assertTrue(refused.contains("[RESTRICTED_SCRIPT] mixes scripts"), refused);
         assertTrue(refused.contains("note: refused under identifier policy HIGHLY_RESTRICTIVE,"
@@ -337,17 +330,17 @@ class OutputFormatTest {
         assertEquals(POLICY, reread);
     }
 
-    /** The same value in {@code --output json}, where a consumer reads a name rather than a bound enum. */
+    /** The same distinction in {@code --output json}, where it is the code a consumer reads. */
     @Test
-    void jsonRendersTheFetchReasonAndOmitsItWhereThereIsNone() {
-        CliDiagnostic unavailable = new CliDiagnostic(Optional.empty(), Optional.of(""), Optional.empty(),
-                Diagnostic.Code.SCHEMA_UNAVAILABLE, "cannot fetch", Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(TsonSchemaFetchException.Reason.TIMEOUT));
+    void jsonRendersWhichWayAFetchFailed() {
+        CliDiagnostic timedOut = new CliDiagnostic(Optional.empty(), Optional.of(""), Optional.empty(),
+                Diagnostic.Code.SCHEMA_TIMEOUT, "cannot fetch", Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty());
 
-        assertTrue(OutputFormat.JSON.render(new ValidationReport(false, POLICY, List.of(unavailable)))
-                .contains("\"fetch_reason\":\"TIMEOUT\""));
+        assertTrue(OutputFormat.JSON.render(new ValidationReport(Outcome.NOT_CHECKED, POLICY, List.of(timedOut)))
+                .contains("\"code\":\"SCHEMA_TIMEOUT\""));
         assertFalse(OutputFormat.JSON.render(ValidationReport.failed(POLICY, Diagnostic.Code.TYPE_MISMATCH, "nope"))
-                .contains("fetch_reason"), "an absent field is left out, not written null");
+                .contains("SCHEMA_"), "a problem that is not a fetch failure names no fetch code");
     }
 
     @Test
@@ -364,15 +357,13 @@ class OutputFormatTest {
 
     @Test
     void tsonOutputRoundTripsMultipleErrors() {
-        ValidationReport original = new ValidationReport(false, POLICY, List.of(
+        ValidationReport original = new ValidationReport(Outcome.INVALID, POLICY, List.of(
                 new CliDiagnostic(Optional.of("/a"), Optional.empty(), Optional.empty(),
                         Diagnostic.Code.VALIDATION_ERROR, "first problem",
-                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                        Optional.empty()),
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()),
                 new CliDiagnostic(Optional.of("/b"), Optional.empty(), Optional.empty(),
                         Diagnostic.Code.VALIDATION_ERROR, "second problem",
-                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-                        Optional.empty())));
+                        Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty())));
 
         String rendered = OutputFormat.TSON.render(original);
 
@@ -390,8 +381,8 @@ class OutputFormatTest {
     void jsonRendersTheEnvelopeForASingleFileToo() {
         ValidationRun run = ValidationRun.of(POLICY, List.of(FileReport.of("a.tn", List.of())));
 
-        assertEquals("{\"valid\":true,\"policy\":" + POLICY_JSON
-                        + ",\"files\":[{\"file\":\"a.tn\",\"valid\":true,\"errors\":[]}],\"errors\":[]}",
+        assertEquals("{\"outcome\":\"VALID\",\"policy\":" + POLICY_JSON
+                        + ",\"files\":[{\"file\":\"a.tn\",\"outcome\":\"VALID\",\"errors\":[]}],\"errors\":[]}",
                 OutputFormat.JSON.render(run));
     }
 
@@ -403,9 +394,9 @@ class OutputFormatTest {
 
         String rendered = OutputFormat.JSON.render(run);
 
-        assertEquals("{\"valid\":false,\"policy\":" + POLICY_JSON + ",\"files\":["
-                + "{\"file\":\"good.tn\",\"valid\":true,\"errors\":[]},"
-                + "{\"file\":\"bad.tn\",\"valid\":false,\"errors\":[{"
+        assertEquals("{\"outcome\":\"INVALID\",\"policy\":" + POLICY_JSON + ",\"files\":["
+                + "{\"file\":\"good.tn\",\"outcome\":\"VALID\",\"errors\":[]},"
+                + "{\"file\":\"bad.tn\",\"outcome\":\"INVALID\",\"errors\":[{"
                 + "\"code\":\"TYPE_MISMATCH\",\"message\":\"nope\"}]}"
                 + "],\"errors\":[]}", rendered);
     }
@@ -421,7 +412,7 @@ class OutputFormatTest {
 
         String rendered = OutputFormat.JSON.render(run);
 
-        assertTrue(rendered.startsWith("{\"valid\":false,\"policy\":" + POLICY_JSON
+        assertTrue(rendered.startsWith("{\"outcome\":\"NOT_CHECKED\",\"policy\":" + POLICY_JSON
                 + ",\"files\":[],\"errors\":[{"), rendered);
         assertTrue(rendered.contains("\"message\":\"no data files\""), rendered);
     }
@@ -445,7 +436,7 @@ class OutputFormatTest {
                 FileReport.of("bad.tn", List.of(new CliDiagnostic(Optional.of("/a"), Optional.empty(), Optional.empty(),
                         Diagnostic.Code.FIELD_REQUIRED,
                         "missing required field 'a'", Optional.of("a value"), Optional.of("(absent)"),
-                        Optional.of("1:1:0"), Optional.of("6:3:42"), Optional.empty())))));
+                        Optional.of("1:1:0"), Optional.of("6:3:42"))))));
 
         String rendered = OutputFormat.TSON.render(original);
 
@@ -469,10 +460,10 @@ class OutputFormatTest {
 
     @Test
     void tsonOutputRoundTripsRealPositions() {
-        ValidationReport original = new ValidationReport(false, POLICY, List.of(
+        ValidationReport original = new ValidationReport(Outcome.INVALID, POLICY, List.of(
                 new CliDiagnostic(Optional.of("/value"), Optional.empty(), Optional.empty(), Diagnostic.Code.FIELD_REQUIRED,
                         "missing required field 'value'", Optional.of("a value"), Optional.of("(absent)"),
-                        Optional.of("1:1:0"), Optional.of("6:3:42"), Optional.empty())));
+                        Optional.of("1:1:0"), Optional.of("6:3:42"))));
 
         String rendered = OutputFormat.TSON.render(original);
 

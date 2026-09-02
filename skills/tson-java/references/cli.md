@@ -29,13 +29,16 @@ options, exit codes and description — including the policy options for the thr
 | Schema selection      | entirely the data's own: its `!!schema` names the schema, its root type-ref (`!person`) the type. There is no `--type`, and no `--schema` |
 | `-`                   | reads one data document from stdin, at most once, always data (a file really named `-` is `./-`)     |
 | `--output`            | `text` (default), `json`, `tson`                                                                    |
-| Exit codes            | `0` valid · `1` a document is invalid · `2` usage · `69` a schema nothing would supply · `70` library gap or fault |
+| Exit codes            | `0` checked, nothing reported · `1` checked and rejected · `2` usage · `69` a schema nothing would supply · `75` a schema that could not be reached · `78` a type with no Java class here · `70` library gap or fault |
 
 **The CLI fetches nothing** — schemas come from the files you list, and one it cannot match is
-`SCHEMA_UNAVAILABLE` and exit 69, not a verdict on your data. `69` and `70` are deliberately kept apart from
-`1`: `1` is a verdict on the document, the other two are the *absence* of one, naming who could not give it.
-`TsonCli.exitCodeFor` lifts a run to whichever is most permanent — 70 over 69 over 1. `validate` collects
-every problem in a file in one pass.
+`SCHEMA_NOT_FOUND` and exit 69, not a verdict on your data. Everything above `2` is deliberately kept apart
+from `1`: `1` is a verdict on the document, the rest are the *absence* of one, naming who could not give it —
+this library (`70`), an application that would have to bind the type (`78`), whoever was to serve the schema
+(`69` permanently, `75` perhaps not). `TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by who must
+act before anyone else's fix counts and with permanence breaking the tie — `70` > `78` > `69` > `75` > `1`.
+A §8.2 name-hygiene refusal is a `1`: the processor looked and declined, and the sender holds the fix.
+`validate` collects every problem in a file in one pass.
 
 ```bash
 tson init-example .                                   # writes person.tn + person-data.tn
@@ -105,15 +108,15 @@ one setting.
 ## Machine-readable output
 
 `--output json` is one document per invocation, one file or twenty — a `files` array with each data file's
-own `file`/`valid`/`errors`, wrapped in the run's verdict. **Both machine formats spell one report one way:
-`snake_case` keys, and a field with nothing to say left out rather than written `null`.**
+own `file`/`outcome`/`errors`, wrapped in the run's own outcome. **Both machine formats spell one report one
+way: `snake_case` keys, and a field with nothing to say left out rather than written `null`.**
 
 ```json
-{"valid":false,
+{"outcome":"INVALID",
  "policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,"permitting":[]},
            "token_policy":{"level":"UNRESTRICTED","per_segment":false,"permitting":[]},
            "unicode_data_version":"16.0"},
- "files":[{"file":"person-data.tn","valid":false,"errors":[
+ "files":[{"file":"person-data.tn","outcome":"INVALID","errors":[
    {"path":"/age","schema_pointer":"/person/age","schema_id":"example.com/…/person.tn",
     "code":"ATOM_CONSTRAINT_VIOLATION","message":"'int32': 'thirty' is not a valid integer …",
     "expected":"an integer or based-integer form","actual":"thirty",
@@ -121,10 +124,19 @@ own `file`/`valid`/`errors`, wrapped in the run's verdict. **Both machine format
  "errors":[]}
 ```
 
-`policy` sits between `valid` and `files` on every envelope — the §8.2 configuration the run was judged
+**`outcome` is `VALID` / `INVALID` / `NOT_CHECKED`, not a `valid` boolean**, because those are two questions
+and one bit cannot carry both: a document whose schema was never obtained, or whose types have no Java class
+in this tool, was never read, and calling it `valid: false` asserts a verdict the run cannot make — the
+assertion an agent acts on the moment it writes `if (!valid)`. `NOT_CHECKED` is exactly the set of codes that
+are not a verdict: the five `SCHEMA_*` fetch codes, `BIND_MISMATCH` and `NOT_IMPLEMENTED`. One of them in a
+file makes that file `NOT_CHECKED`, and one such file makes the run `NOT_CHECKED` — a run being no better
+than its parts, and its exit code then one of `69`, `75`, `78`, `70`. A run that never reached a document at
+all (a usage or classification failure, exit `2`) is `NOT_CHECKED` with an empty `files` too.
+
+`policy` sits between `outcome` and `files` on every envelope — the §8.2 configuration the run was judged
 under, stated once because it is constant for the run and cannot differ between two of its problems. A
 §8.2 refusal is an ordinary diagnostic told apart by its `code` (`CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`,
-`RESTRICTED_SCRIPT`) and carries nothing extra.
+`RESTRICTED_SCRIPT`), carries nothing extra, and leaves the file `INVALID` rather than `NOT_CHECKED`.
 
 `--output tson` is the same record through the library's own writer — the shape `tson-cli`'s own
 `diagnostics.tn` declares, which that output is validated against, and which `--output json` now matches key
@@ -141,6 +153,8 @@ stopped the run before any document was read.
 | a schema passed by filename convention                       | classification is by content (`!!meta`), and matching is by `!!id`      | check the `!!id` the schema declares                  |
 | exit `70` read as "invalid document"                         | it is a gap or a fault in this library, not a verdict                  | treat it as a bug report                              |
 | exit `69` read as "invalid document"                         | no schema was obtained, so nothing was judged                          | pass the schema file, or check the `!!id`             |
+| exit `75` retried forever, or `69` retried at all            | `75` says a rerun may help; `69` says it will not                      | retry `75`; fix the reference or allow-list for `69`  |
+| `if (!valid)` against the envelope                           | there is no `valid`; `NOT_CHECKED` is not `INVALID`                    | switch on `outcome` — three states, no falsy shortcut |
 | a refusal treated as a permanent verdict                     | another deployment's policy may accept the same name                   | read `policy` in the report, or run `tson policy`     |
 | `--token-scripts` with `--token-policy unrestricted`         | a list of combinations under a level that scans nothing                | name a level that scans, or drop the list             |
 | relaxing a policy in a shell profile                         | ambient authority is what §8.2's non-silence rule is about             | put the flag in the CI file or Makefile that runs it  |

@@ -139,28 +139,13 @@ public interface TsonReadContext {
      * #schemaLocation()} and hands it to this read's {@link TsonDiagnosticsReceiver}, which decides its
      * fate -- a fail-fast receiver throws {@link TsonReadException} from here and never returns.
      */
-    default void report(Diagnostic.Code code, String message, String expected, String actual) {
-        report(code, message, expected, actual, Optional.empty());
-    }
+    void report(Diagnostic.Code code, String message, String expected, String actual);
 
     // A [TSON-DATA] §8.2 name-hygiene refusal reports through this same method, and has no channel of its
     // own: what distinguishes it is its `code` (CONFUSABLE_NAMES / RESTRICTED_CHARACTER / RESTRICTED_SCRIPT,
     // one per rule), which is what a consumer routes on. The Unicode data version §8.2 requires a refusal to
     // name is a fact about this processor rather than about the problem, so it is stated once per run beside
     // the diagnostics -- TsonUnicodeProcessorPolicy -- rather than stamped onto each one.
-
-    /**
-     * {@link #report(Diagnostic.Code, String, String, String)} carrying a {@link
-     * TsonSchemaFetchException.Reason} -- the one thing about a problem that neither the code nor the
-     * location model states, and which only {@link Diagnostic.Code#SCHEMA_UNAVAILABLE} has.
-     *
-     * <p>A separate method rather than a fifth parameter on the common one: every reader in the compiled
-     * stack reports values, and none of them can ever have a fetch reason to state -- a schema that could
-     * not be fetched has no compiled readers to run. Only the facades, which catch the failure to obtain a
-     * schema at all, reach this.
-     */
-    void report(Diagnostic.Code code, String message, String expected, String actual,
-            Optional<TsonSchemaFetchException.Reason> fetchReason);
 
     /**
      * How many problems have been reported through this read so far, counting every scoped copy since they

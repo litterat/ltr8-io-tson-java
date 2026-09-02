@@ -42,22 +42,14 @@ import java.util.Optional;
  * alike, which is exactly the ambiguity the structured half exists to remove. An absent pointer means
  * this diagnostic has no such end at all; a present {@code ""} means the root.
  *
- * <p><b>One component is not a location</b>, {@code fetchReason}: it is present for a closed set of codes
- * and carries a fact a consumer acts on that is recoverable from neither the document nor the schema.
+ * <p><b>Every component is a location</b>, and the one fact that is not -- why a schema could not be
+ * obtained -- is carried by the {@link Code} rather than beside it. A fetch failure has five causes and
+ * consumers partition them differently (a command line by whether a rerun could help, an HTTP surface by
+ * whose doing it was), so each is its own code and no partition is privileged. A field would have been a
+ * second carrier for a routing question, and the code is what a consumer routes on.
  *
- * <p>{@code fetchReason} is present for exactly one code. {@link Code#SCHEMA_UNAVAILABLE} says a schema
- * could not be obtained; {@link
- * TsonSchemaFetchException.Reason} says whether that is the document's doing ({@code NOT_PERMITTED} names a
- * reference this deployment will not fetch, {@code NOT_FOUND} one nothing serves) or the world's ({@code
- * TIMEOUT}, {@code TRANSPORT}, {@code TOO_LARGE}), which is the difference between telling a sender to fix
- * its document and telling it to try again. The code cannot carry it -- {@code Code} is closed and sorts by
- * <em>who</em> could not check, so five members for one condition would be the wrong axis -- and {@code
- * message} must not, since recovering it means parsing prose. It exists because the two channels one
- * fetch failure travels on, the thrown {@link TsonSchemaFetchException} and the collected diagnostic, have
- * to be able to answer the same question; a collecting receiver is the common path, not the edge.
- *
- * <p><b>A [TSON-DATA] §8.2 name-hygiene refusal carries no component of its own</b>, and the rule that
- * keeps it out is the one that let {@code fetchReason} in. §8.2 requires a refusal to name the Unicode data
+ * <p><b>A [TSON-DATA] §8.2 name-hygiene refusal carries no component of its own</b> either, for a related
+ * reason. §8.2 requires a refusal to name the Unicode data
  * version it was computed against, which is a fact about <em>this processor</em>: constant for the life of
  * a process, so a copy on each problem is N copies of a string that cannot differ, and needed by a sender
  * before it writes a document rather than after it is refused. It is stated once, beside the diagnostics
@@ -84,8 +76,7 @@ import java.util.Optional;
  */
 public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, String schemaId, Code code,
                           String message, String expected, String actual,
-                          Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition,
-                          Optional<TsonSchemaFetchException.Reason> fetchReason) {
+                          Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition) {
 
     // ── Absence, for a renderer ──────────────────────────────────────────
     //
@@ -167,7 +158,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
             default -> throw e;
         }
         return new Diagnostic(Optional.of(""), Optional.empty(), "", Code.VALIDATION_ERROR, e.getMessage(),
-                expected, actual, Optional.ofNullable(position), Optional.empty(), Optional.empty());
+                expected, actual, Optional.ofNullable(position), Optional.empty());
     }
 
     /**
@@ -190,7 +181,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofRestrictedToken(String text, String why, SourcePosition position) {
         return new Diagnostic(Optional.empty(), Optional.empty(), "", Code.RESTRICTED_SCRIPT,
                 "the token " + why, "a token the Unicode policy admits", text,
-                Optional.ofNullable(position), Optional.empty(), Optional.empty());
+                Optional.ofNullable(position), Optional.empty());
     }
 
     /**
@@ -216,7 +207,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                 schemaId, Code.VALIDATION_ERROR, e.getMessage(),
                 e.expected().isEmpty() ? "well-formed TSON" : e.expected(),
                 e.actual().isEmpty() ? "a syntax error" : e.actual(),
-                Optional.empty(), Optional.ofNullable(e.position()), Optional.empty());
+                Optional.empty(), Optional.ofNullable(e.position()));
     }
 
     /**
@@ -236,13 +227,13 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
             default -> throw e;
         }
         return new Diagnostic(Optional.empty(), Optional.of(""), schemaId, Code.VALIDATION_ERROR, e.getMessage(),
-                "well-formed TSON", "a syntax error", Optional.empty(), Optional.ofNullable(position),
-                Optional.empty());
+                "well-formed TSON", "a syntax error", Optional.empty(), Optional.ofNullable(position));
     }
 
     /**
      * The schema could not be obtained at all -- {@link #ofSchemaError}'s shape with {@link
-     * Code#SCHEMA_UNAVAILABLE} in place of {@code SCHEMA_ERROR}, and the whole of the difference between
+     * Code#of(TsonSchemaFetchException.Reason) fetch code} in place of {@code SCHEMA_ERROR}, and the whole
+     * of the difference between
      * "this schema is wrong" and "nobody would give me this schema".
      *
      * <p><b>It takes the exception rather than its message</b>, because it is built from a {@link
@@ -252,17 +243,16 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * will serve reaches this; one that resolves and then fails to link is a {@code SCHEMA_ERROR} like any
      * other.
      *
-     * <p>Taking the whole exception is also what lets {@link #fetchReason} be populated at all, and the
-     * {@code expected}/{@code actual} pair with it: the reference that could not be obtained is {@code
-     * actual}, since it is the thing a consumer must look at. The alternative -- passing a flattened
-     * message -- is how this factory came to state {@link TsonSchemaFetchException.Reason}'s distinction
-     * nowhere.
+     * <p>Taking the whole exception is also what picks the {@link Code}, and what fills the {@code
+     * expected}/{@code actual} pair: the reference that could not be obtained is {@code actual}, since it is
+     * the thing a consumer must look at. The alternative -- passing a flattened message -- is how this
+     * factory came to state {@link TsonSchemaFetchException.Reason}'s distinction nowhere.
      */
     public static Diagnostic ofSchemaUnavailable(String schemaId, String declaration,
                                                  TsonSchemaFetchException e, Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, Code.SCHEMA_UNAVAILABLE, e.getMessage(), SchemaFailure.UNAVAILABLE_EXPECTED, e.uri(),
-                Optional.empty(), position, Optional.of(e.reason()));
+                schemaId, Code.of(e.reason()), e.getMessage(), SchemaFailure.UNAVAILABLE_EXPECTED, e.uri(),
+                Optional.empty(), position);
     }
 
     /**
@@ -282,7 +272,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofSchemaError(String schemaId, String declaration, String message,
                                            Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, Code.SCHEMA_ERROR, message, "", "", Optional.empty(), position, Optional.empty());
+                schemaId, Code.SCHEMA_ERROR, message, "", "", Optional.empty(), position);
     }
 
     /**
@@ -305,7 +295,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofSchemaRefusal(String schemaId, String declaration, Code code, String message,
                                              Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, code, message, "", "", Optional.empty(), position, Optional.empty());
+                schemaId, code, message, "", "", Optional.empty(), position);
     }
 
     /**
@@ -322,8 +312,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                                                   TsonBindMismatchException e,
                                                   Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, Code.BIND_MISMATCH, e.getMessage(), "", "", Optional.empty(), position,
-                Optional.empty());
+                schemaId, Code.BIND_MISMATCH, e.getMessage(), "", "", Optional.empty(), position);
     }
 
     /**
@@ -342,8 +331,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public static Diagnostic ofSchemaGap(String schemaId, String declaration, String message,
                                          Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, Code.NOT_IMPLEMENTED, message, "", "", Optional.empty(), position,
-                Optional.empty());
+                schemaId, Code.NOT_IMPLEMENTED, message, "", "", Optional.empty(), position);
     }
 
     /**
@@ -392,11 +380,11 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * of one identifier policy. It is also the one of the three a <em>value</em> can carry ({@link
      * #ofRestrictedToken}), a token having no identifier profile and no scope to be distinct within.
      *
-     * <p><b>{@code NOT_IMPLEMENTED}, {@code BIND_MISMATCH} and {@code SCHEMA_UNAVAILABLE} are the three
-     * members that are not a verdict on the document.</b> Each says the thing it names could not be
-     * checked, which is not the same as invalid, and a consumer that treats any of them as invalid is
-     * wrong in the one direction that matters. They differ in <em>who</em> could not check it, which is
-     * exactly what a consumer picking an HTTP status or an exit code is asking:
+     * <p><b>{@code NOT_IMPLEMENTED}, {@code BIND_MISMATCH} and the five {@code SCHEMA_*} fetch codes are
+     * the members that are not a verdict on the document</b> ({@link Code#verdict}). Each says the thing it
+     * names could not be checked, which is not the same as invalid, and a consumer that treats any of them
+     * as invalid is wrong in the one direction that matters. They differ in <em>who</em> could not check it,
+     * which is exactly what a consumer picking an HTTP status or an exit code is asking:
      * <ul>
      *   <li>{@code NOT_IMPLEMENTED} -- this library. A construct is beyond it; the member exists so a gap
      *       can ride in the same single-pass list as the ordinary problems rather than throwing and taking
@@ -405,15 +393,13 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      *       disagree ({@link TsonBindMismatchException}, {@link TsonMissingBindingException}): a wiring
      *       mistake, where the document may be perfectly valid and the message names one of that
      *       application's own classes.</li>
-     *   <li>{@code SCHEMA_UNAVAILABLE} -- everyone else. No configured {@link TsonSchemaSource} would
-     *       supply the schema the document names: a host that did not answer, a reference this deployment
-     *       will not fetch, a schema nobody registered ({@link TsonSchemaFetchException}). Nothing is
-     *       wrong with the document, and nothing may be wrong with the schema either -- it was never
-     *       obtained, so it was never read. Kept apart from {@code SCHEMA_ERROR} because that one is a
-     *       verdict: the schema <em>was</em> obtained and it does not resolve. <b>"Everyone else" is
-     *       several people</b>, and {@link #fetchReason} is which: a reference this deployment refuses is
-     *       the sender's mistake where a host that timed out is nobody's, and only one of those is worth
-     *       retrying.</li>
+     *   <li>the five {@code SCHEMA_*} codes -- everyone else. No configured {@link TsonSchemaSource} would
+     *       supply the schema the document names ({@link TsonSchemaFetchException}). Nothing is wrong with
+     *       the document, and nothing may be wrong with the schema either -- it was never obtained, so it
+     *       was never read. Kept apart from {@code SCHEMA_ERROR} because that one is a verdict: the schema
+     *       <em>was</em> obtained and it does not resolve. <b>"Everyone else" is several people</b>, and
+     *       that is why there are five: a reference this deployment refuses is the sender's mistake where a
+     *       host that timed out is nobody's, and only one of those is worth retrying.</li>
      * </ul>
      */
     public enum Code {
@@ -434,6 +420,68 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         VALIDATION_ERROR,
         NOT_IMPLEMENTED,
         BIND_MISMATCH,
-        SCHEMA_UNAVAILABLE
+
+        // ── A schema was not obtained: one code per reason ───────────────────────────────────────
+        //
+        // Why a fetch failed is a *routing* question, and a code is what a consumer routes on -- the same
+        // reason §8.2's three refusal codes are three codes with no `refusalReason` beside them. Carrying it
+        // as a field instead would be a second carrier for one fact, free to disagree with the first.
+        //
+        // One per reason rather than a permanent/transient pair, because consumers partition them
+        // differently: a command line by whether a rerun could help, an HTTP surface by whose doing it was.
+        // A code encoding one partition strands the other. `TsonSchemaFetchException.Reason` is the throwing
+        // channel's own vocabulary and the single input to `Code.of`, so the two channels cannot disagree.
+
+        /** Policy refused it: not an allowed host, not a legal identity, or no pin where one is required. */
+        SCHEMA_NOT_PERMITTED,
+
+        /** The location was reached and does not have it. */
+        SCHEMA_NOT_FOUND,
+
+        /** The location could not be reached, or answered with something other than a document. */
+        SCHEMA_UNREACHABLE,
+
+        /** The location did not answer in time. */
+        SCHEMA_TIMEOUT,
+
+        /** The location answered with more bytes than a schema document is allowed to be. */
+        SCHEMA_TOO_LARGE;
+
+        /** The code a fetch failure reports, one per {@link TsonSchemaFetchException.Reason}. */
+        public static Code of(TsonSchemaFetchException.Reason reason) {
+            return switch (reason) {
+                case NOT_PERMITTED -> SCHEMA_NOT_PERMITTED;
+                case NOT_FOUND -> SCHEMA_NOT_FOUND;
+                case TRANSPORT -> SCHEMA_UNREACHABLE;
+                case TIMEOUT -> SCHEMA_TIMEOUT;
+                case TOO_LARGE -> SCHEMA_TOO_LARGE;
+            };
+        }
+
+        /**
+         * Whether this code is a verdict on the document -- <b>the document was checked, and this is what
+         * checking found</b>.
+         *
+         * <p>The three that are not say so for three different reasons: {@link #NOT_IMPLEMENTED} that this
+         * library could not check it, {@link #BIND_MISMATCH} that the reading application is wired wrong,
+         * and the five {@code SCHEMA_*} fetch codes that no schema was obtained to check against. Nothing
+         * about the document is being asserted by any of them, which is what a caller routing on the answer
+         * needs to know.
+         *
+         * <p><b>A §8.2 name-hygiene refusal is a verdict</b>, though not a validity one: the processor
+         * looked and declined, and the sender holds the fix. What it is not is an {@link #SCHEMA_ERROR}-style
+         * claim about conformance, which is what the code beside it carries.
+         *
+         * <p>Stated here so that a consumer does not keep its own copy of the set. Two already would --
+         * {@code TsonCli.exitCodeFor} and this project's HTTP surface -- and a private copy each is how two
+         * consumers come to disagree about the same diagnostic.
+         */
+        public boolean verdict() {
+            return switch (this) {
+                case NOT_IMPLEMENTED, BIND_MISMATCH, SCHEMA_NOT_PERMITTED, SCHEMA_NOT_FOUND,
+                        SCHEMA_UNREACHABLE, SCHEMA_TIMEOUT, SCHEMA_TOO_LARGE -> false;
+                default -> true;
+            };
+        }
     }
 }

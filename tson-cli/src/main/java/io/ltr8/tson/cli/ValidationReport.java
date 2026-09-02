@@ -19,13 +19,14 @@ import java.util.List;
  *
  * <p>Public for the same reason {@link CliDiagnostic} is -- see its own Javadoc.
  */
-public record ValidationReport(boolean valid, CliPolicy policy, List<CliDiagnostic> errors) {
+public record ValidationReport(Outcome outcome, CliPolicy policy, List<CliDiagnostic> errors) {
 
     static ValidationReport ok(CliPolicy policy) {
-        return new ValidationReport(true, policy, List.of());
+        return new ValidationReport(Outcome.VALID, policy, List.of());
     }
 
     static ValidationReport failed(CliPolicy policy, Diagnostic.Code code, String message) {
-        return new ValidationReport(false, policy, List.of(CliDiagnostic.minimal(code, message)));
+        List<CliDiagnostic> errors = List.of(CliDiagnostic.minimal(code, message));
+        return new ValidationReport(Outcome.of(errors), policy, errors);
     }
 }

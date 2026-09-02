@@ -664,10 +664,10 @@ $ tson validate person.tn ada.tn      # ada.tn = !!schema:"…/person-1.tn" !per
 OK
 
 $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person-1.tn" !person { age: 30 }
-{"valid":false,"policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,
+{"outcome":"INVALID","policy":{"identifier_policy":{"level":"HIGHLY_RESTRICTIVE","per_segment":false,
   "permitting":[]},"token_policy":{"level":"UNRESTRICTED","per_segment":false,"permitting":[]},
   "unicode_data_version":"16.0"},
-  "files":[{"file":"bad.tn","valid":false,"errors":[{"path":"/name",
+  "files":[{"file":"bad.tn","outcome":"INVALID","errors":[{"path":"/name",
   "schema_pointer":"/person/name","schema_id":"example.com/2026/34/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(absent)","data_position":"2:9:63",
@@ -678,10 +678,18 @@ OK
 ```
 
 - **`--output json`/`tson` is one document per invocation**, one file or twenty: a `files` array with each
-  data file's own `file`/`valid`/`errors`, wrapped in the run's own verdict. Nothing to reassemble, and
+  data file's own `file`/`outcome`/`errors`, wrapped in the run's own outcome. Nothing to reassemble, and
   no branch on file count. The top-level `errors` carries only what stopped the run before any document
   was read (exit 2); a document that read but didn't validate reports inside its own entry (exit 1).
   `--output text` keeps the human-facing `# <file>` headers instead.
+- **`outcome` is `VALID`, `INVALID` or `NOT_CHECKED`**, not a `valid` boolean, because those are two
+  questions and one bit cannot carry both: a document whose schema was never obtained, or whose types have
+  no Java class in this tool, was never read at all, and reporting it `valid: false` asserts a verdict the
+  run cannot make — which is exactly the assertion an agent acts on when it reads `if (!valid)`.
+  `NOT_CHECKED` is precisely the set of codes that are not a verdict (`Diagnostic.Code.verdict`): the five
+  `SCHEMA_*` fetch codes, `BIND_MISMATCH` and `NOT_IMPLEMENTED`. One of them anywhere in a file makes that
+  file `NOT_CHECKED`, and one such file makes the run `NOT_CHECKED`; a §8.2 name-hygiene refusal is
+  `INVALID`, the processor having looked and declined with the sender holding the fix.
 - **Both machine formats spell one report one way** — `snake_case` keys, and a field with nothing to say
   left out rather than written `null`. That is what `tson-cli`'s own `diagnostics.tn` declares, what
   `--output tson` always emitted, and what the TypeScript CLI emits in both of its formats.
@@ -693,10 +701,14 @@ OK
   A field with nothing to say is omitted, never `""`, the two RFC 6901 pointers included: for a pointer
   `""` is the *root*, a real location a document-level problem genuinely carries, so a present `""` and an
   absent key stay apart there. A position is `line:column:byteOffset`, the first two
-  1-based and the offset counting UTF-8 bytes from 0. One field is not a location: `fetch_reason` rides a
-  `SCHEMA_UNAVAILABLE` and says *why* no schema was obtained — `NOT_PERMITTED`/`NOT_FOUND` mean the document
-  named something this deployment will not fetch or nothing serves, where `TRANSPORT`/`TIMEOUT`/`TOO_LARGE`
-  mean the reference was fine and only those are worth retrying. A §8.2 name-hygiene refusal is an ordinary
+  1-based and the offset counting UTF-8 bytes from 0. **Every field is a location, and the one fact that is
+  not — why no schema was obtained — rides the `code` rather than a field beside it**: `SCHEMA_NOT_PERMITTED`
+  and `SCHEMA_NOT_FOUND` mean the document named something this deployment will not fetch or nothing serves,
+  where `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT` and `SCHEMA_TOO_LARGE` mean the reference itself was fine — and
+  of those, only the first two are worth retrying. Five codes rather than one plus a reason field because
+  which one it is is a *routing* question, and a code is what a consumer routes on; consumers partition the
+  five differently (this CLI by whether a rerun could help, an HTTP surface by whose doing it was), so one
+  code per reason privileges no partition. A §8.2 name-hygiene refusal is an ordinary
   diagnostic told apart by its code — `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT`, one
   per rule — and carries nothing extra; what judged it rides on the envelope (below). The whole shape is
   declared as a real schema in `tson-cli`'s own `diagnostics.tn`, which `--output tson` is validated
@@ -714,19 +726,24 @@ OK
   (an LLM repair loop, say) never has to parse `message` to recover a bound or a member list.
 - **Schema selection** is entirely the data's own doing: its `!!schema` names the schema and its root
   type-ref (`!person`) names the type. The CLI itself does no URL *fetching* — schemas come from the files
-  you list, and one it can't match is `SCHEMA_UNAVAILABLE` (exit 69), not a verdict on your data. The
+  you list, and one it can't match is `SCHEMA_NOT_FOUND` (exit 69), not a verdict on your data. The
   library has fetching sources (`TsonHttpSchemaSource`, `TsonFileSchemaSource`); wiring one into the CLI is
   separate.
 - **`--output`**: `text` (default, human-readable), `json` (for scripts/agents — the shape aligns with
   Pydantic's own `errors()`), or `tson` (the diagnostics rendered as a real, schema-validated TSON
   document — the CLI dogfooding the library).
-- **Exit codes** are Unix-conventional: `0` valid/compiled, `1` a real validation/compile failure,
-  `2` a usage error (bad arguments, an unreadable file), `69` (`EX_UNAVAILABLE`) a schema nothing would
-  supply (you didn't pass the schema file, or a host didn't answer), and `70` (`EX_SOFTWARE`) `tson` failing
-  to reach a verdict at all — either a gap (`not implemented yet: …`, whose message usually names the way to
-  write the thing today) or a bug, which prints its stack trace and asks for a report. The last two are
-  deliberately kept distinct from `1` so a script never reads a crash, or a schema it never fetched, as
-  "your document is invalid" — so a script gets a clean pass/fail without parsing prose. `validate` collects
+- **Exit codes** are Unix-conventional: `0` everything checked and nothing reported, `1` **checked and
+  rejected**, `2` a usage error (bad arguments, an unreadable file), `69` (`EX_UNAVAILABLE`) a schema not
+  obtained and a rerun will not obtain it (you didn't pass the schema file, or the reference is one this
+  deployment refuses), `75` (`EX_TEMPFAIL`) a schema not obtained because a host didn't answer or timed out —
+  the one worth running again, `78` (`EX_CONFIG`) a type the schema needs has no Java class in this tool, and
+  `70` (`EX_SOFTWARE`) `tson` failing to reach a verdict at all — either a gap (`not implemented yet: …`,
+  whose message usually names the way to write the thing today) or a bug, which prints its stack trace and
+  asks for a report. Everything above `2` is deliberately kept distinct from `1` so a script never reads a
+  crash, a missing binding, or a schema it never fetched, as "your document is invalid" — so a script gets a
+  clean pass/fail without parsing prose. `1` includes a §8.2 name-hygiene refusal: the processor looked and
+  declined, and the sender holds the fix. A mixed run is lifted to whichever code is most permanent —
+  **`70` > `78` > `69` > `75` > `1`** — since rerunning reaches a gap again. `validate` collects
   *every* problem in a file in one pass, not just the first.
 
 ## Use it from another project

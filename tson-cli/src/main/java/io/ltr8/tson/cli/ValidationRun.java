@@ -5,7 +5,7 @@ import io.ltr8.tson.compiler.Diagnostic;
 import java.util.List;
 
 /**
- * The result of one {@code validate} invocation: {@code valid} for the run as a whole, one {@link
+ * The result of one {@code validate} invocation: {@code outcome} for the run as a whole, one {@link
  * FileReport} per data document validated, and {@code errors} for anything that went wrong with the
  * invocation itself rather than with any one document.
  *
@@ -13,12 +13,13 @@ import java.util.List;
  * never branches on file count to find the diagnostics. {@code compile} keeps rendering a bare {@link
  * ValidationReport} instead -- it checks exactly one schema and has no file list to name.
  *
- * <p><b>The two error lists match the two exit codes.</b> {@code errors} is populated only by the
+ * <p><b>The two error lists say two different things.</b> {@code errors} is populated only by the
  * failures that stop the run before any data is read -- a file that can't be read while being
  * classified, a schema document with no {@code !!id}, an argument list with no data files in it -- and
- * those are exit 2. A document that read but didn't validate lands in its own {@link FileReport}, and
- * that is exit 1. So {@code errors} non-empty means "the invocation was wrong", never "your document
- * was", and a consumer can tell the two apart without reading the messages. Shape matches {@code
+ * those are exit 2, with the run {@link Outcome#NOT_CHECKED} because nothing was. A document that read
+ * lands in its own {@link FileReport} carrying its own outcome. So {@code errors} non-empty means "the
+ * invocation was wrong", never "your document was", and a consumer can tell the two apart without reading
+ * the messages. Shape matches {@code
  * diagnostics.tn}'s own {@code validation_run} field for field.
  *
  * <p><b>{@code policy} is stated once here rather than on the diagnostics.</b> A [TSON-DATA] §8.2
@@ -30,16 +31,18 @@ import java.util.List;
  *
  * <p>Public for the same reason {@link CliDiagnostic} is -- see its own Javadoc.
  */
-public record ValidationRun(boolean valid, CliPolicy policy, List<FileReport> files,
+public record ValidationRun(Outcome outcome, CliPolicy policy, List<FileReport> files,
                             List<CliDiagnostic> errors) {
 
     /** A run that got as far as validating documents: the verdict is every file's verdict. */
     static ValidationRun of(CliPolicy policy, List<FileReport> files) {
-        return new ValidationRun(files.stream().allMatch(FileReport::valid), policy, files, List.of());
+        return new ValidationRun(Outcome.ofFiles(files), policy, files, List.of());
     }
 
     /** A run that never reached a document -- no files, one run-level problem, and exit 2. */
     static ValidationRun failed(CliPolicy policy, Diagnostic.Code code, String message) {
-        return new ValidationRun(false, policy, List.of(), List.of(CliDiagnostic.minimal(code, message)));
+        // Exit 2: the invocation was wrong, so nothing was checked and no verdict is being given.
+        return new ValidationRun(Outcome.NOT_CHECKED, policy, List.of(),
+                List.of(CliDiagnostic.minimal(code, message)));
     }
 }

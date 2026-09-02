@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 
-import java.util.Optional;
 
 /**
  * What a read reports when it cannot obtain a compiled schema for the document it is reading -- the {@link
@@ -26,34 +25,26 @@ import java.util.Optional;
  * indistinguishable by type here, and either every fault reads as a bad schema or every source that spells
  * a miss with an {@code IllegalStateException} crashes the read.
  *
- * <p><b>Not obtaining a schema and not resolving one are two codes</b>, {@code SCHEMA_UNAVAILABLE} and
- * {@code SCHEMA_ERROR}. The first is not a verdict on anything: no source would supply the schema, so it was
- * never read, and whether it would have resolved is unknown. The second is a verdict -- the schema arrived
- * and is wrong. A pinned reference whose bytes do not match its digest is the second: something was
- * obtained, and it is not what the reference named.
+ * <p><b>Not obtaining a schema and not resolving one are different codes</b>. Not obtaining one is not a
+ * verdict on anything: no source would supply the schema, so it was never read, and whether it would have
+ * resolved is unknown. {@code SCHEMA_ERROR} is a verdict -- the schema arrived and is wrong. A pinned
+ * reference whose bytes do not match its digest is the second: something was obtained, and it is not what
+ * the reference named.
  *
- * <p><b>The fetch branch carries one more thing than a code.</b> {@code SCHEMA_UNAVAILABLE} says the schema
- * was not obtained; {@link TsonSchemaFetchException.Reason} says by whose doing, and a consumer picking a
- * status needs the second as much as the first -- a reference this deployment will not fetch is the
- * sender's mistake, where a host that did not answer is nobody's and is worth retrying. It rides here so it
- * reaches {@link Diagnostic#fetchReason()}, which is the only channel a collecting read has; classifying to
- * a code alone would drop it exactly where almost every read now reports.
+ * <p><b>"Not obtained" is five codes rather than one</b>, because a consumer picking a status or an exit
+ * code needs to know by whose doing -- a reference this deployment will not fetch is the sender's mistake,
+ * where a host that did not answer is nobody's and is worth retrying. {@link Diagnostic.Code#of} maps the
+ * thrown {@link TsonSchemaFetchException.Reason} onto them, so this classifier states a code like every
+ * other branch and carries no sub-reason of its own.
  *
- * @param code        what to report the failure as
- * @param expected    what the read needed, for the diagnostic's {@code expected} half; its {@code actual} is
- *                    the schema URI in every case, since that is the thing that could not be obtained
- * @param fetchReason why a fetch failed, present on that branch alone -- the other four have no sub-reason
- *                    to state, and inventing one for them would make the component look general
+ * @param code     what to report the failure as
+ * @param expected what the read needed, for the diagnostic's {@code expected} half; its {@code actual} is
+ *                 the schema URI in every case, since that is the thing that could not be obtained
  */
-record SchemaFailure(Diagnostic.Code code, String expected, Optional<TsonSchemaFetchException.Reason> fetchReason) {
+record SchemaFailure(Diagnostic.Code code, String expected) {
 
     /** The {@code expected} every "could not be obtained" states, so both of its report sites state one thing. */
     static final String UNAVAILABLE_EXPECTED = "a schema that can be obtained";
-
-    /** A failure with no sub-reason -- every branch but the fetch one. */
-    private SchemaFailure(Diagnostic.Code code, String expected) {
-        this(code, expected, Optional.empty());
-    }
 
     /**
      * Classifies a failure thrown while obtaining a compiled schema, rethrowing anything none of the four
@@ -72,8 +63,7 @@ record SchemaFailure(Diagnostic.Code code, String expected, Optional<TsonSchemaF
             // The contract exception of TsonSchemaSource.fetch, so this branch is every source's miss and
             // no source's bug: the reference named something this deployment could not obtain.
             case TsonSchemaFetchException fetch ->
-                    new SchemaFailure(Diagnostic.Code.SCHEMA_UNAVAILABLE, UNAVAILABLE_EXPECTED,
-                            Optional.of(fetch.reason()));
+                    new SchemaFailure(Diagnostic.Code.of(fetch.reason()), UNAVAILABLE_EXPECTED);
             case TsonSchemaValidationException ignored ->
                     new SchemaFailure(Diagnostic.Code.SCHEMA_ERROR, "a resolvable schema");
             // [TSON-DATA] §2.2.1's integrity failure: the bytes a source returned are not the bytes the

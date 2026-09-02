@@ -368,7 +368,8 @@ class Class2ConformanceSuiteTest {
 
     private static void assertIsAVerdict(Diagnostic diagnostic) {
         switch (diagnostic.code()) {
-            case NOT_IMPLEMENTED, BIND_MISMATCH, SCHEMA_UNAVAILABLE -> fail(
+            case NOT_IMPLEMENTED, BIND_MISMATCH, SCHEMA_NOT_PERMITTED, SCHEMA_NOT_FOUND,
+                    SCHEMA_UNREACHABLE, SCHEMA_TIMEOUT, SCHEMA_TOO_LARGE -> fail(
                     "this is not a verdict on the document -- it says the vector could not be checked: "
                             + diagnostic);
             default -> {
