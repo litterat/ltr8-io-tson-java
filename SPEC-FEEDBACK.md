@@ -12,17 +12,17 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The nineteen below are what Revision 34 leaves open, renumbered from #1; the fourteen it resolved of the
-seventeen raised against Revision 33 are gone from here, because the spec now carries their rules and that
-is where the answer belongs. **This file is the as-built record**, not a pointer to one: where an entry
-proposes a design this implementation has built, the entry states the design, what is running, and what is
-not, so that a reviewer editing the spec needs nothing beside it. **Where the evidence is a consumer of this
-library rather than this library** — #16 through #19 were found building the HTTP layer in
-`ltr8-io-tson-java-http`, and this register is the collection point for all of it — the entry says so and
-states what is running there on the same terms. **Cite the spec, not the argument that got
+The twenty-three below are what is open against Revision 34 — the nineteen it left open, renumbered from #1, and
+four raised since; the fourteen it resolved of the seventeen raised against Revision 33 are gone from here,
+because the spec now carries their rules and that is where the answer belongs. **This file is the as-built
+record**, not a pointer to one: where an entry proposes a design this implementation has built, the entry states
+the design, what is running, and what is not, so that a reviewer editing the spec needs nothing beside it.
+**Where the evidence is a consumer of this library rather than this library** — #16 through #19 were found
+building the HTTP layer in `ltr8-io-tson-java-http`, and this register is the collection point for all of it —
+the entry says so and states what is running there on the same terms. **Cite the spec, not the argument that got
 it there:** `docs/` and the Javadoc name the section that requires a behaviour, and a `SPEC-FEEDBACK.md #N`
-citation is for an entry below, where there is no section to point at yet. When an entry closes, its
-citations become spec citations and the entry is deleted — nothing here is an archive.
+citation is for an entry below, where there is no section to point at yet. When an entry closes, its citations
+become spec citations and the entry is deleted — nothing here is an archive.
 
 ---
 
@@ -1446,5 +1446,182 @@ untagged value to the variant of its own class and does not retry another on fai
 **Status against Revision 34:** open, and new against this revision — split out of #11, where they were
 recorded first and would not have been found by anyone reading for §5.4. Finding 1 is a wording defect;
 finding 2 is a consequence the section leaves for an author to discover from a read failure.
+
+---
+
+## 23. `unknown` has no reader for an untyped value, and `extern` names one schema where a position admits a set — proposal: no base type resolution under a schema, and one `scoped` constructor over the namespaces a value's type may come from
+
+**Section:** [TSON-SCHEMA] §7.8 (cross-schema references, the typed-position restriction), §7.1 (the unannotated
+root, the permissive-type list), §4.1 (the sum kind: `choice`, `extern`, `unknown_type`), §5.2 (which fields may
+carry a value), §5.4 (classless variants), §8.1 (`disjoint` absent on the non-choice sums), §9 (meta.tn's
+contents); meta.tn's `extern` and `unknown_type`; core.tn's `unknown`; [TSON-DATA] §2.3 (scoped values), §3.3
+(directive positions), §4 and §4.5 (when base type resolution applies), §5.1 (when the built-in vocabulary
+applies).
+
+**Problem:** three findings about the two sums that are not `choice`, found asking what a reader for each would do.
+Neither has one in this implementation, and the reason is that the spec does not say.
+
+**1. An untyped value at an `unknown` position has no parsing contract.** meta.tn defines `unknown_type` as "an
+empty sum whose instance, `unknown`, accepts any well-formed value of any type", and §7.8 calls `unknown` "a sum
+instance with universe membership". That names the membership and not the reader. For a *tagged* value the reader
+is clear: `!name` resolves in the governing namespace (§7.2) or, after a scoped `!!schema`, in the foreign one. For
+an untagged `42` there is none. [TSON-DATA] §4 applies base type resolution "only when no declared type
+information is in scope", and at an `unknown` position it is — the position's type is `unknown`; [TSON-DATA] §5.1
+switches the built-in vocabulary off under any schema; and `unknown_type` supplies no contract of its own. Read
+literally, the token has no reader, and an implementation must either invent one or refuse the value, and the
+prose supports neither.
+
+The regime such a value would need does exist, at exactly one position. §7.1 makes an unannotated root under
+`!!schema` "legal but vocabulary-only" — untagged tokens by base resolution, validation engaging only where
+annotations appear within the value — and then requires a validator to report it, "with no root type there is
+no contract to check". So the spec has a third reading regime beside *typed by position* and *typed by tag*,
+describes it once, at the root, forbids claiming validation for it there, and leaves `unknown` — the one position
+where an author has explicitly asked for it — with no statement at all.
+
+**2. `extern` names one schema, and the space it sits in has five points, two of them unspellable.** An `extern`
+carries one `schema` and an optional `types` narrowing. A position admitting values from *several* foreign schemas
+— §7.8's own example, an attachments array holding an insurance claim and a radiology report — is written
+`[extern]`, each element carrying its own `!!schema`, and the schema cannot say which schemas are welcome there:
+`types` narrows within one schema, and there is no way to list two. That is the small half. The larger half is
+what the constructor is a point in. Under a schema a value's type comes from a namespace, and there are two
+independent questions about a position: whether the governing namespace (locals and imports, §2.2.3) is admitted,
+and which foreign schemas are. Two answers by three, less the combination that admits nothing:
+
+| Governing namespace | Foreign schemas | Revision 34 | Meaning |
+|---|---|---|---|
+| no | specific | `extern` | the current `extern`, one schema at a time |
+| no | any | — | any foreign schema (the `[extern]` element) |
+| yes | none | — | any type this schema declares or imports |
+| yes | any | `unknown` | either, from anywhere |
+| yes | specific | — | this schema's types, or a named partner's |
+
+Two constructors, unrelated to each other, spell two rows; the third row has no spelling, and the fifth — an
+envelope schema admitting its own event types or a claim from one named partner — cannot be recovered with a
+choice, since a choice dispatches on a variant name and a foreign value's tag is not one.
+
+**3. §7.8's permissive list is a list, and one entry on it is not a sum.** A nested `!!schema` is a resolver
+error "unless the outer type is one of the permissive types: `extern`, `value`, `unknown`, or a container
+thereof". `extern` and `unknown` are sums, and admitting a scope push is what their membership means. `value` is
+the kernel's unit instance — a single token, read by whichever declared type the position hands it to (§5.2) — and
+a scope push at a single-token position has nothing to push a scope *for*: the pushed schema's namespace is
+consulted by `!name` annotations, and a token position carries none that the enclosing schema did not already
+give it. The list is a list because the property is not derived from anything; a constructor that states which
+namespaces a position admits would make it a derived fact, the way `disjoint` is (§8.1).
+
+**Interpretation chosen — a proposal, not yet built.** Three decisions, each stated as what the rule would be.
+
+*No base type resolution under a schema.* Under `!!schema` every value is typed by its position or by its tag,
+and there is no third way to read a token. This closes finding 1 by removing the regime rather than specifying
+it: [TSON-DATA] §4's applicability clause becomes "base type resolution applies only in schemaless documents",
+with no "declared type information in scope" hedge to interpret; §7.1's "legal but vocabulary-only" root becomes
+a plain error in every mode, the root having no position to be typed by, so the MUST that follows it has nothing
+left to guard; and "validated" always means "checked against a named type". It also removes `value` from the
+permissive list, closing finding 3's odd entry: `value` is a token position, not a scope. (The kernel's `@doc`
+on `value` describes it as "the result of base type resolution applied to a source token" and names `null`;
+that sentence is already false under #7 and is false a second way here, and wants rewording to "the token,
+uninterpreted, read by the type the position hands it to".)
+
+*One constructor in meta.tn, replacing `extern` and `unknown_type`, naming the namespaces a value's type may come
+from:*
+
+```
+scoped => ~sum & {
+  scope:   !set { element_type: scope_cell  min_items: 1 }
+  schemas: {uri => [type_name; 1..]?; 1..}?
+}
+scope_cell => !enum [LOCAL EXTERN]
+```
+
+`scope` says which namespaces are admitted; `schemas` narrows the foreign ones — absent is any foreign schema, a
+keyed map is those schemas, and a key's absent value (`{K => V?}`, §5.3) is every type the schema declares where a
+list is those types. The map is keyed by schema identity so one schema cannot be listed twice, compared by §2.2.1's
+canonical identity so a pinned key and an unpinned `!!schema` in the data match, each pin verified by the loader on
+its own. One coherence rule, of the family a resolver already runs over `min_items`/`max_items`: `schemas` requires
+`EXTERN` in `scope`. The state that admits nothing is unspellable rather than refused — `min_items: 1` on both
+collections — which is why the set spelling beats a boolean beside an empty map: the empty map was the only reason
+the narrowing field carried an admission fact, and it was also the ugly spelling.
+
+*Three instances in core.tn*, one per subset, so that the five rows are three names plus one per-use form:
+
+```
+declared => !scoped { scope: [LOCAL] }
+extern   => !scoped { scope: [EXTERN] }
+dynamic  => !scoped { scope: [LOCAL EXTERN] }
+```
+
+`extern` survives as the instance the spec has always meant by the word; `declared` is "a type this schema declares
+or imports"; `dynamic` is the widest, named for what it says — the *data* decides the type, from any namespace — and
+not `any`, which every language a reader arrives from uses for a value that is *unchecked*, where this one is
+validated in full against the type it names. `unknown` goes, deliberately: its meaning was "any well-formed value,
+typed or not", and the untyped half is what the first decision removed — keeping the name over the narrower meaning
+would be the silent kind of change, and the new name marks it. meta.tn loses two constructors and gains one; §4.1's
+sum kind lists `choice` and `scoped`.
+
+*Two templates in core.tn, so that naming one schema, or one type in it, is an application rather than a
+declaration:*
+
+```
+extern_of   => <S>    !scoped { scope: [EXTERN]  schemas: { S => _ } }
+extern_type => <S, T> !scoped { scope: [EXTERN]  schemas: { S => [T] } }
+```
+
+A field then writes `attachment: extern_type<"https://…/claim.tn", claim>` and declares nothing, which is meta.tn's
+own line about an intent that deserves a name earning a template. Both are ordinary §5.10 partial applications over
+a meta constructor, so the kernel does not move; §8.2's instantiation identity makes two schemas writing one
+application land on one entry; and the parameter kinds fall out of the slots — `S` stands in a `uri`-typed key and
+`T` inside `[type_name]`, both atoms, so both are value parameters and the arguments are the scalars §5.10 admits.
+(`T` arrives on the reference channel as a bare name; §5.6 spells a no-argument reference positionally, as its own
+token, so it lands in the `type_name` slot as the identifier it is — this implementation's substitution already
+does exactly that.) Two limits, stated so they are not discovered later: a value parameter is one scalar, so the
+template form reaches one schema per application and one type per schema, and the multi-type and multi-schema rows
+keep the instance form or a named declaration in the user's schema; and an application's identity is the argument
+as written, so a pinned and an unpinned `S` are two applications where the data-side match is canonical — #2's
+question about pins in identity, met again, not a new one.
+
+*The data rule is one paragraph, and the value's own shape picks the cell.* At a position whose type resolves to a
+`scoped` instance: a value carrying `!!schema` is `EXTERN` — its identity must be a key of `schemas`, or any if
+`schemas` is absent, and its `!type` must be in that key's list, or any of the schema's types if the list is absent;
+a value carrying `!type` alone is `LOCAL`, resolved in the governing namespace; a value carrying neither is a
+validation error, "a value at a scoped position must name its type". A cell the instance's `scope` does not hold
+refuses the value it would have taken. The read of an `EXTERN` value is then §7.8's scope push exactly as written:
+load the named schema through the ordinary loader, so a schema nothing would supply is one of the five
+`SCHEMA_*` codes and never a verdict; push the scope; resolve `!type` in it; validate in full; pop. §7.8's
+permissive list becomes a derived fact: a position admits a nested `!!schema` exactly when its type resolves to a
+`scoped` instance whose `scope` holds `EXTERN`, containers descending as §7.8 already says.
+
+The distinction the constructor draws is against `choice`. Both are sums in which the value names its own type; a
+choice is *closed*, enumerating its variants, and `scoped` is *open*, naming the namespaces its variants are drawn
+from. §5.4's classless-variant list and §8.1's "`disjoint` is absent on the non-choice sums" both keep their meaning
+with `scoped` in place of the two names they list.
+
+**What is running, and what is not.** Nothing above is built; the description of running code is of the gap.
+`ValueReaderFactoryRegistry` registers `extern` and `unknown_type` to `ErrorReader`, so a schema declaring either
+compiles and the first read of a value against one reports `NOT_IMPLEMENTED`, located at the value, costing it a
+verdict and nothing else's. `TsonDataStream` already emits a `SchemaRef` event for a scoped `!!schema` at every
+position [TSON-DATA] §2.3 admits one, and no reader consumes it — the grammar half of §7.8 is done and the scope
+push is not. `DiscriminationClass` already treats both as classless, per §5.4. `schema.meta.Extern` and
+`UnknownType` exist as `Sum` implementations so that `!extern { … }` resolves, and carry no behaviour. Building
+the proposal is one piece of machinery rather than two — a reader over `SchemaRef` that every `scoped` instance
+would share — and it waits on the shape being agreed, since the reader for each is exactly "what can be checked
+here". The bundled schemas are untouched for the reason #7 gives: they are Revision 34's published artifacts, and
+stamping new digests ahead of the revision mints documents nobody has published.
+
+**Suggested resolution:** concretely, by section.
+
+- [TSON-DATA] §4: "Base type resolution applies only in schemaless documents" — one sentence replacing the
+  "declared type information in scope" clause; §5.1 already says the same of the vocabulary.
+- §7.1: delete the "legal but vocabulary-only" reading and the validator's MUST that qualifies it. Under `!!schema`
+  the root names its type or the document is invalid, in every mode. Replace the permissive-type list with the
+  derived rule above.
+- §7.8: replace `extern`'s description with `scoped`'s, the five-row table, and the data rule; keep the scope-push
+  paragraphs and the example, whose attachments field becomes `[extern]` over core's new instance, or a narrowed
+  `scoped` listing both schemas, which is the case the example exists to show.
+- §4.1, §5.2, §5.4, §8.1, §9: `scoped` where `extern` and `unknown_type` are named; `dynamic` where `unknown` is.
+- meta.tn: `scoped` and `scope_cell` in place of `extern` and `unknown_type`. core.tn: `declared`, `extern`,
+  `dynamic`, `extern_of` and `extern_type` in place of `unknown`. meta-kernel.tn: reword `value`'s `@doc`.
+
+**Status against Revision 34:** open, and new against this revision — a proposal, and unlike #7–#10 one this
+implementation has not built: the two constructors it replaces compile to a reader that reports a gap, and the
+reader that replaces them is the work the shape unblocks.
 
 ---
