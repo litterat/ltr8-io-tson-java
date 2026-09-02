@@ -1292,3 +1292,65 @@ case excepted — it is refused on the loop, not on the parameter.
 **Status against Revision 34:** open, and new against this revision.
 
 ---
+
+## 21. Should base type resolution recognise `date`, now that JSON is not the reason it does not?
+
+**Section:** §4.1–§4.5 (base type resolution and its order), §5 (the built-in type vocabulary), §7.6 (the
+number production); [TSON-SCHEMA] §5.4 (discrimination classes and derived disjointness), §5.11 (field
+groups).
+
+**Problem:** §4 resolves three classes — boolean, number, string — and every other built-in type is reached
+by an annotation (`!date 2025-03-13`) or by a declared type. A date is lexically unmistakable and starts with
+a digit, so the number scanner already inspects it and fails; recognising it there would cost nothing
+mechanically. The reason it was left out is JSON, whose value space is exactly those three classes plus null
+and the containers — and with §6 and principle 5 gone (#8), that reason is gone with them. So the question is
+open on its own terms for the first time, and it should be asked before a revision settles §4 for good.
+
+**The gain is real and is not about Class 1.** [TSON-SCHEMA] §5.4 derives `disjoint` from §4's partition, so
+`date` is string-class and **`( date | text )` is not disjoint**: a date beside a free-form string carries
+`!date` on every value. That is a common shape and an ergonomic wart. A DATE class would remove the tag.
+
+**The cost lands on schemas that never mention a date.** §5.4 couples the two directions — `disjoint` "means
+precisely that the encoding's own form resolution ... recovers the variant", and TSON text's form resolution
+*is* §4 — so a DATE discrimination class requires §4 to recognise dates, and §4 recognising dates narrows
+what a `text` variant catches untagged. Measured against this implementation: `( text | int32 )` today
+accepts `2025-03-13` and a bare UUID through its `text` variant. Give dates a class of their own and those
+tokens classify as DATE, match neither variant, and an existing schema stops reading a document it used to.
+There is no version of the change that takes the gain and leaves the cost.
+
+Three consequences beyond that one:
+
+1. **§5's vocabulary stops being additive.** Today a new built-in atom changes no existing choice's derived
+   `disjoint`. Under the proposal, adding one changes the fact on choices that do not mention it — a poor
+   property for a registry meant to grow.
+2. **`date` alone is immediately arbitrary.** With `date` DATE-class and `datetime` still string-class,
+   `( date | text )` reads untagged and `( datetime | text )` does not, though the second shape is at least
+   as common. The first addition demands the second, and `uuid`, `uri`, `email` and the two address families
+   are all lexically distinguishable too — at which point `text` in Class 1 means "matched none of twenty
+   ordered rules", which is unstable in the way §4's three classes are not, and makes the resolution order
+   normative over the whole vocabulary rather than over three cases.
+3. **The gap already has a spec-endorsed answer.** §5.4 names this exact case: "the labelled form is the
+   recommended resolution wherever the tag would otherwise be mandatory: a choice whose variants share a
+   base-type class ... is often better written as a single-group record". `( date | text )` is that choice,
+   and `{ ( on: date | note: text ) }` discriminates by label with no disjointness required and no tag.
+
+**Interpretation chosen:** Revision 34 as written. `BaseTypeResolver` resolves boolean, then number, then
+string; `DateParser` and the rest of §5's vocabulary are reached by annotation in Class 1 and by declaration
+in Class 2, and `DiscriminationClass.classify` gives every text-form family — `text`, `uuid`, `date`,
+`binary`, the address families — the one `STRING` class.
+
+**Suggested resolution:** leave §4 at three classes, and state the reason on its own authority now that the
+JSON one is gone: **§4 classifies host base types** — what a schemaless read hands back with no library type
+and no ordered vocabulary behind it — where §5 classifies **semantic types**, which a Class 1 document reaches
+deliberately through an annotation rather than by shape inference. That sentence belongs in §4.5 beside the
+order, and it is what answers the same question for `uuid`, `uri` and every future addition without
+re-arguing each. §5.4's own recommendation of the labelled form (§5.11) covers the ergonomics the proposal was
+aimed at, and is worth a cross-reference from §5 for the text-form families, whose choices are where the
+missing tag is felt.
+
+**Status against Revision 34:** open, and new against this revision — consequent on #8, a question rather
+than a defect, and one this implementation recommends answering *no* and recording, since #8 removed the
+reason the answer used to be obvious. Nothing here is built: the recommendation is the status quo, and what
+is proposed is the sentence that justifies it.
+
+---
