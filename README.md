@@ -5,8 +5,8 @@ schemas whose definitions are themselves data. A document names its schema, the 
 one hash verifies the whole chain. The finishing touch, TSON's data format is a Unicode-first notation you'll
 actually enjoy writing — JSON-like in shape, and not a superset of it.
 
-> **Status:** first implementation of TSON, built against a working-draft spec (2026
-> revision 34). Part 1 (data format) and most of Part 2 (schema layer) are implemented; the
+> **Status:** first implementation of TSON, built against a working-draft spec — revision 34
+> published, with this branch carrying the proposed 2026 revision 35 artifacts. Part 1 (data format) and most of Part 2 (schema layer) are implemented; the
 > API and the format itself may still change. See [STATUS.md](STATUS.md) for the full
 > checklist.
 
@@ -47,13 +47,13 @@ Try it (the data names its own schema and type, so no --type is needed):
 ```
 
 Here's the `person.tn` schema created. It shows a few of the basic schema features,
-including records, record groups, enums and some in-built types. The `2026/34` in the
+including records, record groups, enums and some in-built types. The `2026/35` in the
 URIs is the draft year/revision marker from the spec's release scheme.
 
 ```tson
-!!id:"https://example.com/2026/34/getting-started/person.tn?sha256=13cf46617c13225c7df1e292f60798d99af6ae6593657ca117b5a617220b0c51"
-!!meta:"https://tson.io/2026/34/m/meta.tn?sha256=a5cf63664cccaafed4b11e494fdb8b3aed0133bf47200910a039a252daed0613"
-!!import:"https://tson.io/2026/34/m/core.tn?sha256=c2127732df2dbac80ac4bbb7cb7d35070bfe546472368088a2f76343a8d85830"
+!!id:"https://example.com/2026/35/getting-started/person.tn?sha256=5b0f1ff9c48af39028d2050feaf46a4bd036feb77d06fb4ae209096665f87767"
+!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=39f6b12e8a866900375584e3cc989ae4a1191001d2138e7fd1898f8efc686923"
+!!import:"https://tson.io/2026/35/m/core.tn?sha256=7a01ca15aca73b3d828135b15d9b47ae68b08888537172405e32d268c4318ee9"
 @doc:"An example schema from `tson init-example` -- a short tour of TSON. Edit this file or person-data.tn, then re-run tson validate to see what changes."
 {
   role => !enum [admin member guest]
@@ -90,7 +90,7 @@ And here's a corresponding `person-data.tn` *data* document. It's *self-describi
 `!!schema` header names the schema it conforms to, and the leading `!person` says which type:
 
 ```tson
-!!schema:"https://example.com/2026/34/getting-started/person.tn"
+!!schema:"https://example.com/2026/35/getting-started/person.tn"
 !person {
   id: !uuid 9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09
   name: "Ada Lovelace"
@@ -343,9 +343,9 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.builder().build();
 
 String schema = """
-        !!id:"https://example.com/2026/34/app/server-1.tn"
-        !!meta:"https://tson.io/2026/34/m/meta.tn"
-        !!import:"https://tson.io/2026/34/m/core.tn"
+        !!id:"https://example.com/2026/35/app/server-1.tn"
+        !!meta:"https://tson.io/2026/35/m/meta.tn"
+        !!import:"https://tson.io/2026/35/m/core.tn"
         {
             server => { hostname: text  port: int32 }
         }""";
@@ -353,7 +353,7 @@ String schema = """
 tson.resolve(schema);
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/34/app/server-1.tn")
+        .withSchema("https://example.com/2026/35/app/server-1.tn")
         .readAs("{ hostname: \"web-01\"  port: 8080 }", "server");
 
 value.get("hostname").asString();          // Optional[web-01] — validated against the schema
@@ -385,12 +385,12 @@ Tson tson = Tson.builder()
         // Schemas you already hold, keyed by identity. Not `schemas::get` -- a source says "I cannot
         // supply that" by throwing, where a map returns null, for whichever identity the document names.
         .schemaSource(TsonSchemaSource.ofMap(                 // the `server` schema from §4
-                Map.of("https://example.com/2026/34/app/server-1.tn", schema)))
+                Map.of("https://example.com/2026/35/app/server-1.tn", schema)))
         .build();
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
 TsonValue server = tson.treeReader().read("""
-        !!schema:"https://example.com/2026/34/app/server-1.tn"
+        !!schema:"https://example.com/2026/35/app/server-1.tn"
         !server { hostname: "web-01"  port: 8080 }""");        // validated as it builds the tree
 
 // No !!schema? The same reader reads schemalessly, straight off the wire.
@@ -651,9 +651,9 @@ nothing to reopen, so piped input is always treated as data.
 For a hand-written schema `person.tn` and a self-describing data file `ada.tn`:
 
 ```tson
-!!id:"https://example.com/2026/34/app/person-1.tn"
-!!meta:"https://tson.io/2026/34/m/meta.tn"
-!!import:"https://tson.io/2026/34/m/core.tn"
+!!id:"https://example.com/2026/35/app/person-1.tn"
+!!meta:"https://tson.io/2026/35/m/meta.tn"
+!!import:"https://tson.io/2026/35/m/core.tn"
 {
     person => { name: text  age: int32 }
 }
@@ -668,7 +668,7 @@ $ tson validate --output json person.tn bad.tn   # bad.tn = !!schema:"…/person
   "permitting":[]},"token_policy":{"level":"UNRESTRICTED","per_segment":false,"permitting":[]},
   "unicode_data_version":"16.0"},
   "files":[{"file":"bad.tn","outcome":"INVALID","errors":[{"path":"/name",
-  "schema_pointer":"/person/name","schema_id":"example.com/2026/34/app/person-1.tn",
+  "schema_pointer":"/person/name","schema_id":"example.com/2026/35/app/person-1.tn",
   "code":"FIELD_REQUIRED","message":"missing required field 'name' for 'person'",
   "expected":"a value for 'name'","actual":"(absent)","data_position":"2:9:63",
   "schema_position":"5:5:145"}]}],"errors":[]}
@@ -765,7 +765,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.ltr8:tson:0.34.0-SNAPSHOT")
+    implementation("io.ltr8:tson:0.35.0-SNAPSHOT")
 }
 ```
 

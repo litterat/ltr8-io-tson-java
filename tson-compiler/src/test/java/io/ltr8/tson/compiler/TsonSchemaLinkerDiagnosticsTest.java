@@ -49,7 +49,7 @@ class TsonSchemaLinkerDiagnosticsTest {
         entries.put("b", record(5, RecordField.required("y", TypeRef.of("also_missing"))));
         entries.put("c", record(6, RecordField.required("z", TypeRef.of("missing_too"))));
         entries.put("fine", record(7));
-        return new TsonSchema(ID, "https://tson.io/2026/34/m/meta.tn", List.of(), entries);
+        return new TsonSchema(ID, "https://tson.io/2026/35/m/meta.tn", List.of(), entries);
     }
 
     private static final TsonSchemaLoader NO_IMPORTS = uri -> Optional.empty();
@@ -103,7 +103,7 @@ class TsonSchemaLinkerDiagnosticsTest {
         entries.put("fine", record(6));
 
         List<Diagnostic> diagnostics = linkCollecting(
-                new TsonSchema(ID, "https://tson.io/2026/34/m/meta.tn", List.of(), entries));
+                new TsonSchema(ID, "https://tson.io/2026/35/m/meta.tn", List.of(), entries));
 
         assertEquals(List.of("/bad_field", "/bad_supertype"),
                 diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());

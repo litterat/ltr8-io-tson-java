@@ -37,15 +37,22 @@ copy. `spec/` holds local snapshots of the current revision for quick reference:
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not
 a source of truth — with one standing exception: the three `.tn` schemas are **packaged from here at build
-time**, so they are the live copies rather than a snapshot. As of Revision 34 they **are** the published
-artifacts, digests included: Part 2 §13.2 lists these three identities with these three `?sha256=` values,
-so a diff against the published draft is empty. The divergences earlier revisions carried are all in the
+time**, so they are the live copies rather than a snapshot. They carry **Revision 35 identities** —
+`https://tson.io/2026/35/m/*.tn` — ahead of that revision's publication, this branch being where the
+proposed artifacts are built (below), so Part 2 §13.2's table lists Revision 34's three identities and
+digests and is one revision behind here by design; `main` carries the published ones, and a diff against
+the published draft is empty *there*. The divergences earlier revisions carried are all in the
 spec now — `reference.target` typed `type_ref`, no `instance_template`/`template_argument`/`value_param`
 (§5.10's held bodies replaced the quoted open-body vocabulary), and `map`'s `state` field behind
 `{K => V?}` (§5.3).
-**Changing them means re-stamping all three digests bottom-up** (`tson hash`, kernel first), moving the
-matching `*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which
-carry the published values.
+**Changing them means re-stamping all three digests bottom-up**, moving the matching `*-resolved.tn`
+entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the published
+values. `scripts/restamp-bundled-schemas.sh` does the digest half — every pin in the repo, in dependency
+order, plus the getting-started example, which pins meta and core and so has a digest of its own that moves
+with them; `--check` reports staleness and writes nothing. **The digests are not a test-only concern**: the
+library verifies the packaged bytes against `TsonBundledSchemas`' held digest on every load, so one stale
+constant fails `Tson.builder().build()` and with it most of the suite. Restamping after each edit is what
+lets a schema change land across several commits with the integrity checks left on.
 
 **The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
 `@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`
@@ -59,7 +66,9 @@ the removals `SPEC-FEEDBACK.md` #7–#13 propose, ahead of the spec revision tha
 those entries state what is *running* rather than what is *proposed* — the branch is the argument. It merges
 to `main` when the spec lands and not before: `main` is the reference implementation of the published
 revision, and merging a divergence early costs it the one signal it exists to give. The sibling corpus has a
-branch of the same name and moves with this one, `SUITE_PIN` following it. Landed here so far: **#7, `null`
+branch of the same name and moves with this one, `SUITE_PIN` following it. The three bundled schemas already
+carry the revision's own identities (`/2026/35/m/`), so a content change lands on artifacts named for the
+revision proposing it rather than being re-identified at the end. Landed here so far: **#7, `null`
 removed from the notation**, **#8, the JSON-superset claim and the rules that existed only for it**,
 **#9, a field name is an identifier at every layer**, and **#10, the trailing-comma ban**.
 §1.3's Part 1 freeze is a claim about the published revision, which `main` keeps; it does not hold on this
@@ -178,7 +187,7 @@ keeps it apart. The exception classification itself is unchanged and is what pic
 `DefinitionResolver`'s Javadoc lists the exact current boundary.
 
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
-`https://tson.io/2026/34/ltr8/<group>/<name>-<version>.tn` — `/2026/34` is the spec revision, `ltr8` the
+`https://tson.io/2026/35/ltr8/<group>/<name>-<version>.tn` — `/2026/35` is the spec revision, `ltr8` the
 publishing org, `<group>` the subsystem (`cli`), `<name>-<version>` the schema name with a trailing
 integer version. **The version is bumped on a release, not on a change.** §10's immutability rule binds a
 *published* identity: once a release ships carrying the schema, the document under that `!!id` is fixed and
@@ -992,7 +1001,7 @@ No system Gradle — always use the wrapper:
 ```
 ./gradlew build                   # also builds the javadoc/sources jars, so doclint runs under `build`
 ./gradlew test
-./gradlew publishToMavenLocal     # installs every module into ~/.m2 as io.ltr8:<module>:0.34.0-SNAPSHOT
+./gradlew publishToMavenLocal     # installs every module into ~/.m2 as io.ltr8:<module>:0.35.0-SNAPSHOT
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.lexer.LexerTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonDataParserTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.ConformanceSuiteTest"  # class1; skipped unless ../../ltr8-io-tson-test-suite exists
@@ -1017,7 +1026,7 @@ flags for when the next question is "where".
 **Publishing is packaging, not release.** Every subproject applies `maven-publish` with a `mavenJava`
 publication (the `java` component plus sources and javadoc jars) and a POM carrying name/description/
 url/licence, so `publishToMavenLocal` gives another project on the same machine an ordinary
-`io.ltr8:tson:0.34.0-SNAPSHOT` dependency instead of an included build. **No remote repository is
+`io.ltr8:tson:0.35.0-SNAPSHOT` dependency instead of an included build. **No remote repository is
 configured, deliberately** — Maven Central needs signed artifacts and a POM with scm/developers, and
 publishing under a name is not a decision the build should make quietly. The jars carry real
 `module-info.class`es, so a consumer works on the class path or the module path; `tson-annotation` and

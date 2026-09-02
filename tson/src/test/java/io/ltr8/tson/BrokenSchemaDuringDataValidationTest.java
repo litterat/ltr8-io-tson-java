@@ -31,8 +31,8 @@ class BrokenSchemaDuringDataValidationTest {
     /** Two independent faults, neither a consequence of the other, plus the type the data actually uses. */
     private static final String BROKEN_SCHEMA = """
             !!id:"https://example.test/broken-during-read.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             {
               widens => !uint8 ^ { min: -10  max: 300 }
               point => { x: int32  y: int32 }
@@ -64,8 +64,8 @@ class BrokenSchemaDuringDataValidationTest {
     void aSchemaThatDoesNotParseIsReportedPerDeclarationToo() {
         String unparseable = """
                 !!id:"https://example.test/broken-during-read.tn"
-                !!meta:"https://tson.io/2026/34/m/meta.tn"
-                !!import:"https://tson.io/2026/34/m/core.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
                 {
                   first => { x: }
                   point => { x: int32  y: int32 }

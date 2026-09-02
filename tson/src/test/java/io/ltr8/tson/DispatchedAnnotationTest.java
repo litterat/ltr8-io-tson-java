@@ -40,8 +40,8 @@ class DispatchedAnnotationTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/dispatch-1.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             {
               note => text
               shape => {}
