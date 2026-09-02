@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/35/m/core.tn?sha256=7a01ca15aca73b3d828135b15d9b47ae68b08888537172405e32d268c4318ee9"
-!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=39f6b12e8a866900375584e3cc989ae4a1191001d2138e7fd1898f8efc686923"
+!!id:"https://tson.io/2026/35/m/core.tn?sha256=8d1f24733f5a084dc4b471fcc42d44d03bc8470975eadc579eca72e92d17ea67"
+!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=f3637af2c1510588d23680047582b76df161ab21ddb0b312223a0009ac920edd"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 34 draft).
@@ -36,7 +36,7 @@
     W3C XSD Part 2        Facet model and constraint vocabulary
     JSON Schema 2020-12   Modern constraint vocabulary
     IEEE 754-2019         Floating-point semantics
-    ISO 8601-1:2019       Date and time formats (duration)
+    ISO 8601-1:2019       Date and time formats (duration, period)
     RFC 3339              Internet date/time profile
     RFC 9562              UUID format
     RFC 4648              Base encoding
@@ -187,17 +187,29 @@
   @ordered:NONE @bounded:false
   uri => !uri_type {}
 
-  @doc:"Base64-encoded binary (RFC 4648)."
-  base64 => !binary BASE64
+  @doc:"""
+    An octet string. The unrefined binary instance: it names the value
+    space, so `!bytes ^ { min_length: 4 }` is "at least four bytes",
+    and takes the constructor's default alphabet for reading — base64,
+    since "abcd" is well-formed hex and well-formed base64 and decodes
+    to different octets, so text needs one of them chosen. The four
+    alphabets below refine it, each IS-A bytes, so a bytes-typed field
+    accepts any of their values under its own spelling.
+    """
+  @ordered:NONE
+  bytes => !binary_type {}
 
-  @doc:"URL-safe base64-encoded binary (RFC 4648 §5)."
-  base64url => !binary BASE64URL
+  @doc:"Base64-encoded octets (RFC 4648 §4)."
+  base64 => !bytes ^ { encoding: BASE64 }
 
-  @doc:"Base32-encoded binary (RFC 4648)."
-  base32 => !binary BASE32
+  @doc:"URL-safe base64-encoded octets (RFC 4648 §5)."
+  base64url => !bytes ^ { encoding: BASE64URL }
 
-  @doc:"Hex-encoded binary."
-  hex => !binary HEX
+  @doc:"Base32-encoded octets (RFC 4648 §6)."
+  base32 => !bytes ^ { encoding: BASE32 }
+
+  @doc:"Hex-encoded octets (RFC 4648 §8)."
+  hex => !bytes ^ { encoding: HEX }
 
   @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
   @ordered:TOTAL @bounded:false
@@ -222,15 +234,25 @@
   datetime => !datetime_type {}
 
   @doc:"""
-    Time duration. ISO 8601 PnYnMnDTnHnMnS. PARTIAL ordering reflects
-    that durations expressed with calendar units (years, months) have
-    no fixed length — P1M may be 28, 29, 30, or 31 days depending on
-    when applied — so two such durations are not unconditionally
-    comparable. Durations expressed only in fixed-length units (days,
-    hours, minutes, seconds) are totally ordered.
+    Elapsed time — a signed rational number of seconds. The clock half
+    of what one ISO 8601 duration used to carry: no Y or month-M
+    component, so every value has a fixed length and ordering is TOTAL.
+    `P1M` is a month and belongs to `period`; a minute is `PT1M`. A day
+    is exactly 86400 s and a week 7 days, so `PT90M`, `PT1H30M` and
+    `P0DT5400S` are one value.
     """
-  @ordered:PARTIAL @bounded:false
+  @ordered:TOTAL @bounded:false
   duration => !duration_type {}
+
+  @doc:"""
+    Calendar span — a signed integer number of months. The calendar
+    half, and the reason `duration` can be totally ordered: a month has
+    no fixed length, so months and seconds are two value spaces rather
+    than one partially ordered one. `P1Y` and `P12M` are one value.
+    A span that is genuinely both is a record with a field of each.
+    """
+  @ordered:TOTAL @bounded:false
+  period => !period_type {}
 
   @doc:"128-bit identifier per RFC 9562."
   @ordered:NONE @bounded:true
@@ -284,12 +306,65 @@
   mac => !mac_type {}
 
   @doc:"""
-    Value whose type is unconstrained. Membership is the universe of
-    types. Distinct from absent and from the unit type. The validator
-    accepts any well-formed value of any type.
+    A type this schema declares or imports, chosen by the value. The
+    narrowest of the three scoped instances: the value names its type
+    with a !type-ref and that name resolves in the governing namespace
+    ([TSON-SCHEMA] §2.2.3), exactly as it does anywhere else — what the
+    position adds is that the choice of type is the data's.
     """
   @ordered:NONE @bounded:false
-  unknown => !unknown_type {}
+  declared => !scoped { scope: [LOCAL] }
+
+  @doc:"""
+    A type from a foreign schema, which the value names for itself: it
+    carries a nested !!schema ([TSON-DATA] §2.3) and a !type-ref
+    resolved in that schema, read by §7.8's scope push. Any foreign
+    schema is admitted; `extern_of` and `extern_type` narrow to one
+    schema, or to one type in one schema, without declaring anything.
+    """
+  @ordered:NONE @bounded:false
+  extern => !scoped { scope: [EXTERN] }
+
+  @doc:"""
+    A type from either namespace — the widest scoped instance, and the
+    successor to what earlier revisions called `unknown`. Named for
+    what it says: the *data* decides the type, from any namespace. Not
+    `any`, which in every language a reader arrives from means a value
+    that is unchecked, where this one is validated in full against the
+    type it names. A value naming no type at all is a validation error
+    here as at every scoped position.
+    """
+  @ordered:NONE @bounded:false
+  dynamic => !scoped { scope: [LOCAL EXTERN] }
+
+  @doc:"""
+    A type from one named foreign schema. An application rather than a
+    declaration, so a field writes `attachment: extern_of<"https://…/claim.tn">`
+    and declares nothing. `S` stands in a uri-typed key, an atom, so it
+    is a value parameter and the argument is the scalar §5.10 admits —
+    one schema per application.
+    """
+  extern_of => <S> !scoped { scope: [EXTERN]  schemas: { S => _ } }
+
+  @doc:"""
+    One named type in one named foreign schema. As `extern_of`, with
+    `T` standing inside [type_name] — also an atom, so also a value
+    parameter, and one type per application. A no-argument reference is
+    spelled positionally ([TSON-SCHEMA] §5.6), so `T` lands in the
+    type_name slot as the identifier it is.
+    """
+  extern_type => <S, T> !scoped { scope: [EXTERN]  schemas: { S => [T] } }
+
+  @doc:"""
+    The set spelling an author writes: `set<text>` where the bare
+    construction is `!set_type { element_type: text }`. A §5.10
+    template, not a constructor — it carries no `~`, so §4.2's
+    value-route-only rule does not reach its parameter, and
+    `set_type` stays parameterless as §4.2 requires of every
+    container constructor. The element type arrives by application
+    rather than by a parameter on the constructor itself.
+    """
+  set => <T> !set_type { element_type: T }
 
   @doc:"Marker annotation."
   annotation => @annotation void

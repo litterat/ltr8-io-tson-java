@@ -10,6 +10,8 @@ import java.time.OffsetDateTime;
 import java.time.OffsetTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.time.Duration;
+import java.time.Period;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -292,14 +294,25 @@ class AtomCoherenceTest {
     }
 
     /**
-     * The one ordered family neither check judges: its bounds are unparsed ISO 8601 text, and {@code
-     * "P1M"} vs {@code "P30D"} does not order lexically. Comparing the raw strings would call this
-     * coherent body empty, so it is left alone -- a documented gap, pinned so it stays deliberate.
+     * The family that used to be the one exception. Its bounds went unjudged while a duration could carry
+     * calendar components: {@code P1M} against {@code P30D} has no answer, a month having no fixed length,
+     * so the pair could not be ordered and the facets it declared were decoration. Splitting the calendar
+     * half into {@code period} left every duration a fixed number of seconds, and the ordinary range check
+     * applies to both.
      */
     @Test
-    void durationBoundsAreLeftUnjudged() {
-        assertCoherent(new DurationType(Optional.of("P1M"), Optional.of("P30D")));
-        assertCoherent(new DurationType(Optional.of("P30D"), Optional.of("P1D")));
+    void durationBoundsAreJudgedNowThatTheValueSpaceIsOrdered() {
+        assertCoherent(new DurationType(Optional.of(Duration.ofDays(1)), Optional.of(Duration.ofDays(30))));
+        assertViolation(new DurationType(Optional.of(Duration.ofDays(30)), Optional.of(Duration.ofDays(1))),
+                "is above");
+    }
+
+    /** And the calendar half, on the months it denotes -- {@code P1Y} is above {@code P6M}. */
+    @Test
+    void periodBoundsAreJudgedOnMonths() {
+        assertCoherent(new PeriodType(Optional.of(Period.ofMonths(6)), Optional.of(Period.ofYears(1))));
+        assertViolation(new PeriodType(Optional.of(Period.ofYears(1)), Optional.of(Period.ofMonths(6))),
+                "is above");
     }
 
     // ── CIDR families ────────────────────────────────────────────────────────

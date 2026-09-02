@@ -11,6 +11,7 @@ import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
@@ -98,6 +99,7 @@ public enum DiscriminationClass {
             case TimeType ignored -> Optional.of(STRING);
             case DateTimeType ignored -> Optional.of(STRING);
             case DurationType ignored -> Optional.of(STRING);
+            case PeriodType ignored -> Optional.of(STRING);
             case BinaryType ignored -> Optional.of(STRING);
             case EmailType ignored -> Optional.of(STRING);
             case Ipv4Type ignored -> Optional.of(STRING);

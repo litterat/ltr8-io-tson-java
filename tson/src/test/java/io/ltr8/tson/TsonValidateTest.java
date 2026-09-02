@@ -117,7 +117,7 @@ class TsonValidateTest {
         Diagnostic problem = problems.getFirst();
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE, problem.code());
         assertTrue(problem.message().contains("did you mean 'point'?"), problem.message());
-        assertTrue(problem.message().contains("and 41 more"), problem.message());
+        assertTrue(problem.message().contains("and 48 more"), problem.message());
         assertEquals("pont", problem.actual());
         assertTrue(problem.expected().endsWith("| point"), problem.expected());
         assertTrue(problem.expected().contains("int32"), problem.expected());

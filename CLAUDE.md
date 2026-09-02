@@ -161,7 +161,7 @@ exactly when a read would accept the same token in the same position. A field ty
 positional form and an atom-typed variant mean a read would accept some. Admitting those would make "may
 this field have a default?" depend on another declaration's field count or variant list, a rule an author
 computes rather than remembers, and one that breaks silently when that other declaration gains a field.
-§5.2's "Which fields may carry a value" states exactly this rule; `void`/`unknown`/`extern` fall out of the
+§5.2's "Which fields may carry a value" states exactly this rule; `void` and the scoped instances fall out of the
 same line.
 
 **A schema and its bound class must agree about a type's fields** (`TsonBindMismatchException`, raised at
@@ -224,7 +224,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
   deliberately open branch, `Data`, which a consumer's own class implements — see below), plus
   `io.ltr8.tson.schema.atom` — the three **host value types** the built-in atoms read to (`Rational`,
-  `IsoDuration`, `Complex`), which is the question a consumer arrives with (*what do I get back from
+  `Complex`), which is the question a consumer arrives with (*what do I get back from
   `!rational`?*) and not part of §8's model. Two of them are in this module because `schema.meta` needs
   them structurally — `RationalType`'s `min`/`max`/`multiple_of` are `Rational` values — and `Complex` is
   here because splitting the three by whether the schema model happens to reuse one as a facet value is a
@@ -1050,7 +1050,7 @@ compatibility).
   Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
   **Gaps reaching a read still exist**, two of them, both through `ErrorReader` and both on a schema that
-  loaded clean: `unknown` and `extern` (below). Each **rides in the report as `NOT_IMPLEMENTED`**, located
+  loaded clean: core's three `scoped` instances (below). Each **rides in the report as `NOT_IMPLEMENTED`**, located
   at the value it could not read, and costs that value a verdict and nothing else's — so a gap and an
   ordinary error in one document both get reported, and `TsonCli.exitCodeFor` lifts the run to 70.
 - **A container position that is an application, and what a held open body still cannot say.** §5.10
@@ -1086,11 +1086,11 @@ compatibility).
   routed parameter rides `value` with §8.1's shadowing rule to tell it from a literal, and §5.7's fixation
   moves to materialisation. What a held body cannot enforce is half of §5.10's argument-kind rule — see
   "Not yet implemented".
-- **Undocumented atom constructors** — `unknown` (and `extern`, which has no core.tn declaration, so it is
-  spellable only as `!extern { schema: … }` and never as a bare name) has no compiled-parser factory, so it
-  compiles to `ErrorReader` (a schema merely *declaring* one still compiles; the first read of one fails).
-  Neither is an ordinary missing parser waiting to be written: `extern` is a whole absent mechanism and `unknown`
-  is the universe of types, not a token shape. `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` do have
+- **The scoped constructor has no reader** — `scoped` has no compiled-parser factory, so core's `declared`,
+  `extern` and `dynamic` compile to `ErrorReader` (a schema merely *declaring* one still compiles; the first
+  read of one fails). Not an ordinary missing parser waiting to be written: it is one piece of machinery over
+  `TsonDataStream`'s existing `SchemaRef` event, shared by every scoped instance — §7.8's scope push, whose
+  grammar half is done and whose read half is not. `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` do have
   parsers — the CIDR pair reusing the two address grammars, and validating §5.5's family-range and
   host-bits-zero rules on top. **`email` is
   a built-in of §5.5 like its siblings**, and its format check is the subset §5.5 pins: the

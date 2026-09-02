@@ -35,14 +35,17 @@ public record IntegerType(
         @Field("exclusive_min") Optional<BigInteger> exclusiveMin,
         Optional<BigInteger> max,
         @Field("exclusive_max") Optional<BigInteger> exclusiveMax,
-        @Field("multiple_of") Optional<BigInteger> multipleOf) implements Atom {
+        @Field("multiple_of") Optional<BigInteger> multipleOf,
+        Optional<List<BigInteger>> members) implements Atom {
 
     /** The kernel's unconstrained, arbitrary-precision {@code integer}. */
     public static final IntegerType UNCONSTRAINED = new IntegerType(
-            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+            Optional.empty());
 
     @Record
     public IntegerType {
+        members = members.map(List::copyOf);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
@@ -51,19 +54,32 @@ public record IntegerType(
         }
     }
 
+    /**
+     * The constraint set without a member set -- every facet but {@link #members}, which most integer types
+     * do not carry. The sparse member set is the newest facet and the rarest; spelling {@code
+     * Optional.empty()} for it at every construction says nothing a reader needs.
+     */
+    public IntegerType(Optional<IntegerSize> size, Optional<BigInteger> min, Optional<BigInteger> exclusiveMin,
+            Optional<BigInteger> max, Optional<BigInteger> exclusiveMax, Optional<BigInteger> multipleOf) {
+        this(size, min, exclusiveMin, max, exclusiveMax, multipleOf, Optional.empty());
+    }
+
     /** {@code int32 => !integer ^ { size: { bits: 32 signed: true } } } -- e.g. {@code new IntegerType(new IntegerSize(32, true))}. */
     public IntegerType(IntegerSize size) {
-        this(Optional.of(size), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+        this(Optional.of(size), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty());
     }
 
     /** {@code positive_integer => !integer ^ { min: 1 } }. */
     public static IntegerType ofMin(BigInteger min) {
-        return new IntegerType(Optional.empty(), Optional.of(min), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+        return new IntegerType(Optional.empty(), Optional.of(min), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty());
     }
 
     /** {@code negative_integer => !integer ^ { max: -1 } }. */
     public static IntegerType ofMax(BigInteger max) {
-        return new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(max), Optional.empty(), Optional.empty());
+        return new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(max), Optional.empty(),
+                Optional.empty(), Optional.empty());
     }
 
     /**
@@ -108,6 +124,7 @@ public record IntegerType(
             violations.add("multiple_of " + other.multipleOf.get() + " is not itself a multiple of the source's own "
                     + multipleOf.get());
         }
+        AtomNarrowing.checkSubset(violations, "members", members.orElse(List.of()), other.members.orElse(List.of()));
         return List.copyOf(violations);
     }
 
@@ -138,6 +155,7 @@ public record IntegerType(
         List<String> violations = new ArrayList<>();
         AtomCoherence.checkRange(violations, effectiveLower(), effectiveUpper());
         AtomCoherence.checkPositiveStep(violations, "multiple_of", multipleOf, BigInteger::signum);
+        AtomCoherence.checkMembers(violations, members.orElse(List.of()), effectiveLower(), effectiveUpper());
         return List.copyOf(violations);
     }
 

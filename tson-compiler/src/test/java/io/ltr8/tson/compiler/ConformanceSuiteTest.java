@@ -29,7 +29,6 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.suite.Sidecar;
 import io.ltr8.tson.suite.Vectors;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.atom.IsoDuration;
 import io.ltr8.tson.schema.atom.Rational;
 import io.ltr8.tson.tree.TsonAbsent;
 import io.ltr8.tson.tree.TsonArray;
@@ -664,11 +663,21 @@ class ConformanceSuiteTest {
                 OffsetDateTime actual = (OffsetDateTime) atomType.read(token, OffsetDateTime.class);
                 assertEquals(OffsetDateTime.parse(((TokenValue) payload).text()), actual, "vocabulary value");
             }
+            // duration and period state the *value* -- seconds and months -- rather than a canonical
+            // spelling, P3W and PT504H being one duration and P1Y and P12M one period.
             case "duration" -> {
-                IsoDuration actual = (IsoDuration) atomType.read(token, IsoDuration.class);
-                RecordValue expected = (RecordValue) payload;
-                assertEquals(Period.parse(fieldText(expected, "period")), actual.calendarPart(), "duration calendar part");
-                assertEquals(Duration.parse(fieldText(expected, "clock")), actual.clockPart(), "duration clock part");
+                Duration actual = (Duration) atomType.read(token, Duration.class);
+                java.math.BigDecimal seconds = new java.math.BigDecimal(actual.getSeconds())
+                        .add(new java.math.BigDecimal(actual.getNano()).movePointLeft(9));
+                // compareTo, not equals: a BigDecimal carries its scale, and 5400 and 5.4E+3 are the same
+                // number written two ways -- the vector states the value, not a scale.
+                assertEquals(0, new java.math.BigDecimal(((TokenValue) payload).text()).compareTo(seconds),
+                        "duration seconds: expected " + ((TokenValue) payload).text() + " but was " + seconds);
+            }
+            case "period" -> {
+                Period actual = (Period) atomType.read(token, Period.class);
+                assertEquals(Long.parseLong(((TokenValue) payload).text()), actual.toTotalMonths(),
+                        "period months");
             }
             case "uri" -> {
                 URI actual = (URI) atomType.read(token, URI.class);

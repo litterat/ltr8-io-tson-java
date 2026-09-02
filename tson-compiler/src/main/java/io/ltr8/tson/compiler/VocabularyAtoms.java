@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.atom.*;
 import io.ltr8.tson.schema.atom.Complex;
-import io.ltr8.tson.schema.atom.IsoDuration;
 import io.ltr8.tson.schema.atom.Rational;
 
 import java.net.Inet4Address;
@@ -66,7 +65,8 @@ final class VocabularyAtoms {
         atoms.put(byte[].class, new Entry(BinaryParser.BASE64.typeName(), BinaryParser.BASE64));
         atoms.put(Rational.class, new Entry(RationalParser.TYPENAME, RationalParser.UNCONSTRAINED));
         atoms.put(Complex.class, new Entry(ComplexParser.TYPENAME, ComplexParser.UNCONSTRAINED));
-        atoms.put(IsoDuration.class, new Entry(DurationParser.TYPENAME, DurationParser.UNCONSTRAINED));
+        atoms.put(java.time.Duration.class, new Entry(DurationParser.TYPENAME, DurationParser.UNCONSTRAINED));
+        atoms.put(java.time.Period.class, new Entry(PeriodParser.TYPENAME, PeriodParser.UNCONSTRAINED));
         return atoms;
     }
 }

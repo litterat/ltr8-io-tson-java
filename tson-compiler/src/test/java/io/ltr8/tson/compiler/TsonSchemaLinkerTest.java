@@ -31,6 +31,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -443,16 +444,34 @@ class TsonSchemaLinkerTest {
 
     @Test
     void rejectsACollisionBetweenALocalEntryAndAnImportedEntry() {
-        TsonLinkedSchema imported = new TsonLinkedSchema(schemaOf(Map.of("shared_name", emptyRecord())));
+        // A genuinely different type under the same name. This used to declare `emptyRecord()` on both
+        // sides, which is not a collision at all: [TSON-SCHEMA] §8.2 makes two entries that are the same
+        // entry one entry, so the assertion passed only because nothing checked whether they agreed.
+        assertThrows(TsonSchemaValidationException.class, () -> link("shared_name", emptyRecord(), unitEntry()));
+    }
+
+    /**
+     * And the other half of the same rule: an entry a local declaration and an import both reach, agreeing
+     * byte for byte, unifies rather than colliding. §8.2 names a materialised instantiation by a function of
+     * its resolved form alone -- "two {@code box<text>} anywhere share one entry" -- so a consumer that
+     * closes an application its import already closed must link, or exporting a template is exporting a trap.
+     */
+    @Test
+    void anImportedEntryAndAnIdenticalLocalOneUnify() {
+        assertDoesNotThrow(() -> link("shared_name", emptyRecord(), emptyRecord()));
+    }
+
+    /** Links a schema declaring {@code name} locally against an import declaring the same name. */
+    private static TsonLinkedSchema link(String name, TypeDefinition importedEntry, TypeDefinition localEntry) {
+        TsonLinkedSchema imported = new TsonLinkedSchema(schemaOf(Map.of(name, importedEntry)));
         Map<String, TsonLinkedSchema> byIdentity =
                 Map.of(TsonCanonicalIdentity.canonicalize("https://example.test/import.tn"), imported);
         TsonSchemaLoader loader = id -> Optional.ofNullable(byIdentity.get(id));
 
         TsonSchema local = new TsonSchema("https://example.test/importer.tn",
                 "https://example.test/meta.tn", List.of("https://example.test/import.tn"),
-                Map.of("shared_name", emptyRecord()));
-
-        assertThrows(TsonSchemaValidationException.class, () -> TsonSchemaLinker.link(local, loader));
+                Map.of(name, localEntry));
+        return TsonSchemaLinker.link(local, loader);
     }
 
     /**

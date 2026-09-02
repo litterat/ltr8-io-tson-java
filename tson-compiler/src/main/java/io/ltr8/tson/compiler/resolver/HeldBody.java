@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.resolver;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -118,6 +119,12 @@ public record HeldBody(DataValue application) implements TemplateBody {
                     .forEach(element -> collect(element.value().coreValue(), into));
             case RecordValue record -> record.fields()
                     .forEach(field -> collect(field.value().value().coreValue(), into));
+            // A map's keys carry names as readily as its values do -- `{ S => [T] }` puts one parameter in
+            // each -- and a key is a full data-value (§2.6), so it is walked rather than read as a token.
+            case MapValue map -> map.entries().forEach(entry -> {
+                collect(entry.key().coreValue(), into);
+                collect(entry.value().value().coreValue(), into);
+            });
             default -> { } // a quoted token is a literal, and nothing else carries a name
         }
     }

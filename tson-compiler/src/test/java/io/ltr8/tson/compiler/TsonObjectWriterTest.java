@@ -230,8 +230,8 @@ class TsonObjectWriterTest {
         TsonObjectReader durationReader = new TsonObjectReader(durationContext);
         TsonObjectWriter durationWriter = new TsonObjectWriter(durationContext);
         UserDurationHolder duration =
-                durationReader.read("{ value: !duration P1Y2M3DT4H5M6S }", UserDurationHolder.class);
-        assertEquals("{ value: !duration \"P1Y2M3DT4H5M6S\" }", durationWriter.toTson(duration));
+                durationReader.read("{ value: !duration PT4H5M6S }", UserDurationHolder.class);
+        assertEquals("{ value: !duration \"PT4H5M6S\" }", durationWriter.toTson(duration));
     }
 
     // ── Full example, adapted from spec §2.1 ─────────────────────────────

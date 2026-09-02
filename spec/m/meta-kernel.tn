@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=c53e904cb122f1a8662439d95602128ad10cd91ef7e440e7b94f4fff95504631"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=f25b7fb317b0fc8a9a3b670bcce764a68cd6b1a3dfae0381c68398fa92ff77aa"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 34 draft).
@@ -73,12 +73,13 @@
 
   @doc:"""
     Escape hatch primitive. Instance of the unit atom constructor. The
-    result of base type resolution ([TSON-DATA] §4) applied to a source token, with
-    no further interpretation by the TSON type system. value-typed
-    fields receive whatever [TSON-DATA] §4 produces — null, boolean, integer, float,
-    or string — and the host runtime is responsible for type-checking
-    values at use site against the field's semantic role. value carries
-    no constraint vocabulary and is not narrowable.
+    token, uninterpreted, read by the type the position hands it to. Under
+    a schema every value is typed by its position or by its tag, so a
+    value-typed field is read by the declared type it stands for and never
+    by base type resolution, which applies only in schemaless documents
+    ([TSON-DATA] §4). value carries no constraint vocabulary and is not
+    narrowable, and a value position is not a scope: it admits no nested
+    !!schema, having no tag of its own for one to resolve.
 
     Used for record_field.value (the type of fixed/default values, which
     must be the field's declared type — a dependency the schema language
@@ -151,6 +152,17 @@
   }
 
   @doc:"""
+    A named entry for the same reason enum_set is one, and a set for the
+    same three reasons: uniqueness comes from set's own contract,
+    non-emptiness from min_items (an empty member set is a body admitting
+    no value at all), and member identity is [TSON-DATA] §4.3's, so 80 and
+    0x50 are one member and a duplicate rather than two. An array spelling
+    — which is what an inline form would give, array sugar being the only
+    inline container — loses all three.
+    """
+  integer_member_set => !set_type { element_type: integer }
+
+  @doc:"""
     Integer constraint vocabulary. Atom constructor whose instance,
     `integer`, is the kernel's arbitrary-precision integer. Field
     types reference `integer` directly; the mutual reference closes
@@ -189,6 +201,7 @@
     ( min: integer | exclusive_min: integer )?
     ( max: integer | exclusive_max: integer )?
     multiple_of:  integer?
+    members:      integer_member_set?
   }
 
   integer => !integer_type {}
@@ -383,10 +396,24 @@
     max_items:       integer?
   }
 
-  set => ~array ^ {
+  @doc:"""
+    The unordered, unique refinement of array. `min_items` carries a
+    default of 1 rather than inheriting array's absent lower bound:
+    the empty set is a set, so this is a default and not a fixed
+    value — `!set { element_type: text  min_items: 0 }` spells it —
+    but every set in the meta layer wants a non-empty one, and a
+    default is what makes non-emptiness the thing an author gets
+    without writing it and emptiness the thing they ask for. The
+    field is restated with its type because a refinement cannot give
+    an optional field a default ([TSON-SCHEMA] §5.2): the restatement
+    moves it from OPTIONAL to REQUIRED_DEFAULT, which is a tightening
+    — a set admits fewer values than the array it refines.
+    """
+  set_type => ~array ^ {
     state:        = REQUIRED
     unordered:    = true
     unique_items: = true
+    min_items:     integer ~ 1
   }
 
   map => ~product & {
@@ -410,7 +437,7 @@
     applications remain prohibited at field positions
     ([TSON-SCHEMA] §5.2) and `set` has no sugar of its own.
     """
-  enum_set => !set { element_type: identifier  min_items: 1 }
+  enum_set => !set_type { element_type: identifier }
 
   enum => ~atom & {
     members: enum_set

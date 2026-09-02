@@ -238,7 +238,7 @@ public final class TsonObjectWriter {
     /**
      * A host {@code null} aside -- which writes {@code _}, the absent sentinel, and reaches here only where
      * there is no field to omit it from (see {@link #writeRecord}): a bridge, if present, is unwrapped once, up front -- covers plain Java
-     * {@code enum}s and {@code Rational}/{@code Complex}/{@code IsoDuration} reached through a
+     * {@code enum}s and {@code Rational}/{@code Complex}/{@code Duration} reached through a
      * caller's own {@code DataBridge} (all via {@code DataBindContext#registerAtom(Class,
      * DataBridge)}, which always attaches to a {@code DataClassAtom}), and, in principle, a {@code
      * DataClassRecord}'s own (unrelated) {@code ToData}-interface bridge too, the same way {@code

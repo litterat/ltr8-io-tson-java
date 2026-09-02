@@ -99,7 +99,7 @@ class MetaSchemaImportTest {
         // eight occurrences, since identical forms share a name. Its sibling sugar `[type_name]` adds
         // nothing here, because the meta-kernel already declares that same form and an import in scope is
         // referenced rather than redeclared.
-        assertEquals(31, meta.entries().size(), "expected every meta.tn declaration to resolve");
+        assertEquals(45, meta.entries().size(), "expected every meta.tn declaration to resolve");
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(meta, registry));
 
@@ -114,7 +114,7 @@ class MetaSchemaImportTest {
                 registered.schema().entries().get("binary_encoding").body());
         // ...and the three declarations that reference one of those four as a field type now
         // register successfully as well, since their dependency is present in the same schema.
-        assertTrue(registered.schema().entries().containsKey("binary"));
+        assertTrue(registered.schema().entries().containsKey("binary_type"));
         assertTrue(registered.schema().entries().containsKey("float_type"));
         assertTrue(registered.schema().entries().containsKey("complex_type"));
     }
@@ -124,9 +124,10 @@ class MetaSchemaImportTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
         TsonSchema meta = parseMetaTn1(registry);
-        TypeDefinition binary = meta.entries().get("binary");
+        TypeDefinition binary = meta.entries().get("binary_type");
 
-        TsonSchema withBinaryOnly = new TsonSchema(meta.id(), meta.meta(), meta.imports(), Map.of("binary", binary));
+        TsonSchema withBinaryOnly =
+                new TsonSchema(meta.id(), meta.meta(), meta.imports(), Map.of("binary_type", binary));
 
         assertThrows(io.ltr8.tson.schema.TsonSchemaValidationException.class,
                 () -> registry.register(TsonSchemaLinker.link(withBinaryOnly, registry)));

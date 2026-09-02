@@ -15,6 +15,7 @@ import io.ltr8.tson.compiler.atom.DateParser;
 import io.ltr8.tson.compiler.atom.DateTimeParser;
 import io.ltr8.tson.compiler.atom.DecimalParser;
 import io.ltr8.tson.compiler.atom.DurationParser;
+import io.ltr8.tson.compiler.atom.PeriodParser;
 import io.ltr8.tson.compiler.atom.EmailParser;
 import io.ltr8.tson.compiler.atom.EnumParser;
 import io.ltr8.tson.compiler.atom.FloatParser;
@@ -40,6 +41,7 @@ import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -83,7 +85,6 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition));
     static final ValueReaderFactory UUID_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new UuidParser((UuidType) definition.body()), context.locationOf(name, definition));
-    /** Registered under {@code "binary"}, not {@code "binary_type"} -- {@link BinaryType}'s own {@code @Typename} matches the real spec constructor name. */
     static final ValueReaderFactory BINARY = (name, definition, context) ->
             new AtomTypeReader<>(name, new BinaryParser((BinaryType) definition.body()),
                     context.locationOf(name, definition));
@@ -96,6 +97,9 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition));
     static final ValueReaderFactory DURATION_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new DurationParser((DurationType) definition.body()),
+                    context.locationOf(name, definition));
+    static final ValueReaderFactory PERIOD_TYPE = (name, definition, context) ->
+            new AtomTypeReader<>(name, new PeriodParser((PeriodType) definition.body()),
                     context.locationOf(name, definition));
     static final ValueReaderFactory URI_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new UriParser((UriType) definition.body()), context.locationOf(name, definition));

@@ -50,7 +50,7 @@ class TypeDefinitionTest {
     void aGenuineStructuralDifferenceStillCompareUnequal() {
         TypeDefinition unitEntry = unit(Optional.empty());
         TypeDefinition otherKind = new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), false,
-                List.of(), List.of(), Optional.empty(), new UnknownType(), Optional.empty());
+                List.of(), List.of(), Optional.empty(), new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()), Optional.empty());
 
         assertNotEquals(unitEntry, otherKind);
     }

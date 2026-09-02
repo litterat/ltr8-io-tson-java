@@ -109,7 +109,7 @@ are kept in step deliberately.
   stated bound is judged against the source's **effective** range, folding in a derived one like an integer's
   `size` (intersecting the refinement's own bounds first would make every widening vacuous). Unchecked by
   design, each documented on its class: `pattern` against `pattern` (regular-language containment, and
-  `tson-schema` has no `tson-regex` dependency), `duration_type`'s text bounds, and **selector** facets
+  `tson-schema` has no `tson-regex` dependency) and **selector** facets
   (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
   rejecting one would reject a documented construct — §5.7 states the rule per facet kind, and a selector is
   settable where the source leaves it at the constructor's default, identity-only once bound.

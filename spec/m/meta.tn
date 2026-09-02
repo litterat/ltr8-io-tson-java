@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/35/m/meta.tn?sha256=39f6b12e8a866900375584e3cc989ae4a1191001d2138e7fd1898f8efc686923"
-!!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=c53e904cb122f1a8662439d95602128ad10cd91ef7e440e7b94f4fff95504631"
-!!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=c53e904cb122f1a8662439d95602128ad10cd91ef7e440e7b94f4fff95504631"
+!!id:"https://tson.io/2026/35/m/meta.tn?sha256=f3637af2c1510588d23680047582b76df161ab21ddb0b312223a0009ac920edd"
+!!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=f25b7fb317b0fc8a9a3b670bcce764a68cd6b1a3dfae0381c68398fa92ff77aa"
+!!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=f25b7fb317b0fc8a9a3b670bcce764a68cd6b1a3dfae0381c68398fa92ff77aa"
 @doc:"""
   TSON meta-schema — 2026 Revision 34 draft.
 
@@ -62,33 +62,99 @@
   check.
   """
 {
+  @doc:"""
+    The set spelling an author writes: `set<text>` where the bare
+    construction is `!set_type { element_type: text }`. A §5.10
+    template, not a constructor — it carries no `~`, so §4.2's
+    value-route-only rule does not reach its parameter, and
+    `set_type` stays parameterless as §4.2 requires of every
+    container constructor. The element type arrives by application
+    rather than by a parameter on the constructor itself.
+    """
+  set => <T> !set_type { element_type: T }
+
   @doc:"Binary encoding formats per RFC 4648."
   binary_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
 
-  @doc:"Binary data constructor. Encoding alphabets are pinned to RFC 4648."
-  binary => ~atom & atom_specification & {
-    spec:        = "https://www.rfc-editor.org/rfc/rfc4648"
-    encoding:    binary_encoding
+  @doc:"""
+    Octet-string constructor. The value space is octet strings and
+    nothing else; `bytes` in core is the unrefined instance and the
+    four alphabets refine it, so each IS-A `bytes` and a field typed
+    `bytes` accepts any spelling.
+
+    `encoding` carries a default rather than being REQUIRED, and there
+    is no `spec`: RFC 4648 defines the alphabets, not the value space,
+    so an unrefined `bytes` has no specification to name — which is why
+    this composes with `atom` alone and not with `atom_specification`.
+    The default is what §5.7's selector rule needs to fire on: a
+    refinement may set the facet where the source leaves it at the
+    constructor's default, which is how core's four alphabets refine
+    `bytes` and become subtypes of it rather than siblings. The facet
+    is lexical
+    metadata of the reference encoding: it says how that encoding
+    writes octets as text, which it must, since "abcd" is well-formed
+    hex and well-formed base64 and decodes to different octets. An
+    encoding whose values are octets neither carries nor contradicts
+    it. Equality, identity and content addressing are over the octets
+    and never over the spelling, so a round trip through a non-text
+    encoding preserves the value and re-spells it from the schema.
+
+    The default also settles the one ambiguity the reference encoding
+    has: `"abcd"` is well-formed hex and well-formed base64 and decodes
+    to different octets, so a position that names no alphabet reads its
+    value as base64 rather than refusing it.
+
+    `length` fixes the decoded octet count exactly; `min_length` and
+    `max_length` bound it. All three count decoded octets, never
+    characters of the spelling, which differ by alphabet.
+    """
+  binary_type => ~atom & {
+    encoding:    binary_encoding ~ BASE64
+    length:      integer?
     min_length:  integer?
     max_length:  integer?
   }
 
   @doc:"""
-    Constructor for sum types whose members belong to a named external
-    schema. When `types` is absent, any type from the schema is
-    accepted. When present, only the listed types are accepted.
+    Which namespace a value's type may be drawn from. LOCAL is the
+    governing namespace — the schema's own declarations and its imports
+    ([TSON-SCHEMA] §2.2.3); EXTERN is a foreign schema, named by a
+    nested !!schema on the value itself ([TSON-DATA] §2.3).
     """
-  extern => ~sum & {
-    schema: uri
-    types:  [type_name]?
-  }
+  scope_kind => !enum [LOCAL EXTERN]
 
   @doc:"""
-    Unknown sum constructor. An empty sum whose instance, `unknown`,
-    accepts any well-formed value of any type. Membership is the
-    universe of types. Distinct from absent and from the unit type.
+    Constructor for open sum types: the value names its own type, and
+    the instance names the namespaces that name may be resolved in.
+    The distinction against `choice` is closed against open — a choice
+    enumerates its variants, a scoped instance names where variants are
+    drawn from — which is why `disjoint` is absent here as on every
+    non-choice sum ([TSON-SCHEMA] §8.1).
+
+    `scope` says which namespaces are admitted. `schemas` narrows the
+    foreign ones: absent is any foreign schema, a keyed map is those
+    schemas, and a key's absent value is every type that schema
+    declares where a list is those types. The map is keyed by schema
+    identity, so one schema cannot be listed twice, and keys are
+    compared by canonical identity ([TSON-DATA] §2.2.1) so a pinned key
+    and an unpinned !!schema in the data match; each pin is verified by
+    the loader on its own.
+
+    The state admitting nothing is unspellable rather than refused —
+    min_items: 1 on both collections. One coherence rule, of the family
+    a resolver already runs over min_items/max_items: `schemas`
+    requires EXTERN in `scope`.
+
+    `scope` is written `set<scope_kind>` inline. §5.2 prohibits a `!`
+    constructor application at a field position, which is why the
+    kernel's own set-typed fields are named entries; a §5.10 template
+    application is not one, so a schema the resolver materialises can
+    write it where it stands.
     """
-  unknown_type => ~sum & {}
+  scoped => ~sum & {
+    scope:    set<scope_kind>
+    schemas:  {uri => [type_name; 1..]?; 1..}?
+  }
 
   @doc:"""
     IEEE 754-2019 interchange formats, both radices. Selects the
@@ -168,6 +234,7 @@
     multiple_of:      value?
     total_digits:     integer?
     fraction_digits:  integer?
+    members:          set<value>?
   }
 
   @doc:"""
@@ -218,8 +285,8 @@
   @doc:"Date constraint vocabulary. Instance is `date` in core."
   date_type => ~atom & atom_specification & {
     spec:  = "https://www.rfc-editor.org/rfc/rfc3339"
-    min:   value?
-    max:   value?
+    ( min: value | exclusive_min: value )?
+    ( max: value | exclusive_max: value )?
   }
 
   @doc:"""
@@ -233,8 +300,8 @@
     """
   time_type => ~atom & atom_specification & {
     spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
-    min:        value?
-    max:        value?
+    ( min: value | exclusive_min: value )?
+    ( max: value | exclusive_max: value )?
     precision:  integer?
   }
 
@@ -247,16 +314,61 @@
     """
   datetime_type => ~atom & atom_specification & {
     spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
-    min:        value?
-    max:        value?
+    ( min: value | exclusive_min: value )?
+    ( max: value | exclusive_max: value )?
     precision:  integer?
   }
 
-  @doc:"Duration constraint vocabulary. Instance is `duration` in core."
+  @doc:"""
+  Elapsed-time constraint vocabulary. Instance is `duration` in core.
+  Lexical form is the RFC 3339 Appendix A `duration` production with
+  three extensions and one restriction: an optional leading `-`; a
+  fraction on the seconds component only, written with `.` (`PT0.5S`,
+  never `PT1.5H` or `PT0,5S`); any subset of D, H, M, S may be omitted
+  provided at least one component is present and order is kept
+  (`PT1H30S` is admitted, as `java.time.Duration` writes it); and the
+  Y and month-M components are not admitted — `P1M` is one month and
+  belongs to `period`; a minute is `PT1M`. `PnW` stands alone, as in
+  the ABNF (`P1W2D` is an error). A day is exactly 86400 s and a week
+  7 days. The value is a signed rational number of seconds, so `PT90M`,
+  `PT1H30M` and `P0DT5400S` are equal, `PT0S`, `P0D` and `-PT0S` are
+  equal, and ordering is TOTAL. Bounds compare the value, not the
+  token. `precision` bounds fractional-second digits as for
+  `time_type`: at most N digits on the written token, `precision: 0`
+  admits no fraction. `multiple_of` is a strictly positive duration
+  (`PT0S` or a negative value is a schema-load error): `PT15M` admits
+  only quarter-hour values; sign is ignored for the test, so `-PT30M`
+  is a multiple of `PT15M`. A refinement may only tighten
+  `multiple_of` to an integer multiple of the inherited value.
+  """
   duration_type => ~atom & atom_specification & {
-    spec:  = "https://www.iso.org/standard/70907.html"
-    min:   value?
-    max:   value?
+    spec:        = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
+    ( min: value | exclusive_min: value )?
+    ( max: value | exclusive_max: value )?
+    precision:   integer?
+    multiple_of: value?
+  }
+
+  @doc:"""
+  Calendar-span constraint vocabulary. Instance is `period` in core.
+  Lexical form is the RFC 3339 Appendix A `duration` production
+  restricted to an optional leading `-`, then `P` followed by a Y
+  component, an M component, or both in that order; no fraction, no
+  W or D component and no `T` part (`P1M15D`, `P1Y0D` and `P1YT1H`
+  are errors — use `duration`, or a record with a `period` field and
+  a `duration` field, for mixed spans). The value is a signed integer
+  number of months, so `P1Y` and `P12M` are equal, `P0Y`, `P0M` and
+  `-P0M` are equal, and ordering is TOTAL. Bounds compare the value,
+  not the token. `multiple_of` is a strictly positive period (`P0M`
+  or a negative value is a schema-load error): `P3M` admits only
+  whole quarters; sign is ignored for the test. A refinement may only
+  tighten `multiple_of` to an integer multiple of the inherited value.
+  """
+  period_type => ~atom & atom_specification & {
+    spec:        = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
+    ( min: value | exclusive_min: value )?
+    ( max: value | exclusive_max: value )?
+    multiple_of: value?
   }
 
   @doc:"UUID constraint vocabulary. Instance is `uuid` in core."
@@ -375,4 +487,44 @@
 
   @doc:"BCP 47 language tag (RFC 5646)."
   lang => @annotation text
+
+  @doc:"Short human-readable name for a definition or field."
+  title => @annotation text
+
+  @doc:"Example values for a definition or field, carried for documentation only."
+  examples => @annotation [value]
+
+  @doc:"Marks a field an encoding's consumers may read but not write."
+  read_only => @annotation boolean
+
+  @doc:"Marks a field an encoding's consumers may write but not read."
+  write_only => @annotation boolean
+
+  @doc:"""
+    Names the field a member-dispatching encoding selects a choice's
+    variant on. A checked annotation: it carries no decode force in the
+    model or in the reference encoding — a discriminated choice admits
+    exactly the variants it admitted, and text keeps its !variant tag at
+    every non-disjoint choice — and it carries load-time force, on
+    `@disjoint`'s verified-or-error precedent ([TSON-SCHEMA] §5.4).
+
+    Checked at schema load, two outcomes and no third: every variant is
+    a record declaring the named field; that field is REQUIRED_FIXED in
+    every variant (never REQUIRED_DEFAULT — a default is omissible and
+    so cannot dispatch); and the fixed values are pairwise distinct.
+    `field_name` is an identifier, so a non-name spelling fails at the
+    annotation's own type.
+    """
+  discriminator => @annotation field_name
+
+  @doc:"""
+    Designates the field an encoding that flattens is meant to flatten
+    — the map-typed field a record's undeclared entries live in, a
+    record being closed under its type ([TSON-SCHEMA] §7.2). A checked
+    annotation on the same terms as `@discriminator`: no decode force,
+    load-time force. Checked at schema load: the field's type resolves
+    to a text-keyed map, and at most one field per composed chain
+    carries the mark.
+    """
+  rest => @annotation void
 }

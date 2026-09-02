@@ -76,7 +76,7 @@
   @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A."
   top => !type_definition {
     kind: PRODUCT
-    subtypes: [array atom choice data enum integer_type map product record reference regex_type set sum text_type tuple unit uri_type]
+    subtypes: [array atom choice data enum integer_type map product record reference regex_type set_type sum text_type tuple unit uri_type]
     body: !record { fields: [] }
   }
 
@@ -90,7 +90,7 @@
   product => !type_definition {
     kind: PRODUCT
     supertypes: [top]
-    subtypes: [array map record set tuple]
+    subtypes: [array map record set_type tuple]
     body: !record { supertypes: [top]  fields: [
       !record_field { name: access_pattern  type: product_access_type }
       !record_field { name: size_type       type: product_size_type }
@@ -189,6 +189,7 @@
       !record_field { name: max            type: integer  state: OPTIONAL }
       !record_field { name: exclusive_max  type: integer  state: OPTIONAL }
       !record_field { name: multiple_of    type: integer  state: OPTIONAL }
+      !record_field { name: members        type: integer_member_set  state: OPTIONAL }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -420,7 +421,7 @@
     kind: PRODUCT
     constructor: true
     supertypes: [product top]
-    subtypes: [set]
+    subtypes: [set_type]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: INDEX }
       !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: VARIABLE }
@@ -433,7 +434,7 @@
     ] }
   }
 
-  set => !type_definition {
+  set_type => !type_definition {
     kind: PRODUCT
     constructor: true
     source: array
@@ -445,7 +446,7 @@
       !record_field { name: state           type: element_state  state: REQUIRED_FIXED  value: REQUIRED }
       !record_field { name: unordered       type: boolean  state: REQUIRED_FIXED  value: true }
       !record_field { name: unique_items    type: boolean  state: REQUIRED_FIXED  value: true }
-      !record_field { name: min_items       type: integer  state: OPTIONAL }
+      !record_field { name: min_items       type: integer  state: REQUIRED_DEFAULT  value: 1 }
       !record_field { name: max_items       type: integer  state: OPTIONAL }
     ] }
   }
@@ -475,11 +476,17 @@
     ] }
   }
 
-  @doc:"A named entry rather than an inline form: ! constructor applications remain prohibited at field positions (Part 2 Section 5.2) and set has no sugar of its own."
+  @doc:"A named entry rather than an inline form: ! constructor applications remain prohibited at field positions (Part 2 Section 5.2) and set_type has no sugar of its own."
   enum_set => !type_definition {
     kind: PRODUCT
-    source: set
-    body: !set { element_type: identifier  min_items: 1 }
+    source: set_type
+    body: !set_type { element_type: identifier  min_items: 1 }
+  }
+
+  integer_member_set => !type_definition {
+    kind: PRODUCT
+    source: set_type
+    body: !set_type { element_type: integer  min_items: 1 }
   }
 
   enum => !type_definition {

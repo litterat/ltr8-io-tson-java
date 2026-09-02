@@ -49,7 +49,8 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
-import io.ltr8.tson.schema.meta.UnknownType;
+import io.ltr8.tson.schema.meta.ScopeKind;
+import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import org.junit.jupiter.api.Test;
 
@@ -373,7 +374,8 @@ class DefinitionResolverTest {
                         + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"multiple_of\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } ] "
+                        + "{ name: \"multiple_of\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } state: \"OPTIONAL\" } ] "
                         + "groups: [ "
                         + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "
                         + "{ members: [ \"max\" \"exclusive_max\" ] state: \"OPTIONAL\" } "
@@ -836,7 +838,7 @@ class DefinitionResolverTest {
         // an allowed REQUIRED_DEFAULT -> REQUIRED_FIXED transition (§5.7's table).
         resolveUpToArray();
 
-        TypeDefinition set = resolver.resolve(schemaMapFromFixture().declarations().get("set"));
+        TypeDefinition set = resolver.resolve(schemaMapFromFixture().declarations().get("set_type"));
 
         assertEquals(TypeKind.PRODUCT, set.kind());
         assertEquals(List.of(), set.parameters(), "the container constructors carry no parameters");
@@ -858,7 +860,7 @@ class DefinitionResolverTest {
                         + "state: \"REQUIRED_FIXED\" value: true } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" value: true } "
-                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" value: 1 } "
                         + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",
                 write(set));
@@ -892,7 +894,7 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesEnumFromTheRealMetaKernelFixtureNamingTheEnumSetEntry() throws IOException, DataBindException {
-        // enum => ~atom & { members: enum_set }, where enum_set => !set { element_type: identifier  min_items: 1 }.
+        // enum => ~atom & { members: enum_set }, where enum_set => !set_type { element_type: identifier }.
         // The named entry exists because `!` forms stay prohibited at field positions (§5.2) and `set`
         // has no sugar of its own -- there is no generic application left to write here.
         SchemaMap schemaMap = schemaMapFromFixture();
@@ -1050,20 +1052,23 @@ class DefinitionResolverTest {
     }
 
     @Test
-    void resolvesHexFromTheRealCoreTypeLibraryFixtureAsAPositionalFormInstance() throws IOException {
-        // hex => !binary HEX -- an Instance (constructor application), not an atom refinement:
-        // `binary` itself is the constructor, applied positionally. Included alongside the
-        // refinement cases above to confirm the positional-form path (step 3) also works against a
-        // real core.tn declaration, not just meta-kernel's own `enum` case. Unlike `integer_type`,
-        // `binary`'s own constructor is declared in meta.tn, not meta-kernel.tn, so this needs the fuller
-        // meta.tn-merged namespace, not just meta-kernel's entries.
+    void resolvesHexFromTheRealCoreTypeLibraryFixtureAsARefinementOfBytes() throws IOException {
+        // hex => !bytes ^ { encoding: HEX } -- an atom refinement of the unrefined instance, not a
+        // positional construction of the constructor. That is what gives the four alphabets an IS-A into
+        // `bytes` (§5.5: construction founds siblings, refinement founds subtypes), so a bytes-typed field
+        // accepts any spelling. `bytes` has to resolve first, being what `hex` refines; `binary_type`
+        // itself is declared in meta.tn rather than meta-kernel.tn, so this needs the merged namespace.
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
+        Map<String, TypeDefinition> namespace = new LinkedHashMap<>();
+        DefinitionResolver coreResolver = definitionResolverFor(metaTn1Parser, namespace::get);
+        namespace.put("bytes", coreResolver.resolve(schemaMap.declarations().get("bytes")));
 
-        TypeDefinition hex = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE).resolve(
-                schemaMap.declarations().get("hex"));
+        TypeDefinition hex = coreResolver.resolve(schemaMap.declarations().get("hex"));
 
         assertEquals(BinaryType.HEX, hex.body());
+        assertEquals(List.of("bytes"), hex.supertypes());
+        assertEquals(BinaryType.UNSPELLED, namespace.get("bytes").body());
     }
 
     @Test
@@ -1156,11 +1161,11 @@ class DefinitionResolverTest {
     }
 
     @Test
-    void resolvesComplexAndUnknownInstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
+    void resolvesComplexAndScopedInstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
         // complex => !complex_type {} -- ComplexType, same record-only/no-compiler treatment as the
         // other atom families above.
         //
-        // unknown => !unknown_type {} -- UnknownType's own constructor (unknown_type => ~sum & {})
+        // declared => !scoped { scope: [LOCAL] } -- Scoped's own constructor (scoped => ~sum & { ... })
         // composes with `sum`, not `atom`; resolves fine since bindAtomInstance binds against Top,
         // not the narrower Atom.
         SchemaMap schemaMap = schemaMapFromCoreFixture();
@@ -1168,11 +1173,11 @@ class DefinitionResolverTest {
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
         TypeDefinition complex = instanceResolver.resolve(schemaMap.declarations().get("complex"));
-        TypeDefinition unknown = instanceResolver.resolve(schemaMap.declarations().get("unknown"));
+        TypeDefinition declared = instanceResolver.resolve(schemaMap.declarations().get("declared"));
 
         assertEquals(ComplexType.UNCONSTRAINED, complex.body());
-        assertEquals(TypeKind.SUM, unknown.kind());
-        assertEquals(new UnknownType(), unknown.body());
+        assertEquals(TypeKind.SUM, declared.kind());
+        assertEquals(new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()), declared.body());
     }
 
     @Test
@@ -1584,7 +1589,12 @@ class DefinitionResolverTest {
     private static TsonCompiledMetaSchema metaTn1Compiled() throws IOException {
         io.ltr8.tson.schema.TsonSchemaRegistry registry = new io.ltr8.tson.schema.TsonSchemaRegistry();
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledMetaRegistry throwawayRegistry = new TsonCompiledMetaRegistry(context, TsonBundledSchemas::fetch);
+        // Pin-tolerant, because a reference out of meta.tn's own header carries the `?sha256=` its
+        // `!!meta`/`!!import` were stamped with, and TsonBundledSchemas keys on the bare identity. The
+        // production registry never reaches the source for these -- the standard library is already
+        // registered by canonical identity -- so only this throwaway one has to strip the query.
+        TsonCompiledMetaRegistry throwawayRegistry = new TsonCompiledMetaRegistry(context,
+                uri -> TsonBundledSchemas.fetch(uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri));
         TsonCompiledSchemaLoader throwawayLoader = throwawayRegistry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
@@ -1594,20 +1604,12 @@ class DefinitionResolverTest {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
 
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn").normalize());
-        // Desugared first, as SchemaResolver does: resolution only ever sees a bare reference or `!C value`,
-        // and skipping the phase leaves meta.tn's own `[type_name]` as an inline form that resolves to a
-        // structural `array<type_name>` -- a shape the pipeline never produces and the linker rejects.
-        SchemaDocument metaDoc = SchemaDesugarer.desugar(
-                new TsonSchemaParser(source).parseSchemaDocument(), metaKernel.entries().keySet());
-        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.entries());
-        DefinitionResolver metaResolver = definitionResolverFor(metaKernelParser, namespace::get);
-        Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
-        for (SchemaMap.Declaration declaration : metaDoc.body().declarations().values()) {
-            TypeDefinition resolved = metaResolver.resolve(declaration);
-            namespace.put(declaration.name(), resolved);
-            localOnly.put(declaration.name(), resolved);
-        }
-        TsonSchema meta = new TsonSchema(metaDoc.id().orElseThrow(), metaDoc.meta(), metaDoc.imports(), localOnly);
+        // Through SchemaResolver, exactly as meta-kernel goes two lines above, rather than a hand-rolled
+        // declaration loop. The loop skipped every phase that runs *between* declarations -- materialisation
+        // most of all -- so a field typed by a template application (`scope: set<scope_kind>`) stayed an
+        // unclosed application and the first read against it met the template instead of the entry it closes.
+        TsonSchema meta = new SchemaResolver(throwawayLoader)
+                .resolveSchema(new TsonSchemaParser(source).parseSchemaDocument());
         TsonLinkedSchema registeredMeta = registry.register(TsonSchemaLinker.link(meta, registry));
         return compileAsMetaParser(registeredMeta.schema().entries());
     }

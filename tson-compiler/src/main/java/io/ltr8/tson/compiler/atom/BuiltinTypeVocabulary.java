@@ -86,6 +86,7 @@ public final class BuiltinTypeVocabulary {
         types.put(TimeParser.TYPENAME, TimeParser.UNCONSTRAINED);
         types.put(DateTimeParser.TYPENAME, DateTimeParser.UNCONSTRAINED);
         types.put(DurationParser.TYPENAME, DurationParser.UNCONSTRAINED);
+        types.put(PeriodParser.TYPENAME, PeriodParser.UNCONSTRAINED);
 
         types.put(UriParser.TYPENAME, UriParser.UNCONSTRAINED);
 

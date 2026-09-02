@@ -7,11 +7,12 @@ import java.util.List;
  * Top} variant IS-A this. {@link Unit} backs {@code value}/{@code token}/{@code void} (the "atom
  * with no constraint vocabulary"); {@link EnumBody} backs {@code boolean} and the kernel's other
  * internal enumerations; the remaining variants are the atom constraint-vocabulary families, one
- * per {@code *_type} constructor. {@link UnknownType} is the sibling SUM-kind case -- see {@link
- * Sum}, not here.
+ * per {@code *_type} constructor. {@link Scoped} is the sibling SUM-kind case -- see {@link Sum}, not
+ * here.
  */
 public sealed interface Atom extends Top permits Unit, EnumBody, IntegerType, TextType, UriType, RegexType,
         DecimalType, FloatType, RationalType, UuidType, BinaryType, DateType, TimeType, DateTimeType, DurationType,
+        PeriodType,
         Cidr4Type, Cidr6Type, EmailType, MacType, Ipv4Type, Ipv6Type, ComplexType {
 
     /**

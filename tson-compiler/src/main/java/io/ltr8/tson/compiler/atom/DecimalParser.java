@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.base.NumberNarrowing;
 import io.ltr8.tson.schema.meta.DecimalType;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -35,7 +36,8 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
     public DecimalParser(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
                           Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf,
                           Optional<Integer> totalDigits, Optional<Integer> fractionDigits) {
-        this(new DecimalType(min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits));
+        this(new DecimalType(min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits,
+                Optional.empty()));
     }
 
     @Override

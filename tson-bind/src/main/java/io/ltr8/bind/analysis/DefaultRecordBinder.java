@@ -558,6 +558,16 @@ public class DefaultRecordBinder {
 				setter);
 	}
 
+	/**
+	 * The class a type erases to: itself, or a parameterized type's raw type. An {@link Optional}'s own
+	 * argument may be parameterized -- {@code Optional<List<X>>}, which is what an optional collection
+	 * field looks like when an empty collection cannot stand for absence -- and every method handle here
+	 * is typed against the erasure either way.
+	 */
+	private static Class<?> rawTypeOf(Type type) {
+		return type instanceof ParameterizedType parameterized ? (Class<?>) parameterized.getRawType() : (Class<?>) type;
+	}
+
 	private DataClassField resolveOptionalField(DataBindContext context, Class<?> targetClass, ComponentInfo info,
 			int index) throws DataBindException, NoSuchMethodException, IllegalAccessException {
 
@@ -566,9 +576,14 @@ public class DefaultRecordBinder {
 		boolean isRequired = isRequired(info);
 		String fieldName = fieldName(info);
 
-		Class<?> optionalType = (Class<?>) info.getParamType().getActualTypeArguments()[0];
+		// An Optional's own type argument may itself be parameterized -- Optional<List<X>>, the shape an
+		// optional collection field takes when an empty collection cannot stand for absence (a schema
+		// field whose type carries min_items: 1). The raw type is what the method handles are typed
+		// against; the full type is what the component is resolved from, so the element type survives.
+		Type optionalArgument = info.getParamType().getActualTypeArguments()[0];
+		Class<?> optionalType = rawTypeOf(optionalArgument);
 
-		Supplier<DataClass> dataClass = context.componentSource(optionalType, optionalType);
+		Supplier<DataClass> dataClass = context.componentSource(optionalType, optionalArgument);
 
 		Lookup lookup = MethodHandles.publicLookup();
 
@@ -1033,7 +1048,10 @@ public class DefaultRecordBinder {
 
 		} else if (field.getType() == Optional.class && field.getParamType() != null) {
 
-			Class<?> optionalType = (Class<?>) field.getParamType().getActualTypeArguments()[0];
+			// The method handles are typed against the raw class, so an Optional whose own argument is
+			// parameterized -- Optional<List<X>> -- erases to the collection interface here. Only the
+			// component resolution needs the full type, and that happened in resolveOptionalField.
+			Class<?> optionalType = rawTypeOf(field.getParamType().getActualTypeArguments()[0]);
 
 			// (values[]) -> values[inputIndex]:optionalType
 			arrayIndexGetter = MethodHandles.collectArguments(arrayGetter, 1, index)

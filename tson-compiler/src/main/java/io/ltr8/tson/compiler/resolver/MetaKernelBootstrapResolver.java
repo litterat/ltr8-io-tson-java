@@ -154,6 +154,18 @@ public final class MetaKernelBootstrapResolver {
             if (target == null) {
                 continue;
             }
+            // An *open* instance is a §5.10 template, not a construction: its body is held -- the
+            // application as written -- and stays unread until materialisation substitutes the parameters
+            // away. Constructing it here instead would resolve `element_type: T` into a reference to a type
+            // called T, which is how `set => <T> !set_type { element_type: T }` used to fail. Held bodies are
+            // the one thing this bootstrap shares with ordinary resolution, and for the same reason:
+            // meta-kernel governs itself, so its own templates are applied by the layer below it.
+            if (!instance.typeParams().isEmpty()) {
+                entries.put(declaration.name(), new TypeDefinition(Optional.of(TypeRef.of(instance.target())),
+                        target.kind(), instance.typeParams(), false, List.of(), List.of(), Optional.empty(),
+                        new HeldBody(instance.value())));
+                continue;
+            }
             // §5.5: constructor application transfers only the target's kind; no supertypes, no
             // parameters -- this is construction, not composition or refinement.
             instanceBody(instance).ifPresent(body -> entries.put(declaration.name(),
@@ -201,7 +213,7 @@ public final class MetaKernelBootstrapResolver {
             // Emitted by SchemaDesugarer above, never written by hand in the fixture. array and set differ
             // only in the defaults set tightens (§5.7): ordered/duplicating vs unordered/unique.
             case "array" -> Optional.of(toArrayBody(instance.value(), false));
-            case "set" -> Optional.of(toArrayBody(instance.value(), true));
+            case "set_type" -> Optional.of(toArrayBody(instance.value(), true));
             case "map" -> Optional.of(toMapBody(instance.value()));
             default -> Optional.empty();
         };

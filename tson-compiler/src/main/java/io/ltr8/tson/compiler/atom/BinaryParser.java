@@ -30,7 +30,7 @@ public record BinaryParser(BinaryType constraints) implements AtomType<byte[]> {
 
     private static final HexFormat HEX_FORMAT = HexFormat.of();
 
-    /** §5.3's built-in annotation name for this instance's encoding, e.g. {@code !base64}. */
+    /** §5.5's built-in annotation name for this instance's encoding, e.g. {@code !base64}. */
     public String typeName() {
         return constraints.typeName();
     }
@@ -38,9 +38,10 @@ public record BinaryParser(BinaryType constraints) implements AtomType<byte[]> {
     @Override
     public byte[] read(TokenValue token) {
         String text = token.text();
-        byte[] value = switch (constraints.encoding()) {
-            case BASE64 -> Base64Decoding.decode(text, Base64.getDecoder(), constraints.encoding().typeName());
-            case BASE64URL -> Base64Decoding.decode(text, Base64.getUrlDecoder(), constraints.encoding().typeName());
+        BinaryType.Encoding encoding = constraints.encoding();
+        byte[] value = switch (encoding) {
+            case BASE64 -> Base64Decoding.decode(text, Base64.getDecoder(), encoding.typeName());
+            case BASE64URL -> Base64Decoding.decode(text, Base64.getUrlDecoder(), encoding.typeName());
             case BASE32 -> Base32Decoding.decode(text);
             case HEX -> decodeHex(text);
         };
@@ -85,6 +86,16 @@ public record BinaryParser(BinaryType constraints) implements AtomType<byte[]> {
                 throw new AtomValidationException(
                         "'" + text + "' decodes to " + value.length + " bytes, more than the maximum " + max,
                         "at most " + max + " bytes");
+            }
+        });
+        // Decoded octets, never characters of the spelling: the same value is 4 characters of hex and 4 of
+        // base64 for different byte counts, so a length counted on the token would mean a different type
+        // per alphabet.
+        constraints.length().ifPresent(exact -> {
+            if (value.length != exact) {
+                throw new AtomValidationException(
+                        "'" + text + "' decodes to " + value.length + " bytes, not the required " + exact,
+                        "exactly " + exact + " bytes");
             }
         });
     }

@@ -56,6 +56,35 @@ final class AtomCoherence {
     }
 
     /**
+     * Every member of a sparse member set must satisfy the body's other facets. {@code { members: [80 443]
+     *  max: 100 }} is {@code { min: 10  max: 3 }}'s exact twin -- two individually legal facets whose
+     * conjunction admits nothing -- and §5.7 does not reach it, each facet tightening fine on its own. The
+     * rule is per member and needs no set arithmetic; the range passed in is the family's <em>effective</em>
+     * one, so a width a family derives rather than stores ({@code integer_type.size}) constrains a member
+     * exactly as a stated bound does.
+     */
+    static <T extends Comparable<? super T>> void checkMembers(List<String> out, List<T> members,
+            AtomNarrowing.Bound<T> lower, AtomNarrowing.Bound<T> upper) {
+        for (T member : members) {
+            if (lower != null && outsideLower(member, lower)) {
+                out.add("member " + member + " is below " + lower);
+            } else if (upper != null && outsideUpper(member, upper)) {
+                out.add("member " + member + " is above " + upper);
+            }
+        }
+    }
+
+    private static <T extends Comparable<? super T>> boolean outsideLower(T member, AtomNarrowing.Bound<T> lower) {
+        int order = member.compareTo(lower.value());
+        return order < 0 || (order == 0 && !lower.inclusive());
+    }
+
+    private static <T extends Comparable<? super T>> boolean outsideUpper(T member, AtomNarrowing.Bound<T> upper) {
+        int order = member.compareTo(upper.value());
+        return order > 0 || (order == 0 && !upper.inclusive());
+    }
+
+    /**
      * A floor facet must not sit above its ceiling twin, for the families whose bounds are plain
      * inclusive values with no exclusive spelling -- {@code min_length}/{@code max_length}, {@code
      * min_prefix}/{@code max_prefix}, {@code fraction_digits} against {@code total_digits}.

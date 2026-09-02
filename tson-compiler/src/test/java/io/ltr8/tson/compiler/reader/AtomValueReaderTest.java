@@ -7,7 +7,6 @@ import io.ltr8.tson.compiler.atom.DurationParser;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.atom.IsoDuration;
 import io.ltr8.tson.schema.atom.Rational;
 import io.ltr8.tson.schema.meta.BinaryType;
 import io.ltr8.tson.schema.meta.DateTimeType;
@@ -122,8 +121,7 @@ class AtomValueReaderTest {
 
     @Test
     void duration() {
-        assertEquals("PT1H30M", DurationParser.UNCONSTRAINED.write(
-                (IsoDuration) readValue(DurationType.UNCONSTRAINED, "{ value: PT1H30M }")));
+        assertEquals(java.time.Duration.ofMinutes(90), readValue(DurationType.UNCONSTRAINED, "{ value: PT1H30M }"));
     }
 
     @Test

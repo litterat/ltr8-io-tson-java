@@ -138,12 +138,19 @@ final class AtomNarrowing {
         }
     }
 
-    /** A member/value set may only shrink -- an enum's own {@code members}, a CIDR family's {@code within}. */
-    static void checkSubset(List<String> out, String facet, List<String> source, List<String> refined) {
+    /**
+     * A member/value set may only shrink -- an enum's own {@code members}, a numeric family's sparse
+     * {@code members}, a CIDR family's {@code within}. §5.7 declares the member-set facet kind once and
+     * never enum-specifically ("an enum's {@code members}, a pattern alternation authored as a set"), so
+     * one comparison serves every family that carries one. Members are compared by {@code equals}, which
+     * is [TSON-DATA] §4.3's identity for the numeric families: the token is recorded as written and
+     * compared as the value denoted, so {@code 0x50} and {@code 80} are one member.
+     */
+    static <T> void checkSubset(List<String> out, String facet, List<T> source, List<T> refined) {
         if (source.isEmpty()) {
             return;
         }
-        List<String> added = refined.stream().filter(member -> !source.contains(member)).toList();
+        List<T> added = refined.stream().filter(member -> !source.contains(member)).toList();
         if (!added.isEmpty()) {
             out.add(facet + " adds " + added + ", which the source does not admit");
         }

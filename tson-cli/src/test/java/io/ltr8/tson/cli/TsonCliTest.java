@@ -82,7 +82,7 @@ class TsonCliTest {
             !!meta:"https://tson.io/2026/35/m/meta.tn"
             !!import:"https://tson.io/2026/35/m/core.tn"
             {
-              stamped => { at: unknown  n: int32 }
+              stamped => { at: dynamic  n: int32 }
               plain   => { n: int32 }
             }
             """;
@@ -140,8 +140,8 @@ class TsonCliTest {
      * lifts the run to 70 with the note on stderr, so the report on stdout stays exactly what {@code
      * --output json|tson} promises.
      *
-     * <p>Never exit 1, which would tell a script the document was judged and rejected. Two constructors
-     * reach this ({@code CLAUDE.md}); {@code unknown} is the cheapest to write.
+     * <p>Never exit 1, which would tell a script the document was judged and rejected. The scoped instances
+     * reach this ({@code CLAUDE.md}); {@code dynamic} is the cheapest to write.
      */
     @Test
     void aReadTimeGapIsAGapNotAVerdict(@TempDir Path dir) throws IOException {

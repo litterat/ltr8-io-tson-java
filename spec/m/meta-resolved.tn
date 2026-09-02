@@ -24,36 +24,48 @@
     body: !enum { members: [BASE64 BASE64URL BASE32 HEX] }
   }
 
-  @doc:"Binary data constructor."
-  binary => !type_definition {
+  @doc:"Octet-string constructor. No spec: RFC 4648 defines the alphabets, not the value space, so an unrefined bytes has none to name."
+  binary_type => !type_definition {
     kind: ATOM
     constructor: true
-    supertypes: [atom atom_specification top]
-    body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4648" }
-      !record_field { name: encoding    type: binary_encoding }
+    supertypes: [atom top]
+    body: !record { supertypes: [atom]  fields: [
+      !record_field { name: encoding    type: binary_encoding  state: REQUIRED_DEFAULT  value: BASE64 }
+      !record_field { name: length      type: integer  state: OPTIONAL }
       !record_field { name: min_length  type: integer  state: OPTIONAL }
       !record_field { name: max_length  type: integer  state: OPTIONAL }
     ] }
   }
 
   @doc:"Constructor for sum types whose members belong to a named external schema."
-  extern => !type_definition {
+  scope_kind => !type_definition {
+    kind: ATOM
+    source: enum
+    body: !enum { members: [LOCAL EXTERN] }
+  }
+
+  @doc:"The set spelling an author writes: a template over the parameterless set_type constructor."
+  set => !type_definition {
+    kind: PRODUCT
+    source: set_type
+    parameters: [T]
+    body: !set_type { element_type: T }
+  }
+
+  @doc:"""
+    Constructor for open sum types: the value names its own type,
+    and the instance names the namespaces that name may be resolved
+    in. Open where a choice is closed, so `disjoint` is absent here
+    as on every non-choice sum.
+    """
+  scoped => !type_definition {
     kind: SUM
     constructor: true
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
-      !record_field { name: schema  type: uri }
-      !record_field { name: types   type: array_type_name_xxhash  state: OPTIONAL }
+      !record_field { name: scope    type: set_scope_kind_xxhash }
+      !record_field { name: schemas  type: map_uri_array_type_name_1_ef020ac1_OPTIONAL_1_xxhash  state: OPTIONAL }
     ] }
-  }
-
-  @doc:"Unknown sum constructor. Its instance `unknown` (core) accepts any well-formed value of any type."
-  unknown_type => !type_definition {
-    kind: SUM
-    constructor: true
-    supertypes: [sum top]
-    body: !record { supertypes: [sum]  fields: [] }
   }
 
   @doc:"IEEE 754-2019 interchange formats, both radices. Selects the representable grid of an approximate (float_type) value."
@@ -99,6 +111,7 @@
       !record_field { name: multiple_of      type: value    state: OPTIONAL }
       !record_field { name: total_digits     type: integer  state: OPTIONAL }
       !record_field { name: fraction_digits  type: integer  state: OPTIONAL }
+      !record_field { name: members          type: set_value_xxhash  state: OPTIONAL }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -147,9 +160,15 @@
     constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec  type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
-      !record_field { name: min   type: value  state: OPTIONAL }
-      !record_field { name: max   type: value  state: OPTIONAL }
+      !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
+      !record_field { name: min            type: value  state: OPTIONAL }
+      !record_field { name: exclusive_min  type: value  state: OPTIONAL }
+      !record_field { name: max            type: value  state: OPTIONAL }
+      !record_field { name: exclusive_max  type: value  state: OPTIONAL }
+    ]
+    groups: [
+      !field_group { members: [min exclusive_min]  state: OPTIONAL }
+      !field_group { members: [max exclusive_max]  state: OPTIONAL }
     ] }
   }
 
@@ -161,8 +180,14 @@
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec              type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
       !record_field { name: min               type: value    state: OPTIONAL }
+      !record_field { name: exclusive_min     type: value    state: OPTIONAL }
       !record_field { name: max               type: value    state: OPTIONAL }
+      !record_field { name: exclusive_max     type: value    state: OPTIONAL }
       !record_field { name: precision         type: integer  state: OPTIONAL }
+    ]
+    groups: [
+      !field_group { members: [min exclusive_min]  state: OPTIONAL }
+      !field_group { members: [max exclusive_max]  state: OPTIONAL }
     ] }
   }
 
@@ -174,8 +199,14 @@
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec              type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
       !record_field { name: min               type: value    state: OPTIONAL }
+      !record_field { name: exclusive_min     type: value    state: OPTIONAL }
       !record_field { name: max               type: value    state: OPTIONAL }
+      !record_field { name: exclusive_max     type: value    state: OPTIONAL }
       !record_field { name: precision         type: integer  state: OPTIONAL }
+    ]
+    groups: [
+      !field_group { members: [min exclusive_min]  state: OPTIONAL }
+      !field_group { members: [max exclusive_max]  state: OPTIONAL }
     ] }
   }
 
@@ -185,9 +216,41 @@
     constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
-      !record_field { name: spec  type: uri  state: REQUIRED_FIXED  value: "https://www.iso.org/standard/70907.html" }
-      !record_field { name: min   type: value  state: OPTIONAL }
-      !record_field { name: max   type: value  state: OPTIONAL }
+      !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
+      !record_field { name: min            type: value    state: OPTIONAL }
+      !record_field { name: exclusive_min  type: value    state: OPTIONAL }
+      !record_field { name: max            type: value    state: OPTIONAL }
+      !record_field { name: exclusive_max  type: value    state: OPTIONAL }
+      !record_field { name: precision      type: integer  state: OPTIONAL }
+      !record_field { name: multiple_of    type: value    state: OPTIONAL }
+    ]
+    groups: [
+      !field_group { members: [min exclusive_min]  state: OPTIONAL }
+      !field_group { members: [max exclusive_max]  state: OPTIONAL }
+    ] }
+  }
+
+  @doc:"""
+    Calendar-span constraint vocabulary. Instance is `period` in core.
+    A signed integer number of months, so P1Y and P12M are one value
+    and ordering is TOTAL. The calendar half of what one duration used
+    to carry, and the reason the other half can be ordered at all.
+    """
+  period_type => !type_definition {
+    kind: ATOM
+    constructor: true
+    supertypes: [atom atom_specification top]
+    body: !record { supertypes: [atom atom_specification]  fields: [
+      !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
+      !record_field { name: min            type: value  state: OPTIONAL }
+      !record_field { name: exclusive_min  type: value  state: OPTIONAL }
+      !record_field { name: max            type: value  state: OPTIONAL }
+      !record_field { name: exclusive_max  type: value  state: OPTIONAL }
+      !record_field { name: multiple_of    type: value  state: OPTIONAL }
+    ]
+    groups: [
+      !field_group { members: [min exclusive_min]  state: OPTIONAL }
+      !field_group { members: [max exclusive_max]  state: OPTIONAL }
     ] }
   }
 
@@ -341,6 +404,54 @@
     body: !reference { target: text }
   }
 
+  @doc:"Short human-readable name for a definition or field."
+  title => @annotation !type_definition {
+    kind: REFERENCE
+    source: text
+    body: !reference { target: text }
+  }
+
+  @doc:"Example values, carried for documentation only."
+  examples => @annotation !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: value }
+  }
+
+  @doc:"Marks a field an encoding's consumers may read but not write."
+  read_only => @annotation !type_definition {
+    kind: REFERENCE
+    source: boolean
+    body: !reference { target: boolean }
+  }
+
+  @doc:"Marks a field an encoding's consumers may write but not read."
+  write_only => @annotation !type_definition {
+    kind: REFERENCE
+    source: boolean
+    body: !reference { target: boolean }
+  }
+
+  @doc:"""
+    Names the field a member-dispatching encoding selects a choice's
+    variant on. A checked annotation: no decode force, load-time force.
+    """
+  discriminator => @annotation !type_definition {
+    kind: REFERENCE
+    source: field_name
+    body: !reference { target: field_name }
+  }
+
+  @doc:"""
+    Designates the field an encoding that flattens is meant to flatten.
+    A checked annotation on the same terms as @discriminator.
+    """
+  rest => @annotation !type_definition {
+    kind: REFERENCE
+    source: void
+    body: !reference { target: void }
+  }
+
   @doc:"""
     Synthetic entries — the closed forms the sugar lifts to; see
     meta-kernel-resolved.tn's own note. Each key carries the derived
@@ -353,5 +464,46 @@
     kind: PRODUCT
     source: array
     body: !array { element_type: value }
+  }
+
+  @synthetic array_type_name_1_xxhash => !type_definition {
+    kind: PRODUCT
+    source: array
+    body: !array { element_type: @alias:type_name identifier  min_items: 1 }
+  }
+
+  @synthetic map_uri_array_type_name_1_ef020ac1_OPTIONAL_1_xxhash => !type_definition {
+    kind: PRODUCT
+    source: map
+    body: !map { key_type: uri  value_type: array_type_name_1_xxhash  state: OPTIONAL  min_items: 1 }
+  }
+
+  @synthetic set_type_scope_kind_xxhash => !type_definition {
+    kind: PRODUCT
+    source: set_type
+    body: !set_type { element_type: scope_kind  min_items: 1 }
+  }
+
+  @doc:"""
+    Instantiation entries — what a template application closes to. Unlike
+    a synthetic these carry no `@synthetic` marker: their `source` is an
+    application where a synthetic's is a bare constructor (Section 8.2).
+    """
+  set_scope_kind_xxhash => !type_definition {
+    kind: REFERENCE
+    source: { name: set  arguments: [ { name: scope_kind } ] }
+    body: !reference { target: set_type_scope_kind_xxhash }
+  }
+
+  @synthetic set_type_value_xxhash => !type_definition {
+    kind: PRODUCT
+    source: set_type
+    body: !set_type { element_type: value  min_items: 1 }
+  }
+
+  set_value_xxhash => !type_definition {
+    kind: REFERENCE
+    source: { name: set  arguments: [ { name: value } ] }
+    body: !reference { target: set_type_value_xxhash }
   }
 }

@@ -268,33 +268,42 @@
     body: !uri_type {}
   }
 
-  @doc:"Base64-encoded binary (RFC 4648)."
+  @doc:"An octet string, spelled however the value says. The four alphabets below refine it."
+  bytes => !type_definition {
+    kind: ATOM
+    source: binary_type
+    subtypes: [base32 base64 base64url hex]
+    body: !binary_type { encoding: BASE64 }
+  }
+
   base64 => !type_definition {
     kind: ATOM
-    source: binary
-    body: !binary { encoding: BASE64 }
+    source: binary_type
+    supertypes: [bytes]
+    body: !binary_type { encoding: BASE64 }
   }
 
-  @doc:"URL-safe base64-encoded binary (RFC 4648 Section 5)."
   base64url => !type_definition {
     kind: ATOM
-    source: binary
-    body: !binary { encoding: BASE64URL }
+    source: binary_type
+    supertypes: [bytes]
+    body: !binary_type { encoding: BASE64URL }
   }
 
-  @doc:"Base32-encoded binary (RFC 4648)."
   base32 => !type_definition {
     kind: ATOM
-    source: binary
-    body: !binary { encoding: BASE32 }
+    source: binary_type
+    supertypes: [bytes]
+    body: !binary_type { encoding: BASE32 }
   }
 
-  @doc:"Hex-encoded binary."
   hex => !type_definition {
     kind: ATOM
-    source: binary
-    body: !binary { encoding: HEX }
+    source: binary_type
+    supertypes: [bytes]
+    body: !binary_type { encoding: HEX }
   }
+
 
   @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
   @ordered:TOTAL @bounded:false
@@ -326,6 +335,12 @@
     kind: ATOM
     source: duration_type
     body: !duration_type {}
+  }
+
+  period => !type_definition {
+    kind: ATOM
+    source: period_type
+    body: !period_type {}
   }
 
   @doc:"128-bit identifier per RFC 9562."
@@ -386,10 +401,54 @@
 
   @doc:"Value whose type is unconstrained. The validator accepts any well-formed value of any type."
   @ordered:NONE @bounded:false
-  unknown => !type_definition {
+  @doc:"A type this schema declares or imports, chosen by the value."
+  declared => !type_definition {
     kind: SUM
-    source: unknown_type
-    body: !unknown_type {}
+    source: scoped
+    body: !scoped { scope: [LOCAL] }
+  }
+
+  @doc:"A type from a foreign schema, which the value names for itself."
+  extern => !type_definition {
+    kind: SUM
+    source: scoped
+    body: !scoped { scope: [EXTERN] }
+  }
+
+  @doc:"A type from either namespace — the widest scoped instance."
+  dynamic => !type_definition {
+    kind: SUM
+    source: scoped
+    body: !scoped { scope: [LOCAL EXTERN] }
+  }
+
+  @doc:"""
+    Open entries. Their bodies are <b>held</b> — the application as
+    written, unread until materialisation substitutes the parameters
+    away — so a token in one is a parameter reference rather than a
+    value of the slot's declared type (Section 8.1's shadowing rule).
+    A processor comparing these compares wire form, not bound values.
+    """
+  extern_of => !type_definition {
+    kind: SUM
+    source: scoped
+    parameters: [S]
+    body: !scoped { scope: [EXTERN]  schemas: { S => _ } }
+  }
+
+  extern_type => !type_definition {
+    kind: SUM
+    source: scoped
+    parameters: [S T]
+    body: !scoped { scope: [EXTERN]  schemas: { S => [T] } }
+  }
+
+  @doc:"The set spelling an author writes: a template over meta's parameterless set_type."
+  set => !type_definition {
+    kind: PRODUCT
+    source: set_type
+    parameters: [T]
+    body: !set_type { element_type: T }
   }
 
   @doc:"Marker annotation."

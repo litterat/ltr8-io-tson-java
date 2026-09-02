@@ -20,10 +20,10 @@ import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.Data;
-import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.FloatType;
@@ -50,7 +50,8 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
-import io.ltr8.tson.schema.meta.UnknownType;
+import io.ltr8.tson.schema.meta.Scoped;
+import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
@@ -508,9 +509,19 @@ public final class TsonSchemaLinker {
         Boolean constructorsAllowed = null;
         for (Map.Entry<String, TypeDefinition> entry : schema.entries().entrySet()) {
             if (merged.containsKey(entry.getKey())) {
-                // The local entry is dropped, not the import's: an import is already-linked, separately
-                // registered material, so keeping it is the choice that leaves the rest of this schema
-                // checkable against something real.
+                // Two entries of one name that are the same entry unify rather than collide. §8.2 names a
+                // materialised instantiation by a function of its resolved form alone, precisely so that
+                // "two `box<text>` anywhere share one entry" -- so an application this schema closed and an
+                // identical one an import already closed agree by construction, and refusing them would make
+                // a template unusable by any schema that imports the one exporting it. Compared by value, not
+                // by origin: it is sameness that makes them one entry, and a derived name that is a function
+                // of the form is what makes sameness decidable here.
+                if (merged.get(entry.getKey()).equals(entry.getValue())) {
+                    continue;
+                }
+                // Otherwise the local entry is dropped, not the import's: an import is already-linked,
+                // separately registered material, so keeping it is the choice that leaves the rest of this
+                // schema checkable against something real.
                 if (!report(receiver, schema, entry.getKey(), entry.getValue(), "'" + entry.getKey()
                         + "' collides with an entry of the same name brought in by !!import")) {
                     continue;
@@ -1074,6 +1085,8 @@ public final class TsonSchemaLinker {
             }
             case DurationType ignored -> {
             }
+            case PeriodType ignored -> {
+            }
             case Cidr4Type ignored -> {
             }
             case Cidr6Type ignored -> {
@@ -1088,9 +1101,7 @@ public final class TsonSchemaLinker {
             }
             case ComplexType ignored -> {
             }
-            case UnknownType ignored -> {
-            }
-            case Extern ignored -> {
+            case Scoped ignored -> {
             }
             case Data data -> {
                 // A body describing something other than a data value. Its shape is the consumer's own Java
@@ -1298,6 +1309,7 @@ public final class TsonSchemaLinker {
         List<String> violations = switch (body) {
             case Atom atom -> atom.coherenceCheck();
             case Product product -> product.coherenceCheck();
+            case Sum sum -> sum.coherenceCheck();
             default -> List.of();
         };
         if (!violations.isEmpty()) {
@@ -1401,8 +1413,7 @@ public final class TsonSchemaLinker {
             case RecordBody ignored -> "a record";
             case ChoiceBody ignored -> "a choice";
             case Unit ignored -> "the void type";
-            case Extern ignored -> "an external type";
-            case UnknownType ignored -> "the unknown type, which is every type rather than a token shape";
+            case Scoped ignored -> "a scoped type, whose values name their own type rather than being a token shape";
             default -> "not a scalar type";
         };
     }
