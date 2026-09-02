@@ -138,32 +138,60 @@ references it. The same argument applies to the open forms, and nothing but avai
 declaration into the document being desugared, with `positionalNames`/`rename` alpha-normalising the
 parameters so that two spellings of one form land on one entry within that document.
 
-**Suggested resolution:** consider declaring the fixed-arity open forms in the kernel — `<T> !array
-{ element_type: T }`, its `state: OPTIONAL` sibling, and the `map` pair — so that §5.3's lift targets a
-declared name rather than an injection. Two things to weigh, both real:
+**Suggested resolution: leave it undefined, and this entry now recommends against the kernel declaration it
+was opened to propose.** Declaring the lift targets would hard-code a resolver's internal template logic into
+the shared type vocabulary. Leaving them undefined is what lets each implementation mint its internal
+templates in the shape its own resolver requires — latitude the format grants today at no cost, and would be
+spending for nothing.
 
-1. **Only part of the family is fixed-arity.** The size specifier's variants differ by which bounds are
-   present (`[T; 3]`, `[T; 1..]`, `[T; 1..2]` are three shapes, since an absent `max_items` is not a
-   defaulted one), and `tuple` and `choice` are variadic, so `[T, U]` and `( T | error )` have no
-   fixed-arity template at all. A kernel set would cover the commonest case and leave the lift rule in
-   place for the rest, which is a smaller win than "declare them once" suggests.
-2. **Availability is the hard part.** A schema's type-name namespace is its own declarations plus its
-   `!!import`s (§3.3.1, §2.2.3); it does not include the namespace of the schema its `!!meta` names. So a
-   kernel-declared `array_of` is not in scope for a schema that has not imported the kernel, and a lift
-   targeting it would make desugaring — a phase whose whole virtue is being syntactic, consulting no
-   governing meta and no namespace — depend on the import set. Either §5.3 would have to name these as
-   always-available regardless of import (a new category of name), or they would have to live somewhere
-   every schema already reaches.
+The freedom being given up is real and §8.2 already grants it deliberately: synthetic names are
+"resolver-chosen and fresh by construction ... and unreachable from source". An author never writes one,
+never references one, and meets one only when reading resolved output. So the shape, arity and even the
+existence of the lifted entry are an implementation's business today — this one alpha-normalises parameters
+so two spellings land on one entry, and another may reasonably do something else. A kernel declaration makes
+one implementation's bookkeeping normative for all of them.
 
-Note this is **not** a proposal to re-parameterize `array`/`set`/`map`: those stay de-parameterized
-constructors with `element_type` as an ordinary field, and what is proposed here is named templates *over*
-them, which is the layer a user's own `box => <T> { ... }` lives in.
+Four reasons, in the order they bite:
 
-**Status against Revision 34:** open, unaddressed. §5.3's lift rule is restated in this revision's own
-terms — a parameter-bearing form lifts to an open synthetic "whose body is the constructor application as
-written, held until materialisation" — but it still mints per schema, and §9 declares no open container
-templates. This implementation mints per schema and `ContainerSugarEndToEndTest` pins the resulting entry
-sets.
+1. **It is a category error.** The kernel is a type *vocabulary* — what types are, and what a constructor's
+   fields hold. A lift target is *resolver machinery*: it exists because §5.3 needs somewhere to put a form
+   the author wrote inline, and it describes no type the author was reasoning about. §9's `enum_set` is not
+   the precedent it looks like, and the difference is the whole argument: `enum_set` is declared because
+   `enum.members` — a kernel constructor's own field — must be typed something, so it is part of the
+   vocabulary's shape and is referenced from inside the kernel. The proposed container templates would be
+   referenced by nothing in the kernel and would exist only for user schemas to lift into.
+2. **§10 makes it permanent.** The kernel is published, hash-pinned, and immutable at its identity. A
+   template shape that turns out wrong — the wrong parameter order, the wrong treatment of `state`, a
+   missing sibling — cannot be corrected without minting a new kernel version and re-stamping the digest
+   chain through `meta.tn` and `core.tn`. That is a heavy price for an artifact no author writes, and it
+   would be paid by every schema in existence.
+3. **The family is not closed, so the mechanism would not be replaced, only doubled.** Only the fixed-arity
+   forms could be declared: the size specifier's variants differ by which bounds are present (`[T; 3]`,
+   `[T; 1..]`, `[T; 1..2]` are three shapes, an absent `max_items` not being a defaulted one), and `tuple`
+   and `choice` are variadic, so `[T, U]` and `( T | error )` have no fixed-arity template at all. The lift
+   rule stays for the rest, and a reader of resolved output must then know which forms are kernel-backed and
+   which are minted — two mechanisms where there is one.
+4. **Availability would need a new category of name.** A schema's type-name namespace is its own
+   declarations plus its `!!import`s (§3.3.1, §2.2.3), and does not include the namespace its `!!meta`
+   names. A kernel-declared `array_of` is therefore not in scope for a schema that has not imported the
+   kernel, so either §5.3 names these as always-available regardless of import — a new scoping rule
+   invented for an internal artifact — or desugaring stops being purely syntactic and starts depending on
+   the import set, which is the property that makes it consult no governing meta and need no bootstrap
+   special case.
+
+Against all of that, the cost the problem statement names is bytes in resolved output and a little repetition
+under a reader's eye. Nothing an author writes changes either way.
+
+Note this was **never** a proposal to re-parameterize `array`/`set`/`map`: those stay de-parameterized
+constructors with `element_type` as an ordinary field, and what was proposed was named templates *over* them.
+That half of the design is settled and is not reopened by declining this.
+
+**Status against Revision 34:** open as an observation, closed as a proposal — the repetition is real and the
+kernel declaration is the wrong fix for it. A revision that wants to say something here should say that
+synthetic entries are an implementation's own, which §8.2 already implies and could state outright: their
+names are resolver-chosen, their shape is unconstrained beyond producing the required resolved output, and a
+processor is free to mint, share or normalise them however it likes. This implementation mints per schema and
+`ContainerSugarEndToEndTest` pins the resulting entry sets.
 
 ---
 
