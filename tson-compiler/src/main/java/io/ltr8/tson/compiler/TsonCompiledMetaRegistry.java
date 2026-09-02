@@ -382,7 +382,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * <p><b>An {@link IllegalStateException}, so it stays a fault.</b> A source is the caller's own code and
      * a broken one is a bug in the deployment, not a verdict on the document that happened to name the
      * schema: {@code SchemaFailure}'s default rethrows it rather than reporting the document invalid, which
-     * is right, and it must not become {@code SCHEMA_UNAVAILABLE} -- treating {@code null} as a miss would
+     * is right, and it must not become a fetch failure -- treating {@code null} as a miss would
      * make the wrong spelling work and hide every later one.
      *
      * <p>The trap this catches is {@code schemaSource(schemas::get)}, so the message names {@link

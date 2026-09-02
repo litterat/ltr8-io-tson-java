@@ -35,8 +35,8 @@ class TsonValidateSchemaTest {
     /**
      * <b>An {@code !!import} nobody would serve is a fetch failure with a stated reason.</b> This is the
      * schema-document channel of the same problem a read hits, and it must answer the same way: {@code
-     * SCHEMA_UNAVAILABLE} for "no schema was obtained", and {@link TsonSchemaFetchException.Reason} for
-     * whose doing that was -- {@code NOT_PERMITTED} for a reference this deployment refuses being the
+     * SCHEMA_NOT_PERMITTED} and its four siblings for "no schema was obtained", one per reason, since whose
+     * doing that was -- {@code NOT_PERMITTED} for a reference this deployment refuses being the
      * author's to fix, where {@code TIMEOUT} is not. The {@code actual} half names the reference itself,
      * since that is what the author would go and look at.
      */

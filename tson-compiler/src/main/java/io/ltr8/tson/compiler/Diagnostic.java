@@ -423,12 +423,14 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
 
         // ── A schema was not obtained: one code per reason ───────────────────────────────────────
         //
-        // Five codes rather than one plus a `fetchReason` field, because both are a consumer's *routing*
-        // question and a code is what a consumer routes on -- the same reason §8.2's three refusal codes are
-        // three codes with no `refusalReason` beside them. Consumers partition these differently (a command
-        // line by whether a rerun could help, an HTTP surface by whose doing it was), so the split is per
-        // reason and no partition is privileged. `TsonSchemaFetchException.Reason` remains the throwing
-        // channel's own vocabulary and the single input to `Code.of`.
+        // Why a fetch failed is a *routing* question, and a code is what a consumer routes on -- the same
+        // reason §8.2's three refusal codes are three codes with no `refusalReason` beside them. Carrying it
+        // as a field instead would be a second carrier for one fact, free to disagree with the first.
+        //
+        // One per reason rather than a permanent/transient pair, because consumers partition them
+        // differently: a command line by whether a rerun could help, an HTTP surface by whose doing it was.
+        // A code encoding one partition strands the other. `TsonSchemaFetchException.Reason` is the throwing
+        // channel's own vocabulary and the single input to `Code.of`, so the two channels cannot disagree.
 
         /** Policy refused it: not an allowed host, not a legal identity, or no pin where one is required. */
         SCHEMA_NOT_PERMITTED,

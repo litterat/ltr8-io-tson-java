@@ -24,16 +24,19 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `VALIDATION_ERROR`          | anything not covered by a more specific code — including a document that will not lex or parse |
 | `NOT_IMPLEMENTED`           | **a library gap, not bad input**                                                             |
 | `BIND_MISMATCH`             | a schema type and its bound class disagree about that type's fields                          |
-| `SCHEMA_UNAVAILABLE`        | a reference no configured source would supply — **not** a verdict on the schema, never obtained |
+| `SCHEMA_NOT_PERMITTED`      | policy refused the reference — not an allowed host, not a legal identity, no pin where required |
+| `SCHEMA_NOT_FOUND`          | the location was reached and does not have it                                                |
+| `SCHEMA_UNREACHABLE`        | the location could not be reached, or answered with something other than a document          |
+| `SCHEMA_TIMEOUT`            | the location did not answer in time                                                          |
+| `SCHEMA_TOO_LARGE`          | the location answered with more bytes than a schema document may be                          |
 
-### The four that are not verdicts on the document
+### The seven that are not verdicts on the document
 
-`NOT_IMPLEMENTED`, `BIND_MISMATCH`, `SCHEMA_UNAVAILABLE` and the three refusal codes each say the
-document was not judged, for a different reason:
+`Code.verdict()` is the one statement of the set, so a consumer does not keep a private copy that can
+drift: it is `false` for `NOT_IMPLEMENTED`, `BIND_MISMATCH` and the five `SCHEMA_*` fetch codes, and
+`true` for everything else. Each of the seven says the document was not judged, and they differ in *who*
+could not judge it — which is exactly what a caller picking an HTTP status or an exit code is asking.
 
-- **`SCHEMA_ERROR` vs `SCHEMA_UNAVAILABLE`** is the distinction a caller deciding whether to retry
-  needs: the first says the schema is wrong, the second that nothing was checked. `fetchReason` says
-  by whose doing.
 - **`NOT_IMPLEMENTED`** is a gap in this library. It rides in the report located at the value it could
   not read, and costs that value a verdict and nothing else's — so a gap and an ordinary error in one
   document both get reported. Two exist today, both on a schema that loaded clean: `unknown` and
@@ -41,9 +44,21 @@ document was not judged, for a different reason:
 - **`BIND_MISMATCH`** is a misconfiguration in the *reading application*, no more a verdict on the
   document than a gap is. It normally fails the bind-mode compile as an exception instead; it reaches a
   read as a diagnostic only for a schema compiled on demand.
-- **The three refusal codes** are §8.2's fifth outcome. §8.2 says a refusal MUST NOT be reported in any
-  of §8.1's four error categories, because each rule reads Unicode data the UCD does not freeze. One
-  code per rule — the three want three different remedies, and the code is what a consumer routes on.
+- **The five `SCHEMA_*` fetch codes** are everyone else: no configured `TsonSchemaSource` would supply
+  the schema the document names. Nothing is wrong with the document, and nothing may be wrong with the
+  schema either — it was never obtained, so it was never read. **`SCHEMA_ERROR` vs the five** is the
+  distinction a caller deciding whether to retry needs: `SCHEMA_ERROR` is a verdict, the schema *was*
+  obtained and does not resolve. And "everyone else" is several people, which is why there are five:
+  `SCHEMA_NOT_PERMITTED` and `SCHEMA_NOT_FOUND` mean the document named something this deployment will
+  not fetch or nothing serves, `SCHEMA_TOO_LARGE` that it named something too big to accept, and
+  `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` that the reference was fine and the world did not answer — only
+  those last two are worth a retry.
+
+**The three refusal codes are verdicts**, though not validity ones. §8.2 says a refusal MUST NOT be
+reported in any of §8.1's four error categories, because each rule reads Unicode data the UCD does not
+freeze — but the processor looked and declined, and the sender holds the fix, so `verdict()` is `true`
+and the CLI exits 1. One code per rule: the three want three different remedies, and the code is what a
+consumer routes on.
 
 ## The `Diagnostic` record
 
@@ -59,8 +74,7 @@ public record Diagnostic(
         String expected,                  // the CONSTRAINT that failed, never a type name
         String actual,
         Optional<SourcePosition> dataPosition,
-        Optional<SourcePosition> schemaPosition,
-        Optional<TsonSchemaFetchException.Reason> fetchReason) {
+        Optional<SourcePosition> schemaPosition) {
 
     Optional<String> schemaIdIfKnown();
     Optional<String> expectedIfStated();
@@ -72,12 +86,13 @@ The four location components match JSON Schema 2020-12 §12's output unit — wh
 the schema — so one record renders both data-side and schema-side problems; the variation between them
 is locational, not categorical.
 
-**One component is not a location**, and it carries a distinction the closed `Code` cannot and
-`message` must not:
-
-- `fetchReason` — `NOT_PERMITTED` / `NOT_FOUND` mean the document named something this deployment will
-  not fetch or nothing serves; `TRANSPORT` / `TIMEOUT` / `TOO_LARGE` mean the reference was fine and
-  only those are worth retrying.
+**Every component is a location.** The one fact that is not — why a schema could not be obtained — is
+carried by the `Code` rather than beside it. A fetch failure has five causes, and which one it was is a
+*routing* question: a code is what a consumer routes on, so a field beside the code would be a second
+carrier for the same fact, free to disagree with it. Consumers partition the five differently (a command
+line by whether a rerun could help, an HTTP surface by whose doing it was), so there is one code per
+cause and no partition is privileged. `TsonSchemaFetchException.Reason` remains the *throwing* channel's
+vocabulary, and `Diagnostic.Code.of(reason)` is the single mapping between the two.
 
 What earns a component at all is one rule: **a fact not recoverable from the document plus the schema,
 and about the problem rather than about the processor**. Which is why an atom's failed bound (in the
@@ -187,18 +202,27 @@ or `TsonDataParser` directly cannot do for themselves. The facade readers call i
 
 ## CLI exit codes
 
-| Code | Meaning                                                                  |
-| ---- | -------------------------------------------------------------------------- |
-| `0`  | valid / compiled cleanly (or an explicit `--help`)                       |
-| `1`  | at least one data document is invalid                                    |
-| `2`  | usage error — bad arguments, an unreadable file                          |
-| `69` | `EX_UNAVAILABLE` — a schema nothing would supply; **nothing was checked** |
-| `70` | `EX_SOFTWARE` — a library gap or an internal fault; **no verdict reached** |
+| Code | Meaning                                                                                          |
+| ---- | -------------------------------------------------------------------------------------------------- |
+| `0`  | everything was checked and nothing was reported (or an explicit `--help`)                        |
+| `1`  | **checked and rejected** — the validity codes, plus a §8.2 refusal                               |
+| `2`  | usage error — bad arguments, an unreadable file                                                  |
+| `69` | `EX_UNAVAILABLE` — a schema was not obtained and a rerun will not obtain it: `SCHEMA_NOT_PERMITTED`, `SCHEMA_NOT_FOUND`, `SCHEMA_TOO_LARGE` |
+| `75` | `EX_TEMPFAIL` — a schema was not obtained and a rerun may help: `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT` |
+| `78` | `EX_CONFIG` — a type the schema needs has no Java class in this tool: `BIND_MISMATCH`             |
+| `70` | `EX_SOFTWARE` — a library gap (`NOT_IMPLEMENTED`) or an uncaught fault; **no verdict reached**    |
 
-`1` is a verdict on the input; `69` and `70` are the absence of one, naming who could not give it.
-`TsonCli.exitCodeFor` lifts a run to whichever is most permanent — **70 over 69 over 1**, since
-retrying reaches a gap again. Both non-verdicts also ride in the report as codes
-(`NOT_IMPLEMENTED`, `SCHEMA_UNAVAILABLE`) with a note on stderr; the report on stdout is unchanged.
+`1` is a verdict on the input; everything above `2` is the absence of one, naming who could not give it.
+A §8.2 name-hygiene refusal is a `1` and not a fifth code: §8.2's "not in any of the four categories" is
+about which layer detected it, where an exit code answers what the caller should do now — and a refusal
+was checked and declined, with the sender holding the fix.
+
+`TsonCli.exitCodeFor` lifts a mixed run to one code, ranked by **who must act before anyone else's fix
+counts**, permanence breaking the tie: **70 > 78 > 69 > 75 > 1**. 70 and 78 name nobody present (a
+release of this library; an application wired to bind that type), 69 the runner editing the reference or
+the allow-list it is checked against, 75 the runner simply rerunning, and 1 the runner editing the
+document. Every non-verdict also rides in the report as its own code, with a note on stderr; the report
+on stdout is unchanged, and its `outcome` reads `NOT_CHECKED` for all of them.
 
 70's two halves print differently: a gap prints `not implemented yet: <message>`, whose text usually
 names the workaround; a fault gets the please-report-it banner and its stack trace.

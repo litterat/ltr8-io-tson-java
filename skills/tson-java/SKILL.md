@@ -298,13 +298,13 @@ problem with the document — base syntax included — so a collecting read neve
 document; only a fault in the library throws past it. A fail-fast read throws `TsonReadException`,
 which carries the `Diagnostic` on `.diagnostic()`.
 
-A `Diagnostic` locates itself at both ends and carries one component that is not a location:
+A `Diagnostic` locates itself at both ends, and **every component is a location** — the one fact that is
+not, why a schema could not be obtained, rides the `code` rather than a field beside it:
 
 ```java
 record Diagnostic(Optional<String> path, Optional<String> schemaPointer, String schemaId,
                   Code code, String message, String expected, String actual,
-                  Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition,
-                  Optional<TsonSchemaFetchException.Reason> fetchReason) {}
+                  Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition) {}
 ```
 
 Two absence conventions, deliberately: the two RFC 6901 pointers are `Optional` because `""` is the
@@ -320,10 +320,15 @@ The **schema end is the path taken through *your* schema**: an `age: int32` fiel
 bound reports `/person/age`, not `/int32` in core.tn, because a pointer into a library file you did not
 write is not where you go to fix it.
 
-`Diagnostic.Code` is a **closed enum** — switch on it exhaustively. Three of its members are not
-verdicts on the document: `NOT_IMPLEMENTED` (a library gap), `BIND_MISMATCH` (your class and the schema
-disagree), `SCHEMA_UNAVAILABLE` (nothing was checked — the schema was never obtained, and `fetchReason`
-says by whose doing). Full list, the exception hierarchy and the exit codes: `references/diagnostics.md`.
+`Diagnostic.Code` is a **closed enum** — switch on it exhaustively. Seven of its members are not verdicts
+on the document, and `Code.verdict()` is the one place that says so rather than each consumer keeping its
+own copy of the set: `NOT_IMPLEMENTED` (a library gap), `BIND_MISMATCH` (your class and the schema
+disagree), and the five `SCHEMA_*` fetch codes (nothing was checked — the schema was never obtained).
+Those five are `SCHEMA_NOT_PERMITTED`, `SCHEMA_NOT_FOUND`, `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT` and
+`SCHEMA_TOO_LARGE`, one per `TsonSchemaFetchException.Reason` and mapped by `Code.of(reason)` — a code
+rather than a reason field beside one code, because which one it is is a *routing* question and the code
+is what a consumer routes on. Full list, the exception hierarchy and the exit codes:
+`references/diagnostics.md`.
 
 ## Name hygiene and token policy
 
@@ -380,9 +385,12 @@ tson hash person.tn                     # stamp ?sha256=… onto its own !!id, i
 
 **A flat file list**, each auto-classified as schema or data by content and never by filename; selection
 is entirely the data's own `!!schema` plus its root type-ref, so there is no `--type` and no `--schema`.
-Nothing is fetched over the network. Exit codes: `0` valid · `1` a document is invalid · `2` usage ·
-`69` a schema nothing would supply · `70` a library gap or fault — the last two being the *absence* of a
-verdict rather than one.
+Nothing is fetched over the network. Exit codes: `0` checked and nothing reported · `1` checked and
+rejected · `2` usage · `69` a schema not obtained and a rerun will not help · `75` a schema not reached,
+where a rerun may · `78` a type with no Java class in this tool · `70` a library gap or fault — everything
+above `2` being the *absence* of a verdict rather than one, and a mixed run lifting to the most permanent
+(`70` > `78` > `69` > `75` > `1`). The report envelope says the same thing as an `outcome` of `VALID`,
+`INVALID` or `NOT_CHECKED`.
 
 `tson --help` lists the commands; `tson <command> --help` carries that command's own options, including
 the [TSON-DATA] §8.2 policy flags for the three that judge a name.
@@ -418,7 +426,8 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | `asInt()` to assert which host type a read produced             | it converts; `234.56E2` answers too                                 | `as(Integer.class)`                                         |
 | `schemaSource(schemas::get)`                                    | a `null` carries no `Reason`; refused as a fault                    | `TsonSchemaSource.ofMap(schemas)`                           |
 | `httpSchemas()` with no host                                    | deny by default means nothing is permitted                          | name the hosts explicitly                                   |
-| a `SCHEMA_UNAVAILABLE` read as "invalid document"               | nothing was checked                                                 | route on the code; `fetchReason` says whether to retry      |
+| a `SCHEMA_*` fetch code read as "invalid document"              | nothing was checked                                                 | route on the code; only `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` are worth a retry |
+| your own copy of the "not a verdict" code set                   | two consumers drift apart over the same diagnostic                  | ask `Diagnostic.Code.verdict()`                             |
 | `NOT_IMPLEMENTED` read as "invalid document"                    | it is a verdict on this library                                     | treat it as a bug report; the CLI exits 70                  |
 | a refusal code read as "invalid document"                       | §8.2 refusals are a fifth outcome, outside §8.1's four categories   | report it apart; relax `identifierPolicy` in code if intended |
 | relaxing identifier policy from an env var                      | ambient authority, invisible at the call site                       | pass `identifierPolicy` explicitly                          |

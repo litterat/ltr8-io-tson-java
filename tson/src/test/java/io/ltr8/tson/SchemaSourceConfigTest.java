@@ -166,7 +166,7 @@ class SchemaSourceConfigTest {
     /**
      * <b>And it stays a fault under a collector.</b> {@code validate} promises never to throw for a bad
      * <em>document</em>, which this is not: the document is fine and the deployment's source is broken.
-     * Reporting it as {@code SCHEMA_UNAVAILABLE} would make the wrong spelling work and hide every later one.
+     * Reporting it as a fetch failure would make the wrong spelling work and hide every later one.
      */
     @Test
     void aSourceReturningNullIsAFaultEvenWhenCollecting() {
