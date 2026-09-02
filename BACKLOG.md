@@ -49,6 +49,17 @@ own prose (which had gone stale on at least one of them):
 
 ## Built-in types
 
+- [ ] **Set uniqueness and map-key identity never fire for `binary`.** `BinaryParser` is
+  `AtomType<byte[]>`, and `byte[]` carries Java identity equality, so [TSON-SCHEMA] §7.5's duplicate rule
+  and [TSON-DATA] §2.6's key identity both compare two decoded values that can never be equal. Measured:
+  a `!set { element_type: hex }` accepts `[ "abcd" "abcd" ]`, where the same set over `text` reports
+  `'ts' requires unique elements`. The fix is a value-equality contract for the atom rather than a
+  `byte[]` comparison at each call site, since the same contract decides a `FIXED` value check and a map
+  key; and it has to answer the case-and-spelling question with it — `"abcd"` and `"ABCD"` are one octet
+  string, and `base64`/`base64url`/`base32`/`hex` are four instances of one `binary` constructor over one
+  value space. What the spec owes here is `SPEC-FEEDBACK.md` #28; the comparison being absent entirely is
+  this implementation's own.
+
 - [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
   `ErrorReader`), pinned down exactly by
   `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom

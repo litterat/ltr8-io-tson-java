@@ -12,8 +12,8 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The twenty-three below are what is open against Revision 34 — the nineteen it left open, renumbered from #1, and
-four raised since; the fourteen it resolved of the seventeen raised against Revision 33 are gone from here,
+The twenty-nine below are what is open against Revision 34 — the nineteen it left open, renumbered from #1,
+and ten raised since; the fourteen it resolved of the seventeen raised against Revision 33 are gone from here,
 because the spec now carries their rules and that is where the answer belongs. **This file is the as-built
 record**, not a pointer to one: where an entry proposes a design this implementation has built, the entry states
 the design, what is running, and what is not, so that a reviewer editing the spec needs nothing beside it.
@@ -1623,5 +1623,640 @@ stamping new digests ahead of the revision mints documents nobody has published.
 **Status against Revision 34:** open, and new against this revision — a proposal, and unlike #7–#10 one this
 implementation has not built: the two constructors it replaces compile to a reader that reports a gap, and the
 reader that replaces them is the work the shape unblocks.
+
+---
+
+## 24. §7.4 rules out a numeric enum and names two replacements, neither of which expresses a sparse value set — proposal: a `members` facet on the exact numeric constraint vocabularies
+
+**Section:** [TSON-SCHEMA] §7.4 (enum member semantics; constraint fields typed as `value`), §5.5 (constructor
+application and atom refinement), §5.4 (discrimination classes and derived disjointness), §5.7 (value tightening
+per facet kind), §9 (meta-kernel's `integer_type` and `enum_set`, meta's `decimal_type` and `float_type`);
+[TSON-DATA] §4.3 (numeric equivalence).
+
+**Problem:** §7.4 forbids a numeric enum and names what to write instead — "`!enum [1 2 3]` is a schema-load
+error, and the intent is an `!integer ^ { min: 1  max: 3 }` or a choice". The rule is right and its reasons hold:
+`enum_set` is a set of `identifier`, an enum member is a name, and a display string is mapped at the boundary.
+What the sentence does not cover is the case its own example is the easy half of. `min`/`max`/the exclusive
+bounds denote a contiguous range and `multiple_of` an arithmetic progression; a **sparse** set — `[80 443 8080]`,
+an HTTP status subset, a protobuf enum's explicit numbers — is neither, and no combination of the facets
+`integer_type` carries denotes it.
+
+Running here, the enum half refuses exactly as §7.4 requires, through the meta's own compiled reader:
+
+```
+port => !enum [80 443 8080]
+[SCHEMA_ERROR] /port: 'port': the body is not valid data for 'enum', the constructor's own constraint
+vocabulary -- 'identifier': '80': U+0038 at index 0 cannot start an identifier
+```
+
+**The choice half is the one that costs something, and §5.4 is explicit about why.** The derivation names this
+exact shape: a choice "whose variants are separated only by value sets — bounded numerics, disjoint patterns,
+disjoint enum member sets — derives `false`". So the replacement is three single-value refinements, three names
+an author never wanted, and — because the choice is not disjoint — a tag on every value:
+
+```
+p80 => !integer ^ { min: 80  max: 80 }   …   port => ( p80 | p443 | p8080 )
+
+!server { p: 443 }        [UNKNOWN_TYPE_REF] /p: 'port' is a choice -- a value at this position requires an
+                          explicit type annotation (!typeName) naming one of its declared variants: [p80, …]
+!server { p: !p443 443 }  OK
+```
+
+An identifier enum in the same position needs no tag, no per-member declaration and no name per value. The
+suggested replacement is strictly worse than the construct it replaces, for a case every schema language this
+one converts from treats as ordinary — JSON Schema's `enum: [80, 443, 8080]`, a protobuf enum's numbers, an
+OpenAPI document's status list.
+
+**The gap is a facet, not a constructor.** A `numeric_enum` constructor is the shape that suggests itself and is
+the wrong one, on §5.5's own rule: "construction creates siblings, not subtypes". A fresh constructor mints a
+family with no IS-A into the numeric tiers and no facet composition, where `!integer ^ { members: [80 443 8080] }`
+inherits both — it is an `integer`, it refines further, and its bounds and `members` compose as facets of one
+body. The facet also lands where the family's other constraints already live, so the tightening, coherence and
+identity rules it needs are the ones already stated for its neighbours.
+
+**§5.7 already declares the facet kind, and already anticipates a non-enum member set.** Its per-kind table gives
+"a **member set** (an enum's `members`, a pattern alternation authored as a set) may shrink to a subset, never
+grow or replace" — the parenthetical's second item is not an enum, so the kind was never enum-specific. No new
+tightening kind is needed, and this implementation's shared facet machinery already carries the comparison
+(`AtomNarrowing.checkSubset`, today serving `enum.members` alone).
+
+**Three things the landing shape has to settle, and the enum side answers all three.**
+
+1. **A set, not an array — and it needs a named entry.** `enum_set` is `!set { element_type: identifier
+   min_items: 1 }`, which buys uniqueness from `set`'s contract and non-emptiness from `min_items`; an array
+   spelling admits both `[80 80]` and `[]`, the second being a body that admits no value at all. The array is
+   also what an author gets by *default*, which is the trap: meta-kernel's own `@doc` on `enum_set` records that
+   it is "a named entry rather than an inline form, because `!` constructor applications remain prohibited at
+   field positions ([TSON-SCHEMA] §5.2) and `set` has no sugar of its own" — so `members: [integer]?` written
+   inline is an array because array sugar is the only inline container, not because anyone chose one.
+2. **Coherence against the facets beside it.** `{ members: [80 443]  max: 100 }` is `{ min: 10  max: 3 }`'s exact
+   twin: two individually legal facets whose conjunction admits nothing. §5.7 does not reach it (each facet
+   tightens fine on its own), so it belongs with the schema-load coherence rule meta.tn's own `@doc` already
+   calls for — here, `Atom.coherenceCheck` over `AtomCoherence`. The rule is per member and needs no set
+   arithmetic: every member MUST satisfy the body's other facets, including the range `integer_type.size`
+   derives rather than stores, on which `{ members: [443]  size: { bits: 8 } }` fails the same way a stated
+   bound outside the width does.
+3. **Identity is [TSON-DATA] §4.3's, and it is already the rule.** `0x50` and `80` are one member, so
+   `[80 0x50]` is a duplicate — which the set catches and the array silently keeps, tying this back to (1).
+   §8.2 already states the shape ("recorded as written and compared as the value denoted") and `NumericIdentity`
+   already implements it for type arguments; the facet reuses it rather than adding a rule. The base-type line
+   holds too: `1` and `1.0` are two members of a `decimal_type` member set, §4 resolving them to different
+   classes.
+
+**What the facet buys beyond the enum itself.** A mixed-scalar source enum (`["AUTO", "MANUAL", 80, 443]`, the
+shape a converter meets constantly) becomes a choice over an identifier enum and a member-set numeric, which is
+**disjoint by class and therefore tag-free** — an enum's class is read off its members' own tokens per §7.4, so
+the identifier enum is string-class and the refined integer number-class. Verified here on the bounded stand-in
+the facet would replace: `@disjoint setting => ( mode | ports )` links, and `!box { s: 443 }` reads untagged.
+The converter output is better structure than its source, which is where a strict mapping wants to land.
+
+**The exact tier only.** `float_type` takes no `members`, on the rationale meta.tn already states for the facet
+it likewise omits: "a step constraint cannot hold on a binary grid (e.g. 0.05 is not a binary32 value, so nothing
+is exactly a multiple of it); use the exact tier (`decimal_type`) when a step is required". A member set is the
+same claim about the same grid.
+
+**Interpretation chosen:** Revision 34 as written. `!enum [80 443 8080]` is refused at schema load through the
+meta's compiled reader, `IntegerType` carries `size`/`min`/`exclusive_min`/`max`/`exclusive_max`/`multiple_of`
+and nothing else, and an author wanting a sparse numeric set writes §5.4's non-disjoint choice and tags every
+value. Nothing of the proposal is built: the facet does not exist in `schema.meta`, no parser applies it, and the
+bundled schemas are untouched for the reason #7 gives — they are Revision 34's published artifacts, and stamping
+new digests ahead of the revision mints documents nobody has published.
+
+**Suggested resolution:** ordinary constraint vocabulary, in the family each tier's bounds already sit in.
+
+- meta-kernel.tn: `integer_member_set => !set { element_type: integer  min_items: 1 }` beside `enum_set`, and
+  `members: integer_member_set?` on `integer_type` — `integer`-typed as that constructor's bounds are, §7.4's
+  own "exception that proves the rule" about which tier can name its own constrained atom.
+- meta.tn: the same pair for `decimal_type`, `value`-typed as its bounds are, under §7.4's constraint-fields-
+  typed-as-`value` rule and the bootstrap ordering behind it. `float_type` takes none.
+- §7.4: extend the sentence that rules the enum out, so the replacements it names cover the space — a contiguous
+  range is `min`/`max`, an arithmetic progression is `multiple_of`, a sparse set is `members`, and a choice is
+  for alternatives that are not one family. As written, the sentence sends the sparse case to the choice.
+- §5.7, §5.4, §8.1, §8.2: no change. The member-set kind, the class derivation and the identity rule all already
+  say what this needs.
+- Coherence: one sentence wherever the schema-load coherence check is stated — every member must satisfy the
+  body's other facets, including a range the family derives rather than stores.
+
+Being a kernel edit, this cannot land as a patch: it re-stamps all three companion digests bottom-up and moves
+the `*-resolved.tn` fixtures with them.
+
+**Status against Revision 34:** open, and new against this revision — a proposal, and like #23 one this
+implementation has not built. What is running is the refusal and the costly replacement, both quoted above; what
+the entry contributes beyond the shape is the three under-determined points, where writing the facet the obvious
+way (`members: [integer]?`) gets an array where the enum precedent gets a set, and loses uniqueness,
+non-emptiness and §4.3's identity in one stroke.
+
+---
+
+## 25. A schema cannot name its own discriminator field or its own rest field — proposal: two checked annotations in meta.tn, and the three rules §6 needs before a checked annotation can carry either
+
+**Section:** [TSON-SCHEMA] §6 (annotations as types; the two declaration positions; the field-def position),
+§5.4 (`@disjoint`'s verified-or-error precedent), §5.2 (field states, `REQUIRED_FIXED`), §5.7 (modifier-only
+tightening entries), §5.8 (supertype composition), §7.2 (records are closed), §8.1 (`record_field`, preserved
+annotations), §9 (meta.tn's contents); [TSON-DATA] §7.7 (identifiers), §3.1 (annotation preservation).
+
+**Problem:** two facts a schema already fixes but has no way to *state*, both needed by an encoding that
+dispatches on members rather than on a type tag, and neither needed by TSON text. Recording them together
+because they raise one question — what a schema-side annotation is allowed to do — and because §6's answer is
+missing in the same three places for both.
+
+**1. The discriminator.** The pins are ordinary Part 2 and already discriminate:
+
+```
+cat => animal & { pet_type: text = cat  lives: int32 }
+dog => animal & { pet_type: text = dog  breed: text }
+pet => ( cat | dog )
+```
+
+Every variant is record-class, so the choice is not disjoint and TSON text asks for its native selector — which
+is correct and stays:
+
+```
+!box { p: { name: Tom  pet_type: cat  lives: 9 } }
+[UNKNOWN_TYPE_REF] /p: 'pet' is a choice -- a value at this position requires an explicit type annotation
+(!typeName) naming one of its declared variants to disambiguate: [cat, dog]
+```
+
+What the resolved schema does not carry is that `pet_type` is the field a member-dispatching encoding selects
+on. Deriving it is possible and wrong on its own terms: with two `REQUIRED_FIXED` fields in every variant
+(`pet_type` and, say, a pinned `schema_version`), derivation either picks arbitrarily or picks both, and
+whichever it picks it has coupled the wire format to a pin the author fixed for an unrelated reason. That is
+the well-known-field-name objection in structural clothing — the wire acquires a dependency on a declaration
+nobody wrote for it.
+
+**2. The rest field.** §7.2 makes a record closed under its type, verified here:
+
+```
+cfg => { name: text  extra: {text => text} }
+!cfg { name: n  a: 1 }   [UNRECOGNIZED_FIELD] /a: unknown field 'a' on 'cfg' -- a record is closed under its
+                         type (§7.2), whose fields are (name | extra)
+!cfg { name: n  extra: { a => 1  b => 2 } }   OK
+```
+
+So "these declared fields plus arbitrary extras" is modelled as a map-typed field, and the map nests on the
+wire — again right for TSON text, and again a fact the schema cannot express is which field, if any, an
+encoding that flattens is meant to flatten. Nothing in `record` or `map` designates one.
+
+**Both are annotations, and there is a criterion for saying so rather than a preference.** Neither mark changes
+what any value's validity: a choice with a designated discriminator admits exactly the variants it admitted, and
+a record with a designated rest field admits exactly the values §7.2 already admits. A kernel constructor field
+would put an encoding's projection concern into every processor's type model, including every processor that
+implements only the text encoding. **An annotation is the right home exactly when the mark changes no value's
+validity** — that sentence is what §6 is missing, and it decides this case and the next one without re-arguing.
+
+**Three things §6 has to say. The first is already true and unstated; the third is a defect independent of
+whether either annotation lands.**
+
+**(a) A checked annotation is a category §6 does not describe.** §6 accounts for three kinds — validated against
+its own type, advisory (`@annotation`, "carries no runtime force"), and resolver-derived (`@alias`,
+`@synthetic`). It never says an annotation may be checked against a fact the resolver derives and make the
+schema fail to load. §5.4 nonetheless makes `@disjoint` do exactly that, and this implementation implements it
+(`TsonSchemaLinker.checkDisjointAssertions`: `disjoint: true` verifies silently, `disjoint: false` is a resolver
+error, no third outcome). One such annotation reads as a special case; three make a category, and §6 is where it
+belongs — an annotation carries no decode force, and may carry load-time force where the section defining it
+states the check and its outcomes.
+
+**(b) Which position a checked declaration annotation is honoured at.** §6 gives a declaration two annotation
+positions with two meanings and forbids hoisting between them. An assertion is an assertion in either, so this
+implementation consults both for `@disjoint` — and that was a decision it had to make alone, since §5.4 does not
+say. `@discriminator:pet_type` sits in the same two places and inherits the same silence; a processor consulting
+one position ignores the other spelling with no diagnostic. Worth stating once in §6 for the category rather
+than once per annotation.
+
+**(c) Whether a field annotation survives composition — the rule `@rest` actually depends on, and the one this
+implementation got wrong by never deciding.** §6 puts an annotation on a `record_field` and §8.1 preserves it;
+§5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one. Neither says what happens
+to the annotation. Measured here:
+
+- an **inherited** field is copied whole (`DefinitionResolver.absorb`: `fields.add(field)`), annotations
+  included;
+- a **restated** field is rebuilt with `Annotations.empty()` and then given exactly what the restatement wrote
+  (`resolveFieldEntry` / `resolveField`), so the inherited annotations are dropped.
+
+The consequence is that §5.7's modifier-only entry — `extra: ?`, which names no type and is defined to tighten
+presence and nothing else — silently un-marks the field. A `@rest` check phrased as "at most one per composed
+chain" cannot be written against that, because a restatement severs the chain without saying so; and the same
+hole loses a `@deprecated` or a `@doc` on any field a subtype tightens. This wants deciding in §5.8/§8.1
+whichever way the annotations go: the defensible rule is that a restatement's annotations **merge over** the
+inherited ones, since a modifier-only entry writes none and should not be able to erase what it does not
+mention.
+
+**Interpretation chosen:** Revision 34 as written. Declaration and field annotations resolve one hop against the
+governing meta (§3.3.3) and round-trip into resolved output; `@disjoint` is the only annotation with load-time
+force, honoured at both declaration positions; a pinned-record choice derives `disjoint: false` and is tagged in
+text; a map-typed field nests. Neither annotation exists: nothing in `schema.meta` carries a discriminator or a
+rest designation, and the bundled schemas are untouched for the reason #7 gives.
+
+**Suggested resolution:**
+
+- meta.tn, not the kernel: `discriminator => @annotation field_name` and `rest => @annotation void`, on the
+  criterion above. `field_name` is an `identifier`, so the discriminator names a field the way every other
+  naming position in the series names one, and a non-name spelling fails at the annotation's own type.
+- `@discriminator:pet_type` on the choice declaration, `@rest` on the designated field. Checks on §5.4's
+  verified-or-error precedent, both at schema load, both two-outcome: for the discriminator, every variant is a
+  record declaring the named field, that field is `REQUIRED_FIXED` in every variant (never `REQUIRED_DEFAULT` —
+  a default is omissible and so cannot dispatch), and the fixed values are pairwise distinct; for the rest
+  field, its type resolves to a text-keyed map and at most one field per composed chain carries the mark.
+- §6: the three sentences of (a), (b) and the criterion. Plus the licence the two exist for — an annotation
+  carries no force in the model or in the reference encoding, and an encoding-rules document may bind
+  projection behaviour to a schema-side annotation declared for it. Force stays confined to the encoding that
+  claims it; text keeps `!variant` at every non-disjoint choice, discriminated or not, so §5.4's tagging rule
+  needs no change.
+- §5.8/§8.1: the field-annotation rule of (c), which is owed whether or not `@rest` lands.
+- §8.1: otherwise no change. Both ride the existing author-annotation preservation channel, which already keeps
+  declaration and field annotations through output and ingest.
+
+**Status against Revision 34:** open, and new against this revision — a proposal, and like #23 and #24 one this
+implementation has not built. Its own contribution is the three rules rather than the two annotations: (a) and
+(b) are already load-bearing for `@disjoint` and unstated, and (c) is a live defect this implementation is on
+the wrong side of today, found by asking what a checked field annotation would have to survive.
+
+---
+
+## 26. The constraint and annotation vocabulary is incomplete in three places and over-complete in a fourth — and the sharp one is an asymmetry, not an omission: the temporal families have no exclusive bounds
+
+**Section:** [TSON-SCHEMA] §5.11 (field groups), §5.7 (the ordered-bound facet kind), §5.5 (bodies are closed;
+the temporal `precision` facets), §6 (an unresolvable annotation is a resolver error), §9 (the companion
+artifacts); meta.tn's `date_type`/`time_type`/`datetime_type`/`duration_type`/`float_type`, meta-kernel's
+`array` and `integer_type`.
+
+**Problem: 1 — every numeric family states its bounds as a field group and no temporal family can state an
+exclusive bound at all.** The four numeric vocabularies write each side as §5.11's group, so at most one bound
+per side holds by shape:
+
+```
+integer_type  =>  ( min: integer | exclusive_min: integer )?   ( max: integer | exclusive_max: integer )?
+decimal_type / float_type / rational_type  =>  the same pair, value-typed
+```
+
+The four temporal vocabularies write neither the group nor the exclusive facet:
+
+```
+date_type      => ~atom & atom_specification & { spec: = …  min: value?  max: value? }
+time_type      => …  min: value?  max: value?  precision: integer?
+datetime_type  => …  min: value?  max: value?  precision: integer?
+duration_type  => …  min: value?  max: value?
+```
+
+So the commonest range shape there is — a half-open interval — has no spelling on a date:
+
+```
+window => !date ^ { min: "2025-01-01"  exclusive_max: "2026-01-01" }
+[SCHEMA_ERROR] /window: the body is not valid data for 'date_type', the constructor's own constraint
+vocabulary -- unknown field 'exclusive_max' on 'date_type' -- a record is closed under its type (§7.2),
+whose fields are (spec | min | max)
+```
+
+**This reads as an oversight rather than a decision, and the section's own habits are the evidence.** §5.7
+declares the ordered-bound facet kind once, "for every family", and names `min`, `max` and "exclusive bounds"
+together in it. Where a family really does omit a facet on purpose, the spec says why at the family: meta.tn's
+`float_type` carries a paragraph explaining that it has no `multiple_of` because "a step constraint cannot hold
+on a binary grid", and §5.5 explains the temporal `precision` facets and the *absence* of a timezone facet in
+its own text. The missing exclusive bounds are explained nowhere, and a date's value space is discrete and
+totally ordered — the one shape where `exclusive_max` is exactly `max` minus a day and the omission costs an
+author an off-by-one they have to compute themselves.
+
+**And the bound the temporal families do have raises a question of its own for `duration`.** §5.7 classes
+`min`/`max` as ordered bounds, which presumes the value space is ordered; an ISO 8601 duration is not, since a
+calendar-based duration has no fixed length to compare against a clock-based one (`P1M` against `P30D`). This
+implementation therefore parses `duration_type.min`/`max` and enforces neither — `DurationParser` states it
+outright: "No min/max bound validation is performed yet … not `Comparable`". That is a real gap here, and it is
+downstream of a real one in the spec: `duration_type` declares two ordered bounds over a partial order and
+§5.7's rule for the kind cannot be applied to them. Either the comparison is stated (a total order over the
+calendar-independent seconds, say, with the calendar components refused in a bound) or the facets go; adding
+`exclusive_min`/`exclusive_max` here without answering it would double an unenforceable pair.
+
+**Problem: 2 — `array` has no `contains` family.** "At least one element satisfying T" is not expressible:
+
+```
+needs => !array { element_type: text  min_contains: 1 }
+[SCHEMA_ERROR] /needs: unknown field 'min_contains' on 'array' -- a record is closed under its type (§7.2),
+whose fields are (access_pattern | size_type | element_type | state | unordered | unique_items | min_items |
+max_items)
+```
+
+Purely additive as vocabulary, but **not** as §5.7 text: existential quantification over elements is a facet
+kind the taxonomy does not have. §5.7 declares five — ordered bound, permission, member set, selector, fixed —
+and `contains` is none of them, while `min_contains`/`max_contains` are ordered bounds over a count the
+`contains` facet defines. So the addition owes §5.7 a sixth kind and its refinement direction (tightening
+raises the floor and lowers the ceiling; narrowing the `contains` type itself tightens). It is the one item in
+this entry with resolver-semantics wording to write rather than a field to add.
+
+**Problem: 3 — `unique_items` on an ordered array is already there, and a stale queue says it is not.** Worth
+recording because the cost of a stale entry is a revision cycle spent rediscovering it. `array` carries
+`unordered: boolean ~ false` and `unique_items: boolean ~ false` as *separate* facets, and `set` is the
+refinement that fixes both true — so an ordered-but-unique array is ordinary and needs nothing:
+
+```
+tags => !array { element_type: text  unique_items: true }        OK
+```
+
+**Problem: 4 — the documentation annotations stop at `doc`.** meta-kernel declares `annotation`,
+`documentation`, `doc`, `alias`, `synthetic`; meta.tn adds `ordered`, `bounded`, `exact`, `numeric`,
+`disjoint`, `deprecated`, `since`, `todo`, `lang`. There is no `title`, `examples`, `read_only` or
+`write_only` — the four every schema language carrying documentation has, and the four a converter from one of
+them must drop. **The absence is a hard stop rather than a nicety**, because §6 makes an annotation whose name
+does not resolve a resolver error, with no preserved-uninterpreted fallback under a governing schema:
+
+```
+@title:"X" thing => { a: text }
+[SCHEMA_ERROR] /thing: '@title' does not name a type in the governing meta-schema's namespace, which is the
+whole annotation namespace of a schema document (one hop through !!meta, §3.3.3)
+```
+
+An author cannot work around it locally either: §3.3.3 confines the annotation namespace to the governing
+meta, so a name the schema declares or imports itself is not usable as an annotation within that schema.
+
+**Interpretation chosen:** Revision 34 as written, in all four. The diagnostics above are what an author gets
+today; `DateType`/`TimeType`/`DateTimeType`/`DurationType` in `schema.meta` mirror the vocabularies exactly,
+carrying inclusive bounds only, and `DurationParser` enforces neither of its two.
+
+**Suggested resolution:**
+
+- meta.tn: `( min: value | exclusive_min: value )?` and `( max: value | exclusive_max: value )?` on
+  `date_type`, `time_type` and `datetime_type`, matching the numeric families' shape exactly so §5.11 does the
+  work and §5.7 needs no new text. `duration_type` waits on its ordering question, which wants answering
+  either way.
+- meta-kernel: `contains: type_ref?`, `min_contains: integer?`, `max_contains: integer?` on `array`, with the
+  coherence rule the pair implies (`min_contains` ≤ `max_contains`, and both meaningless without `contains`)
+  stated where §5.3's `min_items`/`max_items` rule is, and §5.7 gaining the existential facet kind above.
+- meta.tn: `title => @annotation text`, `examples => @annotation [value]`, `read_only => @annotation boolean`,
+  `write_only => @annotation boolean` beside `deprecated`/`since`/`todo`.
+- Nothing on `unique_items`; the queue is what needs the edit, not the schema.
+- §5.7: one sentence saying that an ordered-bound facet requires its family's value space to be totally
+  ordered, which is what `duration_type` is currently the counter-example to.
+
+Being kernel and meta edits, this re-stamps the companion digests bottom-up and moves the `*-resolved.tn`
+fixtures with them.
+
+**Status against Revision 34:** open, and new against this revision. Problem 1 is a defect against §5.7's own
+per-kind rule and the sharpest of the four; the `duration` half of it is a gap this implementation has as well,
+and says so at the class. Problem 2 is additive vocabulary that costs §5.7 a new facet kind; problem 4 is
+additive outright. Problem 3 is a correction to a queue rather than to the spec. None of the additions is
+built.
+
+---
+
+## 27. §7.5 leaves set element order implementation-defined for exactly one field in the whole meta layer, and requires a comparison rule nothing else in the series wants
+
+**Section:** [TSON-SCHEMA] §7.5 (sets; element order; the comparison MUST), §1.3 (a resolver MUST produce a
+resolved schema value; output MUST conform to §8), §8 (the serialization contract), §7.4 (enum member
+semantics), §9 (`enum_set`); [TSON-DATA] §8.1.
+
+**Problem:** §7.5 says element order in a set is implementation-defined, then puts a MUST on everyone who
+compares resolver outputs:
+
+> Sets are unordered; the materialised representation uses array syntax, but element order is
+> implementation-defined. Implementations comparing resolver outputs MUST compare set-typed fields as sets, not
+> ordered lists; fixture-comparison tools SHOULD canonicalise set-typed fields (e.g. lexical sort) before
+> byte-comparison.
+
+Three things make that rule cost more than it buys.
+
+**1. It applies to one field.** `enum_set` is the only `!set` in meta-kernel, meta.tn and core.tn combined, and
+its only use is `enum.members`. Every other list in §8's output — `supertypes`, `subtypes`, `variants`,
+`elements`, `fields`, `groups`, `parameters` — is an array whose order is either significant or, for the two
+§8.2 calls "name-level indexes", already free by that section's own words. So the whole of §7.5's
+implementation-defined order and the MUST that compensates for it exist for enum members and nothing else.
+
+**2. It puts an obligation on the wrong side of the comparison.** §1.3 makes producing a resolved schema value
+a MUST and fixes its serialization in §8, so resolved output is the artifact the series checks against — the
+companion `*-resolved.tn` documents are exactly that, byte-fixed and published. §7.5 then makes those bytes one
+conforming output among many, and moves the burden onto every consumer to know which of §8's fields are
+secretly sets. A structural comparison of two resolved documents cannot be written from §8 alone; it has to
+carry a table of set-typed positions read out of §9.
+
+**3. Nobody wants the freedom, and this implementation is on the wrong side of the MUST.** `EnumBody` holds
+`List<String> members` in source order, and `ResolvedForm.canonical` — shared by `ResolvedFixtureTest` and the
+Class 2 conformance runner — normalises `supertypes`/`subtypes` and states that "nothing else is normalised; a
+difference anywhere else is a real one". So enum members are compared as an ordered list, in the two places
+this implementation compares resolved output. That is a conformance gap against §7.5's MUST and it has never
+surfaced, because source order is what every producer emits and what §7.4's own reading of an enum makes
+natural. The rule is a freedom nobody exercises, guarded by a MUST nobody keeps.
+
+**The direction worth considering is the opposite one.** §7.4 already ties an enum's discrimination class to
+its members' own tokens and describes members as declared names; source order is meaningful to a reader, and a
+binary or ordinal-based encoding needs it to be canonical rather than free — an encoding assigning members
+ordinals cannot do so from a set whose order the spec refuses to fix. Making member order significant in
+resolved output costs nothing anyone has, since every implementation preserves it already, and turns §7.5's
+comparison MUST into a rule that needs no table: two resolved documents are compared as §8 writes them.
+
+**Interpretation chosen:** Revision 34's *representation* as written, and — stated plainly because it is a
+divergence — not §7.5's comparison MUST. `EnumBody` preserves source order, `!enum [OPEN OPEN]` is refused by
+the set's uniqueness contract, and both comparison sites treat `members` as an ordered list. Nothing here
+canonicalises a set-typed field before comparing, and no set-typed field other than `enum.members` exists to
+canonicalise.
+
+**Suggested resolution:** in §7.5, replace the implementation-defined order with a stated one, and delete the
+comparison MUST and the fixture-tooling SHOULD that exist only to absorb it. Two candidates, and the choice
+should be made on what §8's output is for rather than on set theory:
+
+- **Source declaration order is canonical** for `enum.members` (and for any future set-typed field, by the same
+  rule). It is what every producer already emits, it keeps §8's output comparable as written, and it is what an
+  ordinal-assigning encoding would need. §7.5's "sets are unordered" stays true of the *value* — uniqueness and
+  set equality are unchanged — and becomes a statement about semantics rather than about bytes.
+- **Bytewise-ascending order of the elements' canonical encodings**, if a canonical form is wanted that two
+  producers reach independently from differently-ordered sources. This is the stronger determinism guarantee
+  and the one a content-addressed or binary encoding would want; it costs the author's declaration order, which
+  §7.4 gives a reader a reason to care about.
+
+Either way §7.5 keeps its duplicate-handling paragraph and its uniformity sentence unchanged, and the entry's
+point stands under both: the field's order should be *stated*, not left free and then compensated for by a rule
+on everyone downstream.
+
+**Status against Revision 34:** open, and new against this revision. Unlike #24–#26 this is not a proposal for
+new vocabulary but a rule to remove: what it asks is that one under-exercised freedom be spent, so that the
+comparison MUST it necessitates can go. It records a divergence rather than a build — this implementation does
+not implement §7.5's comparison rule, in either of the two places it compares resolved output.
+
+---
+
+## 28. §7.5 and §2.6 both delegate to "the element type's equality contract", and no atom whose value space differs from its lexical space has one — `binary` is four spellings of one value space and compares as none of them
+
+**Section:** [TSON-SCHEMA] §7.5 (sets; the duplicate rule and its equality delegation), §5.2 (FIXED values),
+§5.5 (constructor application; `binary`'s `encoding` selector), §5.7 (the selector facet kind), §9 (core's
+`base64`/`base64url`/`base32`/`hex`), §10.2/§10.3 (hash pinning and canonical identity); [TSON-DATA] §2.6 (map
+key identity is the decoded value), §4.3 (numeric equivalence — the one family that *does* have the rule).
+
+**Problem:** three separate rules in the series compare two decoded values, and each delegates the comparison
+to a contract the type is supposed to own:
+
+- §7.5: "Two values are duplicates if the element type's **equality contract** considers them equal (name
+  identity for a set of `identifier`, value equality for a set of `integer`)."
+- [TSON-DATA] §2.6: key identity is the decoded host value, type-ref and annotations stripped.
+- §5.2: a stated FIXED value is checked against the declared one.
+
+For exactly one family the contract is written down: [TSON-DATA] §4.3 states numeric equivalence, so `255`,
+`0xFF` and `+255` are one value and `1` and `1.0` are two. §7.5's two examples are the two easy families —
+`identifier` (NFC text) and `integer` (§4.3). **Every family whose value space differs from its lexical space
+is left without one**, and `binary` is the case where that is not a corner.
+
+**`binary` is one constructor over one value space with four spellings.** core.tn declares
+`base64 => !binary BASE64`, `base64url => !binary BASE64URL`, `base32 => !binary BASE32`,
+`hex => !binary HEX` — four instances differing only in a selector facet (§5.7's own example of the kind), all
+denoting octet strings. Nothing states whether two spellings of one octet string are one value: not within a
+single instance (`!hex "abcd"` against `!hex "ABCD"` — hex is case-insensitive by every definition of it, and
+the spec's `@doc` says only "Hex-encoded binary"), and not across two (`!hex "4869"` against
+`!base64 "SGk="`). The same silence reaches base64's padding and its two alphabets.
+
+**Measured here, and the implementation is worse than the ambiguity.** A set over `hex` accepts every
+duplicate there is, because `BinaryParser` is `AtomType<byte[]>` and Java's `byte[]` carries identity
+equality, so no two decoded binary values are ever equal:
+
+```
+keys => !set { element_type: hex }
+!holder { k: [ "abcd" "ABCD" ] }   OK        (two spellings of one octet string)
+!holder { k: [ "abcd" "abcd" ] }   OK        (the same spelling, twice)
+
+ts => !set { element_type: text }
+!h { k: [ "a" "a" ] }   [TYPE_MISMATCH] /k/1: 'ts' requires unique elements, 'a' appears more than once
+```
+
+The second line is this implementation's own bug and is on the backlog; the *first* is the spec question, and
+fixing the bug does not answer it — a correct `byte[]` content comparison still has to be told whether
+`"abcd"` and `"ABCD"` decode to the same value, which they do, and whether `hex` and `base64` positions can
+ever meet, which §7.5's homogeneous element type mostly prevents but §5.2's FIXED check and §2.6's map keys do
+not.
+
+**The stake is larger than duplicate detection, and §10 is where it bites.** §10.3 defines canonical identity
+and §10.2 pins content by hash. If equality is over the spelling rather than the value, then one octet string
+has four hashes and a content-addressed reference is encoding-dependent — the property hash pinning exists to
+provide. That consequence follows from the same undefined contract, and it is why this wants a general clause
+rather than a sentence about sets.
+
+**The general shape, and the families it decides.** The clause is one sentence: **a type denotes a value space;
+an encoding defines a lexical space and one canonical form per value; equality, ordering, refinement,
+disjointness and content addressing are defined over value spaces only.** Applied to Revision 34's vocabulary
+it settles a list that is currently settled nowhere:
+
+- `binary` — octet strings; the four `encoding` instances are spellings, and case in `hex` and padding in
+  base64 are lexical.
+- the temporal families — RFC 3339 admits `Z` and `+00:00` for one instant, and `2025-01-01T00:00:00Z`
+  against `2024-12-31T19:00:00-05:00` is one instant in two spellings.
+- `uuid` — canonical lower-case hex is a form, not the value.
+- `rational` — `"2/4"` and `"1/2"`, where meta.tn's `rational_type` `@doc` explicitly says constraints
+  "operate on the value, not the written token: tokens are not normalized", which is the right rule stated for
+  one family and generalisable to all of them.
+- `text`/`identifier` — already answered (NFC), and the answer is the same shape.
+
+**Interpretation chosen:** Revision 34 as written, which is to say each atom's host type decides by default.
+`RationalParser` compares values (meta.tn states the rule), `IdentifierParser` compares NFC text, numeric
+comparison follows §4.3 through `NumericIdentity`, and `binary` compares by array identity — so its duplicate
+check, and any FIXED check over it, silently never fires. Nothing in this implementation states a
+value-space contract as such; each parser answers for itself, which is exactly the shape a general clause
+would replace.
+
+**Suggested resolution:** the clause above, placed where §5.5 defines what a constructor's instance denotes,
+and a cross-reference from §7.5's duplicate rule and [TSON-DATA] §2.6 so the delegation has a target. Then one
+line per family in §9's own `@doc`s naming the value space and the canonical form, which is what `rational_type`
+already does and what every other family is missing. §5.7 needs no change: a selector facet choosing among
+lexical forms is already the right classification for `binary.encoding` under this reading, and saying so
+explicitly is worth a clause — a selector picks a spelling, so it must not be able to change what two values
+compare as.
+
+**Status against Revision 34:** open, and new against this revision. It is not a proposal for new vocabulary:
+the structural half is already done — `binary` is one constructor with an `encoding` selector, not four types
+— and what is missing is the sentence saying what that construction means for comparison. The gap is a
+defect rather than an addition, and this implementation is a demonstration of it rather than a counter-example:
+its binary equality is absent, not merely undefined, and the fix is blocked on the same question.
+
+---
+
+## 29. `binary`'s encoding is a reference-encoding spelling promoted to a type name: there is no type for the value space, and the distinction the four names exist to make cannot survive a non-text encoding
+
+**Section:** [TSON-SCHEMA] §5.5 (constructor application: "construction creates siblings, not subtypes"; the
+`!C value` positional form), §5.7 (the selector facet kind), §5.4 (discrimination classes), §4.2
+(de-parameterised constructors), §8.2/§10.3 (instantiation identity and canonical identity), §9 (meta.tn's
+`binary`, core's four instances); [TSON-DATA] §7 (the text encoding as the reference encoding).
+
+**Problem:** meta.tn declares `binary` as a constructor whose `encoding` field is REQUIRED with no default:
+
+```
+binary_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
+binary => ~atom & atom_specification & { spec: = "…rfc4648"  encoding: binary_encoding
+                                          min_length: integer?  max_length: integer? }
+```
+
+and core declares four instances of it and no bare one — `base64 => !binary BASE64`, `base64url`, `base32`,
+`hex`. §5.5 makes construction produce siblings: "This form does NOT establish IS-A: construction transfers
+only the constructor's `kind`; the result records `source: C` with empty `supertypes`." The published resolved
+output shows exactly that, and shows the whole of what separates them:
+
+```
+base64 => !type_definition { kind: ATOM  source: binary  body: !binary { encoding: BASE64 } }
+hex    => !type_definition { kind: ATOM  source: binary  body: !binary { encoding: HEX } }
+```
+
+Four types over one value space — octet strings — differing in one selector facet, with no IS-A between them
+and nothing above them. **The distinction is nominal**: `encoding` is a facet in the body, but because
+construction founds siblings rather than subtypes, the facet's four settings become four unrelated type names
+with no common parent.
+
+**Consequence 1: an author who does not care about the spelling cannot say so.** There is no `bytes`. The
+constructor cannot be applied without choosing an alphabet, because `encoding` is REQUIRED and undefaulted:
+
+```
+anybytes => !binary { min_length: 4 }
+[SCHEMA_ERROR] /anybytes: missing required field 'encoding' for 'binary'
+```
+
+and a choice does not recover it, the four sharing a discrimination class:
+
+```
+@disjoint anyb => ( base64 | hex )
+[SCHEMA_ERROR] /anyb asserts @disjoint, but its variants [base64, hex] are not disjoint (§5.4) -- two of them
+occupy the same discrimination class … so no encoding's single form-resolution pass can tell them apart and
+every value keeps its !variant tag
+```
+
+So "an octet string of at least four bytes" — a statement about the value space with nothing to say about
+spelling — is unspellable, and the nearest approximation costs a `!variant` tag on every value.
+
+**Consequence 2: the distinction cannot survive an encoding whose values are octets.** An alphabet describes
+how the *reference* encoding writes bytes as text. A binary encoding writes the bytes. A writer emitting a
+`base64`-typed field and a `hex`-typed field there produces identical output and is right to — there is
+nothing in the octets for the alphabet to be a property of, so such an encoding does not so much ignore the
+selector as have no place to put it. But the *type identity* is `base64` or `hex`, and identity is what §8.2
+keys instantiation on and §10.3 canonicalises. Two schemas differing only in the alphabet therefore describe
+byte-identical binary streams while being different types, and a hash pinned over the schema differs for
+documents that are indistinguishable on the wire.
+
+**Consequence 3: a round trip through such an encoding is value-preserving and not text-preserving, and
+nothing says so.** Going text → binary → text, the alphabet has to be recovered from the schema, since the
+intermediate carried none. That is fine and probably desirable, but it means a document's own spelling is not
+its own: a schema saying `hex` re-spells a base64 document's bytes as hex, and the series currently
+frames the alphabet as part of what the type *is*, which invites the opposite expectation.
+
+**The constraint that produced this design is real, and it is why the obvious fix is not obvious.** A generic
+`bytes` position cannot be read from text: `"abcd"` is well-formed hex *and* well-formed base64, and decodes to
+different octets. The alphabet must be known at the position or the reference encoding cannot read the value at
+all. So the selector is not gratuitous. What is questionable is satisfying that need through **nominal type
+identity**, which exports a reference-encoding concern into the type model — where §5.4's classes, §8.2's
+identity and every other encoding then have to carry it, and only one of them can act on it.
+
+**Interpretation chosen:** Revision 34 as written. This implementation has four sibling atom types reading to
+`byte[]`, no `bytes` type, and no non-text encoding — so consequence 1 is measured above and consequences 2 and
+3 are read off the artifacts and §5.5 rather than observed. Its own binary equality is separately broken (#28).
+
+**Suggested resolution:** two levels, and the first is owed whichever way the second goes.
+
+- **Say what the alphabet is.** In §5.5 or §9's `binary` entry: the `encoding` facet is lexical metadata of the
+  reference encoding; an encoding whose values are octets neither carries nor contradicts it; equality,
+  identity and content addressing over binary values are over octets, never over spelling (#28's clause, of
+  which this family is the sharpest case); and a round trip through a non-text encoding preserves the value and
+  re-spells from the schema. Nothing in the artifacts changes.
+- **Give the value space a type.** Add `bytes` (the unrefined instance) and make the four *refinements* rather
+  than constructions — `base64 => !bytes ^ { encoding: = BASE64 }` — which under §5.5 establishes IS-A, so
+  `base64` IS-A `bytes` and a field may be typed `bytes` and accept any spelling. Two edits it needs: `encoding`
+  must gain a default or become OPTIONAL (today it is REQUIRED and undefaulted, so §5.7's selector rule — "may
+  be set where the source leaves it at the constructor's default" — has nothing to fire on); and the reference
+  encoding must require a type-ref at an unrefined `bytes` position, exactly as it does at a non-disjoint
+  choice, so `!hex "abcd"` is how the ambiguity is resolved where it is actually ambiguous. That puts the cost
+  at the one position that has the problem, instead of forbidding the general type at every position.
+
+**Status against Revision 34:** open, and new against this revision. Companion to #28 and a different question:
+#28 asks what equality over a binary value *is*; this asks what the type is and what part of it is an artifact
+of one encoding. Both are answered by the same clause in the first resolution above, which is why that half is
+worth landing even if `bytes` is not. Nothing is built: the four types are as core declares them here.
 
 ---
