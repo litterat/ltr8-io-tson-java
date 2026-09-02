@@ -40,8 +40,8 @@ class BindMismatchClassificationTest {
     /** A meta layer declaring a constructor whose instances are DATA-kinded -- and no Java class for it. */
     private static final String META_SCHEMA = """
             !!id:"https://example.test/meta-bindmismatch.tn"
-            !!meta:"https://tson.io/2026/34/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/34/m/meta.tn"
+            !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/35/m/meta.tn"
             {
               notification => ~data & { path: text }
             }
@@ -50,13 +50,13 @@ class BindMismatchClassificationTest {
     private static final String GOVERNED_HEADER = """
             !!id:"https://example.test/api-bindmismatch.tn"
             !!meta:"https://example.test/meta-bindmismatch.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             """;
 
     private static final String ORDINARY_HEADER = """
             !!id:"https://example.test/bindmismatch.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             """;
 
     private static Tson tson() {

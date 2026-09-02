@@ -22,21 +22,21 @@ void main() {
     // than `schemas::get`: a source says "I cannot supply that" by throwing TsonSchemaFetchException,
     // and a map returns null instead -- for whichever identity the *document* names.
     String schema = """
-            !!id:"https://example.com/2026/34/app/server-1.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!id:"https://example.com/2026/35/app/server-1.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             {
                 server => { hostname: text  port: int32 }
             }""";
 
     Tson tson = Tson.builder()
-            .schemaSource(TsonSchemaSource.ofMap(Map.of("https://example.com/2026/34/app/server-1.tn", schema)))
+            .schemaSource(TsonSchemaSource.ofMap(Map.of("https://example.com/2026/35/app/server-1.tn", schema)))
             .build();
 
     // Self-describing: the document names its own schema and root type. No other arguments needed --
     // the reader resolves the schema, selects the `server` type, and validates as it builds the tree.
     TsonValue server = tson.treeReader().read("""
-            !!schema:"https://example.com/2026/34/app/server-1.tn"
+            !!schema:"https://example.com/2026/35/app/server-1.tn"
             !server { hostname: "web-01"  port: 8080 }""");
     IO.println("validated hostname: " + server.get("hostname").asString().orElseThrow());   // web-01
     IO.println("validated port:     " + server.at("/port").asInt().orElseThrow());         // 8080
@@ -48,7 +48,7 @@ void main() {
     // A value that violates the schema is rejected fail-fast, rather than returned wrong.
     try {
         tson.treeReader().read("""
-                !!schema:"https://example.com/2026/34/app/server-1.tn"
+                !!schema:"https://example.com/2026/35/app/server-1.tn"
                 !server { hostname: "bad"  port: 99999999999999 }""");   // out of int32 range
         IO.println("unexpected: bad port was accepted");
     } catch (TsonReadException rejected) {

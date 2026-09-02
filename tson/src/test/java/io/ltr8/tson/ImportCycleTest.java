@@ -27,8 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ImportCycleTest {
 
-    private static final String META = "https://tson.io/2026/34/m/meta.tn";
-    private static final String CORE = "https://tson.io/2026/34/m/core.tn";
+    private static final String META = "https://tson.io/2026/35/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/35/m/core.tn";
 
     private final Map<String, String> documents = new LinkedHashMap<>();
 

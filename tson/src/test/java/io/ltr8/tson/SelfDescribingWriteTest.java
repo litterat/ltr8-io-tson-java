@@ -33,8 +33,8 @@ class SelfDescribingWriteTest {
     private static final String ID = "https://example.test/point-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/point-1.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             { point => { x: int32  y: int32 } }
             """;
 

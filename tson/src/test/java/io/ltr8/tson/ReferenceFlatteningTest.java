@@ -66,8 +66,8 @@ class ReferenceFlatteningTest {
     private static TypeDefinition resolve(String body, String entry) {
         String schema = """
                 !!id:"https://example.test/flat.tn"
-                !!meta:"https://tson.io/2026/34/m/meta.tn"
-                !!import:"https://tson.io/2026/34/m/core.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
                 { %s }
                 """.formatted(body);
         return Tson.builder().schemaSource((TsonSchemaSource) uri -> schema)

@@ -32,8 +32,8 @@ class TsonCompiledSchemaRegistryTest {
     private static final String SCHEMA_ID = "https://example.test/read-registry.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/read-registry.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             {
               my_record => { value: int32 }
             }

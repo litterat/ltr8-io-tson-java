@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/34/m/core-resolved.tn"
-!!schema:"https://tson.io/2026/34/m/meta.tn"
+!!id:"https://tson.io/2026/35/m/core-resolved.tn"
+!!schema:"https://tson.io/2026/35/m/meta.tn"
 @doc:"""
   Resolver-output fixture for core.tn (2026 Revision 34 draft).
   Parse the source schema, run the resolver, canonicalise, compare.

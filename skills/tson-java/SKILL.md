@@ -30,12 +30,12 @@ the shared conformance vectors both are tested against are
 
 **Versioning is `0.<spec revision>.<patch>`.** `0.34.x` implements the **2026 Revision 34** spec series.
 A new revision moves the minor, and the spec is a working draft with no compatibility guarantee between
-revisions — so a schema `!!id` pinned at `https://tson.io/2026/34/m/core.tn` is revision-specific and
+revisions — so a schema `!!id` pinned at `https://tson.io/2026/35/m/core.tn` is revision-specific and
 must match the library's own revision.
 
 > **Not on Maven Central**, deliberately — publishing needs signed artifacts and a fuller POM, which is a
 > separate decision. To use it from another project on the same machine: clone, `./gradlew
-> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.34.0-SNAPSHOT` (the front
+> publishToMavenLocal`, then add `mavenLocal()` and depend on `io.ltr8:tson:0.35.0-SNAPSHOT` (the front
 > door pulls the rest in). The jars carry real `module-info.class`es, so class path or module path both
 > work.
 
@@ -92,9 +92,9 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.builder().build();   // bootstraps meta-kernel, meta.tn and core.tn
 
 String schema = """
-        !!id:"https://example.com/2026/34/app/order-1.tn"
-        !!meta:"https://tson.io/2026/34/m/meta.tn"
-        !!import:"https://tson.io/2026/34/m/core.tn"
+        !!id:"https://example.com/2026/35/app/order-1.tn"
+        !!meta:"https://tson.io/2026/35/m/meta.tn"
+        !!import:"https://tson.io/2026/35/m/core.tn"
         {
           order => {
             order_id: int32
@@ -107,7 +107,7 @@ String schema = """
 tson.resolve(schema);                 // registers it under its own !!id
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/34/app/order-1.tn")
+        .withSchema("https://example.com/2026/35/app/order-1.tn")
         .readAs("""
                 { order_id: 1042  customer: "Ada Lovelace"  placed: !date 2026-07-01  total: 149.95 }""",
                 "order");
