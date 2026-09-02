@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ValueParserTest {
@@ -21,9 +21,10 @@ class ValueParserTest {
         return new TokenValue(text, TokenForm.SINGLE_LINE_QUOTED);
     }
 
+    /** {@code value} has no null inhabitant: §4 gives the token {@code null} to string, like any other word. */
     @Test
-    void readsNullAsJavaNull() {
-        assertNull(ValueParser.INSTANCE.read(unquoted("null")));
+    void readsNullAsTheString() {
+        assertEquals("null", ValueParser.INSTANCE.read(unquoted("null")));
     }
 
     @Test
@@ -64,7 +65,6 @@ class ValueParserTest {
 
     @Test
     void writeIsTheInverseForEveryVariant() {
-        assertEquals("null", ValueParser.INSTANCE.write(null));
         assertEquals("true", ValueParser.INSTANCE.write(true));
         assertEquals("255", ValueParser.INSTANCE.write(BigInteger.valueOf(255)));
         assertEquals("0.5", ValueParser.INSTANCE.write(new BigDecimal("0.5")));
@@ -72,5 +72,11 @@ class ValueParserTest {
         assertEquals(".inf", ValueParser.INSTANCE.write(Double.POSITIVE_INFINITY));
         assertEquals("-.inf", ValueParser.INSTANCE.write(Double.NEGATIVE_INFINITY));
         assertEquals("hello", ValueParser.INSTANCE.write("hello"));
+    }
+
+    /** Absence is {@code _}, which an emitter writes as absence -- there is no token for this parser to give. */
+    @Test
+    void writeRefusesAHostNull() {
+        assertThrows(IllegalArgumentException.class, () -> ValueParser.INSTANCE.write(null));
     }
 }

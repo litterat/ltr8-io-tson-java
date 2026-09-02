@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The schemaless {@link TsonTreeReader}: TSON text straight to a {@link TsonValue} tree with no schema,
  * structure and types coming from the wire. Proves records stay records and arrays stay arrays (no schema
  * to distinguish tuple), leaves are base-resolved (or built-in-typed when tagged), wire type-refs are
- * captured, and null/absent/empty-brace map to the right kinds.
+ * captured, and absent/empty-brace map to the right kinds.
  *
  * <p>The type-ref rules a schemaless read applies -- a built-in name must sit on a token and its token must
  * satisfy the atom, any other name resolves to nothing and is reported unless preserved -- are the second
@@ -65,8 +65,8 @@ class TsonTreeReaderTest {
         assertTrue(node.get("skills").isArray());                                     // array, never tuple (schemaless)
         assertEquals(Optional.of("b"), node.at("/skills/1").asString());
         assertEquals(Boolean.TRUE, node.get("active").asBoolean().orElseThrow());
-        assertTrue(node.get("note").isAbsent());                                      // the null token: §4 + one no-value node
-        assertTrue(node.get("nickname").isAbsent());                                  // the _ sentinel
+        assertEquals(Optional.of("null"), node.get("note").asString());               // `null` is a token like any other
+        assertTrue(node.get("nickname").isAbsent());                                  // `_`, the one no-value node
     }
 
     @Test

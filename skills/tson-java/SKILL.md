@@ -159,8 +159,8 @@ that failed* — `at("/nope/deeper").missingPath()` is `Optional[/nope]` — and
 returns that same node, so the first failure stays the informative one.
 
 **`TsonMissing` (nothing there) is not `TsonAbsent` (the document wrote `_`).** There is one no-value
-node and no separate null node: `TsonAbsent` carries `_`, the `null` token where §4 base resolution
-applies, and a collecting-mode read failure.
+node because there is one no-value spelling: `TsonAbsent` carries `_` and a collecting-mode read failure.
+The token `null` is not absence — §4 resolves it to the string `null`, so it arrives as a `TsonAtom`.
 
 **Casting and converting are different questions.** `as(Class)`/`asString`/`asBigDecimal` only ever
 cast (`isInstance`), so a test asserting *which host type a reader produced* must use `as(Class)`.

@@ -38,8 +38,7 @@ import java.util.Set;
  * Reads a TSON data document into an immutable {@link TsonValue} tree with <b>no schema</b> -- the
  * schemaless (Class 1) tree-producing peer of {@link TsonObjectReader} (which produces Java objects). Like
  * Jackson's {@code readTree}: the wire structure is the source of truth. Leaves are typed by §4 base
- * resolution ({@code Boolean}/{@code BigInteger}/{@code BigDecimal}/{@code Double}/{@code String}, and the
- * {@code null} token as a {@link TsonAbsent} -- the tree model has one no-value node, not two), or by the
+ * resolution ({@code Boolean}/{@code BigInteger}/{@code BigDecimal}/{@code Double}/{@code String}), or by the
  * built-in vocabulary when a leaf carries a type-ref for one (e.g. {@code !uuid},
  * {@code !date}); a container carries its own wire type-ref (e.g. {@code !person}) when present.
  *
@@ -242,12 +241,11 @@ public final class SchemalessTreeReader {
     /**
      * A token leaf, decoded by the built-in atom {@link #checkTypeRef} resolved, else by §4 base resolution.
      *
-     * <p>Both no-value outcomes land on {@link TsonAbsent}: the {@code null} token, which §4.1 resolves to
-     * the null base value and which the tree model spells as absence, and a token the atom rejected, where
-     * reporting never abandons the surrounding value and the diagnostic -- not the placeholder -- carries
-     * what went wrong. This is the only path on which {@code null} means absence: it is base resolution's
-     * answer, so it holds exactly where §4 applies (no declared type in scope). Under a schema, {@code null}
-     * is a token like any other and the position's own atom decides ([TSON-SCHEMA] §7.3).
+     * <p>A token is always a value: §4 resolves every one of them to boolean, number or string, {@code null}
+     * included, which is the string {@code null}. The one no-value outcome here is a token the atom rejected,
+     * kept as a {@link TsonAbsent} placeholder -- reporting never abandons the surrounding value, and the
+     * diagnostic rather than the placeholder carries what went wrong. Absence proper is {@code _}, which is
+     * never a token and reaches the tree through its own event.
      */
     private TsonValue leaf(TsonReadContext ctx, TokenEvent token, Optional<String> typeRef,
                            Optional<AtomType<?>> atom, List<TsonAnnotation> annotations) {
@@ -263,7 +261,7 @@ public final class SchemalessTreeReader {
         } else {
             value = ValueParser.INSTANCE.read(tokenValue);
         }
-        return value == null ? new TsonAbsent(typeRef, annotations) : new TsonAtom(value, typeRef, annotations);
+        return new TsonAtom(value, typeRef, annotations);
     }
 
     /** A map key's own path segment: its scalar text, or {@code ?} for a key with no single text form. */
@@ -317,11 +315,9 @@ public final class SchemalessTreeReader {
             case TsonMap map -> map.entries().stream()
                     .map(entry -> List.of(keyIdentity(entry.key()), keyIdentity(entry.value()))).toList();
             // No payload to compare: the kind is the whole identity, and a distinct constant per kind keeps
-            // a no-value key apart from a quoted "null" that base resolution made an ordinary string. Inside
-            // a compound key, a `_` element and a `null` element share this identity (a bare `_` key never
-            // reaches here -- readMap refuses it first, §2.9), so `[_ 1]` and `[null 1]` are one key. §2.6's
-            // decoded-value layer does not ask for that -- §4.1 keeps null and absence distinct -- it falls
-            // out of the tree spelling both as absence, the one-node model SPEC-FEEDBACK.md #7 argues from.
+            // a no-value key apart from the string `null`, which is what that token now resolves to. A `_`
+            // key never reaches here at all -- readMap refuses it first, §2.9 -- so this identity is only
+            // ever a compound key's own element.
             case TsonAbsent ignored -> KeyKind.ABSENT;
             case TsonMissing ignored -> KeyKind.MISSING;
         };

@@ -54,7 +54,16 @@ differ is pinned per schema. They are the only external statement of what a conf
 so a change that moves those counts wants looking at rather than renumbering. Keep them in step with the
 `.tn` beside them; both have drifted before.
 
-**Status:** Part 1 is complete and frozen. Part 2's grammar, resolution, linking, and Class 2 compilation
+**This branch is `r2026-35-proposal`, and it diverges from published Revision 34 deliberately.** It builds
+the removals `SPEC-FEEDBACK.md` #7–#13 propose, ahead of the spec revision that would carry them, so that
+those entries state what is *running* rather than what is *proposed* — the branch is the argument. It merges
+to `main` when the spec lands and not before: `main` is the reference implementation of the published
+revision, and merging a divergence early costs it the one signal it exists to give. The sibling corpus has a
+branch of the same name and moves with this one, `SUITE_PIN` following it. Landed here so far: **#7, `null`
+removed from the notation.** §1.3's Part 1 freeze is a claim about the published revision, which `main` keeps;
+it does not hold on this branch.
+
+**Status:** Part 2's grammar, resolution, linking, and Class 2 compilation
 all work: the three bundled schemas resolve/register/compile in full, user schemas governed by them
 validate and read, and a `tson` CLI drives it end to end. Known gaps are listed under "Not yet
 implemented".
@@ -305,8 +314,12 @@ schema document is unsupported, not malformed).
 
 ### Base type resolution (`.../base/`) — `docs/lexer-and-data-parsing.md`
 
-`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (null → boolean → number → string) for
-untyped tokens; `NumberGrammar.tryParse` recognizes the number production and extracts structure into
+`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (boolean → number → string) for
+untyped tokens — **there is no `null`**: absence has one spelling, `_`, and it is lexical (its own token type,
+its own event, its own AST node), so it is never a `TokenValue` and no order here reaches it, while the
+unquoted token `null` is the string `null` as `frobnicate` is. `BaseValue` carries an `AbsentValue` member
+`resolve` never returns, so that binding an identified value stays one switch (`AtomBinder.bind`) and a
+schemaless bind reaching `_` has a way into it. `NumberGrammar.tryParse` recognizes the number production and extracts structure into
 `NumberForm` **without** converting to a host type — over a hand-written `NumberScanner`, one method per
 ABNF rule, because a reference implementation should not state the grammar in a host regex dialect no port
 shares (`NumberScannerEquivalenceTest` fuzzes it against the patterns it replaced) — binding decides the
@@ -671,10 +684,10 @@ These live in `tson-compiler`'s root package because `DefinitionResolver` depend
 A sealed `TsonValue` over seven pure immutable node types (`TsonRecord`/`TsonMap`/`TsonArray`/`TsonTuple`/
 `TsonAtom`/`TsonAbsent`/`TsonMissing`), structure-preserving and annotation-aware. No `Node`
 suffix (deliberate, against Jackson's names). `get`/`at` never throw — a `TsonMissing` carries the RFC 6901
-pointer of the step that failed. **One no-value node, no separate null node**: `TsonAbsent` carries `_`, the
-`null` token where §4 base resolution applies (schemaless data and `value` positions), and a collecting-mode
-read failure. Under a schema `null` stays ordinary text — §7.3's concession is local to `void`, and lives in
-`VoidReader`, never in the lexer or `TsonDataStream`.
+pointer of the step that failed. **One no-value node, because there is one no-value spelling**: `TsonAbsent`
+carries `_` and a collecting-mode read failure, and nothing else. `null` is a `TsonAtom` holding the string
+`null`, schemaless and under a schema alike; a `void` position admits `_` and nothing else (`VoidReader`),
+which is where a second spelling would be cheapest to admit and is refused anyway.
 Two accessor families with different questions: `as(Class)`/`asString`/…
 **cast** ("what host type did the read produce?"), `asInt`/`asLong`/`asDouble` **convert** ("what number is
 this?") — a test asserting which host type a reader produced must use `as(Class)`. Read-side only; no

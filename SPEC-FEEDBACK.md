@@ -354,41 +354,59 @@ Two smaller consequences of keeping it:
   represent the string `"null"` in schemaless TSON, use quotes." `_` makes no such demand on names: it is
   `XID_Continue` only, so no identifier begins with it, and the reservation is lexical rather than a word.
 
-**Interpretation chosen:** Revision 34 as written — this is a proposal, not a resolved ambiguity. `BaseTypeResolver`
-runs §4.5's order with `null` first; `ValueParser` reads it at a `value`-typed position; `VoidReader` applies §7.3's
-concession, for the unquoted token only; `TsonDataEmitter.nullValue()` writes it. What the implementation
-*models* is the other half of the evidence: the read output has **one** no-value node, `TsonAbsent`, carrying `_`,
-the `null` token where §4 applies, and a collecting-mode read failure alike, with no separate null node — because
-no consumer of the tree had a use for the difference, so there was nothing to model. When the first
-implementation quietly merges two things the spec calls distinct, the spec is describing a distinction it does not
-have. What is **not** running is the removal itself: `null` is still resolved, still emitted, and the corpus's
-`class1/resolver/valid/null-keyword` vector still expects the null base value.
+**Interpretation chosen — and built.** This implementation has removed `null`, and the description below is
+of running code rather than of a design. `BaseTypeResolver` runs boolean → number → string; the unquoted token
+`null` resolves to the string `null`; `VoidReader` admits `_` and nothing else; `ValueParser` has no null
+inhabitant in either direction; `TsonDataEmitter` has no `null` to write, and a host `null` with no field to be
+omitted from writes `_`. Nothing lexical moved: `null` was never a token class, so the lexer is untouched and
+`_` keeps the token type, event and AST node it always had — which is also the sharpest form of the argument
+below, since it means absence was never in the resolution order to begin with and removing `null` shortens the
+order rather than replacing one entry in it.
+
+What the implementation *models* is the other half of the evidence, and it needed no change at all: the read
+output has **one** no-value node, `TsonAbsent`, carrying `_` and a collecting-mode read failure, with no
+separate null node — because no consumer of the tree had a use for the difference, so there was nothing to
+model. When the first implementation quietly merges two things the spec calls distinct, the spec is describing
+a distinction it does not have.
+
+One deletion is worth reporting because it was invisible until the change forced the question.
+`DiscriminationClass` — the §5.4 discrimination classes untagged choice recovery dispatches on — carried a
+`NULL` member that nothing could produce: a `unit` type has no class at all, so `void` never reached it, and
+the only other route was a host `null` from base resolution. **No disjointness fact rested on it**, and
+absence cannot be a discrimination class in any case, §5.4 refusing a `void` variant outright. §4 has three
+scalar classes, and it turns out the fourth was never doing anything.
 
 **Suggested resolution:** remove `null` from the notation. Concretely:
 
-- Part 1: delete §4.1; §4.5's order becomes boolean → number → string; drop the "distinct from … null" clauses in
-  §2.9 and §4.4 and the "use quotes" sentence; §7.7 rule 3 then holds without qualification. The JSON note under §9
-  changes from a mapping to a statement of scope: a JSON document containing `null` is not a TSON document, and a
-  processor that reads JSON does so through a JSON reader that maps `null` to absence. That is a *softer* claim
-  than the current SHOULD ("accept any valid JSON document"), and it should be made in those words rather than
-  left as a silent narrowing.
-- Part 2: `value` in §4.2 admits boolean, integer, float and string; `void`'s parenthetical and the §7.3 concession
-  paragraph go, `void` admitting `_` alone; §5.4's rationale for refusing `(T | void)` loses the "absent-versus-null"
-  clause and gets simpler, not weaker; §9's restatement goes with it.
-- Nothing lexical moves: `null` was never a token class, so §1.3's lexer freeze holds and the unquoted token `null`
-  is a string, as `frobnicate` is.
+- Part 1: delete §4.1; §4.5's order becomes boolean → number → string; drop the "distinct from … null" clauses
+  in §2.9 and §4.4 and the "use quotes" sentence; §7.7 rule 3 then holds without qualification. The JSON note
+  under §9 changes from a mapping to a statement of scope: a JSON document containing `null` is not a TSON
+  document, and a processor that reads JSON does so through a JSON reader that maps `null` to absence. That is
+  a *softer* claim than the current SHOULD ("accept any valid JSON document"), and it should be made in those
+  words rather than left as a silent narrowing.
+- Part 2: `value` in §4.2 admits boolean, integer, float and string; `void`'s parenthetical and the §7.3
+  concession paragraph go, `void` admitting `_` alone; §5.4's rationale for refusing `(T | void)` loses the
+  "absent-versus-null" clause and gets simpler, not weaker; §9's restatement goes with it.
 
 The one thing the removal changes for a document is that a bare `null` in schemaless data becomes the string
-`null` rather than an error. It would be a mistake to guard that with a reserved word — a parse error on unquoted
-`null` reintroduces exactly what §7.7 rule 3 removed, for the sake of one JSON habit that the JSON reader is the
-right place to serve. The cost worth naming instead is the structured-output case: a model emitting `null` by JSON
-reflex into a `text` position gets the string `null` silently, where an `int32` position refuses it loudly. That
-case is already the behaviour under a schema in Revision 34, and it is the case that argues for routing model
-output through a JSON reader rather than for a keyword in the notation.
+`null` rather than an error. It would be a mistake to guard that with a reserved word — a parse error on
+unquoted `null` reintroduces exactly what §7.7 rule 3 removed, for the sake of one JSON habit that the JSON
+reader is the right place to serve. The cost worth naming instead is the structured-output case: a model
+emitting `null` by JSON reflex into a `text` position gets the string `null` silently, where an `int32`
+position refuses it loudly. That case was already the behaviour under a schema in Revision 34, and it is the
+case that argues for routing model output through a JSON reader rather than for a keyword in the notation.
 
-**Status against Revision 34:** open, and new against this revision — a proposal rather than an ambiguity, and
-one this implementation has not built ahead of the spec, since a base-resolution change is a Part 1 change and
-Part 1 is frozen until the revision that makes it.
+**What is not built**, and is not this implementation's to build: the bundled schemas. `meta-kernel.tn`
+documents `value`'s inhabitants as "null, boolean, integer, float, string" and `void`'s prose names `null` as
+an accepted spelling, and both are now false — but the three schemas are Revision 34's published artifacts
+with published digests, and stamping new ones ahead of the revision would mint digests for documents nobody
+has published. They are untouched, and the divergence is behavioural rather than declared.
+
+**Status against Revision 34:** open, and new against this revision — a proposal, and one this implementation
+has now built and is running. It is built on a branch (`r2026-35-proposal`) rather than on `main`, which stays
+the reference implementation of the published revision; the shared corpus has a branch of the same name,
+carrying a resolver vector for `null` resolving to a string and a validate vector for `null` refused at a
+`void` position.
 
 ---
 

@@ -450,18 +450,22 @@ class TsonObjectReaderTest {
     public record Nullable(String text) {
     }
 
+    /**
+     * The token {@code null} is a string and binds as one; only {@code _} is absence. A {@code String} field
+     * takes both, which is what made the two confusable and why the notation keeps one spelling.
+     */
     @Test
-    void nullKeywordBindsToJavaNull() throws DataBindException {
-        Nullable n = mapper.read("{ text: null }", Nullable.class);
-        assertNull(n.text());
+    void theNullTokenBindsAsAStringAndOnlyTheSentinelAsAbsence() throws DataBindException {
+        assertEquals("null", mapper.read("{ text: null }", Nullable.class).text());
+        assertNull(mapper.read("{ text: _ }", Nullable.class).text());
     }
 
     public record RequiresInt(int x) {
     }
 
     @Test
-    void cannotBindNullToPrimitive() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ x: null }", RequiresInt.class));
+    void cannotBindTheAbsentSentinelToPrimitive() throws DataBindException {
+        assertThrows(TsonReadException.class, () -> mapper.read("{ x: _ }", RequiresInt.class));
     }
 
     // ── Atoms: enums (EnumStringBridge) ──────────────────────────────────

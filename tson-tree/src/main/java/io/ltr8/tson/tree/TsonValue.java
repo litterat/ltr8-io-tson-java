@@ -20,8 +20,8 @@ import java.util.stream.Stream;
  *
  * <p><b>Navigation never throws.</b> {@link #get}/{@link #at} return {@link TsonMissing} for an absent
  * field/index, so a deep {@code node.at("/orders/3/total").asBigDecimal()} chain is null-safe. "Absent"
- * (a position that was written but holds no value -- the {@code _} sentinel or its alternate spelling
- * {@code null}, {@link TsonAbsent}) and "missing" (no such node in the tree at all, {@link TsonMissing})
+ * (a position that was written but holds no value -- the {@code _} sentinel, {@link TsonAbsent}) and
+ * "missing" (no such node in the tree at all, {@link TsonMissing})
  * are distinct kinds. A lenient chain still says <em>where</em> it
  * failed: the missing carries the pointer of the step that failed, readable via {@link #missingPath()}.
  *

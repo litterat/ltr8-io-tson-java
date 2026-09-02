@@ -344,21 +344,17 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   cast via `TsonValue.missingPath()`. The first failure sticks — stepping on past a missing returns the
   same node rather than extending its pointer. "Missing" (not in the tree) and "absent" (written, but
   holding no value) stay distinct kinds.
-- **There is one no-value node, `TsonAbsent`, and no separate null node.** Three things land on it: the
-  `_` sentinel; the `null` token where §4 base type resolution applies (schemaless data and `value`-typed
-  positions, the one place `null` still identifies as a value at all); and the placeholder a tree reader
-  leaves where a read failed in collecting mode, whose story is carried by its diagnostic rather than by
-  the node standing in for it. The model deliberately does **not** carry §4.1's null base type as its own
-  kind: `TsonAbsent` is what a consumer asks about, and a JSON-shaped `null` reaching a tree read means
-  the same thing `_` does. Two consequences worth knowing — a schemaless `null` re-emits as `_` through
-  `TsonTreeWriter` (absence has one written form), and a `_` map key and a `null` map key share one
-  identity in `SchemalessTreeReader`'s duplicate check, an extension of the decoded-value layer §2.6 names.
-- **None of this reaches a schema-typed position.** [TSON-SCHEMA] §7.3: `null` "has no special status when
-  a schema is in scope — [its] meaning is determined entirely by the position's type", so `null` at a
-  `text` position is the string `"null"`. The sole exception is a `void`-typed position, where `VoidReader`
-  accepts an unquoted `null` as a spelling of `_` (a single-inhabitant type loses no distinction by it);
-  that acceptance lives in that one reader, deliberately, and not in the token stream, so no other atom
-  contract — `enum`, `token`, a FIXED `text` — loses `null` as a legal value.
+- **There is one no-value node, `TsonAbsent`, because there is one no-value spelling.** Two things land on
+  it: the `_` sentinel, and the placeholder a tree reader leaves where a read failed in collecting mode,
+  whose story is carried by its diagnostic rather than by the node standing in for it. `null` is not one of
+  them — §4 resolves boolean, number and string, so the unquoted token is a `TsonAtom` holding the string
+  `null`, schemaless and under a schema alike, and it round-trips through `TsonTreeWriter` as the string it
+  is. A JSON document's `null` reaches absence through a JSON reader, which maps it in the model, where the
+  position's own state decides whether absence is admitted at all.
+- **A `void` position admits `_` and nothing else** (`VoidReader`), which is where a second spelling would
+  be cheapest to admit — the type has one inhabitant, so conceding loses no distinction — and it is refused
+  there too. Conceding would make absence's spelling depend on the position's type, a rule an author
+  computes rather than remembers.
 - **Two families of value accessor, and the split is the point.** `as(Class)`/`asString`/`asNumber`/
   `asBigInteger`/`asBigDecimal` only ever **cast** (`isInstance`), so they answer "what host type did the
   read produce?" — an `int32` field holding an `Integer` gives empty from `asBigInteger()`. `asInt`/

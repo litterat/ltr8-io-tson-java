@@ -23,19 +23,13 @@ class VoidReaderTest {
     }
 
     /**
-     * [TSON-SCHEMA] §7.3's void-position concession: the unquoted token {@code null} is accepted here as an
-     * equivalent spelling of {@code _}. Local to {@code void} -- §7.3 is explicit that it "does not change
-     * {@code null}'s meaning elsewhere", which is why the acceptance lives in this reader and not in the
-     * token stream.
+     * Absence has one spelling, so {@code void} admits one token: {@code _}. The unquoted {@code null} is a
+     * string here as it is everywhere else, and fails this reader the way {@code frobnicate} does -- there is
+     * no second spelling for the contract to concede to.
      */
     @Test
-    void acceptsNullAsAnEquivalentSpellingOfTheSentinel() {
-        assertNull(READER.read(TestDocuments.document("null")));
-    }
-
-    /** The concession is about the spelling of absence, not about text that reads that way (§4.4). */
-    @Test
-    void rejectsAQuotedNull() {
+    void rejectsTheNullToken() {
+        assertThrows(TsonReadException.class, () -> READER.read(TestDocuments.document("null")));
         assertThrows(TsonReadException.class, () -> READER.read(TestDocuments.document("\"null\"")));
     }
 
