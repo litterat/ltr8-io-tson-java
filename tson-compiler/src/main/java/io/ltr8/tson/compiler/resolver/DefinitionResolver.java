@@ -419,6 +419,15 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + declaration + "': the value of annotation '@"
                     + annotationName + "' is not valid data for the type '" + annotationName + "' names -- "
                     + e.getMessage(), e);
+        } catch (TsonBindMismatchException e) {
+            // The same arm {@link #bindAtomInstance} carries, for the same reason and it is not a stylistic
+            // echo: an annotation naming a type the consumer never bound -- the kernel's own `data` among
+            // them -- is their configuration, and `TsonMissingBindingException` exists precisely so that a
+            // missing line of wiring does not read as "this library cannot do that". Letting the catch-all
+            // below have it rebuilds the shape that type was introduced to retire.
+            String where = "'" + declaration + "': " + e.getMessage();
+            throw e instanceof TsonMissingBindingException ? new TsonMissingBindingException(where)
+                    : new TsonBindMismatchException(where);
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException("'" + declaration + "': failed to bind the value of "
                     + "annotation '@" + annotationName + "' via the compiled meta-schema reader: "

@@ -784,11 +784,16 @@ error* category, so this is the same layer, not a new one.
       document with three ordinary mistakes reported none of them, so the author fixed one thing per run.
       The policy's substance is that a gap is not a verdict on the author's schema, and a code carries that
       as well as a channel did — while letting the pass stay single, which is the property the whole
-      schema-diagnostics design exists for. `SchemaResolver.Problems` is where the schema pipeline classifies, and
-      `TsonCli.exitCodeFor` is what the CLI's 1-vs-70 rides on. **One site does not go through it**: binding a
-      *name's* annotations reports `ofSchemaError` whatever the exception's type, so a gap there arrives as
-      SCHEMA_ERROR rather than NOT_IMPLEMENTED. It is marked in place rather than quietly folded in, because
-      changing it moves an exit code and wants its own verdict.
+      schema-diagnostics design exists for. `SchemaResolver.Problems` is where the schema pipeline
+      classifies, and `TsonCli.exitCodeFor` is what the CLI's exit code rides on.
+    - **It classifies three ways, not two.** A `TsonBindMismatchException` is neither an author error nor a
+      gap, and reaches `ofSchemaBindMismatch` — the same answer `SchemaFailure` gives a read, for the same
+      reason. Both throw sites keep it clear of their catch-alls (`bindAtomInstance` and
+      `bindAnnotationValue`, which carry the same arm): relabelling it `UnsupportedOperationException`
+      rebuilds the shape `TsonMissingBindingException` exists to retire, a missing line of wiring reading as
+      *this library cannot do that*. An annotation naming a type the consumer never bound — the kernel's own
+      `data` among them — is the reachable case, and `BindMismatchClassificationTest` pins it in both §6
+      positions plus the constructor case beside them.
     - A gap that escapes some *other* way still throws and still exits 70 unchanged — compilation and the
       lexer are fail-fast, and `TsonCli.notImplemented` remains for anything that reaches it.
 - **A read that cannot get its schema classifies the failure the same way (`SchemaFailure`).** Both facades
