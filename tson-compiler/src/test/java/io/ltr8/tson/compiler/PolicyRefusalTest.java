@@ -34,6 +34,14 @@ class PolicyRefusalTest {
     /** Cyrillic а (U+0430) -- Identifier_Status=Allowed, so only the script rules have anything to say. */
     private static final String CYR_A = new String(Character.toChars(0x0430));
 
+    /**
+     * {@code pass} in Cyrillic (р а ѕ ѕ) -- single-script, so the restricted-script rule admits it, and
+     * confusable with the Latin spelling, so the look-alike rule is the only one with anything to say.
+     */
+    private static final String CYRILLIC_PASS =
+            new String(new int[] {0x0440, 0x0430, 0x0455, 0x0455}, 0, 4);
+
+
     /** U+0132 LATIN CAPITAL LIGATURE IJ: {@code XID_Continue}, Latin, and Identifier_Status=Restricted. */
     private static final String RESTRICTED_NAME = "a" + new String(Character.toChars(0x0132)) + "b";
 
@@ -53,10 +61,13 @@ class PolicyRefusalTest {
      * The look-alike rule over a Class 1 record's own field names -- the one naming scope at the data layer, since
      * no declaration stands behind it. The remedy is to rename one of the pair; there is no policy to relax,
      * the skeleton relation reading a fixed table with nothing configurable in it.
+     *
+     * <p>Each name is single-script, so this rule is the only one with anything to say: a field name is a name
+     * (§2.5), and a within-word homograph would be refused as a restricted script first.
      */
     @Test
     void aConfusableFieldPairIsReportedAsConfusableNames() {
-        Diagnostic refusal = soleRefusal(new TsonTreeReader(), "{ admin: 1  " + CYR_A + "dmin: 2 }");
+        Diagnostic refusal = soleRefusal(new TsonTreeReader(), "{ pass: 1  " + CYRILLIC_PASS + ": 2 }");
 
         assertEquals(Diagnostic.Code.CONFUSABLE_NAMES, refusal.code());
     }

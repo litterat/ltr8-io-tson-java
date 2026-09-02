@@ -428,10 +428,9 @@ public final class TsonDataStream implements TsonEventSource {
     /**
      * {@code field-name = unquoted-token / single-line-token} (§7.4). Narrower than {@link #isBareTokenType},
      * which stays the map-key shape: a key is a value (§2.6) and takes all three forms, where a name takes the
-     * two a name is ever written in. The production stays <em>lexical</em> because §7.4 writes it that way: a
-     * quoted field name is ordinary, and the identifier contract is stated once, on declarations, with data
-     * conforming by construction. Whether it should stay lexical now that no JSON object has to parse as a
-     * record is {@code SPEC-FEEDBACK.md} #9's question, not this class's.
+     * two a name is ever written in. <b>This is the token rule only</b>: which of the two forms carried the
+     * name is no part of what a name is, and {@link #requireFieldName} matches the decoded text against the
+     * identifier profile either way.
      */
     private static boolean isFieldNameTokenType(TokenType type) {
         return type == TokenType.UNQUOTED || type == TokenType.SINGLE_LINE_STRING;
@@ -578,14 +577,44 @@ public final class TsonDataStream implements TsonEventSource {
      * {@code field-name = unquoted-token / single-line-token} (§7.4) -- see {@link #isFieldNameTokenType} for why
      * the multi-line form is not a name. Shared with [TSON-SCHEMA]'s identical production (§12.1).
      * {@code construct} names the position in the author's voice, exactly as {@link #expect}'s does.
+     *
+     * <p>The two spellings are two spellings of one name: {@link #requireFieldName} matches the decoded text
+     * against the identifier profile whichever was written, so quoting carries a name that would otherwise
+     * resolve as a number and never a key that is not a name at all.
      */
     Token expectFieldNameToken(String construct) {
         Token name = peekToken();
         if (!isFieldNameTokenType(name.type())) {
             throw mismatch(construct);
         }
+        requireFieldName(name);
         advance();
         return name;
+    }
+
+    /**
+     * A field name is an identifier, at every layer (§2.5, §7.7). A record's fields are the named members of a
+     * shape, which is what makes them declarable; a key that is not a name is what a <b>map</b> is for, and the
+     * diagnostic says so, that being the one place this rule meets an author.
+     *
+     * <p>Matching runs on the <em>decoded</em> text, so it reaches both spellings the production admits -- the
+     * quoted form is not an escape hatch from the profile, only from the lexical accidents of the unquoted one.
+     *
+     * <p><b>Normalised before it is matched, which is the one thing the profile does not decide here.</b>
+     * {@code IdentifierParser} requires NFC as a <em>form</em> and would refuse a decomposed name outright, but
+     * §2.5 gives a field name its identity by NFC-normalised comparison -- a decomposed spelling is the same
+     * name, not a different one, and the corpus says so by making the pair a duplicate-field error. The lexer
+     * already normalises the unquoted spelling, so refusing the form here would make the quoted spelling the
+     * stricter of the two, which is the asymmetry this rule exists to remove.
+     */
+    private void requireFieldName(Token name) {
+        try {
+            IdentifierParser.validate(Nfc.of(name.text()));
+        } catch (AtomTypeException e) {
+            throw new TsonParseException("invalid field name -- " + e.getMessage()
+                    + ". A record's fields are names a schema can declare; a key that is not a name belongs in "
+                    + "a map, written '{ key => value }'", name.start());
+        }
     }
 
     // ── The explicit frame stack replacing recursion ────────────────────────────────────
@@ -724,6 +753,7 @@ public final class TsonDataStream implements TsonEventSource {
                     if (!isFieldNameTokenType(t1.type())) {
                         throw mismatch("a record field name");
                     }
+                    requireFieldName(t1);
                     advance(); // field-name token
                     advance(); // ':'
                     ready.add(new RecordStart(lbrace.start()));

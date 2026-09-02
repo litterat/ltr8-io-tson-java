@@ -32,6 +32,14 @@ class ConfusableNameScopesTest {
     /** Cyrillic а (U+0430) — the character §9.4 opens with. */
     private static final String CYR_A = new String(Character.toChars(0x0430));
 
+    /**
+     * {@code pass} in Cyrillic (р а ѕ ѕ) -- single-script, so the restricted-script rule admits it, and
+     * confusable with the Latin spelling, so the look-alike rule is the only one with anything to say.
+     */
+    private static final String CYRILLIC_PASS =
+            new String(new int[] {0x0440, 0x0430, 0x0455, 0x0455}, 0, 4);
+
+
     /** Cyrillic А (U+0410), the capital. */
     private static final String CYR_CAP_A = new String(Character.toChars(0x0410));
 
@@ -169,11 +177,15 @@ class ConfusableNameScopesTest {
     /**
      * Class 1 has no declaration to have caught it, so a schemaless record's own field set is checked where
      * it is read. This is the one scope that needs a reader rather than the linker.
+     *
+     * <p>The pair is whole-script rather than a within-word homograph, deliberately: a field name is a name
+     * (§2.5), so a mixed-script spelling is refused by the restricted-script rule before this one has a pair
+     * to compare, and isolating the look-alike rule needs two names each of which is single-script.
      */
     @Test
     void aSchemalessRecordsFieldNamesAreChecked() {
         TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
-        new TsonTreeReader().withDiagnostics(problems).read("{ admin: 1  " + CYR_A + "dmin: 2 }");
+        new TsonTreeReader().withDiagnostics(problems).read("{ pass: 1  " + CYRILLIC_PASS + ": 2 }");
 
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES),
                 problems.diagnostics().stream().map(Diagnostic::code).toList(),

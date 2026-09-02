@@ -525,23 +525,62 @@ a shape, which is what makes them declarable; arbitrary string keys are what a *
 => "text/plain" }` is the honest spelling of that data today. Once no JSON object has to parse as a record, nothing
 requires a record to admit a key a schema could never declare.
 
-**Interpretation chosen:** Revision 34 as written. `TsonDataStream.isFieldNameTokenType` admits an unquoted or
-single-line token as a field name and matches nothing against the identifier grammar there — deliberately, per
-§2.5; `SchemalessTreeReader.reportConfusableFields` runs the look-alike rule over a schemaless record's field names
-and nothing else, per §8.2. Under a schema, a field name conforms by construction, which is the half that would not
-change.
+**Interpretation chosen — and built.** This implementation has made `field-name` an identifier position at
+every layer, and the description below is of running code. `TsonDataStream.requireFieldName` matches the
+decoded text against the identifier profile at both the record dispatch and the brace-disambiguation
+lookahead, so `{ "first name": 1 }`, `{ "_id": 1 }` and `{ 42x: 2 }` are parse errors. The schema grammar
+shares the production, so a schema's own field name meets the same rule at the same layer — where it used to
+reach `record_field.name`'s declared type one phase later.
 
-**Suggested resolution:** make `field-name` an identifier position at every layer — the production keeps its two
-spellings (quoting is still how a name containing nothing outside the profile is written when it would otherwise
-resolve as a number, §7.1's "quoting by kind") and the decoded text is matched against §7.7 as an annotation name's
-is. Consequences, all deletions: §2.5's "lexical" paragraph; §7.7's "record field names are lexical at this layer"
-and rule 3's `"_"`/`"_id"` carve-out; §8.2's field-name distinction, so one walk polices every named scope and
-[TSON-DATA] §1.5's Class 1 MUST ("the name-hygiene checks of §8.2 over each record's own field names") stops needing to
-say which checks. A record whose key is not a name is a parse error, and the diagnostic can say what the author
-wants: a map.
+**The two spellings stay, and are two spellings of one name.** §7.4's production keeps `unquoted-token /
+single-line-token`; what quoting buys is the lexical accidents of the unquoted form — a name that would
+otherwise resolve as a number — and not a different set of names. The diagnostic names the remedy the format
+already has: *a key that is not a name belongs in a map*, which is the one place this rule meets an author.
 
-**Status against Revision 34:** open, and new against this revision — consequent on #8, a proposal rather than an
-ambiguity, and the one of #9–#13 this implementation would recommend taking.
+**Normalisation runs before the match, and the entry above does not say so.** `identifier` requires NFC as a
+*form* and would refuse a decomposed name outright, where §2.5 gives a field name its identity by
+NFC-normalised comparison — a decomposed spelling is the same name, so the pair is a duplicate-field error and
+not a malformed one. The lexer already normalises the unquoted spelling, so requiring the form here would make
+the quoted spelling the stricter of the two, which is the asymmetry this change exists to remove. **A
+revision taking #9 should say which of the two rules governs**, since a reasonable implementer reads
+"a field name is an identifier" as importing the form.
+
+**Two consequences worth stating, because both change what a conforming processor refuses:**
+
+- **`_id` stops being expressible in a record.** Identifier-Start is `XID_Start`, which excludes `_`, so a
+  leading underscore was a Class 1 field name and never a declared one; after this it is neither. That is
+  accepted deliberately rather than paid for by admitting `_` at Start: the profile is what every naming
+  position in the series shares, and bending it in one position to keep one spelling writable is the wrong
+  shape of answer. It is not the cheap road either — `_` is §2.9's absent sentinel and the lexer takes it
+  greedily, so admitting it as a name also costs the rule that every identifier is a well-formed unquoted
+  token. If a leading underscore is wanted it is a change to the profile for every naming position at once,
+  argued on its own merits.
+- **A Class 1 field name now meets all three §8.2 rules, not one.** It was the look-alike rule alone
+  *because* the name was lexical; once it is a name, the restricted-character and restricted-script rules
+  reach it exactly as they reach a type-ref or annotation name. **This refuses §8.2's own illustration**:
+  `id_пользователя` is a compound mixing Latin and Cyrillic, so at the Highly Restrictive default the
+  restriction level refuses it whole-name even though nothing collides with it — the section offers it as the
+  lone name mechanism 1 does *not* catch, which stays true and is now beside the point. The per-segment unit,
+  which §8.2 names as the first relaxation to reach for, admits it. **A revision taking #9 should either
+  choose a single-script example or say that the relaxation is what the example assumes.**
+
+The second of those has a testing consequence any implementation will meet: a vector isolating the look-alike
+rule over field names needs two names each of which is single-script (`pass` against Cyrillic `раѕѕ`), because
+a within-word homograph is refused by the restriction level before mechanism 1 has a pair to compare. A pair
+written the obvious way passes for the wrong reason — a processor implementing only the script rule satisfies
+it.
+
+**Suggested resolution:** make `field-name` an identifier position at every layer — the production keeps its
+two spellings, and the decoded text is matched against §7.7 as an annotation name's is, after NFC
+normalisation. Consequences, all deletions: §2.5's "lexical" paragraph; §7.7's "record field names are lexical
+at this layer" and rule 3's `"_"`/`"_id"` carve-out; §8.2's field-name distinction, so one walk polices every
+named scope and [TSON-DATA] §1.5's Class 1 MUST stops needing to say which checks. A record whose key is not a
+name is a parse error, and the diagnostic can say what the author wants: a map.
+
+**Status against Revision 34:** open, and new against this revision — consequent on #8, and one this
+implementation has now built and is running on the `r2026-35-proposal` branch. It was the one of #9–#13 this
+implementation recommended taking, and building it turned up the two questions above, neither of which is
+visible from the proposal alone.
 
 ---
 

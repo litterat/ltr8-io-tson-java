@@ -725,11 +725,19 @@ class TsonDataParserTest {
                 assertInstanceOf(TokenValue.class, map.entries().get(0).key().coreValue()).form());
     }
 
-    /** And a single-line quoted field name keeps working -- it is the spelling §7.1 sends out-of-profile names to. */
+    /**
+     * A quoted field name still parses -- the production has two spellings and always did. What it is not is an
+     * escape hatch from the profile: a field name is an identifier however it was written (§2.5, §7.7), so
+     * quoting carries a name the unquoted form would misread and never a key that is not a name.
+     */
     @Test
-    void aSingleLineQuotedFieldNameParses() {
-        RecordValue record = assertInstanceOf(RecordValue.class, root("{\"first name\": 1}").coreValue());
-        assertEquals("first name", record.fields().get(0).name());
+    void aSingleLineQuotedFieldNameIsStillMatchedAgainstTheProfile() {
+        RecordValue record = assertInstanceOf(RecordValue.class, root("{\"order-id\": 1}").coreValue());
+        assertEquals("order-id", record.fields().get(0).name());
+
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> root("{\"first name\": 1}"));
+        assertTrue(thrown.getMessage().contains("invalid field name"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("belongs in a map"), thrown.getMessage());
     }
 
     @Test

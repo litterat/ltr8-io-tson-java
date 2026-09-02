@@ -155,13 +155,18 @@ Key points:
   token-Start carries `Nd`/`-`/`+`/`.` so a *number* can be an unquoted token, and those reach names only
   because names and values share one lexical class. So `!42x` and `@x.y` are syntax errors rather than a
   reference to an undeclared type and an annotation carrying a name the format reserves — the dot being
-  reserved as a future identifier separator. **`field-name` is the deliberate exception and stays lexical**:
-  `unquoted-token / single-line-token` (`isFieldNameTokenType`, narrower than the map key's
-  `isBareTokenType`, a key being a value and not a name, §2.6). A Class 1 document has no schema, so nothing
-  there knows which tokens are meant as names, and `{"first name": 1}` must keep reading as an ordinary
-  record; the identifier contract is stated once on *declarations* (`TsonSchemaParser.expectTypeName`,
-  `DefinitionResolver.requireIdentifier`) and data conforms by construction, a field name that is not an
-  identifier matching nothing and already being an `UNRECOGNIZED_FIELD`. §2.5 and §7.7 state both halves.
+  reserved as a future identifier separator. **`field-name` reaches the same check** (`requireFieldName`), and
+  its production's two spellings are two spellings of one name: `unquoted-token / single-line-token`
+  (`isFieldNameTokenType`, narrower than the map key's `isBareTokenType`, a key being a value and not a name,
+  §2.6) is the *token* rule, and the decoded text is matched against the profile whichever form carried it. So
+  `{"first name": 1}` is a parse error, and the diagnostic names the remedy the format already has: a key that
+  is not a name belongs in a map. A record's fields are the named members of a shape, which is what makes them
+  declarable.
+  **Normalisation runs before the match**, which is the one thing the profile does not decide here.
+  `IdentifierParser` requires NFC as a *form* and would refuse a decomposed name outright, where §2.5 gives a
+  field name its identity by NFC-normalised comparison — a decomposed spelling is the same name, and a
+  duplicate rather than a malformed one. The lexer already normalises the unquoted spelling, so refusing the
+  form here would make the quoted spelling the stricter of the two, which is the asymmetry the rule removes.
 - **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`.** This is a
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
   parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic).

@@ -23,6 +23,9 @@ class TokenPolicyConfigTest {
     /** Cyrillic а (U+0430). */
     private static final String CYR_A = new String(Character.toChars(0x0430));
 
+    /** {@code админ}, all Cyrillic -- a single-script name the default identifier policy admits. */
+    private static final String CYRILLIC_NAME = new String(new int[] {0x0430, 0x0434, 0x043C, 0x0438, 0x043D}, 0, 5);
+
     private static final String DOCUMENT = "{ note: \"" + new String(Character.toChars(0x0430)) + "dmin\" }";
 
     /**
@@ -63,11 +66,28 @@ class TokenPolicyConfigTest {
      * <b>A name is a token, so a strict token policy subsumes the identifier policy.</b> The check runs
      * before anything knows which tokens are names, so a data field name clears it too -- the property the
      * setter is named for.
+     *
+     * <p>The name is single-script, so only the token policy has anything to say about it: a field name is
+     * also judged as a name (§2.5), and this test is about the token surface alone.
      */
     @Test
     void aDataFieldNameIsSubjectToTheTokenPolicy() {
         List<Diagnostic> found = Tson.builder().tokenPolicy(TsonUnicodePolicy.asciiOnly()).build()
-                .validate("{ " + CYR_A + "dmin: 1 }");
+                .validate("{ " + CYRILLIC_NAME + ": 1 }");
+
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
+                found.stream().map(Diagnostic::code).toList(), found.toString());
+    }
+
+    /**
+     * And the other half, which needs no configuration at all: a field name is an identifier (§2.5), so it
+     * meets the <em>identifier</em> policy the way a type-ref or annotation name does, and that policy
+     * defaults to Highly Restrictive. {@code аdmin} spelled with a Cyrillic а is the homograph the rule
+     * exists for, and it is refused on a default build reading an ordinary document.
+     */
+    @Test
+    void aDataFieldNameIsAlsoJudgedAsAName() {
+        List<Diagnostic> found = Tson.builder().build().validate("{ " + CYR_A + "dmin: 1 }");
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
                 found.stream().map(Diagnostic::code).toList(), found.toString());
