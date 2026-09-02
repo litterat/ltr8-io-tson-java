@@ -131,3 +131,17 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   derivation, the way `withTokenPolicy` already is. A document past the limit must be refused with a
   diagnostic carrying a position, never a host `Error`. The numeric-literal length limit named in
   `CLAUDE.md`'s "Not yet implemented" is the fourth limit of the same section and comes with it.
+
+- [ ] **A gap binding a *name's* annotations is reported as a schema error, so the CLI exits 1 rather than
+  70.** [TSON-SCHEMA] §6 binds an annotation written before the declared name to the name, and
+  `SchemaResolver`'s loop for those reports `Diagnostic.ofSchemaError` whatever the exception's type — so an
+  `UnsupportedOperationException`, which `DefinitionResolver.bindAnnotationValue` raises deliberately to mean
+  *this library could not bind that value*, arrives as `SCHEMA_ERROR`. The same annotation written after the
+  arrow binds to the definition, resolves inside the memoized getter, and gets `NOT_IMPLEMENTED`: identical
+  message, different code, different exit. Routing the site through `SchemaResolver.Problems` is the change;
+  it is marked in place, and issue #295 carries the reproduction. Any annotation naming a meta type with no
+  bound Java class triggers it — `@data` and `@atom_specification` against meta.tn, in every value form.
+  **Decide `bindAnnotationValue`'s `catch (RuntimeException)` at the same time**, since it is what decides
+  which throws reach the misclassified site at all: it relabels an NPE or a `ClassCastException` from inside
+  the compiled reader as a coverage gap, and `bindAtomInstance` has the same shape. If those are faults
+  rather than gaps, both catches narrow and the classification question here narrows with them.
