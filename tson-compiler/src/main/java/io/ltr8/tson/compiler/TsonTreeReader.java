@@ -497,7 +497,7 @@ public final class TsonTreeReader {
      * beside a field a later call site can forget.
      */
     private static TsonValue abandon(TsonReadContext ctx, SchemaFailure failure, String message, String actual) {
-        ctx.report(failure.code(), message, failure.expected(), actual, failure.fetchReason());
+        ctx.report(failure.code(), message, failure.expected(), actual);
         EventSkip.dataValue(ctx);
         return null;
     }

@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Entry point for the {@code tson} command ({@code BACKLOG.md}'s "Front door / ergonomics" -- a CLI,
@@ -49,8 +50,9 @@ public final class TsonCli {
               --output text|json|tson    output format (default: text)
               --help, -h                 this help; `tson <command> --help` for a command's own options
 
-            exit codes: 0 ok, 1 validation/compile failure, 2 usage error,
-                        69 a schema could not be obtained, 70 not implemented / internal error""";
+            exit codes: 0 ok, 1 checked and rejected, 2 usage error, 69 a schema could not be obtained,
+                        75 a schema could not be reached (retry may help), 78 a type has no Java class
+                        in this tool, 70 not implemented / internal error""";
 
     /**
      * The [TSON-DATA] §8.2 flags, printed by the help of each command that takes them.
@@ -103,8 +105,9 @@ public final class TsonCli {
             """ + POLICY_OPTIONS + """
 
 
-            exit codes: 0 every data file valid, 1 at least one invalid, 2 usage error,
-                        69 a schema nothing would supply, 70 a gap in this library or a fault""";
+            exit codes: 0 every data file valid, 1 at least one checked and rejected, 2 usage error,
+                        69 a schema nothing would supply, 75 a schema that could not be reached,
+                        78 a type with no Java class in this tool, 70 a gap in this library or a fault""";
 
     private static final String COMPILE_USAGE =
             "usage: tson compile [--output text|json|tson] [<policy options>] <schema>";
@@ -123,8 +126,9 @@ public final class TsonCli {
             """ + POLICY_OPTIONS + """
 
 
-            exit codes: 0 compiled cleanly, 1 it did not, 2 usage error, 69 an !!import or !!meta of its
-                        own could not be obtained, 70 a gap in this library or a fault""";
+            exit codes: 0 compiled cleanly, 1 checked and rejected, 2 usage error, 69 an !!import or
+                        !!meta of its own could not be obtained, 75 one that could not be reached,
+                        78 a type with no Java class in this tool, 70 a gap in this library or a fault""";
 
     private static final String INIT_USAGE =
             "usage: tson init-example [<dir>]   (writes an example person.tn and person-data.tn; default dir: .)";
@@ -243,29 +247,40 @@ public final class TsonCli {
     }
 
     /**
-     * The exit code for a run that produced problems: <b>70 if any of them is a gap in this library, 69 if
-     * any is a schema nothing would supply, 1 otherwise</b>. One is a verdict on the document; the other two
-     * are the absence of one, and they say who could not give it -- this library, or whoever was to serve
-     * the schema. A script that sees 1 fixes the document, 70 files a bug, 69 checks its own configuration
-     * or tries again later, and none of the three has to parse prose to find that out.
+     * The exit code for a run that produced problems.
      *
-     * <p><b>A [TSON-DATA] §8.2 name-hygiene refusal is a 1</b>, and deliberately not a fourth code, though
-     * §8.2 calls it a fifth outcome that must not be reported in any of §8.1's four categories. That rule is
-     * about the lexer/parser/resolver/validation taxonomy -- which layer detected it -- and this code answers
-     * a different question: what should the caller do now. A refusal was checked and declined, so the answer
-     * is fix the document, which is what 1 means. The three that are not verdicts share the property a
-     * refusal lacks: nothing was checked, so "invalid" is a claim the run cannot make. What is genuinely
+     * <p><b>Rank by who must act first; permanence breaks the tie.</b> A mixed run is the normal path -- the
+     * pipeline collects rather than abandoning -- so the order is a stated rule rather than an accident of
+     * which check ran first. The party who must act before anyone else's work counts is the one the code
+     * names, because until they do, every other fix is wasted. Permanence decides only between ranks where
+     * nobody present can act at all.
+     *
+     * <p>At a command line the actors present are the runner and their files:
+     * <ol>
+     *   <li><b>70</b> -- nobody present; it needs a release of this library. The more permanent of the two
+     *       nobody-present ranks, which is what puts it above 78.</li>
+     *   <li><b>78</b> -- nobody present; it needs a differently-wired application. {@code tson} has no flag
+     *       that supplies a binding, which is exactly why this is not the runner's to fix.</li>
+     *   <li><b>69</b> -- the runner: edit the reference, or the allow-list it is checked against.</li>
+     *   <li><b>75</b> -- the runner, by rerunning.</li>
+     *   <li><b>1</b> -- the runner: edit the document.</li>
+     * </ol>
+     *
+     * <p><b>1 means checked and rejected</b>, not "invalid". A [TSON-DATA] §8.2 name-hygiene refusal is one,
+     * though §8.2 calls it a fifth outcome that must not be reported in any of §8.1's four categories: that
+     * rule is about which layer detected it, and this code answers what the caller should do now. A refusal
+     * was checked and declined and the sender holds the fix, which is what 1 means. What is genuinely
      * portable-sensitive about a refusal -- that another deployment may accept the same document -- is
-     * carried by the diagnostic's own code and by the run's own {@link CliPolicy}, which together say which
-     * rule refused and under what configuration; neither needs an outcome of its own up here.
+     * carried by the diagnostic's own code and by the run's own {@link CliPolicy}.
      * {@code SPEC-FEEDBACK.md} #14 proposes §8.2 stop asking for the separate channel.
      *
-     * <p><b>A mixed run takes the most permanent code</b>, which is why 70 outranks 69 and both outrank 1:
-     * a gap is not fixed by retrying, and retrying a run that also holds one would just reach the gap
-     * again. The ordinary problems are still printed and still real either way, but something in the
-     * document was not checked at all, so "invalid" is a claim the run cannot make -- exit 1 would tell a
-     * script the document was judged and rejected. Each note goes to stderr so the report on stdout stays
-     * exactly what {@code --output json|tson} promises.
+     * <p><b>78 rather than 70 for a bind mismatch</b>, because {@code EX_CONFIG} is "found in an
+     * unconfigured or misconfigured state" and unconfigured is what this is: no class is registered for a
+     * type the schema needs. 70 would say this library cannot do it, which is the reading {@link
+     * io.ltr8.tson.compiler.TsonMissingBindingException} exists to prevent.
+     *
+     * <p>Each note goes to stderr so the report on stdout stays exactly what {@code --output json|tson}
+     * promises.
      */
     static int exitCodeFor(Collection<Diagnostic.Code> codes) {
         if (codes.contains(Diagnostic.Code.NOT_IMPLEMENTED)) {
@@ -274,14 +289,38 @@ public final class TsonCli {
                     + " document.");
             return 70;
         }
-        if (codes.contains(Diagnostic.Code.SCHEMA_UNAVAILABLE)) {
+        if (codes.contains(Diagnostic.Code.BIND_MISMATCH)) {
+            // Deliberately not naming TsonConfig.bindings or DataNameBinder the way the diagnostic's own
+            // message does: neither has a command-line surface, so the remedy it states is not one the
+            // person reading this can carry out.
+            System.err.println("note: some of this could not be checked -- a type the schema needs has no"
+                    + " Java class in this tool (see the BIND_MISMATCH entries above). Nothing is wrong with"
+                    + " your document; checking it needs an application that binds that type.");
+            return 78;
+        }
+        if (codes.stream().anyMatch(PERMANENTLY_UNAVAILABLE::contains)) {
             System.err.println("note: some of this could not be checked -- a schema could not be obtained"
-                    + " (see the SCHEMA_UNAVAILABLE entries above). Nothing here has read that schema, so"
-                    + " nothing here is saying your document, or that schema, is wrong.");
+                    + " (see the SCHEMA_ entries above). Nothing here has read that schema, so nothing here"
+                    + " is saying your document, or that schema, is wrong. Rerunning will not obtain it.");
             return 69;
+        }
+        if (codes.stream().anyMatch(TEMPORARILY_UNAVAILABLE::contains)) {
+            System.err.println("note: some of this could not be checked -- a schema could not be reached"
+                    + " (see the SCHEMA_ entries above). Nothing here has read that schema. This one may"
+                    + " succeed if you run it again.");
+            return 75;
         }
         return 1;
     }
+
+    /** Fetch codes a rerun cannot fix: the reference, or the allow-list it is checked against, has to change. */
+    private static final Set<Diagnostic.Code> PERMANENTLY_UNAVAILABLE = Set.of(
+            Diagnostic.Code.SCHEMA_NOT_PERMITTED, Diagnostic.Code.SCHEMA_NOT_FOUND,
+            Diagnostic.Code.SCHEMA_TOO_LARGE);
+
+    /** Fetch codes a rerun might fix: nothing about the request was wrong, the world did not answer. */
+    private static final Set<Diagnostic.Code> TEMPORARILY_UNAVAILABLE = Set.of(
+            Diagnostic.Code.SCHEMA_UNREACHABLE, Diagnostic.Code.SCHEMA_TIMEOUT);
 
     /**
      * A fault in this library, reported as one: the stack trace goes to stderr and the exit code is 70

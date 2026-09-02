@@ -69,7 +69,7 @@ class CompileCommandTest {
         String output = captureStdout(() -> assertEquals(69,
                 CompileCommand.run(schema, OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
-        assertTrue(output.contains("[SCHEMA_UNAVAILABLE]"), output);
+        assertTrue(output.contains("[SCHEMA_NOT_PERMITTED]"), output);
         assertTrue(output.contains("nobody-serves-this"), output);
     }
 

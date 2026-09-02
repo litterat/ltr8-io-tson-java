@@ -574,18 +574,22 @@ where it did not. Both run where a composite reader wires its children, so neith
 `Diagnostic` (root package) is one record for both data- and schema-side problems — the variation is
 locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual`, four location
 components matching JSON Schema 2020-12 §12's output unit (`path`, `schemaId`+`schemaPointer`, plus
-`dataPosition`/`schemaPosition`), and the **one component that is not a location**, carrying a
-distinction the closed `Code` cannot (it sorts by *who* could not check) and `message` must not (that
-means parsing prose). `fetchReason`: `SCHEMA_UNAVAILABLE` says a schema was not obtained and
-`TsonSchemaFetchException.Reason` says by whose doing. It is what makes the thrown and the collected
-channel answer one fetch failure alike, the collecting one being where almost every read now hears about
-it. **A §8.2 name-hygiene refusal is a diagnostic like any other and carries nothing extra**: which rule
+`dataPosition`/`schemaPosition`) — and nothing else. **Every component is a location**; the one fact that is
+not, why a schema could not be obtained, is the `Code` itself: five members, one per
+`TsonSchemaFetchException.Reason` (`SCHEMA_NOT_PERMITTED`/`SCHEMA_NOT_FOUND`/`SCHEMA_UNREACHABLE`/
+`SCHEMA_TIMEOUT`/`SCHEMA_TOO_LARGE`, mapped by `Code.of`). Consumers *route* on that question and a code is
+what a consumer routes on, so a field beside it was a second carrier for one fact; five rather than two
+because consumers partition the reasons differently and no partition is privileged. The exception's own
+`Reason` stays, as the throwing channel's vocabulary and the single input to the mapping, so the thrown and
+the collected channel cannot disagree. `Code.verdict()` answers the other question a consumer asks — whether
+the code is a verdict on the document at all, which the five, `NOT_IMPLEMENTED` and `BIND_MISMATCH` are not.
+**A §8.2 name-hygiene refusal is a diagnostic like any other and carries nothing extra**: which rule
 refused is the `Code` — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT`, one each, since the
 three want three different remedies and the code is what a consumer routes on — and the Unicode data
 version §8.2 requires a refusal to name is a fact about the *processor*, so it is stated once beside the
 diagnostics rather than N times inside them (`TsonUnicodeProcessorPolicy`, below).
 **What earns a component at all is one rule** — *a fact not recoverable from the
-document plus the schema* — which is why `fetchReason` is the only non-location component and why an atom's
+document plus the schema, and not one the consumer routes on* — which is why an atom's
 failed bound (in the schema), a duplicate key (in the document) and the rule that fired (the code) get none;
 `tson-cli`'s wire shape applies a second filter, whether the recipient can act on it. Both RFC 6901 pointers are
 `Optional<String>` because `""` is the *root*,
@@ -716,8 +720,8 @@ does both; `requireContentHashPin` adds the one thing it cannot, that a pin be p
 names its own failure exception** — a source says "cannot supply this" with `TsonSchemaFetchException` and
 nothing else, which is what lets `SchemaFailure` classify every branch positively and rethrow a fault as
 itself; the exception lives in `tson-compiler` beside the interface, since the classification cannot see a
-type declared in `tson`. A schema no source would supply is `SCHEMA_UNAVAILABLE`, never `SCHEMA_ERROR`: it
-was never read, so nothing about it has been judged.
+type declared in `tson`. A schema no source would supply is one of the five `SCHEMA_*` codes, never
+`SCHEMA_ERROR`: it was never read, so nothing about it has been judged.
 
 ```java
 Tson tson = Tson.builder().build();
@@ -732,11 +736,12 @@ embedded `!!id`, never filename) and data, and validates each data document via 
 self-describing, no `--type`; `-` is stdin, at most once, always data. One `ValidationRun` envelope per
 invocation. **Exit codes: 0 all valid, 1 any data file invalid, 2 usage/classification, 69 a schema nothing
 would supply, 70 a library gap or fault** — the split is load-bearing and rides on the exception-classification
-policy. 1 is a verdict on the document; **69 and 70 are the absence of one**, naming who could not give it
-(whoever was to serve the schema; this library), and `TsonCli.exitCodeFor` lifts a run to whichever of the
-three is most permanent — 70 over 69 over 1, since retrying reaches a gap again. Both non-verdicts ride in
-the report as codes (`NOT_IMPLEMENTED`, `SCHEMA_UNAVAILABLE`) with a stderr note, the report on stdout
-unchanged. 70's halves print differently: a gap that escapes as an exception prints
+policy. 1 is a verdict on the document — *checked and rejected*, a §8.2 refusal included, since the sender
+still holds the fix; **69, 75, 78 and 70 are the absence of one**, naming who could not give it (whoever was
+to serve the schema, permanently or not; whoever wired this application; this library).
+`TsonCli.exitCodeFor` **ranks by who must act first, permanence breaking the tie** where nobody present can
+act: `70 > 78 > 69 > 75 > 1`. Every non-verdict rides in the report as a code with a stderr note, the report
+on stdout unchanged. 70's halves print differently: a gap that escapes as an exception prints
 `not implemented yet: <message>`, whose text usually names the workaround; a fault gets the please-report-it
 banner and its stack trace. Also `tson compile`, `tson hash` (stamps a
 `?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `TsonUnicodeProcessorPolicy`
@@ -927,7 +932,7 @@ failure is §8.1's category plus the RFC 6901 pointer into the data and nothing 
 error that makes a schema fail to load or ingest is a resolver error "however value-like the violated rule",
 so a schema-authoring mistake this library catches through the meta's own compiled reader arrives carrying a
 record-shaped code and is still a resolver error. What is checked per diagnostic instead is that each one is
-a **verdict**: `NOT_IMPLEMENTED`/`BIND_MISMATCH`/`SCHEMA_UNAVAILABLE` say the vector could not be judged, and
+a **verdict** (`Code.verdict()`): a gap, a bind mismatch and the five fetch codes say the vector could not be judged, and
 letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
 
 **No `class2/schema/` subject declares a template**, and the reason is where this layer compares rather

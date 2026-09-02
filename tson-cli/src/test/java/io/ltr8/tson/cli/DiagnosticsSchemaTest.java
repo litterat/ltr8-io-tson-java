@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code diagnostics.tn} against the code it describes.
  *
  * <p><b>It declares two hand-written copies of Java enums</b> -- {@code diagnostic_code} of {@link
- * Diagnostic.Code}, {@code fetch_reason} of {@link TsonSchemaFetchException.Reason} -- and nothing else
+ * Diagnostic.Code}, {@code outcome} of {@link Outcome} -- and nothing else
  * checks that either copy is current. Add a member to one of the enums and forget the schema, and {@code
  * --output tson} emits a value its own schema rejects, caught only if some other fixture happened to use
  * that value, which for a new one it never has. The schema's own {@code @doc} records this having been
@@ -67,12 +67,25 @@ class DiagnosticsSchemaTest {
     }
 
     /**
-     * The second copy, and the one with no other check behind it: {@code fetch_reason} exists so a consumer
-     * of {@code --output json|tson} can tell a reference this deployment refuses from a host that did not
-     * answer, both of which arrive under the one {@code SCHEMA_UNAVAILABLE} code.
+     * The second copy, and the one with no other check behind it: {@code outcome} exists so a consumer of
+     * {@code --output json|tson} can tell a document that was checked and rejected from one that was never
+     * checked at all.
      */
     @Test
-    void fetchReasonMirrorsTheJavaEnum() {
-        assertMirrors("fetch_reason", TsonSchemaFetchException.Reason.class);
+    void outcomeMirrorsTheJavaEnum() {
+        assertMirrors("outcome", Outcome.class);
+    }
+
+    /**
+     * Every fetch reason has a code, so the wire never has to say "a schema was not obtained" without
+     * saying which way. The mapping is {@link io.ltr8.tson.compiler.Diagnostic.Code#of}'s; this asserts the
+     * schema copy of the code enum kept up with it.
+     */
+    @Test
+    void everyFetchReasonHasACodeInTheSchemaCopy() {
+        for (TsonSchemaFetchException.Reason reason : TsonSchemaFetchException.Reason.values()) {
+            assertTrue(declared("diagnostic_code").contains(
+                    io.ltr8.tson.compiler.Diagnostic.Code.of(reason).name()), reason::name);
+        }
     }
 }

@@ -12,9 +12,9 @@ import java.util.List;
  *
  * <p>Public for the same reason {@link CliDiagnostic} is -- see its own Javadoc.
  */
-public record FileReport(String file, boolean valid, List<CliDiagnostic> errors) {
+public record FileReport(String file, Outcome outcome, List<CliDiagnostic> errors) {
 
     static FileReport of(String file, List<CliDiagnostic> errors) {
-        return new FileReport(file, errors.isEmpty(), errors);
+        return new FileReport(file, Outcome.of(errors), errors);
     }
 }

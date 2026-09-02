@@ -83,7 +83,7 @@ class TsonValidateTest {
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }""");
         assertEquals(1, problems.size(), problems.toString());
-        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, problems.getFirst().code());
+        assertEquals(Diagnostic.Code.SCHEMA_NOT_FOUND, problems.getFirst().code());
     }
 
     @Test

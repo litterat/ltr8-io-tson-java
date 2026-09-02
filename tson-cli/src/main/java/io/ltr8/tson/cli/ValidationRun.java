@@ -30,16 +30,18 @@ import java.util.List;
  *
  * <p>Public for the same reason {@link CliDiagnostic} is -- see its own Javadoc.
  */
-public record ValidationRun(boolean valid, CliPolicy policy, List<FileReport> files,
+public record ValidationRun(Outcome outcome, CliPolicy policy, List<FileReport> files,
                             List<CliDiagnostic> errors) {
 
     /** A run that got as far as validating documents: the verdict is every file's verdict. */
     static ValidationRun of(CliPolicy policy, List<FileReport> files) {
-        return new ValidationRun(files.stream().allMatch(FileReport::valid), policy, files, List.of());
+        return new ValidationRun(Outcome.ofFiles(files), policy, files, List.of());
     }
 
     /** A run that never reached a document -- no files, one run-level problem, and exit 2. */
     static ValidationRun failed(CliPolicy policy, Diagnostic.Code code, String message) {
-        return new ValidationRun(false, policy, List.of(), List.of(CliDiagnostic.minimal(code, message)));
+        // Exit 2: the invocation was wrong, so nothing was checked and no verdict is being given.
+        return new ValidationRun(Outcome.NOT_CHECKED, policy, List.of(),
+                List.of(CliDiagnostic.minimal(code, message)));
     }
 }

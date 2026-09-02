@@ -330,8 +330,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
 
     /** The one place a read builds a {@link Diagnostic} -- every report, refusal included, lands here. */
     @Override
-    public void report(Diagnostic.Code code, String message, String expected, String actual,
-            Optional<TsonSchemaFetchException.Reason> fetchReason) {
+    public void report(Diagnostic.Code code, String message, String expected, String actual) {
         // All three schema-end components come from the one SchemaLocation the descent accumulated, so they
         // cannot disagree about which document to open. A read with no schema behind it carries none of them:
         // Diagnostic spells a missing identity "" and a missing pointer as an absence, since for a pointer
@@ -339,7 +338,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
         Diagnostic diagnostic = new Diagnostic(Optional.of(render(false)),
                 schemaRoot == null ? Optional.empty() : Optional.of(render(true)),
                 schemaRoot == null ? "" : schemaId, code, message, expected, actual,
-                position(), schemaRoot == null ? Optional.empty() : schemaPosition, fetchReason);
+                position(), schemaRoot == null ? Optional.empty() : schemaPosition);
         cursor.reported++;
         cursor.receiver.report(diagnostic);
     }

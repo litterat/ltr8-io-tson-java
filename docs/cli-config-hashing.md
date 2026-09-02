@@ -83,12 +83,15 @@ reading messages. `compile` renders a bare `ValidationReport` instead, having on
 name. Every file's report is collected before anything prints, since the envelope's verdict is the AND
 across them.
 
-**Exit codes: 0 all valid, 1 any data file invalid** (bad value / unknown type / no root type-ref),
+**Exit codes: 0 everything checked and nothing reported, 1 checked and rejected** (bad value / unknown type
+/ no root type-ref, and a §8.2 refusal — the processor looked and declined, and the sender holds the fix),
 **2 usage/classification** (no data files, an unreadable/`!!id`-less schema, a bad flag), **69
-(`EX_UNAVAILABLE`) a schema nothing would supply**, **70 (`EX_SOFTWARE`) the library failing to reach a
-verdict at all**. The last two are the run declining to give a verdict rather than giving a bad one, and
-they name who could not give it: 69 is the caller's own setup or the world (the schema file was not passed,
-the host did not answer), 70 is this library. That is why 1 is not enough — and 70 in particular is what
+(`EX_UNAVAILABLE`) a schema nothing would supply and a rerun would not either**, **75 (`EX_TEMPFAIL`) a
+schema that could not be reached, where a rerun might**, **78 (`EX_CONFIG`) a type the schema needs with no
+Java class in this tool**, **70 (`EX_SOFTWARE`) the library failing to reach a verdict at all**. Everything
+but 0, 1 and 2 is the run declining to give a verdict rather than giving a bad one, and each names who could
+not give it: 69/75 whoever was to serve the schema, 78 whoever wired the reading application, 70 this
+library. That is why 1 is not enough — and 70 in particular is what
 makes `Diagnostic.ofBaseSyntaxError`'s rethrow worth anything: the read loop catches only
 `IOException` (an unreadable file *is* that file's verdict), so a `RuntimeException` — which `Tson.validate`
 raises only for a bug, never for a bad document — reaches `TsonCli`'s own handler instead of being folded
@@ -97,24 +100,33 @@ catch would relabel a library fault as "your command line is wrong", so only thi
 parsing throws the type that means that.
 
 **A gap usually arrives as a diagnostic now, not as an exception**, and `TsonCli.exitCodeFor` is where the
-run's code is decided: any `NOT_IMPLEMENTED` in the collected problems makes the run 70 rather than 1, any
-`SCHEMA_UNAVAILABLE` makes it 69, each with a one-line note on stderr and the report on stdout unchanged.
-**A mixed run takes the most permanent of the three**, deliberately — the ordinary problems are real and
-still printed, but something was not checked at all, so "invalid" is a claim the run cannot make, and exit 1
-would tell a script the document had been judged and rejected. 70 outranks 69 because retrying reaches the
-gap again. What this buys the author is the pass staying single: a schema with a gap in one declaration and
-a mistake in another reports both, where the throw used to take the second verdict with it.
+run's code is decided, each branch with a one-line note on stderr and the report on stdout unchanged.
 
-**69 is reached two ways, and both are `TsonSchemaFetchException`.** A data document's `!!schema` that no
-configured source will serve arrives through `SchemaFailure` as a read diagnostic; a schema document's own
-`!!import`/`!!meta` that will not load arrives through `Tson.validateSchema`'s own catch as
-`Diagnostic.ofSchemaUnavailable`, located at the root pointer. So `tson validate` missing a schema file and
-`tson compile` on a schema importing something the CLI cannot fetch land on the same code, which is right:
-neither run read the thing it needed. **Both carry the exception's `Reason` through to the report**, as
-`fetch_reason` in both machine formats — 69 says no schema was obtained, and the reason says
-whether the document named something this deployment refuses (`NOT_PERMITTED`/`NOT_FOUND`) or a host simply
-did not answer, which is the half that decides whether retrying is worth anything. `TEXT` omits it, as it
-omits `expected`/`actual`: the stderr note already tells a person that nothing was judged.
+**A mixed run is the normal path**, so the order is a stated rule: **rank by who must act first, with
+permanence breaking the tie** between ranks where nobody present can act. At a command line the actors are
+the runner and their files, which gives `70 > 78 > 69 > 75 > 1` — a library release, a differently-wired
+application, an edit to a reference or an allow-list, a rerun, an edit to the document. The ordinary problems
+are real and still printed, but something was not checked at all, so "invalid" is a claim the run cannot
+make, and exit 1 would tell a script the document had been judged and rejected. What this buys the author is
+the pass staying single: a schema with a gap in one declaration and a mistake in another reports both, where
+the throw used to take the second verdict with it.
+
+**78 rather than 70 for a bind mismatch**, because `EX_CONFIG` is "found in an unconfigured or misconfigured
+state" and unconfigured is what this is. 70 would say this library cannot do it, which is the reading
+`TsonMissingBindingException` exists to prevent — and the note printed with 78 deliberately does not repeat
+the diagnostic's own remedy (`TsonConfig.bindings`, a `DataNameBinder`), neither of which has a command-line
+surface.
+
+**69 and 75 are reached two ways each, and all of them are `TsonSchemaFetchException`.** A data document's
+`!!schema` that no configured source will serve arrives through `SchemaFailure` as a read diagnostic; a
+schema document's own `!!import`/`!!meta` that will not load arrives through `Tson.validateSchema`'s own
+catch as `Diagnostic.ofSchemaUnavailable`, located at the root pointer. So `tson validate` missing a schema
+file and `tson compile` on a schema importing something the CLI cannot fetch land alike: neither run read the
+thing it needed. **Which way it failed is the code**, one per `Reason` —
+`SCHEMA_NOT_PERMITTED`/`SCHEMA_NOT_FOUND`/`SCHEMA_TOO_LARGE` are 69 because no rerun obtains them, and
+`SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` are 75 because one might. A field beside the code would have been a
+second carrier for a question the consumer routes on, and `exitCodeFor` reads codes and nothing else because
+of it.
 
 **A [TSON-DATA] §8.2 name-hygiene refusal is a diagnostic like any other**, told apart by its `code` alone
 (`CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT`, one per rule), so the wire carries no second
@@ -167,7 +179,7 @@ A person does not want a configuration dump on every clean run; they do want, at
 to be told the verdict came from this deployment's settings rather than from the file in front of them, and
 they want a run that relaxed a rule to say so even when it passed. The machine formats always carry it.
 
-That makes `restriction_level` a third hand-written enum copy beside `diagnostic_code` and `fetch_reason` —
+That makes `restriction_level` a third hand-written enum copy beside `diagnostic_code` and `outcome` —
 `DiagnosticsSchemaTest` checks all three against their Java enums in both directions.
 
 **The envelope does not yet keep a refusal apart from a verdict**, and the codes are the only thing that

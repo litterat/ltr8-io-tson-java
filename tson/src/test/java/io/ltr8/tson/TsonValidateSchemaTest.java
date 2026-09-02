@@ -55,8 +55,7 @@ class TsonValidateSchemaTest {
 
         assertEquals(1, problems.size(), problems::toString);
         Diagnostic problem = problems.getFirst();
-        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, problem.code());
-        assertEquals(Optional.of(TsonSchemaFetchException.Reason.NOT_PERMITTED), problem.fetchReason());
+        assertEquals(Diagnostic.Code.SCHEMA_NOT_PERMITTED, problem.code());
         assertEquals(Optional.of("https://example.test/nowhere.tn"), problem.actualIfStated());
     }
 

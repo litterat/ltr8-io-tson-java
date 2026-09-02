@@ -14,29 +14,32 @@
   identity, so this document is in development and is edited in place. Bumping per change instead
   mints versions nobody ever consumed, one for every field added during a development cycle.
 
-  diagnostic_code, fetch_reason and restriction_level are hand-written copies of Diagnostic.Code,
-  TsonSchemaFetchException.Reason and TsonUnicodePolicy.Level. DiagnosticsSchemaTest checks every copy
-  against the Java enum in both directions, which is what catches a member added to one and forgotten
-  here -- before that test existed, two such omissions were noticed only by a version bump.
+  diagnostic_code, outcome and restriction_level are hand-written copies of Diagnostic.Code,
+  Outcome and TsonUnicodePolicy.Level. DiagnosticsSchemaTest checks every copy against the Java enum
+  in both directions, which is what catches a member added to one and forgotten here -- before that
+  test existed, two such omissions were noticed only by a version bump.
 
-  BIND_MISMATCH is not reachable from this CLI, which reads in DOM mode and binds nothing. It is
-  declared because this enum copies Diagnostic.Code, not the subset one consumer happens to emit
-  -- the same reason DUPLICATE_FIELD's absence was a defect rather than an economy.
+  This enum copies Diagnostic.Code whole, not the subset one consumer happens to emit -- the same
+  reason DUPLICATE_FIELD's absence was a defect rather than an economy.
   """
 {
   diagnostic_code => !enum [
     FIELD_REQUIRED FIELD_FIXED TYPE_MISMATCH WRONG_ARITY UNKNOWN_TYPE_REF ATOM_CONSTRAINT_VIOLATION
     UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD CONFUSABLE_NAMES RESTRICTED_CHARACTER RESTRICTED_SCRIPT
-    SCHEMA_ERROR UNKNOWN_TYPE VALIDATION_ERROR NOT_IMPLEMENTED BIND_MISMATCH SCHEMA_UNAVAILABLE
+    SCHEMA_ERROR UNKNOWN_TYPE VALIDATION_ERROR NOT_IMPLEMENTED BIND_MISMATCH
+    SCHEMA_NOT_PERMITTED SCHEMA_NOT_FOUND SCHEMA_UNREACHABLE SCHEMA_TIMEOUT SCHEMA_TOO_LARGE
   ]
   @doc:"""
-    Why a schema could not be obtained, carried only beside SCHEMA_UNAVAILABLE. The code says that no
-    schema was obtained; this says by whose doing, which is the half a caller acts on: NOT_PERMITTED
-    names a reference this deployment will not fetch and NOT_FOUND one nothing serves, both the
-    document's to fix, where TRANSPORT, TIMEOUT and TOO_LARGE say the reference was fine and the
-    world was not, and only those are worth retrying.
+    Whether a document was checked, and if it was, what checking found. Two questions that a single
+    `valid` boolean carried on one bit: a document whose schema could not be obtained, or whose types
+    have no Java class here, was never read at all -- reporting it as invalid asserts a verdict this
+    run cannot make, and an agent reading `if (!valid)` acts on that assertion.
+
+    NOT_CHECKED is exactly the set of diagnostic codes that are not a verdict (Diagnostic.Code.verdict):
+    the five SCHEMA_ codes, BIND_MISMATCH and NOT_IMPLEMENTED. A name-hygiene refusal is INVALID --
+    the processor looked and declined, and the sender holds the fix.
     """
-  fetch_reason => !enum [ NOT_PERMITTED NOT_FOUND TRANSPORT TIMEOUT TOO_LARGE ]
+  outcome => !enum [ VALID INVALID NOT_CHECKED ]
   @doc:"""
     One problem, located at up to two ends: the value in the data (path, data_position) and the rule
     in the schema (schema_id, schema_pointer, schema_position). Either end may be absent -- a problem
@@ -69,11 +72,10 @@
     actual: text?
     data_position: text?
     schema_position: text?
-    fetch_reason: fetch_reason?
   }
   @doc:"""
     UTS #39 §5.2's restriction levels, a hand-written copy of TsonUnicodePolicy.Level checked against it
-    by DiagnosticsSchemaTest the way diagnostic_code and fetch_reason are.
+    by DiagnosticsSchemaTest the way diagnostic_code and outcome are.
     """
   restriction_level => !enum [
     ASCII_ONLY SINGLE_SCRIPT HIGHLY_RESTRICTIVE MODERATELY_RESTRICTIVE MINIMALLY_RESTRICTIVE UNRESTRICTED
@@ -106,7 +108,7 @@
     token_policy: unicode_policy
     unicode_data_version: text
   }
-  validation_report => { valid: boolean  policy: policy  errors: [diagnostic] }
-  file_report => { file: text  valid: boolean  errors: [diagnostic] }
-  validation_run => { valid: boolean  policy: policy  files: [file_report]  errors: [diagnostic] }
+  validation_report => { outcome: outcome  policy: policy  errors: [diagnostic] }
+  file_report => { file: text  outcome: outcome  errors: [diagnostic] }
+  validation_run => { outcome: outcome  policy: policy  files: [file_report]  errors: [diagnostic] }
 }

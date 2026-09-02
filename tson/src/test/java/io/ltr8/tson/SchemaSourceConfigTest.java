@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -124,8 +125,8 @@ class SchemaSourceConfigTest {
     }
 
     /**
-     * <b>And a schema it does not hold is a verdict on nothing</b> -- {@code SCHEMA_UNAVAILABLE} carrying
-     * {@code NOT_FOUND}, which is what a server routes on to answer the sender rather than blaming itself.
+     * <b>And a schema it does not hold is a verdict on nothing</b> -- {@code SCHEMA_NOT_FOUND}, which is
+     * what a server routes on to answer the sender rather than blaming itself.
      * The identity comes from the document, so this is the branch any caller can reach.
      */
     @Test
@@ -135,9 +136,8 @@ class SchemaSourceConfigTest {
         List<Diagnostic> problems = tson.validate(UNPUBLISHED);
 
         assertEquals(1, problems.size(), problems::toString);
-        assertEquals(Diagnostic.Code.SCHEMA_UNAVAILABLE, problems.getFirst().code());
-        assertEquals(java.util.Optional.of(TsonSchemaFetchException.Reason.NOT_FOUND),
-                problems.getFirst().fetchReason());
+        assertEquals(Diagnostic.Code.SCHEMA_NOT_FOUND, problems.getFirst().code());
+        assertFalse(problems.getFirst().code().verdict(), "nothing was read, so nothing is being judged");
     }
 
     /**

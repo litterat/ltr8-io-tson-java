@@ -75,13 +75,14 @@ enum OutputFormat {
     private static String renderText(ValidationRun run) {
         StringBuilder text = new StringBuilder();
         for (CliDiagnostic error : run.errors()) {
-            text.append(renderText(false, List.of(error))).append(System.lineSeparator());
+            text.append(renderText(Outcome.of(List.of(error)), List.of(error)))
+                    .append(System.lineSeparator());
         }
         for (FileReport file : run.files()) {
             if (run.files().size() > 1) {
                 text.append("# ").append(file.file()).append(System.lineSeparator());
             }
-            text.append(renderText(file.valid(), file.errors())).append(System.lineSeparator());
+            text.append(renderText(file.outcome(), file.errors())).append(System.lineSeparator());
         }
         text.append(policyNote(run.policy(), run.files().stream()
                 .flatMap(file -> file.errors().stream()).toList()));
@@ -90,7 +91,7 @@ enum OutputFormat {
 
     private static String renderJson(ValidationRun run) {
         StringBuilder json = new StringBuilder();
-        json.append("{\"valid\":").append(run.valid()).append(",\"policy\":");
+        json.append("{\"outcome\":").append(jsonString(run.outcome().name())).append(",\"policy\":");
         jsonPolicy(json, run.policy());
         json.append(",\"files\":[");
         for (int i = 0; i < run.files().size(); i++) {
@@ -99,7 +100,7 @@ enum OutputFormat {
             }
             FileReport file = run.files().get(i);
             json.append("{\"file\":").append(jsonString(file.file()))
-                    .append(",\"valid\":").append(file.valid())
+                    .append(",\"outcome\":").append(jsonString(file.outcome().name()))
                     .append(",\"errors\":");
             jsonErrors(json, file.errors());
             json.append('}');
@@ -118,7 +119,7 @@ enum OutputFormat {
     }
 
     private static String renderText(ValidationReport report) {
-        return (renderText(report.valid(), report.errors()) + System.lineSeparator()
+        return (renderText(report.outcome(), report.errors()) + System.lineSeparator()
                 + policyNote(report.policy(), report.errors())).stripTrailing();
     }
 
@@ -127,8 +128,8 @@ enum OutputFormat {
      * the list rather than an envelope, since {@link #renderText(ValidationRun)} renders each of a run's
      * files through it and a run has one policy, not one per file.
      */
-    private static String renderText(boolean valid, List<CliDiagnostic> errors) {
-        if (valid) {
+    private static String renderText(Outcome outcome, List<CliDiagnostic> errors) {
+        if (outcome == Outcome.VALID) {
             return "OK";
         }
         StringBuilder text = new StringBuilder();
@@ -233,7 +234,7 @@ enum OutputFormat {
      */
     private static String renderJson(ValidationReport report) {
         StringBuilder json = new StringBuilder();
-        json.append("{\"valid\":").append(report.valid()).append(",\"policy\":");
+        json.append("{\"outcome\":").append(jsonString(report.outcome().name())).append(",\"policy\":");
         jsonPolicy(json, report.policy());
         json.append(",\"errors\":");
         jsonErrors(json, report.errors());
@@ -257,7 +258,6 @@ enum OutputFormat {
             object.optional("actual", error.actual());
             object.optional("data_position", error.dataPosition());
             object.optional("schema_position", error.schemaPosition());
-            object.optional("fetch_reason", error.fetchReason().map(Enum::name));
             object.end();
         }
         json.append(']');
