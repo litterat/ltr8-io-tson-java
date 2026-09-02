@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -26,8 +27,10 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UriType;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -136,13 +139,20 @@ public final class MetaKernelBootstrapResolver {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, EMPTY_META_DEFINITIONS, entries::get);
         List<SchemaMap.Declaration> instances = new ArrayList<>();
+        List<SchemaMap.Declaration> refinements = new ArrayList<>();
 
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             if (declaration.typeDef() instanceof Instance) {
-                // Deferred to the second pass: an Instance's own kind is transferred from its
+                // Deferred to the instance pass: an Instance's own kind is transferred from its
                 // target, which (e.g. "enum", declared long after "boolean" uses it) may not be
                 // resolved yet in source order.
                 instances.add(declaration);
+                continue;
+            }
+            if (declaration.typeDef() instanceof AtomRefinement) {
+                // Deferred for the same reason, one step further along: a refinement's source is an
+                // instance, so it cannot resolve until the instance pass below has produced one.
+                refinements.add(declaration);
                 continue;
             }
             entries.put(declaration.name(), resolver.resolve(declaration));
@@ -172,7 +182,67 @@ public final class MetaKernelBootstrapResolver {
                     new TypeDefinition(Optional.of(TypeRef.of(instance.target())), target.kind(), List.of(),
                             false, List.of(), List.of(), Optional.empty(), body)));
         }
+        for (SchemaMap.Declaration declaration : refinements) {
+            AtomRefinement refinement = (AtomRefinement) declaration.typeDef();
+            TypeDefinition target = entries.get(refinement.target());
+            if (target == null) {
+                throw new IllegalStateException("'" + declaration.name() + "': refines '" + refinement.target()
+                        + "', which meta-kernel does not declare");
+            }
+            entries.put(declaration.name(), new TypeDefinition(target.source(), target.kind(), List.of(), false,
+                    List.of(refinement.target()), List.of(), Optional.empty(),
+                    refinedBody(declaration.name(), refinement, target)));
+        }
         return entries;
+    }
+
+    /**
+     * The hand-written merge for an atom refinement, {@link #instanceBody}'s twin and bounded the same way:
+     * meta-kernel refines exactly one family, so this handles that one and refuses the rest by name rather
+     * than pretending to be general.
+     *
+     * <p>Ordinary resolution does this through a {@code TsonObjectWriter} round trip and the governing
+     * meta's compiled reader ({@code DefinitionResolver.resolveAtomRefinement}). The bootstrap has neither:
+     * the reader it would use is the one being produced. So the kernel pays for a refinement in hand-written
+     * code, which is the same bargain {@link #instanceBody} already strikes -- and the reason to keep the
+     * kernel's own refinements few.
+     */
+    private static Top refinedBody(String name, AtomRefinement refinement, TypeDefinition target) {
+        if (!(target.body() instanceof IntegerType source)) {
+            throw new UnsupportedOperationException("'" + name + "' refines '" + refinement.target()
+                    + "', whose body is a " + target.body().getClass().getSimpleName() + ". meta-kernel's "
+                    + "bootstrap merges an atom refinement by hand and covers the integer family only; "
+                    + "extend refinedBody to add another");
+        }
+        Optional<BigInteger> min = source.min();
+        Optional<BigInteger> max = source.max();
+        for (RecordValue.Field binding : bindingFields(name, refinement)) {
+            BigInteger value = new BigInteger(bindingText(name, binding));
+            switch (binding.name()) {
+                case "min" -> min = Optional.of(value);
+                case "max" -> max = Optional.of(value);
+                default -> throw new UnsupportedOperationException("'" + name + "' refines '"
+                        + refinement.target() + "' with '" + binding.name() + "'; meta-kernel's bootstrap "
+                        + "merges min and max only");
+            }
+        }
+        return new IntegerType(source.size(), min, source.exclusiveMin(), max, source.exclusiveMax(),
+                source.multipleOf(), source.members());
+    }
+
+    private static List<RecordValue.Field> bindingFields(String name, AtomRefinement refinement) {
+        if (!(refinement.bindings().coreValue() instanceof RecordValue record)) {
+            throw new UnsupportedOperationException("'" + name + "': a refinement's bindings are a record");
+        }
+        return record.fields();
+    }
+
+    private static String bindingText(String name, RecordValue.Field binding) {
+        if (!(binding.value().value().coreValue() instanceof TokenValue token)) {
+            throw new UnsupportedOperationException("'" + name + "': '" + binding.name()
+                    + "' takes a token in meta-kernel's own bootstrap");
+        }
+        return token.text();
     }
 
     /**

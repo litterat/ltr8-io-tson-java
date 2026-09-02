@@ -64,8 +64,12 @@ public record BinaryType(Encoding encoding, Optional<Integer> length,
         this(encoding, Optional.empty(), minLength, maxLength);
     }
 
-    /** {@code bytes => !binary_type {}} -- the unrefined instance, which takes the constructor's default. */
-    public static final BinaryType UNSPELLED = of(Encoding.BASE64);
+    /**
+     * {@code bytes => !binary_type {}} -- the unrefined instance. Equal to {@link #BASE64} by construction,
+     * the constructor defaulting {@code encoding}: after resolution nothing distinguishes a value that took
+     * the default from one an author stated, which is the same fact {@link #constraintsCheck} rests on.
+     */
+    public static final BinaryType BYTES = of(Encoding.BASE64);
 
     /** {@code base64 => !bytes ^ { encoding: BASE64 }}, and so on for the other three. */
     public static final BinaryType BASE64 = of(Encoding.BASE64);

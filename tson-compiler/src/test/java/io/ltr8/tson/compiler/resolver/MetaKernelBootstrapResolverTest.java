@@ -135,10 +135,10 @@ class MetaKernelBootstrapResolverTest {
      * form stays prohibited at a field position (§5.2).
      */
     @Test
-    void theFiftyFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
+    void theFiftyOneFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(58, schema.entries().size());
+        assertEquals(59, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_param_name", "array_field_group",
                 "array_record_field")) {

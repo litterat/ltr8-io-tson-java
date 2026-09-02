@@ -31,9 +31,9 @@
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: encoding    type: binary_encoding  state: REQUIRED_DEFAULT  value: BASE64 }
-      !record_field { name: length      type: integer  state: OPTIONAL }
-      !record_field { name: min_length  type: integer  state: OPTIONAL }
-      !record_field { name: max_length  type: integer  state: OPTIONAL }
+      !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
     ] }
   }
 
@@ -109,8 +109,8 @@
       !record_field { name: max              type: value    state: OPTIONAL }
       !record_field { name: exclusive_max    type: value    state: OPTIONAL }
       !record_field { name: multiple_of      type: value    state: OPTIONAL }
-      !record_field { name: total_digits     type: integer  state: OPTIONAL }
-      !record_field { name: fraction_digits  type: integer  state: OPTIONAL }
+      !record_field { name: total_digits     type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: fraction_digits  type: non_negative_integer  state: OPTIONAL }
       !record_field { name: members          type: set_value_xxhash  state: OPTIONAL }
     ]
     groups: [
@@ -183,7 +183,7 @@
       !record_field { name: exclusive_min     type: value    state: OPTIONAL }
       !record_field { name: max               type: value    state: OPTIONAL }
       !record_field { name: exclusive_max     type: value    state: OPTIONAL }
-      !record_field { name: precision         type: integer  state: OPTIONAL }
+      !record_field { name: precision         type: non_negative_integer  state: OPTIONAL }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -202,7 +202,7 @@
       !record_field { name: exclusive_min     type: value    state: OPTIONAL }
       !record_field { name: max               type: value    state: OPTIONAL }
       !record_field { name: exclusive_max     type: value    state: OPTIONAL }
-      !record_field { name: precision         type: integer  state: OPTIONAL }
+      !record_field { name: precision         type: non_negative_integer  state: OPTIONAL }
     ]
     groups: [
       !field_group { members: [min exclusive_min]  state: OPTIONAL }
@@ -221,7 +221,7 @@
       !record_field { name: exclusive_min  type: value    state: OPTIONAL }
       !record_field { name: max            type: value    state: OPTIONAL }
       !record_field { name: exclusive_max  type: value    state: OPTIONAL }
-      !record_field { name: precision      type: integer  state: OPTIONAL }
+      !record_field { name: precision      type: non_negative_integer  state: OPTIONAL }
       !record_field { name: multiple_of    type: value    state: OPTIONAL }
     ]
     groups: [
@@ -261,7 +261,7 @@
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec     type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9562" }
-      !record_field { name: version  type: integer  state: OPTIONAL }
+      !record_field { name: version  type: non_negative_integer  state: OPTIONAL }
     ] }
   }
 
@@ -271,9 +271,9 @@
     constructor: true
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length  type: integer  state: OPTIONAL }
-      !record_field { name: max_length  type: integer  state: OPTIONAL }
-      !record_field { name: length      type: integer  state: OPTIONAL }
+      !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
       !record_field { name: pattern     type: regex    state: OPTIONAL }
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc5322" }
     ] }
@@ -310,8 +310,8 @@
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
-      !record_field { name: min_prefix  type: integer  state: OPTIONAL }
-      !record_field { name: max_prefix  type: integer  state: OPTIONAL }
+      !record_field { name: min_prefix  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: max_prefix  type: non_negative_integer  state: OPTIONAL }
       !record_field { name: within      type: array_value_xxhash  state: OPTIONAL }
       !record_field { name: excluding   type: array_value_xxhash  state: OPTIONAL }
     ] }
@@ -324,8 +324,8 @@
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
-      !record_field { name: min_prefix  type: integer  state: OPTIONAL }
-      !record_field { name: max_prefix  type: integer  state: OPTIONAL }
+      !record_field { name: min_prefix  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: max_prefix  type: non_negative_integer  state: OPTIONAL }
       !record_field { name: within      type: array_value_xxhash  state: OPTIONAL }
       !record_field { name: excluding   type: array_value_xxhash  state: OPTIONAL }
     ] }
@@ -421,15 +421,15 @@
   @doc:"Marks a field an encoding's consumers may read but not write."
   read_only => @annotation !type_definition {
     kind: REFERENCE
-    source: boolean
-    body: !reference { target: boolean }
+    source: void
+    body: !reference { target: void }
   }
 
   @doc:"Marks a field an encoding's consumers may write but not read."
   write_only => @annotation !type_definition {
     kind: REFERENCE
-    source: boolean
-    body: !reference { target: boolean }
+    source: void
+    body: !reference { target: void }
   }
 
   @doc:"""

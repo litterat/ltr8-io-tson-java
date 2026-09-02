@@ -1,8 +1,8 @@
-!!id:"https://tson.io/2026/35/m/core.tn?sha256=8d1f24733f5a084dc4b471fcc42d44d03bc8470975eadc579eca72e92d17ea67"
-!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=f3637af2c1510588d23680047582b76df161ab21ddb0b312223a0009ac920edd"
+!!id:"https://tson.io/2026/35/m/core.tn?sha256=d4e291b3ee97341dd65de87b5b51ab38535460aa902a42bd0badfc94b2bfac31"
+!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=8b04727c8f752f03726ed39fe6932a0f2b631dbe4f5740b6c0901df263a61d85"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
-  (2026 Revision 34 draft).
+  (2026 Revision 35 draft).
 
   Every type in core comes from a constructor defined in meta-kernel
   or meta. Atoms are uniformly defined as empty instances:
@@ -21,25 +21,28 @@
   meta-kernel.tn's note.
 
   Annotation types (`@ordered`, `@bounded`, `@exact`, `@numeric`,
-  `@deprecated`, `@since`, `@todo`, `@lang`) live in meta.tn —
-  annotations resolve one hop against the governing target's
-  namespace (Part 2 §3.3.3, §6), so for this schema document they
-  must be reachable through the `!!meta` chain; they appear here
-  only by use. Core's own `annotation`, `documentation`, `doc`, and
-  `alias` declarations (and its `void` sibling) face the other
-  direction: they exist so that *data documents* governed by
-  core-importing schemas can use them — the same one-hop rule, seen
-  from the data side.
+  `@disjoint`, `@discriminator`, `@rest`, `@deprecated`, `@since`,
+  `@todo`, `@lang`, `@title`, `@examples`, `@read_only`,
+  `@write_only`) live in meta.tn — annotations resolve one hop
+  against the governing target's namespace (Part 2 §3.3.3, §6), so
+  for this schema document they must be reachable through the
+  `!!meta` chain; they appear here only by use. Core's own
+  `annotation`, `documentation`, `doc`, and `alias` declarations (and
+  its `void` and `set` siblings) face the other direction: they exist
+  so that *data documents* and user schemas governed by or importing
+  core can use them — the same one-hop rule, seen from the other
+  side.
 
   References:
     ISO/IEC 11404:2007    General Purpose Datatypes
     W3C XSD Part 2        Facet model and constraint vocabulary
     JSON Schema 2020-12   Modern constraint vocabulary
     IEEE 754-2019         Floating-point semantics
-    ISO 8601-1:2019       Date and time formats (duration, period)
-    RFC 3339              Internet date/time profile
+    RFC 3339              Internet date/time profile; Appendix A is
+                          the duration/period grammar (ISO 8601-1:2019
+                          is the informative source behind it)
     RFC 9562              UUID format
-    RFC 4648              Base encoding
+    RFC 4648              Base encodings (text spellings of `binary`)
     RFC 3986              URI syntax (incl. IPv4address grammar)
     RFC 4291              IPv6 addressing architecture
     RFC 4632              Classless Inter-domain Routing (CIDR)
@@ -188,27 +191,33 @@
   uri => !uri_type {}
 
   @doc:"""
-    An octet string. The unrefined binary instance: it names the value
-    space, so `!bytes ^ { min_length: 4 }` is "at least four bytes",
-    and takes the constructor's default alphabet for reading — base64,
-    since "abcd" is well-formed hex and well-formed base64 and decodes
-    to different octets, so text needs one of them chosen. The four
-    alphabets below refine it, each IS-A bytes, so a bytes-typed field
-    accepts any of their values under its own spelling.
+    Octet sequence. The universal binary type, and the one a schema
+    field wants: `avatar: bytes`, `sha256 => !bytes ^ { length: 32 }`.
+    Equality and the length facets are over octets. In text an
+    untagged value is spelled base64 (RFC 4648 §4) unless a refinement
+    sets `encoding` or the token carries one of the tags below; an
+    encoding whose values are octets writes them raw.
     """
-  @ordered:NONE
+  @ordered:NONE @bounded:false
   bytes => !binary_type {}
 
-  @doc:"Base64-encoded octets (RFC 4648 §4)."
+  @doc:"""
+    `bytes` spelled base64 (RFC 4648 §4, padded). The default made
+    nameable: a tag for schemaless documents, and a base for
+    refinements that want the spelling stated (`!base64 ^ { length: 32 }`).
+    """
   base64 => !bytes ^ { encoding: BASE64 }
 
-  @doc:"URL-safe base64-encoded octets (RFC 4648 §5)."
+  @doc:"`bytes` spelled URL-safe base64 (RFC 4648 §5), as a tag or a refinement base."
   base64url => !bytes ^ { encoding: BASE64URL }
 
-  @doc:"Base32-encoded octets (RFC 4648 §6)."
+  @doc:"`bytes` spelled base32 (RFC 4648 §6), as a tag or a refinement base."
   base32 => !bytes ^ { encoding: BASE32 }
 
-  @doc:"Hex-encoded octets (RFC 4648 §8)."
+  @doc:"""
+    `bytes` spelled base16 (RFC 4648 §8, case-insensitive on read), as a tag or a refinement
+    base: `!hex "deadbeef"` is admitted at any `bytes` position.
+    """
   hex => !bytes ^ { encoding: HEX }
 
   @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
@@ -216,21 +225,31 @@
   date => !date_type {}
 
   @doc:"""
-    Time of day. RFC 3339 full-time HH:MM:SS. PARTIAL ordering reflects
-    that times with different timezone offsets are not unconditionally
-    comparable without resolving to a common reference; times within a
-    single timezone are totally ordered.
+    Time of day. RFC 3339 full-time HH:MM:SS[.s…] with a mandatory
+    offset. The value is the time of day in UTC, on the finite
+    interval [00:00:00, 24:00:00), so `10:00:00+01:00` and
+    `09:00:00Z` are one value, and ordering is TOTAL — the offset
+    being mandatory is what makes it so; XSD's partial order is the
+    cost of an optional one. Normalising to UTC wraps at midnight
+    (`23:30:00-02:00` is `01:30:00Z`), which is the price of a time
+    with no date: a local time of day — "09:00 wherever you are" —
+    is not this type. Equality and bounds compare the value; the
+    token is preserved as written.
     """
-  @ordered:PARTIAL @bounded:true
+  @ordered:TOTAL @bounded:true
   time => !time_type {}
 
   @doc:"""
-    Date and time. RFC 3339 date-time. PARTIAL ordering reflects that
-    datetimes with different timezone offsets require resolution to a
-    common reference (typically UTC) before comparison; datetimes
-    within a single timezone or all in UTC are totally ordered.
+    Date and time. RFC 3339 date-time with a mandatory offset. The
+    value is the instant on the UTC timeline, so
+    `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are one
+    value, and ordering is TOTAL for the same reason as `time`. An
+    offset of `-00:00` (offset unknown, RFC 3339 §4.3) is the same
+    instant as `Z` and compares as such. A local datetime — a wall
+    clock with no offset — is not this type. Equality and bounds
+    compare the value; the token is preserved as written.
     """
-  @ordered:PARTIAL @bounded:false
+  @ordered:TOTAL @bounded:false
   datetime => !datetime_type {}
 
   @doc:"""
@@ -363,6 +382,11 @@
     `set_type` stays parameterless as §4.2 requires of every
     container constructor. The element type arrives by application
     rather than by a parameter on the constructor itself.
+
+    A sibling of meta's declaration under the same name, as `void`
+    is of the kernel's: user schemas reach it through their core
+    import, so `tags: set<text>` resolves without touching the
+    governing namespace.
     """
   set => <T> !set_type { element_type: T }
 

@@ -172,7 +172,7 @@
   integer_size => !type_definition {
     kind: PRODUCT
     body: !record { fields: [
-      !record_field { name: bits    type: integer }
+      !record_field { name: bits    type: non_negative_integer }
       !record_field { name: signed  type: boolean }
     ] }
   }
@@ -200,6 +200,7 @@
   integer => !type_definition {
     kind: ATOM
     source: integer_type
+    subtypes: [non_negative_integer]
     body: !integer_type {}
   }
 
@@ -210,9 +211,9 @@
     supertypes: [atom top]
     subtypes: [regex_type uri_type]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: min_length  type: integer  state: OPTIONAL }
-      !record_field { name: max_length  type: integer  state: OPTIONAL }
-      !record_field { name: length      type: integer  state: OPTIONAL }
+      !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
       !record_field { name: pattern     type: regex    state: OPTIONAL }
     ] }
   }
@@ -238,9 +239,9 @@
     constructor: true
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length  type: integer  state: OPTIONAL }
-      !record_field { name: max_length  type: integer  state: OPTIONAL }
-      !record_field { name: length      type: integer  state: OPTIONAL }
+      !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
       !record_field { name: pattern     type: regex    state: OPTIONAL }
       !record_field { name: spec        type: uri   state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
       !record_field { name: scheme      type: text  state: OPTIONAL }
@@ -259,9 +260,9 @@
     constructor: true
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
-      !record_field { name: min_length  type: integer  state: OPTIONAL }
-      !record_field { name: max_length  type: integer  state: OPTIONAL }
-      !record_field { name: length      type: integer  state: OPTIONAL }
+      !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
       !record_field { name: pattern     type: regex    state: OPTIONAL }
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9485" }
     ] }
@@ -429,8 +430,8 @@
       !record_field { name: state           type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
       !record_field { name: unordered       type: boolean  state: REQUIRED_DEFAULT  value: false }
       !record_field { name: unique_items    type: boolean  state: REQUIRED_DEFAULT  value: false }
-      !record_field { name: min_items       type: integer  state: OPTIONAL }
-      !record_field { name: max_items       type: integer  state: OPTIONAL }
+      !record_field { name: min_items       type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: max_items       type: non_negative_integer  state: OPTIONAL }
     ] }
   }
 
@@ -446,8 +447,8 @@
       !record_field { name: state           type: element_state  state: REQUIRED_FIXED  value: REQUIRED }
       !record_field { name: unordered       type: boolean  state: REQUIRED_FIXED  value: true }
       !record_field { name: unique_items    type: boolean  state: REQUIRED_FIXED  value: true }
-      !record_field { name: min_items       type: integer  state: REQUIRED_DEFAULT  value: 1 }
-      !record_field { name: max_items       type: integer  state: OPTIONAL }
+      !record_field { name: min_items       type: non_negative_integer  state: REQUIRED_DEFAULT  value: 1 }
+      !record_field { name: max_items       type: non_negative_integer  state: OPTIONAL }
     ] }
   }
   map => !type_definition {
@@ -460,8 +461,8 @@
       !record_field { name: key_type        type: type_ref }
       !record_field { name: value_type      type: type_ref }
       !record_field { name: state           type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
-      !record_field { name: min_items       type: integer  state: OPTIONAL }
-      !record_field { name: max_items       type: integer  state: OPTIONAL }
+      !record_field { name: min_items       type: non_negative_integer  state: OPTIONAL }
+      !record_field { name: max_items       type: non_negative_integer  state: OPTIONAL }
     ] }
   }
 
@@ -481,6 +482,14 @@
     kind: PRODUCT
     source: set_type
     body: !set_type { element_type: identifier  min_items: 1 }
+  }
+
+  @doc:"A count. Refines integer rather than constructing beside it, so it IS-A integer."
+  non_negative_integer => !type_definition {
+    kind: ATOM
+    source: integer_type
+    supertypes: [integer]
+    body: !integer_type { min: 0 }
   }
 
   integer_member_set => !type_definition {

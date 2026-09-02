@@ -107,6 +107,15 @@ class DefinitionResolverTest {
                     + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } state: \"REQUIRED\" } "
                     + "] groups: [] } }";
 
+    /**
+     * The same shape as the real fixture resolves it. meta-kernel types {@code bits} as a count rather than
+     * a bare integer, where the hand-written schemas above -- which are about resolution mechanics, not
+     * about the kernel's own field types -- keep the plainer spelling.
+     */
+    private static final String EXPECTED_FIXTURE_INTEGER_SIZE =
+            EXPECTED_INTEGER_SIZE.replace("{ name: \"bits\" type: { name: \"integer\"",
+                    "{ name: \"bits\" type: { name: \"non_negative_integer\"");
+
     /** Throws if ever actually invoked -- most tests below never reach {@code Instance}/{@code AtomRefinement} binding at all; the ones that do build their own {@link DefinitionResolver} wrapping a real compiled reader instead of using this field. */
     private static final DefinitionMetaReader NEVER_CALLED = (type, value) -> {
         throw new UnsupportedOperationException("'" + type + "': not exercised by this test");
@@ -161,7 +170,7 @@ class DefinitionResolverTest {
 
         TypeDefinition resolved = resolver.resolve(declaration);
 
-        assertEquals(EXPECTED_INTEGER_SIZE, write(resolved));
+        assertEquals(EXPECTED_FIXTURE_INTEGER_SIZE, write(resolved));
     }
 
     @Test
@@ -722,8 +731,8 @@ class DefinitionResolverTest {
                         + "state: \"REQUIRED_DEFAULT\" value: false } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
                         + "state: \"REQUIRED_DEFAULT\" value: false } "
-                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",
                 write(array));
     }
@@ -754,8 +763,8 @@ class DefinitionResolverTest {
                         + "state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
                         + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
-                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",
                 write(map));
     }
@@ -860,8 +869,8 @@ class DefinitionResolverTest {
                         + "state: \"REQUIRED_FIXED\" value: true } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" value: true } "
-                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" value: 1 } "
-                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" value: 1 } "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",
                 write(set));
     }
@@ -1068,7 +1077,7 @@ class DefinitionResolverTest {
 
         assertEquals(BinaryType.HEX, hex.body());
         assertEquals(List.of("bytes"), hex.supertypes());
-        assertEquals(BinaryType.UNSPELLED, namespace.get("bytes").body());
+        assertEquals(BinaryType.BYTES, namespace.get("bytes").body());
     }
 
     @Test
