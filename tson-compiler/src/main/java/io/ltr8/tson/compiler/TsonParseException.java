@@ -19,7 +19,7 @@ package io.ltr8.tson.compiler;
  * reason {@code expected} names the <em>construct</em> the position admits ({@code a type
  * reference}, {@code a record field's ':'}) rather than the token class that would have satisfied
  * it. Both are {@code ""} where a throw site states a rule rather than a substitution -- an
- * adjacency violation, a trailing separator -- and nothing invents a pair to fill them.
+ * adjacency violation, a missing separator -- and nothing invents a pair to fill them.
  */
 public final class TsonParseException extends RuntimeException {
 

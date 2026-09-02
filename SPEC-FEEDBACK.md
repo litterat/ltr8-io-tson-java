@@ -597,20 +597,62 @@ has a separator, whitespace, and no comma rule at all; or it has commas as a fir
 the one rule about them that every JSON author has wished away — no trailing comma — is a rule TSON chose to keep
 with no JSON contract to honour.
 
-**Interpretation chosen:** Revision 34 as written: `TsonDataStream.consumeSeparatorOrCloseCheck` accepts
-whitespace, a comma or both, requires at least one between adjacent values, and refuses a separator before a
-closing delimiter ("a trailing separator is not permitted before …").
+**Interpretation chosen — and built.** This implementation keeps the comma and permits a trailing one, which
+is (b) below rather than (a), the preference this entry used to state. `consumeSeparatorOrCloseCheck` now
+answers *is there another element?* and the three container frames close on `false`, so a comma before a
+closing delimiter ends the container instead of being refused.
 
-**Suggested resolution:** take one of the two, and this implementation's preference is the first. **(a) Drop the
-comma.** Whitespace is the separator, the trailing-separator rule has nothing to apply to, and §7.4 loses a
-production. It is what principle 4 says it wants, reached by removing a rule rather than reversing one; what it
-costs is a long inline array reading `[1 2 3 4]` rather than `[1, 2, 3, 4]`, which the format already admits and
-which every other position in the format already reads. **(b) Keep the comma and permit a trailing one.** The
-lesser change, and the one to make if the comma stays: the ban exists only where a comma is *the* separator and a
-trailing one would be a missing element, which in TSON it never is. Either is better than the current shape, and
-"the rule applies throughout the series" means the choice reaches [TSON-SCHEMA] §12.1's separators too.
+**Why (a) was wrong, and it is a fact about the grammar rather than a matter of taste.** The comma is not
+only a value separator: it is the delimiter in every type expression [TSON-SCHEMA] §12.1 writes —
+`pair<uuid, B>`, `[text, int32]`, `<T, N>`, `vector<float32, 3>` — and those are not a second construct.
+§12.1 parses tuple elements and type-argument lists through the *same* separator rule §2.4 states for a
+record's fields, so `pair<uuid B>` also parses today and the comma everyone writes in a type expression is
+§2.4's optional separator wearing a different hat. Dropping the comma therefore breaks §5.10's own worked
+example, `uuid_pair => <B> pair<uuid, B>` — which meta-kernel.tn quotes verbatim in its own `@doc`. (a) has
+to become (a′), *drop it as a value separator and keep it as a type-expression delimiter*, which is two rules
+where §2.4 has one, and the token has to stay either way: a `,` removed from the token vocabulary makes a
+pasted JSON array fail as "an unrecognised character" rather than with advice.
 
-**Status against Revision 34:** open, and new against this revision — consequent on #8, and a proposal.
+**The rule, as built: a comma may follow a value.** One clause decides every case and replaces both halves of
+§2.4's current wording. `[1, 2, ]` is admitted (the comma follows a value; nothing follows it, and nothing
+needs to); `[, 1]` and `[1, , 2]` are refused (a comma following nothing, and a comma following a comma). The
+two refusals need no rule of their own and get none — a comma is not a value, so they fail as a missing one.
+
+**A trailing comma cannot mean an absent element, which is why admitting it is safe here and is not safe in
+JSON.** Absence is spellable and occupies a slot: `[1, 2, ]` is two elements and `[1 2 _]` is three, so there
+is nothing for a stray comma to be confused with. RFC 8259's ban exists because that grammar has elision —
+JavaScript's `[1, , 2]` is three elements with a hole, which makes a trailing comma genuinely ambiguous
+between two elements and three. TSON has no elision, so the ambiguity the ban prevents cannot arise. The ban
+was inherited from a grammar whose problem this format does not have. **That is the argument to put in §2.4**,
+rather than authorial convenience.
+
+The same fact settles the other three shapes, and it is worth stating that they were considered: the coherent
+opposite position is *a comma is ignorable punctuation, admitted anywhere between values*, and it is refused
+because it is not simpler (the whitespace-separation requirement stays either way, so it is a second concept
+beside one rather than a replacement for one), because only the trailing position has an editing story —
+appending a line — while nothing produces `[, 1]` as a byproduct of an edit that should have kept working,
+and because a doubled comma is far more likely a lost element than deliberate noise. In a format whose whole
+purpose is validating generated output, reading `[1, , 2]` as two elements is exactly the silent failure it
+exists to catch, and in a format where the lost element is spellable as `_`, accepting it is what would make
+`_` meaningless.
+
+**Two defects in §2.4's wording, independent of the decision:**
+
+- It says "a trailing **separator**", and no implementation can enforce that. A whitespace-only separator
+  before a closing delimiter is already legal — `[1 2 ]` parses under Revision 34 — because a container's
+  close check runs before the separator check. It is a trailing *comma* rule and should say so.
+- "The rule applies throughout the series" is doing more work than it looks: it is what carries the decision
+  into §12.1's tuple elements and type-argument lists, so `[text, int32, ]` and `pair<uuid, B, >` are legal
+  under (b). Odd-looking, and accepted deliberately — the alternative is a comma meaning something different
+  by position.
+
+**Suggested resolution:** keep the comma, delete the trailing-separator ban, and state §2.4 as *values are
+separated by whitespace, a comma, or both, and a comma may follow a value*. §7.4 is unchanged.
+
+**Status against Revision 34:** open, and new against this revision — consequent on #8, and one this
+implementation has now built and is running on the `r2026-35-proposal` branch. The entry's original
+preference for (a) is withdrawn; the type-expression finding above is why, and is the part a revision needs
+whichever way it goes.
 
 ---
 

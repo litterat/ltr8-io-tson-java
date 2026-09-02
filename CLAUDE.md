@@ -60,8 +60,8 @@ those entries state what is *running* rather than what is *proposed* — the bra
 to `main` when the spec lands and not before: `main` is the reference implementation of the published
 revision, and merging a divergence early costs it the one signal it exists to give. The sibling corpus has a
 branch of the same name and moves with this one, `SUITE_PIN` following it. Landed here so far: **#7, `null`
-removed from the notation**, **#8, the JSON-superset claim and the rules that existed only for it**, and
-**#9, a field name is an identifier at every layer**.
+removed from the notation**, **#8, the JSON-superset claim and the rules that existed only for it**,
+**#9, a field name is an identifier at every layer**, and **#10, the trailing-comma ban**.
 §1.3's Part 1 freeze is a claim about the published revision, which `main` keeps; it does not hold on this
 branch, and #8's escape-table change is the first thing to rely on that.
 
@@ -310,7 +310,9 @@ One implementation of the data grammar, split by role: **`TsonDataStream`** (Tie
 walks source text — a lazy pull-based `TsonEventSource` over a sealed `TsonEvent` hierarchy, frame-stacked,
 at most two tokens of lookahead; **`TsonDataParser`** (Tier 3) reduces the event sequence into the sealed
 `CoreValue` AST and holds no grammar logic of its own. Whitespace is gone by token time — adjacency (§7.5)
-and separators (§2.4) are checked via `Position` gaps. The layering is deliberately incomplete per §1.2:
+and separators (§2.4) are checked via `Position` gaps — where the rule is **a comma may follow a value**, so a
+trailing comma is ordinary and a leading or doubled one fails as a missing value rather than by a rule of its
+own. The layering is deliberately incomplete per §1.2:
 neither tier dedupes fields/keys, resolves `EmptyBrace`, or interprets token text — those belong to later
 layers. **A name is the one exception, and §7.6 is the precedent**: `type-ref = "!" identifier` and
 `annotation = "@" identifier`, so `TsonDataStream` matches each name's decoded text against
