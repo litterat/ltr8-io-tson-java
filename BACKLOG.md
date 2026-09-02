@@ -131,3 +131,15 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   derivation, the way `withTokenPolicy` already is. A document past the limit must be refused with a
   diagnostic carrying a position, never a host `Error`. The numeric-literal length limit named in
   `CLAUDE.md`'s "Not yet implemented" is the fourth limit of the same section and comes with it.
+
+## Revision 35 proposal (`r2026-35-proposal` branch only)
+
+- [ ] **Re-stamp the three bundled schemas for the notation changes this branch makes.** `spec/m/meta-kernel.tn`
+  documents `value`'s own inhabitants as "null, boolean, integer, float, string" and `void`'s prose names `null` as
+  an accepted spelling; both are false once `null` leaves the notation. The edit is prose inside a published
+  artifact, so it carries the whole re-stamp: `tson hash` bottom-up (kernel, then meta, then core), the matching
+  `*-resolved.tn` fixture entries, and the published digests in `TsonBundledSchemas`, `InitCommand` and
+  `README.md`. **Blocked on the spec revision publishing the new artifacts** — stamping ahead of it mints digests
+  for documents nobody has published, where Revision 34's are the ones `main` must go on serving. Until then this
+  branch leaves all three untouched, and the divergence is behavioural (`ValueParser`, `VoidReader`) rather than
+  declared.
