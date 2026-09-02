@@ -110,14 +110,18 @@ class NameHygieneTest {
     }
 
     /**
-     * <b>Names only.</b> §8.2 defaults the token surface to Unrestricted because a value is data and may
-     * legitimately be anything, and Class 1 field names are lexical (§2.5, §7.7) rather than names -- so
-     * neither reaches the restricted-script rule, however mixed its scripts.
+     * <b>Names only</b>, and a <b>value is not one</b>: §8.2 defaults the token surface to Unrestricted because
+     * data may legitimately be anything, so the same spelling passes in value position and is refused in name
+     * position. A field name is the name half (§2.5) -- it is an identifier at every layer, so it meets these
+     * rules exactly as a type-ref or annotation name does, with no Class 1 exception left to state.
      */
     @Test
-    void aValueAndAClass1FieldNameAreNotNames() {
+    void aValueIsNotANameButAFieldNameIs() {
         assertEquals(List.of(), read("{ a: pаy }"), "a value is data");
-        assertEquals(List.of(), read("{ pаy: 1 }"), "a Class 1 field name is lexical, not a name");
+
+        List<Diagnostic> refused = read("{ pаy: 1 }");
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
+                refused.stream().map(Diagnostic::code).toList(), refused::toString);
     }
 
     /**
@@ -167,7 +171,25 @@ class NameHygieneTest {
     @Test
     void ordinaryNamesAreUntouched() {
         assertEquals(List.of(), read("@doc:\"x\" !int32 1"));
-        assertEquals(List.of(), read("{ id_пользователя: 1 }"),
-                "a mixed-script compound field name is not this rule's business");
+        assertEquals(List.of(), read("{ order_id: 1  日本語: 2 }"), "single-script names, whatever the script");
+    }
+
+    /**
+     * §8.2's own illustration of the look-alike rule, {@code id_пользователя}, is a <em>compound</em> mixing
+     * Latin and Cyrillic -- so the restricted-script rule refuses it whole-name even though nothing collides
+     * with it, and now that a field name is a name it does so in data as well as in a schema. The unit is the
+     * relaxation §8.2 names first, and it admits exactly this shape: a Latin abbreviation beside a name in
+     * another script, each segment single-script.
+     */
+    @Test
+    void aMixedScriptCompoundFieldNameIsRefusedWholeNameAndAdmittedPerSegment() {
+        List<Diagnostic> wholeName = read("{ id_пользователя: 1 }");
+        assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
+                wholeName.stream().map(Diagnostic::code).toList(), wholeName::toString);
+
+        List<Diagnostic> perSegment = new ArrayList<>();
+        new TsonTreeReader().withIdentifierPolicy(TsonUnicodePolicy.highlyRestrictive().perSegment())
+                .withDiagnostics(perSegment::add).read("{ id_пользователя: 1 }");
+        assertEquals(List.of(), perSegment, perSegment::toString);
     }
 }

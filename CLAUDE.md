@@ -60,7 +60,8 @@ those entries state what is *running* rather than what is *proposed* — the bra
 to `main` when the spec lands and not before: `main` is the reference implementation of the published
 revision, and merging a divergence early costs it the one signal it exists to give. The sibling corpus has a
 branch of the same name and moves with this one, `SUITE_PIN` following it. Landed here so far: **#7, `null`
-removed from the notation**, and **#8, the JSON-superset claim and the rules that existed only for it**.
+removed from the notation**, **#8, the JSON-superset claim and the rules that existed only for it**, and
+**#9, a field name is an identifier at every layer**.
 §1.3's Part 1 freeze is a claim about the published revision, which `main` keeps; it does not hold on this
 branch, and #8's escape-table change is the first thing to rely on that.
 
@@ -315,9 +316,13 @@ layers. **A name is the one exception, and §7.6 is the precedent**: `type-ref =
 `annotation = "@" identifier`, so `TsonDataStream` matches each name's decoded text against
 `IdentifierParser` the way a number's text is matched against the number grammar — a production that is no
 part of the token-stream grammar, over a token the lexer has already produced. `field-name` stays lexical
-(`unquoted-token / single-line-token`, where a map key keeps all three forms), the identifier contract being
-stated once on declarations, with data conforming by construction — whether it should stay lexical now that no
-JSON object has to parse as a record is `SPEC-FEEDBACK.md` #9's question.
+(`unquoted-token / single-line-token`, where a map key keeps all three forms), but **that is the token rule
+only**: a field name is an identifier at every layer, so `TsonDataStream` matches its decoded text against the
+profile whichever spelling carried it. Quoting buys the lexical accidents of the unquoted form — a name that
+would otherwise resolve as a number — and never a key that is not a name; a key that is not a name is what a
+map is for, and the diagnostic says so. Normalisation runs *before* the match, since §2.5 gives a field name
+its identity by NFC-normalised comparison and the lexer already normalises the unquoted spelling: requiring
+NFC as a form here would make the quoted spelling the stricter of the two.
 `!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException` (a
 schema document is unsupported, not malformed).
 
@@ -909,8 +914,11 @@ script; exempting minted names from the walk would answer that by leaving the ho
 positions instead — spread over the schema parser, the definition resolver and the atom vocabulary — and had
 holes at exactly the positions only some of them reached: an enum member and a group's member labels were
 checked for reading alike and for script mixing, and never for a restricted character. A scope list can be
-reviewed; three call sites cannot. Class 1 *field* names see only the look-alike rule, being lexical rather
-than names (§2.5, §7.7). The identifier policy defaults to Highly Restrictive
+reviewed; three call sites cannot. **A field name is a name and meets all three rules** (§2.5, §7.7) — the two
+per-name ones in `DefaultTsonReadContext` beside a type-ref's and an annotation's, the look-alike one in
+`SchemalessTreeReader`, which is where it belongs because it is a property of a *set*. There is no
+conformance class in which a record's field names are judged by a different rule. The identifier policy
+defaults to Highly Restrictive
 whole-name (§8.2's SHOULD) and relaxes through `withIdentifierPolicy`, which §8.2 requires be code rather
 than ambient; `withTokenPolicy` is the other surface and defaults to `unrestricted()`, a value being data that
 may legitimately be anything.

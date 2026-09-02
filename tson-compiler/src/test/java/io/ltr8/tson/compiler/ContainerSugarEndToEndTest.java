@@ -357,10 +357,10 @@ class ContainerSugarEndToEndTest {
     }
 
     /**
-     * The kernel types every naming position {@code identifier} (issue #231), and the resolver builds
-     * {@code record_field.name} directly rather than round-tripping the model through the compiled meta
-     * reader — so the contract is asserted here as well as at the constructor applications that do round
-     * trip. Each of these was a valid schema until the type carried a contract.
+     * The kernel types every naming position {@code identifier} (issue #231), and a field name is one at every
+     * layer -- so this is now refused by the grammar, where a schema's field name and a data document's meet the
+     * same rule, rather than by the resolver reading {@code record_field.name} against its declared type. The
+     * resolver's own contract is unchanged and still the backstop for a model built without parsing.
      */
     @Test
     void aDeclaredFieldNameMustBeAnIdentifier() {
@@ -369,7 +369,7 @@ class ContainerSugarEndToEndTest {
                 {"a.b", "U+002E at index 1 cannot appear in an identifier"},
                 {"42", "cannot start an identifier -- an identifier never begins with a digit or a sign"},
         }) {
-            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+            TsonParseException thrown = assertThrows(TsonParseException.class,
                     () -> compile("  ok => { " + c[0] + ": text }"), c[0]);
             assertTrue(thrown.getMessage().contains("invalid field name"), thrown.getMessage());
             assertTrue(thrown.getMessage().contains(c[1]), thrown.getMessage());

@@ -22,6 +22,10 @@ class TokenPolicyTest {
     /** Cyrillic а (U+0430) -- the character [TSON-DATA] §9.4 opens with. */
     private static final String CYR_A = new String(Character.toChars(0x0430));
 
+    /** {@code админ}, all Cyrillic -- single-script, so only the token policy has anything to say. */
+    private static final String CYRILLIC_NAME =
+            new String(new int[] {0x0430, 0x0434, 0x043C, 0x0438, 0x043D}, 0, 5);
+
     private static List<Diagnostic> problems(TsonTreeReader reader, String document) {
         TsonDiagnosticsCollector collected = new TsonDiagnosticsCollector();
         reader.withDiagnostics(collected).read(document);
@@ -66,12 +70,15 @@ class TokenPolicyTest {
      * <b>A name is a token.</b> The check runs before anything knows which tokens are names, so a token
      * policy reaches a field name as well -- the property that makes a strict token policy subsume the
      * identifier policy rather than sit beside it.
+     *
+     * <p>Single-script, so the identifier policy admits it and this assertion is about the token surface
+     * alone: a field name is also a name (§2.5), and both policies would otherwise refuse it.
      */
     @Test
     void aFieldNameIsATokenAndIsChecked() {
         List<Diagnostic> found = problems(
                 new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
-                "{ " + CYR_A + "dmin: 1 }");
+                "{ " + CYRILLIC_NAME + ": 1 }");
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
                 found.stream().map(Diagnostic::code).toList(), found.toString());

@@ -319,8 +319,12 @@ and this is where it is said. §8.2 calls the identifier surface the "name polic
 implementation says *identifier* throughout, §7.7 being where that term is defined
 (`SPEC-FEEDBACK.md` #15).
 
-Class 1 **field** names see neither — they are lexical rather than names (§2.5, §7.7) — and only the
-look-alike rule, whose scope they are (`SchemalessTreeReader`). A refusal reports one code per rule —
+**Field** names see all three, being names at every layer (§2.5, §7.7): the two per-name rules in the read
+context beside a type-ref's and an annotation's, and the look-alike rule in `SchemalessTreeReader`, which is
+where it belongs because it is a property of a *set* rather than of a name. One consequence worth knowing when
+reading a report: a within-word homograph in a field name is refused as a restricted script before the
+look-alike rule has a pair to compare, so a corpus vector isolating that rule wants two names each of which is
+single-script. A refusal reports one code per rule —
 `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT` — each a verdict on the document like any other in
 that the caller must change it or relax the policy. What these codes carry that a validity error does not is
 that another processor at another Unicode version may accept the same document.
