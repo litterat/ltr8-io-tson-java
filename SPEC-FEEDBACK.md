@@ -671,16 +671,62 @@ distinction between `true` and `"true"` is the one place §2.4's "form is not me
 "the string `true`, not the boolean" — which is the same distinction `42` and `"42"` draw and is not JSON's. Removing
 them would leave Class 1 with no boolean at all, which is a loss, not a simplification.
 
-**Interpretation chosen:** Revision 34 as written: `BaseTypeResolver` matches `true` and `false` before the number
-grammar, and a schema-typed position hands the token to its declared type.
+**Interpretation chosen:** Revision 34 as written, and kept: `BaseTypeResolver` matches `true` and `false`
+before the number grammar, and a schema-typed position hands the token to its declared type.
 
-**Suggested resolution:** keep them, and say why in §4.2 in the terms above, so that #7's removal is not read as
-half of a pattern. §4.5's order becomes boolean → number → string, and §7.7 rule 3 then has two words to explain
-rather than three — a sentence, since both are members of a kernel enum and that is the whole of their status under
-a schema.
+**The keywords are load-bearing for §5.4, which is the argument this entry was missing.** BOOLEAN is a
+discrimination class only because §4.5 matches the two tokens ahead of the number grammar. Strip that and
+`boolean`'s members resolve to strings, so by §5.4's own rule — "an enum's class is its members' shared class
+(`[true false]` is boolean-class)" — the kernel's `boolean` becomes string-class and `( boolean | text )`
+derives `disjoint: false`. Every boolean in an untagged choice would need a `!boolean` tag, and a derived
+fact §5.4 requires every resolver to record would change under a Part 1 edit. That is demonstrable today,
+since a word-valued enum is exactly what a keyword-less `boolean` would be: `status => !enum [OPEN DONE]`
+beside `text` is refused — *"two of them occupy the same discrimination class ... every value keeps its
+!variant tag"*. So the reasons this entry gave (a boolean is a value a consumer stores; `true` against
+`"true"` is the distinction `42` and `"42"` already draw) are true but secondary.
 
-**Status against Revision 34:** open, and new against this revision — recorded so that the decision is a decision;
-this implementation recommends keeping them.
+**Base type resolution is not a disjoint choice, and the attempt to write it as one is instructive.**
+`( boolean | number | text )` derives `disjoint: true` and reads every §4 shape, so it looks like a model of
+Class 1 reading. It is not one, for two reasons:
+
+- **A Class 1 value is one of three things** — an untyped token, a token carrying a built-in type annotation
+  from §5's vocabulary, or a container — and §4 governs only the first, by its own applicability clause. The
+  choice refuses the other two: a schemaless `!uuid "9f1c…"` is *"not a declared variant"*, and `{ a: 1 }`
+  has *"no variant matching this untagged value"*.
+- **It is circular.** §5.4 defines `disjoint` as "the encoding's own form resolution ... recovers the
+  variant", and TSON text's form resolution *is* §4. The choice does not model base resolution; it consumes
+  it, reproducing §4's partition because it is built from it and leaving the resolution order inside the
+  class function where it started.
+
+**Two §5.4 findings fell out of checking this, neither about `true`/`false`:**
+
+1. **The derived fact is discriminability; the `@disjoint` prose says mutual exclusivity.** §5.4 requires the
+   derivation be exactly class-distinctness and "MUST NOT prove more (value-set separation ... does not make
+   a choice disjoint)". But it describes the annotation as recording "the intent that its variants are
+   mutually exclusive", which is inhabitance. The two come apart on any choice containing a string-class
+   atom: `text` admits every token (§2.4's *form is not meaning* means a declared `text` position takes `42`
+   and `true` unquoted), so `42` inhabits both variants of `( int32 | text )` — which is nonetheless accepted
+   as `@disjoint`, correctly. **Suggested:** §5.4's `@disjoint` paragraph should say the author asserts the
+   variants are *distinguishable by the encoding's form resolution*, which is what is checked, and note that
+   overlap in inhabitance is ordinary and expected.
+2. **A token can be discriminated to a variant that refuses it, with no second chance.** §4's `number`
+   production admits `0xFF`, `0b1010`, `0o377`, `.inf` and `.nan`; core.tn's `number` atom is decimal-only
+   and refuses all five. So in `( number | text )` those tokens classify as NUMBER, dispatch to `number`, and
+   fail — they cannot reach `text`, because §5.4's once-only rule forbids "a second, type-directed inspection
+   of the value's form". The behaviour is exactly as specified and the trap is real: the natural reading of
+   `( number | text )` is "a number or anything", and `0xFF` matches neither. Worth a sentence in §5.4 or in
+   core.tn's own `@doc` — a constructor narrower than its base-type class is a footgun in any untagged
+   choice, not only this one.
+
+**Suggested resolution:** keep `true` and `false`, and say why in §4.2 in the terms above — the §5.4
+dependency first, so that #7's removal is not read as half of a pattern whose other half would silently
+change a derived fact. §4.5's order becomes boolean → number → string with #7, and §7.7 rule 3 then has two
+words to explain rather than three, both members of a kernel enum, which is the whole of their status under a
+schema.
+
+**Status against Revision 34:** open, and new against this revision — a decision, recorded so that it is one.
+This implementation recommends keeping them and has changed nothing. Finding 1 above is a §5.4 wording
+question rather than a `true`/`false` question and may want an entry of its own once the revision opens.
 
 ---
 
@@ -705,17 +751,61 @@ why `v1.2.3` is not a near-miss, and "starts with a digit or a sign" is that rul
 common mistakes loud at the cost of that rule and of quoting `007` when the string is meant, which §4.5's "use
 quotes" already asks for `null`.
 
-**Interpretation chosen:** Revision 34 as written: `NumberScanner.decimalNatural` refuses a leading zero, the
-`number` production fails, and `BaseTypeResolver` resolves the token to a string.
+**Interpretation chosen:** Revision 34 as written, and kept: `NumberScanner.decimalNatural` refuses a
+leading zero, the `number` production fails, and `BaseTypeResolver` resolves the token to a string.
 
-**Suggested resolution:** decide, and record the decision in §4.4 either way. If fallthrough stays, say in §4.4 that
-it is deliberate and what a schema is for; if a near-miss becomes an error, define near-miss by the token's first
-character (`Nd`, `+`, `-` or `.` at Start, the four extensions §7.1 admits for the number grammar's sake) so that
-`v1.2.3` and `A-100` are untouched, and list `.` alone as the boundary case, since `.5` is a number and `.name` is
-a string today.
+**The boundary rule this entry proposed does not survive contact with real tokens, which is what turns "no
+recommendation" into one.** Defining near-miss by the token's first character catches far more than the
+typos it was aimed at — eight of these ten begin with a digit, and all ten resolve to string today:
 
-**Status against Revision 34:** open, and new against this revision — a decision to record, with no recommendation
-stronger than "not by default".
+| token | digit-initial | what it is |
+|---|---|---|
+| `2025-03-13` | yes | a date |
+| `9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09` | yes | a UUID |
+| `192.168.0.1` | yes | an IPv4 address |
+| `2h30m` | yes | a duration |
+| `1.2.3` | yes | a version |
+| `007` | yes | a postcode |
+| `5.` | yes | a typo |
+| `1__0` | yes | a typo |
+| `v1.2.3` | no | a version |
+| `A-100` | no | a part number |
+
+A date, a bare UUID, an address and a duration written unquoted would all become Class 1 errors — and those
+are the unquoted forms the format encourages, the ones §5's vocabulary exists to type when a schema is in
+scope. `2025-03-13` settles it: no digit-initial rule can admit the most ordinary unquoted token in
+configuration data while refusing `007`. Sharpening it means enumerating shapes, which is §5's vocabulary
+restated inside §4 as exceptions, and §4.4's "there are no exceptions" is worth more than four typos.
+
+**And Class 1 already has a way to say what a token means: the annotation.** A schemaless document writes
+`!date 2025-03-13`, `!uuid 9f1c…`, `!int32 007` — §5's vocabulary, available with no schema and checked. So
+the fall-through is not the format's answer to "what is this token?"; it is the default for a token the
+author chose not to annotate, and refusing it adds no information. The same observation is why base
+resolution cannot be modelled as a choice (#11): an untyped token is one of three things a Class 1 value can
+be, and §4 governs only that one.
+
+**The third option, and the one worth stating now that §6 is gone: should the leading-zero rule be dropped
+rather than kept, so `007` is the number 7?** That is the widening question the superset's removal invites,
+and the answer is no — but the *reason* changes, and it is the one thing here a revision should edit. JSON's
+reason is C-style octal ambiguity, and TSON has no such ambiguity: `0o377` spells octal explicitly, so the
+inherited justification is gone. The rule survives on a better one. **A zero-padded token is data whose
+leading zeros are significant** — a postcode, an identifier, a zero-padded code — so reading `007` as `7`
+destroys information irrecoverably, where reading it as the string `007` preserves exactly what was written.
+That is also what makes the fall-through *correct* rather than merely total: `007` is a string because it is
+one. Nothing else in the production is a JSON debt — `+255`, `.5`, `1_000`, `0xFF`, `0b1010`, `0o377`,
+`.inf`, `.nan` and `.infinity` are all admitted already and all exceed RFC 8259 — so "no leading zeros" and
+"digits required after `.`" are the only two rules the superset's removal puts in question, and both should
+stay.
+
+**Suggested resolution:** keep the fall-through and say in §4.4 that it is deliberate, naming the two
+mechanisms that do know what a token means — a `!`-annotation from §5's vocabulary in Class 1, a declared
+type in Class 2 — so a reader meets the remedy where they meet the hazard. Restate §4.3's leading-zero
+prohibition on its own authority, in the terms above, rather than as an inherited number-grammar rule: it is
+the sentence that explains why `007` resolves to a string instead of reading as an accident of the order.
+
+**Status against Revision 34:** open, and new against this revision — now a recommendation rather than a
+decision to record. This implementation has changed nothing; what changed is the evidence, and the boundary
+table above is the part a revision would otherwise have to discover for itself.
 
 ---
 
