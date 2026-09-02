@@ -5,6 +5,7 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonBindMismatchException;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -360,16 +361,12 @@ public final class SchemaResolver {
             Annotations nameAnnotations;
             try {
                 nameAnnotations = resolver.annotationsFor(name, declarations.get(name).nameAnnotations());
-            } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
+            } catch (TsonSchemaValidationException | UnsupportedOperationException
+                    | TsonBindMismatchException e) {
                 if (!problems.collecting()) {
                     throw e;
                 }
-                // Reported as a schema error whatever the exception's type, where every other phase lets
-                // Problems classify: a gap binding an annotation value arrives here as SCHEMA_ERROR rather
-                // than NOT_IMPLEMENTED. Left as it was rather than folded into Problems, since changing it
-                // moves a CLI exit code (1 to 70) and wants its own verdict.
-                receiver.report(Diagnostic.ofSchemaError(problems.schemaId(), name, e.getMessage(),
-                        positions.of(declarations.get(name))));
+                problems.report(declarations.get(name), e);
                 nameAnnotations = Annotations.empty();
             }
             // §8.2: a synthetic entry's key carries the derived @synthetic marker, and a lifted declaration
@@ -402,11 +399,17 @@ public final class SchemaResolver {
      * rewritten declaration is carried onto. Every caller has the node, and asking for it is what stops the
      * lookup being spelled out at each site.
      *
-     * <p><b>The code is chosen by the project's own exception classification</b>: a {@code
-     * TsonSchemaValidationException} is the author's error and an {@code UnsupportedOperationException} is
-     * this library's gap, which the reader of the report needs to tell apart -- one says fix your schema,
-     * the other says this could not be checked. Both are reported per declaration and both leave a
-     * placeholder, so a gap in one declaration does not cost every other declaration its verdict.
+     * <p><b>The code is chosen by the project's own exception classification</b>, which has three outcomes
+     * and not two. A {@code TsonSchemaValidationException} is the author's error and an {@code
+     * UnsupportedOperationException} is this library's gap -- one says fix your schema, the other says this
+     * could not be checked. A {@link TsonBindMismatchException} is neither: it says the reading application
+     * is wired wrong, and it is the one a caller most easily acts on, the message naming one of their own
+     * classes. Collapsing it into either of the others is what {@code TsonMissingBindingException} exists to
+     * prevent -- its Javadoc records a downstream service turning the library-gap shape into a 501 for what
+     * was a missing line of configuration.
+     *
+     * <p>All three are reported per declaration and all three leave a placeholder, so one failing
+     * declaration does not cost every other declaration its verdict.
      */
     private record Problems(String schemaId, SchemaPositions positions, TsonDiagnosticsReceiver receiver) {
 
@@ -422,9 +425,13 @@ public final class SchemaResolver {
         /** The same, for a caller that has composed its own message rather than taking the exception's. */
         void report(SchemaMap.Declaration declaration, String message, RuntimeException error) {
             Optional<SourcePosition> position = positions.of(declaration);
-            receiver.report(error instanceof UnsupportedOperationException
-                    ? Diagnostic.ofSchemaGap(schemaId, declaration.name(), message, position)
-                    : Diagnostic.ofSchemaError(schemaId, declaration.name(), message, position));
+            receiver.report(switch (error) {
+                case TsonBindMismatchException mismatch ->
+                        Diagnostic.ofSchemaBindMismatch(schemaId, declaration.name(), mismatch, position);
+                case UnsupportedOperationException ignored ->
+                        Diagnostic.ofSchemaGap(schemaId, declaration.name(), message, position);
+                default -> Diagnostic.ofSchemaError(schemaId, declaration.name(), message, position);
+            });
         }
     }
 
@@ -524,7 +531,8 @@ public final class SchemaResolver {
                 refuseHeadAbstraction(name, resolved);
                 entries.put(name, resolved);
                 return resolved;
-            } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
+            } catch (TsonSchemaValidationException | UnsupportedOperationException
+                    | TsonBindMismatchException e) {
                 if (!problems.collecting()) {
                     throw e;
                 }

@@ -131,18 +131,3 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   derivation, the way `withTokenPolicy` already is. A document past the limit must be refused with a
   diagnostic carrying a position, never a host `Error`. The numeric-literal length limit named in
   `CLAUDE.md`'s "Not yet implemented" is the fourth limit of the same section and comes with it.
-
-- [ ] **A missing binding is relabelled a library gap in the schema pipeline, and at one site an author
-  error.** `TsonMissingBindingException` exists to stop a schema type nothing maps to a Java class reading as
-  *this library cannot do that* — its Javadoc records a downstream service turning the old shape into a 501 —
-  and the data layer honours that, throwing it unwrapped even from a collecting read. The schema layer undoes
-  it: `DefinitionResolver.bindAnnotationValue`'s `catch (RuntimeException)` catches that exception and rethrows
-  `UnsupportedOperationException`, so an annotation naming a type with no bound class reports `NOT_IMPLEMENTED`
-  — and `SchemaResolver`'s loop for annotations written before the declared name ([TSON-SCHEMA] §6) reports
-  `ofSchemaError` whatever the type, so the same annotation moved across the arrow reports `SCHEMA_ERROR` and
-  exits 1 instead of 70. `@data` and `@atom_specification` against meta.tn trigger it in every value form;
-  issue #295 carries the reproduction, the cause chain and the data-layer contrast.
-  **`Diagnostic.ofBindMismatch` is the answer to both halves** — built from a `TsonBindMismatchException` and
-  nothing else, for exactly "the difference between 'your schema is wrong' and 'this application is wired
-  wrong'". So: narrow the catch so a bind mismatch is not relabelled a gap, and report `BIND_MISMATCH` at both
-  schema-layer sites. `bindAtomInstance` carries the same catch and wants the same look.
