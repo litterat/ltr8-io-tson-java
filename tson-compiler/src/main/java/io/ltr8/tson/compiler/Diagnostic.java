@@ -97,7 +97,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
 
     /**
      * The constraint that failed, if the throw site named one. Absent where it stated a <em>rule</em> rather
-     * than a substitution -- an adjacency violation, a trailing separator -- which has no "expected this,
+     * than a substitution -- an adjacency violation, a missing separator -- which has no "expected this,
      * found that" to give.
      */
     public Optional<String> expectedIfStated() {
@@ -147,7 +147,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
             case TsonParseException p -> {
                 position = p.position();
                 // A parse failure that named a construct carries the pair itself; one that stated a rule
-                // (an adjacency violation, a trailing separator) has no substitution to describe.
+                // (an adjacency violation, a missing separator) has no substitution to describe.
                 if (!p.expected().isEmpty()) {
                     expected = p.expected();
                     actual = p.actual();

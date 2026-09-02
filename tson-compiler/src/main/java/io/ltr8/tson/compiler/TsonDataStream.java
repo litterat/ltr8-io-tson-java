@@ -465,9 +465,18 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
-     * Between elements of a record/map/array (§2.4): a separator (whitespace, a comma, or both)
-     * is required unless the closing delimiter is immediately next; a trailing separator right
-     * before the closing delimiter is likewise a parse error.
+     * Between elements of a record/map/array (§2.4): a separator -- whitespace, a comma, or both -- is
+     * required unless the closing delimiter is immediately next.
+     *
+     * <p><b>A comma may follow a value, and that is the whole rule.</b> So a trailing comma is admitted
+     * ({@code [1, 2, ]}), and a leading or doubled one is not ({@code [, 1]}, {@code [1, , 2]}) -- the latter
+     * two needing no rule of their own, since a comma is not a value and they fail as one that is missing.
+     *
+     * <p>A trailing comma is admitted because it cannot mean anything else. Absence is spellable and occupies
+     * a slot, so {@code [1, 2, ]} is two elements and the three-element document is {@code [1 2 _]}; there is
+     * nothing for a stray comma to be confused with. The ban it replaces is RFC 8259's, and it exists there
+     * because that grammar has elision -- JavaScript's {@code [1, , 2]} is three elements with a hole, which
+     * makes a trailing comma genuinely ambiguous. This format has no elision, so the ambiguity cannot arise.
      */
     boolean consumeSeparatorOrCloseCheck(TokenType closing) {
         if (check(closing)) {
@@ -481,10 +490,9 @@ public final class TsonDataStream implements TsonEventSource {
         if (!sawSeparator) {
             throw parseError("adjacent values must be separated by whitespace, a comma, or both");
         }
-        if (check(closing)) {
-            throw parseError("a trailing separator is not permitted before " + describe(peekToken()));
-        }
-        return true;
+        // The comma followed the last value and the list ends here: it separated that value from the
+        // closing delimiter, which is nothing, and the caller has no further element to read.
+        return !check(closing);
     }
 
     /** Looks ahead at an upcoming {@code !!name} directive's name without consuming anything. */
@@ -809,12 +817,13 @@ public final class TsonDataStream implements TsonEventSource {
     private final class RecordFrame extends Frame {
         @Override
         void step() {
-            if (check(TokenType.RBRACE)) {
+            // The separator check answers "is there another field?", so it also closes the record -- both
+            // where the brace follows the last value directly and where a comma stands between them.
+            if (!consumeSeparatorOrCloseCheck(TokenType.RBRACE)) {
                 Token rb = advance();
                 ready.add(new RecordEnd(rb.start()));
                 return;
             }
-            consumeSeparatorOrCloseCheck(TokenType.RBRACE);
             Token name = expectFieldNameToken("a record field name");
             expect(TokenType.COLON, "a record field's ':'");
             ready.add(new FieldName(Nfc.of(name.text()), name.start()));
@@ -837,12 +846,11 @@ public final class TsonDataStream implements TsonEventSource {
         void step() {
             switch (mode) {
                 case AFTER_ENTRY -> {
-                    if (check(TokenType.RBRACE)) {
+                    if (!consumeSeparatorOrCloseCheck(TokenType.RBRACE)) {
                         Token rb = advance();
                         ready.add(new MapEnd(rb.start()));
                         return;
                     }
-                    consumeSeparatorOrCloseCheck(TokenType.RBRACE);
                     pushFrame(new MapFrame(Mode.AWAITING_ARROW));
                     pushFrame(new DataValueFrame()); // the next key
                 }
@@ -866,13 +874,13 @@ public final class TsonDataStream implements TsonEventSource {
 
         @Override
         void step() {
-            if (check(TokenType.RBRACKET)) {
+            // The first element has no preceding value to be separated from, so it asks the plainer question;
+            // every later one asks the separator check, which also closes the array after a trailing comma.
+            boolean ends = first ? check(TokenType.RBRACKET) : !consumeSeparatorOrCloseCheck(TokenType.RBRACKET);
+            if (ends) {
                 Token rb = advance();
                 ready.add(new ArrayEnd(rb.start()));
                 return;
-            }
-            if (!first) {
-                consumeSeparatorOrCloseCheck(TokenType.RBRACKET);
             }
             pushFrame(new ArrayFrame(false));
             pushFrame(new ScopedValueFrame());

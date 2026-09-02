@@ -131,7 +131,14 @@ Key points:
   gaps. So `ws` in the grammar needs nothing special, and strict **adjacency** (`!`, `!!`, `@`, `:` to
   their operand, §7.5) is checked via `Position` equality between one token's end and the next's start.
   **Separator detection** (§2.4) works the same way: a real comma is optional evidence, a position gap is
-  the other kind, and at least one is required unless the closing delimiter is immediately next.
+  the other kind, and at least one is required unless the closing delimiter is immediately next. **A comma
+  may follow a value, and that is the whole rule** — so a trailing one is ordinary and a leading or doubled
+  one is not, the latter two needing no rule of their own since a comma is not a value. A trailing comma is
+  admitted because nothing else could be meant by it: absence is spelled `_` and occupies a slot, so
+  `[1, 2, ]` is two elements where `[1 2 _]` is three. RFC 8259 bans it because that grammar has elision —
+  JavaScript's `[1, , 2]` is three elements with a hole — and this one does not.
+  `consumeSeparatorOrCloseCheck` therefore answers "is there another element?", and the three container
+  frames close on `false` rather than each re-checking the delimiter themselves.
 - **Layering is deliberately incomplete, matching §1.2's division of labor.** Neither tier deduplicates
   record fields or map keys ("last value wins" is a resolver rule, §2.5/§2.6), NFC-normalizes field names,
   rejects `_` as a map key (§2.9), resolves `EmptyBrace` to a record/typed container (§2.8), or interprets

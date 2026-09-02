@@ -37,6 +37,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -561,11 +562,20 @@ class TsonSchemaParserTest {
                 ((ArrayRef) outer.elementType().typeRef()).size().orElseThrow());
     }
 
+    /**
+     * §2.4's rule "applies throughout the series", and §12.1 imports it -- so a tuple's elements and a type
+     * argument list take a trailing comma on the same terms a record's fields do. The alternative is a comma
+     * meaning something different by position, which is what makes the one rule worth having.
+     */
     @Test
-    void trailingCommaInTupleIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
+    void aTrailingCommaInATupleIsOrdinaryAndAStrayOneIsNot() {
+        assertNotNull(parse("""
                 !!meta:"https://tson.io/2026/34/m/meta.tn"
                 { a => [text, integer,] }"""));
+
+        assertThrows(TsonParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/34/m/meta.tn"
+                { a => [text, , integer] }"""));
     }
 
     // ── Instance templates (§12.1) ────────────────────────────────────────

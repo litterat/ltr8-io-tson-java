@@ -195,9 +195,18 @@ class TsonDataStreamTest {
                 "RecordEnd", "DocumentEnd"), shape("{ x: _ }"));
     }
 
+    /**
+     * §2.4: <b>a comma may follow a value</b>, so one before the closing delimiter is ordinary -- it separated
+     * the last field from the delimiter, which is nothing. It cannot mean an absent field: absence is
+     * spelled {@code _} and occupies a slot, so there is nothing for a stray comma to be confused with. What
+     * stays an error is a comma following no value -- a leading one, or one following another comma.
+     */
     @Test
-    void trailingCommaInRecordIsParseError() {
-        assertThrows(TsonParseException.class, () -> shape("{ x: 1, }"));
+    void aTrailingCommaInARecordIsOrdinaryAndAStrayOneIsNot() {
+        assertEquals(List.of("DocumentStart(|)", "RecordStart", "FieldName(x)", "Token(1,UNQUOTED)",
+                "RecordEnd", "DocumentEnd"), shape("{ x: 1, }"));
+        assertThrows(TsonParseException.class, () -> shape("{ x: 1, , y: 2 }"));
+        assertThrows(TsonParseException.class, () -> shape("{ , x: 1 }"));
     }
 
     /**
@@ -253,9 +262,17 @@ class TsonDataStreamTest {
                 "MapEnd", "DocumentEnd"), shape("{ WELCOME10 => \"10%\" loyalty => _ }"));
     }
 
+    /**
+     * §2.4: <b>a comma may follow a value</b>, so one before the closing delimiter is ordinary -- it separated
+     * the last entry from the delimiter, which is nothing. It cannot mean an absent entry: absence is
+     * spelled {@code _} and occupies a slot, so there is nothing for a stray comma to be confused with. What
+     * stays an error is a comma following no value -- a leading one, or one following another comma.
+     */
     @Test
-    void trailingCommaInMapIsParseError() {
-        assertThrows(TsonParseException.class, () -> shape("{ a => 1, }"));
+    void aTrailingCommaInAMapIsOrdinaryAndAStrayOneIsNot() {
+        assertEquals(List.of("DocumentStart(|)", "MapStart", "Token(a,UNQUOTED)", "MapArrow",
+                "Token(1,UNQUOTED)", "MapEnd", "DocumentEnd"), shape("{ a => 1, }"));
+        assertThrows(TsonParseException.class, () -> shape("{ a => 1, , b => 2 }"));
     }
 
     // ── The {} record/map lookahead heuristic: one token settles it for @ ! { [ _ ───
@@ -340,9 +357,18 @@ class TsonDataStreamTest {
                 "ArrayEnd", "DocumentEnd"), shape("[ { sku: A-100 } { sku: B-205 } ]"));
     }
 
+    /**
+     * §2.4: <b>a comma may follow a value</b>, so one before the closing delimiter is ordinary -- it separated
+     * the last element from the delimiter, which is nothing. It cannot mean an absent element: absence is
+     * spelled {@code _} and occupies a slot, so there is nothing for a stray comma to be confused with. What
+     * stays an error is a comma following no value -- a leading one, or one following another comma.
+     */
     @Test
-    void trailingCommaInArrayIsParseError() {
-        assertThrows(TsonParseException.class, () -> shape("[1, 2, 3,]"));
+    void aTrailingCommaInAnArrayIsOrdinaryAndAStrayOneIsNot() {
+        assertEquals(List.of("DocumentStart(|)", "ArrayStart", "Token(1,UNQUOTED)", "Token(2,UNQUOTED)",
+                "Token(3,UNQUOTED)", "ArrayEnd", "DocumentEnd"), shape("[1, 2, 3,]"));
+        assertThrows(TsonParseException.class, () -> shape("[1, , 2]"));
+        assertThrows(TsonParseException.class, () -> shape("[, 1]"));
     }
 
     @Test

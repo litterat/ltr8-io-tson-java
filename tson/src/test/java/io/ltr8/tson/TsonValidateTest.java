@@ -553,9 +553,11 @@ class TsonValidateTest {
     void aMalformedOrWrongKindOfDocumentComesBackAsADiagnosticNotAnException() {
         Tson tson = tsonWithPoint();
 
+        // A doubled comma: a trailing one is ordinary (§2.4 -- a comma may follow a value), where this one
+        // follows a comma and so separates nothing.
         List<Diagnostic> syntax = tson.validate("""
                 !!schema:"https://example.test/point-1.tn"
-                !point { x: 1, }""");
+                !point { x: 1, , y: 2 }""");
         assertEquals(1, syntax.size(), syntax.toString());
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, syntax.getFirst().code());
 
