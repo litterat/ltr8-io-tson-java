@@ -726,25 +726,10 @@ Class 1 reading. It is not one, for two reasons:
   it, reproducing §4's partition because it is built from it and leaving the resolution order inside the
   class function where it started.
 
-**Two §5.4 findings fell out of checking this, neither about `true`/`false`:**
-
-1. **The derived fact is discriminability; the `@disjoint` prose says mutual exclusivity.** §5.4 requires the
-   derivation be exactly class-distinctness and "MUST NOT prove more (value-set separation ... does not make
-   a choice disjoint)". But it describes the annotation as recording "the intent that its variants are
-   mutually exclusive", which is inhabitance. The two come apart on any choice containing a string-class
-   atom: `text` admits every token (§2.4's *form is not meaning* means a declared `text` position takes `42`
-   and `true` unquoted), so `42` inhabits both variants of `( int32 | text )` — which is nonetheless accepted
-   as `@disjoint`, correctly. **Suggested:** §5.4's `@disjoint` paragraph should say the author asserts the
-   variants are *distinguishable by the encoding's form resolution*, which is what is checked, and note that
-   overlap in inhabitance is ordinary and expected.
-2. **A token can be discriminated to a variant that refuses it, with no second chance.** §4's `number`
-   production admits `0xFF`, `0b1010`, `0o377`, `.inf` and `.nan`; core.tn's `number` atom is decimal-only
-   and refuses all five. So in `( number | text )` those tokens classify as NUMBER, dispatch to `number`, and
-   fail — they cannot reach `text`, because §5.4's once-only rule forbids "a second, type-directed inspection
-   of the value's form". The behaviour is exactly as specified and the trap is real: the natural reading of
-   `( number | text )` is "a number or anything", and `0xFF` matches neither. Worth a sentence in §5.4 or in
-   core.tn's own `@doc` — a constructor narrower than its base-type class is a footgun in any untagged
-   choice, not only this one.
+**Two §5.4 findings fell out of checking this, and are recorded as #22** — the `@disjoint` annotation's prose
+describes a different property from the one the resolver derives, and a token discriminated to a variant that
+refuses it gets no second chance. Neither is about `true`/`false`, and an adjudicator looking at §5.4 would not
+find them here.
 
 **Suggested resolution:** keep `true` and `false`, and say why in §4.2 in the terms above — the §5.4
 dependency first, so that #7's removal is not read as half of a pattern whose other half would silently
@@ -753,8 +738,7 @@ words to explain rather than three, both members of a kernel enum, which is the 
 schema.
 
 **Status against Revision 34:** open, and new against this revision — a decision, recorded so that it is one.
-This implementation recommends keeping them and has changed nothing. Finding 1 above is a §5.4 wording
-question rather than a `true`/`false` question and may want an entry of its own once the revision opens.
+This implementation recommends keeping them and has changed nothing.
 
 ---
 
@@ -1165,18 +1149,28 @@ spellings — the braced record resolves, the sugar does not parse.
    data-position reference with arguments uses the explicit record. Costs nothing and stops the next
    implementer discovering it by parse error, which is how it was found.
 2. **Recommend the alias.** `order_page => page<order>` is one line, reads better than either alternative, and
-   gives the application an identity. If that is the intended answer, §8.2 is the place to say so. One
-   diagnostic point comes with it: a bad argument in the *alias* form is reported against the entry the
-   template materialised (`'array_no_such_eb84587b' element_type has an unresolved reference 'no_such'`) where
-   the inline form names the operation — so if (2) is the recommended spelling, that message is the one to
-   improve, the author having written `order_page => page<no_such>` and been shown a synthetic name they have
-   never seen.
+   gives the application an identity. If that is the intended answer, §8.2 is the place to say so. This entry
+   used to attach a diagnostic caveat here — a bad argument in the alias form was reported against the entry
+   the template materialised, showing the author a synthetic name they had never seen — and **that caveat is
+   gone**: `EntryDisplayName` renders a minted entry as the sugar or application that produced it, so
+   `order_page => page<no_such>` now reports
+
+   ```
+   [SCHEMA_ERROR] /order_page: '[no_such]' element_type has an unresolved reference 'no_such'
+   [SCHEMA_ERROR] /order_page: 'page<no_such>' source has an unresolved reference 'no_such'
+   ```
+
+   located at the author's own declaration and naming only text the author wrote. Option 2 therefore carries
+   no cost this implementation can find, which strengthens it against option 1.
 3. **Extend the sugar to data position.** Real ergonomics, and a real cost: `<` becomes meaningful in data, at
    exactly one slot type, decided by the governing schema. Probably not worth it — noted for completeness
    rather than recommended, and it would have to reach a record §8.1 argues must stay braced.
 
 **Status against Revision 34:** open. This revision reworked §8.1 heavily — held bodies, `reference.target`
-widened to a `type_ref` — and left the positional-form paragraph byte-identical.
+widened to a `type_ref` — and left the positional-form paragraph byte-identical. The one thing that has moved
+is on this side: the diagnostic caveat option 2 used to carry is fixed, so the choice between options 1 and 2
+is now between documenting the rule and recommending a spelling, and they are not exclusive — a revision may
+take both.
 
 ---
 
@@ -1283,7 +1277,12 @@ checking it at startup, and the method-as-type shape is measured and kept as a p
 argument are on record where the next revision is designed. The two are what make the primitive look inevitable
 rather than added.
 
-**Status against Revision 34:** open, and new against this revision.
+**Status against Revision 34:** open, and new against this revision — **and blocked on the author rather than
+on this implementation.** Every route to it changes the meta-kernel: a namespace value needs a kernel type, and
+the kernel is a published, hash-pinned Revision 34 artifact (§10, §13.2). Nothing can be built here without
+minting digests for a document nobody has published, so unlike #7–#10 this proposal cannot arrive as running
+code — it needs the revision to move first, and this entry is the whole of what one implementation can
+contribute to it.
 
 ---
 
@@ -1391,5 +1390,61 @@ missing tag is felt.
 than a defect, and one this implementation recommends answering *no* and recording, since #8 removed the
 reason the answer used to be obvious. Nothing here is built: the recommendation is the status quo, and what
 is proposed is the sentence that justifies it.
+
+---
+
+## 22. §5.4 asserts one property and derives another, and a discriminated variant that refuses the value has no fallback
+
+**Section:** [TSON-SCHEMA] §5.4 (discrimination classes, derived disjointness, the `@disjoint` assertion),
+§5.11 (field groups); [TSON-DATA] §2.4 (form is not meaning), §4 (base type resolution).
+
+**Problem:** two findings about one section, both surfaced while checking #11 and neither about the question
+that entry asks.
+
+**1. The assertion and the derivation are different claims.** §5.4 fixes the derivation exactly —
+"a choice is `disjoint: true` if and only if every variant has a class and no class appears twice ... a
+resolver MUST record exactly this — it MUST NOT prove more (value-set separation such as disjoint numeric
+bounds or disjoint patterns does not make a choice disjoint) or less" — and that derivation is about
+**discriminability**. But the same section describes the annotation as recording "the intent that its variants
+are **mutually exclusive**", which is about **inhabitance**. The two come apart on any choice holding a
+string-class atom, because [TSON-DATA] §2.4's *form is not meaning* makes `text` admit every token: a declared
+`text` position takes `42` and `true` unquoted. So `42` inhabits both variants of `( int32 | text )` — which
+this implementation accepts under `@disjoint`, correctly, because it is discriminable.
+
+An author reading §5.4 writes `@disjoint` believing they have asserted their variants cannot both match a
+value. They have asserted something weaker and more useful, and the section never says so.
+
+**Suggested resolution:** state the assertion in the derivation's own terms — the author asserts that the
+variants are *distinguishable by the encoding's form resolution*, which is what is checked — and add that
+overlap in inhabitance is ordinary and expected, `text` beside any scalar being the common case. The
+verification outcomes are unchanged; only the sentence describing what was verified moves.
+
+**2. A variant that refuses a value it was discriminated to has no fallback, and nothing warns.** §4's
+`number` production admits `0xFF`, `0b1010`, `0o377`, `.inf` and `.nan`. core.tn's `number` atom is
+decimal-only and refuses all five. So in `( number | text )` those tokens classify as NUMBER, dispatch to
+`number`, and fail — they cannot reach `text`, because §5.4 requires the variant be "recovered from the
+value's class, never by a second, type-directed inspection of the value's form; the once-only reading of form
+([TSON-DATA] §2.4) is preserved".
+
+Measured: `( number | text )` given `0xFF` reports *"'number': '0xFF' is not a valid number"* rather than
+reading it as text. The behaviour is exactly as specified and the once-only rule is worth keeping — what is
+missing is that nothing tells an author their choice has a hole. `( number | text )` reads as "a number or
+anything" and accepts `0xFF` in neither variant.
+
+**Suggested resolution:** a sentence in §5.4, and a cross-reference from §5's vocabulary: **a constructor
+narrower than its base-type class leaves values of that class unreachable in any untagged choice it appears
+in.** It applies to `number` against §4's production, and to every refined atom — `int32` in
+`( int32 | text )` refuses `99999999999999` the same way, and a pattern-refined `text` beside another
+string-class variant refuses everything the pattern excludes. This is not a rule to add but a consequence to
+name, and naming it is what stops an author reaching for a choice where §5.11's labelled form is the shape
+they want.
+
+**Interpretation chosen:** Revision 34 as written, in both halves. `ChoiceDisjointness` derives class
+distinctness and nothing else; `TsonSchemaLinker` checks `@disjoint` against it; `ChoiceReader` recovers an
+untagged value to the variant of its own class and does not retry another on failure.
+
+**Status against Revision 34:** open, and new against this revision — split out of #11, where they were
+recorded first and would not have been found by anyone reading for §5.4. Finding 1 is a wording defect;
+finding 2 is a consequence the section leaves for an author to discover from a read failure.
 
 ---
