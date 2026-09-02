@@ -815,26 +815,37 @@ table above is the part a revision would otherwise have to discover for itself.
 
 **Problem:** A record and a map share the brace form because a JSON object is `{ … }` and a record is what a JSON
 object becomes. The whole of §2.8 exists to pay for that sharing: a parser consumes one data value and inspects the
-next token to learn which structure it is in; the first field name is checked to be a bare token at that point and
-nowhere else; an empty `{}` is neither and is "deferred to the resolver", where [TSON-SCHEMA] §7.7 resolves it by the
-expected type; and a schema's own grammar imports the dispatch ([TSON-SCHEMA] §12.2 states its lookahead budget). A
-distinct map delimiter would delete the section and the empty-brace concept with it.
+next token to learn which structure it is in; the first field name is checked at that point and nowhere else; an
+empty `{}` is neither and is "deferred to the resolver", where [TSON-SCHEMA] §7.7 resolves it by the expected type;
+and a schema's own grammar imports the dispatch ([TSON-SCHEMA] §12.2 states its lookahead budget). A distinct map
+delimiter would delete the section and the empty-brace concept with it.
 
-**Interpretation chosen:** Revision 34 as written: `TsonDataStream` implements §2.8's dispatch with one consumed
-token plus one of lookahead, `EmptyBrace` is a distinct event and AST node, and `RecordAbstractReader`,
+**Interpretation chosen:** Revision 34 as written, and kept. `TsonDataStream` implements §2.8's dispatch with one
+consumed token plus one of lookahead, `EmptyBrace` is a distinct event and AST node, and `RecordAbstractReader`,
 `MapAbstractReader` and `TupleAbstractReader` each resolve it against their own type ([TSON-SCHEMA] §7.7), with
 `SchemalessTreeReader` taking the empty record by default.
 
-**Suggested resolution:** keep it, and this entry is the record that keeping it was decided rather than inherited.
-`{ k => v }` reads well, the dispatch is one token deep and stated as such, and an empty brace resolving by expected
-type is exactly right under a schema, which is the mode the format is for. The cost of a new delimiter — every map
-in every document and schema, and a second bracket pair for authors to learn — is out of proportion to a section
-that costs a parser a saved token. It is listed because it is the last place where JSON's shape is load-bearing in
-the grammar, and the one item here where the recommendation is that the JSON-derived choice stands on its own
-merits.
+One detail of the dispatch moved with #9 and is worth stating, since this entry is where its cost is accounted:
+the first field name is now matched against the identifier profile at that position rather than merely checked to
+be a bare token. The lookahead budget is unchanged — the same one consumed token plus one — and so is §12.2's
+statement of it; what the dispatch does with the token it already holds is a little more.
 
-**Status against Revision 34:** open, and new against this revision — recorded as a decision to keep, pending the
-author's confirmation.
+**Suggested resolution:** keep it. `{ k => v }` reads well, the dispatch is one token deep and stated as such, and
+an empty brace resolving by expected type is exactly right under a schema, which is the mode the format is for. The
+cost of a new delimiter — every map in every document and schema, and a second bracket pair for authors to learn —
+is out of proportion to a section that costs a parser a saved token.
+
+It is listed because it is the last place where JSON's shape is load-bearing in the grammar, and it is the one item
+of #9–#13 where the recommendation is that the JSON-derived choice stands on its own merits. That is worth stating
+positively rather than as an omission: the other four were kept or removed on reasons that survived the superset
+claim, and this one is kept because a shared brace was a good idea independently of where it came from. **A
+revision should say so in §2.8**, so that a later reader does not find the last JSON-shaped rule in the grammar and
+assume it was missed.
+
+**Status against Revision 34:** closed against this implementation, open as spec feedback — a decision to keep,
+now confirmed, with nothing built and nothing to build. The whole of the JSON cluster #8 opened is answered:
+#9 and #10 changed the grammar, #11 and #12 kept it with better reasons, and this keeps it unchanged and unargued
+against.
 
 ---
 
