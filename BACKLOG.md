@@ -72,15 +72,6 @@ own prose (which had gone stale on at least one of them):
   differing only in a lexical selector. What the spec owes here is `SPEC-FEEDBACK.md` #28; the comparison being absent entirely is
   this implementation's own.
 
-- [ ] **`scoped` has no reader, so core's `declared`/`extern`/`dynamic` compile to `ErrorReader`**
-  ([TSON-SCHEMA] §7.8), pinned by `CoreSchemaImportTest.exactlyTheScopedInstancesCompileToAnErrorReader`.
-  Not an unwritten atom grammar and not three gaps: one piece of machinery every scoped instance shares —
-  a reader over the `SchemaRef` event `TsonDataStream` already emits at every position [TSON-DATA] §2.3
-  admits one. The value names its own type; the instance's `scope` says which namespaces that name may
-  resolve in, and `schemas` narrows the foreign ones. For an `EXTERN` value that is §7.8's scope push as
-  written — load through the ordinary loader, push, resolve the `!type` in it, validate in full, pop — so a
-  schema nothing would supply stays one of the five `SCHEMA_*` codes rather than becoming a verdict. The
-  grammar half is done; the read half is the work.
 - [ ] **A sparse `members` set is declared and never applied at read time.** `integer_type.members` and
   `decimal_type.members` resolve, narrow (`AtomNarrowing.checkSubset`) and are checked for coherence against
   the body's other facets (`AtomCoherence.checkMembers`, including the range `integer_type.size` derives

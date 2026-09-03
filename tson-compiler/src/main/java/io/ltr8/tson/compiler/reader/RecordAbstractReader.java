@@ -14,8 +14,8 @@ import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -292,8 +292,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 seen[schemaIndex] = true;
                 continue;
             }
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
+            SchemaRef push = ScopePush.notAdmitted(ctx, fields.get(schemaIndex).parser());
+            if (push != null) {
+                ScopePush.refuse(ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position()),
+                        fields.get(schemaIndex).schema().type().name(), push);
             }
             Object decoded;
             if (ctx.peek() instanceof AbsentEvent) {
@@ -456,12 +458,15 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * stack uses everywhere else applies here too: if decoding reported, the contradiction check is skipped.
      */
     private void verifyFixed(TsonReadContext ctx, int schemaIndex, FieldSink sink, String fieldName) {
-        if (ctx.peek() instanceof SchemaRef) {
-            ctx.next();
-        }
+        SchemaRef push = ScopePush.notAdmitted(ctx, fields.get(schemaIndex).parser());
         FixedCheck check = fixedCheck[schemaIndex];
         RecordField schema = fields.get(schemaIndex).schema();
         TsonReadContext fieldCtx = ctx.schemaField(fieldName, schema.position());
+        if (push != null) {
+            // A FIXED field's type is an atom or an enum (§5.2), so it is never scoped and the directive is
+            // always refused here -- but it is refused rather than ignored, which is the point.
+            ScopePush.refuse(fieldCtx, schema.type().name(), push);
+        }
         if (ctx.peek() instanceof AbsentEvent) {
             ctx.next();
             if (schema.state() == FieldState.REQUIRED_FIXED) {

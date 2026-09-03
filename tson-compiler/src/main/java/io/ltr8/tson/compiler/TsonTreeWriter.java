@@ -180,6 +180,15 @@ public final class TsonTreeWriter {
     }
 
     private void writeNode(TsonValue node, TsonDataEmitter out) throws DataBindException {
+        // [TSON-DATA] §2.3 fixes the order within a scoped value: the directive opens the scope, and the
+        // value's own annotations and type-ref resolve inside it. So the scope is written first and what it
+        // governs is written exactly as it would be anywhere else -- which is also why this cannot ride in
+        // the switch below, whose every branch is already past the annotations.
+        if (node instanceof TsonScopedValue scoped) {
+            out.schemaRef(scoped.schema());
+            writeNode(scoped.root(), out);
+            return;
+        }
         writeAnnotations(node.annotations(), out);
         switch (node) {
             case TsonRecord record -> writeRecord(record, out);
@@ -194,6 +203,8 @@ public final class TsonTreeWriter {
             case TsonMissing missing -> throw new IllegalArgumentException(
                     "a TsonMissing is a navigation artifact and cannot be written as TSON; navigation failed at \""
                             + missing.path() + "\"");
+            case TsonScopedValue ignored -> throw new IllegalStateException(
+                    "a scoped value is written by the branch above, ahead of the annotations this switch is past");
         }
     }
 

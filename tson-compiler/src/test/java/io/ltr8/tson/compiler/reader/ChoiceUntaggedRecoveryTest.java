@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.ForeignSchemas;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -57,7 +58,8 @@ class ChoiceUntaggedRecoveryTest {
                 List.of(), List.of(), disjoint, new ChoiceBody(refs));
         entries.put("contact", choiceDef);
         ValueReaderContext context = new ValueReaderContext(
-                new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), entries)), readers);
+                new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), entries)), readers,
+                ForeignSchemas.none());
         return ChoiceReader.FACTORY.create("contact", choiceDef, context);
     }
 

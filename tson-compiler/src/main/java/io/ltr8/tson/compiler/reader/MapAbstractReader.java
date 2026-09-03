@@ -10,8 +10,8 @@ import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
 import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -163,8 +163,9 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
                         "each key stated once", "'" + keySegment + "' stated again");
             }
             ctx.next(); // MapArrow
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
+            SchemaRef push = ScopePush.notAdmitted(ctx, valueParser);
+            if (push != null) {
+                ScopePush.refuse(ctx.field(keySegment), body.valueType().name(), push);
             }
             sink.accept(key, decodedValue(keySegment, ctx));
             count++;

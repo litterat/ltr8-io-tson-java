@@ -12,8 +12,8 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The twenty-nine below are what is open against Revision 34 — the nineteen it left open, renumbered from #1,
-and ten raised since; the fourteen it resolved of the seventeen raised against Revision 33 are gone from here,
+The thirty below are what is open against Revision 34 — the nineteen it left open, renumbered from #1,
+and eleven raised since; the fourteen it resolved of the seventeen raised against Revision 33 are gone from here,
 because the spec now carries their rules and that is where the answer belongs. **This file is the as-built
 record**, not a pointer to one: where an entry proposes a design this implementation has built, the entry states
 the design, what is running, and what is not, so that a reviewer editing the spec needs nothing beside it.
@@ -1640,13 +1640,32 @@ one is not. (The member's own name moved from `scope_cell` to `scope_kind`: `cel
 entry's own 2×3 table, which is the argument rather than the thing, where every other enum in the meta layer
 names what its values *are* — `type_kind`, `field_state`, `binary_encoding`.)
 
-**The reader is the part that waits.** `ValueReaderFactoryRegistry` registers `scoped` to an `ErrorReader`, so
-core's three instances compile and the first read of a value against one reports `NOT_IMPLEMENTED`, located at
-the value, costing it a verdict and nothing else's. `TsonDataStream` already emits a `SchemaRef` event for a
-scoped `!!schema` at every position [TSON-DATA] §2.3 admits one, and no reader consumes it — the grammar half
-of §7.8 is done and the scope push is not. `DiscriminationClass` treats a scoped instance as classless, per
-§5.4. It is one piece of machinery rather than three, shared by every instance, which is what this shape
-bought over the two constructors it replaced.
+**The reader is built, and it is one reader.** `ScopedReader` serves every instance — core's `declared`,
+`extern` and `dynamic`, and every narrowing `extern_of`/`extern_type` materialises — because what separates
+them is two constraint values rather than a shape, which is what this constructor bought over the two it
+replaced. The value's own shape picks the cell as the data rule above states it; LOCAL resolves through the
+governing schema's own compiled readers, fixed when the entry is compiled, and EXTERN loads the named schema
+through the ordinary loader as the value arrives, so a schema nothing would supply is one of the five
+`SCHEMA_*` codes and never a verdict. `DiscriminationClass` treats a scoped instance as classless, per §5.4.
+
+**Two things building it settled that the proposal above had not.** First, §7.8's typed-position restriction
+needed somewhere to live: every container used to consume a `SchemaRef` and discard it, so a document could
+push a scope its schema never opted into and be read as though it had not. The refusal now sits at the one
+place that knows both the position's declared type and the reader standing there. Second, §7.8's "the
+discriminant is required" is a **validation** error and not a resolver one — nothing failed to resolve — and
+that is what §8.1's categories make of it at both cells, not only at the extern one §7.8 names.
+
+**And one this implementation had wrong, which only a read could show.** `extern_of<S>` and
+`extern_type<S, T>` are the first templates in the meta layer whose body puts a parameter inside a **map**
+(`schemas: { S => [T] }`), and three walks over the wire form did not descend into one. Substitution left
+the parameter name standing where the argument belonged, so the closed body carried the literal `S` as a
+schema identity. Kind inference never observed the parameter at all, so `T` — a value parameter, standing
+inside `[type_name]` — stayed on §12.1's reference channel and failed as an unresolved reference to a type
+called `claim` in the *applying* schema. And §8.2's derived name rendered the whole map as one unknown-value
+mark, so two bindings differing only inside a map hashed alike; the readable half of the name masked that,
+which is why the guard is now on the canonical rendering directly. Nothing in the spec is at fault; it is
+recorded here because the shape this entry proposes is what reached all three, and an implementation
+adopting it will reach them too.
 
 **Suggested resolution:** concretely, by section.
 
@@ -1663,10 +1682,9 @@ bought over the two constructors it replaced.
   `dynamic`, `extern_of` and `extern_type` in place of `unknown`. meta-kernel.tn: reword `value`'s `@doc`.
 
 **Status against Revision 34:** open, and new against this revision — a proposal, and like #7–#10 one this
-implementation now runs, in the vocabulary if not yet in the reader. The two constructors it replaces are gone;
-`scoped` compiles to a reader that reports a gap, exactly as they did, and that reader is the work the shape
-unblocks rather than a debt the shape created. What building it corrected is above: the entry's own inline
-`!set` at a field position is not spellable.
+implementation now runs end to end. The two constructors it replaces are gone; `scoped` reads, in both modes,
+against the conformance corpus's own vectors for §7.8. What building it corrected is above: the entry's own
+inline `!set` at a field position is not spellable, and its data rule owes §8.1 a category.
 
 ---
 
@@ -2457,5 +2475,77 @@ question: #28 asks what equality over a binary value *is*; this asks what the ty
 an artifact of one encoding. Unlike #23–#26 this entry reports a design that **replaced its own first
 proposal after that proposal was built** — which is the strongest form the register can take, and the reason
 the recommendation above is a report rather than a sketch.
+
+---
+
+## 30. §7.8 lets a schemaless document push a schema scope, which is the one place its own "authored intent" rule has nobody to author it
+
+**Section:** [TSON-SCHEMA] §7.8 (the typed-position restriction, final sentence), §7.1 (a document with no
+`!!schema` has no type vocabulary); [TSON-DATA] §2.3 (scoped values), §3.3 (where a directive may appear),
+§1.2 (conformance classes).
+
+§7.8 ends its typed-position restriction with:
+
+> Schemaless outer documents have no type expectations and always permit nested `!!schema` directives.
+
+The sentence before it gives the rule the whole restriction exists for:
+
+> The outer schema must opt in to receiving foreign values at each position where schema switching is
+> permitted — cross-schema acceptance is authored intent, not accident.
+
+The two do not sit together. A schemaless document has no outer schema, so there is nobody to opt in — and
+the exemption is granted on the strength of the same absence that makes the opt-in unavailable. "No type
+expectations" is why the restriction *cannot* be checked there; §7.8 reads it as why it need not be.
+
+**Three concrete consequences.**
+
+**1. A Class 1 document becomes a Class 2 document halfway down.** §1.2 classes a document by whether a
+schema governs it, and §7.1 says a document with no `!!schema` has no type vocabulary at all: base type
+resolution applies, and any type annotation outside the built-in vocabulary is preserved unresolved. A nested
+`!!schema` under that heading asks a Class 1 read to fetch a schema, resolve a `!name` in it, and validate a
+subtree against it — every Class 2 obligation, entered without the document ever having said it was one, and
+with §7.1's own sentence still true of the value beside it. A processor asked to read Class 1 either declines
+mid-document or silently becomes a Class 2 processor; neither is a position §1.2 describes.
+
+**2. It is the one directive with no cost ceiling.** Every other schema fetch a document can provoke is
+named in the header, where a processor sees it before reading anything, and there is exactly one. Here the
+count is the number of scoped-value positions the document has, discovered as it is read, in a document
+nothing has agreed to validate. §9.1's resource limits are about the document's own size and depth and say
+nothing about how many schemas reading one may fetch.
+
+**3. It has no verdict to give.** §7.8's scope push exists so that a value can be *validated* against the
+foreign schema. Under a schema, the surrounding document's own verdict is what the pushed value's verdict
+joins. Schemaless, there is no such verdict, so a conforming processor has to fetch a schema, resolve a type
+and validate a subtree in order to report the result of validating one value in a document it is otherwise
+not validating at all — or to ignore what it found, which is the outcome the rule reads as permitting.
+
+**What this implementation does:** refuses it. A nested `!!schema` in a document with no `!!schema` of its
+own is a validation error naming the directive, reported once per occurrence; the directive is then consumed
+and the value it prefixed is read schemalessly, so one stray directive costs one diagnostic rather than a
+value, and a `!name` inside it gets the ordinary Class 1 treatment (`UNKNOWN_TYPE_REF`, §7.1's "preserved
+unresolved" surfaced as a reader policy). `ScopePush.refuseSchemaless` is the one place it happens, beside
+the typed-position refusal, and `ScopedReadTest.aSchemalessDocumentOpensNoScope` pins it.
+
+**Suggested resolution:** replace the sentence with its converse — *a schemaless document opens no schema
+scope: a nested `!!schema` in a document with no `!!schema` of its own is a validation error.* One sentence,
+and it makes §7.8's restriction total rather than exempting the case that cannot satisfy it. §1.2's classes
+then stay decidable from the header, which is what makes `TsonDocumentHeader`-style routing possible at all:
+a reader knows from the first two lines which obligations it has taken on.
+
+The alternative resolution — keep the permission and say what it *means* — is available and worse: it has to
+say whether such a read is Class 1 or Class 2, what a processor that will not fetch schemas does with the
+directive, and where the pushed value's verdict goes. Three questions where the converse asks none, for a
+capability whose motivating example (§7.8's own heterogeneous attachments array) is a schema-governed
+document in every line of it.
+
+**What is running, and what is not.** The refusal is running, in both read modes and on both facades.
+Deliberately **not** in the conformance corpus: §7.8 as written says the opposite, so a vector either way
+would fail a conforming processor, and this repo's own tests carry it instead — the same treatment #5's
+template-parameter scopes get.
+
+**Status against Revision 34:** open, and new against this revision. Companion to #23, which rewrites §7.8
+around the `scoped` constructor: this is the one sentence of that section #23 does not touch, and it is the
+sentence that has to move whether or not #23 is adopted, the conflict being with §7.8's own reasoning rather
+than with either vocabulary.
 
 ---

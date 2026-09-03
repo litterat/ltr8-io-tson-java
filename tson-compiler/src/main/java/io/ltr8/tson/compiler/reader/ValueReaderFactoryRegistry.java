@@ -35,15 +35,15 @@ import java.util.function.UnaryOperator;
  * ChoiceReader#FACTORY} -- see that class's own Javadoc for why it has no {@code
  * DataClassUnion}-bounded counterpart the way {@code record} does.
  *
- * <p><b>Every {@code ~}-marked constructor meta-kernel.tn/meta.tn declare has an entry</b> --
- * verified against both files directly, not assumed. Two of them (see {@link #notImplemented}'s own
- * call sites, deliberately grouped at the bottom of {@link #baseFactories} rather than interleaved
- * with the working entries above) still have no compiled reader at all -- {@code extern} and {@code
- * scoped} -- registered anyway, to an {@link ErrorReader}, so a schema merely *declaring* one of
- * them still compiles; only reading a value against one actually fails. Neither is an ordinary missing
- * parser: {@code extern} is a whole absent mechanism (§7.8's mid-document schema scope switch) and
- * {@code scoped} is a whole absent mechanism -- one reader over {@code TsonDataStream}'s {@code SchemaRef}
- * event, shared by every scoped instance -- rather than a token shape waiting for a parser.
+ * <p><b>{@code scoped} is the one constructor whose two modes differ in what they keep rather than in what
+ * they build</b> ({@link ScopedReader#TREE}/{@link ScopedReader#BIND}): both read a foreign value through the
+ * foreign schema's own compiled reader, and only tree mode has somewhere to record the scope the document
+ * pushed. Every scoped instance -- core's {@code declared}, {@code extern} and {@code dynamic}, and every
+ * narrowing {@code extern_of}/{@code extern_type} materialises -- shares the one reader, what separates them
+ * being two constraint values rather than a shape.
+ *
+ * <p><b>Every {@code ~}-marked constructor meta-kernel.tn/meta.tn declare has an entry</b> -- verified
+ * against both files directly, not assumed -- and every one of them now builds a real reader.
  */
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
@@ -79,7 +79,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
                 new RecordBindReader.Factory(context, strict), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
                 AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.UNIT, UnaryOperator.identity(),
-                ChoiceReader.FACTORY));
+                ChoiceReader.FACTORY, ScopedReader.BIND));
     }
 
     /**
@@ -93,7 +93,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return new ValueReaderFactoryRegistry(baseFactories(
                 new RecordTreeReader.Factory(), new ArrayTreeReader.Factory(), new MapTreeReader.Factory(),
                 new TupleTreeReader.Factory(), AtomTypeReader.ENUM_OBJECT_MODE, TREE_UNIT, AtomTreeFactory::new,
-                ChoiceReader.FACTORY));
+                ChoiceReader.FACTORY, ScopedReader.TREE));
     }
 
     /** Tree mode's {@code unit} factory: {@code void} → {@link AbsentTreeReader}, {@code value}/{@code token} → {@link AtomTreeReader} over {@link AtomTypeReader#UNIT}'s own reader. */
@@ -107,7 +107,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,
             ValueReaderFactory unitFactory, UnaryOperator<ValueReaderFactory> leaf,
-            ValueReaderFactory choice) {
+            ValueReaderFactory choice, ValueReaderFactory scoped) {
         Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
 
         // meta-kernel.tn
@@ -143,22 +143,10 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("cidr4_type", leaf.apply(AtomTypeReader.CIDR4_TYPE));
         factories.put("cidr6_type", leaf.apply(AtomTypeReader.CIDR6_TYPE));
 
-        // Sugar/alias names -- not their own `~`-marked constructors, kept for lookup convenience only.
+        factories.put("scoped", scoped);
 
-        // ---- Not implemented yet -- every entry below is a real `~`-marked constructor from
-        // ---- meta-kernel.tn/meta.tn with no compiled reader at all. Registered to ErrorReader so a
-        // ---- schema declaring one still compiles; only reading a value against one actually fails.
-        factories.put("scoped", notImplemented("scoped"));
-
-        // Collections.unmodifiableMap, not Map.copyOf -- preserves the LinkedHashMap's own insertion
-        // order (Map.copyOf's own iteration order is unspecified), so the "not implemented" block
-        // stays visibly last at runtime too, not just in source.
+        // Collections.unmodifiableMap, not Map.copyOf -- preserves the LinkedHashMap's own insertion order
+        // (Map.copyOf's own iteration order is unspecified), so the table reads at runtime as it does here.
         return Collections.unmodifiableMap(factories);
-    }
-
-    private static ValueReaderFactory notImplemented(String constructorName) {
-        return (name, typeDefinition, context) -> new ErrorReader(name, new UnsupportedOperationException(
-                "'" + name + "' uses the '" + constructorName + "' constructor, which has no compiled reader "
-                        + "implemented yet"));
     }
 }

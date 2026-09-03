@@ -181,8 +181,10 @@ sit at the schema layer because that is the only layer able to name request and 
   an `ErrorReader` carrying the real cause. Dropping it — which `TsonCompiledMetaSchema` used to do — lost
   the constructor from the scoped vocabulary silently, so a governing meta compiled and registered looking
   healthy and the complaint landed against a *different* document: the first governed schema to apply it was
-  told the meta-schema does not declare it, which is both false and unactionable. Same treatment
-  `scoped` already gets, and the reason it registers a factory rather than throwing.
+  told the meta-schema does not declare it, which is both false and unactionable. **This is now the only
+  route to an `ErrorReader` at all**: every `~`-marked constructor the kernel and meta.tn declare builds a
+  real reader, `scoped` having been the last, and `CoreSchemaImportTest` asserts that no entry of core.tn
+  compiles to one.
 
 - **A meta layer is not a vocabulary channel, and this is the first thing an author tries.** The instinct on
   declaring `operation` in a meta layer is to put the shared types beside it — a `status_code` atom, an
@@ -373,8 +375,9 @@ class — so `[true false]` is boolean-class — `uuid`, `date`, `bytes`, …) �
 maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a
 discrimination the wire can't deliver) and `bracket` (arrays and tuples). A variant classifies through its
 §8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —
-`rational`/`complex` (whose typed forms straddle classes), `unit`, a mixed-class enum, a scoped instance, a nested
-choice, an extern, an unresolved name — makes the choice `false`, the conservative side. A `void` variant
+`rational`/`complex` (whose typed forms straddle classes), `unit`, a mixed-class enum, a scoped instance (its
+membership is a namespace, not a shape), a nested choice, an unresolved name — makes the choice `false`, the
+conservative side. A `void` variant
 never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`, after
 §8.3 flattening) — `(T | void)` confuses optionality with choice, which belongs to the position (`?`, `_`),
 per §5.4's "a variant MUST NOT resolve to `void`", judged after §8.3 flattening as it is here.
@@ -523,6 +526,16 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   you hold**, not a compile parameter. `get(uri)` resolves through the core (`resolveLinked`) and compiles
   the linked form standalone in its own mode, cached by identity; `compile(linked)` is the uncached
   primitive.
+  - **It also hands its own `get` to every compile it performs** (`ForeignSchemas`, threaded through
+    `TsonSchemaCompiler` into `ValueReaderContext`). [TSON-SCHEMA] §7.8's scope push resolves a schema the
+    *document* names, not one the schema being compiled does, so `ScopedReader` cannot be wired to an answer
+    the way every other reader's children are — it is wired to where to go and ask. Passing `this::get`
+    mid-construction is safe because nothing calls it until a read, long after every compile it could
+    re-enter has finished, and it is what makes a pushed schema share this cache, this loader and this read
+    mode with the schema that admitted it. A compile with no registry behind it — the bootstrap, a
+    standalone compile in a test — passes `ForeignSchemas.none()`, whose every lookup is
+    `SCHEMA_NOT_PERMITTED`: nothing was configured to supply a foreign schema, which is a fact about the
+    deployment and not a verdict on the document.
 - **Resolution is always bind-anchored, so it is delegated to the core regardless of read mode.** A
   schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a tree reader's `TsonValue`
   can't stand in — so every read registry shares the one bind-mode core for resolution; only the final compile

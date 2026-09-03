@@ -32,17 +32,24 @@ import java.util.Optional;
  * and {@code extern_type}, are the per-use narrowings, so naming one schema or one type in it is an
  * application rather than a declaration.
  *
- * <p>Pure constraint values, no reading behaviour: the reader a scoped position needs is one piece of
- * machinery over {@code TsonDataStream}'s {@code SchemaRef} event, shared by every instance, and it is not
- * built -- {@code ValueReaderFactoryRegistry} maps this constructor to an {@code ErrorReader}, so a schema
- * declaring one compiles and the first read of a value against it reports {@code NOT_IMPLEMENTED}.
+ * <p>Pure constraint values, no reading behaviour: {@code ScopedReader} is where these two fields are
+ * applied, and it is one reader for every instance -- what separates them is a scope and a narrowing, not a
+ * shape.
  */
 @Typename(name = "scoped")
 public record Scoped(List<ScopeKind> scope, Optional<Map<URI, List<String>>> schemas) implements Sum {
 
     public Scoped {
         scope = List.copyOf(scope);
-        schemas = schemas.map(entries -> Collections.unmodifiableMap(new LinkedHashMap<>(entries)));
+        // An omitted inner list arrives as null -- the field is `[type_name; 1..]?` and the binder hands an
+        // absent OPTIONAL field to the constructor as null -- so it is normalised here to the empty list this
+        // record's own contract states. Otherwise "any type of that schema" has two spellings and every
+        // consumer has to know both.
+        schemas = schemas.map(entries -> {
+            Map<URI, List<String>> copy = new LinkedHashMap<>();
+            entries.forEach((schema, types) -> copy.put(schema, types == null ? List.of() : List.copyOf(types)));
+            return Collections.unmodifiableMap(copy);
+        });
     }
 
     /** Whether this position admits a value whose type comes from {@code cell}'s namespace. */

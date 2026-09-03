@@ -34,7 +34,6 @@ import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
@@ -365,9 +364,7 @@ public final class SchemalessObjectReader {
                     EventSkip.scopedValue(ctx); // a data field the target class doesn't declare -- discard
                     continue;
                 }
-                if (ctx.peek() instanceof SchemaRef) {
-                    ctx.next();
-                }
+                ScopePush.refuseSchemaless(ctx);
                 construct[fields[idx].index()] = bindField(ctx, fields[idx]);
                 seen[idx] = true; // last occurrence wins (§2.5), reached by overwrite
             }
@@ -421,9 +418,7 @@ public final class SchemalessObjectReader {
         List<Object> buffered = new ArrayList<>();
         int index = 0;
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
-            }
+            ScopePush.refuseSchemaless(ctx);
             buffered.add(bind(ctx.index(index), elementClass));
             index++;
         }
@@ -503,9 +498,7 @@ public final class SchemalessObjectReader {
                             "each key stated once", "'" + key + "' stated again");
                 }
                 ctx.next(); // MapArrow
-                if (ctx.peek() instanceof SchemaRef) {
-                    ctx.next();
-                }
+                ScopePush.refuseSchemaless(ctx);
                 Object value = bind(ctx, valueClass);
                 dataClass.put().invoke(mapData, key, value);
             }
@@ -541,9 +534,7 @@ public final class SchemalessObjectReader {
         int index = 0;
         boolean reportedExtra = false;
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
-            }
+            ScopePush.refuseSchemaless(ctx);
             if (index >= slots.length) {
                 if (!reportedExtra) {
                     ctx.report(Diagnostic.Code.WRONG_ARITY, "tuple " + dataClass.typeClass() + " has " + slots.length

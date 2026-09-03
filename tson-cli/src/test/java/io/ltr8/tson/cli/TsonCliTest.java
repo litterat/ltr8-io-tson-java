@@ -77,20 +77,24 @@ class TsonCliTest {
     }
 
     /** A schema that loads clean and cannot be read against: {@code precision} is carried but not enforced. */
-    private static final String GAP_SCHEMA = """
-            !!id:"https://example.test/cli-gap.tn"
+    private static final String SCOPE_SCHEMA = """
+            !!id:"https://example.test/cli-scope.tn"
             !!meta:"https://tson.io/2026/35/m/meta.tn"
             !!import:"https://tson.io/2026/35/m/core.tn"
             {
-              stamped => { at: dynamic  n: int32 }
+              stamped => { at: extern  n: int32 }
               plain   => { n: int32 }
             }
             """;
 
-    /** Well formed, and valid as far as anything can tell -- the field it fills has no reader. */
-    private static final String GAP_DOCUMENT = """
-            !!schema:"https://example.test/cli-gap.tn"
-            !stamped { at: 1  n: 1 }
+    /**
+     * Well formed, and valid as far as anything can tell: {@code at} is declared {@code extern}, so the
+     * value opening a scope onto another schema is exactly what the field asked for ([TSON-SCHEMA] §7.8).
+     * What no run can do is judge it -- nothing on the command line declares that {@code !!id}.
+     */
+    private static final String UNAVAILABLE_SCOPE_DOCUMENT = """
+            !!schema:"https://example.test/cli-scope.tn"
+            !stamped { at: !!schema:"https://example.test/cli-absent.tn" !claim { id: 1 }  n: 1 }
             """;
 
     /**
@@ -101,10 +105,11 @@ class TsonCliTest {
      * therefore 70, not 1: something went unchecked, so "invalid" is not a verdict that run is entitled to
      * give, and the two codes are what let the CLI tell them apart in one pass.
      *
-     * <p><b>Over the codes here, and end to end in {@link #aGapCostsItsOwnFieldAVerdictAndNoOthers}.</b> No
-     * <em>schema</em> reaches a gap, so the mixed list this decides is reached end to end by a <em>read</em>
-     * gap, arriving as a {@code NOT_IMPLEMENTED} diagnostic like any other. The unit form stays because it
-     * states all three cases of the rule in one place, including the exit-1 case no gap fixture exercises.
+     * <p><b>Over the codes here, and end to end in {@link #aNonVerdictCostsItsOwnFieldAVerdictAndNoOthers}.</b>
+     * The end-to-end case is an unavailable schema rather than a gap: nothing this library refuses to
+     * implement is reachable from a document any more, so {@code NOT_IMPLEMENTED} has no fixture, while a
+     * scope push onto a schema nobody would supply reaches the same ranking through {@code SCHEMA_NOT_FOUND}.
+     * The unit form states all five cases of the rule in one place, gap included.
      */
     @Test
     void aRunHoldingMoreThanOneKindOfProblemTakesTheMostPermanentCode() {
@@ -133,26 +138,27 @@ class TsonCliTest {
     }
 
     /**
-     * <b>A gap at read time is a gap, end to end.</b> The schema loads clean and the document is well
-     * formed; what cannot be done is check one field against it, so the run is entitled to no verdict on
-     * that field. It rides in the report as {@code NOT_IMPLEMENTED} -- with the data path and position of
-     * the value that could not be read, like any other read diagnostic -- and {@link TsonCli#exitCodeFor}
-     * lifts the run to 70 with the note on stderr, so the report on stdout stays exactly what {@code
-     * --output json|tson} promises.
+     * <b>A schema that could not be obtained mid-document is not a verdict, end to end.</b> The outer schema
+     * loads clean, the document is well formed, and the field it fills is declared {@code extern} -- so the
+     * scope push is authored intent, and the only thing that failed is obtaining the schema the value names.
+     * That rides in the report as {@code SCHEMA_NOT_FOUND} -- with the data path and position of the value
+     * that could not be read, like any other read diagnostic -- and {@link TsonCli#exitCodeFor} lifts the run
+     * to 69 with the note on stderr, so the report on stdout stays exactly what {@code --output json|tson}
+     * promises.
      *
-     * <p>Never exit 1, which would tell a script the document was judged and rejected. The scoped instances
-     * reach this ({@code CLAUDE.md}); {@code dynamic} is the cheapest to write.
+     * <p>Never exit 1, which would tell a script the document was judged and rejected. It was not judged at
+     * all: nothing about that value has been checked, and whether it conforms is unknown.
      */
     @Test
-    void aReadTimeGapIsAGapNotAVerdict(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "gap.tn", GAP_SCHEMA);
-        Path data = writeFile(dir, "stamped.tn", GAP_DOCUMENT);
+    void aScopeThatCannotBeLoadedIsNotAVerdict(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "scope.tn", SCOPE_SCHEMA);
+        Path data = writeFile(dir, "stamped.tn", UNAVAILABLE_SCOPE_DOCUMENT);
 
         String err = captureStderr(() -> {
             String out = captureStdout(() ->
-                    assertEquals(70, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
-            assertTrue(out.contains("NOT_IMPLEMENTED"), out);
-            assertTrue(out.contains("has no compiled reader"), out);
+                    assertEquals(69, TsonCli.run(new String[] {"validate", schema.toString(), data.toString()})));
+            assertTrue(out.contains("SCHEMA_NOT_FOUND"), out);
+            assertTrue(out.contains("cli-absent.tn"), () -> "it names the schema it wanted: " + out);
             assertTrue(out.contains("/at"), () -> "located at the value it could not read: " + out);
         });
         assertTrue(err.contains("could not be checked"), err);
@@ -160,10 +166,10 @@ class TsonCliTest {
     }
 
     /**
-     * <b>A gap costs its own field a verdict and nothing else's.</b> This is the whole point of a gap
+     * <b>A non-verdict costs its own field a verdict and nothing else's.</b> This is the whole point of one
      * travelling as a code rather than as an exception, and it is checked in both directions at once: a run
      * holding one unreadable document and one plainly invalid document reports <em>both</em>, and a single
-     * document holding a gap and an ordinary error reports both of those too.
+     * document holding an unobtainable scope and an ordinary error reports both of those too.
      *
      * <p>Throwing instead lost the entire envelope -- stdout was empty and the invalid document was never
      * judged, in either order -- which is exactly the failure the schema pipeline gave up throwing gaps to
@@ -171,16 +177,16 @@ class TsonCliTest {
      * them". The read side was the last place that survived.
      */
     @Test
-    void aGapCostsItsOwnFieldAVerdictAndNoOthers(@TempDir Path dir) throws IOException {
-        Path schema = writeFile(dir, "gap.tn", GAP_SCHEMA);
-        Path gap = writeFile(dir, "stamped.tn", GAP_DOCUMENT);
+    void aNonVerdictCostsItsOwnFieldAVerdictAndNoOthers(@TempDir Path dir) throws IOException {
+        Path schema = writeFile(dir, "scope.tn", SCOPE_SCHEMA);
+        Path gap = writeFile(dir, "stamped.tn", UNAVAILABLE_SCOPE_DOCUMENT);
         Path invalid = writeFile(dir, "plain.tn", """
-                !!schema:"https://example.test/cli-gap.tn"
+                !!schema:"https://example.test/cli-scope.tn"
                 !plain { n: "nope" }
                 """);
         Path both = writeFile(dir, "both.tn", """
-                !!schema:"https://example.test/cli-gap.tn"
-                !stamped { at: 1  n: "nope" }
+                !!schema:"https://example.test/cli-scope.tn"
+                !stamped { at: !!schema:"https://example.test/cli-absent.tn" !claim { id: 1 }  n: "nope" }
                 """);
 
         for (List<String> run : List.of(List.of(gap.toString(), invalid.toString()),
@@ -193,8 +199,8 @@ class TsonCliTest {
                 args[i + 2] = run.get(i);
             }
             captureStderr(() -> {
-                String out = captureStdout(() -> assertEquals(70, TsonCli.run(args), run::toString));
-                assertTrue(out.contains("NOT_IMPLEMENTED"), () -> run + " -> " + out);
+                String out = captureStdout(() -> assertEquals(69, TsonCli.run(args), run::toString));
+                assertTrue(out.contains("SCHEMA_NOT_FOUND"), () -> run + " -> " + out);
                 assertTrue(out.contains("ATOM_CONSTRAINT_VIOLATION"),
                         () -> "the ordinary error still got its verdict: " + run + " -> " + out);
             });

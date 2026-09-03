@@ -12,8 +12,6 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.ScopeKind;
-import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -77,14 +75,16 @@ class TsonSchemaCompilerTest {
 
     @Test
     void anEntryWithNoRegisteredFactoryDoesNotBlockCompilingTheRestOfTheSchemaButFailsOnlyWhenActuallyRead() {
-        // "orphan" uses a constructor ("unknown_type") with no compiled reader at all -- TsonSchemaCompiler
-        // .compile() still builds the whole schema eagerly, including "orphan" itself (get("orphan")
-        // succeeds, unlike the old lazy behavior where it never got attempted at all until asked for);
-        // "used" (which never references "orphan") reads normally either way.
+        // "orphan" is a meta-layer constructor's instance (EndpointBody) -- [TSON-SCHEMA] §2.2.2's extension
+        // point, and the only kind of entry left that this library can build no reader for, every kernel and
+        // meta constructor having one. TsonSchemaCompiler.compile() still builds the whole schema eagerly,
+        // including "orphan" itself (get("orphan") succeeds, unlike the old lazy behavior where it never got
+        // attempted at all until asked for); "used" (which never references "orphan") reads normally either
+        // way.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("used", TypeDefinition.product(RecordBody.of(List.of())));
-        entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.SUM,
-                List.of(), true, List.of(), List.of(), Optional.empty(), new Scoped(List.of(ScopeKind.LOCAL), Optional.empty())));
+        entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.DATA,
+                List.of(), true, List.of(), List.of(), Optional.empty(), new EndpointBody("/search")));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
