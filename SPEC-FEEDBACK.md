@@ -2368,11 +2368,18 @@ ts => !set { element_type: text }
 !h { k: [ "a" "a" ] }   [TYPE_MISMATCH] /k/1: 'ts' requires unique elements, 'a' appears more than once
 ```
 
-The second line is this implementation's own bug and is on the backlog; the *first* is the spec question, and
-fixing the bug does not answer it — a correct `byte[]` content comparison still has to be told whether
-`"abcd"` and `"ABCD"` decode to the same value, which they do, and whether `hex` and `base64` positions can
-ever meet, which §7.5's homogeneous element type mostly prevents but §5.2's FIXED check and §2.6's map keys do
-not.
+The second line was this implementation's own bug and is now fixed: one `ValueIdentity` answers all three
+rules, a `byte[]` compares as its octets, and a set, a map key and a FIXED field agree. Fixing it did not
+answer the spec question, and building it made the shape of what is left clearer. **Two spellings of one
+octet string now compare equal here, and that is a decision this implementation made rather than one it
+read** — `"abcd"` and `"ABCD"` under `@bytes_encoding:HEX` are one value because the decoder is
+case-insensitive and the comparison is over what it produced. Nothing in the series says they must be, and an
+implementation whose hex decoder rejected uppercase would be equally conforming and would disagree.
+
+That is also why **the three vectors this added to the corpus all state one value in one spelling, twice**: a
+value equals itself under any contract there could be, so those are safe, and a vector turning on two
+spellings would fail a processor answering the open question the other way. The case that most wants a vector
+is the one that cannot have one until §7.5 says what equality is.
 
 **The stake is larger than duplicate detection, and §10 is where it bites.** §10.3 defines canonical identity
 and §10.2 pins content by hash. If equality is over the spelling rather than the value, then one octet string

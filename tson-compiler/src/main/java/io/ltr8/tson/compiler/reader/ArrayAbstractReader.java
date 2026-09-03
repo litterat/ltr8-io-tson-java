@@ -116,10 +116,11 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
             }
             Object decoded = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(index, ctx)
                     : elementParser.read(ctx.index(index));
-            if (seen != null && !seen.add(decoded)) {
+            if (seen != null && !seen.add(ValueIdentity.of(decoded))) {
                 ctx.index(index).report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + displayName + "' requires unique elements, '" + decoded + "' appears more than once",
-                        "a value not already present in this array", String.valueOf(decoded));
+                        "'" + displayName + "' requires unique elements, '" + Rendered.value(decoded)
+                                + "' appears more than once",
+                        "a value not already present in this array", Rendered.value(decoded));
             }
             sink.accept(decoded);
             index++;

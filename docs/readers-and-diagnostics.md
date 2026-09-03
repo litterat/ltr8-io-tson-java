@@ -75,8 +75,19 @@ is small and parsed once.)
   satisfies the requirement and makes the AST carry the normalised name. That is one chokepoint for all three record
   readers, and it means a name is stored in the form its identity is defined by, so an ordinary
   `record.get("café")` finds a decomposed one. A map **key** is a value and keeps its written content; only
-  its comparison normalises (`Nfc.keyOf`), which is §2.6's "textual identity is the parser's minimum" read
+  its comparison normalises (`ValueIdentity`), which is §2.6's "textual identity is the parser's minimum" read
   against a processor that decodes.
+- **One equality contract answers all three rules that compare two decoded values** (`ValueIdentity`): §7.5's
+  duplicate rule, §5.2's check of a stated FIXED value against its declared one, and §2.6's key identity.
+  Each of those delegates to "the element type's equality contract" and none of them defines it, so with the
+  comparison at each call site the three disagreed — a key normalised and a set element did not, and `bytes`
+  had no comparison at all, `byte[]` carrying Java's identity equality. That last one is the shape worth
+  remembering: an absent comparison is usually a missing verdict and here it was an **inverted** one, a FIXED
+  `bytes` field rejecting the only document it can accept. A `String` compares NFC, a `byte[]` as its octets,
+  and a tree atom by its normalised value **beside its type-ref and annotations** — stripping those is §2.6's
+  rule for a key, where the schema fixes the key type, and would merge `!cm 5` with `!inch 5` if it reached a
+  set. `Rendered` is the other half: `byte[]` inherits `Object.toString`, so a diagnostic naming one said
+  `[B@6d06d69c` until these comparisons could reach a value at all.
 - **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody`
   carries an `ElementState` governing the value — `{K => V?}`, §5.3's own row and the `state` field the
   kernel gives `map` — so `MapAbstractReader.decodedValue` gives the array element's
