@@ -1279,12 +1279,21 @@ checking it at startup, and the method-as-type shape is measured and kept as a p
 argument are on record where the next revision is designed. The two are what make the primitive look inevitable
 rather than added.
 
-**Status against Revision 34:** open, and new against this revision — **and blocked on the author rather than
-on this implementation.** Every route to it changes the meta-kernel: a namespace value needs a kernel type, and
-the kernel is a published, hash-pinned Revision 34 artifact (§10, §13.2). Nothing can be built here without
-minting digests for a document nobody has published, so unlike #7–#10 this proposal cannot arrive as running
-code — it needs the revision to move first, and this entry is the whole of what one implementation can
-contribute to it.
+**Status against Revision 34:** open, and **deliberately left open for this cycle: the shape needs further
+investigation before anything is built against it.**
+
+The reason first given here was the wrong one, and saying so matters because several entries below relied on
+it. It read: every route changes the meta-kernel, the kernel is a published hash-pinned Revision 34 artifact
+(§10, §13.2), and nothing can be built without minting digests for a document nobody has published. That is no
+longer a constraint. This branch moved all three companion artifacts to `/2026/35/` identities precisely so
+that a revision's own proposals can be built against artifacts named for it, and #7, #23, #24, #25, #26 and #29
+are all running on that basis. Publishing is not what stands in the way.
+
+What stands in the way is the design. A namespace value is not one addition but a question about what the
+kernel's 2×2 is for, and the entry above sketches a cell rather than settles one — so it is held over rather
+than implemented ahead of an answer. That is a different state from the rest of the register, and worth naming:
+every other open entry here is either a defect with a known fix or a proposal this implementation runs. This
+one is neither yet.
 
 ---
 
@@ -1888,7 +1897,43 @@ without saying so. The same hole loses a `@deprecated` or a `@doc` on any field 
 is owed whether or not either annotation lands, which is why it is stated as its own point above rather than as
 a dependency of them.
 
-**Suggested resolution:**
+**A second shape is on the table, and this entry deliberately does not choose between them.** Everything above
+puts the mark on a *choice* declaration. The alternative puts it on a **field of a base record**, and lets the
+subtypes carry the fixed values:
+
+```
+pet  => { @discriminator pet_type: text }
+dog  => pet & { pet_type: text = dog  breed: text }
+cat  => pet & { pet_type: text = cat  lives: int32 }
+pets => [pet]
+```
+
+Measured here, that resolves as written: `pet.subtypes` is `[dog, cat]`, the annotation survives resolution on
+`pet`'s `pet_type` `record_field`, and each subtype's restatement lands `REQUIRED_FIXED` carrying its token. The
+tagged form already validates — `!pets [ !dog { pet_type: dog  breed: lab } ]` — on §8.2's subtype index and
+nothing new. Untagged, `{ pet_type: dog  breed: lab }` is `UNRECOGNIZED_FIELD` against `pet`, a record being
+closed under its type (§7.2). So the carrier works and the dispatch is the whole of what is missing.
+
+What the shape changes:
+
+- **(b) is answered, and more simply than the choice-based shape answers it.** A field has one annotation
+  position, so §6's two-positions silence never arises and nothing has to say which spelling is honoured.
+- **(a) is changed rather than answered.** Dispatching an untagged record at a `pet` position is decode force in
+  the reference encoding, which the proposal above explicitly denies ("text keeps `!variant` at every
+  non-disjoint choice") and which the criterion for annotation-hood does not admit: a record invalid at a `pet`
+  position today would become valid, so the mark *does* change a value's validity. Either the criterion needs
+  restating for a mark that adds an admissible spelling without adding a value, or the fact belongs in the
+  kernel after all.
+- **The base is inhabited, and the choice-based shape never meets this.** `!pets [ { pet_type: anything } ]` is
+  valid today — a bare `pet`. Under untagged dispatch an untagged record whose `pet_type` matches no subtype's
+  fixed value is either a `pet`, or an error, or evidence that a discriminated base must be uninhabitable, and
+  the three are three different formats. A choice has no values of its own and poses none of it.
+- **The mechanism is `subtypes`, not `variants`.** §5.4's derived disjointness is not involved at all; the check
+  would run over the subtype index, and would owe an answer for a subtype that leaves the field unfixed and
+  makes dispatch ambiguous after the fact.
+
+**Suggested resolution:** stated below for the choice-based shape, which is what is running. The field-based
+shape is not excluded and would move the first two bullets.
 
 - meta.tn, not the kernel: `discriminator => @annotation field_name` and `rest => @annotation void`, on the
   criterion above. `field_name` is an `identifier`, so the discriminator names a field the way every other
@@ -1913,6 +1958,13 @@ entry's own point made concrete. Declaring an annotation is nearly free, and it 
 (a) and (b) are already load-bearing for `@disjoint` and unstated, and (c) is a live defect this implementation
 is on the wrong side of today, found by asking what a checked field annotation would have to survive. The
 vocabulary being present and the force being absent is exactly the state §6 has no words for.
+
+**Which shape the mark belongs to is held open for this cycle, on purpose.** It is not a question the schema
+layer settles by itself: both shapes resolve, and choosing between them wants validation against real documents
+and against how each maps to classes in a binding implementation — which is where an untagged-dispatch design
+either pays for itself or does not. So (a)'s criterion, the position, and the checks all stay unresolved pending
+that work, and the answer will move a later revision rather than this one. (c) is unaffected and stays owed
+either way: it is a defect about field annotations, not about discriminators.
 
 ---
 

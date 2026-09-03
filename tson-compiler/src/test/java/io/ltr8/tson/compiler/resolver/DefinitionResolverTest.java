@@ -383,7 +383,7 @@ class DefinitionResolverTest {
                         + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"multiple_of\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } state: \"OPTIONAL\" } ] "
                         + "groups: [ "
                         + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "

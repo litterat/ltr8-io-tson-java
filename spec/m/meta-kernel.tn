@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=ab56c2b77b8679f51a4a196ff4ddb66d3b128a3ba3292826dcc43ad2f9721fac"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=74d7282e5a7ec53a3ab182eda90eeea5b7b5d22f9e948322946779a7a6e4d592"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -195,7 +195,11 @@
     consumer decodes into, not the source form. Resolver output
     stores `size` as written and does not expand it to bounds.
 
-    Step: `multiple_of` is strictly positive — zero or a negative
+    Step: `multiple_of` is strictly positive. The type carries the
+    half of that it can — `non_negative_integer` rules out the sign,
+    with no `positive_integer` in the kernel to carry the rest and
+    none worth adding for one field — and the schema-load coherence
+    check rules out zero. Zero or a negative
     value is a schema-load error — and the test ignores the sign of
     the value, so -30 is a multiple of 15. A refinement may only
     tighten `multiple_of` to an integer multiple of the inherited
@@ -218,7 +222,7 @@
     size:  integer_size?
     ( min: integer | exclusive_min: integer )?
     ( max: integer | exclusive_max: integer )?
-    multiple_of:  integer?
+    multiple_of:  non_negative_integer?
     members:      integer_member_set?
   }
 

@@ -69,6 +69,15 @@ own prose (which had gone stale on at least one of them):
   written — load through the ordinary loader, push, resolve the `!type` in it, validate in full, pop — so a
   schema nothing would supply stays one of the five `SCHEMA_*` codes rather than becoming a verdict. The
   grammar half is done; the read half is the work.
+- [ ] **A sparse `members` set is declared and never applied at read time.** `integer_type.members` and
+  `decimal_type.members` resolve, narrow (`AtomNarrowing.checkSubset`) and are checked for coherence against
+  the body's other facets (`AtomCoherence.checkMembers`, including the range `integer_type.size` derives
+  rather than stores) — but no parser consults them, so `!integer ^ { members: [80 443 8080] }` accepts 22 at
+  read time. `IntegerParser`/`DecimalParser` are where it goes, beside the bounds and `multiple_of` checks
+  they already run; membership is [TSON-DATA] §4.3's identity, which `NumericIdentity` already implements, so
+  `0x50` matches the member `80`. The facet is `SPEC-FEEDBACK.md` #24, and the shape is settled — this is the
+  read half of it and nothing else.
+
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but two gaps are left, each
   matching that family's existing *narrowing* gap and each blocked on the same thing — `tson-schema` has no
@@ -79,6 +88,33 @@ own prose (which had gone stale on at least one of them):
       family has no CIDR parser.
     - The natural fix for both is the same one the narrowing check would want: an injected oracle, rather
       than moving the value model's dependencies.
+
+## Checked annotations
+
+[TSON-SCHEMA] §5.4's `@disjoint` is the precedent both follow: an annotation with **no** decode force and
+load-time force, checked at schema load, two outcomes and no third — verified silently, or the schema fails to
+load. Each is declared in meta.tn and neither is checked, so both are advisory today where the design says
+they carry force. §6 owes the category itself a description (`SPEC-FEEDBACK.md` #25(a)) and owes which of its
+two declaration positions honours one (#25(b)); this implementation consults both for `@disjoint` and should do
+the same here.
+
+- [ ] **`@bytes_encoding` is not checked against the type it annotates.** The directive works — resolved
+  nearest-first, field then the field's type walking its supertypes then base64 (`BytesEncoding`) — but its own
+  `@doc` promises that the annotated field or definition resolves to `bytes`, or the schema fails to load, and
+  nothing enforces that. A directive on an `int32` field is silently inert, which is the worst of the three
+  outcomes: it looks applied and does nothing.
+- [ ] **`@rest` is not checked, and one half of it cannot be written yet.** The type check is ordinary — the
+  annotated field's type resolves to a text-keyed map. "At most one per composed chain" is blocked on the
+  entry below: a restatement severs the chain silently, so there is no chain to count along.
+- [ ] **A restated field loses its inherited annotations** (`SPEC-FEEDBACK.md` #25(c)). `DefinitionResolver`
+  copies an inherited field whole (`absorb`) but rebuilds a *restated* one with `Annotations.empty()` and then
+  gives it only what the restatement wrote (`resolveFieldEntry`/`resolveField`). So §5.7's modifier-only entry
+  — `extra: ?`, defined to tighten presence and nothing else — silently un-marks the field it names, and the
+  same hole loses a `@deprecated` or a `@doc` on any field a subtype tightens. The defensible rule, and the
+  entry's own recommendation, is that a restatement's annotations **merge over** the inherited ones: an entry
+  writing none should not be able to erase what it does not mention. It changes resolved output for any schema
+  restating an annotated field, so it wants deciding rather than assuming — and §5.8/§8.1 owe the rule whichever
+  way it goes.
 
 ## Write side
 

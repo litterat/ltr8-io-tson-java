@@ -188,7 +188,7 @@
       !record_field { name: exclusive_min  type: integer  state: OPTIONAL }
       !record_field { name: max            type: integer  state: OPTIONAL }
       !record_field { name: exclusive_max  type: integer  state: OPTIONAL }
-      !record_field { name: multiple_of    type: integer  state: OPTIONAL }
+      !record_field { name: multiple_of    type: non_negative_integer  state: OPTIONAL }
       !record_field { name: members        type: integer_member_set  state: OPTIONAL }
     ]
     groups: [
