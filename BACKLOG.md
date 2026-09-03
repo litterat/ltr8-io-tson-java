@@ -47,6 +47,18 @@ own prose (which had gone stale on at least one of them):
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 
+- [ ] **§4.2's value-route-only rule is not enforced** — a `~` constructor's parameters may occur only as value
+  routes, and a type-channel one is a resolver error at the declaration. Nothing checks it, so a parameterized
+  container constructor resolves, links and compiles, and the first symptom is a *read* failing with "'set' is
+  a template taking 1 type argument": a diagnostic about a data document, for a mistake in a schema. A check
+  written against the held body alone false-positives, `element_type: = T` and `max_items: = N` being spelled
+  identically where the first is a type channel and the second a legal value route. **The distinction does
+  exist in the pipeline**: `ParameterKinds` resolves the constructor head and walks each written slot against
+  the field the constructor declares for it, classifying a parameter in `element_type` as `TYPE` and one in
+  `max_items` as `VALUE`. What needs establishing is whether that walk reaches the declarations this rule is
+  about — it starts from a held body, where §4.2 speaks about a `~` constructor's own declaration — and what a
+  head it cannot resolve should mean.
+
 ## Built-in types
 
 - [ ] **Set uniqueness and map-key identity never fire for `binary`.** `BinaryParser` is
@@ -77,6 +89,22 @@ own prose (which had gone stale on at least one of them):
   they already run; membership is [TSON-DATA] §4.3's identity, which `NumericIdentity` already implements, so
   `0x50` matches the member `80`. The facet is `SPEC-FEEDBACK.md` #24, and the shape is settled — this is the
   read half of it and nothing else.
+
+- [ ] **§5.7's selector rule is unenforced, and for a defaulted selector needs something the value model
+  does not keep.** "A selector may be set where the source leaves it at the constructor's default" — nothing
+  checks it. `complex_type.component` (`~ NUMBER`) is the case that bites: after resolution `complex` and an
+  explicit `^ { component: NUMBER }` are the same record, so a legal set-from-default and an illegal re-set
+  are indistinguishable, and `ComplexType` says so at the class. Enforcing it means the resolver keeping which
+  facets a refinement's *source* actually wrote, which the atom-refinement merge erases — that is the work,
+  and whether it is worth the carrying cost for one facet is the first thing to decide. The other selector,
+  `float_type.format`, is REQUIRED with no default, so the rule has nothing to fire on there at all.
+
+- [ ] **`duration` is nanosecond-resolved where meta.tn says rational seconds.** The host type is
+  `java.time.Duration` (`DurationType`, `DurationParser`), so `PT0.0000000001S` is refused rather than
+  rounded — chosen because `time_type` and `datetime_type` already work at nanosecond resolution for the same
+  fractional-second component, and silently rounding would make a bound comparison lie. Closing the gap means
+  `Rational` as the host type, which moves `min`/`max`/`exclusive_min`/`exclusive_max`/`multiple_of` with it
+  and gives up `Duration`'s arithmetic; leaving it means the register carrying the divergence. Neither is done.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but two gaps are left, each
