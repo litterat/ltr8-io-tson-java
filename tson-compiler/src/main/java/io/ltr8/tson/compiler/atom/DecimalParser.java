@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.meta.DecimalType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Parses and validates against meta-kernel's {@code decimal_type} constructor (§5.6's {@code
@@ -21,9 +22,9 @@ import java.util.Optional;
  * already implements the exactness for (a bare decimal token already binds to {@code BigDecimal}
  * without loss); this type exists to apply the same exact-preservation contract when the token
  * additionally carries an explicit {@code !number} annotation, plus {@code decimal_type}'s
- * constraint vocabulary (bounds, {@code multiple_of}, digit-count limits) on top. Holds a {@link
- * DecimalType} -- the pure constraint values, unchanged by this split -- rather than declaring
- * those fields itself.
+ * constraint vocabulary (bounds, {@code multiple_of}, digit-count limits, a sparse {@code members} set) on
+ * top. Holds a {@link DecimalType} -- the pure constraint values, unchanged by this split -- rather than
+ * declaring those fields itself.
  */
 public record DecimalParser(DecimalType constraints) implements AtomType<BigDecimal> {
 
@@ -110,6 +111,16 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
                 throw new AtomValidationException(
                         "'" + text + "' has more than the maximum " + fd + " digits after the decimal point",
                         "at most " + fd + " digits after the decimal point");
+            }
+        });
+        // §4.3's identity, and BigDecimal's own is not it: 2.50 and 2.5 are two objects and one number, so
+        // membership is compareTo. `DecimalType` reads every member as a decimal before the set is formed,
+        // which is what lets this compare at all -- the facet is `set<value>` on the wire.
+        constraints.members().ifPresent(members -> {
+            if (members.stream().noneMatch(member -> value.compareTo(member) == 0)) {
+                throw new AtomValidationException(
+                        "'" + text + "' is not a member of this type -- expected one of " + members,
+                        "one of (" + members.stream().map(BigDecimal::toString).collect(Collectors.joining(", ")) + ")");
             }
         });
     }

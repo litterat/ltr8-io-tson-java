@@ -3,6 +3,7 @@ package io.ltr8.tson.schema.meta;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiPredicate;
 
 /**
  * Shared facet-comparison utilities behind {@link Atom#constraintsCheck} -- the mechanics every
@@ -143,14 +144,27 @@ final class AtomNarrowing {
      * {@code members}, a CIDR family's {@code within}. §5.7 declares the member-set facet kind once and
      * never enum-specifically ("an enum's {@code members}, a pattern alternation authored as a set"), so
      * one comparison serves every family that carries one. Members are compared by {@code equals}, which
-     * is [TSON-DATA] §4.3's identity for the numeric families: the token is recorded as written and
-     * compared as the value denoted, so {@code 0x50} and {@code 80} are one member.
+     * is [TSON-DATA] §4.3's identity where a member's host type has one value per number -- an identifier,
+     * a {@link java.math.BigInteger}, so {@code 0x50} and {@code 80} are one member.
      */
     static <T> void checkSubset(List<String> out, String facet, List<T> source, List<T> refined) {
+        checkSubset(out, facet, source, refined, Object::equals);
+    }
+
+    /**
+     * The same rule where the family's own identity is not {@code equals} -- {@link java.math.BigDecimal}
+     * carries its scale, so {@code 2.50} and {@code 2.5} are two objects and one member, and only the
+     * family knows that. §4.3's identity is the one the read applies, so the two must not part company
+     * here: a member set is admitted or refused by exactly what a value in it would be matched against.
+     */
+    static <T> void checkSubset(List<String> out, String facet, List<T> source, List<T> refined,
+            BiPredicate<T, T> sameValue) {
         if (source.isEmpty()) {
             return;
         }
-        List<T> added = refined.stream().filter(member -> !source.contains(member)).toList();
+        List<T> added = refined.stream()
+                .filter(member -> source.stream().noneMatch(admitted -> sameValue.test(admitted, member)))
+                .toList();
         if (!added.isEmpty()) {
             out.add(facet + " adds " + added + ", which the source does not admit");
         }

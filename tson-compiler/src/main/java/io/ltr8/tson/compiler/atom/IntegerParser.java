@@ -11,6 +11,7 @@ import io.ltr8.tson.schema.meta.IntegerType;
 import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Parses and validates against meta-kernel's {@code integer_type} constructor (§5.6's integer
@@ -19,8 +20,8 @@ import java.util.Map;
  * {@code rational_type}/{@code complex_type}, and are separate work). Holds a {@link
  * io.ltr8.tson.schema.meta.IntegerType} -- the pure constraint *values* {@code integer_type}
  * declares in the schema ({@code size}/{@code min}/{@code exclusive_min}/{@code max}/{@code
- * exclusive_max}/{@code multiple_of}), unchanged by this split -- rather than declaring those
- * fields itself; this class contributes only the parsing/validation *behavior* that consumes them.
+ * exclusive_max}/{@code multiple_of}/{@code members}), unchanged by this split -- rather than declaring
+ * those fields itself; this class contributes only the parsing/validation *behavior* that consumes them.
  * Every other built-in vocabulary constructor to come follows the same split (a {@code schema.meta}
  * values class plus a {@code vocab} compiler holding it), not a one-off for the integer family.
  *
@@ -127,6 +128,15 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
         constraints.multipleOf().ifPresent(m -> {
             if (value.remainder(m).signum() != 0) {
                 throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
+            }
+        });
+        // The member set is compared on the decoded value, which is [TSON-DATA] §4.3's identity for this
+        // family: 0x50 and 80 are one member, having reduced to one BigInteger before ever reaching here.
+        constraints.members().ifPresent(members -> {
+            if (!members.contains(value)) {
+                throw new AtomValidationException(
+                        "'" + text + "' is not a member of this type -- expected one of " + members,
+                        "one of (" + members.stream().map(BigInteger::toString).collect(Collectors.joining(", ")) + ")");
             }
         });
     }

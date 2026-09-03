@@ -72,14 +72,17 @@ own prose (which had gone stale on at least one of them):
   differing only in a lexical selector. What the spec owes here is `SPEC-FEEDBACK.md` #28; the comparison being absent entirely is
   this implementation's own.
 
-- [ ] **A sparse `members` set is declared and never applied at read time.** `integer_type.members` and
-  `decimal_type.members` resolve, narrow (`AtomNarrowing.checkSubset`) and are checked for coherence against
-  the body's other facets (`AtomCoherence.checkMembers`, including the range `integer_type.size` derives
-  rather than stores) — but no parser consults them, so `!integer ^ { members: [80 443 8080] }` accepts 22 at
-  read time. `IntegerParser`/`DecimalParser` are where it goes, beside the bounds and `multiple_of` checks
-  they already run; membership is [TSON-DATA] §4.3's identity, which `NumericIdentity` already implements, so
-  `0x50` matches the member `80`. The facet is `SPEC-FEEDBACK.md` #24, and the shape is settled — this is the
-  read half of it and nothing else.
+- [ ] **A `value`-typed scalar facet reports a library gap where the author is wrong.** `decimal_type`'s
+  bounds are typed `value` — §7.4's constraint-fields rule, and the bootstrap ordering behind it, leave the
+  family unable to name its own atom — so `!number ^ { min: "abc" }` is a legal record on the wire and fails
+  where the binder casts a `String` to `BigDecimal`. That `ClassCastException` reaches
+  `DefinitionResolver.bindAtomInstance`'s catch-all and comes out as `NOT_IMPLEMENTED`: the author is told
+  their correct reading of the spec is this library's fault, and the CLI exits 70 rather than 1. The member
+  set's own version of this is closed — `DecimalType` reads each member before the set is formed — and the
+  bounds want the same treatment, which means reading them where the wire type stops short rather than
+  widening the catch-all, since an unread `min` is also what the narrowing and coherence comparisons take on
+  trust. Every `value`-typed facet in the family is in scope: `min`, `exclusive_min`, `max`, `exclusive_max`,
+  `multiple_of`.
 
 - [ ] **§5.7's selector rule is unenforced, and for a defaulted selector needs something the value model
   does not keep.** "A selector may be set where the source leaves it at the constructor's default" — nothing

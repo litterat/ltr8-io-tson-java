@@ -266,4 +266,17 @@ fixed, closed name→`AtomType` table (§5).
   being a materially bigger piece of work than a scalar bound. Their host type is `String` — the authored
   text, validated and handed back — for `MacParser`'s reason: Java has no type to map onto, and the
   round trip stays exact.
+- **The exact tiers' sparse `members` set is a facet, and its identity is [TSON-DATA] §4.3's.** `integer`
+  and `number` carry a member set (§5.6) for a value set that is neither a contiguous range nor an
+  arithmetic progression, so none of the other facets denotes it; `IntegerParser`/`DecimalParser` apply it
+  beside the bounds and `multiple_of`. Membership is the value denoted, never the token: `0x50` is the
+  member written `80`, having reduced to one `BigInteger` before the check runs, and `2.5` is the member
+  written `2.50`, which needs `compareTo` — `BigDecimal` carries its scale and its own equality is not
+  §4.3's. `decimal_type.members` is typed `set<value>` (the family cannot name its own atom, §7.4), so a
+  collection element arrives as whatever §4 resolved it to and nothing narrows it the way a record field's
+  scalar is narrowed; `DecimalType`'s own constructor reads each member as a decimal before the set is
+  formed, which is where "`1` and `1.0` are one member and a duplicate rather than two" is enforced and what
+  lets the read, the tightening (`AtomNarrowing.checkSubset`) and the coherence check
+  (`AtomCoherence.checkMembers`) share one identity. `float_type` carries no member set, on the same
+  rationale it carries no `multiple_of`: a step cannot hold on a binary grid.
 - The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.
