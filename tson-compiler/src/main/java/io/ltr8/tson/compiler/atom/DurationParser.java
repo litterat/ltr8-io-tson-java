@@ -12,7 +12,12 @@ import java.util.regex.Pattern;
 
 /**
  * Parses and validates against meta's {@code duration_type} constructor ([TSON-SCHEMA] §5.5's {@code
- * duration} atom): elapsed time, as a signed rational number of seconds.
+ * duration} atom): elapsed time, as a signed <b>exact decimal</b> number of seconds. The lexical form permits
+ * a decimal fraction on the seconds component and nowhere else, so no non-terminating fraction is writable --
+ * {@code PT1/3S} is not a token -- and every duration is therefore a terminating decimal count of seconds.
+ * That is {@code number}'s value space measured in seconds, which is what makes {@code precision} exactly
+ * {@code fraction_digits} on that count and {@code multiple_of} exactly {@code number}'s own: the facets are
+ * definitions rather than rules of their own.
  *
  * <p><b>The grammar is RFC 3339 Appendix A's {@code duration} production with three extensions and one
  * restriction</b>, and the restriction is what makes the family orderable. Extensions: an optional leading
@@ -28,9 +33,11 @@ import java.util.regex.Pattern;
  * value and never the token, and why this family can enforce them at all: while one type carried both
  * calendar and clock components the order was partial and the bounds it declared went unchecked.
  *
- * <p>{@code precision} bounds fractional-second digits on the written token, as {@code time_type}'s does --
- * a validation constraint, nothing is truncated. {@code multiple_of} is tested on the magnitude, so {@code
- * -PT30M} is a multiple of {@code PT15M}.
+ * <p><b>Both ends of the value space are fixed at a signed 64-bit count of nanoseconds</b> -- see {@link
+ * #MAX_FRACTION_DIGITS}. Within that, {@code precision} constrains the <em>value</em> and never the spelling,
+ * as {@code time_type}'s own {@code @doc} states for the same facet: {@code PT0.50S} is a whole number of
+ * tenths and {@code precision: 1} admits it. Nothing is truncated; a value genuinely off the grid is
+ * rejected. {@code multiple_of} is tested on the magnitude, so {@code -PT30M} is a multiple of {@code PT15M}.
  */
 public record DurationParser(DurationType constraints) implements AtomType<Duration> {
 
@@ -53,6 +60,32 @@ public record DurationParser(DurationType constraints) implements AtomType<Durat
             + "|(?:(?<days>\\d+)D)?(?:T(?:(?<hours>\\d+)H)?(?:(?<minutes>\\d+)M)?"
             + "(?:(?<seconds>\\d+(?:\\.(?<fraction>\\d+))?)S)?)?)");
 
+    /**
+     * The finest resolution the value space carries, and the widest magnitude: a signed 64-bit count of
+     * nanoseconds. RFC 3339's {@code time-secfrac} is {@code "." 1*DIGIT} and its seconds component {@code
+     * 1*DIGIT}, so the grammar alone admits values no host runtime has a type for -- a nanosecond is the
+     * finest resolution any of them offers and several are coarser, and Go's {@code time.Duration} is a
+     * signed 64-bit nanosecond count exactly. A range that depends on which implementation read the document
+     * is not a range, so both ends are fixed here rather than left to what {@code java.time.Duration}
+     * happens to reach (±292 <em>billion</em> years, three orders past the tightest host).
+     *
+     * <p>Stated as a magnitude rather than the asymmetric {@code int64} range, so negating an admitted
+     * duration always yields an admitted one.
+     *
+     * <p>Longer spans are not lost, they are spelled better: a span of centuries is a calendar span and is a
+     * {@code period}, and a count of SI seconds beyond that is a physical quantity, where {@code number} in
+     * the unit the schema names says what a duration cannot.
+     *
+     * <p>The ceiling also makes {@link Duration#toNanos} total for every admitted value, which is what {@link
+     * DurationType#isMultiple} tests on: the range is the range {@code toNanos} has, so the overflow it used
+     * to throw past ±292 years is now unreachable rather than merely unlikely.
+     */
+    private static final int MAX_FRACTION_DIGITS = 9;
+
+    /** The ceiling as a count of seconds -- {@link #MAX_FRACTION_DIGITS} says why this number and not another. */
+    private static final BigDecimal MAX_SECONDS =
+            new BigDecimal(BigInteger.valueOf(Long.MAX_VALUE)).movePointLeft(MAX_FRACTION_DIGITS);
+
     private static final BigDecimal SECONDS_PER_DAY = BigDecimal.valueOf(86_400);
     private static final BigDecimal SECONDS_PER_WEEK = BigDecimal.valueOf(604_800);
     private static final BigDecimal SECONDS_PER_HOUR = BigDecimal.valueOf(3_600);
@@ -73,6 +106,14 @@ public record DurationParser(DurationType constraints) implements AtomType<Durat
                     + "required (§5.5)", "a duration");
         }
 
+        String fraction = m.group("fraction");
+        if (fraction != null && fraction.length() > MAX_FRACTION_DIGITS) {
+            throw new AtomParseException("'" + text + "' states " + fraction.length() + " fractional-second "
+                    + "digits, where a duration carries at most " + MAX_FRACTION_DIGITS + " -- one nanosecond is "
+                    + "the finest resolution the value space admits (§5.5)",
+                    "at most " + MAX_FRACTION_DIGITS + " fractional-second digits");
+        }
+
         BigDecimal seconds = BigDecimal.ZERO
                 .add(scaled(m.group("weeks"), SECONDS_PER_WEEK))
                 .add(scaled(m.group("days"), SECONDS_PER_DAY))
@@ -84,7 +125,7 @@ public record DurationParser(DurationType constraints) implements AtomType<Durat
         }
 
         Duration value = toDuration(seconds, text);
-        validate(value, m.group("fraction"), text);
+        validate(value, seconds, text);
         return value;
     }
 
@@ -93,28 +134,34 @@ public record DurationParser(DurationType constraints) implements AtomType<Durat
     }
 
     /**
-     * The value as a {@link Duration}. Nanosecond resolution is the series' own for fractional seconds --
-     * {@code time_type} and {@code datetime_type} work at it for the same component -- so a fraction finer
-     * than a nanosecond is refused rather than silently rounded, which would make a bound comparison lie.
+     * The value as a {@link Duration}, once the magnitude is known to fit one. The fraction is already
+     * capped at nine digits by the grammar, so the only thing left to refuse here is a span past the
+     * ceiling -- which {@link Duration} itself would take (its {@code long} seconds reach ±292 billion
+     * years) and which no implementation with a nanosecond-counting duration type could.
      */
     private static Duration toDuration(BigDecimal seconds, String text) {
-        BigDecimal nanos = seconds.movePointRight(9);
-        if (nanos.stripTrailingZeros().scale() > 0) {
-            throw new AtomParseException("'" + text + "' is finer than nanosecond resolution, which is what a "
-                    + "duration value carries (§5.5)", "a duration of at most nanosecond resolution");
+        if (seconds.abs().compareTo(MAX_SECONDS) > 0) {
+            throw new AtomValidationException("'" + text + "' is longer than " + MAX_SECONDS + " seconds, the "
+                    + "widest magnitude a duration carries -- a span this long is a calendar span (a period) "
+                    + "or a quantity in a unit a schema names (§5.5)",
+                    "a magnitude of at most " + MAX_SECONDS + " seconds");
         }
-        BigInteger total = nanos.toBigIntegerExact();
-        return Duration.ofSeconds(total.divide(BigInteger.valueOf(1_000_000_000L)).longValueExact(),
-                total.remainder(BigInteger.valueOf(1_000_000_000L)).longValueExact());
+        BigInteger nanos = seconds.movePointRight(MAX_FRACTION_DIGITS).toBigIntegerExact();
+        return Duration.ofSeconds(nanos.divide(NANOS_PER_SECOND).longValueExact(),
+                nanos.remainder(NANOS_PER_SECOND).longValueExact());
     }
 
-    private void validate(Duration value, String fraction, String text) {
+    private static final BigInteger NANOS_PER_SECOND = BigInteger.valueOf(1_000_000_000L);
+
+    private void validate(Duration value, BigDecimal seconds, String text) {
+        // `precision: N` is `fraction_digits: N` on the seconds count, which is a constraint on the value and
+        // not on the spelling -- so PT0.50S is a whole number of tenths and `precision: 1` admits it, the
+        // same rule and the same wording time_type's own @doc already carries.
         constraints.precision().ifPresent(precision -> {
-            int digits = fraction == null ? 0 : fraction.length();
-            if (BigInteger.valueOf(digits).compareTo(precision) > 0) {
-                throw new AtomValidationException("'" + text + "' has " + digits
-                        + " fractional-second digits, more than the maximum " + precision,
-                        "at most " + precision + " fractional-second digits");
+            if (BigInteger.valueOf(Math.max(seconds.stripTrailingZeros().scale(), 0)).compareTo(precision) > 0) {
+                throw new AtomValidationException("'" + text + "' is not a whole number of 10^-" + precision
+                        + " seconds, which is the resolution this duration admits",
+                        "a whole number of 10^-" + precision + " seconds");
             }
         });
         constraints.min().ifPresent(min -> require(value.compareTo(min) >= 0, text, ">= " + min));

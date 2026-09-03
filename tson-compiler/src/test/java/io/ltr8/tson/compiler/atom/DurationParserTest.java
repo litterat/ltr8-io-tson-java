@@ -122,13 +122,72 @@ class DurationParserTest {
         assertThrows(AtomValidationException.class, () -> read(overAnHour, "PT1H"));
     }
 
+    /**
+     * {@code precision: N} is {@code fraction_digits: N} on the seconds count, which §5.5 makes a constraint
+     * on the value and not on the spelling -- {@code PT0.250S} is a whole number of hundredths however it
+     * was typed, and the same rule {@code time_type}'s own {@code @doc} spells out.
+     */
     @Test
-    void precisionBoundsFractionalSecondDigitsOnTheToken() {
+    void precisionConstrainsTheSecondsCountNotTheSpelling() {
         AtomType<Duration> twoDigits = new DurationParser(new DurationType(Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.of(BigInteger.TWO), Optional.empty()));
 
         assertEquals(Duration.ofMillis(250), read(twoDigits, "PT0.25S"));
+        assertEquals(Duration.ofMillis(250), read(twoDigits, "PT0.250S"));
+        assertEquals(Duration.ofMillis(250), read(twoDigits, "PT0.2500S"));
         assertThrows(AtomValidationException.class, () -> read(twoDigits, "PT0.255S"));
+    }
+
+    // ── the value space's own two ends (§5.5) ────────────────────────────
+
+    /**
+     * A signed 64-bit count of nanoseconds, both ends. Below it, {@code time-secfrac}'s unbounded {@code
+     * 1*DIGIT} names a value no host runtime has a type for -- a nanosecond is the finest any of them
+     * offers and several are coarser. Above it, the tightest host is a signed 64-bit nanosecond count
+     * exactly, and a range that depends on which implementation read the document is not a range.
+     */
+    @Test
+    void aFractionFinerThanANanosecondIsNotADuration() {
+        assertEquals(Duration.ofNanos(1), read(DurationParser.UNCONSTRAINED, "PT0.000000001S"));
+        assertThrows(AtomParseException.class,
+                () -> read(DurationParser.UNCONSTRAINED, "PT0.0000000001S"));
+    }
+
+    @Test
+    void aMagnitudePastTheCeilingIsNotADuration() {
+        // The last admitted value and the first refused one, on both signs.
+        assertEquals(Duration.ofSeconds(9_223_372_036L, 854_775_807L),
+                read(DurationParser.UNCONSTRAINED, "PT9223372036.854775807S"));
+        assertEquals(Duration.ofSeconds(9_223_372_036L, 854_775_807L).negated(),
+                read(DurationParser.UNCONSTRAINED, "-PT9223372036.854775807S"));
+        assertThrows(AtomValidationException.class,
+                () -> read(DurationParser.UNCONSTRAINED, "PT9223372036.854775808S"));
+        assertThrows(AtomValidationException.class,
+                () -> read(DurationParser.UNCONSTRAINED, "-PT9223372036.854775808S"));
+    }
+
+    @Test
+    void theCeilingIsBelowWhatTheHostTypeWouldTake() {
+        // java.time.Duration reaches ±292 *billion* years, so nothing about the host refuses this -- only
+        // the value space does, which is the whole point of the ceiling being normative rather than
+        // whatever the implementation happens to hold.
+        assertEquals(400_000L * 86_400L, Duration.ofDays(400_000).getSeconds());
+        assertThrows(AtomValidationException.class, () -> read(DurationParser.UNCONSTRAINED, "P400000D"));
+    }
+
+    /**
+     * {@code multiple_of} tests on {@code Duration.toNanos}, which throws past ±292 years. The ceiling is
+     * exactly that range, so the overflow is unreachable rather than merely unlikely: a value that would
+     * have hit it is refused before the facet is asked.
+     */
+    @Test
+    void aValuePastTheCeilingIsRefusedBeforeMultipleOfCanOverflow() {
+        AtomType<Duration> quarterHours = new DurationParser(new DurationType(Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(Duration.ofMinutes(15))));
+
+        assertThrows(AtomValidationException.class, () -> read(quarterHours, "PT2562047788015215H"));
+        // And a span inside the ceiling still gets a real verdict from the facet.
+        assertEquals(Duration.ofDays(100_000), read(quarterHours, "P100000D"));
     }
 
     /** Sign is ignored for the test, so a negative span is a multiple of a positive step. */
