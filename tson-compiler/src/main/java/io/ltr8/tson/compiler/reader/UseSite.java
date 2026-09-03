@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.atom.BytesParser;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
@@ -43,7 +44,47 @@ public final class UseSite {
      * position when §8.3 left one and the reader has a name to change.
      */
     static TsonTypeReader<?> reader(TypeRef ref, TsonTypeReaderResolver resolver) {
-        return named(resolver.resolve(ref.name()), ref.annotations().value("alias", String.class).orElse(null));
+        TsonTypeReader<?> reader = respelled(resolver.resolve(ref.name()), ref);
+        return named(reader, ref.annotations().value("alias", String.class).orElse(null));
+    }
+
+    /**
+     * {@code reader} in the alphabet this position asks for, where it asks for one and is a {@code bytes}
+     * reader -- otherwise {@code reader} itself.
+     *
+     * <p><b>Why a use site can carry a directive at all.</b> §8.3 flattens a position naming a {@code
+     * REFERENCE} entry straight to the end of its chain, so a declaration-level {@code @bytes_encoding} on an
+     * alias ({@code @bytes_encoding:HEX digest => bytes}) would be unreachable from every use of it -- while
+     * the same intent written as a refinement keeps a {@code supertypes} edge and is found. The flattening
+     * walk therefore carries a dropped hop's annotations onto the reference, and this is where they are read.
+     *
+     * <p><b>Here rather than per container.</b> Every position -- a record field, an array element, a map key
+     * or value, a tuple element, a choice variant -- reaches its child reader through this method, so one
+     * place serves all of them. A record field's own directive is handled a step earlier ({@code
+     * BytesEncoding.fieldReader}), which has the field in hand and so can also state a directive on a field
+     * whose type names no alias at all.
+     */
+    private static TsonTypeReader<?> respelled(TsonTypeReader<?> reader, TypeRef ref) {
+        if (ref.annotations().isEmpty() || !(reader instanceof Respelled respellable)) {
+            return reader;
+        }
+        return BytesEncoding.stated(ref.annotations())
+                .<TsonTypeReader<?>>map(respellable::inEncoding)
+                .orElse(reader);
+    }
+
+    /**
+     * A reader that can restate itself in another RFC 4648 alphabet -- the {@code bytes} half of what a use
+     * site may ask for, and the sibling of {@link Renamed}.
+     *
+     * <p>Two implementations for the same reason {@code Renamed} has two: a leaf reader, and the tree-mode
+     * wrapper that boxes it. A reader is compiled once per entry and shared by every position that names it,
+     * so a per-position alphabet cannot come from the entry -- what a position can do is ask the shared
+     * reader for itself over the same constraints in a different spelling. A reader this does not apply to
+     * hands itself back, exactly as {@code renamed} does.
+     */
+    interface Respelled {
+        TsonTypeReader<?> inEncoding(BytesParser.Encoding encoding);
     }
 
     /**

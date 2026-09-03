@@ -17,7 +17,7 @@ import java.util.Optional;
  * mode -- the diagnostic carries the real problem). This is how atoms produce nodes uniformly, so a
  * container reader's children are always nodes, and reading an atom at the root is a node too.
  */
-final class AtomTreeReader implements TsonTypeReader<TsonValue>, UseSite.Renamed {
+final class AtomTreeReader implements TsonTypeReader<TsonValue>, UseSite.Renamed, UseSite.Respelled {
 
     private final TsonTypeReader<?> delegate;
     private final Optional<String> typeRef;
@@ -34,6 +34,20 @@ final class AtomTreeReader implements TsonTypeReader<TsonValue>, UseSite.Renamed
             return this;
         }
         return new AtomTreeReader(renameable.renamed(displayName), typeRef.orElse(null), annotationTypes);
+    }
+
+    /**
+     * {@inheritDoc} <p>Delegates and re-wraps, exactly as {@link #renamed} does: the boxing is this
+     * wrapper's whole job and it is unchanged by which alphabet the leaf reads.
+     */
+    @Override
+    public TsonTypeReader<?> inEncoding(io.ltr8.tson.compiler.atom.BytesParser.Encoding encoding) {
+        if (!(delegate instanceof UseSite.Respelled respellable)) {
+            return this;
+        }
+        TsonTypeReader<?> respelled = respellable.inEncoding(encoding);
+        return respelled == delegate ? this
+                : new AtomTreeReader(respelled, typeRef.orElse(null), annotationTypes);
     }
 
     AtomTreeReader(TsonTypeReader<?> delegate, String typeRef, AnnotationTypes annotationTypes) {
