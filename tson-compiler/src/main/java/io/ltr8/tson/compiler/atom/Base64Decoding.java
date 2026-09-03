@@ -3,9 +3,9 @@ package io.ltr8.tson.compiler.atom;
 import java.util.Base64;
 
 /**
- * Decode logic for {@link BinaryParser}'s {@code BASE64}/{@code BASE64URL} encodings -- both use
+ * Decode logic for {@link BytesParser}'s {@code BASE64}/{@code BASE64URL} encodings -- both use
  * {@link java.util.Base64}'s {@code Decoder} directly, differing only in which alphabet's decoder
- * {@link BinaryParser} passes in, so the one real decision (padding strictness) lives here once.
+ * {@link BytesParser} passes in, so the one real decision (padding strictness) lives here once.
  *
  * <p>{@link Base64.Decoder} accepts missing padding outright -- {@code "TWE"} decodes identically
  * to the correctly-padded {@code "TWE="} (confirmed empirically before writing this). RFC 4648 §3.2:

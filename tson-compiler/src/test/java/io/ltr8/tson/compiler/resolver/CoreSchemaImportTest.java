@@ -73,7 +73,7 @@ class CoreSchemaImportTest {
         assertTrue(registered.isPresent(), "expected core.tn to be registered");
 
         TsonSchema core = registered.get().schema();
-        assertEquals(48, core.entries().size(), "expected every core.tn declaration to resolve");
+        assertEquals(51, core.entries().size(), "expected every core.tn declaration to resolve");
 
         // A representative spread of core.tn's own real declarations -- atom refinements
         // (int32/positive_integer) and constructor applications (hex, float32, cidr4, ipv4, complex,
@@ -85,7 +85,7 @@ class CoreSchemaImportTest {
         // own `source: integer_type` validate despite integer_type living in meta-kernel, two hops up.
         assertTrue(core.entries().containsKey("int32"));
         assertTrue(core.entries().containsKey("positive_integer"));
-        assertTrue(core.entries().containsKey("hex"));
+        assertTrue(core.entries().containsKey("bytes"));
         assertTrue(core.entries().containsKey("float32"));
         assertTrue(core.entries().containsKey("float64"));
         assertTrue(core.entries().containsKey("cidr4"));
@@ -95,7 +95,11 @@ class CoreSchemaImportTest {
         assertTrue(core.entries().containsKey("ipv4"));
         assertTrue(core.entries().containsKey("ipv6"));
         assertTrue(core.entries().containsKey("complex"));
-        assertTrue(core.entries().containsKey("unknown"));
+        assertTrue(core.entries().containsKey("declared"));
+        assertTrue(core.entries().containsKey("extern"));
+        assertTrue(core.entries().containsKey("dynamic"));
+        assertTrue(core.entries().containsKey("extern_of"));
+        assertTrue(core.entries().containsKey("extern_type"));
     }
 
     /**
@@ -112,7 +116,7 @@ class CoreSchemaImportTest {
      * to a genuinely usable reader.
      */
     @Test
-    void exactlyTheUnknownAtomConstructorCompilesToAnErrorReader() {
+    void exactlyTheScopedInstancesCompileToAnErrorReader() {
         Loaded loaded = loadMetaKernelMetaAndCore();
         TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
@@ -130,7 +134,7 @@ class CoreSchemaImportTest {
             }
         }
 
-        assertEquals(Set.of("unknown"), errored);
+        assertEquals(Set.of("declared", "dynamic", "extern"), errored);
     }
 
     /**

@@ -12,7 +12,8 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.UnknownType;
+import io.ltr8.tson.schema.meta.ScopeKind;
+import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -83,7 +84,7 @@ class TsonSchemaCompilerTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("used", TypeDefinition.product(RecordBody.of(List.of())));
         entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.SUM,
-                List.of(), true, List.of(), List.of(), Optional.empty(), new UnknownType()));
+                List.of(), true, List.of(), List.of(), Optional.empty(), new Scoped(List.of(ScopeKind.LOCAL), Optional.empty())));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 

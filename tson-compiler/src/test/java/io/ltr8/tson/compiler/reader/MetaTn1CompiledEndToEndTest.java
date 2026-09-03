@@ -29,7 +29,7 @@ class MetaTn1CompiledEndToEndTest {
     /**
      * Resolving meta.tn itself now goes through {@code resolveSchema}/{@code bindAtomInstance}, which
      * needs an object-binding-mode compiled reader for meta-kernel (its own Instance declarations,
-     * e.g. {@code binary_encoding => !enum [...]}, go through it) -- so meta.tn's own resolution
+     * e.g. {@code base_encoding => !enum [...]}, go through it) -- so meta.tn's own resolution
      * step below is object mode internally, even though the *outer* compile this test itself
      * exercises stays DOM mode (a separate, fresh compilation of the final, already-resolved {@code
      * TsonSchema}, unrelated to how it got resolved).
@@ -83,15 +83,15 @@ class MetaTn1CompiledEndToEndTest {
         for (String name : meta.schema().entries().keySet()) {
             compiled.get(name);
         }
-        assertEquals(88, meta.schema().entries().size());
+        assertEquals(105, meta.schema().entries().size());
     }
 
     @Test
-    void readsBinaryEncodingEnumMembersAgainstRealData() {
+    void readsBaseEncodingEnumMembersAgainstRealData() {
         TsonLinkedSchema meta = registerMeta();
         TsonCompiledSchema compiled = rawCompile(meta);
 
-        Object result = Dom.of((TsonValue) compiled.get("binary_encoding")
+        Object result = Dom.of((TsonValue) compiled.get("base_encoding")
                 .read(TestDocuments.document("BASE64")));
 
         assertEquals("BASE64", result);

@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
-import io.ltr8.tson.compiler.atom.BinaryParser;
+import io.ltr8.tson.compiler.atom.BytesParser;
 import io.ltr8.tson.compiler.atom.Cidr4Parser;
 import io.ltr8.tson.compiler.atom.Cidr6Parser;
 import io.ltr8.tson.compiler.atom.ComplexParser;
@@ -15,6 +15,7 @@ import io.ltr8.tson.compiler.atom.DateParser;
 import io.ltr8.tson.compiler.atom.DateTimeParser;
 import io.ltr8.tson.compiler.atom.DecimalParser;
 import io.ltr8.tson.compiler.atom.DurationParser;
+import io.ltr8.tson.compiler.atom.PeriodParser;
 import io.ltr8.tson.compiler.atom.EmailParser;
 import io.ltr8.tson.compiler.atom.EnumParser;
 import io.ltr8.tson.compiler.atom.FloatParser;
@@ -32,7 +33,7 @@ import io.ltr8.tson.compiler.atom.UuidParser;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.DateTimeType;
@@ -40,6 +41,7 @@ import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -83,9 +85,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition));
     static final ValueReaderFactory UUID_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new UuidParser((UuidType) definition.body()), context.locationOf(name, definition));
-    /** Registered under {@code "binary"}, not {@code "binary_type"} -- {@link BinaryType}'s own {@code @Typename} matches the real spec constructor name. */
-    static final ValueReaderFactory BINARY = (name, definition, context) ->
-            new AtomTypeReader<>(name, new BinaryParser((BinaryType) definition.body()),
+    // The alphabet is not in the body: it is @bytes_encoding's, resolved from this definition and its
+    // supertypes, defaulting to base64. A field carrying its own directive overrides it where the record
+    // reader wires its children.
+    static final ValueReaderFactory BYTES_TYPE = (name, definition, context) ->
+            new AtomTypeReader<>(name,
+                    new BytesParser(BytesEncoding.of(name, definition, context), (BytesType) definition.body()),
                     context.locationOf(name, definition));
     static final ValueReaderFactory DATE_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new DateParser((DateType) definition.body()), context.locationOf(name, definition));
@@ -96,6 +101,9 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition));
     static final ValueReaderFactory DURATION_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new DurationParser((DurationType) definition.body()),
+                    context.locationOf(name, definition));
+    static final ValueReaderFactory PERIOD_TYPE = (name, definition, context) ->
+            new AtomTypeReader<>(name, new PeriodParser((PeriodType) definition.body()),
                     context.locationOf(name, definition));
     static final ValueReaderFactory URI_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new UriParser((UriType) definition.body()), context.locationOf(name, definition));

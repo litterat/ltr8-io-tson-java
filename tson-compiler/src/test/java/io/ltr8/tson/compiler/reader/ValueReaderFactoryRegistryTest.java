@@ -12,7 +12,8 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.UnknownType;
+import io.ltr8.tson.schema.meta.ScopeKind;
+import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -59,7 +60,7 @@ class ValueReaderFactoryRegistryTest {
     }
 
     /**
-     * {@code unknown_type} stands in for the group with no compiled parser; {@code CoreSchemaImportTest}
+     * {@code scoped} stands in for the group with no compiled parser; {@code CoreSchemaImportTest}
      * pins the current membership. If it ever gains one, pick another from that set rather than deleting
      * this -- the ErrorReader-not-compile-failure behaviour is what is under test, not the constructor.
      */
@@ -67,16 +68,16 @@ class ValueReaderFactoryRegistryTest {
     void aConstructorWithNoCompiledParserYetStillResolvesButFailsOnlyWhenActuallyRead() {
         ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.tree();
         TypeDefinition entry = new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), true,
-                List.of(), List.of(), Optional.empty(), new UnknownType());
+                List.of(), List.of(), Optional.empty(), new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()));
 
-        TsonTypeReader<?> reader = registry.resolve("unknown_type").create("unknown", entry, CONTEXT);
+        TsonTypeReader<?> reader = registry.resolve("scoped").create("declared", entry, CONTEXT);
 
         // A real context, because the reader reports through it now rather than throwing past it -- the gap
         // rides in `diagnostic().code()` so it can join a collecting read instead of ending it.
         TsonReadException thrown = assertThrows(TsonReadException.class,
                 () -> reader.read(TestDocuments.document("{}")));
         assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, thrown.diagnostic().code());
-        assertEquals(true, thrown.getMessage().contains("unknown"));
+        assertEquals(true, thrown.getMessage().contains("scoped"));
     }
 
     @Test

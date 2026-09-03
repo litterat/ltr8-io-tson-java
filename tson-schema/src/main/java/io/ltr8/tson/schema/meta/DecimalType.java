@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.meta;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.math.BigDecimal;
@@ -25,14 +26,27 @@ public record DecimalType(
         @Field("exclusive_max") Optional<BigDecimal> exclusiveMax,
         @Field("multiple_of") Optional<BigDecimal> multipleOf,
         @Field("total_digits") Optional<Integer> totalDigits,
-        @Field("fraction_digits") Optional<Integer> fractionDigits) implements Atom {
+        @Field("fraction_digits") Optional<Integer> fractionDigits,
+        Optional<List<BigDecimal>> members) implements Atom {
 
     /** {@code number => !decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
     public static final DecimalType UNCONSTRAINED = new DecimalType(
             Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
-            Optional.empty(), Optional.empty(), Optional.empty());
+            Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
 
+    /**
+     * The constraint set without a member set -- every facet but {@link #members}, for the same reason
+     * {@link IntegerType} carries the matching constructor.
+     */
+    public DecimalType(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
+            Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf, Optional<Integer> totalDigits,
+            Optional<Integer> fractionDigits) {
+        this(min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits, Optional.empty());
+    }
+
+    @Record
     public DecimalType {
+        members = members.map(List::copyOf);
         if (min.isPresent() && exclusiveMin.isPresent()) {
             throw new IllegalArgumentException("min and exclusiveMin are mutually exclusive");
         }
@@ -70,6 +84,7 @@ public record DecimalType(
             violations.add("multiple_of " + other.multipleOf.get() + " is not itself a multiple of the source's own "
                     + multipleOf.get());
         }
+        AtomNarrowing.checkSubset(violations, "members", members.orElse(List.of()), other.members.orElse(List.of()));
         return List.copyOf(violations);
     }
 
@@ -94,6 +109,9 @@ public record DecimalType(
         AtomCoherence.checkNonNegative(violations, "total_digits", totalDigits);
         AtomCoherence.checkNonNegative(violations, "fraction_digits", fractionDigits);
         AtomCoherence.checkOrdered(violations, "fraction_digits", fractionDigits, "total_digits", totalDigits);
+        AtomCoherence.checkMembers(violations, members.orElse(List.of()),
+                AtomNarrowing.bound(min, exclusiveMin, "min", "exclusive_min"),
+                AtomNarrowing.bound(max, exclusiveMax, "max", "exclusive_max"));
         return List.copyOf(violations);
     }
 }

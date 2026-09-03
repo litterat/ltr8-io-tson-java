@@ -47,6 +47,18 @@ own prose (which had gone stale on at least one of them):
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 
+- [ ] **§4.2's value-route-only rule is not enforced** — a `~` constructor's parameters may occur only as value
+  routes, and a type-channel one is a resolver error at the declaration. Nothing checks it, so a parameterized
+  container constructor resolves, links and compiles, and the first symptom is a *read* failing with "'set' is
+  a template taking 1 type argument": a diagnostic about a data document, for a mistake in a schema. A check
+  written against the held body alone false-positives, `element_type: = T` and `max_items: = N` being spelled
+  identically where the first is a type channel and the second a legal value route. **The distinction does
+  exist in the pipeline**: `ParameterKinds` resolves the constructor head and walks each written slot against
+  the field the constructor declares for it, classifying a parameter in `element_type` as `TYPE` and one in
+  `max_items` as `VALUE`. What needs establishing is whether that walk reaches the declarations this rule is
+  about — it starts from a held body, where §4.2 speaks about a `~` constructor's own declaration — and what a
+  head it cannot resolve should mean.
+
 ## Built-in types
 
 - [ ] **Set uniqueness and map-key identity never fire for `binary`.** `BinaryParser` is
@@ -56,35 +68,81 @@ own prose (which had gone stale on at least one of them):
   `'ts' requires unique elements`. The fix is a value-equality contract for the atom rather than a
   `byte[]` comparison at each call site, since the same contract decides a `FIXED` value check and a map
   key; and it has to answer the case-and-spelling question with it — `"abcd"` and `"ABCD"` are one octet
-  string, and `base64`/`base64url`/`base32`/`hex` are four instances of one `binary` constructor over one
-  value space. What the spec owes here is `SPEC-FEEDBACK.md` #28; the comparison being absent entirely is
+  string, and `base64`/`base64url`/`base32`/`hex` are four refinements of `bytes` over one value space,
+  differing only in a lexical selector. What the spec owes here is `SPEC-FEEDBACK.md` #28; the comparison being absent entirely is
   this implementation's own.
 
-- [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
-  `ErrorReader`), pinned down exactly by
-  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom
-  grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
-  the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
-  question about where that dispatch lives.
-- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the item above, and a different kind of gap
-  again. `Extern` (`schema.meta`) is a record-only placeholder with no
-  parsing/validation behavior at all (its own Javadoc says so explicitly: "not to add real
-  cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
-  carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope
-  mid-document — doesn't exist anywhere in the reader stack.
+- [ ] **`scoped` has no reader, so core's `declared`/`extern`/`dynamic` compile to `ErrorReader`**
+  ([TSON-SCHEMA] §7.8), pinned by `CoreSchemaImportTest.exactlyTheScopedInstancesCompileToAnErrorReader`.
+  Not an unwritten atom grammar and not three gaps: one piece of machinery every scoped instance shares —
+  a reader over the `SchemaRef` event `TsonDataStream` already emits at every position [TSON-DATA] §2.3
+  admits one. The value names its own type; the instance's `scope` says which namespaces that name may
+  resolve in, and `schemas` narrows the foreign ones. For an `EXTERN` value that is §7.8's scope push as
+  written — load through the ordinary loader, push, resolve the `!type` in it, validate in full, pop — so a
+  schema nothing would supply stays one of the five `SCHEMA_*` codes rather than becoming a verdict. The
+  grammar half is done; the read half is the work.
+- [ ] **A sparse `members` set is declared and never applied at read time.** `integer_type.members` and
+  `decimal_type.members` resolve, narrow (`AtomNarrowing.checkSubset`) and are checked for coherence against
+  the body's other facets (`AtomCoherence.checkMembers`, including the range `integer_type.size` derives
+  rather than stores) — but no parser consults them, so `!integer ^ { members: [80 443 8080] }` accepts 22 at
+  read time. `IntegerParser`/`DecimalParser` are where it goes, beside the bounds and `multiple_of` checks
+  they already run; membership is [TSON-DATA] §4.3's identity, which `NumericIdentity` already implements, so
+  `0x50` matches the member `80`. The facet is `SPEC-FEEDBACK.md` #24, and the shape is settled — this is the
+  read half of it and nothing else.
+
+- [ ] **§5.7's selector rule is unenforced, and for a defaulted selector needs something the value model
+  does not keep.** "A selector may be set where the source leaves it at the constructor's default" — nothing
+  checks it. `complex_type.component` (`~ NUMBER`) is the case that bites: after resolution `complex` and an
+  explicit `^ { component: NUMBER }` are the same record, so a legal set-from-default and an illegal re-set
+  are indistinguishable, and `ComplexType` says so at the class. Enforcing it means the resolver keeping which
+  facets a refinement's *source* actually wrote, which the atom-refinement merge erases — that is the work,
+  and whether it is worth the carrying cost for one facet is the first thing to decide. The other selector,
+  `float_type.format`, is REQUIRED with no default, so the rule has nothing to fire on there at all.
+
+- [ ] **`duration` is nanosecond-resolved where meta.tn says rational seconds.** The host type is
+  `java.time.Duration` (`DurationType`, `DurationParser`), so `PT0.0000000001S` is refused rather than
+  rounded — chosen because `time_type` and `datetime_type` already work at nanosecond resolution for the same
+  fractional-second component, and silently rounding would make a bound comparison lie. Closing the gap means
+  `Rational` as the host type, which moves `min`/`max`/`exclusive_min`/`exclusive_max`/`multiple_of` with it
+  and gives up `Duration`'s arithmetic; leaving it means the register carrying the divergence. Neither is done.
+
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
-  (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
+  (issue #50) now rejects an atom body whose own facets admit nothing, but two gaps are left, each
   matching that family's existing *narrowing* gap and each blocked on the same thing — `tson-schema` has no
   dependency on a parser for the values involved:
-    - `duration_type`'s bounds are unparsed ISO 8601 text. `"P1M"` vs `"P30D"` does not order lexically, so
-      judging them as strings would call a coherent body empty. Needs `DurationParser`/`IsoDuration`, which
-      live in `tson-compiler`.
     - `pattern` emptiness — a regex matching no string at all, or none of a permitted length. Needs
       `tson-regex`, the same boundary the narrowing check's containment gap sits behind.
     - CIDR `within`/`excluding` admitting no network between them. Needs real containment arithmetic; the
       family has no CIDR parser.
-    - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
+    - The natural fix for both is the same one the narrowing check would want: an injected oracle, rather
       than moving the value model's dependencies.
+
+## Checked annotations
+
+[TSON-SCHEMA] §5.4's `@disjoint` is the precedent both follow: an annotation with **no** decode force and
+load-time force, checked at schema load, two outcomes and no third — verified silently, or the schema fails to
+load. Each is declared in meta.tn and neither is checked, so both are advisory today where the design says
+they carry force. §6 owes the category itself a description (`SPEC-FEEDBACK.md` #25(a)) and owes which of its
+two declaration positions honours one (#25(b)); this implementation consults both for `@disjoint` and should do
+the same here.
+
+- [ ] **`@bytes_encoding` is not checked against the type it annotates.** The directive works — resolved
+  nearest-first, field then the field's type walking its supertypes then base64 (`BytesEncoding`) — but its own
+  `@doc` promises that the annotated field or definition resolves to `bytes`, or the schema fails to load, and
+  nothing enforces that. A directive on an `int32` field is silently inert, which is the worst of the three
+  outcomes: it looks applied and does nothing.
+- [ ] **`@rest` is not checked, and one half of it cannot be written yet.** The type check is ordinary — the
+  annotated field's type resolves to a text-keyed map. "At most one per composed chain" is blocked on the
+  entry below: a restatement severs the chain silently, so there is no chain to count along.
+- [ ] **A restated field loses its inherited annotations** (`SPEC-FEEDBACK.md` #25(c)). `DefinitionResolver`
+  copies an inherited field whole (`absorb`) but rebuilds a *restated* one with `Annotations.empty()` and then
+  gives it only what the restatement wrote (`resolveFieldEntry`/`resolveField`). So §5.7's modifier-only entry
+  — `extra: ?`, defined to tighten presence and nothing else — silently un-marks the field it names, and the
+  same hole loses a `@deprecated` or a `@doc` on any field a subtype tightens. The defensible rule, and the
+  entry's own recommendation, is that a restatement's annotations **merge over** the inherited ones: an entry
+  writing none should not be able to erase what it does not mention. It changes resolved output for any schema
+  restating an annotated field, so it wants deciding rather than assuming — and §5.8/§8.1 owe the rule whichever
+  way it goes.
 
 ## Write side
 
@@ -100,8 +158,8 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
-  — the fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
-  renders none of them, so the entries would compare equal for the wrong reason;
+  — the fixtures carry `@synthetic` on the keys the resolver minted and `@doc` on many more, and the bound
+  side renders none of them, so the entries would compare equal for the wrong reason;
   `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
   test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
   only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers
@@ -142,15 +200,3 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   derivation, the way `withTokenPolicy` already is. A document past the limit must be refused with a
   diagnostic carrying a position, never a host `Error`. The numeric-literal length limit named in
   `CLAUDE.md`'s "Not yet implemented" is the fourth limit of the same section and comes with it.
-
-## Revision 35 proposal (`r2026-35-proposal` branch only)
-
-- [ ] **Re-stamp the three bundled schemas for the notation changes this branch makes.** `spec/m/meta-kernel.tn`
-  documents `value`'s own inhabitants as "null, boolean, integer, float, string" and `void`'s prose names `null` as
-  an accepted spelling; both are false once `null` leaves the notation. The edit is prose inside a published
-  artifact, so it carries the whole re-stamp: `tson hash` bottom-up (kernel, then meta, then core), the matching
-  `*-resolved.tn` fixture entries, and the published digests in `TsonBundledSchemas`, `InitCommand` and
-  `README.md`. **Blocked on the spec revision publishing the new artifacts** — stamping ahead of it mints digests
-  for documents nobody has published, where Revision 34's are the ones `main` must go on serving. Until then this
-  branch leaves all three untouched, and the divergence is behavioural (`ValueParser`, `VoidReader`) rather than
-  declared.

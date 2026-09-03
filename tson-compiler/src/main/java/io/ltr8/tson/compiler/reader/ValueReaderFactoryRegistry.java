@@ -39,10 +39,11 @@ import java.util.function.UnaryOperator;
  * verified against both files directly, not assumed. Two of them (see {@link #notImplemented}'s own
  * call sites, deliberately grouped at the bottom of {@link #baseFactories} rather than interleaved
  * with the working entries above) still have no compiled reader at all -- {@code extern} and {@code
- * unknown_type} -- registered anyway, to an {@link ErrorReader}, so a schema merely *declaring* one of
+ * scoped} -- registered anyway, to an {@link ErrorReader}, so a schema merely *declaring* one of
  * them still compiles; only reading a value against one actually fails. Neither is an ordinary missing
  * parser: {@code extern} is a whole absent mechanism (§7.8's mid-document schema scope switch) and
- * {@code unknown_type} is the universe of types, not a token shape.
+ * {@code scoped} is a whole absent mechanism -- one reader over {@code TsonDataStream}'s {@code SchemaRef}
+ * event, shared by every scoped instance -- rather than a token shape waiting for a parser.
  */
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
@@ -117,14 +118,14 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("regex_type", leaf.apply(AtomTypeReader.REGEX_TYPE));
         factories.put("record", record);
         factories.put("array", array);
-        factories.put("set", array);
+        factories.put("set_type", array);
         factories.put("map", map);
         factories.put("tuple", tuple);
         factories.put("enum", leaf.apply(enumFactory));
         factories.put("choice", choice);
 
         // meta.tn
-        factories.put("binary", leaf.apply(AtomTypeReader.BINARY));
+        factories.put("bytes_type", leaf.apply(AtomTypeReader.BYTES_TYPE));
         factories.put("float_type", leaf.apply(AtomTypeReader.FLOAT_TYPE));
         factories.put("decimal_type", leaf.apply(AtomTypeReader.DECIMAL_TYPE));
         factories.put("rational_type", leaf.apply(AtomTypeReader.RATIONAL_TYPE));
@@ -132,6 +133,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("time_type", leaf.apply(AtomTypeReader.TIME_TYPE));
         factories.put("datetime_type", leaf.apply(AtomTypeReader.DATETIME_TYPE));
         factories.put("duration_type", leaf.apply(AtomTypeReader.DURATION_TYPE));
+        factories.put("period_type", leaf.apply(AtomTypeReader.PERIOD_TYPE));
         factories.put("uuid_type", leaf.apply(AtomTypeReader.UUID_TYPE));
         factories.put("complex_type", leaf.apply(AtomTypeReader.COMPLEX_TYPE));
         factories.put("mac_type", leaf.apply(AtomTypeReader.MAC_TYPE));
@@ -146,8 +148,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         // ---- Not implemented yet -- every entry below is a real `~`-marked constructor from
         // ---- meta-kernel.tn/meta.tn with no compiled reader at all. Registered to ErrorReader so a
         // ---- schema declaring one still compiles; only reading a value against one actually fails.
-        factories.put("extern", notImplemented("extern"));
-        factories.put("unknown_type", notImplemented("unknown_type"));
+        factories.put("scoped", notImplemented("scoped"));
 
         // Collections.unmodifiableMap, not Map.copyOf -- preserves the LinkedHashMap's own insertion
         // order (Map.copyOf's own iteration order is unspecified), so the "not implemented" block

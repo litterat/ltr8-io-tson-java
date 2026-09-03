@@ -27,7 +27,7 @@ import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -49,7 +49,8 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
-import io.ltr8.tson.schema.meta.UnknownType;
+import io.ltr8.tson.schema.meta.ScopeKind;
+import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import org.junit.jupiter.api.Test;
 
@@ -106,6 +107,15 @@ class DefinitionResolverTest {
                     + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } state: \"REQUIRED\" } "
                     + "] groups: [] } }";
 
+    /**
+     * The same shape as the real fixture resolves it. meta-kernel types {@code bits} as a count rather than
+     * a bare integer, where the hand-written schemas above -- which are about resolution mechanics, not
+     * about the kernel's own field types -- keep the plainer spelling.
+     */
+    private static final String EXPECTED_FIXTURE_INTEGER_SIZE =
+            EXPECTED_INTEGER_SIZE.replace("{ name: \"bits\" type: { name: \"integer\"",
+                    "{ name: \"bits\" type: { name: \"non_negative_integer\"");
+
     /** Throws if ever actually invoked -- most tests below never reach {@code Instance}/{@code AtomRefinement} binding at all; the ones that do build their own {@link DefinitionResolver} wrapping a real compiled reader instead of using this field. */
     private static final DefinitionMetaReader NEVER_CALLED = (type, value) -> {
         throw new UnsupportedOperationException("'" + type + "': not exercised by this test");
@@ -160,7 +170,7 @@ class DefinitionResolverTest {
 
         TypeDefinition resolved = resolver.resolve(declaration);
 
-        assertEquals(EXPECTED_INTEGER_SIZE, write(resolved));
+        assertEquals(EXPECTED_FIXTURE_INTEGER_SIZE, write(resolved));
     }
 
     @Test
@@ -373,7 +383,8 @@ class DefinitionResolverTest {
                         + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"multiple_of\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } ] "
+                        + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } state: \"OPTIONAL\" } ] "
                         + "groups: [ "
                         + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "
                         + "{ members: [ \"max\" \"exclusive_max\" ] state: \"OPTIONAL\" } "
@@ -720,8 +731,8 @@ class DefinitionResolverTest {
                         + "state: \"REQUIRED_DEFAULT\" value: false } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
                         + "state: \"REQUIRED_DEFAULT\" value: false } "
-                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",
                 write(array));
     }
@@ -752,8 +763,8 @@ class DefinitionResolverTest {
                         + "state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
                         + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
-                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",
                 write(map));
     }
@@ -836,7 +847,7 @@ class DefinitionResolverTest {
         // an allowed REQUIRED_DEFAULT -> REQUIRED_FIXED transition (§5.7's table).
         resolveUpToArray();
 
-        TypeDefinition set = resolver.resolve(schemaMapFromFixture().declarations().get("set"));
+        TypeDefinition set = resolver.resolve(schemaMapFromFixture().declarations().get("set_type"));
 
         assertEquals(TypeKind.PRODUCT, set.kind());
         assertEquals(List.of(), set.parameters(), "the container constructors carry no parameters");
@@ -858,8 +869,8 @@ class DefinitionResolverTest {
                         + "state: \"REQUIRED_FIXED\" value: true } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" value: true } "
-                        + "{ name: \"min_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max_items\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" value: 1 } "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
                         + "] groups: [] } }",
                 write(set));
     }
@@ -892,7 +903,7 @@ class DefinitionResolverTest {
 
     @Test
     void resolvesEnumFromTheRealMetaKernelFixtureNamingTheEnumSetEntry() throws IOException, DataBindException {
-        // enum => ~atom & { members: enum_set }, where enum_set => !set { element_type: identifier  min_items: 1 }.
+        // enum => ~atom & { members: enum_set }, where enum_set => !set_type { element_type: identifier }.
         // The named entry exists because `!` forms stay prohibited at field positions (§5.2) and `set`
         // has no sugar of its own -- there is no generic application left to write here.
         SchemaMap schemaMap = schemaMapFromFixture();
@@ -968,102 +979,22 @@ class DefinitionResolverTest {
     }
 
     /**
-     * The same construct as above, but deliberately exercising the *other* half of §3.3.1's lookup
-     * rule: a schema governed by meta-kernel (its {@code !!meta} target) that does NOT import it,
-     * so {@code enum} is nowhere in this schema's own type-name namespace at all -- resolution must
-     * fall through to the structure namespace, supplied here as meta-kernel's own real,
-     * independently-resolved entries (Phase B step 2's threading, exercised for real for the first
-     * time by an actual {@code Instance} resolution rather than an inert pass-through).
+     * {@code bytes => !bytes_type {}} -- the whole binary family, now that the alphabet is a directive
+     * rather than a facet. core declares no spelled subtypes: there is nothing for {@code base64} or
+     * {@code hex} to be a *type* of, the same octets being {@code "3q2+7w=="} and {@code "deadbeef"}.
+     * {@code binary_type} is declared in meta.tn rather than meta-kernel.tn, so this needs the merged
+     * namespace.
      */
     @Test
-    void instanceResolvesViaTheStructureNamespaceWhenNotLocallyAvailable() {
-        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
-                { my_bool => !enum [YES NO] }""").parseSchemaDocument().body();
-
-        TypeDefinition myBool = definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
-                schemaMap.declarations().get("my_bool"));
-
-        assertEquals(TypeKind.ATOM, myBool.kind());
-        assertFalse(myBool.constructor());
-        assertEquals(new EnumBody(List.of("YES", "NO")), myBool.body());
-    }
-
-    @Test
-    void instanceResolutionRejectsATargetThatIsNotAConstructor() {
-        // "identifier" resolves fine (kind ATOM) but constructor: false -- !identifier {} must be rejected,
-        // not silently treated as a valid constructor application (§3.3.1's own suggested
-        // diagnostic: "did you mean atom refinement?").
-        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
-                { bad => !identifier {} }""").parseSchemaDocument().body();
-
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                () -> definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
-                        schemaMap.declarations().get("bad")));
-        assertTrue(thrown.getMessage().contains("does not resolve to a constructor"), thrown.getMessage());
-    }
-
-    // ── Atom refinement (§5.5, §5.7, Phase B step 5) ───────────────────────
-
-    @Test
-    void resolvesInt32FromTheRealCoreTypeLibraryFixture() throws IOException {
-        // int32 => !integer ^ { size: { bits: 32  signed: true } } -- the concrete worked case
-        // this whole phase started from. `integer` is core.tn's own local redeclaration (`integer
-        // => !integer_type {}`, an Instance reaching `integer_type` through the structure
-        // namespace, since core.tn has no !!import of its own -- meta-kernel's entries stand in
-        // for core.tn's real structure namespace here, meta.tn's own merged namespace, which
-        // meta-kernel's entries are a subset of for this specific name; confirmed separately that
-        // meta.tn doesn't locally redeclare integer_type). `int32`'s own refinement then resolves
-        // `integer` purely through the type-name namespace (§3.3.1 -- atom refinement never
-        // touches the structure namespace), which is exactly `resolved` here since `integer` was
-        // just added to it.
-        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, resolved::get);
-        SchemaMap schemaMap = schemaMapFromCoreFixture();
-        resolved.put("integer", instanceResolver.resolve(schemaMap.declarations().get("integer")));
-
-        TypeDefinition int32 = instanceResolver.resolve(schemaMap.declarations().get("int32"));
-
-        assertEquals(TypeKind.ATOM, int32.kind());
-        assertFalse(int32.constructor());
-        assertEquals(List.of("integer"), int32.supertypes());
-        assertEquals(Optional.of(TypeRef.of("integer_type")), int32.source());
-        assertEquals(new IntegerType(new IntegerSize(32, true)), int32.body());
-    }
-
-    @Test
-    void resolvesPositiveIntegerFromTheRealCoreTypeLibraryFixture() throws IOException {
-        // positive_integer => !integer ^ { min: 1 } -- a scalar (not nested-record) refinement
-        // value, confirming the binder isn't only exercised by int32's own nested-IntegerSize case.
-        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, resolved::get);
-        SchemaMap schemaMap = schemaMapFromCoreFixture();
-        resolved.put("integer", instanceResolver.resolve(schemaMap.declarations().get("integer")));
-
-        TypeDefinition positiveInteger =
-                instanceResolver.resolve(schemaMap.declarations().get("positive_integer"));
-
-        assertEquals(IntegerType.ofMin(BigInteger.ONE), positiveInteger.body());
-    }
-
-    @Test
-    void resolvesHexFromTheRealCoreTypeLibraryFixtureAsAPositionalFormInstance() throws IOException {
-        // hex => !binary HEX -- an Instance (constructor application), not an atom refinement:
-        // `binary` itself is the constructor, applied positionally. Included alongside the
-        // refinement cases above to confirm the positional-form path (step 3) also works against a
-        // real core.tn declaration, not just meta-kernel's own `enum` case. Unlike `integer_type`,
-        // `binary`'s own constructor is declared in meta.tn, not meta-kernel.tn, so this needs the fuller
-        // meta.tn-merged namespace, not just meta-kernel's entries.
+    void resolvesBytesFromTheRealCoreTypeLibraryFixture() throws IOException {
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
 
-        TypeDefinition hex = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE).resolve(
-                schemaMap.declarations().get("hex"));
+        TypeDefinition bytes = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE)
+                .resolve(schemaMap.declarations().get("bytes"));
 
-        assertEquals(BinaryType.HEX, hex.body());
+        assertEquals(BytesType.UNCONSTRAINED, bytes.body());
+        assertEquals(List.of(), bytes.supertypes());
     }
 
     @Test
@@ -1156,11 +1087,11 @@ class DefinitionResolverTest {
     }
 
     @Test
-    void resolvesComplexAndUnknownInstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
+    void resolvesComplexAndScopedInstancesFromTheRealCoreTypeLibraryFixture() throws IOException {
         // complex => !complex_type {} -- ComplexType, same record-only/no-compiler treatment as the
         // other atom families above.
         //
-        // unknown => !unknown_type {} -- UnknownType's own constructor (unknown_type => ~sum & {})
+        // declared => !scoped { scope: [LOCAL] } -- Scoped's own constructor (scoped => ~sum & { ... })
         // composes with `sum`, not `atom`; resolves fine since bindAtomInstance binds against Top,
         // not the narrower Atom.
         SchemaMap schemaMap = schemaMapFromCoreFixture();
@@ -1168,11 +1099,11 @@ class DefinitionResolverTest {
         DefinitionResolver instanceResolver = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE);
 
         TypeDefinition complex = instanceResolver.resolve(schemaMap.declarations().get("complex"));
-        TypeDefinition unknown = instanceResolver.resolve(schemaMap.declarations().get("unknown"));
+        TypeDefinition declared = instanceResolver.resolve(schemaMap.declarations().get("declared"));
 
         assertEquals(ComplexType.UNCONSTRAINED, complex.body());
-        assertEquals(TypeKind.SUM, unknown.kind());
-        assertEquals(new UnknownType(), unknown.body());
+        assertEquals(TypeKind.SUM, declared.kind());
+        assertEquals(new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()), declared.body());
     }
 
     @Test
@@ -1584,7 +1515,12 @@ class DefinitionResolverTest {
     private static TsonCompiledMetaSchema metaTn1Compiled() throws IOException {
         io.ltr8.tson.schema.TsonSchemaRegistry registry = new io.ltr8.tson.schema.TsonSchemaRegistry();
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
-        TsonCompiledMetaRegistry throwawayRegistry = new TsonCompiledMetaRegistry(context, TsonBundledSchemas::fetch);
+        // Pin-tolerant, because a reference out of meta.tn's own header carries the `?sha256=` its
+        // `!!meta`/`!!import` were stamped with, and TsonBundledSchemas keys on the bare identity. The
+        // production registry never reaches the source for these -- the standard library is already
+        // registered by canonical identity -- so only this throwaway one has to strip the query.
+        TsonCompiledMetaRegistry throwawayRegistry = new TsonCompiledMetaRegistry(context,
+                uri -> TsonBundledSchemas.fetch(uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri));
         TsonCompiledSchemaLoader throwawayLoader = throwawayRegistry;
 
         String metaKernelSource = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
@@ -1594,20 +1530,12 @@ class DefinitionResolverTest {
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
 
         String source = Files.readString(Path.of("").toAbsolutePath().resolve("../spec/m/meta.tn").normalize());
-        // Desugared first, as SchemaResolver does: resolution only ever sees a bare reference or `!C value`,
-        // and skipping the phase leaves meta.tn's own `[type_name]` as an inline form that resolves to a
-        // structural `array<type_name>` -- a shape the pipeline never produces and the linker rejects.
-        SchemaDocument metaDoc = SchemaDesugarer.desugar(
-                new TsonSchemaParser(source).parseSchemaDocument(), metaKernel.entries().keySet());
-        Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.entries());
-        DefinitionResolver metaResolver = definitionResolverFor(metaKernelParser, namespace::get);
-        Map<String, TypeDefinition> localOnly = new LinkedHashMap<>();
-        for (SchemaMap.Declaration declaration : metaDoc.body().declarations().values()) {
-            TypeDefinition resolved = metaResolver.resolve(declaration);
-            namespace.put(declaration.name(), resolved);
-            localOnly.put(declaration.name(), resolved);
-        }
-        TsonSchema meta = new TsonSchema(metaDoc.id().orElseThrow(), metaDoc.meta(), metaDoc.imports(), localOnly);
+        // Through SchemaResolver, exactly as meta-kernel goes two lines above, rather than a hand-rolled
+        // declaration loop. The loop skipped every phase that runs *between* declarations -- materialisation
+        // most of all -- so a field typed by a template application (`scope: set<scope_kind>`) stayed an
+        // unclosed application and the first read against it met the template instead of the entry it closes.
+        TsonSchema meta = new SchemaResolver(throwawayLoader)
+                .resolveSchema(new TsonSchemaParser(source).parseSchemaDocument());
         TsonLinkedSchema registeredMeta = registry.register(TsonSchemaLinker.link(meta, registry));
         return compileAsMetaParser(registeredMeta.schema().entries());
     }

@@ -18,9 +18,10 @@ import io.ltr8.annotation.Typename;
  *
  * <p>{@link Component} mirrors {@code complex_component}'s own five members (meta.tn: {@code
  * complex_component => !enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]}) -- a plain nested enum,
- * not a {@code typeName()}-mapped one like {@link FloatType.Format}/{@link BinaryType.Encoding},
- * since nothing here multiplexes a single Java class across several built-in annotation names the
- * way those two do.
+ * not a {@code typeName()}-mapped one like {@link FloatType.Format}, since nothing here multiplexes a
+ * single Java class across several built-in annotation names the way that one does. (The binary family's
+ * alphabet did too, and is no longer a facet at all -- it is {@code @bytes_encoding}'s, and its enum lives
+ * with the parser that reads it.)
  */
 @Typename(name = "complex_type")
 public record ComplexType(Component component) implements Atom {

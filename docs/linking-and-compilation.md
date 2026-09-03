@@ -182,7 +182,7 @@ sit at the schema layer because that is the only layer able to name request and 
   the constructor from the scoped vocabulary silently, so a governing meta compiled and registered looking
   healthy and the complaint landed against a *different* document: the first governed schema to apply it was
   told the meta-schema does not declare it, which is both false and unactionable. Same treatment
-  `extern`/`unknown_type` already get, and the reason those register a factory rather than throwing.
+  `scoped` already gets, and the reason it registers a factory rather than throwing.
 
 - **A meta layer is not a vocabulary channel, and this is the first thing an author tries.** The instinct on
   declaring `operation` in a meta layer is to put the shared types beside it — a `status_code` atom, an
@@ -359,7 +359,7 @@ non-empty `subtypes()`, the one case that got a `VariantSchemaReader`. Every ato
 every record whose type had no subtype, consumed the type-ref and discarded it, so a document could claim
 any type at those positions. The guard is the same `VariantSchemaReader`, now wired wherever the rule
 applies. Three things it has to get right, each a real bug found while wiring it: it **follows the body, not
-`kind()`** (a hand-built entry can carry a `ChoiceBody` under `PRODUCT`, and choices and externs have their
+`kind()`** (a hand-built entry can carry a `ChoiceBody` under `PRODUCT`, and choices and scoped instances have their
 own membership relations §7.2 excludes); it accepts an entry's **aliases as the entry itself**, since §7.2
 compares "after reference flattening of both" and resolving an alias would arrive back at the same reader
 and recurse; and it is **transparent to `UseSite` renaming and to bind-mode container rebinding**, both of
@@ -369,11 +369,11 @@ alias, the second or a bound `Map` field silently loses its rebinding.
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
 §4's three scalar classes — `boolean`, `number` (every numeric family: an `integer` and a `decimal`
 are one class, so never disjoint), `string` (every text-form family: `text`, enums by their members' shared
-class — so `[true false]` is boolean-class — `uuid`, `date`, `binary`, …) — plus `brace` (records **and**
+class — so `[true false]` is boolean-class — `uuid`, `date`, `bytes`, …) — plus `brace` (records **and**
 maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a
 discrimination the wire can't deliver) and `bracket` (arrays and tuples). A variant classifies through its
 §8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —
-`rational`/`complex` (whose typed forms straddle classes), `unit`, a mixed-class enum, `unknown`, a nested
+`rational`/`complex` (whose typed forms straddle classes), `unit`, a mixed-class enum, a scoped instance, a nested
 choice, an extern, an unresolved name — makes the choice `false`, the conservative side. A `void` variant
 never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`, after
 §8.3 flattening) — `(T | void)` confuses optionality with choice, which belongs to the position (`?`, `_`),

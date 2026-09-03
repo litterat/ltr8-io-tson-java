@@ -1,25 +1,23 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=c53e904cb122f1a8662439d95602128ad10cd91ef7e440e7b94f4fff95504631"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=74d7282e5a7ec53a3ab182eda90eeea5b7b5d22f9e948322946779a7a6e4d592"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
-  TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 34 draft).
-
-  The root of the schema ladder, written in the Part 2 schema grammar:
-  a braced schema map of `name => definition` declarations, one entry
-  per type, resolving to the kernel's own `schema` type
-  (`{type_name => type_definition}`).
+  TSON meta-kernel — self-referencing bootstrap layer
+  (2026 Revision 35 draft).
 
   The `!!meta` directive names this file itself — the one deliberate
-  circularity in the series, closed by pre-loading rather than by
-  resolution: implementations ship the kernel's resolved structure,
-  and this document describes it.
-
-  Hash pins here are real digests over the bytes of this copy,
-  computed bottom-up (kernel body, then each dependent's pins and
-  digest) so the chain verifies as shipped. Hash *values* are not
-  normative — only the pin's shape is ([TSON-DATA] §2.2.1).
+  circularity, closed by pre-loading rather than by resolution:
+  implementations ship the kernel's resolved structure, and this
+  document describes it.
   """
 {
-  @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A, so instances and fresh records sit under the kinds without supertypes. The first three describe the shape of a data value; `data` describes something that is not one."
+  @doc:"""
+    Base kinds. `top` is the structural root; every constructor
+    transitively IS-A `atom`, `product`, `sum`  or `data`, each of
+    which IS-A `top`. Construction transfers kind, not IS-A, so
+    instances and fresh records sit under the kinds without supertypes.
+    The first three describe the shape of a data value; `data`
+    describes something that is not one.
+    """
   top       => {}
   atom      => top & {}
   product   => top & {
@@ -29,8 +27,8 @@
   sum       => top & {}
 
   @doc:"""
-    Non-data base kind. The body of an entry that describes something
-    other than a data value — vocabulary a meta-schema introduces
+    The body of an entry that describes something other than a atom,
+    product, or sum type — vocabulary a meta-schema introduces
     beyond the kernel's own, whose instances ride along in a schema
     map without being types. No data value ever has such an entry as
     its type, so `data` composes with `top` directly rather than with
@@ -73,12 +71,13 @@
 
   @doc:"""
     Escape hatch primitive. Instance of the unit atom constructor. The
-    result of base type resolution ([TSON-DATA] §4) applied to a source token, with
-    no further interpretation by the TSON type system. value-typed
-    fields receive whatever [TSON-DATA] §4 produces — null, boolean, integer, float,
-    or string — and the host runtime is responsible for type-checking
-    values at use site against the field's semantic role. value carries
-    no constraint vocabulary and is not narrowable.
+    token, uninterpreted, read by the type the position hands it to. Under
+    a schema every value is typed by its position or by its tag, so a
+    value-typed field is read by the declared type it stands for and never
+    by base type resolution, which applies only in schemaless documents
+    ([TSON-DATA] §4). value carries no constraint vocabulary and is not
+    narrowable, and a value position is not a scope: it admits no nested
+    !!schema, having no tag of its own for one to resolve.
 
     Used for record_field.value (the type of fixed/default values, which
     must be the field's declared type — a dependency the schema language
@@ -146,9 +145,20 @@
     is structural — `bits` never appears without `signed`.
     """
   integer_size => {
-    bits:    integer
+    bits:    non_negative_integer
     signed:  boolean
   }
+
+  @doc:"""
+    A named entry for the same reason enum_set is one, and a set for the
+    same three reasons: uniqueness comes from set's own contract,
+    non-emptiness from min_items (an empty member set is a body admitting
+    no value at all), and member identity is [TSON-DATA] §4.3's, so 80 and
+    0x50 are one member and a duplicate rather than two. An array spelling
+    — which is what an inline form would give, array sugar being the only
+    inline container — loses all three.
+    """
+  integer_member_set => !set_type { element_type: integer }
 
   @doc:"""
     Integer constraint vocabulary. Atom constructor whose instance,
@@ -164,8 +174,9 @@
     inclusive `min` or the exclusive `exclusive_min`; likewise `max`
     or `exclusive_max` — so at most one bound per side holds by
     shape. Bound fields are `integer` — an integer's bounds are
-    integers — unlike the `value`-typed bounds of the meta numeric
-    tiers, whose values share the constrained atom's family. That the
+    integers, and the instance is declared beside the constructor —
+    unlike the `value`-typed bounds of the meta tiers, whose instances
+    are core's. That the
     lower bound not exceed the upper (across whichever forms are
     present) is a schema-load coherence check.
 
@@ -183,24 +194,62 @@
     still decimal text — `size` names the target representation a
     consumer decodes into, not the source form. Resolver output
     stores `size` as written and does not expand it to bounds.
+
+    Step: `multiple_of` is strictly positive. The type carries the
+    half of that it can — `non_negative_integer` rules out the sign,
+    with no `positive_integer` in the kernel to carry the rest and
+    none worth adding for one field — and the schema-load coherence
+    check rules out zero. Zero or a negative
+    value is a schema-load error — and the test ignores the sign of
+    the value, so -30 is a multiple of 15. A refinement may only
+    tighten `multiple_of` to an integer multiple of the inherited
+    value (15 under 5 is a tightening; 10 under 15 is an error). It
+    composes with every other facet present: a value must satisfy
+    all of them.
+
+    Enumeration: `members` lists the admitted values outright — the
+    spelling for numeric codes, since enum members are identifiers
+    (`!integer ^ { members: [1 2 3] }`, not `!enum [1 2 3]`). Every
+    member must itself satisfy the bounds, the width and
+    `multiple_of` present on the same body — a member outside them is
+    a schema-load error, as a bound outside the width is — and a
+    refinement may only shrink the set (the member-set rule of the
+    tightening table). A value must be a member and satisfy the other
+    facets; with a coherent set the second test is implied by the
+    first.
     """
   integer_type => ~atom & {
     size:  integer_size?
     ( min: integer | exclusive_min: integer )?
     ( max: integer | exclusive_max: integer )?
-    multiple_of:  integer?
+    multiple_of:  non_negative_integer?
+    members:      integer_member_set?
   }
 
   integer => !integer_type {}
 
   @doc:"""
+    Non-negative integer — the type of every facet that counts
+    something: lengths, item counts, digit counts, bit widths, prefix
+    lengths, fractional-second precision. Zero is a value at nearly
+    all of them (an empty string, an empty set, no fractional digits,
+    a `/0` prefix); that `bits` wants more than zero is a coherence
+    check, not a type. A refinement of the kernel's own `integer`, so
+    a negative count fails when the meta-schema is validated rather
+    than in every resolver. Core declares a sibling under the same
+    name for user schemas, as with `void` and `set`.
+    """
+  non_negative_integer => !integer ^ { min: 0 }
+
+  @doc:"""
     Text constraint vocabulary. Atom constructor whose instance,
-    `text`, is the kernel's Unicode code point sequence type.
+    `text`, is the kernel's Unicode code point sequence type. Lengths
+    count code points.
     """
   text_type => ~atom & {
-    min_length:  integer?
-    max_length:  integer?
-    length:      integer?
+    min_length:  non_negative_integer?
+    max_length:  non_negative_integer?
+    length:      non_negative_integer?
     pattern:     regex?
   }
 
@@ -297,7 +346,12 @@
   element_state       => !enum [REQUIRED OPTIONAL]
   type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA]
 
-  @doc:"Annotation type markers. `alias` and `synthetic` are resolver-attached and derived: discarded and recomputed on ingest ([TSON-SCHEMA] §6, §8.1). `synthetic` marks a resolver-materialised synthetic entry at its schema-map key ([TSON-SCHEMA] §8.2)."
+  @doc:"""
+    Annotation type markers. `alias` and `synthetic` are resolver-attached
+    and derived: discarded and recomputed on ingest ([TSON-SCHEMA] §6, §8.1).
+    `synthetic` marks a resolver-materialised synthetic entry at its
+    schema-map key ([TSON-SCHEMA] §8.2).
+    """
   annotation    => @annotation void
   documentation => @annotation text
   doc           => @annotation documentation
@@ -379,14 +433,35 @@
     state:           element_state ~ REQUIRED
     unordered:       boolean ~ false
     unique_items:    boolean ~ false
-    min_items:       integer?
-    max_items:       integer?
+    min_items:       non_negative_integer?
+    max_items:       non_negative_integer?
   }
 
-  set => ~array ^ {
+  @doc:"""
+    The unordered, unique refinement of array. `min_items` carries a
+    default of 1 rather than inheriting array's absent lower bound:
+    the empty set is a set, so this is a default and not a fixed
+    value — `!set_type { element_type: text  min_items: 0 }` spells
+    it — but every set in the meta layer wants a non-empty one, and a
+    default is what makes non-emptiness the thing an author gets
+    without writing it and emptiness the thing they ask for. The
+    field is restated with its type, and without the `?`, because a
+    defaulted field cannot be optional — `non_negative_integer? ~ 1` is not a
+    state ([TSON-SCHEMA] §5.2): the restatement moves it from
+    OPTIONAL to REQUIRED_DEFAULT, which is a tightening — a set
+    admits fewer values than the array it refines.
+
+    Named `set_type`, with the atom constructors' suffix, because the
+    bare name is taken by the template an author actually writes:
+    meta and core each declare `set => <T> !set_type { element_type: T }`,
+    so a field reads `tags: set<text>`. The kernel, below meta, has
+    no such template and applies the constructor directly.
+    """
+  set_type => ~array ^ {
     state:        = REQUIRED
     unordered:    = true
     unique_items: = true
+    min_items:     non_negative_integer ~ 1
   }
 
   map => ~product & {
@@ -395,8 +470,8 @@
     key_type:        type_ref
     value_type:      type_ref
     state:           element_state ~ REQUIRED
-    min_items:       integer?
-    max_items:       integer?
+    min_items:       non_negative_integer?
+    max_items:       non_negative_integer?
   }
 
   tuple => ~product & {
@@ -408,9 +483,10 @@
   @doc:"""
     A named entry rather than an inline form, because `!` constructor
     applications remain prohibited at field positions
-    ([TSON-SCHEMA] §5.2) and `set` has no sugar of its own.
+    ([TSON-SCHEMA] §5.2), sets have no bracket sugar, and the `set<T>`
+    template lives in meta, out of the kernel's reach.
     """
-  enum_set => !set { element_type: identifier  min_items: 1 }
+  enum_set => !set_type { element_type: identifier }
 
   enum => ~atom & {
     members: enum_set

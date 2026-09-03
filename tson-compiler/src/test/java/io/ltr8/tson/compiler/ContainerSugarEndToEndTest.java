@@ -199,20 +199,20 @@ class ContainerSugarEndToEndTest {
         assertNotNull(compile("  holder => { xs: [text] }"));
         assertNotNull(compile("  ids => [text]"));
         assertNotNull(compile("""
-                  text_set => !set { element_type: text }
+                  text_set => !set_type { element_type: text }
                   holder => { xs: text_set }"""));
     }
 
     /**
      * {@code set} and {@code array} share a body shape, so the only thing distinguishing them is the defaults
-     * {@code set}'s own vocabulary tightens (§5.7). Binding {@code !set { element_type: text }} through the
+     * {@code set}'s own vocabulary tightens (§5.7). Binding {@code !set_type { element_type: text }} through the
      * compiled reader applies those schema-composed defaults, so this needs no {@code set}-specific handling
      * anywhere -- worth pinning precisely because nothing names {@code set}.
      */
     @Test
     void aSetCarriesItsOwnTightenedDefaultsNotArrays() {
         ArrayBody asSet = assertInstanceOf(ArrayBody.class,
-                compile("  xs => !set { element_type: text }").schema().entries().get("xs").body());
+                compile("  xs => !set_type { element_type: text }").schema().entries().get("xs").body());
         assertTrue(asSet.unordered());
         assertTrue(asSet.uniqueItems());
 
