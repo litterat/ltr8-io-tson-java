@@ -329,17 +329,15 @@ otherwise.
 
 ---
 
-## 5. §11.4's scope list omits a template's parameters, so two parameters that read alike are accepted
+## 5. §11.4's scope list omits a template's parameters — recommendation: no change, and this implementation stays deliberately stricter
 
 **Section:** Part 2 §11.4 (name hygiene at the schema layer), [TSON-DATA] §8.2 (the three mechanisms).
 
-**Problem:** §11.4 enumerates the schema layer's named scopes — "the members of one enum; the field names of
-one record definition (member labels of its groups included, §5.11); the declared names of one schema; and
-the merged namespace at `!!import`". A template's **parameters** are not among them, and a parameter is a
-name: §5.10 says "a parameter declaration is a bare name", and §12.1 makes it a naming position matched
-against §7.7's identifier grammar like any other.
-
-The consequence is concrete rather than doctrinal. This is accepted:
+**The gap is real.** §11.4 enumerates the schema layer's named scopes — "the members of one enum; the field
+names of one record definition (member labels of its groups included, §5.11); the declared names of one
+schema; and the merged namespace at `!!import`". A template's **parameters** are not among them, and a
+parameter is a name: §5.10 says "a parameter declaration is a bare name", and §12.1 makes it a naming
+position matched against §7.7's identifier grammar like any other. So this is accepted:
 
 ```
 box => <T, Т> { a: T  b: Т }
@@ -347,29 +345,54 @@ box => <T, Т> { a: T  b: Т }
 
 Latin `T` and Cyrillic `Т` (U+0422) are two parameters that render identically. A body referencing `T` binds
 one of them, an application `box<text, integer>` fills both positionally, and no reader of the source can see
-which slot either argument reaches. That is the substitution hazard §8.2 exists to refuse, and §11.4's own
-argument for the enum-member scope — distinct strings, so the set's own uniqueness rule cannot see them —
-applies to it word for word.
+which slot either argument reaches.
 
 The two per-name mechanisms have the same gap for the same reason. §8.2 frames all three as operating "over
-named scopes", which is strictly true only of mechanism 1: `Identifier_Status` and the restriction level
-judge one name at a time and need no scope at all. But because §11.4 supplies the schema layer's scopes as a
-closed list, a name in no scope is a name no mechanism is stated to reach — so a mixed-script or
-restricted-character parameter name has no stated verdict either.
+named scopes", which is strictly true only of mechanism 1: `Identifier_Status` and the restriction level judge
+one name at a time and need no scope at all. But because §11.4 supplies the schema layer's scopes as a closed
+list, a name in no scope is a name no mechanism is stated to reach.
 
-**Interpretation chosen:** this implementation treats **the parameter names of one template** as a fourth
-schema-layer scope, checked by all three mechanisms in the same walk as the other three
-(`TsonSchemaLinker.checkNames`; `ConfusableNameScopesTest` pins each). `<T, Т>` is refused as a confusable
-pair, and a restricted or mixed-script parameter name is refused like any other name.
+**Recommendation: no change, on the grounds that closes it.** A scope earns its line in §11.4 by being a place
+where names an author did not write together end up side by side. Every scope on the list is one: a record's
+field names are matched against a document someone else sends, an enum's members outlive the schema that
+declared them, and `!!import`'s merged namespace is the collision of two authors who never met. A template's
+parameter list is none of that. It is one or two single letters, written by one author, in one line, visible
+whole at the point of declaration — and the confusable pair has to be *deliberate*, because nobody reaches for
+Cyrillic `Т` by accident while typing `<T, U>`. The hazard is real and the population is empty.
 
-**Suggested resolution:** add the parameter names of one template to §11.4's list. It is the smallest change
-that closes it, it needs no new mechanism, and the section already carries the reasoning under a different
-scope. Worth considering alongside it: §8.2's "The mechanisms operate over named scopes" over-generalises
-from mechanism 1, and saying so — that mechanisms 2 and 3 are per-name rules that apply wherever a name
-occurs, while mechanism 1 is a relation needing a scope — would make a forgotten scope cost one missing
-relation rather than three missing checks.
+Against that, the cost of the text is not one line. A fourth scope is a fourth thing every implementation must
+walk, a fourth thing a conformance suite must cover, and a fourth thing the next scope-shaped construct has to
+be compared against. §11.4's list is short because a short list is reviewable; the case for growing it should
+be a case someone has met.
 
-**Status against Revision 34:** open, and new against this revision.
+The same answer disposes of the second half. §8.2's over-generalisation — "the mechanisms operate over named
+scopes" — has exactly one observable consequence, which is that a parameter name has no stated verdict under
+mechanisms 2 and 3. Leave the scope list alone and that consequence stays confined to the one construct nobody
+writes badly, at which point correcting the sentence buys precision and no behaviour.
+
+**This implementation is stricter, and will stay so.** It treats the parameter names of one template as a
+fourth schema-layer scope, checked by all three mechanisms in the same walk as the other three
+(`TsonSchemaLinker.checkNames`; `ConfusableNameScopesTest` pins each case). That is not a claim the spec
+should follow: the walk here is one walk over a list, and adding the parameter list to that list was cheaper
+than carving it out — "one place is the point", as this implementation's own note on the rule puts it, and a
+walk with an exemption is the shape that grew the holes the walk was built to close.
+
+The divergence is bounded, which is why it is tolerable. §8.2's refusal is a fifth outcome and explicitly not
+one of §8.1's four categories, so a schema refused here is not a schema called invalid — the document's
+verdict is *withheld*, not decided against it. What it does mean is that a schema this refuses may load
+elsewhere, and that **no conformance vector can exist either way**: one asserting the refusal fails a
+conforming processor, and one asserting acceptance fails this one. Those cases live in this repo's own tests
+instead, and `class2/schema/refused/` deliberately carries none of them.
+
+**Suggested resolution:** none. Record it as considered and declined, so the next revision's scope list stays
+answerable as a whole rather than growing by accretion. If §11.4 is opened for another reason, the sentence
+about mechanisms 2 and 3 being per-name is worth taking then — it costs nothing and makes a forgotten scope
+cost one missing relation rather than three missing checks.
+
+**Status against Revision 34:** open, with its recommendation reversed. The entry originally proposed adding
+the scope; building it is what changed the argument — the check is cheap here and finds nothing, which is
+evidence about the population rather than about the rule. Adopting this entry costs the change log one line
+saying no.
 
 ---
 
