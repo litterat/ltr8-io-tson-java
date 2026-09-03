@@ -21,8 +21,9 @@ import java.util.Optional;
  * expected}/{@code actual} -- the two fields that exist so a consumer needn't parse the message -- and into
  * the message itself wherever a reader interpolates a value. The type-ref and annotations stay reachable
  * through the accessors; they are simply not what a value reads as. A {@code byte[]} value is the one shape
- * this does not improve ({@code String.valueOf} gives its identity hash either way) -- rendering binary is
- * {@code TsonTreeWriter}'s job, encoding and all.
+ * this cannot improve, {@code String.valueOf} giving its identity hash either way: a reader building a
+ * diagnostic renders that one through its own {@code Rendered}, and writing binary back as TSON text,
+ * encoding and all, is {@code TsonTreeWriter}'s job.
  */
 public record TsonAtom(Object value, Optional<String> typeRef, List<TsonAnnotation> annotations)
         implements TsonValue {

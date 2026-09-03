@@ -24,7 +24,6 @@ import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.compiler.base.BaseValue;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.compiler.lexer.Nfc;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
@@ -489,7 +488,7 @@ public final class SchemalessObjectReader {
                 }
                 int beforeKey = ctx.reported();
                 Object key = bind(ctx, keyClass);
-                if (ctx.reported() == beforeKey && !statedKeys.add(Nfc.keyOf(key))) {
+                if (ctx.reported() == beforeKey && !statedKeys.add(ValueIdentity.of(key))) {
                     // §2.6, by bound key value -- a key that failed to bind is left out, since it is not a
                     // key the document stated and a second failure would otherwise read as a repeat of it.
                     ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,

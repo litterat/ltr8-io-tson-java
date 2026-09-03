@@ -37,15 +37,4 @@ public final class Nfc {
                 ? text
                 : Normalizer.normalize(text, Normalizer.Form.NFC);
     }
-
-    /**
-     * The identity of a decoded scalar key: NFC for a {@code String}, the value itself otherwise. §2.6 makes
-     * NFC-normalised text the *minimum* a processor must relate ("textual identity is the parser's
-     * minimum"), and a decoding processor "compares decoded values", which must therefore detect at least
-     * what the textual rule does -- so a decoded string key is compared normalised even though it is stored
-     * as written.
-     */
-    public static Object keyOf(Object decoded) {
-        return decoded instanceof String text ? of(text) : decoded;
-    }
 }

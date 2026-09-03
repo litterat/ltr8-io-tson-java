@@ -494,12 +494,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             // of nothing.
             return;
         }
-        if (!Objects.equals(written, check.value())) {
+        if (!Objects.equals(ValueIdentity.of(written), ValueIdentity.of(check.value()))) {
             fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
                     "'" + fieldName + "' is fixed on '" + displayName + "' and cannot be given another value -- the "
                             + "schema declares it with '=' (fixed); for a default the data may override, "
                             + "use '~'",
-                    String.valueOf(check.value()), String.valueOf(written));
+                    Rendered.value(check.value()), Rendered.value(written));
             return;
         }
         // The raw value, not the narrowed precomputed one -- every other field reaches the sink raw and is
