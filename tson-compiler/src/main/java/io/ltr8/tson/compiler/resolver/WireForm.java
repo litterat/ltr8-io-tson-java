@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -302,8 +303,23 @@ final class WireForm {
                             bindings))).toList());
             case RecordValue record -> new RecordValue(record.fields().stream()
                     .map(field -> substituteField(field, head, parameters, bindings)).toList());
+            // Both halves of an entry, because a parameter reaches either: core's `extern_of => <S> !scoped
+            // { scope: [EXTERN]  schemas: { S => _ } }` puts one in a key, and `extern_type`'s `T` inside the
+            // array its value names. A key is a data-value and a value a scoped-value ([TSON-DATA] §2.6), so
+            // the two are rebuilt through their own carriers rather than one.
+            case MapValue map -> new MapValue(map.entries().stream()
+                    .map(entry -> new MapValue.MapEntry(
+                            retyped(entry.key(), substitute(entry.key().coreValue(), head, parameters, bindings)),
+                            rescope(entry.value(), substitute(entry.value().value().coreValue(), head, parameters,
+                                    bindings))))
+                    .toList());
             default -> value;
         };
+    }
+
+    /** {@link #rescope}'s counterpart for a map key, which is a bare {@code data-value} and carries no scope. */
+    static DataValue retyped(DataValue original, CoreValue rewritten) {
+        return new DataValue(original.annotations(), original.typeRef(), rewritten);
     }
 
     /**

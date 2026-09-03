@@ -111,9 +111,6 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
         int index = 0;
         boolean reportedExtra = false;
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
-            }
             if (index >= slots.size()) {
                 if (!reportedExtra) {
                     ctx.report(Diagnostic.Code.WRONG_ARITY,
@@ -121,11 +118,15 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
                             slots.size() + " elements", "more than " + slots.size());
                     reportedExtra = true;
                 }
-                EventSkip.dataValue(ctx);
+                EventSkip.scopedValue(ctx);
                 index++;
                 continue;
             }
             CompiledSlot slot = slots.get(index);
+            SchemaRef push = ScopePush.notAdmitted(ctx, slot.parser());
+            if (push != null) {
+                ScopePush.refuse(ctx.index(index), slot.schema().elementType().name(), push);
+            }
             result[index] = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(slot, index, ctx)
                     : slot.parser().read(ctx.index(index));
             index++;

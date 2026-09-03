@@ -71,7 +71,8 @@ public final class TsonSchemaCompiler {
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonCompiledMetaSchema governingMeta) {
         TsonSchema schema = linkedSchema.schema();
-        return compileWith(linkedSchema, name -> governedFactory(name, schema, governingMeta));
+        return compileWith(linkedSchema, name -> governedFactory(name, schema, governingMeta),
+                ForeignSchemas.none());
     }
 
     /**
@@ -108,7 +109,20 @@ public final class TsonSchemaCompiler {
      * since meta-kernel declares its whole vocabulary itself and has no earlier meta to be governed by.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {
-        return compileWith(linkedSchema, factories::resolve);
+        return compile(linkedSchema, factories, ForeignSchemas.none());
+    }
+
+    /**
+     * {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver)} naming where a scope push goes to find
+     * the schema a document names inside itself ([TSON-SCHEMA] §7.8) -- {@code TsonCompiledSchemaRegistry}
+     * passes its own lookup, so a foreign schema resolves through the same cache and the same read mode as
+     * the schema that admitted it. The overload above passes {@link ForeignSchemas#none()}, which is the
+     * right answer for a compile with no registry behind it and the wrong one to arrive at by omission,
+     * which is why it is a separate method rather than a default.
+     */
+    public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
+                                             ForeignSchemas foreign) {
+        return compileWith(linkedSchema, factories::resolve, foreign);
     }
 
     /**
@@ -116,8 +130,8 @@ public final class TsonSchemaCompiler {
      * differs between a governed and a standalone compile.
      */
     private static TsonCompiledSchema compileWith(
-            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor) {
-        Compilation compilation = new Compilation(linkedSchema, factoryFor);
+            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, ForeignSchemas foreign) {
+        Compilation compilation = new Compilation(linkedSchema, factoryFor, foreign);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -145,6 +159,7 @@ public final class TsonSchemaCompiler {
         private final TsonLinkedSchema linked;
         private final TsonSchema schema;
         private final Function<String, ValueReaderFactory> factoryFor;
+        private final ForeignSchemas foreign;
         private final Map<String, TsonTypeReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
 
@@ -155,10 +170,12 @@ public final class TsonSchemaCompiler {
          */
         private final CompiledReaders readers = new CompiledReaders(this::resolve);
 
-        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor) {
+        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor,
+                ForeignSchemas foreign) {
             this.linked = linked;
             this.schema = linked.schema();
             this.factoryFor = factoryFor;
+            this.foreign = foreign;
         }
 
         TsonTypeReader<?> resolve(String name) {
@@ -205,7 +222,7 @@ public final class TsonSchemaCompiler {
                 // An open entry is a template, not a type, whatever its body says -- see OpenTemplateReader
                 // for why the refusal is the entry's own reader rather than a check at the root.
                 return new OpenTemplateReader(name, definition.parameters(),
-                        new ValueReaderContext(linked, readers).locationOf(name, definition));
+                        new ValueReaderContext(linked, readers, foreign).locationOf(name, definition));
             }
             Top body = definition.body();
             if (body instanceof Reference r) {
@@ -217,7 +234,7 @@ public final class TsonSchemaCompiler {
                         EntryDisplayName.of(name, definition));
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
-            TsonTypeReader<?> built = factory.create(name, definition, new ValueReaderContext(linked, readers));
+            TsonTypeReader<?> built = factory.create(name, definition, new ValueReaderContext(linked, readers, foreign));
             // §7.2's subsumption rule, applied at every position it governs rather than only where a record
             // happened to have subtypes -- see Subsumption for which kinds it deliberately leaves alone.
             return Subsumption.guard(name, definition, built, linked.schema().entries(), readers);

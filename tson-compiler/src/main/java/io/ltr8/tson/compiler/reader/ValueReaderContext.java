@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.ForeignSchemas;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -15,8 +16,12 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  *
  * <p>A context object rather than a widening parameter list: a factory that later needs a further handle
  * gains a field here instead of every factory's signature churning.
+ *
+ * <p>{@link #foreign} is the one handle that is not about the schema being compiled: [TSON-SCHEMA] §7.8's
+ * scope push resolves a schema the <em>document</em> names, so {@link ScopedReader} is given where to go and
+ * ask rather than an answer. Every other factory ignores it.
  */
-public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers) {
+public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers, ForeignSchemas foreign) {
 
     /** The resolved schema being compiled -- what a factory reaching a sibling entry wants. */
     public TsonSchema schema() {

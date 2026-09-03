@@ -110,8 +110,9 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         Set<Object> seen = body.uniqueItems() ? new LinkedHashSet<>() : null;
         int index = 0;
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
+            SchemaRef push = ScopePush.notAdmitted(ctx, elementParser);
+            if (push != null) {
+                ScopePush.refuse(ctx.index(index), body.elementType().name(), push);
             }
             Object decoded = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(index, ctx)
                     : elementParser.read(ctx.index(index));

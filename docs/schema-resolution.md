@@ -230,6 +230,18 @@ a held body.
   on a token being *unquoted*, so a quoted body references no parameters at all.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the
   materialisation section below.
+- **Every walk over a held body descends into a map slot, and three of them did not.** meta.tn's
+  `scoped.schemas` is `{uri => [type_name; 1..]?; 1..}`, so core's `extern_of => <S> !scoped { scope:
+  [EXTERN]  schemas: { S => _ } }` and `extern_type => <S, T> ... { S => [T] }` are the first templates
+  putting a parameter inside a map — one in a key, one inside the array its value names. `substitute` left
+  the parameter name standing where the argument belonged; `ParameterKinds` never observed the parameter at
+  all, so its kind was never inferred and a `type_name` argument stayed on the reference channel and failed
+  as an unresolved reference; and `DerivedName`'s canonical rendering — the half §8.2 keys identity on —
+  rendered the whole map as the unknown-value mark, so two bindings differing only inside one hashed alike;
+  the readable half masked it, which is the `startsWith` hazard inverted and why `DerivedNameTest` asserts
+  `canonicalBinding` directly. A map key is a `data-value` and its
+  value a `scoped-value` ([TSON-DATA] §2.6), so the two halves rebuild through their own carriers
+  (`WireForm.rescope` and `WireForm.retyped`); both halves descend, because a parameter reaches either.
 
 **`MetaRefs`** — the `schema.meta` reference walk, `mapRefs` over a definition and `mapBodyRefs` over a body.
 Four callers use it and only one is closing a template: §8.3 flattening rewrites a use site, §8.2's synthetic

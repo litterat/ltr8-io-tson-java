@@ -108,15 +108,16 @@ class CoreSchemaImportTest {
      * effect of registering it -- but {@link TsonSchemaCompiler}'s own per-entry build-failure
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to
      * an {@code ErrorReader} instead (see that class's own Javadoc), only throwing once someone
-     * actually tries to {@code read} it. This confirms exactly which entries land there and pins the
-     * set down: {@code unknown} alone -- constructed via {@code unknown_type}, one of the two constructors
-     * {@link ValueReaderFactoryRegistry} registers to {@code ErrorReader} outright (the other, {@code
-     * extern}, has no core.tn declaration at all) -- a real, already-documented, deliberate gap (see this
-     * repo's own CLAUDE.md, "Not yet implemented"), not a regression to chase. Every *other* entry compiles
-     * to a genuinely usable reader.
+     * actually tries to {@code read} it. So this walks every entry and asserts the set is empty: core.tn is
+     * the whole standard library, so "every one of these reads" is the strongest single statement about the
+     * compiled reader stack this repo can make, and a regression here is silent everywhere else.
+     *
+     * <p>It was not always empty. {@code declared}, {@code extern} and {@code dynamic} sat here for as long
+     * as {@code scoped} had no reader, which is why this is written as a set rather than a boolean -- a new
+     * gap names itself.
      */
     @Test
-    void exactlyTheScopedInstancesCompileToAnErrorReader() {
+    void noCoreEntryCompilesToAnErrorReader() {
         Loaded loaded = loadMetaKernelMetaAndCore();
         TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
@@ -134,7 +135,7 @@ class CoreSchemaImportTest {
             }
         }
 
-        assertEquals(Set.of("declared", "dynamic", "extern"), errored);
+        assertEquals(Set.of(), errored, () -> "an entry with no compiled reader: " + errored);
     }
 
     /**

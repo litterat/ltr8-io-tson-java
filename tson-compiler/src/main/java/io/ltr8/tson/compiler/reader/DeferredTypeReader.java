@@ -17,6 +17,15 @@ import java.util.Map;
  */
 public record DeferredTypeReader<T>(String typeName, Map<String, TsonTypeReader<?>> registry) implements TsonTypeReader<T> {
 
+    /**
+     * The entry this stands in for, once the compilation that created it has finished it -- {@code null}
+     * while it is still building. What {@link ScopePush} asks when a scope push arrives at a recursive
+     * position, since the real reader is the one that decides whether the push is admitted.
+     */
+    TsonTypeReader<?> resolved() {
+        return registry.get(typeName);
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public T read(TsonReadContext ctx) {

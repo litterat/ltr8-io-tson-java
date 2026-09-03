@@ -29,7 +29,8 @@ import java.util.stream.Stream;
  * {@code "person"}) and {@link #annotations()}.
  */
 public sealed interface TsonValue
-        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonAbsent, TsonMissing {
+        permits TsonRecord, TsonMap, TsonArray, TsonTuple, TsonAtom, TsonAbsent, TsonMissing,
+                TsonScopedValue {
 
     /** This value's own type-ref (e.g. {@code "int32"}, {@code "uuid"}, {@code "person"}), if the wire or schema gave one. */
     Optional<String> typeRef();
@@ -66,6 +67,8 @@ public sealed interface TsonValue
             case TsonAtom n -> new TsonAtom(n.value(), n.typeRef(), merged);
             case TsonAbsent n -> new TsonAbsent(n.typeRef(), merged);
             case TsonMissing n -> n;
+            // The annotations belong to the value the directive governs, not to the scope around it.
+            case TsonScopedValue n -> new TsonScopedValue(n.schema(), n.root().withAnnotations(leading));
         };
     }
 

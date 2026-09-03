@@ -288,10 +288,30 @@ admit UTS #39's own `Toys-Я-Us`.
 ## Tree model: `TsonValue` (`tson-tree` module)
 
 What every tree read hands back — the compiled tree readers (`docs/linking-and-compilation.md`) and the
-schemaless `TsonTreeReader` alike. A sealed `TsonValue` over seven pure immutable node types (`TsonRecord`/`TsonMap`/`TsonArray`/
-`TsonTuple`/`TsonAtom`/`TsonAbsent`/`TsonMissing`), **structure-preserving** — TSON's
+schemaless `TsonTreeReader` alike. A sealed `TsonValue` over eight pure immutable node types (`TsonRecord`/
+`TsonMap`/`TsonArray`/`TsonTuple`/`TsonAtom`/`TsonAbsent`/`TsonMissing`/`TsonScopedValue`),
+**structure-preserving** — TSON's
 record-vs-map and array-vs-tuple distinctions survive into the model, where JSON's would collapse — and
 annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
+
+- **`TsonScopedValue` is a wrapper because the directive belongs to the position, not to the value.**
+  [TSON-DATA] §2.3's grammar is `scoped-value = [ schema-directive ws ] data-value`: the same record means
+  the same thing with or without one, so a nested `!!schema` ([TSON-SCHEMA] §7.8's scope push) attaches
+  *around* the value rather than as a ninth component on each of the other seven. That is the argument
+  `TsonDocument` makes at document level, and the reason the two are separate types rather than one — a
+  document also carries `!!id`, is not itself a value, and cannot stand at a field position.
+  - **Transparent to navigation.** Every kind predicate, accessor and step delegates to the value it
+    governs, so `tree.at("/attachments/0/claim_id")` reads the same whether or not a scope was pushed, and
+    a consumer that does not care about scopes never unwraps one. Asking for the scope is what surfaces it:
+    `v instanceof TsonScopedValue s` then `s.schema()`.
+  - **Only a genuine push produces one.** A value whose type came from the governing namespace carries no
+    directive and is read as its own node. So a tree round-trips through `TsonTreeWriter` with its
+    directives exactly where the author put them — the writer emits the scope first and then the value it
+    governs, §2.3's own order, which is also why the scoped case sits ahead of `writeNode`'s switch rather
+    than in it: every branch of that switch is already past the annotations, and a directive precedes them.
+  - **Bind mode has no counterpart**, deliberately: a bound object has nowhere to carry a URI and inventing
+    somewhere would change what a consumer's own class means. `TsonAbsent` makes the same asymmetry for
+    §2.9.
 
 - **`TsonDocument` is the model's document, and `TsonValue` stays a pure value.** [TSON-DATA] §2.2 —
   "Header directives are properties of the document, not of the body's root value" — is why the header is a

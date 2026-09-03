@@ -2,11 +2,13 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
@@ -260,10 +262,24 @@ final class ParameterKinds {
             switch (written) {
                 case TokenValue token when occurrences.declares(token.text()) -> token(token.text(), slot, type);
                 case ArrayValue array -> elements(array, type);
+                case MapValue map when type instanceof MapBody entries -> entries(map, entries);
                 case RecordValue record when TYPE_REF.equals(slot) -> application(record);
                 case RecordValue record when type instanceof RecordBody nested -> record(record, nested);
                 default -> {
                 }
+            }
+        }
+
+        /**
+         * A map slot: the key against {@code key_type}, the value against {@code value_type}. Both halves,
+         * because a parameter reaches either -- core's {@code extern_type => <S, T> !scoped { scope: [EXTERN]
+         * schemas: { S => [T] } }} puts one in each, {@code S} in a {@code uri}-typed key and {@code T}
+         * inside the {@code [type_name]} the value names.
+         */
+        private void entries(MapValue map, MapBody declared) {
+            for (MapValue.MapEntry entry : map.entries()) {
+                value(entry.key().coreValue(), declared.keyType());
+                value(entry.value().value().coreValue(), declared.valueType());
             }
         }
 

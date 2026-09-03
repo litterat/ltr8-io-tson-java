@@ -71,7 +71,7 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
      * {@code expected}. Order comes from the resolved schema's entries (insertion-ordered), not from
      * {@link #entries}, which is an unordered immutable copy of the same name set.
      */
-    String declaredTypeNames() {
+    public String declaredTypeNames() {
         return String.join(" | ", schema().entries().keySet());
     }
 
@@ -85,7 +85,7 @@ public sealed class TsonCompiledSchema permits TsonCompiledMetaSchema {
      * nearest declared name when there is one, and lists only the first few. The full set stays available
      * through {@link #declaredTypeNames} for the machine-readable end of a {@code Diagnostic}.
      */
-    String unknownTypeMessage(String typeName) {
+    public String unknownTypeMessage(String typeName) {
         Collection<String> names = schema().entries().keySet();
         List<String> shown = names.stream().limit(NAMES_IN_MESSAGE).toList();
         StringBuilder message = new StringBuilder("'").append(typeName)

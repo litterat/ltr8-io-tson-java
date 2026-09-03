@@ -578,7 +578,12 @@ registered only once linked, so a cycle is invisible to every cache and was a `S
 per-mode registry of compiled user schemas — **the read mode is which registry you hold**, not a compile
 parameter. Resolution is always bind-anchored (meta instances bind to `schema.meta.Top`), so every read
 registry shares the one bind-mode core; core.tn is never compiled in the core, only inline in a read
-registry.
+registry. **A read registry also hands its own lookup to every compile it performs** (`ForeignSchemas`,
+threaded through `TsonSchemaCompiler` into `ValueReaderContext`): §7.8's scope push resolves a schema the
+*document* names, so `ScopedReader` is given where to go and ask rather than an answer, and a foreign schema
+shares this cache, this loader and this read mode with the schema that admitted it. A compile with no
+registry behind it passes `ForeignSchemas.none()`, whose every lookup is `SCHEMA_NOT_PERMITTED` — a fact
+about the deployment, never a verdict.
 
 ### Streaming readers and read context — `docs/readers-and-diagnostics.md`
 
@@ -606,6 +611,23 @@ content-derived entry name — `EntryDisplayName` renders a minted entry as the 
 produced it (told apart by having no source position), and `UseSite` names a *position* as that position
 wrote it, following §8.3's `@alias` where flattening left one and the referring entry's own `source`
 where it did not. Both run where a composite reader wires its children, so neither costs a read anything.
+
+**§7.8's scope push is `ScopedReader`, and who may open one is `ScopePush`.** At a `scoped` position the
+value's own shape picks the cell: a nested `!!schema` is EXTERN, a bare type-ref is LOCAL, and neither is a
+validation error (§7.8's required discriminant — *validation*, not resolver: nothing failed to resolve). A
+cell the instance's `scope` does not hold refuses the value it would have taken, so `declared` refuses a push
+and `extern` requires one, from the one reader. LOCAL resolves through the governing schema's own compiled
+readers, fixed at compile time — a `scoped` entry belongs to exactly one schema. EXTERN loads through
+`ForeignSchemas` as the value arrives, so a schema nothing would supply is one of the five `SCHEMA_*` codes
+and never a verdict; the scope then **pops by returning**, the foreign type's reader being wired to the
+foreign schema's own entries, so everything below it resolves there by construction and nothing after it
+does. Tree mode keeps the push (`TsonScopedValue`); bind mode hands the object back unwrapped, a bound class
+having nowhere to carry a URI — the same asymmetry §2.9 already gets. **The containers leave a `SchemaRef`
+where it stands** rather than consuming it, which is how a document used to push a scope its schema never
+opted into and be read as though it had not: `ScopePush.notAdmitted` answers it once per position and refuses
+it where that position's reader is not a scoped one (§7.8's typed-position restriction — "cross-schema
+acceptance is authored intent, not accident"). A **schemaless** document opens no scope at all, a deliberate
+divergence from §7.8's last sentence (`SPEC-FEEDBACK.md` #30).
 
 ### Diagnostics — `docs/readers-and-diagnostics.md`
 
@@ -706,13 +728,22 @@ These live in `tson-compiler`'s root package because `DefinitionResolver` depend
 
 ### Tree model: `TsonValue` (`tson-tree`) — `docs/facades-and-tree.md`
 
-A sealed `TsonValue` over seven pure immutable node types (`TsonRecord`/`TsonMap`/`TsonArray`/`TsonTuple`/
-`TsonAtom`/`TsonAbsent`/`TsonMissing`), structure-preserving and annotation-aware. No `Node`
+A sealed `TsonValue` over eight pure immutable node types (`TsonRecord`/`TsonMap`/`TsonArray`/`TsonTuple`/
+`TsonAtom`/`TsonAbsent`/`TsonMissing`/`TsonScopedValue`), structure-preserving and annotation-aware. No `Node`
 suffix (deliberate, against Jackson's names). `get`/`at` never throw — a `TsonMissing` carries the RFC 6901
 pointer of the step that failed. **One no-value node, because there is one no-value spelling**: `TsonAbsent`
 carries `_` and a collecting-mode read failure, and nothing else. `null` is a `TsonAtom` holding the string
 `null`, schemaless and under a schema alike; a `void` position admits `_` and nothing else (`VoidReader`),
 which is where a second spelling would be cheapest to admit and is refused anyway.
+**`TsonScopedValue` is the eighth, and it is a wrapper because the directive belongs to the position**:
+`scoped-value = [ schema-directive ws ] data-value` (§2.3), so the same record means the same thing with or
+without one, and a nested `!!schema` attaches *around* a value rather than as a ninth component on each of
+the other seven — the same argument `TsonDocument` makes at document level, which is why the two are
+separate types rather than one (a document also carries `!!id`, is not itself a value, and cannot stand at a
+field position). It is **transparent to navigation**: every kind predicate, accessor and step delegates
+through, so `at("/attachments/0/claim_id")` reads the same whether or not a scope was pushed and a consumer
+that does not care never unwraps one. Only a genuine push produces one, so a tree round-trips through
+`TsonTreeWriter` with its directives where the author put them.
 Two accessor families with different questions: `as(Class)`/`asString`/…
 **cast** ("what host type did the read produce?"), `asInt`/`asLong`/`asDouble` **convert** ("what number is
 this?") — a test asserting which host type a reader produced must use `as(Class)`. Read-side only; no
@@ -1049,10 +1080,13 @@ compatibility).
   edges an open operand does and does not give. `DefinitionResolver`'s Javadoc is the exact current boundary.
   Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
-  **Gaps reaching a read still exist**, two of them, both through `ErrorReader` and both on a schema that
-  loaded clean: core's three `scoped` instances (below). Each **rides in the report as `NOT_IMPLEMENTED`**, located
-  at the value it could not read, and costs that value a verdict and nothing else's — so a gap and an
-  ordinary error in one document both get reported, and `TsonCli.exitCodeFor` lifts the run to 70.
+  **No gap reaches a read either**, `scoped` having been the last: every `~`-marked constructor
+  meta-kernel.tn and meta.tn declare builds a real reader, and `CoreSchemaImportTest` asserts that no entry
+  of core.tn — the whole standard library — compiles to an `ErrorReader`. `ErrorReader` stays, and so does
+  `NOT_IMPLEMENTED`'s machinery: §2.2.2's extension point still reaches one, a meta-layer constructor this
+  library has never seen having no factory to dispatch to. It **rides in the report**, located at the value
+  it could not read, and costs that value a verdict and nothing else's — so a gap and an ordinary error in
+  one document both get reported, and `TsonCli.exitCodeFor` lifts the run to 70.
 - **A container position that is an application, and what a held open body still cannot say.** §5.10
   substitution works for both template shapes: a **record** template (parameters occupying field types and
   values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T
@@ -1086,15 +1120,11 @@ compatibility).
   routed parameter rides `value` with §8.1's shadowing rule to tell it from a literal, and §5.7's fixation
   moves to materialisation. What a held body cannot enforce is half of §5.10's argument-kind rule — see
   "Not yet implemented".
-- **The scoped constructor has no reader** — `scoped` has no compiled-parser factory, so core's `declared`,
-  `extern` and `dynamic` compile to `ErrorReader` (a schema merely *declaring* one still compiles; the first
-  read of one fails). Not an ordinary missing parser waiting to be written: it is one piece of machinery over
-  `TsonDataStream`'s existing `SchemaRef` event, shared by every scoped instance — §7.8's scope push, whose
-  grammar half is done and whose read half is not. `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` do have
-  parsers — the CIDR pair reusing the two address grammars, and validating §5.5's family-range and
-  host-bits-zero rules on top. **`email` is
-  a built-in of §5.5 like its siblings**, and its format check is the subset §5.5 pins: the
-  `dot-atom "@" dot-atom` core, without quoted local parts, domain literals or comments.
+- **The atom vocabulary is complete** — `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` all have
+  parsers, the CIDR pair reusing the two address grammars and validating §5.5's family-range and
+  host-bits-zero rules on top. **`email` is a built-in of §5.5 like its siblings**, and its format check is
+  the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted local parts, domain literals or
+  comments.
 - **Schema-side diagnostics** — **none outstanding**; what follows is the boundary. Parsing, desugaring,
   resolution and linking all report through a `TsonDiagnosticsReceiver` (see
   `docs/readers-and-diagnostics.md`), and read- and schema-side diagnostics now populate the same four
