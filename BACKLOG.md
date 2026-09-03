@@ -61,15 +61,6 @@ own prose (which had gone stale on at least one of them):
 
 ## Built-in types
 
-- [ ] **A declaration-level `@bytes_encoding` is lost on a pure alias.** `@bytes_encoding:HEX` above
-  `digest => !bytes ^ { length: 4 }` is inherited, and above `digest => bytes` it is not — the alias is a
-  `REFERENCE` entry, §8.3 flattens the reference to `bytes` at every use site, and the directive goes with
-  the entry that carried it. So the two spellings of "a named hex digest" differ in whether the name means
-  anything, and the one an author reaches for first is the one that silently reads base64.
-  `BytesEncodingDirectiveTest` covers the refinement form only. Either flattening carries the annotations of
-  the entries it passes through — which is the general fix and reaches `@rest`/`@discriminator` too — or the
-  alias form is refused at schema load rather than accepted and ignored.
-
 - [ ] **§5.7's selector rule is unenforced, and for a defaulted selector needs something the value model
   does not keep.** "A selector may be set where the source leaves it at the constructor's default" — nothing
   checks it. `complex_type.component` (`~ NUMBER`) is the case that bites: after resolution `complex` and an

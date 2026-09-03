@@ -43,7 +43,7 @@ import java.util.Set;
  * is what this used to do, left the reader that builds the value unable to see them, and re-attaching
  * afterwards could only put them back on a {@code TsonValue}.
  */
-final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renamed {
+final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renamed, UseSite.Respelled {
 
     private final String name;
     private final TsonTypeReader<?> ownParser;
@@ -83,6 +83,20 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
 
     VariantSchemaReader rewrap(TsonTypeReader<?> replacement) {
         return new VariantSchemaReader(name, selfNames, replacement, subtypeNames, resolver);
+    }
+
+    /**
+     * {@inheritDoc} <p>Respells the <em>wrapped</em> reader and keeps this one's dispatch untouched, exactly
+     * as {@link #renamed} does: the alphabet is the leaf's business, and which subtype a tagged value
+     * dispatches to is this wrapper's.
+     */
+    @Override
+    public TsonTypeReader<?> inEncoding(io.ltr8.tson.compiler.atom.BytesParser.Encoding encoding) {
+        if (!(wrapped() instanceof UseSite.Respelled respellable)) {
+            return this;
+        }
+        TsonTypeReader<?> respelled = respellable.inEncoding(encoding);
+        return respelled == wrapped() ? this : rewrap(respelled);
     }
 
     /**

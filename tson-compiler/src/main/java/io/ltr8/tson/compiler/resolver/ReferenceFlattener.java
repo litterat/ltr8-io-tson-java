@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * [TSON-SCHEMA] §8.3's use-site reference flattening: a type position naming a {@code REFERENCE} entry is
@@ -39,10 +40,50 @@ import java.util.Set;
  * <p>Runs after materialisation so an instantiation's minted entry is in the namespace to be flattened
  * past: an alias to an application ({@code string_triple => vector<text, 3>}) is a {@code REFERENCE} like
  * any other, and a use of it lands on the instantiation with {@code @alias:string_triple}.
+ *
+ * <p><b>The walk carries the annotations of the entries it passes through.</b> A declaration's annotations
+ * are reachable from a use site only while the use site names that declaration, and flattening is what stops
+ * it naming one: {@code @bytes_encoding:HEX digest => bytes} is an alias, so every use of {@code digest}
+ * becomes a use of {@code bytes} and the directive it was declared with becomes unreachable -- where the same
+ * intent written as a refinement ({@code digest => !bytes ^ { length: 4 }}) keeps a {@code supertypes} edge
+ * and is found. Two spellings of one intent, one of which silently reads base64. So each dropped hop's
+ * annotations are appended to the use site, nearest hop first, after the {@code @alias} that names the first
+ * of them.
+ *
+ * <p><b>Nearest-first and additive</b>, the same rule a restated field's annotations follow
+ * ({@code DefinitionResolver.merged}): [TSON-DATA] §3.1 makes a name repeatable on one value, so this is
+ * concatenation rather than replacement, and every first-occurrence lookup then reads the hop nearest the use
+ * site. The terminal's own annotations are <em>not</em> carried -- the reference names it, so anything
+ * consulting them can look it up, and copying them would put one fact in two places.
+ *
+ * <p><b>What travels is a directive, not every annotation</b> ({@link #CARRIED}). An annotation earns the
+ * walk when carrying it changes how a value at that position is <em>read</em>; documentation is about the
+ * declaration and stays there. Carrying everything was built first and measured, and it is wrong in a way
+ * only the measurement shows: across all three bundled schemas exactly one annotation travels, meta-kernel's
+ * group {@code @doc} on {@code type_name} ("Identifier roles -- distinct naming positions referencing the
+ * identifier primitive"), which then documents four unrelated positions including {@code schema}'s own key
+ * type. One sentence describing three declarations, restated as the documentation of an array's element.
+ *
+ * <p><b>The set is enumerated here because §6 gives no way to declare it.</b> An annotation is declared with
+ * a type ({@code bytes_encoding => @annotation base_encoding}) and nothing else, so nothing in a schema says
+ * whether it describes the declaration or directs how values of it are read. That is the same gap {@code
+ * SPEC-FEEDBACK.md} #25(a) reports for checked annotations, met from the other side, and until §6 says which
+ * annotations are positional an implementation can only carry the ones it acts on.
+ *
+ * <p><b>Derived markers do not travel either</b>, and would not even if the set were open: {@code @alias} and
+ * {@code @synthetic} are §8.2 facts about the entry that carries them -- where a name came from, and that a
+ * resolver minted it -- so carrying them onto a use site would assert them of a position that is neither.
  */
 final class ReferenceFlattener {
 
     private static final String ALIAS = "alias";
+
+    /**
+     * The annotations a dropped hop hands to the use site: those that direct how a value at that position is
+     * read. {@code @bytes_encoding} is the whole set today, being the only annotation in the meta layer with
+     * per-position force -- see this class's own note on why the set is enumerated rather than declared.
+     */
+    private static final Set<String> CARRIED = Set.of("bytes_encoding");
 
     private ReferenceFlattener() {
     }
@@ -52,30 +93,35 @@ final class ReferenceFlattener {
      * the whole schema including merged imports, since an alias may be imported while the use site is local.
      */
     static Map<String, TypeDefinition> flatten(Map<String, TypeDefinition> entries,
-                                                Map<String, TypeDefinition> namespace, Set<String> minted) {
+                                                Map<String, TypeDefinition> namespace, Set<String> minted,
+                                                Function<String, Annotations> declared) {
         Map<String, TypeDefinition> flattened = new LinkedHashMap<>();
-        entries.forEach((name, definition) -> flattened.put(name, flattenEntry(definition, namespace, minted)));
+        entries.forEach((name, definition) ->
+                flattened.put(name, flattenEntry(definition, namespace, minted, declared)));
         return flattened;
     }
 
     /** One entry's body, or the entry unchanged where nothing in it moved. */
     private static TypeDefinition flattenEntry(TypeDefinition definition, Map<String, TypeDefinition> namespace,
-                                                Set<String> minted) {
+                                                Set<String> minted, Function<String, Annotations> declared) {
         if (definition.body() instanceof Reference) {
             return definition; // an alias entry records the hop; see this class's own note
         }
-        Top body = MetaRefs.mapBodyRefs(definition.body(), ref -> flattenRef(ref, namespace, minted));
+        Top body = MetaRefs.mapBodyRefs(definition.body(), ref -> flattenRef(ref, namespace, minted, declared));
         return body == definition.body() ? definition : definition.withBody(body);
     }
 
     /** One type-ref, its own arguments flattened first so a nested alias moves too. */
-    private static TypeRef flattenRef(TypeRef ref, Map<String, TypeDefinition> namespace, Set<String> minted) {
-        TypeRef withArguments = flattenArguments(ref, namespace, minted);
+    private static TypeRef flattenRef(TypeRef ref, Map<String, TypeDefinition> namespace, Set<String> minted,
+                                       Function<String, Annotations> declared) {
+        TypeRef withArguments = flattenArguments(ref, namespace, minted, declared);
         String terminal = terminalName(ref.name(), namespace, minted);
         if (terminal.equals(ref.name())) {
             return withArguments;
         }
-        return new TypeRef(terminal, withArguments.arguments(), plusAlias(withArguments.annotations(), ref.name()));
+        Annotations annotations = plusAlias(withArguments.annotations(), ref.name());
+        annotations = plusCarried(annotations, ref.name(), terminal, namespace, minted, declared);
+        return new TypeRef(terminal, withArguments.arguments(), annotations);
     }
 
     /** {@code annotations} with {@code @alias:written} added -- the carrier is immutable, so this rebuilds it. */
@@ -85,14 +131,60 @@ final class ReferenceFlattener {
         return builder.add(new Annotation(ALIAS, Optional.of(written))).build();
     }
 
+    /**
+     * {@code annotations} followed by those of every hop this use site is being flattened past, nearest
+     * first -- both of §6's declaration positions per hop, the key's before the definition's, since the key
+     * is the position an author reaches for and the two are never in conflict.
+     *
+     * <p>Walks the same chain {@link #terminalName} did rather than sharing its loop: that method answers a
+     * question every use site asks and most answer with "no hop at all", and threading a collector through
+     * it would allocate on the common path to serve the rare one.
+     */
+    private static Annotations plusCarried(Annotations annotations, String written, String terminal,
+            Map<String, TypeDefinition> namespace, Set<String> minted,
+            Function<String, Annotations> declared) {
+        Annotations.Builder builder = null;
+        Set<String> walked = new LinkedHashSet<>();
+        String current = written;
+        while (!current.equals(terminal) && walked.add(current)) {
+            TypeDefinition hop = namespace.get(current);
+            if (hop == null || !(hop.body() instanceof Reference reference)) {
+                break;
+            }
+            for (Annotation carried : carriedFrom(declared.apply(current), hop.annotations())) {
+                if (builder == null) {
+                    builder = new Annotations.Builder();
+                    annotations.values().forEach(builder::add);
+                }
+                builder.add(carried);
+            }
+            if (minted.contains(current) || !reference.target().arguments().isEmpty()) {
+                break;
+            }
+            current = reference.target().name();
+        }
+        return builder == null ? annotations : builder.build();
+    }
+
+    /** One hop's two annotation positions, filtered to {@link #CARRIED} -- see this class's own note. */
+    private static List<Annotation> carriedFrom(Annotations key, Annotations definition) {
+        List<Annotation> carried = new java.util.ArrayList<>();
+        for (Annotations written : new Annotations[] { key, definition }) {
+            if (written != null) {
+                written.values().stream().filter(a -> CARRIED.contains(a.name())).forEach(carried::add);
+            }
+        }
+        return carried;
+    }
+
     private static TypeRef flattenArguments(TypeRef ref, Map<String, TypeDefinition> namespace,
-                                             Set<String> minted) {
+                                             Set<String> minted, Function<String, Annotations> declared) {
         if (ref.arguments().isEmpty()) {
             return ref;
         }
         List<TypeArgument> arguments = ref.arguments().stream()
                 .map(argument -> argument instanceof TypeArgument.Ref nested
-                        ? new TypeArgument.Ref(flattenRef(nested.ref(), namespace, minted))
+                        ? new TypeArgument.Ref(flattenRef(nested.ref(), namespace, minted, declared))
                         : argument)
                 .toList();
         return arguments.equals(ref.arguments()) ? ref

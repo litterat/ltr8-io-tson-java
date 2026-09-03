@@ -39,6 +39,12 @@ class BytesEncodingDirectiveTest {
 
               sized => !bytes ^ { length: 4 }
 
+              @bytes_encoding:HEX
+              @doc:"A digest, spelled in hex, declared as a pure alias."
+              digest_alias => bytes
+
+              digest_chain => digest_alias
+
               holder => {
                 plain:    bytes
                 inherits: digest
@@ -47,6 +53,10 @@ class BytesEncodingDirectiveTest {
                 @bytes_encoding:BASE64
                 overrides: digest
                 still_hex: sized
+                aliased:   digest_alias?
+                chained:   digest_chain?
+                in_array:  [digest_alias]?
+                in_map:    {text => digest_alias}?
               }
             }
             """.formatted(ID);
@@ -131,5 +141,79 @@ class BytesEncodingDirectiveTest {
 
     private static boolean hasProblem(String body) {
         return !problems(body).isEmpty();
+    }
+
+    /**
+     * The case the alias hole cost: two spellings of one intent -- "a named hex digest" -- and before §8.3's
+     * walk carried the directive, only the refinement got it. The alias read base64 and said nothing.
+     */
+    @Test
+    void anAliasDirectsItsSpellingAsARefinementDoes() {
+        TsonValue read = read("""
+                {
+                  plain:     "3q2+7w=="
+                  inherits:  "deadbeef"
+                  stated:    "deadbeef"
+                  overrides: "3q2+7w=="
+                  still_hex: "3q2+7w=="
+                  aliased:   "deadbeef"
+                  chained:   "deadbeef"
+                  in_array:  [ "deadbeef" ]
+                  in_map:    { k => "deadbeef" }
+                }
+                """);
+        assertArrayEquals(DEADBEEF, read.get("aliased").as(byte[].class).orElseThrow());
+        assertArrayEquals(DEADBEEF, read.get("inherits").as(byte[].class).orElseThrow(),
+                "the refinement spelling must still agree with the alias spelling");
+    }
+
+    /** A chain of aliases carries from the hop that wrote the directive, not only from the name at the use site. */
+    @Test
+    void aChainOfAliasesCarriesFromTheHopThatWroteIt() {
+        TsonValue read = read("""
+                {
+                  plain: "3q2+7w=="  inherits: "deadbeef"  stated: "deadbeef"  overrides: "3q2+7w=="
+                  still_hex: "3q2+7w=="  aliased: "deadbeef"  chained: "deadbeef"
+                  in_array: [ "deadbeef" ]  in_map: { k => "deadbeef" }
+                }
+                """);
+        assertArrayEquals(DEADBEEF, read.get("chained").as(byte[].class).orElseThrow());
+    }
+
+    /**
+     * Every position reads it, not only a record field. An array element and a map value have no field of
+     * their own to state a directive on, so an alias is the only way they can get one at all -- which is what
+     * makes the use-site seam ({@code UseSite.Respelled}) the right place for it rather than the record reader.
+     */
+    @Test
+    void aContainerElementReadsTheAliasDirective() {
+        TsonValue read = read("""
+                {
+                  plain: "3q2+7w=="  inherits: "deadbeef"  stated: "deadbeef"  overrides: "3q2+7w=="
+                  still_hex: "3q2+7w=="  aliased: "deadbeef"  chained: "deadbeef"
+                  in_array: [ "deadbeef" ]  in_map: { k => "deadbeef" }
+                }
+                """);
+        assertArrayEquals(DEADBEEF, read.at("/in_array/0").as(byte[].class).orElseThrow());
+        assertArrayEquals(DEADBEEF, read.at("/in_map/k").as(byte[].class).orElseThrow());
+    }
+
+    /**
+     * Only a directive travels. The alias also carries a {@code @doc}, and carrying that to the use site
+     * would document four unrelated positions with one declaration's sentence -- measured against the bundled
+     * schemas, where meta-kernel's group {@code @doc} on {@code type_name} was the only annotation an
+     * unfiltered walk moved at all.
+     */
+    @Test
+    void documentationDoesNotTravelWithTheDirective() {
+        var entries = Tson.builder().build().resolve(SCHEMA).schema().entries();
+        var holder = (io.ltr8.tson.schema.meta.RecordBody) entries.get("holder").body();
+        var aliased = holder.fields().stream().filter(f -> f.name().equals("aliased")).findFirst().orElseThrow();
+        assertEquals(List.of("alias", "bytes_encoding"),
+                aliased.type().annotations().values().stream().map(io.ltr8.annotation.Annotation::name).toList());
+        assertEquals(List.of("bytes_encoding", "doc"),
+                entries.getAnnotations("digest_alias").values().stream()
+                        .map(io.ltr8.annotation.Annotation::name).toList(),
+                "the declaration keeps both -- it is the use site that takes only the directive");
     }
 }

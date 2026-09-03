@@ -55,6 +55,19 @@ are kept in step deliberately.
   four hex octets `deadbeef`. It used to read six base64 octets (`75e69d6de79f`) — a different value, with no
   diagnostic, because dropping the inherited annotations dropped the directive with them.
   `RestatedFieldAnnotationsTest` covers each case; §5.8/§8.1 owe the rule, which is `SPEC-FEEDBACK.md` #25(c).
+- **§8.3's flattening walk carries a dropped hop's directives to the use site** (`ReferenceFlattener.plusCarried`,
+  read by `UseSite.respelled`). A declaration's annotations are reachable from a use site only while the use
+  site names that declaration, and flattening is what stops it: `@bytes_encoding:HEX digest => bytes` is a
+  `REFERENCE` entry rewritten away at every use, where the same intent as a refinement keeps a `supertypes`
+  edge and is found. Two spellings, one of which silently read base64 — a different value, with no diagnostic.
+  So each dropped hop's annotations are appended to the reference, nearest hop first, after the `@alias`;
+  ordering and additivity are the restated-field rule above, reused. **Only a directive travels** (`CARRIED`):
+  carrying everything was built first and measured, and across all three bundled schemas exactly one
+  annotation moved — meta-kernel's group `@doc` on `type_name`, which then documented four unrelated positions
+  including `schema`'s key type. The set is enumerated because §6 gives an annotation a type and no way to say
+  it is positional (`SPEC-FEEDBACK.md` #32, and #25(a) is the same gap from the other side). **Every decorator
+  in the reader stack must delegate through `UseSite.Respelled`** — the leaf, tree mode's boxing, and the
+  subtype dispatcher — or the directive silently does not apply at that position.
 - **What resolves:** record construction; composition (`A & B & { ... }`, §5.8, with kind from the literal
   base-kind names in the transitive supertype chain, and tightening in the trailing body per §5.7); the
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare

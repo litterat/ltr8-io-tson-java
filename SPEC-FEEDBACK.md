@@ -12,8 +12,8 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The thirty-one below are what is open against Revision 34 — the eight it left open, renumbered from #1, and
-twenty-three raised since; which of the two an entry is, its own `Status` line says, so the split stays
+The thirty-two below are what is open against Revision 34 — the eight it left open, renumbered from #1, and
+twenty-four raised since; which of the two an entry is, its own `Status` line says, so the split stays
 checkable rather than counted once. The fourteen Revision 34 resolved of the seventeen raised against Revision 33 are gone
 from here, because the spec now carries their rules and that is where the answer belongs. **This file is the as-built
 record**, not a pointer to one: where an entry proposes a design this implementation has built, the entry states
@@ -2928,5 +2928,114 @@ touches no constructor's shape and adds no facet. It does narrow what a conformi
 ends — below, a token no processor could honour stops being one; above, a token some processors could honour
 does too, which is the price of the range being the same everywhere rather than a property of whoever read the
 document.
+
+---
+
+## 32. §8.3 flattening drops the annotations of the entries it walks past, so a declaration-level directive means nothing on an alias
+
+**Section:** [TSON-SCHEMA] §8.3 (use-site reference flattening and `@alias`), §6 (annotation positions and
+what an annotation carries), §5.7 (refinement), §8.2 (derived markers); meta.tn's `bytes_encoding`
+(#29's directive). Companion to #25, whose (a) is the rule this entry turns out to need.
+
+**Problem:** a declaration's annotations are reachable from a use site only while the use site names that
+declaration, and §8.3 is what stops it naming one. So the same intent, written the two ways the grammar
+offers, gets two answers:
+
+```
+@bytes_encoding:HEX  digest_refined => !bytes ^ { length: 4 }     a refinement
+@bytes_encoding:HEX  digest_alias   => bytes                      a pure alias
+digest_chain => digest_alias
+
+holder => { refined: digest_refined   alias: digest_alias   chained: digest_chain   plain: bytes }
+```
+
+The refinement keeps a `supertypes` edge, which the directive's nearest-first walk follows. The alias is a
+`REFERENCE` entry that §8.3 rewrites away, so nothing at the use site can see what the alias was declared
+with. Reading one literal at each field:
+
+```
+!holder { refined: "deadbeef"  alias: "deadbeef"  chained: "deadbeef"  plain: "3q2+7w==" }
+
+  refined  -> deadbeef       4 octets, hex     the directive applied
+  alias    -> 75e69d6de79f   6 octets, base64  the directive unreachable
+  chained  -> 75e69d6de79f   6 octets, base64  same
+  plain    -> deadbeef       4 octets, base64  correct: "3q2+7w==" *is* deadbeef
+```
+
+**A different value, not an error** — no diagnostic, no length complaint. And the spelling an author reaches
+for first is the one that silently reads base64: `digest => bytes` is what "a named hex digest" looks like
+before anyone has a reason to add a facet.
+
+**Nothing is lost, only unreachable.** `digest_alias` still carries `@bytes_encoding:HEX` at its key, and
+§8.3 leaves `@alias:digest_alias` on the flattened reference, so the name *is* recorded. Nothing consults it.
+The workaround is to repeat the directive at every use site, which is what declaring the named type was for.
+
+**Interpretation chosen — the walk carries them, and it is running.** §8.3's rewrite appends each dropped
+hop's declaration annotations to the reference it produces, nearest hop first, after the `@alias` that names
+the first of them; `UseSite` reads them where a position wires its child reader. All four positions above now
+read `deadbeef`, and so do an array element and a map value typed by the alias — positions that have no field
+of their own to state a directive on, so an alias is the only way they could ever get one.
+
+Ordering and additivity are #25(c)'s rule, reused rather than reinvented: [TSON-DATA] §3.1 makes a name
+repeatable on one value, so this is concatenation, and every first-occurrence lookup then reads the hop
+nearest the use site. Derived markers do not travel — `@alias` and `@synthetic` are §8.2 facts about the
+entry that carries them, and asserting them of a position would be a category error.
+
+**What building it measured, which is the part worth carrying into the revision.**
+
+**1. Carrying *every* annotation is wrong, and only the measurement shows it.** Built that way first and run
+against the three bundled schemas: exactly one annotation travels anywhere, meta-kernel's group `@doc` on
+`type_name` — *"Identifier roles — distinct naming positions referencing the identifier primitive"* — which
+then documents four unrelated positions, `schema`'s own key type among them. One sentence describing three
+declarations, restated as the documentation of an array's element. Four of 156 entries across the three
+schemas moved, and all four moved for that reason.
+
+**2. So the rule needs a category §6 does not have.** What should travel is an annotation that changes how a
+value at that position is *read*; what should stay is one that describes the declaration. §6 gives an
+annotation a type (`bytes_encoding => @annotation base_encoding`) and nothing else, so no schema can say which
+of the two it is. This implementation therefore **enumerates** the carried set — one name today — and says so
+at the class. That is the same gap #25(a) reports for *checked* annotations, met from the other side: §6 needs
+to say that an annotation may carry force, and this needs it to say that an annotation may be *positional*.
+Two entries asking for one paragraph.
+
+**3. The reader cost is a wrapper chain, not a call site.** A reader is compiled once per entry and shared by
+every position naming it, so a per-position directive cannot come from the entry — the position has to ask the
+shared reader for itself under a different spelling. One seam serves every position (`UseSite.Respelled`,
+beside the `Renamed` that §8.3's own alias already needed), but **each decorator in the stack must delegate
+through it**: the leaf, tree mode's boxing wrapper, and the subtype dispatcher were three, found one at a time
+by the directive silently not applying. An implementation adopting this should expect that shape.
+
+**4. The bootstrap route cannot carry the name-position half.** Meta-kernel's resolution binds no key
+annotations — it is producing the very entries a reader would bind them through (§1.5's circularity) — so a
+hop's name-position annotations contribute nothing there where ordinary resolution carries them. Latent rather
+than live (meta-kernel declares no directive), but a revision that requires the carry should say that a
+self-describing meta-schema's own bootstrap is exempt, or the two routes are two answers to one question.
+
+**Suggested resolution:**
+
+- §8.3: say what happens to a walked-past entry's annotations, which today it does not. The rule that works is
+  *the flattened reference carries the annotations of every entry the walk drops, nearest first, after the
+  `@alias`; derived markers are not carried* — which makes `@alias` the record of where the name came from and
+  the carried set the record of what it was declared with.
+- §6: the missing category. An annotation is **positional** when it directs how values at a position of that
+  type are read, and only a positional annotation is carried by §8.3's walk. Pair it with #25(a)'s
+  checked-annotation sentence; both are the same missing statement that an annotation may do something.
+- Failing both, §8.3 should at least say that a declaration annotation is **not** reachable from a flattened
+  use site, so that meta.tn's `@bytes_encoding` `@doc` stops promising a nearest-first walk that an alias
+  silently leaves.
+- The alternative considered and not taken: refuse a declaration annotation on a `REFERENCE` entry at schema
+  load. It converts a silent wrong value into a message and needs no new category, but it forbids `@doc` on an
+  alias, which is common and harmless.
+
+**What is running, and what is not.** The carry, the ordering, the use-site seam, and the enumerated set are
+running; `BytesEncodingDirectiveTest` covers the alias, the chain, an array element, a map value, and that
+documentation stays behind. No bundled fixture moves and no digest is re-stamped, which is a consequence of
+the filter and not of the mechanism — the unfiltered form moves four. What is not running is any notion of a
+positional annotation the schema itself declares; there is nowhere to write one.
+
+**Status against Revision 34:** open, and new against this revision — a defect with a fix this implementation
+runs, and a request for the one sentence that would let the fix stop being a list. §8.3 is Revision 34 text and
+#29's directive design, which this is a hole in, is newer than it: the two have never been read against each
+other, which is how a rule that only works for one of §5's two spellings survived review.
 
 ---
