@@ -26,38 +26,87 @@ become spec citations and the entry is deleted — nothing here is an archive.
 
 ---
 
-## 1. Does `!duration` accept ISO 8601's `PnW` week form, or only `PnYnMnDTnHnMnS`?
+## 1. §5.4's `duration` row shows two designators the type does not have and omits the one it does — proposal: the table states RFC 3339's own alternation, which is what the split already implements
 
-**Section:** §5.4.
+**Section:** [TSON-DATA] §5.4 (the temporal annotation table); [TSON-SCHEMA] §5.5, §9 (meta's `duration_type`
+and `period_type`); RFC 3339 Appendix A.
 
-**Problem:** §5.4's table gives `!duration`'s format as "ISO 8601 duration (`PnYnMnDTnHnMnS`)" — a
-parenthetical showing one specific designator sequence. ISO 8601-1:2019 (the spec `duration_type` itself
-pins to, per meta.tn's `spec` field) also defines a second, mutually-exclusive alternative form for
-expressing a duration in whole weeks: `PnW` (e.g. `P3W` for three weeks), which cannot be combined with
-the `Y`/`M`/`D`/`H`/`M`/`S` designators in the same value. §5.4's parenthetical doesn't mention `W`
-anywhere, and nothing in the surrounding prose says whether that's because the week form is deliberately
-excluded from the schemaless `!duration` atom, or because the parenthetical is a representative example of
-the ISO 8601 duration format rather than an exhaustive grammar (the same way, elsewhere in the document,
-a parenthetical sometimes illustrates rather than fully specifies). Both readings are defensible: excluding
-`W` would be consistent with `!duration`'s host value being modeled as year/month/day/hour/minute/second
-components (a week doesn't decompose uniquely into those without picking a day-length, though `P3W` itself
-carries no such ambiguity on its own terms); including it would be consistent with simply deferring to "the
-ISO 8601 duration format" as a whole, of which `PnW` is a normal part.
+**Problem:** §5.4's table gives `!duration`'s format as "ISO 8601 duration (`PnYnMnDTnHnMnS`)". That
+parenthetical is now wrong in both directions, and the table is missing a row:
 
-**Interpretation chosen:** `DurationType`'s parser accepts only `P` followed optionally by `Y`/`M`/`D`
-designators, optionally followed by `T` and `H`/`M`/`S` designators, matching §5.4's parenthetical
-literally — `P3W` is rejected as a parse error, not specially recognized. This was the more conservative
-reading available (implementing a format the annotation's own table doesn't show would be a bigger leap
-than declining to implement one it might have intended by reference), but it's a real coin flip, not a
-confident call.
+- **`Y` and month-`M` are not `duration`'s.** #26's split moved them: `duration` is a signed number of
+  seconds and `period` a signed number of months, because the thing that made one type partially ordered was
+  a month with no fixed length beside a second with one. `P1Y2M3DT4H5M6S` is an error.
+- **`W` is `duration`'s, and the table never mentions it.** `P3W` is 1814400 seconds.
+- **There is no `!period` row at all**, so the annotation the calendar half needs is unlisted.
 
-**Suggested resolution:** State explicitly whether `PnW` is part of `!duration`'s accepted format or not.
-If it is, the table's parenthetical should show it (`PnYnMnDTnHnMnS` / `PnW`) the same way §5.6's table
-spells out multiple accepted grammar forms per numeric atom explicitly rather than by implication.
+The original question here was whether the parenthetical excluded the week form deliberately or was
+illustrating rather than specifying, and it was a coin flip on the text as written. It is not one any more,
+and not because anybody chose: **RFC 3339 Appendix A settles it by construction.**
 
-**Status against Revision 34:** open, carried across a third revision. §5.4's table is unchanged again —
-`!duration` still reads `ISO 8601 duration (PnYnMnDTnHnMnS)` with no mention of `W`, and no prose anywhere
-says whether the omission is a decision or an abbreviation. `DurationParser` still rejects `P3W`.
+```
+duration = "P" (dur-date / dur-time / dur-week)
+```
+
+An alternation. The week form is a third alternative to the date and time forms, never a component beside
+them, so `P1W2D` is not a duration and neither is `P1WT1H` — a week with a time part has no production. ISO
+8601-1:2019 agrees; only ISO 8601-2 relaxes it to admit `P1W2D`. Once the question is asked of the ABNF
+rather than of the parenthetical, there is one answer and no latitude to record.
+
+**Why the week form belongs to `duration` and not `period`, which is the half the ABNF does not answer.** A
+week is exactly 7 days and a day exactly 86400 s, so `P2W`, `P14D` and `PT336H` are one value and the whole
+form has a fixed length. A month does not, which is what put it on the other side of #26's split. `period`'s
+own grammar already excludes `W` along with `D`, so that half needs no new text — but the placement is worth
+stating, because **the JDK does the opposite and a reader arriving from Java will expect it:**
+
+```
+Duration.parse("P3W")    DateTimeParseException      — java.time refuses the week form outright
+Period.parse("P3W")      P21D                        — and folds it to days on the calendar side
+Period.parse("P1W2D")    P9D                         — mixing it, which is ISO 8601-2's rule, not 8601-1's
+```
+
+That is evidence for the placement rather than against it. `java.time` treats a week as seven *days*, a
+calendar quantity, which is exactly the ambiguity the split removes: seven days is 604800 s only if every day
+is 86400 s, which is true for `duration` and is not the claim `period` makes. Putting the week where its
+length is fixed is what lets `P3W` be a value at all rather than a value-with-a-caveat.
+
+**What a writer emits, which §5.4 does not say and should.** The value is a number of seconds, so a canonical
+writer has no way to recover that its input was written in weeks — and, by the same argument, no way to
+recover that it was written in days. So a text encoding emits the `PTnHnMnS` form and nothing else: `P3W`
+round-trips as `PT504H` and `P9DT1H` as `PT217H`. `PnW` and `PnD` are *reading* conveniences, the way `0x50`
+is for an integer — admitted on the way in, gone on the way out, and never a claim about how a value was
+spelled. Saying so is what stops an implementation treating the round trip as a defect.
+
+**What is running.** All of it. `P3W`, `P1W`, `P0W` and `P2W` read; `P1W2D` and `P1WT1H` are refused as parse
+errors; `P2W`, `P14D` and `PT336H` are one value; `!period P1W` and `!period P1D` are refused; and
+`DurationParser.write` emits `PTnHnMnS`, a day not being a distinct unit of the value. The corpus carries
+`class1/vocabulary/valid/duration-week-form` (`P3W` → `1814400`, stated as seconds precisely because the
+spelling is not canonical) and `class1/vocabulary/invalid/duration-combined-rejected`.
+
+**Suggested resolution: the table follows what the ABNF and the split already require.** Replace §5.4's
+`!duration` row and add the missing one —
+
+| Annotation  | Format | Host value |
+|-------------|--------|------------|
+| `!duration` | RFC 3339 Appendix A `dur-time` / `dur-date` / `dur-week`, no `Y` or month-`M` | duration |
+| `!period`   | `P` with a `Y` component, an `M` component, or both | period |
+
+— and add three sentences the grammar does not carry on its face:
+
+- The week form stands alone: `P1W2D` and `P1WT1H` are errors, the ABNF's alternation admitting no
+  combination. Naming `P1WT1H` explicitly is worth the words, since a reader who has absorbed "stands alone"
+  still tends to read it as being about the *date* designators.
+- A week is exactly 7 days and a day exactly 86400 s, so `P2W`, `P14D` and `PT336H` are one value, and the
+  week form belongs to `duration` rather than `period` for that reason.
+- A text encoding emits the `PTnHnMnS` form; the week and day designators are accepted and not produced.
+
+No change to §5.5, §9, or either constraint vocabulary: this is the annotation table catching up with a
+value space the rest of the series already describes.
+
+**Status against Revision 34:** open, and the *reason* it is open has changed. It is no longer a question
+about which of two readings the spec meant — #26's split and RFC 3339's own alternation between them leave
+one answer — but a table that still shows a form `duration` does not accept and omits two things it does. A
+reader implementing from §5.4 alone builds the wrong type.
 
 ---
 
