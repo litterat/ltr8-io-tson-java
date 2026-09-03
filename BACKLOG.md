@@ -93,12 +93,17 @@ own prose (which had gone stale on at least one of them):
   and whether it is worth the carrying cost for one facet is the first thing to decide. The other selector,
   `float_type.format`, is REQUIRED with no default, so the rule has nothing to fire on there at all.
 
-- [ ] **`duration` is nanosecond-resolved where meta.tn says rational seconds.** The host type is
-  `java.time.Duration` (`DurationType`, `DurationParser`), so `PT0.0000000001S` is refused rather than
-  rounded — chosen because `time_type` and `datetime_type` already work at nanosecond resolution for the same
-  fractional-second component, and silently rounding would make a bound comparison lie. Closing the gap means
-  `Rational` as the host type, which moves `min`/`max`/`exclusive_min`/`exclusive_max`/`multiple_of` with it
-  and gives up `Duration`'s arithmetic; leaving it means the register carrying the divergence. Neither is done.
+- [ ] **`duration`'s value space is stated as rational, and the nanosecond floor is enforced three ways
+  without being named once.** The value is a signed *exact decimal* number of seconds — no non-terminating
+  fraction is writable, so `PT1/3S` is not a token — and the floor is a nanosecond, which is where every host
+  runtime already stops. `SPEC-FEEDBACK.md` #31 proposes both, and `java.time.Duration` stays the host type.
+  What is left here: meta.tn's `duration_type` `@doc` carries the corrected wording (a meta edit, so all three
+  digests re-stamp bottom-up and the `*-resolved.tn` fixtures move with it); `DurationParser` names the rule
+  where `TimeParser`/`DateTimeParser` leak a `java.time` message about a character index, so one refusal reads
+  the same in all three families; and `multiple_of` computes on the seconds count rather than
+  `Duration.toNanos()`, which throws `ArithmeticException` past ±292 years and so turns a legal schema and a
+  legal document into a library fault. `period_type` needs none of it — its grammar admits no fraction, so its
+  own "signed integer number of months" is already what the lexical form guarantees.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but two gaps are left, each

@@ -2567,3 +2567,109 @@ sentence that has to move whether or not #23 is adopted, the conflict being with
 than with either vocabulary.
 
 ---
+
+## 31. `duration`'s value space is stated as rational and bounded below by nothing, where no host runtime goes finer than a nanosecond — proposal: exact decimal seconds, with the fraction capped at nine digits
+
+**Section:** [TSON-SCHEMA] §5.5 (`duration`'s lexical form and value space; `time`/`datetime`'s fractional-second
+component), §9 (meta's `duration_type`, `period_type`); [TSON-DATA] §4.3 (numeric equivalence).
+
+Two problems, one of them a wrong word and the other the rule that word was hiding.
+
+**1. The value space is not rational, and saying so costs the facets their definitions.** meta's
+`duration_type` says "the value is a signed rational number of seconds". The lexical form permits a decimal
+fraction on the seconds component only, so no non-terminating fraction is writable at all — `PT1/3S` is not a
+token, and no combination of the admitted components produces a value that is not a terminating decimal. Every
+duration is a signed **exact decimal number of seconds**: any magnitude, any number of fractional digits,
+nothing rounded. That is `number`'s value space, measured in seconds.
+
+Saying it that way is not only more accurate, it is shorter, because two facets stop being rules of their own:
+
+- `precision: N` is `fraction_digits: N` on the seconds count — the value is a whole number of 10⁻ᴺ seconds,
+  `precision: 0` whole seconds, `precision: 9` the nanosecond grid of most hosts. The base type has no
+  precision, as `number` has no `fraction_digits`, so a host-bound schema states one.
+- `multiple_of` is `number`'s `multiple_of` under the header's uniform rule: `PT15M` admits only quarter-hour
+  values, and `-PT30M` is a multiple of `PT15M`.
+
+`period_type`'s matching sentence — "a signed integer number of months" — is already right, and for the same
+kind of reason: its grammar admits no fraction anywhere, so the integer claim is one the lexical form
+guarantees rather than one the prose asserts.
+
+**2. Exactness with no floor names a value nothing can hold.** RFC 3339's `time-secfrac` is `"." 1*DIGIT` with
+no upper bound, so `PT0.0000000001S` — one hundred picoseconds — is a token the grammar admits, and under an
+exact value space it denotes exactly that. No mainstream runtime has a type for it:
+
+| Runtime | Type | Finest unit |
+|---|---|---|
+| Java | `java.time.Duration` | 1 ns (`long` seconds + `int` nanos) |
+| Go | `time.Duration` | 1 ns (`int64` nanoseconds) |
+| Rust | `std::time::Duration` | 1 ns (`u64` seconds + `u32` nanos) |
+| JavaScript | `Temporal.Duration` | 1 ns |
+| .NET | `TimeSpan` | 100 ns (`int64` ticks) |
+| Python | `datetime.timedelta` | 1 µs |
+| PostgreSQL | `interval` | 1 µs |
+
+A nanosecond is the *finest* resolution any of them offers and several are coarser. A value space below the
+finest host is not exactness anyone can use: a processor either rounds, which makes every bound comparison
+beneath it lie, or refuses, which makes a token the spec admits an error. Both are worse than the spec saying
+where the floor is, and the second is what this implementation does today because there is nothing else to do.
+
+**The finer case is not lost — it is spelled, and better.** A schema that genuinely needs picoseconds writes
+`number` for it, which is the same value space with the unit under the schema's own control, or declares its
+own atom. That is where sub-nanosecond belongs: the unit becomes a statement the schema makes rather than a
+fixed second nobody can carry, and nothing pretends the value will survive a round trip through a host's
+duration type.
+
+**The floor belongs in the lexical form, not the value space.** `time-secfrac` restricted to `"." 1*9DIGIT`
+makes `PT0.0000000001S` not a token, so the refusal is a parse error at the character, before any arithmetic,
+and it is one rule rather than a lexical form plus a value-level "must be a whole number of nanoseconds" that
+disagree with it on trailing zeros. It also settles a facet bound for free: `precision` may not exceed 9, which
+becomes an ordinary schema-load coherence error rather than a facet that silently admits nothing.
+
+**It is one rule for three families, not one for `duration`.** `time` and `datetime` carry the same unbounded
+`time-secfrac`, so the same token is admitted there and the same nothing can hold it. Stating the cap once, on
+the production, reaches all three.
+
+**Magnitude is deliberately not proposed.** The same argument reaches the other end — Go's `int64` nanoseconds
+overflow at about ±292 years where Java's `long` seconds reach ±2.9 × 10¹¹ — but the hosts disagree by nine
+orders of magnitude there, where they agree exactly on the floor. A ceiling is therefore an implementation
+limit under §9.1's existing posture, not a value-space rule, and this entry asks for nothing on it.
+
+**What is running, and what is not.** The nanosecond floor is running, for all three families, and by three
+different routes rather than one: `DurationParser` computes the seconds count as a `BigDecimal` and refuses a
+value finer than a nanosecond by name, while `TimeParser` and `DateTimeParser` get the same cap as a side
+effect of `java.time`'s own parser and report it as a shape error carrying a JDK message about a character
+index — the rule is enforced and never named. Unifying that is this implementation's own work and waits on the
+rule existing to name.
+
+Three things are not running. The `@doc` still says "rational", which is the wording this entry corrects and
+which moves with the implementation change, a meta edit re-stamping all three digests. **`duration_type`'s and
+`period_type`'s bounds do not bind at all** — `min`, `exclusive_min`, `max`, `exclusive_max` and `multiple_of`
+are typed `value`, so a `PT30M` token arrives as the string `PT30M` and nothing reads it under the atom it
+constrains; `!duration ^ { min: PT30M }` reports a library gap rather than resolving. That is this
+implementation's own hole and not a question for the spec, but it is why nothing here reports experience with a
+duration bound. And `multiple_of` computes on `Duration.toNanos()`, which overflows past ±292 years — the
+magnitude end of the same story, and an argument for computing the facets on the seconds count the way the
+corrected wording describes them.
+
+**Suggested resolution:**
+
+- §5.5 and meta.tn's `duration_type` `@doc`: replace the value-space sentence with — *The value is a signed
+  exact decimal number of seconds — `number`'s value space, in seconds: any magnitude, any number of fractional
+  digits, nothing rounded — so `PT90M`, `PT1H30M` and `P0DT5400S` are one value, `PT0S`, `P0D` and `-PT0S` are
+  one value, and ordering is TOTAL. Bounds compare the value, not the token. `precision: N` is
+  `fraction_digits` on that count: the value is a whole number of 10⁻ᴺ seconds, `precision: 0` whole seconds,
+  `precision: 9` the nanosecond grid of most hosts — the base type has no precision, as `number` has no
+  `fraction_digits`, so a host-bound schema states one. `multiple_of` is a duration under the header's uniform
+  rule: `PT15M` admits only quarter-hour values, and `-PT30M` is a multiple of `PT15M`.*
+- §5.5's fractional-second production, once for `duration`, `time` and `datetime`: `time-secfrac` is `"."
+  1*9DIGIT`. One sentence saying why — no host runtime represents finer, and a schema needing finer uses
+  `number` seconds or its own atom — so the restriction does not read as arbitrary.
+- §5.5's `precision` facet: at most 9, falling out of the production above rather than stated twice.
+- `period_type`: no change. Its integer claim is what its own grammar already guarantees.
+- §9.1: no change. Magnitude stays an implementation limit, for the reason given above.
+
+**Status against Revision 34:** open, and new against this revision. Independent of the other open entries: it
+touches no constructor's shape, adds no facet and removes none, and the only thing it changes about a
+conforming document is that a token no processor could honour stops being one.
+
+---
