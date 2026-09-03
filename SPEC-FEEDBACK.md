@@ -12,9 +12,10 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The thirty below are what is open against Revision 34 — the nineteen it left open, renumbered from #1,
-and eleven raised since; the fourteen it resolved of the seventeen raised against Revision 33 are gone from here,
-because the spec now carries their rules and that is where the answer belongs. **This file is the as-built
+The thirty-one below are what is open against Revision 34 — the eight it left open, renumbered from #1, and
+twenty-three raised since; which of the two an entry is, its own `Status` line says, so the split stays
+checkable rather than counted once. The fourteen Revision 34 resolved of the seventeen raised against Revision 33 are gone
+from here, because the spec now carries their rules and that is where the answer belongs. **This file is the as-built
 record**, not a pointer to one: where an entry proposes a design this implementation has built, the entry states
 the design, what is running, and what is not, so that a reviewer editing the spec needs nothing beside it.
 **Where the evidence is a consumer of this library rather than this library** — #16 through #19 were found
