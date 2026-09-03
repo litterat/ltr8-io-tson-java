@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta.tn?sha256=a337effc5ff597aa534c0f982cffe64051334e4dc1366c108c5fd318507a4851"
+!!id:"https://tson.io/2026/35/m/meta.tn?sha256=450ede71027f98665ec2cb6368a5fac094efba8c1524c3b6002f8a5c3df883a0"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=74d7282e5a7ec53a3ab182eda90eeea5b7b5d22f9e948322946779a7a6e4d592"
 !!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=74d7282e5a7ec53a3ab182eda90eeea5b7b5d22f9e948322946779a7a6e4d592"
 @doc:"""
@@ -397,14 +397,37 @@
     Y and month-M components are not admitted — `P1M` is one month and
     belongs to `period`; a minute is `PT1M`. `PnW` stands alone, as in
     the ABNF (`P1W2D` is an error). A day is exactly 86400 s and a week
-    7 days. The value is a signed rational number of seconds, so `PT90M`,
-    `PT1H30M` and `P0DT5400S` are equal, `PT0S`, `P0D` and `-PT0S` are
-    equal, and ordering is TOTAL. Bounds compare the value, not the
-    token. `precision` as for `time_type`: the value is a whole number
-    of 10^-N seconds, so `precision: 0` admits whole seconds only.
-    `multiple_of` is a duration under the header's uniform rule:
-    `PT15M` admits only quarter-hour values, and `-PT30M` is a multiple
-    of `PT15M`.
+    7 days.
+
+    The value is a signed exact decimal number of seconds — `number`'s
+    value space, in seconds: nothing is rounded, and the lexical form
+    permits a fraction on the seconds component and nowhere else, so no
+    non-terminating fraction is writable and every duration is a
+    terminating decimal count. So `PT90M`, `PT1H30M` and `P0DT5400S` are
+    one value, `PT0S`, `P0D` and `-PT0S` are one value, and ordering is
+    TOTAL. Bounds compare the value, not the token.
+
+    Both ends of that space are fixed at a signed 64-bit count of
+    nanoseconds. The seconds component admits at most nine fractional
+    digits, and a magnitude may not exceed 2^63 - 1 nanoseconds (about
+    292 years) — stated as a magnitude, so negating an admitted duration
+    always yields an admitted one. A processor MUST represent every
+    value in that range and MUST reject one outside it whether or not
+    its own representation could hold it: a range that depends on which
+    implementation read the document is not a range. Nothing is lost at
+    either end, only spelled better — a span of centuries is a calendar
+    span and is a `period`, and a quantity finer or wider than the range
+    is a `number` in the unit the schema names.
+
+    `precision` as for `time_type`, and it is `fraction_digits` on the
+    seconds count: the value is a whole number of 10^-N seconds, so
+    `precision: 0` admits whole seconds only and `precision: 9` is the
+    nanosecond grid. A constraint on the value and not on a spelling —
+    `PT0.50S` is a whole number of tenths — and it may not exceed 9,
+    there being no tenth digit to constrain. `multiple_of` is
+    `number`'s `multiple_of` on that same count, under the header's
+    uniform rule: `PT15M` admits only quarter-hour values, and `-PT30M`
+    is a multiple of `PT15M`.
     """
   duration_type => ~atom & atom_specification & {
     spec:        = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"

@@ -123,12 +123,23 @@ class DecimalParserTest {
 
     @Test
     void aMemberSetComposesWithTheFacetsBesideIt() {
-        // §5.6: "a value must satisfy all present facets" -- fraction_digits still refuses 2.50's own scale.
-        DecimalParser type = new DecimalParser(new DecimalType(Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(1),
+        // §5.6: "a value must satisfy all present facets" -- a member still has to clear the bound beside it.
+        DecimalParser type = new DecimalParser(new DecimalType(Optional.of(new BigDecimal("2")), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.of(List.of(new BigDecimal("1"), new BigDecimal("2.50")))));
-        assertEquals(new BigDecimal("2.5"), type.read(token("2.5")));
-        assertThrows(AtomValidationException.class, () -> type.read(token("2.50")));
+        assertEquals(new BigDecimal("2.50"), type.read(token("2.50")));
+        assertThrows(AtomValidationException.class, () -> type.read(token("1")));
+    }
+
+    @Test
+    void aTrailingZeroChangesNeitherMembershipNorTheDigitCounts() {
+        // meta.tn: "scale is not part of the value -- 1, 1.0 and 1.00 are one value", so no facet may see
+        // the difference. 2.500 is the member 2.50, is a whole number of tenths, and has three significant
+        // digits rather than four.
+        DecimalParser type = new DecimalParser(new DecimalType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(3), Optional.of(1),
+                Optional.of(List.of(new BigDecimal("2.50")))));
+        assertEquals(new BigDecimal("2.500"), type.read(token("2.500")));
     }
 
     private static DecimalParser members(String... admitted) {

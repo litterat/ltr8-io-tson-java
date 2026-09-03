@@ -54,6 +54,7 @@ public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
                             + "HH:MM:SS[.fraction](Z|+HH:MM) (§5.4)", "an RFC 3339 full-time");
         }
         OffsetTime value;
+        FractionalSeconds.checkRepresentable(text, "time");
         try {
             value = OffsetTime.parse(text);
         } catch (DateTimeParseException e) {
@@ -71,7 +72,7 @@ public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
     }
 
     private void validate(OffsetTime value, String text) {
-        FractionalSeconds.check(constraints.precision(), text, "time");
+        FractionalSeconds.check(constraints.precision(), value.getNano(), text, "time");
         constraints.min().ifPresent(m -> {
             if (value.isBefore(m)) {
                 throw new AtomValidationException("'" + text + "' is before the minimum " + m, ">= " + m);

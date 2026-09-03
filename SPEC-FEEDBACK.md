@@ -2674,22 +2674,40 @@ effect of `java.time`'s own parser and report it as a shape error carrying a JDK
 index — the rule is enforced and never named. Unifying that is this implementation's own work and waits on the
 rule existing to name.
 
-**The ceiling is not running, and the shape of what is there argues for it.** A value between 2⁶³ ns and
-`java.time.Duration`'s own ±292-billion-year limit is accepted today, so `PT400000D` reads where a Go processor
-could not have held it — exactly the range-depends-on-the-reader problem the rule above closes. And
-`multiple_of` computes on `Duration.toNanos()`, which throws `ArithmeticException` past ±292 years: an
-overflow that turns a legal schema and a legal document into a library fault today, and that under the
-proposed ceiling stops being an overflow at all and becomes the conformance check, because the ceiling is
-exactly the range `toNanos` has.
+**All of it is running.** The wording is meta.tn's, so the `@doc` this entry quotes is the one the schema now
+carries and the three digests re-stamped with it. Both ends are enforced against the value space rather than
+against the host: `PT0.0000000001S` is refused for its tenth digit and `P400000D` for its magnitude, though
+`java.time.Duration` would take a span three orders wider. `precision` is `fraction_digits` on the seconds
+count and may not exceed nine. A bound is checked at both ends too — from a schema by the parser that reads
+its token, and from Java by `coherenceCheck`, so a `DurationType` built programmatically cannot carry one
+either. And `duration_type`'s bounds bind at all now, which they did not when this entry was written: every
+`value`-typed constraint field in the meta layer arrived as the string §4 made of it, so nothing here had
+experience with a duration bound to report.
 
-Two other things are not running. The `@doc` still says "rational", which is the wording this entry corrects
-and which moves with the implementation change, a meta edit re-stamping all three digests. And
-**`duration_type`'s and `period_type`'s bounds do not bind at all** — `min`, `exclusive_min`, `max`,
-`exclusive_max` and `multiple_of` are typed `value`, so a `PT30M` token arrives as the string `PT30M` and
-nothing reads it under the atom it constrains; `!duration ^ { min: PT30M }` reports a library gap rather than
-resolving. That reaches every non-numeric bound in the meta layer — `date`, `time`, `datetime`, `period` and
-`rational` alike — and is this implementation's own hole rather than a question for the spec, but it is why
-nothing here reports experience with a duration bound.
+**The ceiling turned out to close the overflow rather than sit beside it.** `multiple_of` tests on
+`Duration.toNanos()`, which throws `ArithmeticException` past ±292 years — a legal schema and a legal document
+producing a library fault. 2⁶³ − 1 nanoseconds is exactly the range `toNanos` has, so a value that would have
+hit it is now refused before the facet is asked, and the overflow is unreachable rather than merely unlikely.
+That is a small piece of evidence for the number: an implementation that picks the tightest host's limit finds
+its own arithmetic already agrees with it.
+
+**One thing found while building it, and it is not about durations.** §5.5 and §7.4 both make these facets
+constraints on the *value* — `time_type`'s `@doc` gives the worked example, "a text encoding may spell an
+admitted value with trailing zeros (`12:00:00.500` under `precision: 1`)", and `decimal_type`'s says "scale is
+not part of the value". This implementation counted written digits in all four places that carry such a facet
+(`time`, `datetime`, `duration`, and `number`'s own `total_digits`/`fraction_digits`), and so refused the
+spec's own example. Fixed here, and worth noting in the register because the prose is already unambiguous and
+an implementation still got it wrong four times: the rule reads like a spelling rule, and only the parenthetical
+example says otherwise.
+
+**In the conformance corpus**, on the branch that carries this revision's proposals. Seven vocabulary vectors
+for the two ends and two validate-layer vectors for `precision`. Three of them turn on the ceiling being the
+*format's* and not the reader's: `P400000D` is about 1095 years written in days, so no single component is
+large and several runtimes' duration types would hold it comfortably; and
+`-PT9223372036.854775808S` is the one value a signed 64-bit count holds and a magnitude rule does not, so a
+processor bounding by casting to its own `int64` passes every other vector here and fails that one. The floor's
+vectors pin rather than newly enforce — this implementation already refused a tenth digit, having nowhere to
+put it — which is the shape of the whole entry: the floor was forced by the hosts and the ceiling is a choice.
 
 **Suggested resolution:**
 

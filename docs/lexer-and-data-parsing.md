@@ -291,4 +291,23 @@ fixed, closed name→`AtomType` table (§5).
   rather than being re-read under `number`, whose grammar admits no based-integer form. Only a token the
   position could not have held under any narrowing reaches the atom — which is also what turns
   `!number ^ { min: "abc" }` from a cast failure reported as a library gap into `number`'s own verdict.
+- **No facet counts written digits, because scale is not part of the value.** meta.tn says it for both
+  families that carry a digit-count facet — `decimal_type`'s "`1`, `1.0` and `1.00` are one value… whether a
+  spelling's trailing zeros survive a round trip is an encoding's promise, not the type's", and
+  `time_type`'s worked example, "a text encoding may spell an admitted value with trailing zeros
+  (`12:00:00.500` under `precision: 1`)". So `precision: N` tests that the value is a whole number of 10⁻ᴺ
+  seconds (`FractionalSeconds`, over the parsed nanosecond field for `time`/`datetime` and over the seconds
+  count's own scale for `duration`), and `total_digits`/`fraction_digits` measure `stripTrailingZeros()`
+  (`DecimalParser`). The value handed back is still exactly as written — only the measurement strips, the
+  same split `members` already makes.
+- **`duration` is a signed exact decimal number of seconds, bounded at both ends by a signed 64-bit count of
+  nanoseconds.** The lexical form puts a fraction on the seconds component and nowhere else, so no
+  non-terminating fraction is writable and every duration is a terminating decimal count — `number`'s value
+  space in seconds, which is what makes `precision` exactly `fraction_digits` on that count and `multiple_of`
+  exactly `number`'s. Both ends are §5.5's and not the host's: `DurationParser` refuses a tenth fractional
+  digit and a magnitude past 2⁶³ − 1 ns, though `java.time.Duration` would take spans three orders of
+  magnitude wider. That ceiling is also what makes `DurationType.isMultiple`'s `toNanos` total — the range
+  is the range `toNanos` has — and `coherenceCheck` refuses a bound or a `precision` outside it, so a
+  `DurationType` built in Java cannot carry one either. Longer spans are `period`, finer or wider quantities
+  are `number` in the unit the schema names. `SPEC-FEEDBACK.md` #31 is the proposal.
 - The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.

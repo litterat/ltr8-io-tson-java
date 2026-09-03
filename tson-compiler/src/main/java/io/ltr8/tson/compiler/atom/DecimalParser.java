@@ -97,8 +97,13 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
                 throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
             }
         });
+        // Both digit-count facets measure the value, never the spelling: meta.tn's own @doc says "scale is
+        // not part of the value -- 1, 1.0 and 1.00 are one value", so 1.230 has three significant digits and
+        // two after the point, and `fraction_digits: 2` admits "any hundredth" whatever the author typed.
+        // The value handed back is still exactly as written; only the measurement strips.
+        BigDecimal measured = value.stripTrailingZeros();
         constraints.totalDigits().ifPresent(td -> {
-            if (value.precision() > td) {
+            if (measured.precision() > td) {
                 throw new AtomValidationException(
                         "'" + text + "' has more than the maximum " + td + " total significant digits",
                         "at most " + td + " total significant digits");
@@ -107,7 +112,7 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
         constraints.fractionDigits().ifPresent(fd -> {
             // scale() can be negative (e.g. 1E+2 has scale -2, a whole number with no fraction
             // digits at all, not -2 of them) -- clamp at 0 before comparing.
-            if (Math.max(value.scale(), 0) > fd) {
+            if (Math.max(measured.scale(), 0) > fd) {
                 throw new AtomValidationException(
                         "'" + text + "' has more than the maximum " + fd + " digits after the decimal point",
                         "at most " + fd + " digits after the decimal point");
