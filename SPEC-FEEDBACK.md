@@ -2001,8 +2001,8 @@ would put an encoding's projection concern into every processor's type model, in
 implements only the text encoding. **An annotation is the right home exactly when the mark changes no value's
 validity** — that sentence is what §6 is missing, and it decides this case and the next one without re-arguing.
 
-**Three things §6 has to say. The first is already true and unstated; the third is a defect independent of
-whether either annotation lands.**
+**Three things §6 has to say. The first is already true and unstated; the third is independent of whether
+either annotation lands, and is the one settled below.**
 
 **(a) A checked annotation is a category §6 does not describe.** §6 accounts for three kinds — validated against
 its own type, advisory (`@annotation`, "carries no runtime force"), and resolver-derived (`@alias`,
@@ -2023,20 +2023,46 @@ than once per annotation.
 **(c) Whether a field annotation survives composition — the rule `@rest` actually depends on, and the one this
 implementation got wrong by never deciding.** §6 puts an annotation on a `record_field` and §8.1 preserves it;
 §5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one. Neither says what happens
-to the annotation. Measured here:
+to the annotation, and a resolver's two paths answered it two ways:
 
 - an **inherited** field is copied whole (`DefinitionResolver.absorb`: `fields.add(field)`), annotations
   included;
-- a **restated** field is rebuilt with `Annotations.empty()` and then given exactly what the restatement wrote
-  (`resolveFieldEntry` / `resolveField`), so the inherited annotations are dropped.
+- a **restated** field was rebuilt with `Annotations.empty()` and then given exactly what the restatement wrote,
+  so the inherited annotations were dropped.
 
 The consequence is that §5.7's modifier-only entry — `extra: ?`, which names no type and is defined to tighten
-presence and nothing else — silently un-marks the field. A `@rest` check phrased as "at most one per composed
-chain" cannot be written against that, because a restatement severs the chain without saying so; and the same
-hole loses a `@deprecated` or a `@doc` on any field a subtype tightens. This wants deciding in §5.8/§8.1
-whichever way the annotations go: the defensible rule is that a restatement's annotations **merge over** the
-inherited ones, since a modifier-only entry writes none and should not be able to erase what it does not
-mention.
+presence and nothing else — silently un-marks the field. Written out, one type shows the whole of it:
+
+```
+account => { @doc:"Pre-2020 registry identifier."  @deprecated  legacy_id: text?
+             @doc:"Display name."                                name: text }
+
+premium_account  => account & { legacy_id: = _ }                                  a modifier-only tightening
+archived_account => account & { @todo:"drop in v3"  legacy_id: = _ }              a tightening that writes one
+```
+
+Before the rule below, that resolved to `legacy_id` carrying nothing on `premium_account` and `@todo` alone on
+`archived_account`, while `name` — inherited, not restated — kept its `@doc` in both. So the same record shows
+both answers at once, and which one a field gets depends on whether a subtype happened to tighten it.
+
+**The rule, which this implementation now runs:** a restated field's annotations are **the restatement's own,
+in source order, followed by the inherited ones, in source order**. Nothing is dropped, no name is treated as a
+key, and the two halves are what the rest of the series already requires:
+
+- **Concatenation, not replacement by name**, because [TSON-DATA] §3.1 already makes an annotation name
+  repeatable on one value — "an annotation name MAY appear any number of times on a single value; all
+  occurrences are preserved in source order". Annotations are a list, not a map. "The inherited `@doc` is
+  replaced" needs an identity the model does not give them, and has no defined answer where the source carries
+  two. A restated field carrying two `@doc`s is the same shape as a field an author wrote two on directly.
+- **Nearer first**, because order is already the precedence mechanism. Every first-occurrence lookup reads it
+  that way, `@bytes_encoding`'s own nearest-first resolution included, so leading with the restatement makes the
+  nearer declaration win at every such site without any of them knowing about composition.
+
+The cost is that a subtype rewriting an inherited `@doc` leaves the field carrying both, which is what
+"annotations are not removable" buys and what §3.1 accepts everywhere else. The alternative that would remove it
+is not per-name replacement but a **cardinality** on a declared annotation — `@annotation` gaining an
+at-most-one-per-value form, at which point replacement has a defined meaning and a schema-load check to enforce
+it. That is a real addition to §6 and is named here as the option rather than the recommendation.
 
 **Interpretation chosen — both annotations are declared, and neither is checked.** meta.tn carries
 `discriminator => @annotation field_name` and `rest => @annotation void`. They resolve one hop against the
@@ -2052,12 +2078,39 @@ declaring the named field, that the field is `REQUIRED_FIXED` in each, or that t
 distinct; nothing verifies that a `@rest` field's type resolves to a text-keyed map. So both annotations are
 today what §6 calls advisory, carrying no load-time force, where the design says they carry it.
 
-**(c) is still a live defect and still blocks the `@rest` check.** `DefinitionResolver.resolveField` rebuilds a
-restated field with `Annotations.empty()`, so §5.7's modifier-only entry (`extra: ?`) silently un-marks the
-field it names, and "at most one per composed chain" cannot be phrased against a chain a restatement severs
-without saying so. The same hole loses a `@deprecated` or a `@doc` on any field a subtype tightens. Deciding it
-is owed whether or not either annotation lands, which is why it is stated as its own point above rather than as
-a dependency of them.
+**(c) is fixed here and is the one part of this entry that is not waiting on the spec.**
+`DefinitionResolver.resolveField` merges the restatement's annotations over the inherited ones, one path serving
+§5.7's refinement and §5.8's composition alike, and `RestatedFieldAnnotationsTest` pins each case — the
+modifier-only entry, the tightening that writes its own, a repeated name kept twice with the nearer one first,
+and the refinement spelling getting the same answer as the composition spelling. It unblocks the `@rest` check:
+"at most one per composed chain" is now a count along a chain no restatement can sever.
+
+**Two things building it settled that stating it did not.** First, **the rule has read-side force, and that is
+what makes its ordering half more than a convention.** `@bytes_encoding` on a field is resolved nearest-first by
+first occurrence, so a restated field is read in whichever alphabet its merged annotations lead with:
+
+```
+envelope        => { @bytes_encoding:HEX  digest: bytes? }
+sealed_envelope => envelope & { digest: bytes }        tightens presence, writes no annotation of its own
+
+!sealed_envelope { digest: "deadbeef" }
+    was   75e69d6de79f   six octets, base64 — the restatement dropped the directive with everything else
+    now   deadbeef       four octets, hex   — the restatement inherits it
+```
+
+The old answer was a *different value*, not an error: no diagnostic, no length complaint, six octets where the
+schema says four. Inherited-first ordering produces the same class of defect from the other end, handing a field
+restated under its **own** `@bytes_encoding` the alphabet of the type it tightens instead. Restatement-first is
+the only order under which both come out right, which is why the ordering is forced rather than chosen.
+
+Second, **the three bundled schemas are unaffected, and verifiably so**: none of meta-kernel, meta.tn or core.tn
+writes a field-position annotation at all, so nothing there can inherit one. No `*-resolved.tn` fixture moves and
+no digest is re-stamped — a change to resolved output that touches none of the published artifacts.
+
+**No conformance vector can carry it, for #5's reason rather than a new one.** §5.8 and §8.1 are silent, so a
+processor that replaces is as conforming as one that merges: a vector asserting either fails a conforming
+implementation of the current revision. The cases live in this repo's tests until the rule is stated, and the
+corpus's `class2/schema/` layer stays silent on it.
 
 **A second shape is on the table, and this entry deliberately does not choose between them.** Everything above
 puts the mark on a *choice* declaration. The alternative puts it on a **field of a base record**, and lets the
@@ -2110,23 +2163,28 @@ shape is not excluded and would move the first two bullets.
   projection behaviour to a schema-side annotation declared for it. Force stays confined to the encoding that
   claims it; text keeps `!variant` at every non-disjoint choice, discriminated or not, so §5.4's tagging rule
   needs no change.
-- §5.8/§8.1: the field-annotation rule of (c), which is owed whether or not `@rest` lands.
+- §5.8/§8.1: the field-annotation rule of (c), which is owed whether or not `@rest` lands — *a restated field's
+  annotations are the restatement's own, in source order, followed by the inherited field's, in source order; a
+  restatement adds and never removes.* One sentence, and it is what makes "at most one `@rest` per composed
+  chain" a rule that can be checked.
 - §8.1: otherwise no change. Both ride the existing author-annotation preservation channel, which already keeps
   declaration and field annotations through output and ingest.
 
 **Status against Revision 34:** open, and new against this revision — a proposal, and like #23 and #24 one this
-implementation now runs in part: the two annotations are declared, the three rules are not. That split is the
-entry's own point made concrete. Declaring an annotation is nearly free, and it is worth nothing on its own —
-(a) and (b) are already load-bearing for `@disjoint` and unstated, and (c) is a live defect this implementation
-is on the wrong side of today, found by asking what a checked field annotation would have to survive. The
-vocabulary being present and the force being absent is exactly the state §6 has no words for.
+implementation now runs in part: the two annotations are declared, (a) and (b) are unwritten, the two checks are
+unwritten, and (c) is built. That split is the entry's own point made concrete. Declaring an annotation is nearly
+free and is worth nothing on its own — (a) and (b) are already load-bearing for `@disjoint` and unstated — and the
+vocabulary being present while the force is absent is exactly the state §6 has no words for. (c) was found by
+asking what a checked field annotation would have to survive, and it is the part that could be settled without
+the spec, because a resolver has to do *something* and doing nothing was itself an answer.
 
 **Which shape the mark belongs to is held open for this cycle, on purpose.** It is not a question the schema
 layer settles by itself: both shapes resolve, and choosing between them wants validation against real documents
 and against how each maps to classes in a binding implementation — which is where an untagged-dispatch design
 either pays for itself or does not. So (a)'s criterion, the position, and the checks all stay unresolved pending
-that work, and the answer will move a later revision rather than this one. (c) is unaffected and stays owed
-either way: it is a defect about field annotations, not about discriminators.
+that work, and the answer will move a later revision rather than this one. (c) is unaffected by that hold and is
+owed either way: it is a rule about field annotations, not about discriminators, and it is stated above as a
+report rather than a request.
 
 ---
 

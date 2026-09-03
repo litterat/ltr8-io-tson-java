@@ -39,6 +39,22 @@ are kept in step deliberately.
   `=>` that land on the `TypeDefinition`, and the ones before the name that land on the entry's key — and
   `SchemaResolver` catches the second set's failures itself, since that loop runs outside the memoized getter
   that catches the first set's.
+- **A restated field's annotations merge over the inherited ones, restatement first** (`resolveField`/`merged`).
+  §5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one, and neither says what
+  becomes of the field's annotations; a resolver's two paths gave two answers, an inherited field being absorbed
+  whole while a restated one was rebuilt with only what the restatement wrote. The rule closes that: the
+  restatement's own annotations in source order, then the inherited field's, one path serving refinement and
+  composition alike. **Concatenation rather than replacement by name**, because [TSON-DATA] §3.1 makes a name
+  repeatable on one value with every occurrence preserved — annotations are a list, not a map, so "the
+  inherited `@doc`" names nothing when the source wrote two. **Restatement first**, because order *is* the
+  precedence mechanism: `Annotations.get`/`value` and `BytesEncoding.stated` all take the first occurrence, so
+  leading with the nearer declaration is what makes `@bytes_encoding`'s nearest-first resolution come out right
+  at a restated field without either of them knowing about composition. The case that pins it is read-side: under
+  `envelope => { @bytes_encoding:HEX  digest: bytes? }`, a `sealed_envelope => envelope & { digest: bytes }` that
+  tightens presence and writes no annotation of its own now inherits the directive and reads `"deadbeef"` as the
+  four hex octets `deadbeef`. It used to read six base64 octets (`75e69d6de79f`) — a different value, with no
+  diagnostic, because dropping the inherited annotations dropped the directive with them.
+  `RestatedFieldAnnotationsTest` covers each case; §5.8/§8.1 owe the rule, which is `SPEC-FEEDBACK.md` #25(c).
 - **What resolves:** record construction; composition (`A & B & { ... }`, §5.8, with kind from the literal
   base-kind names in the transitive supertype chain, and tightening in the trailing body per §5.7); the
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
