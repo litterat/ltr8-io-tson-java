@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.compiler.base.BaseValue;
 import io.ltr8.tson.compiler.base.NumberForm;
 import io.ltr8.tson.compiler.base.NumberForms;
+import io.ltr8.tson.compiler.base.NumberNarrowing;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -40,6 +41,73 @@ public final class ValueParser implements AtomType<Object> {
     @Override
     public Object read(TokenValue token) {
         return narrow(BaseTypeResolver.resolve(token));
+    }
+
+    /**
+     * The {@code value} atom read at a slot whose bound host type is known -- [TSON-SCHEMA] §7.4's
+     * constraint fields, and any other {@code value}-typed position a class binds to something base type
+     * resolution does not produce.
+     *
+     * <p><b>Base type resolution is what a {@code value} slot is decoded by; it is not what the slot means.</b>
+     * §4 resolves three classes -- boolean, number, string -- and a duration, a date and a UUID are none of
+     * them, so {@code min: PT30M} on {@code duration_type} arrives here as the string {@code PT30M} and the
+     * position's own host type is the only thing left that says what it was. Where the natural resolution
+     * cannot be what the position holds, the token is re-read under the built-in atom that produces that host
+     * type ({@link HostAtoms}) -- which is what meta.tn already describes the resolver as doing, and the same
+     * rule {@code DecimalType} applies to a member of a {@code set<value>}.
+     *
+     * <p><b>Additive, never a re-interpretation.</b> A value the position can already hold is returned
+     * untouched, and so is one a caller's own numeric narrowing will reach -- {@code min: 0x10} at a {@code
+     * BigDecimal} slot stays the integer 16 and is narrowed by the caller, rather than being re-read under
+     * {@code number}, whose grammar admits no based-integer form. Only a token whose natural resolution the
+     * position could not hold under any narrowing reaches the atom, so nothing that reads today reads
+     * differently, and what did not read at all now gets a verdict from the atom that owns the question:
+     * {@code !number ^ { min: "abc" }} is refused by {@code number}, not by a cast.
+     *
+     * <p>A position whose host type no built-in produces is left alone, so a consumer's own class binding a
+     * {@code value} field to their own type keeps whatever their bind context does with it.
+     */
+    @Override
+    public Object read(TokenValue token, Class<?> target) {
+        Object natural = read(token);
+        if (target == null || AtomType.wrap(target).isInstance(natural) || narrowsTo(natural, target)) {
+            return natural;
+        }
+        return HostAtoms.forHostType(target).<Object>map(atom -> atom.read(token)).orElse(natural);
+    }
+
+    /**
+     * Whether a caller's own numeric narrowing turns {@code natural} into something {@code target} holds.
+     * Asked rather than performed: the narrowing belongs to whoever declared the target, and doing it here
+     * as well would narrow twice -- the trap {@code verifyFixed} already documents.
+     */
+    private static boolean narrowsTo(Object natural, Class<?> target) {
+        if (!(natural instanceof Number)) {
+            return false;
+        }
+        try {
+            Object narrowed = natural instanceof java.math.BigInteger integer
+                    ? NumberNarrowing.narrowIntegral(integer, target)
+                    : natural instanceof BigDecimal decimal ? NumberNarrowing.narrowDecimal(decimal, target) : natural;
+            return AtomType.wrap(target).isInstance(narrowed);
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /** The {@code value} atom at a slot of known host type, for a caller that holds a reader rather than a token. */
+    public static AtomType<Object> at(Class<?> target) {
+        return new AtomType<Object>() {
+            @Override
+            public Object read(TokenValue token) {
+                return INSTANCE.read(token, target);
+            }
+
+            @Override
+            public String write(Object value) {
+                return INSTANCE.write(value);
+            }
+        };
     }
 
     private static Object narrow(BaseValue value) {

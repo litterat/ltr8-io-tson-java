@@ -51,7 +51,12 @@ public interface AtomType<T> {
 
     String write(T value);
 
-    private static Class<?> wrap(Class<?> type) {
+    /**
+     * {@code type}'s boxed form, so an {@code isInstance} check answers the same for {@code int} as for
+     * {@link Integer}. Shared with {@link ValueParser}, which asks the same question of a bound slot's own
+     * host type rather than of a caller-supplied target.
+     */
+    static Class<?> wrap(Class<?> type) {
         if (type == int.class) {
             return Integer.class;
         }

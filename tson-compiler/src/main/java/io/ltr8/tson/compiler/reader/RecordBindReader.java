@@ -18,6 +18,7 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
 import io.ltr8.tson.compiler.base.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FieldState;
@@ -134,7 +135,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 }
                 continue;
             }
-            TsonTypeReader<?> rebound = rebindContainerIfNeeded(field, target, resolver, this.annotationTypes);
+            TsonTypeReader<?> rebound = rebindValueIfNeeded(field, target);
+            rebound = rebindContainerIfNeeded(new CompiledField(field.schema(), rebound), target, resolver,
+                    this.annotationTypes);
             if (target.dataClass() instanceof DataClassAnnotated boxed) {
                 rebound = boxing(rebound, boxed, annotationTypes);
             }
@@ -416,6 +419,41 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             return uri.toString();
         }
         return raw;
+    }
+
+    /**
+     * A {@code value}-typed field read under the atom of the position it stands in, where the position's own
+     * host type says which one.
+     *
+     * <p>[TSON-SCHEMA] §7.4 types a constructor's constraint fields {@code value}, and the bootstrap ordering
+     * behind it leaves no alternative: {@code duration_type} is what defines a duration, and {@code duration
+     * => !duration_type {}} lives a layer up in core.tn, so meta.tn cannot write {@code min: duration}. A
+     * {@code value} slot is decoded by [TSON-DATA] §4 and by nothing else, which resolves boolean, number and
+     * string -- so every non-numeric bound in the meta layer arrives as a {@code String} and reaches a
+     * component that cannot hold one. The schema-driven reader has no visibility into that component, exactly
+     * as it has none into a collection's Java shape; this is {@link #rebindContainerIfNeeded}'s sibling and
+     * runs beside it for the same reason.
+     *
+     * <p>Keyed on the slot still being read as the uninterpreted {@code value} atom, which is what makes
+     * {@link #tokenAware} the sibling rather than the competitor: it claims a {@code Token}-bound slot before
+     * the field loop runs, and a slot something has already specialised is one this must not redo. Untouched
+     * for every other field, and {@link ValueParser#at} itself changes nothing about a token the component
+     * could already have held, so the rebind is only ever reached by a value that had no way to arrive.
+     */
+    private static TsonTypeReader<?> rebindValueIfNeeded(CompiledField field, DataClassField target) {
+        // A §7.2 subsumption guard wraps the atom reader, as it does a container's -- look through it and put
+        // it back around the replacement, the same handover rebindContainerIfNeeded makes.
+        if (field.parser() instanceof VariantSchemaReader guard) {
+            TsonTypeReader<?> rebound = rebindValueIfNeeded(
+                    new CompiledField(field.schema(), guard.wrapped()), target);
+            return rebound == guard.wrapped() ? field.parser() : guard.rewrap(rebound);
+        }
+        if (!(field.parser() instanceof AtomTypeReader<?> atom) || !atom.readsUninterpretedValue()) {
+            return field.parser();
+        }
+        // The field's own name, for the same reason the container rebind takes it: the entry here is `value`,
+        // which names the escape hatch and not the constraint the author wrote.
+        return atom.overAtom(field.schema().name(), ValueParser.at(target.type()));
     }
 
     /**

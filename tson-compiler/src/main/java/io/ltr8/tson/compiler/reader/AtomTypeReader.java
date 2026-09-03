@@ -201,6 +201,26 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         return new AtomTypeReader<>(displayName, delegate, schemaLocation);
     }
 
+    /**
+     * The same position, read by a different atom and under a different name -- the location is all that
+     * survives. {@code RecordBindReader} uses it for a {@code value}-typed slot, whose atom depends on what
+     * the bound component holds and so cannot be known when the factory runs. The name goes with it because
+     * the entry's own is {@code value}, which names the escape hatch rather than anything the author wrote.
+     */
+    /**
+     * Whether this reads the uninterpreted {@code value} atom -- the one slot {@code RecordBindReader} may
+     * specialise to the host type its component holds. False once something already has: {@code tokenAware}
+     * claims a {@code Token}-bound slot before the field loop runs, and that is a specialisation of the same
+     * kind rather than a case to redo.
+     */
+    boolean readsUninterpretedValue() {
+        return delegate == ValueParser.INSTANCE;
+    }
+
+    TsonTypeReader<?> overAtom(String displayName, AtomType<?> replacement) {
+        return new AtomTypeReader<>(displayName, replacement, schemaLocation);
+    }
+
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
         this.name = name;
         this.delegate = delegate;
