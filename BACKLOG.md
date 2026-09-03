@@ -98,11 +98,13 @@ own prose (which had gone stale on at least one of them):
   fraction is writable, so `PT1/3S` is not a token — and the floor is a nanosecond, which is where every host
   runtime already stops. `SPEC-FEEDBACK.md` #31 proposes both, and `java.time.Duration` stays the host type.
   What is left here: meta.tn's `duration_type` `@doc` carries the corrected wording (a meta edit, so all three
-  digests re-stamp bottom-up and the `*-resolved.tn` fixtures move with it); `DurationParser` names the rule
-  where `TimeParser`/`DateTimeParser` leak a `java.time` message about a character index, so one refusal reads
-  the same in all three families; and `multiple_of` computes on the seconds count rather than
-  `Duration.toNanos()`, which throws `ArithmeticException` past ±292 years and so turns a legal schema and a
-  legal document into a library fault. `period_type` needs none of it — its grammar admits no fraction, so its
+  digests re-stamp bottom-up and the `*-resolved.tn` fixtures move with it); the ceiling is enforced, a
+  magnitude past 2⁶³ − 1 nanoseconds being refused rather than accepted on the strength of
+  `java.time.Duration` reaching ±292 *billion* years; `DurationParser` names the rule where
+  `TimeParser`/`DateTimeParser` leak a `java.time` message about a character index, so one refusal reads the
+  same in all three families; and the facets compute on the seconds count rather than `Duration.toNanos()`,
+  whose `ArithmeticException` past ±292 years turns a legal schema and a legal document into a library fault
+  today and becomes the ceiling check once the ceiling exists. `period_type` needs none of it — its grammar admits no fraction, so its
   own "signed integer number of months" is already what the lexical form guarantees.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`

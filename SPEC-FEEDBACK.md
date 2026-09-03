@@ -2568,12 +2568,12 @@ than with either vocabulary.
 
 ---
 
-## 31. `duration`'s value space is stated as rational and bounded below by nothing, where no host runtime goes finer than a nanosecond — proposal: exact decimal seconds, with the fraction capped at nine digits
+## 31. `duration`'s value space is stated as rational and bounded at neither end — proposal: exact decimal seconds, with both ends fixed at a signed 64-bit count of nanoseconds
 
 **Section:** [TSON-SCHEMA] §5.5 (`duration`'s lexical form and value space; `time`/`datetime`'s fractional-second
 component), §9 (meta's `duration_type`, `period_type`); [TSON-DATA] §4.3 (numeric equivalence).
 
-Two problems, one of them a wrong word and the other the rule that word was hiding.
+Two problems, one of them a wrong word and the other the pair of rules that word was hiding.
 
 **1. The value space is not rational, and saying so costs the facets their definitions.** meta's
 `duration_type` says "the value is a signed rational number of seconds". The lexical form permits a decimal
@@ -2619,6 +2619,44 @@ own atom. That is where sub-nanosecond belongs: the unit becomes a statement the
 fixed second nobody can carry, and nothing pretends the value will survive a round trip through a host's
 duration type.
 
+**3. The other end is unbounded too, and there the hosts do not agree.** The seconds component is `1*DIGIT`,
+so `PT99999999999999999999S` is a token. Here the floor's argument does not carry over, because the ceilings
+differ by nine orders of magnitude:
+
+| Runtime | Type | Representation | Ceiling |
+|---|---|---|--:|
+| Go | `time.Duration` | int64 nanoseconds | ±292 y |
+| .NET | `TimeSpan` | int64 × 100 ns ticks | ±29,228 y |
+| PostgreSQL | `interval` | int64 µs (plus months, days) | ±292,277 y |
+| Python | `datetime.timedelta` | ±999,999,999 days | ±2.74 My |
+| Rust | `chrono::TimeDelta` | i64 milliseconds | ±292 My |
+| Java | `java.time.Duration` | int64 seconds + int nanos | ±292 Gy |
+| Rust | `std::time::Duration` | u64 s + u32 ns, unsigned | 0 … 585 Gy |
+
+The repeated 292 is 2⁶³ in different units, and Go is three orders of magnitude below the next entry.
+
+**Proposal: the ceiling is 2⁶³ − 1 nanoseconds, and it is normative in both directions.** A conforming
+processor MUST carry a value space of *at least* a signed 64-bit count of nanoseconds — so no implementation
+may claim conformance with a narrower type — and MUST reject a value whose magnitude exceeds it *even where
+its own type could hold one*. Java's `Duration` reaches ±292 billion years; under this rule it still refuses
+`PT400000D`. A ceiling only some processors enforce is not a ceiling, and an interchange format whose admitted
+range depends on which implementation read the document has not specified one.
+
+**Magnitude, not the signed range.** 2⁶³ − 1 rather than the asymmetric int64 range, so that negating an
+admitted duration always yields an admitted duration. The one value that costs — −2⁶³ ns — is representable in
+Go and Java and is not worth the rule that `-PT9223372036.854775808S` is legal while its own negation is not.
+
+**Why 292 years is not as tight as it reads: the long-span case already has a better type.** A span of
+centuries is a *calendar* span, and `period` carries it as a count of months with no such limit. A clock-based
+count of SI seconds beyond that is a physics quantity, and `number` seconds — or a schema's own atom, in its
+own unit — is what it wants. That is the same escape hatch the floor uses, which makes the two ends one
+argument rather than two unrelated restrictions: **outside the range a host duration type can carry, the value
+is not a duration, it is a number with a unit.**
+
+**The ceiling is a value rule where the floor is a lexical one**, and deliberately: the seconds count is
+summed from the D, H, M and S components, so `PT999999999999D` overflows with no single component long enough
+to catch, where a fraction only ever reaches the value through one component and can be capped at the token.
+
 **The floor belongs in the lexical form, not the value space.** `time-secfrac` restricted to `"." 1*9DIGIT`
 makes `PT0.0000000001S` not a token, so the refusal is a parse error at the character, before any arithmetic,
 and it is one rule rather than a lexical form plus a value-level "must be a whole number of nanoseconds" that
@@ -2629,11 +2667,6 @@ becomes an ordinary schema-load coherence error rather than a facet that silentl
 `time-secfrac`, so the same token is admitted there and the same nothing can hold it. Stating the cap once, on
 the production, reaches all three.
 
-**Magnitude is deliberately not proposed.** The same argument reaches the other end — Go's `int64` nanoseconds
-overflow at about ±292 years where Java's `long` seconds reach ±2.9 × 10¹¹ — but the hosts disagree by nine
-orders of magnitude there, where they agree exactly on the floor. A ceiling is therefore an implementation
-limit under §9.1's existing posture, not a value-space rule, and this entry asks for nothing on it.
-
 **What is running, and what is not.** The nanosecond floor is running, for all three families, and by three
 different routes rather than one: `DurationParser` computes the seconds count as a `BigDecimal` and refuses a
 value finer than a nanosecond by name, while `TimeParser` and `DateTimeParser` get the same cap as a side
@@ -2641,15 +2674,22 @@ effect of `java.time`'s own parser and report it as a shape error carrying a JDK
 index — the rule is enforced and never named. Unifying that is this implementation's own work and waits on the
 rule existing to name.
 
-Three things are not running. The `@doc` still says "rational", which is the wording this entry corrects and
-which moves with the implementation change, a meta edit re-stamping all three digests. **`duration_type`'s and
-`period_type`'s bounds do not bind at all** — `min`, `exclusive_min`, `max`, `exclusive_max` and `multiple_of`
-are typed `value`, so a `PT30M` token arrives as the string `PT30M` and nothing reads it under the atom it
-constrains; `!duration ^ { min: PT30M }` reports a library gap rather than resolving. That is this
-implementation's own hole and not a question for the spec, but it is why nothing here reports experience with a
-duration bound. And `multiple_of` computes on `Duration.toNanos()`, which overflows past ±292 years — the
-magnitude end of the same story, and an argument for computing the facets on the seconds count the way the
-corrected wording describes them.
+**The ceiling is not running, and the shape of what is there argues for it.** A value between 2⁶³ ns and
+`java.time.Duration`'s own ±292-billion-year limit is accepted today, so `PT400000D` reads where a Go processor
+could not have held it — exactly the range-depends-on-the-reader problem the rule above closes. And
+`multiple_of` computes on `Duration.toNanos()`, which throws `ArithmeticException` past ±292 years: an
+overflow that turns a legal schema and a legal document into a library fault today, and that under the
+proposed ceiling stops being an overflow at all and becomes the conformance check, because the ceiling is
+exactly the range `toNanos` has.
+
+Two other things are not running. The `@doc` still says "rational", which is the wording this entry corrects
+and which moves with the implementation change, a meta edit re-stamping all three digests. And
+**`duration_type`'s and `period_type`'s bounds do not bind at all** — `min`, `exclusive_min`, `max`,
+`exclusive_max` and `multiple_of` are typed `value`, so a `PT30M` token arrives as the string `PT30M` and
+nothing reads it under the atom it constrains; `!duration ^ { min: PT30M }` reports a library gap rather than
+resolving. That reaches every non-numeric bound in the meta layer — `date`, `time`, `datetime`, `period` and
+`rational` alike — and is this implementation's own hole rather than a question for the spec, but it is why
+nothing here reports experience with a duration bound.
 
 **Suggested resolution:**
 
@@ -2665,11 +2705,20 @@ corrected wording describes them.
   1*9DIGIT`. One sentence saying why — no host runtime represents finer, and a schema needing finer uses
   `number` seconds or its own atom — so the restriction does not read as arbitrary.
 - §5.5's `precision` facet: at most 9, falling out of the production above rather than stated twice.
-- `period_type`: no change. Its integer claim is what its own grammar already guarantees.
-- §9.1: no change. Magnitude stays an implementation limit, for the reason given above.
+- §5.5's value space, one sentence for the ceiling: *a `duration`'s magnitude does not exceed 2⁶³ − 1
+  nanoseconds (about 292 years). A processor MUST be able to represent every value in that range, and MUST
+  reject one outside it whether or not its own representation could hold it.* A span longer than that is a
+  calendar span and is a `period`, or a physical quantity and is a `number` in the unit the schema names.
+- `period_type`: no change. Its integer claim is what its own grammar already guarantees, and its own
+  magnitude question is separate — a count of months has no host consensus to appeal to and no equivalent of
+  `time.Duration` to be tightest.
+- §9.1: no change. The ceiling is a value-space rule, not a resource limit: it is the same for every processor
+  and is not the kind of bound an implementation may set for itself.
 
 **Status against Revision 34:** open, and new against this revision. Independent of the other open entries: it
-touches no constructor's shape, adds no facet and removes none, and the only thing it changes about a
-conforming document is that a token no processor could honour stops being one.
+touches no constructor's shape and adds no facet. It does narrow what a conforming document may say, at both
+ends — below, a token no processor could honour stops being one; above, a token some processors could honour
+does too, which is the price of the range being the same everywhere rather than a property of whoever read the
+document.
 
 ---
