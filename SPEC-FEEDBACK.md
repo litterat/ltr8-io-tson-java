@@ -2327,12 +2327,13 @@ not implement §7.5's comparison rule, in either of the two places it compares r
 
 ---
 
-## 28. §7.5 and §2.6 both delegate to "the element type's equality contract", and no atom whose value space differs from its lexical space has one — `binary` is four spellings of one value space and compares as none of them
+## 28. §7.5 and §2.6 both delegate to "the element type's equality contract", and no atom whose value space differs from its lexical space has one — so each processor invents it, and this one has now had to
 
 **Section:** [TSON-SCHEMA] §7.5 (sets; the duplicate rule and its equality delegation), §5.2 (FIXED values),
-§5.5 (constructor application; `binary`'s `encoding` selector), §5.7 (the selector facet kind), §9 (core's
-`base64`/`base64url`/`base32`/`hex`), §10.2/§10.3 (hash pinning and canonical identity); [TSON-DATA] §2.6 (map
-key identity is the decoded value), §4.3 (numeric equivalence — the one family that *does* have the rule).
+§5.5 (constructor application; what an instance denotes), §9 (`bytes_type`, the temporal families, `uuid_type`,
+`rational_type`), §10.2/§10.3 (hash pinning and canonical identity); [TSON-DATA] §2.6 (map key identity is the
+decoded value), §4.3 (numeric equivalence — the one family that *does* have the rule). Companion to #29, which
+replaced the four `binary` spellings this entry was first opened against.
 
 **Problem:** three separate rules in the series compare two decoded values, and each delegates the comparison
 to a contract the type is supposed to own:
@@ -2345,36 +2346,42 @@ to a contract the type is supposed to own:
 For exactly one family the contract is written down: [TSON-DATA] §4.3 states numeric equivalence, so `255`,
 `0xFF` and `+255` are one value and `1` and `1.0` are two. §7.5's two examples are the two easy families —
 `identifier` (NFC text) and `integer` (§4.3). **Every family whose value space differs from its lexical space
-is left without one**, and `binary` is the case where that is not a corner.
+is left without one**, and `bytes` is the case where that is not a corner.
 
-**`binary` is one constructor over one value space with four spellings.** core.tn declares
-`base64 => !binary BASE64`, `base64url => !binary BASE64URL`, `base32 => !binary BASE32`,
-`hex => !binary HEX` — four instances differing only in a selector facet (§5.7's own example of the kind), all
-denoting octet strings. Nothing states whether two spellings of one octet string are one value: not within a
-single instance (`!hex "abcd"` against `!hex "ABCD"` — hex is case-insensitive by every definition of it, and
-the spec's `@doc` says only "Hex-encoded binary"), and not across two (`!hex "4869"` against
-`!base64 "SGk="`). The same silence reaches base64's padding and its two alphabets.
+**`bytes` is one value space with four spellings, and #29 is what made that plain rather than what caused it.**
+Under that entry's design there is one `bytes` type over octet strings and `@bytes_encoding` names the alphabet
+a text encoding reads and writes it in, so the spelling is no longer a *type* — which is the half #29 fixed.
+What it does not fix is this one: nothing states whether two spellings of one octet string are one **value**.
+Within a single alphabet the question is unavoidable, because both spellings land at the same position:
+`"abcd"` against `"ABCD"` under `@bytes_encoding:HEX`, hex being case-insensitive by every definition of it,
+and the type's own `@doc` saying only what the alphabet is. Across two alphabets — `"4869"` under HEX against
+`"SGk="` under BASE64 — the directive makes one alphabet apply per position, so the two meet only across
+positions, documents or encodings, which is exactly where §10's content addressing lives. The same silence
+reaches base64's padding and its two alphabets.
 
-**Measured here, and the implementation is worse than the ambiguity.** A set over `hex` accepts every
-duplicate there is, because `BinaryParser` is `AtomType<byte[]>` and Java's `byte[]` carries identity
-equality, so no two decoded binary values are ever equal:
+**Measured here, and the implementation had to answer before the spec did.** A set over `bytes` used to accept
+every duplicate there is, `BytesParser` being `AtomType<byte[]>` and Java's `byte[]` carrying identity
+equality, so no two decoded binary values were ever equal:
 
 ```
-keys => !set { element_type: hex }
-!holder { k: [ "abcd" "ABCD" ] }   OK        (two spellings of one octet string)
-!holder { k: [ "abcd" "abcd" ] }   OK        (the same spelling, twice)
+keys => !set { element_type: bytes }
+!holder { k: [ "SGk=" "SGk=" ] }   OK        (the same spelling, twice)
 
 ts => !set { element_type: text }
 !h { k: [ "a" "a" ] }   [TYPE_MISMATCH] /k/1: 'ts' requires unique elements, 'a' appears more than once
 ```
 
-The second line was this implementation's own bug and is now fixed: one `ValueIdentity` answers all three
-rules, a `byte[]` compares as its octets, and a set, a map key and a FIXED field agree. Fixing it did not
-answer the spec question, and building it made the shape of what is left clearer. **Two spellings of one
-octet string now compare equal here, and that is a decision this implementation made rather than one it
-read** — `"abcd"` and `"ABCD"` under `@bytes_encoding:HEX` are one value because the decoder is
-case-insensitive and the comparison is over what it produced. Nothing in the series says they must be, and an
-implementation whose hex decoder rejected uppercase would be equally conforming and would disagree.
+That was this implementation's own bug and is fixed: one `ValueIdentity` answers all three rules, a `byte[]`
+compares as its octets, and a set, a map key and a FIXED field agree. The FIXED case was the sharp one and
+worse than "never fires" — a `bytes` field with a fixed value rejected every document including the only one it
+can accept.
+
+**Fixing it did not answer the spec question; it forced an answer.** Two spellings of one octet string now
+compare equal here — `"abcd"` and `"ABCD"` under `@bytes_encoding:HEX` are one value, because the decoder is
+case-insensitive and the comparison is over what it produced. **That is a decision this implementation made
+rather than one it read.** Nothing in the series says they must be, and an implementation whose hex decoder
+rejected uppercase would be equally conforming and would disagree. There is no way to write the comparison
+without deciding it, which is this entry's point restated as running code rather than as a gap.
 
 That is also why **the three vectors this added to the corpus all state one value in one spelling, twice**: a
 value equals itself under any contract there could be, so those are safe, and a vector turning on two
@@ -2392,8 +2399,7 @@ an encoding defines a lexical space and one canonical form per value; equality, 
 disjointness and content addressing are defined over value spaces only.** Applied to Revision 34's vocabulary
 it settles a list that is currently settled nowhere:
 
-- `binary` — octet strings; the four `encoding` instances are spellings, and case in `hex` and padding in
-  base64 are lexical.
+- `bytes` — octet strings; the alphabet is a spelling (#29), and case in hex and padding in base64 are lexical.
 - the temporal families — RFC 3339 admits `Z` and `+00:00` for one instant, and `2025-01-01T00:00:00Z`
   against `2024-12-31T19:00:00-05:00` is one instant in two spellings.
 - `uuid` — canonical lower-case hex is a form, not the value.
@@ -2402,34 +2408,47 @@ it settles a list that is currently settled nowhere:
   one family and generalisable to all of them.
 - `text`/`identifier` — already answered (NFC), and the answer is the same shape.
 
-**Interpretation chosen:** Revision 34 as written, which is to say each atom's host type decides by default.
-`RationalParser` compares values (meta.tn states the rule), `IdentifierParser` compares NFC text, numeric
-comparison follows §4.3 through `NumericIdentity`, and `binary` compares by array identity — so its duplicate
-check, and any FIXED check over it, silently never fires. Nothing in this implementation states a
-value-space contract as such; each parser answers for itself, which is exactly the shape a general clause
-would replace.
+**Interpretation chosen: no general contract, because there is none to read — so six families are answered six
+ways, and two of the answers are accidents of a host type.** What each compares as here:
+
+| Family | Compares as | Where the answer came from |
+|---|---|---|
+| `text`/`identifier` | NFC-normalised text | §2.6, and stated |
+| the numeric tiers | §4.3 equivalence, through `NumericIdentity` | stated |
+| `rational` | the value — `"2/4"` and `"1/2"` are one | meta.tn's own `rational_type` `@doc` |
+| `bytes` | the octets, through `ValueIdentity` | **decided here**; the series is silent |
+| `uuid` | the value, `UUID.fromString` being case-insensitive | the host type, and it lands where the list above wants it |
+| `time`/`datetime` | local time **and offset**, `OffsetDateTime.equals` | the host type, and it lands opposite |
+
+The last row is what building the `bytes` answer turned up. `2025-01-01T00:00:00Z` and `2024-12-31T19:00:00-05:00`
+are one instant and two values here, because `OffsetDateTime`/`OffsetTime` compare the offset and nothing
+normalises before them. (`date` is unaffected: `LocalDate` has no offset and RFC 3339's `full-date` has one
+spelling per value.) That is not a considered position — it is what the host type does when nothing has told it
+otherwise, and it points the opposite way from the `bytes` row, where the same absence produced value equality.
+One processor, one missing clause, two contradictory answers is what a delegation with no target costs.
 
 **Suggested resolution:** the clause above, placed where §5.5 defines what a constructor's instance denotes,
 and a cross-reference from §7.5's duplicate rule and [TSON-DATA] §2.6 so the delegation has a target. Then one
 line per family in §9's own `@doc`s naming the value space and the canonical form, which is what `rational_type`
-already does and what every other family is missing. §5.7 needs no change: a selector facet choosing among
-lexical forms is already the right classification for `binary.encoding` under this reading, and saying so
-explicitly is worth a clause — a selector picks a spelling, so it must not be able to change what two values
-compare as.
+already does and what every other family is missing. §5.7 needs no change, and #29 is why: with the alphabet a
+directive rather than a selector facet, no facet kind is left in a position to be misread as narrowing a value
+space. What is worth stating in its place is the same rule aimed at the directive — **`@bytes_encoding` picks a
+spelling, so it must not be able to change what two values compare as** — beside the directive's own definition.
 
 **Status against Revision 34:** open, and new against this revision. It is not a proposal for new vocabulary,
 and #29's redesign has removed the last of the structure it might have needed: there is one `bytes` type over
-one value space, and the alphabet is a directive that no encoding but a text one reads, so nothing is left for
-a *selector* to be misread as narrowing. What that leaves is exactly the missing sentence — what the element
-type's equality contract *is* for an atom whose value space differs from its lexical space — and it is now the
-whole of the entry rather than half of it.
+one value space, and the alphabet is a directive that no encoding but a text one reads. What that leaves is
+exactly the missing sentence — what the element type's equality contract *is* for an atom whose value space
+differs from its lexical space — and it is now the whole of the entry rather than half of it.
 
-This implementation remains a demonstration of the gap rather than a counter-example. `BytesParser` reads to
-`byte[]`, which carries Java identity equality, so §7.5's duplicate rule and [TSON-DATA] §2.6's key identity
-both compare two decoded values that can never be equal: a `set` of `bytes` accepts a repeated value where the
-same set over `text` reports one. Its binary equality is absent, not merely undefined, and the fix is blocked
-on the same question the spec owes — which is why it sits in `BACKLOG.md` waiting on this entry rather than
-being written against a guess.
+**This implementation is now a counter-example rather than a demonstration, which is the stronger evidence.**
+When the entry was opened, `bytes` compared by array identity and the gap showed as a check that never fired: a
+bug, and easy to read as one implementation's oversight rather than as the spec's silence. It is fixed, and
+fixing it meant choosing octet equality with nothing in the series to choose it from — while the temporal
+families took the opposite answer from the same silence, and nobody chose that at all. A contract the series
+declines to state is one each processor writes anyway, differently. Nothing here waits on this entry any
+longer: the comparison is implemented, the corpus vectors it added are the ones that hold under any contract,
+and what a revision would change is which of the six answers above are right, not whether there are any.
 
 ---
 
