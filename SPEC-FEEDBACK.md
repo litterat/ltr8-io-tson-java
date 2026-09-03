@@ -110,7 +110,7 @@ reader implementing from §5.4 alone builds the wrong type.
 
 ---
 
-## 2. Content-hash pinning rides in the URI query (`?sha256=`), where a hash is neither a request parameter nor part of identity — external review suggests a fragment, or a structured `{ url, sha256 }` directive, instead
+## 2. Content-hash pinning rides in the URI query (`?sha256=`), where a hash is neither a request parameter nor part of identity — recommendation: keep the query form, and say why
 
 **Section:** Part 1 §2.2.1 (canonical identity / hash-pinned references), §10.2 (per-identity verification).
 
@@ -140,25 +140,58 @@ pinned and a plain reference name the same identity. Two objections from externa
    currently take a bare URI string, so this is a directive-grammar change, and `!!id` (which today carries its
    own pin on its own line, excluded from the hash) would need an equivalent structured form.
 
+**Recommendation: keep the query form.** Both objections turn on one premise — that a hash is client-side
+verification metadata with no business reaching the origin — and that premise is the wrong way round. Two costs
+neither reviewer names.
+
+1. **The fragment is already spoken for.** It is the natural home for an *intra-document* reference, which is the
+   one thing this series will want next: a reference to a declaration inside a schema is spelled
+   `…/core.tn#uuid`, or JSON Schema-style `…/core.tn#/uuid`, and no other component can carry it. Spending the
+   fragment on the hash forecloses that, or makes the two share one component and invents a grammar for the
+   sharing. The query has no such occupant — §2.2.1 already reserves it entirely for hash parameters and makes
+   any other parameter an error — so the hash is in the component with nothing else to do, and the alternative
+   is the component with something else to do.
+
+2. **"Never meaningfully sent to a server" is backwards: sending it is the point.** A hash in the query reaches
+   the origin, and an origin that stores revisions content-addressably can answer with the exact bytes a pinned
+   reference asks for long after the unpinned URL has moved on. A cache can treat a pinned URL as immutable and
+   keep it forever, because a pinned URL names bytes that cannot change. A fragment is never sent: the server
+   sees the bare locator, serves whatever is current, and the client's only recourse when verification fails is
+   an error — a pin that can detect drift and never repair it. **Objection 2's structured `{ url, sha256 }`
+   fails on the same ground and for the same reason**, the fetch carrying the locator alone; it separates
+   locator from integrity so cleanly that the integrity cannot reach the party able to satisfy it.
+
+The placement is not novel. draft-sporny-hashlink defines a `?hl=` query parameter precisely so a hash can ride
+an existing URL and reach existing infrastructure, and `magnet:` has carried `?xt=urn:sha1:…` for twenty years.
+RFC 3986 §3.4 is also less hostile than objection 1 reads it: a query holds "non-hierarchical data that, along
+with data in the path component, serves to identify a resource", and *these exact bytes* is an identification.
+On that reading the identity-stripping rule stops being a symptom — the pin identifies a byte sequence where
+the rest of the URI identifies a resource, and canonical identity strips it because the two answer different
+questions. That is a consequence to state, not a smell to design away.
+
 **Interpretation chosen:** This implementation follows the spec as written — the query form. `TsonContentHash`
 parses `?sha256=<hex>` off a reference (rejecting any other/unrecognized query parameter or malformed hex),
 `CanonicalIdentity`/`TsonSchemaRegistry` strip the query to key everything by identity, `tson hash <file>`
 stamps `?sha256=` onto the `!!id` line, and the bundled chain (meta.tn pins meta-kernel, core.tn pins meta.tn)
 is pinned end-to-end this way. No change made — flagging the design, not diverging from it.
 
-**Suggested resolution:** Choose among three. (a) Keep the query form — simplest, but semantically stretched
-and dependent on the identity-stripping rule. (b) Move the pin to a fragment (`#sha256=<hex>`) — better matches
-URI semantics, and identity can still ignore it by dropping the fragment; here a small, localized change (parse
-`#` rather than `?` in `TsonContentHash`, and in `tson hash`). (c) Lift integrity out of the URI into a structured
-directive (`{ url, sha256 }`) — the cleanest separation of locator from integrity, at the cost of a
-directive-grammar change plus an `!!id` equivalent; here it touches the directive grammar, `TsonContentHash`,
-canonical identity, `tson hash`, and every bundled `.tn`'s pin lines. If the query form stays, the spec should
-at least justify why a hash lives in the query and name the identity-stripping as its deliberate consequence.
+**Suggested resolution: (a), and say why.** Keep `?sha256=` and add the two sentences §2.2.1 has never carried:
+that the pin rides in the query so it reaches the origin and the cache, which is where a content-addressed
+store can act on it rather than merely be checked against it; and that canonical identity strips it because a
+pin identifies bytes where the rest of the URI identifies a resource. Record (b) and (c) as considered and
+declined on the argument above — (b) spends the component an intra-document reference will need, and both leave
+the origin holding only the bare locator.
 
-**Status against Revision 34:** open, carried deliberately. §2.2.1 is unchanged: the query form stays,
-with the discipline Revision 33 tightened around it — the pin is "verification metadata, not identity", a
-query MUST consist solely of hash parameters, and an unrecognised parameter name is an error rather than
-something silently retained. The placement question itself has never been answered.
+If §2.2.1 is opened for the justification anyway, one addition is worth taking with it: say that a fragment is
+no part of a schema identity and is **reserved**, so a later revision can spell an intra-document reference
+there without a compatibility question.
+
+**Status against Revision 34:** open as a question, closed as a proposal — the placement is right and what is
+missing is only the justification for it. §2.2.1 needs no change: the query form stays, with the discipline
+Revision 33 tightened around it — the pin is "verification metadata, not identity", a query MUST consist solely
+of hash parameters, and an unrecognised parameter name is an error rather than something silently retained.
+Adopting this entry costs the change log two sentences and a reservation, and nothing moves on this side:
+`TsonContentHash`, canonical identity, `tson hash` and every bundled pin are the query form already.
 
 ---
 
