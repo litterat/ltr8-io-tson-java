@@ -647,7 +647,9 @@ class ConformanceSuiteTest {
                 UUID actual = (UUID) atomType.read(token, UUID.class);
                 assertEquals(UUID.fromString(((TokenValue) payload).text()), actual, "vocabulary value");
             }
-            case "base64", "base64url", "base32", "hex" -> {
+            // One name, not four: Part 1 fixes base64, a schemaless document having no schema to
+            // carry a @bytes_encoding directive.
+            case "bytes" -> {
                 byte[] actual = (byte[]) atomType.read(token, byte[].class);
                 assertArrayEquals(HexFormat.of().parseHex(((TokenValue) payload).text()), actual, "vocabulary value");
             }

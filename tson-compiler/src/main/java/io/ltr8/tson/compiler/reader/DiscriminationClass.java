@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.DateTimeType;
@@ -100,7 +100,7 @@ public enum DiscriminationClass {
             case DateTimeType ignored -> Optional.of(STRING);
             case DurationType ignored -> Optional.of(STRING);
             case PeriodType ignored -> Optional.of(STRING);
-            case BinaryType ignored -> Optional.of(STRING);
+            case BytesType ignored -> Optional.of(STRING);
             case EmailType ignored -> Optional.of(STRING);
             case Ipv4Type ignored -> Optional.of(STRING);
             case Ipv6Type ignored -> Optional.of(STRING);

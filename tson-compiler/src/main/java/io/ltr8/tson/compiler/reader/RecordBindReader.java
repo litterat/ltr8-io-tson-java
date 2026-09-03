@@ -102,10 +102,11 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private final AnnotationTypes annotationTypes;
 
     public RecordBindReader(String name, String displayName, RecordBody body, DataClassRecord descriptor,
-                             TsonTypeReaderResolver resolver, SchemaLocation schemaLocation,
+                             TsonTypeReaderResolver resolver, ValueReaderContext context,
+                             SchemaLocation schemaLocation,
                              AnnotationTypes annotationTypes, boolean strict) {
         super(name, displayName, body, tokenAware(name, descriptor.fields(),
-                descriptor.annotationsCarrier().orElse(null), resolver, schemaLocation), schemaLocation);
+                descriptor.annotationsCarrier().orElse(null), resolver, context, schemaLocation), schemaLocation);
         this.descriptor = descriptor;
         this.annotationsCarrier = descriptor.annotationsCarrier().orElse(null);
         this.annotationTypes = annotationTypes;
@@ -257,12 +258,19 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * type that bind different components each get what they want.
      */
     private static FieldReaders tokenAware(String name, DataClassField[] classFields, DataClassField carrier,
-                                            TsonTypeReaderResolver resolver, SchemaLocation location) {
+                                            TsonTypeReaderResolver resolver, ValueReaderContext context,
+                                            SchemaLocation location) {
         return field -> {
             DataClassField target = findTargetField(classFields, carrier, field.name());
-            return target != null && target.type() == io.ltr8.tson.schema.meta.Token.class
-                    ? AtomTypeReader.of(name, RawTokenParser.INSTANCE, location)
-                    : UseSite.reader(field.type(), resolver);
+            if (target != null && target.type() == io.ltr8.tson.schema.meta.Token.class) {
+                return AtomTypeReader.of(name, RawTokenParser.INSTANCE, location);
+            }
+            // A field's own @bytes_encoding needs a reader the type does not share -- see FieldReaders.byType,
+            // which does the same for tree mode.
+            // Bind mode wants the atom itself, so the mode wrapper is the identity here where tree mode
+            // boxes the leaf in a TsonAtom.
+            return BytesEncoding.fieldReader(field, context, (reader, leafName) -> reader)
+                    .orElseGet(() -> UseSite.reader(field.type(), resolver));
         };
     }
 
@@ -466,7 +474,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                             labelled, resolver, location);
                 }
                 return new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
-                        requireRecord(name, dataClass), resolver,
+                        requireRecord(name, dataClass), resolver, context,
                         context.locationOf(name, typeDefinition), AnnotationTypes.of(context), strict);
             }
 
@@ -486,7 +494,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
             if (dataClass instanceof DataClassRecord record) {
                 RecordBindReader ownParser = new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition),
-                        body, record, resolver,
+                        body, record, resolver, context,
                         context.locationOf(name, typeDefinition), AnnotationTypes.of(context), strict);
                 return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver);
             }

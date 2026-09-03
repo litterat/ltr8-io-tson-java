@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 
 import java.util.Base64;
 import java.util.HexFormat;
@@ -13,32 +13,62 @@ import java.util.Optional;
  * into four sibling classes, one per encoding, since each encoding's decode algorithm is genuinely
  * different -- but that's the same shape of branching {@link IntegerParser} already does on {@code
  * size.signed()} and {@link FloatParser} already does on {@code format}, not a reason to fork the
- * class). Holds a {@link BinaryType} -- the pure constraint values, unchanged by this split --
+ * class). Holds a {@link BytesType} -- the pure constraint values, unchanged by this split --
  * rather than declaring those fields itself.
  */
-public record BinaryParser(BinaryType constraints) implements AtomType<byte[]> {
+public record BytesParser(Encoding encoding, BytesType constraints) implements AtomType<byte[]> {
+
+    /**
+     * The RFC 4648 base encodings a text encoding may spell a {@code bytes} value in -- meta.tn's
+     * {@code base_encoding}. It lives here rather than on {@link BytesType} because it is not part of
+     * the type: it is what a *reader* was told, from Part 1's own {@code !hex}/{@code !base64} tags in
+     * a schemaless document, or from the {@code @bytes_encoding} directive under a schema.
+     */
+    public enum Encoding {
+        BASE64("base64"), BASE64URL("base64url"), BASE32("base32"), HEX("hex");
+
+        private final String typeName;
+
+        Encoding(String typeName) {
+            this.typeName = typeName;
+        }
+
+        /** §5.3's built-in annotation name for this encoding, e.g. {@code !base64}. */
+        public String typeName() {
+            return typeName;
+        }
+    }
+
 
     /** {@code base64 => !binary BASE64}, and so on for the other three -- §5.3's four built-in annotations, all unconstrained beyond {@code encoding}. */
-    public static final BinaryParser BASE64 = new BinaryParser(BinaryType.BASE64);
-    public static final BinaryParser BASE64URL = new BinaryParser(BinaryType.BASE64URL);
-    public static final BinaryParser BASE32 = new BinaryParser(BinaryType.BASE32);
-    public static final BinaryParser HEX = new BinaryParser(BinaryType.HEX);
+    public static final BytesParser BASE64 = new BytesParser(Encoding.BASE64, BytesType.UNCONSTRAINED);
+    public static final BytesParser BASE64URL = new BytesParser(Encoding.BASE64URL, BytesType.UNCONSTRAINED);
+    public static final BytesParser BASE32 = new BytesParser(Encoding.BASE32, BytesType.UNCONSTRAINED);
+    public static final BytesParser HEX = new BytesParser(Encoding.HEX, BytesType.UNCONSTRAINED);
 
-    public BinaryParser(BinaryType.Encoding encoding, Optional<Integer> minLength, Optional<Integer> maxLength) {
-        this(new BinaryType(encoding, minLength, maxLength));
+    /** The alphabet an unannotated position takes -- §4, padded, and what every neighbouring format chose. */
+    public static final Encoding DEFAULT = Encoding.BASE64;
+
+    public BytesParser(Encoding encoding, Optional<Integer> minLength, Optional<Integer> maxLength) {
+        this(encoding, new BytesType(Optional.empty(), minLength, maxLength));
     }
 
     private static final HexFormat HEX_FORMAT = HexFormat.of();
 
-    /** §5.5's built-in annotation name for this instance's encoding, e.g. {@code !base64}. */
-    public String typeName() {
-        return constraints.typeName();
-    }
+    /**
+     * Part 1's built-in annotation name -- {@code !bytes}, and only that.
+     *
+     * <p>The four alphabets are not built-in type annotations. A schemaless document has no schema to carry
+     * a {@code @bytes_encoding} directive, so there is nothing for a reader to consult and no way for one
+     * spelling to be more right than another: Part 1 fixes base64 and offers no override. Under a schema
+     * the directive decides, which is where the choice belongs -- and it means {@code !bytes} names one type
+     * in both classes rather than one type in Part 2 and four in Part 1.
+     */
+    public static final String TYPENAME = "bytes";
 
     @Override
     public byte[] read(TokenValue token) {
         String text = token.text();
-        BinaryType.Encoding encoding = constraints.encoding();
         byte[] value = switch (encoding) {
             case BASE64 -> Base64Decoding.decode(text, Base64.getDecoder(), encoding.typeName());
             case BASE64URL -> Base64Decoding.decode(text, Base64.getUrlDecoder(), encoding.typeName());
@@ -65,7 +95,7 @@ public record BinaryParser(BinaryType constraints) implements AtomType<byte[]> {
      */
     @Override
     public String write(byte[] value) {
-        return switch (constraints.encoding()) {
+        return switch (encoding) {
             case BASE64 -> Base64.getEncoder().encodeToString(value);
             case BASE64URL -> Base64.getUrlEncoder().encodeToString(value);
             case BASE32 -> Base32Decoding.encode(value);

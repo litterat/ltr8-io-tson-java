@@ -1,22 +1,13 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=573ee7ff7b8ebc63c9b45404f8c142a7d274cadb89c288c19b6dcf576247253c"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=ab56c2b77b8679f51a4a196ff4ddb66d3b128a3ba3292826dcc43ad2f9721fac"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
-  TSON meta-kernel — self-referencing bootstrap layer (2026 Revision 35 draft).
-
-  The root of the schema ladder, written in the Part 2 schema grammar:
-  a braced schema map of `name => definition` declarations, one entry
-  per type, resolving to the kernel's own `schema` type
-  (`{type_name => type_definition}`).
+  TSON meta-kernel — self-referencing bootstrap layer
+  (2026 Revision 35 draft).
 
   The `!!meta` directive names this file itself — the one deliberate
-  circularity in the series, closed by pre-loading rather than by
-  resolution: implementations ship the kernel's resolved structure,
-  and this document describes it.
-
-  Hash pins here are real digests over the bytes of this copy,
-  computed bottom-up (kernel body, then each dependent's pins and
-  digest) so the chain verifies as shipped. Hash *values* are not
-  normative — only the pin's shape is ([TSON-DATA] §2.2.1).
+  circularity, closed by pre-loading rather than by resolution:
+  implementations ship the kernel's resolved structure, and this
+  document describes it.
   """
 {
   @doc:"""
@@ -36,8 +27,8 @@
   sum       => top & {}
 
   @doc:"""
-    Non-data base kind. The body of an entry that describes something
-    other than a data value — vocabulary a meta-schema introduces
+    The body of an entry that describes something other than a atom,
+    product, or sum type — vocabulary a meta-schema introduces
     beyond the kernel's own, whose instances ride along in a schema
     map without being types. No data value ever has such an entry as
     its type, so `data` composes with `top` directly rather than with
@@ -183,8 +174,9 @@
     inclusive `min` or the exclusive `exclusive_min`; likewise `max`
     or `exclusive_max` — so at most one bound per side holds by
     shape. Bound fields are `integer` — an integer's bounds are
-    integers — unlike the `value`-typed bounds of the meta numeric
-    tiers, whose values share the constrained atom's family. That the
+    integers, and the instance is declared beside the constructor —
+    unlike the `value`-typed bounds of the meta tiers, whose instances
+    are core's. That the
     lower bound not exceed the upper (across whichever forms are
     present) is a schema-load coherence check.
 
@@ -350,7 +342,12 @@
   element_state       => !enum [REQUIRED OPTIONAL]
   type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA]
 
-  @doc:"Annotation type markers. `alias` and `synthetic` are resolver-attached and derived: discarded and recomputed on ingest ([TSON-SCHEMA] §6, §8.1). `synthetic` marks a resolver-materialised synthetic entry at its schema-map key ([TSON-SCHEMA] §8.2)."
+  @doc:"""
+    Annotation type markers. `alias` and `synthetic` are resolver-attached
+    and derived: discarded and recomputed on ingest ([TSON-SCHEMA] §6, §8.1).
+    `synthetic` marks a resolver-materialised synthetic entry at its
+    schema-map key ([TSON-SCHEMA] §8.2).
+    """
   annotation    => @annotation void
   documentation => @annotation text
   doc           => @annotation documentation

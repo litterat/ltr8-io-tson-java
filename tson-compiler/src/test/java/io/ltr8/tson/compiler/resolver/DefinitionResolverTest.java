@@ -27,7 +27,7 @@ import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -979,105 +979,22 @@ class DefinitionResolverTest {
     }
 
     /**
-     * The same construct as above, but deliberately exercising the *other* half of §3.3.1's lookup
-     * rule: a schema governed by meta-kernel (its {@code !!meta} target) that does NOT import it,
-     * so {@code enum} is nowhere in this schema's own type-name namespace at all -- resolution must
-     * fall through to the structure namespace, supplied here as meta-kernel's own real,
-     * independently-resolved entries (Phase B step 2's threading, exercised for real for the first
-     * time by an actual {@code Instance} resolution rather than an inert pass-through).
+     * {@code bytes => !bytes_type {}} -- the whole binary family, now that the alphabet is a directive
+     * rather than a facet. core declares no spelled subtypes: there is nothing for {@code base64} or
+     * {@code hex} to be a *type* of, the same octets being {@code "3q2+7w=="} and {@code "deadbeef"}.
+     * {@code binary_type} is declared in meta.tn rather than meta-kernel.tn, so this needs the merged
+     * namespace.
      */
     @Test
-    void instanceResolvesViaTheStructureNamespaceWhenNotLocallyAvailable() {
-        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
-                { my_bool => !enum [YES NO] }""").parseSchemaDocument().body();
-
-        TypeDefinition myBool = definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
-                schemaMap.declarations().get("my_bool"));
-
-        assertEquals(TypeKind.ATOM, myBool.kind());
-        assertFalse(myBool.constructor());
-        assertEquals(new EnumBody(List.of("YES", "NO")), myBool.body());
-    }
-
-    @Test
-    void instanceResolutionRejectsATargetThatIsNotAConstructor() {
-        // "identifier" resolves fine (kind ATOM) but constructor: false -- !identifier {} must be rejected,
-        // not silently treated as a valid constructor application (§3.3.1's own suggested
-        // diagnostic: "did you mean atom refinement?").
-        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
-                { bad => !identifier {} }""").parseSchemaDocument().body();
-
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                () -> definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
-                        schemaMap.declarations().get("bad")));
-        assertTrue(thrown.getMessage().contains("does not resolve to a constructor"), thrown.getMessage());
-    }
-
-    // ── Atom refinement (§5.5, §5.7, Phase B step 5) ───────────────────────
-
-    @Test
-    void resolvesInt32FromTheRealCoreTypeLibraryFixture() throws IOException {
-        // int32 => !integer ^ { size: { bits: 32  signed: true } } -- the concrete worked case
-        // this whole phase started from. `integer` is core.tn's own local redeclaration (`integer
-        // => !integer_type {}`, an Instance reaching `integer_type` through the structure
-        // namespace, since core.tn has no !!import of its own -- meta-kernel's entries stand in
-        // for core.tn's real structure namespace here, meta.tn's own merged namespace, which
-        // meta-kernel's entries are a subset of for this specific name; confirmed separately that
-        // meta.tn doesn't locally redeclare integer_type). `int32`'s own refinement then resolves
-        // `integer` purely through the type-name namespace (§3.3.1 -- atom refinement never
-        // touches the structure namespace), which is exactly `resolved` here since `integer` was
-        // just added to it.
-        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, resolved::get);
-        SchemaMap schemaMap = schemaMapFromCoreFixture();
-        resolved.put("integer", instanceResolver.resolve(schemaMap.declarations().get("integer")));
-
-        TypeDefinition int32 = instanceResolver.resolve(schemaMap.declarations().get("int32"));
-
-        assertEquals(TypeKind.ATOM, int32.kind());
-        assertFalse(int32.constructor());
-        assertEquals(List.of("integer"), int32.supertypes());
-        assertEquals(Optional.of(TypeRef.of("integer_type")), int32.source());
-        assertEquals(new IntegerType(new IntegerSize(32, true)), int32.body());
-    }
-
-    @Test
-    void resolvesPositiveIntegerFromTheRealCoreTypeLibraryFixture() throws IOException {
-        // positive_integer => !integer ^ { min: 1 } -- a scalar (not nested-record) refinement
-        // value, confirming the binder isn't only exercised by int32's own nested-IntegerSize case.
-        TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
-        DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, resolved::get);
-        SchemaMap schemaMap = schemaMapFromCoreFixture();
-        resolved.put("integer", instanceResolver.resolve(schemaMap.declarations().get("integer")));
-
-        TypeDefinition positiveInteger =
-                instanceResolver.resolve(schemaMap.declarations().get("positive_integer"));
-
-        assertEquals(IntegerType.ofMin(BigInteger.ONE), positiveInteger.body());
-    }
-
-    @Test
-    void resolvesHexFromTheRealCoreTypeLibraryFixtureAsARefinementOfBytes() throws IOException {
-        // hex => !bytes ^ { encoding: HEX } -- an atom refinement of the unrefined instance, not a
-        // positional construction of the constructor. That is what gives the four alphabets an IS-A into
-        // `bytes` (§5.5: construction founds siblings, refinement founds subtypes), so a bytes-typed field
-        // accepts any spelling. `bytes` has to resolve first, being what `hex` refines; `binary_type`
-        // itself is declared in meta.tn rather than meta-kernel.tn, so this needs the merged namespace.
+    void resolvesBytesFromTheRealCoreTypeLibraryFixture() throws IOException {
         SchemaMap schemaMap = schemaMapFromCoreFixture();
         TsonCompiledMetaSchema metaTn1Parser = metaTn1Compiled();
-        Map<String, TypeDefinition> namespace = new LinkedHashMap<>();
-        DefinitionResolver coreResolver = definitionResolverFor(metaTn1Parser, namespace::get);
-        namespace.put("bytes", coreResolver.resolve(schemaMap.declarations().get("bytes")));
 
-        TypeDefinition hex = coreResolver.resolve(schemaMap.declarations().get("hex"));
+        TypeDefinition bytes = definitionResolverFor(metaTn1Parser, EMPTY_NAMESPACE)
+                .resolve(schemaMap.declarations().get("bytes"));
 
-        assertEquals(BinaryType.HEX, hex.body());
-        assertEquals(List.of("bytes"), hex.supertypes());
-        assertEquals(BinaryType.BYTES, namespace.get("bytes").body());
+        assertEquals(BytesType.UNCONSTRAINED, bytes.body());
+        assertEquals(List.of(), bytes.supertypes());
     }
 
     @Test

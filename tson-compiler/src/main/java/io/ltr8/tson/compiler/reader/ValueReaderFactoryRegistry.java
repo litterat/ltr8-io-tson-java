@@ -125,7 +125,7 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("choice", choice);
 
         // meta.tn
-        factories.put("binary_type", leaf.apply(AtomTypeReader.BINARY));
+        factories.put("bytes_type", leaf.apply(AtomTypeReader.BYTES_TYPE));
         factories.put("float_type", leaf.apply(AtomTypeReader.FLOAT_TYPE));
         factories.put("decimal_type", leaf.apply(AtomTypeReader.DECIMAL_TYPE));
         factories.put("rational_type", leaf.apply(AtomTypeReader.RATIONAL_TYPE));

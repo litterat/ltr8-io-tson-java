@@ -268,41 +268,13 @@
     body: !uri_type {}
   }
 
-  @doc:"An octet string, spelled however the value says. The four alphabets below refine it."
+  @doc:"Octet sequence, and the only binary type. The alphabet a text encoding spells it in is @bytes_encoding's, not the type's."
   bytes => !type_definition {
     kind: ATOM
-    source: binary_type
-    subtypes: [base32 base64 base64url hex]
-    body: !binary_type { encoding: BASE64 }
+    source: bytes_type
+    body: !bytes_type {}
   }
 
-  base64 => !type_definition {
-    kind: ATOM
-    source: binary_type
-    supertypes: [bytes]
-    body: !binary_type { encoding: BASE64 }
-  }
-
-  base64url => !type_definition {
-    kind: ATOM
-    source: binary_type
-    supertypes: [bytes]
-    body: !binary_type { encoding: BASE64URL }
-  }
-
-  base32 => !type_definition {
-    kind: ATOM
-    source: binary_type
-    supertypes: [bytes]
-    body: !binary_type { encoding: BASE32 }
-  }
-
-  hex => !type_definition {
-    kind: ATOM
-    source: binary_type
-    supertypes: [bytes]
-    body: !binary_type { encoding: HEX }
-  }
 
 
   @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."

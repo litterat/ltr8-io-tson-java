@@ -369,7 +369,7 @@ alias, the second or a bound `Map` field silently loses its rebinding.
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
 §4's three scalar classes — `boolean`, `number` (every numeric family: an `integer` and a `decimal`
 are one class, so never disjoint), `string` (every text-form family: `text`, enums by their members' shared
-class — so `[true false]` is boolean-class — `uuid`, `date`, `binary`, …) — plus `brace` (records **and**
+class — so `[true false]` is boolean-class — `uuid`, `date`, `bytes`, …) — plus `brace` (records **and**
 maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a
 discrimination the wire can't deliver) and `bracket` (arrays and tuples). A variant classifies through its
 §8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —

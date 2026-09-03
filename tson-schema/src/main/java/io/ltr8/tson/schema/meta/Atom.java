@@ -11,7 +11,7 @@ import java.util.List;
  * here.
  */
 public sealed interface Atom extends Top permits Unit, EnumBody, IntegerType, TextType, UriType, RegexType,
-        DecimalType, FloatType, RationalType, UuidType, BinaryType, DateType, TimeType, DateTimeType, DurationType,
+        DecimalType, FloatType, RationalType, UuidType, BytesType, DateType, TimeType, DateTimeType, DurationType,
         PeriodType,
         Cidr4Type, Cidr6Type, EmailType, MacType, Ipv4Type, Ipv6Type, ComplexType {
 

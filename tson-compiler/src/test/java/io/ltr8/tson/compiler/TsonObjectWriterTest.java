@@ -145,12 +145,12 @@ class TsonObjectWriterTest {
     }
 
     @Test
-    void writeBinaryEmitsBase64TypeRefRegardlessOfOriginalEncoding() throws DataBindException {
-        // No way to recover which of base64/base64url/base32/hex a byte[] came from -- base64 is
-        // the writer's arbitrary but reasonable default (see AtomWriter's own Javadoc).
-        BytesHolder original = reader.read("{ value: !hex deadbeef }", BytesHolder.class);
+    void writeBytesEmitsTheOnlyBuiltinTagAndRoundTrips() throws DataBindException {
+        // Nothing to choose: !bytes is the only built-in name and it is base64. The four alphabets are a
+        // schema's to select with @bytes_encoding, and a schemaless document has no schema to carry one.
+        BytesHolder original = reader.read("{ value: !bytes \"3q2+7w==\" }", BytesHolder.class);
         String tson = writer.toTson(original);
-        assertEquals("{ value: !base64 \"3q2+7w==\" }", tson);
+        assertEquals("{ value: !bytes \"3q2+7w==\" }", tson);
         assertArrayEquals(original.value(), reader.read(tson, BytesHolder.class).value());
     }
 

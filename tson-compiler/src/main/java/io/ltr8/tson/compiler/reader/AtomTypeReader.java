@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
-import io.ltr8.tson.compiler.atom.BinaryParser;
+import io.ltr8.tson.compiler.atom.BytesParser;
 import io.ltr8.tson.compiler.atom.Cidr4Parser;
 import io.ltr8.tson.compiler.atom.Cidr6Parser;
 import io.ltr8.tson.compiler.atom.ComplexParser;
@@ -33,7 +33,7 @@ import io.ltr8.tson.compiler.atom.UuidParser;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.DateTimeType;
@@ -85,8 +85,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition));
     static final ValueReaderFactory UUID_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new UuidParser((UuidType) definition.body()), context.locationOf(name, definition));
-    static final ValueReaderFactory BINARY = (name, definition, context) ->
-            new AtomTypeReader<>(name, new BinaryParser((BinaryType) definition.body()),
+    // The alphabet is not in the body: it is @bytes_encoding's, resolved from this definition and its
+    // supertypes, defaulting to base64. A field carrying its own directive overrides it where the record
+    // reader wires its children.
+    static final ValueReaderFactory BYTES_TYPE = (name, definition, context) ->
+            new AtomTypeReader<>(name,
+                    new BytesParser(BytesEncoding.of(name, definition, context), (BytesType) definition.body()),
                     context.locationOf(name, definition));
     static final ValueReaderFactory DATE_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new DateParser((DateType) definition.body()), context.locationOf(name, definition));

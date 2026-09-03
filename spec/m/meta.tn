@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/35/m/meta.tn?sha256=8b04727c8f752f03726ed39fe6932a0f2b631dbe4f5740b6c0901df263a61d85"
-!!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=573ee7ff7b8ebc63c9b45404f8c142a7d274cadb89c288c19b6dcf576247253c"
-!!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=573ee7ff7b8ebc63c9b45404f8c142a7d274cadb89c288c19b6dcf576247253c"
+!!id:"https://tson.io/2026/35/m/meta.tn?sha256=60d7749c94cafcb3e483d3a00364704fce61a3025dc196b2cee2933a696aa599"
+!!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=ab56c2b77b8679f51a4a196ff4ddb66d3b128a3ba3292826dcc43ad2f9721fac"
+!!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=ab56c2b77b8679f51a4a196ff4ddb66d3b128a3ba3292826dcc43ad2f9721fac"
 @doc:"""
   TSON meta-schema — 2026 Revision 35 draft.
 
@@ -22,14 +22,13 @@
   Three families of constructors live here:
 
   1. Structural constructors: `binary_type` (with the
-     `binary_encoding` enum), whose instance in core is `binary` and
-     whose spelled refinements are `base64`, `base64url`, `base32`
-     and `hex`; and `scoped` (with the `scope_kind` enum), whose
-     instances in core are `declared`, `extern` and `dynamic` and
-     whose applications are `extern_of` and `extern_type`. Fixed-size
-     arrays need no constructor of their own — `[T; N]` is the
-     spelling, and an intent that deserves a name earns a user
-     template.
+     `binary_encoding` enum), whose instance in core is `bytes`, its
+     text spelling directed by `@bytes_encoding`; and `scoped` (with
+     the `scope_kind` enum), whose instances in core are `declared`,
+     `extern` and `dynamic` and whose applications are `extern_of`
+     and `extern_type`. Fixed-size arrays need no constructor of their
+     own — `[T; N]` is the spelling, and an intent that deserves a
+     name earns a user template.
 
   2. The `set` template — the `set<T>` spelling of the kernel's
      `set_type` constructor, declared here for meta's own fields and
@@ -46,20 +45,38 @@
      `cidr6_type`, `mac_type`), and text (`email_type`).
 
   Plus annotation types — the classifying markers `ordered`,
-  `bounded`, `exact`, `numeric`; the checked assertions `disjoint`,
-  `discriminator`, `rest`; and the documentary `deprecated`, `since`,
-  `todo`, `lang`, `title`, `examples`, `read_only`, `write_only`.
-  Annotation types must reside in the governing target's namespace
-  (per Part 2 §6); placing them in meta makes them reachable from
-  core and from every schema that meta governs.
+  `bounded`, `exact`, `numeric`; the checked assertion `disjoint`;
+  the representation directives `bytes_encoding`, `rest`,
+  `discriminator`; and the documentary `deprecated`, `since`, `todo`,
+  `lang`, `title`, `examples`, `read_only`, `write_only`. Annotation
+  types must reside in the governing target's namespace (per Part 2
+  §6); placing them in meta makes them reachable from core and from
+  every schema that meta governs.
+
+  An annotation never changes a value, its type, or whether it is
+  valid: validation is over values, and a schema with every
+  annotation erased admits exactly the same values. An annotation
+  may add a load-time check, and it may direct how a class of
+  encodings represents a value. No encoding is privileged — TSON
+  text is one member of the text class, beside JSON — so a directive
+  binds every encoding in its class, and a document in a directed
+  encoding may not be readable without it. That is a directive's
+  force, and it is the only force an annotation has over data. The
+  same stance governs the type docs: a value space is described
+  without reference to any encoding, and where a doc mentions how
+  TSON text spells a value it says so by name.
 
   Constructors that bind to a governing specification compose with
   the kernel's atom_specification mixin and pin the spec field with
-  `=`. Their instances in core are uniformly empty.
+  `=`. Their instances in core are empty, `float_type` aside, whose
+  instances select a `format`.
 
-  Constraint fields whose values are of the constrained atom's family
-  use the kernel's `value` escape hatch where the constrained atom is
-  not defined in meta-kernel or meta. A field that counts something —
+  Constraint fields whose values are of an atom meta declares the
+  constructor of but not the instance — a bound of the constrained
+  atom's own family, or a network list of the `cidr4`/`cidr6` family
+  on the address types — use the kernel's `value` escape hatch; the
+  resolver reads each such token under the atom it stands for once
+  that atom is in scope. A field that counts something —
   a length, a digit count, a prefix length, a precision — is typed by
   the kernel's `non_negative_integer`, and one that may be negative
   by `integer`; both arrive through this schema's kernel import.
@@ -100,42 +117,45 @@
   set => <T> !set_type { element_type: T }
 
   @doc:"""
-    Alphabets of the text spelling of a binary value, per RFC 4648
-    (HEX is §8's base16). A spelling is not a kind of value: the same
+    The base encodings of RFC 4648 — its own term for the family —
+    that a text encoding may spell a `bytes` value in (HEX is §8's
+    base16). A spelling is not a kind of value: the same
     octets are `"3q2+7w=="`, `"deadbeef"` and `"3WV37Q======"`, and
     "abcd" is well-formed hex and well-formed base64 decoding to
     different octets, which is why a text reader must be told which
     alphabet is in force.
     """
-  binary_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
+  base_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
 
   @doc:"""
-    Octet-sequence constraint vocabulary. Instance is `binary` in
+    Directs the text class of encodings — TSON text, JSON, and any
+    encoding whose values are character sequences — to read and write
+    a `bytes` value in the named RFC 4648 alphabet; an encoding whose
+    values are octets ignores it. Resolved nearest-first: the field,
+    then the field's type's definition walking its supertypes, then
+    BASE64 (§4, padded — the choice of JSON Schema's contentEncoding,
+    Protobuf's JSON mapping and CBOR's), so an unannotated `bytes`
+    position is base64 in every text encoding. Core declares no
+    spelled subtypes: a schema designer annotates the field or the
+    type, or takes the default. Checked at schema load on `@rest`'s
+    terms: the annotated field or definition resolves to `bytes`, or
+    the schema fails to load.
+    """
+  bytes_encoding => @annotation base_encoding
+
+  @doc:"""
+    Octet-sequence constraint vocabulary. Instance is `bytes` in
     core. The value is the octets: equality, identity, content
     addressing and the length facets are all over octets, never over
     a spelling — `length: 32` is a 32-byte digest whether it arrives
     as 64 hex characters, 44 base64 characters, or 32 raw bytes — so a
-    round trip through a non-text encoding preserves the value and
-    re-spells it from the schema.
-
-    `spelling` is the text encoding's concern and nobody else's: it
-    names the RFC 4648 alphabet an untagged token at this position is
-    read with and written in, and defaults to BASE64 (§4, padded — the
-    choice of JSON Schema's contentEncoding, Protobuf's JSON mapping
-    and CBOR's), so `binary` alone is the type an author writes. An
-    encoding whose values are octets carries no spelling and ignores
-    the facet. It is a selector on `complex_type.component`'s
-    pattern: a refinement may set it where the source left the
-    default and thereafter only restate it (`!hex ^ { spelling: BASE64 }`
-    is an error), which is what makes core's `hex`, `base64`,
-    `base64url` and `base32` distinct entities and therefore usable
-    as tags — a value written `!hex "deadbeef"` is admitted at any
-    `binary` position, each being a subtype, and the tag selects the
-    alphabet for that one token. No spec pin: RFC 4648 governs the
-    spellings, not the octets.
+    round trip through any encoding preserves the value. The type
+    says nothing about how a text encoding spells the octets, as
+    `text` says nothing about UTF-8: that is the `@bytes_encoding`
+    directive's job, and its default is base64. No spec pin: RFC 4648
+    governs spellings, not octets.
     """
-  binary_type => ~atom & {
-    encoding:    binary_encoding ~ BASE64
+  bytes_type => ~atom & {
     length:      non_negative_integer?
     min_length:  non_negative_integer?
     max_length:  non_negative_integer?
@@ -144,8 +164,9 @@
   @doc:"""
     Which namespace a value's type may be drawn from. LOCAL is the
     governing namespace — the schema's own declarations and its imports
-    ([TSON-SCHEMA] §2.2.3); EXTERN is a foreign schema, named by a
-    nested !!schema on the value itself ([TSON-DATA] §2.3).
+    ([TSON-SCHEMA] §2.2.3); EXTERN is a foreign schema, whose identity
+    the value carries with it (in TSON text, a nested !!schema on the
+    value; [TSON-DATA] §2.3).
     """
   scope_kind => !enum [LOCAL EXTERN]
 
@@ -219,9 +240,11 @@
     `multiple_of` here — a step constraint cannot hold on a binary grid
     (e.g. 0.05 is not a binary32 value, so nothing is exactly a multiple
     of it); use the exact tier (`decimal_type`) when a step is required.
-    A value that does not land on the grid is rounded to nearest, ties
-    to even (IEEE 754-2019 roundTiesToEven), the default across the
-    format; loss of precision is expected, not an error.
+    A text-class token that does not land on the grid is rounded to
+    nearest, ties to even (IEEE 754-2019 roundTiesToEven), the default
+    across the format; loss of precision is expected, not an error. An
+    encoding that carries the format's bits delivers a grid value
+    directly and rounds nothing.
     """
   float_type => ~atom & atom_specification & {
     spec:                 = "https://ieeexplore.ieee.org/document/8766229"
@@ -239,8 +262,11 @@
     11404 `scaled`, radix 10). Instance in core is `number` — the
     unrestricted exact number, which is also the JSON Schema `number`
     mapping (arbitrary magnitude and precision, finite, no special
-    values). An exact value is preserved as written within its declared
-    precision, so equality is safe and ordering is TOTAL.
+    values). An exact value is exact: nothing is rounded on the way in,
+    so equality is safe and ordering is TOTAL. Scale is not part of
+    the value — `1`, `1.0` and `1.00` are one value (unlike Java's
+    `BigDecimal.equals`), and whether a spelling's trailing zeros
+    survive a round trip is an encoding's promise, not the type's.
     `total_digits`/`fraction_digits` are the ISO `scaled` precision and
     scale (SQL `DECIMAL(precision, scale)`): total significant digits
     and digits after the point.
@@ -258,9 +284,9 @@
     does for integers. Its elements are `value`-typed, so the set's
     own identity test cannot see them as numbers: the resolver reads
     each member under the constrained atom before the set is formed,
-    so `1`, `1.0` and `1.00` are one member and a duplicate rather
-    than three, and a member that does not parse as a decimal fails
-    at schema load. The header's uniform `members` rule applies —
+    so `1` and `1.0` are one member and a duplicate rather than two,
+    and a member that does not parse as a decimal fails at schema
+    load. The header's uniform `members` rule applies —
     every member inside the bounds and on the step, refinements only
     shrink the set.
     """
@@ -305,7 +331,7 @@
     `component` selects the type of both parts from the closed
     `complex_component` vocabulary; it defaults to `NUMBER`
     (REQUIRED_DEFAULT, §5.2), so a bare complex has exact components —
-    the same defaulted-selector pattern as `binary_type.spelling`.
+    a defaulted selector.
     The enum both enforces that a component is numeric (unlike a free
     `type_name`, which any token would satisfy) and keeps meta free of
     any reference to core's type names. Complex has no useful total
@@ -328,12 +354,16 @@
 
   @doc:"""
     Time constraint vocabulary. Instance is `time` in core. `precision`
-    bounds the fractional-second digits: `precision: N` admits a token
-    whose fractional part has at most N digits, judged on the written
-    token, as a validation constraint — the atom is exact, so nothing
-    is truncated — and `precision: 0` admits no fractional part
-    ([TSON-SCHEMA] §5.5). No timezone facet: RFC 3339 `full-time`
-    already makes the offset mandatory.
+    is a constraint on the value, not on a spelling: `precision: N`
+    admits a value that is a whole number of 10^-N seconds, so
+    `precision: 3` is millisecond resolution and `precision: 0` whole
+    seconds, and an encoding that counts nanoseconds checks it as
+    readily as one that counts digits. The atom is exact — nothing is
+    truncated; a value off the grid is rejected ([TSON-SCHEMA] §5.5).
+    A text encoding may spell an admitted value with trailing zeros
+    (`12:00:00.500` under `precision: 1`) and writes at most N digits.
+    No timezone facet: RFC 3339 `full-time` already makes the offset
+    mandatory.
     """
   time_type => ~atom & atom_specification & {
     spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
@@ -344,8 +374,8 @@
 
   @doc:"""
     Datetime constraint vocabulary. Instance is `datetime` in core.
-    `precision` as for `time_type`: at most N fractional-second digits
-    on the written token, a validation constraint ([TSON-SCHEMA] §5.5).
+    `precision` as for `time_type`: the value is a whole number of
+    10^-N seconds, a constraint on the value ([TSON-SCHEMA] §5.5).
     No timezone facet: RFC 3339 `date-time` already makes the offset
     mandatory.
     """
@@ -370,11 +400,11 @@
     7 days. The value is a signed rational number of seconds, so `PT90M`,
     `PT1H30M` and `P0DT5400S` are equal, `PT0S`, `P0D` and `-PT0S` are
     equal, and ordering is TOTAL. Bounds compare the value, not the
-    token. `precision` bounds fractional-second digits as for
-    `time_type`: at most N digits on the written token, `precision: 0`
-    admits no fraction. `multiple_of` is a duration under the header's
-    uniform rule: `PT15M` admits only quarter-hour values, and `-PT30M`
-    is a multiple of `PT15M`.
+    token. `precision` as for `time_type`: the value is a whole number
+    of 10^-N seconds, so `precision: 0` admits whole seconds only.
+    `multiple_of` is a duration under the header's uniform rule:
+    `PT15M` admits only quarter-hour values, and `-PT30M` is a multiple
+    of `PT15M`.
     """
   duration_type => ~atom & atom_specification & {
     spec:        = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
@@ -490,7 +520,11 @@
   @doc:"Boundedness annotation."
   bounded => @annotation boolean
 
-  @doc:"Exactness classification (ISO/IEC 11404 characterizing property): true for exact types (values preserved as written), false for approximate types (values rounded to a representation grid)."
+  @doc:"""
+    Exactness classification (ISO/IEC 11404 characterizing property):
+    true for exact types (values preserved as written), false for
+    approximate types (values rounded to a representation grid).
+    """
   exact => @annotation boolean
 
   @doc:"Numeric type marker annotation."
@@ -544,11 +578,13 @@
 
   @doc:"""
     Names the field a member-dispatching encoding selects a choice's
-    variant on. A checked annotation: it carries no decode force in the
-    model or in the reference encoding — a discriminated choice admits
-    exactly the variants it admitted, and text keeps its !variant tag at
-    every non-disjoint choice — and it carries load-time force, on
-    `@disjoint`'s verified-or-error precedent ([TSON-SCHEMA] §5.4).
+    variant on. A representation directive: force in the class of
+    encodings that dispatch a choice on a member, none in the model —
+    a discriminated choice admits exactly the variants it admitted,
+    and an encoding that tags variants (TSON text, with `!variant` at
+    every non-disjoint choice) keeps its tags. It also carries
+    load-time force, on `@disjoint`'s verified-or-error precedent
+    ([TSON-SCHEMA] §5.4).
 
     Checked at schema load, two outcomes and no third: every variant is
     a record declaring the named field; that field is REQUIRED_FIXED in
@@ -562,11 +598,11 @@
   @doc:"""
     Designates the field an encoding that flattens is meant to flatten
     — the map-typed field a record's undeclared entries live in, a
-    record being closed under its type ([TSON-SCHEMA] §7.2). A checked
-    annotation on the same terms as `@discriminator`: no decode force,
-    load-time force. Checked at schema load: the field's type resolves
-    to a text-keyed map, and at most one field per composed chain
-    carries the mark.
+    record being closed under its type ([TSON-SCHEMA] §7.2). A
+    representation directive on `@discriminator`'s terms: force in the
+    class of encodings that flatten, none in the model. Checked at
+    schema load: the field's type resolves to a text-keyed map, and at
+    most one field per composed chain carries the mark.
     """
   rest => @annotation void
 }

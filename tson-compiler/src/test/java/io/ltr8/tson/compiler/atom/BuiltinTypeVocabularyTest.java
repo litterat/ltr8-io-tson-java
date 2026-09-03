@@ -47,7 +47,7 @@ class BuiltinTypeVocabularyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"base64", "base64url", "base32", "hex"})
+    @ValueSource(strings = {"bytes"})
     void binaryAtomsAreRegistered(String name) {
         assertTrue(BuiltinTypeVocabulary.lookup(name).isPresent());
     }

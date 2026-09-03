@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.ComplexType;
@@ -78,7 +78,8 @@ public final class AtomParsers {
             case FloatType t -> new FloatParser(t);
             case RationalType t -> new RationalParser(t);
             case UuidType t -> new UuidParser(t);
-            case BinaryType t -> new BinaryParser(t);
+            // No @bytes_encoding here: this path has a body and no position, so it takes the default.
+            case BytesType t -> new BytesParser(BytesParser.DEFAULT, t);
             case DateType t -> new DateParser(t);
             case TimeType t -> new TimeParser(t);
             case DateTimeType t -> new DateTimeParser(t);

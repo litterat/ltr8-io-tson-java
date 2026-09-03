@@ -1089,36 +1089,21 @@ class TsonObjectReaderTest {
         // constructor does (see TsonAtomContext.defaultContext()). This documents *why* that
         // pre-registration exists.
         TsonObjectReader bareMapper = new TsonObjectReader(DataBindContext.builder().build());
-        assertThrows(TsonReadException.class, () -> bareMapper.read("{ value: !base64 TWFu }", BytesHolder.class));
+        assertThrows(TsonReadException.class, () -> bareMapper.read("{ value: !bytes TWFu }", BytesHolder.class));
     }
 
     @Test
-    void builtinBase64AnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.read("{ value: !base64 TWFu }", BytesHolder.class);
+    void builtinBytesAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        BytesHolder h = mapper.read("{ value: !bytes TWFu }", BytesHolder.class);
         assertArrayEquals("Man".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
     }
 
-    @Test
-    void builtinBase64UrlAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.read("{ value: !base64url TWFu }", BytesHolder.class);
-        assertArrayEquals("Man".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
-    }
+
+
 
     @Test
-    void builtinHexAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.read("{ value: !hex deadbeef }", BytesHolder.class);
-        assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF}, h.value());
-    }
-
-    @Test
-    void builtinBase32AnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.read("{ value: !base32 MZXW6YTB }", BytesHolder.class);
-        assertArrayEquals("fooba".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
-    }
-
-    @Test
-    void builtinBase64AnnotationRejectsMissingPaddingThroughTheMapper() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !base64 TWE }", BytesHolder.class));
+    void builtinBytesAnnotationRejectsMissingPaddingThroughTheMapper() throws DataBindException {
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !bytes TWE }", BytesHolder.class));
     }
 
     // ── Rational/Complex: binding to a richer third-party type via DataBridge ──────────────

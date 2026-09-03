@@ -17,20 +17,26 @@
   `subtypes` list here is empty and omitted.
   """
 !schema {
-  @doc:"Binary encoding formats per RFC 4648."
-  binary_encoding => !type_definition {
+  @doc:"The RFC 4648 base encodings a text encoding may spell a bytes value in. A spelling is not a kind of value."
+  base_encoding => !type_definition {
     kind: ATOM
     source: enum
     body: !enum { members: [BASE64 BASE64URL BASE32 HEX] }
   }
 
-  @doc:"Octet-string constructor. No spec: RFC 4648 defines the alphabets, not the value space, so an unrefined bytes has none to name."
-  binary_type => !type_definition {
+  @doc:"Directs a text encoding to spell a bytes value in the named alphabet. Nearest-first; default base64."
+  bytes_encoding => @annotation !type_definition {
+    kind: REFERENCE
+    source: base_encoding
+    body: !reference { target: base_encoding }
+  }
+
+  @doc:"Octet-sequence constraint vocabulary. Instance is bytes in core. The value is the octets; the alphabet is a directive, not a facet."
+  bytes_type => !type_definition {
     kind: ATOM
     constructor: true
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
-      !record_field { name: encoding    type: binary_encoding  state: REQUIRED_DEFAULT  value: BASE64 }
       !record_field { name: length      type: non_negative_integer  state: OPTIONAL }
       !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
       !record_field { name: max_length  type: non_negative_integer  state: OPTIONAL }

@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * *reach* a compiled governing schema works.
  *
  * <p>Reading an entry that isn't itself a {@code ~}-marked constructor (e.g. {@code
- * binary_encoding}, {@code product_access_type}, {@code top} -- ordinary declarations, not vocabulary
+ * base_encoding}, {@code product_access_type}, {@code top} -- ordinary declarations, not vocabulary
  * this codebase's own factories build against) goes through {@link
  * TsonCompiledMetaSchema#compiledSchema()}'s own unscoped {@code get}, not {@link
  * TsonCompiledMetaSchema#reader}, which is deliberately scoped to constructor-declared entries only
@@ -56,7 +56,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
      * Now that {@code bindAtomInstance} needs a real, object-binding-mode compiled reader for the
      * schema it's resolving against (see {@code SchemaResolver}'s own field), meta.tn itself can no
      * longer be loaded via a bare DOM-mode registry -- its own Instance declarations (e.g. {@code
-     * binary_encoding => !enum [...]}) go through {@code resolveInstance}/{@code bindAtomInstance}
+     * base_encoding => !enum [...]}) go through {@code resolveInstance}/{@code bindAtomInstance}
      * just like any other schema's. Resolve meta-kernel ordinarily first (object mode's own {@link
      * ValueReaderFactoryRegistry#bind} needs no materialized schema up front the way the old
      * eager-validation design did -- see {@code TsonObjectBinder}'s own retirement note), then
@@ -121,7 +121,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
 
-        assertTrue(compiledMeta.schema().entries().containsKey("binary_encoding"));
+        assertTrue(compiledMeta.schema().entries().containsKey("base_encoding"));
     }
 
     @Test
@@ -130,7 +130,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
-        Object result = compiledMeta.compiledSchema().get("binary_encoding")
+        Object result = compiledMeta.compiledSchema().get("base_encoding")
                 .read(TestDocuments.document("BASE64"));
 
         assertEquals("BASE64", result);
@@ -444,7 +444,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_ID);
 
-        assertEquals("BASE64", compiled.compiledSchema().get("binary_encoding")
+        assertEquals("BASE64", compiled.compiledSchema().get("base_encoding")
                 .read(TestDocuments.document("BASE64")));
         // Still there, from the explicit pre-registration step above -- meta.tn's own resolution
         // didn't need to (and doesn't) re-register it.

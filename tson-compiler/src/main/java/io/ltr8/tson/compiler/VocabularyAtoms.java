@@ -59,10 +59,8 @@ final class VocabularyAtoms {
         atoms.put(LocalDate.class, new Entry(DateParser.TYPENAME, DateParser.UNCONSTRAINED));
         atoms.put(OffsetTime.class, new Entry(TimeParser.TYPENAME, TimeParser.UNCONSTRAINED));
         atoms.put(OffsetDateTime.class, new Entry(DateTimeParser.TYPENAME, DateTimeParser.UNCONSTRAINED));
-        // base64 is an arbitrary but reasonable default -- which of base64/base64url/base32/hex a byte[]
-        // was decoded from doesn't survive decoding (see TsonObjectWriter#toTson). A tree node that kept
-        // its own type-ref overrides this default (see TsonTreeWriter).
-        atoms.put(byte[].class, new Entry(BinaryParser.BASE64.typeName(), BinaryParser.BASE64));
+        // Not a default among four any more: !bytes is the only built-in name, and it is base64.
+        atoms.put(byte[].class, new Entry(BytesParser.TYPENAME, BytesParser.BASE64));
         atoms.put(Rational.class, new Entry(RationalParser.TYPENAME, RationalParser.UNCONSTRAINED));
         atoms.put(Complex.class, new Entry(ComplexParser.TYPENAME, ComplexParser.UNCONSTRAINED));
         atoms.put(java.time.Duration.class, new Entry(DurationParser.TYPENAME, DurationParser.UNCONSTRAINED));

@@ -8,7 +8,7 @@ import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.atom.Rational;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
@@ -42,7 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * constructing a {@code TokenValue} directly). Dispatch to the right {@link AtomTypeReader}
  * constant happens automatically, keyed by each body's own {@code @Typename} (see {@link
  * ValueReaderFactoryRegistry}'s own registration table) -- so a real wiring mistake (e.g.
- * registering under the wrong constructor name, as {@link BinaryType}'s own {@code "binary"}-not-
+ * registering under the wrong constructor name, as {@link BytesType}'s own {@code "binary"}-not-
  * {@code "binary_type"} naming invites) would only show up here, not in the underlying {@code atom}
  * reader's own tests.
  */
@@ -99,7 +99,7 @@ class AtomValueReaderTest {
     void binary() {
         byte[] expected = "Man".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         assertEquals(java.util.Arrays.toString(expected),
-                java.util.Arrays.toString((byte[]) readValue(BinaryType.BASE64, "{ value: TWFu }")));
+                java.util.Arrays.toString((byte[]) readValue(BytesType.UNCONSTRAINED, "{ value: TWFu }")));
     }
 
     @Test

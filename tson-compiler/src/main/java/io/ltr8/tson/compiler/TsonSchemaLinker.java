@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.lexer.ConfusableNames;
 import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -1075,7 +1075,7 @@ public final class TsonSchemaLinker {
             }
             case UuidType ignored -> {
             }
-            case BinaryType ignored -> {
+            case BytesType ignored -> {
             }
             case DateType ignored -> {
             }

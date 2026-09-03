@@ -24,8 +24,8 @@ import java.util.Optional;
  * {@code float64}), {@code rational_type} ({@code rational}), and {@code complex_type} ({@code
  * complex}) -- all fully published in §5.6's table as-is, unlike the integer family. And with {@code
  * uuid_type} ({@code uuid}, §5.5) and {@code text_type} ({@code text}, §5's unconstrained text atom).
- * And with the full {@code binary} family (§5.3) -- {@code base64}, {@code
- * base64url}, {@code base32}, {@code hex} -- four instances of one {@link BinaryParser} constructor,
+ * And with {@code bytes} (§5.5), one name over one value space -- a schemaless document has no schema to
+ * carry a {@code @bytes_encoding} directive, so Part 1 fixes base64 rather than offering four names,
  * each a distinct {@code binary_encoding} value, not one generic {@code !binary} annotation,
  * matching §5.3's own "there is no generic {@code !binary} annotation." And with the temporal
  * family (§5.4) -- {@code date_type} ({@code date}), {@code time_type} ({@code time}), {@code
@@ -77,10 +77,7 @@ public final class BuiltinTypeVocabulary {
         types.put(TextParser.TYPENAME, TextParser.UNCONSTRAINED);
         types.put(UuidParser.TYPENAME, UuidParser.UNCONSTRAINED);
 
-        types.put(BinaryParser.BASE64.typeName(), BinaryParser.BASE64);
-        types.put(BinaryParser.BASE64URL.typeName(), BinaryParser.BASE64URL);
-        types.put(BinaryParser.BASE32.typeName(), BinaryParser.BASE32);
-        types.put(BinaryParser.HEX.typeName(), BinaryParser.HEX);
+        types.put(BytesParser.TYPENAME, BytesParser.BASE64);
 
         types.put(DateParser.TYPENAME, DateParser.UNCONSTRAINED);
         types.put(TimeParser.TYPENAME, TimeParser.UNCONSTRAINED);
