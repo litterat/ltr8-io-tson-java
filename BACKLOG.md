@@ -104,18 +104,9 @@ the same here.
   `@doc` promises that the annotated field or definition resolves to `bytes`, or the schema fails to load, and
   nothing enforces that. A directive on an `int32` field is silently inert, which is the worst of the three
   outcomes: it looks applied and does nothing.
-- [ ] **`@rest` is not checked, and one half of it cannot be written yet.** The type check is ordinary — the
-  annotated field's type resolves to a text-keyed map. "At most one per composed chain" is blocked on the
-  entry below: a restatement severs the chain silently, so there is no chain to count along.
-- [ ] **A restated field loses its inherited annotations** (`SPEC-FEEDBACK.md` #25(c)). `DefinitionResolver`
-  copies an inherited field whole (`absorb`) but rebuilds a *restated* one with `Annotations.empty()` and then
-  gives it only what the restatement wrote (`resolveFieldEntry`/`resolveField`). So §5.7's modifier-only entry
-  — `extra: ?`, defined to tighten presence and nothing else — silently un-marks the field it names, and the
-  same hole loses a `@deprecated` or a `@doc` on any field a subtype tightens. The defensible rule, and the
-  entry's own recommendation, is that a restatement's annotations **merge over** the inherited ones: an entry
-  writing none should not be able to erase what it does not mention. It changes resolved output for any schema
-  restating an annotated field, so it wants deciding rather than assuming — and §5.8/§8.1 owe the rule whichever
-  way it goes.
+- [ ] **`@rest` is not checked.** Two checks, both ordinary now: the annotated field's type resolves to a
+  text-keyed map, and at most one field per composed chain carries the mark — the chain being countable since a
+  restatement merges annotations rather than dropping them.
 
 ## Write side
 

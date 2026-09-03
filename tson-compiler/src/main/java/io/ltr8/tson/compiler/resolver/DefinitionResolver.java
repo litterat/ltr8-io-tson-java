@@ -1624,10 +1624,49 @@ final class DefinitionResolver {
      * requires the resolver to reject a modifier-only entry both in a fresh record (no source to elide
      * toward) and in a composition body naming no inherited field, so it raises {@link
      * io.ltr8.tson.schema.TsonSchemaValidationException}.
+     *
+     * <p><b>A restatement's annotations merge over the inherited ones</b> ({@link #merged}), rather than
+     * replacing them: a tightening entry states what it tightens, and §5.7's modifier-only spelling ({@code
+     * extra: ?}) has no annotation position at all, so an entry that mentions nothing must not be able to
+     * erase what it does not mention.
      */
     private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
+        Annotations own = annotationsOf(field.name(), field.annotations());
         return resolveFieldEntry(field, parameters, inherited)
-                .withAnnotations(annotationsOf(field.name(), field.annotations()));
+                .withAnnotations(inherited.map(source -> merged(own, source.annotations())).orElse(own));
+    }
+
+    /**
+     * A restated field's annotations: the restatement's own first, in source order, then the inherited
+     * field's, in source order. One rule, and every part of it is load-bearing.
+     *
+     * <p><b>Concatenation, not replacement by name.</b> [TSON-DATA] §3.1 makes an annotation name repeatable
+     * on one value -- "an annotation name MAY appear any number of times on a single value; all occurrences
+     * are preserved in source order" -- so annotations are a list and not a map. Replacing "the inherited
+     * {@code @doc}" would need an identity the model does not give them, and has no defined answer where the
+     * source carries two. A restated field carrying two {@code @doc}s is the same shape as a field an author
+     * wrote two on directly.
+     *
+     * <p><b>Nearer first, because order is the precedence mechanism already.</b> {@link Annotations#get} and
+     * {@link Annotations#value} take the first occurrence, and so does the {@code @bytes_encoding} lookup
+     * that resolves the directive nearest-first. Leading with the restatement is what makes the nearer
+     * declaration win at every such site without one of them having to know about composition. Inherited-first
+     * would hand a field restated under its own {@code @bytes_encoding} the alphabet of the type it tightens.
+     *
+     * <p>The cost is that a subtype rewriting an inherited {@code @doc} leaves the field carrying both, which
+     * is what "annotations are not removable" buys and what §3.1 already accepts anywhere else.
+     */
+    private static Annotations merged(Annotations restatement, Annotations inherited) {
+        if (inherited.isEmpty()) {
+            return restatement;
+        }
+        if (restatement.isEmpty()) {
+            return inherited;
+        }
+        Annotations.Builder merged = new Annotations.Builder();
+        restatement.values().forEach(merged::add);
+        inherited.values().forEach(merged::add);
+        return merged.build();
     }
 
     /**
