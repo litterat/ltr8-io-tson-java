@@ -279,4 +279,16 @@ fixed, closed name→`AtomType` table (§5).
   lets the read, the tightening (`AtomNarrowing.checkSubset`) and the coherence check
   (`AtomCoherence.checkMembers`) share one identity. `float_type` carries no member set, on the same
   rationale it carries no `multiple_of`: a step cannot hold on a binary grid.
+- **A `value`-typed slot is read under the atom of the position it stands in.** §7.4 types a constructor's
+  constraint fields `value` and the bootstrap ordering leaves no alternative — `duration_type` is what defines
+  a duration, and `duration => !duration_type {}` is a layer up in core.tn — so a bound is decoded by §4 base
+  type resolution, which resolves boolean, number and string and none of those is a duration, a date or a
+  UUID. `ValueParser.read(token, target)` asks `HostAtoms` which built-in produces the position's own host
+  type and re-reads the token under it; `RecordBindReader.rebindValueIfNeeded` is where a field's reader is
+  swapped for one, beside `rebindContainerIfNeeded` and `tokenAware`, which specialise the same slot on the
+  same evidence. **Additive by construction**: a value the component can already hold, or that the caller's
+  own numeric narrowing reaches, is returned untouched, so `!number ^ { min: 0x10 }` stays the integer 16
+  rather than being re-read under `number`, whose grammar admits no based-integer form. Only a token the
+  position could not have held under any narrowing reaches the atom — which is also what turns
+  `!number ^ { min: "abc" }` from a cast failure reported as a library gap into `number`'s own verdict.
 - The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.

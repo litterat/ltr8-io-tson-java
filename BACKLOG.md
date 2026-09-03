@@ -72,18 +72,6 @@ own prose (which had gone stale on at least one of them):
   differing only in a lexical selector. What the spec owes here is `SPEC-FEEDBACK.md` #28; the comparison being absent entirely is
   this implementation's own.
 
-- [ ] **A `value`-typed scalar facet reports a library gap where the author is wrong.** `decimal_type`'s
-  bounds are typed `value` — §7.4's constraint-fields rule, and the bootstrap ordering behind it, leave the
-  family unable to name its own atom — so `!number ^ { min: "abc" }` is a legal record on the wire and fails
-  where the binder casts a `String` to `BigDecimal`. That `ClassCastException` reaches
-  `DefinitionResolver.bindAtomInstance`'s catch-all and comes out as `NOT_IMPLEMENTED`: the author is told
-  their correct reading of the spec is this library's fault, and the CLI exits 70 rather than 1. The member
-  set's own version of this is closed — `DecimalType` reads each member before the set is formed — and the
-  bounds want the same treatment, which means reading them where the wire type stops short rather than
-  widening the catch-all, since an unread `min` is also what the narrowing and coherence comparisons take on
-  trust. Every `value`-typed facet in the family is in scope: `min`, `exclusive_min`, `max`, `exclusive_max`,
-  `multiple_of`.
-
 - [ ] **§5.7's selector rule is unenforced, and for a defaulted selector needs something the value model
   does not keep.** "A selector may be set where the source leaves it at the constructor's default" — nothing
   checks it. `complex_type.component` (`~ NUMBER`) is the case that bites: after resolution `complex` and an
@@ -104,7 +92,8 @@ own prose (which had gone stale on at least one of them):
   `TimeParser`/`DateTimeParser` leak a `java.time` message about a character index, so one refusal reads the
   same in all three families; and the facets compute on the seconds count rather than `Duration.toNanos()`,
   whose `ArithmeticException` past ±292 years turns a legal schema and a legal document into a library fault
-  today and becomes the ceiling check once the ceiling exists. `period_type` needs none of it — its grammar admits no fraction, so its
+  today and becomes the ceiling check once the ceiling exists. The bounds themselves bind now, so every one
+  of these is testable. `period_type` needs none of it — its grammar admits no fraction, so its
   own "signed integer number of months" is already what the lexical form guarantees.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
