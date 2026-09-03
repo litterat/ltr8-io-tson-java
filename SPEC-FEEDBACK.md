@@ -247,13 +247,33 @@ and what one resolves to is stated only indirectly, at the corpus's `link/` laye
 mints. Whether that gap is worth closing with a real §8 emitter depends on which of the three answers below
 the spec gives.
 
-**Suggested resolution:** drop "so no `type_definition` could carry it" and say which of the three shapes
-output takes. The cheapest answer consistent with everything else in §8.1 is the second: an open entry is a
-`type_definition` with a non-empty `parameters` list whose `body` is the held application's own binding
-record, read under the parameter-precedence rule §8.1 already states — which needs no change to the kernel,
-keeps `schema`'s value type as it is, and makes the closed-entry rule a check over a form that exists. The
-`<params> !C core-value` spelling then belongs to schema *source*, which is where it is already written,
-rather than to output.
+**The open-entry sentence is the half that is right, and the other three places are what have to move.** A
+held body is an *AST* — the application as written, with parameter references standing where types and values
+will go — and a `type_definition`'s `body` is a resolved closed type. There is no ingest of the first into the
+second: reading a held body against the kernel's own vocabulary is exactly what materialisation exists to
+defer, and a consumer that did it would be resolving the template rather than holding it. So §8 output for a
+schema declaring templates is a compromise however it is spelled, and the compromise this implementation makes
+— comparing an open entry's body as wire form on both sides, which is what it is on both sides
+(`ResolvedForm.heldBodies`) — is the one the value model allows.
+
+**Suggested resolution:** keep "no `type_definition` could carry it" and fix the three places that assume
+otherwise.
+
+- §8.1's "Reading parameter references" paragraph has no position to apply at if the sentence stands. Either it
+  is about schema *source* — where a held body really does carry parameter references and really is resolved
+  against the enclosing entry's `parameters` — or it goes.
+- §5.10's closed-entry rule is stated as a well-formedness rule **on resolver output**, which presupposes output
+  in which an open entry appears. Restate it on the resolver's own value, where it is a real check and where
+  this implementation applies it.
+- §8.1's ingest paragraph needs `schema` to admit a second value shape for "an open entry ... re-resolved as
+  source" to typecheck, and the kernel's `schema => {type_name => type_definition}` does not. Say what a
+  conforming emitter writes for an open entry, or say that §8 output is defined over closed entries only and an
+  open one is not serialized — which is the answer the sentence already implies.
+- The parameter reference *does* type-check structurally today (`type_ref.name` is an `identifier`, and `T` is
+  one), so nothing in the model enforces the sentence. **Typed template parameters** would close that — a
+  parameter declared with the kind of slot it stands in, which would also give §4.2's value-route-only rule and
+  §5.10's argument-kind rule the slot types a held body cannot supply. It is a larger change than this entry
+  proposes and is named as the direction rather than the recommendation.
 
 **Status against Revision 34:** open, and new against this revision — §8.1's open-entry sentence and its
 "Reading parameter references" paragraph are both Revision 34 text.

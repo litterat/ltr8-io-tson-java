@@ -117,11 +117,13 @@ final class ResolvedForm {
      * The <b>held</b> bodies a fixture document writes, by entry name -- the wire form, parsed and not read.
      *
      * <p>[TSON-SCHEMA] §8.1's shadowing rule makes a token in an open entry's body a parameter reference
-     * rather than a value of the slot's declared type, and no reader implements that rule: both readers
-     * apply the slot's own type regardless. Where the parameter's spelling happens to satisfy that type it
-     * binds a <em>misreading</em> ({@code extern_of}'s {@code S} binds as a relative URI), and where it does
-     * not it fails outright ({@code min_items: N} against {@code integer}). Either way a bound comparison of
-     * an open entry compares the wrong things.
+     * rather than a value of the slot's declared type, and no reader can apply it: a held body is an
+     * <em>AST</em> -- the application as written -- where a reader reads a closed type, so both readers apply
+     * the slot's own type regardless. Where the parameter's spelling happens to satisfy that type it binds a
+     * <em>misreading</em> ({@code extern_of}'s {@code S} binds as a relative URI), and where it does not it
+     * fails outright ({@code min_items: N} against {@code integer}). Either way a bound comparison of an open
+     * entry compares the wrong things, and no emitter closes the gap: a template body does not ingest into a
+     * closed-type body ({@code SPEC-FEEDBACK.md} #4).
      *
      * <p>So an open entry's body is compared as wire form on both sides, which is what it is on both sides:
      * this resolver holds the application unread ({@code HeldBody}), and the fixture writes it verbatim. The
