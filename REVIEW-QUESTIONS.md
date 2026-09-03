@@ -32,33 +32,9 @@ at the class.
 This bit during the binary work — a selector check I had added refused `base64url` outright — and it is why the
 `bytes` redesign is better than a facet: with no selector there is no rule to leave unenforced.
 
-### 3. #25's rule (c) is a live defect and blocks `@rest`'s check
-
-`DefinitionResolver.resolveField` rebuilds a restated field with `Annotations.empty()`, so a subtype that
-tightens a field silently drops its inherited annotations — a `@rest`, a `@deprecated`. §5.7's modifier-only
-entry (`extra: ?`) un-marks the field it names. **`@rest`'s "at most one per composed chain" cannot be phrased
-against a chain a restatement severs without saying so.**
-
-The entry recommends a restatement's annotations merge over the inherited ones. That is a small change and I
-can make it — but it changes resolved output for any schema restating an annotated field, so it wants your
-call, and it is the one item here that is squarely an implementation defect rather than a spec question.
-
----
-
-## Declared but not enforced
-
-All of it is in `BACKLOG.md` now — the two load-time checks under **Checked annotations**, `members`'
-missing read-time half and `scoped`'s absent reader under **Built-in types**. Only one needs a decision from
-you rather than someone's time:
-
-**#25(c), the restated-field annotation drop**, is what blocks `@rest`'s "at most one per composed chain" —
-a restatement severs the chain silently, so there is nothing to count along. The recommended fix is that a
-restatement's annotations merge over the inherited ones, and it changes resolved output for any schema that
-restates an annotated field. That is the call; the rest is work.
-
 ## Judgement call worth confirming
 
-### 4. `duration` is nanosecond-resolved, where meta.tn says rational seconds
+### 3. `duration` is nanosecond-resolved, where meta.tn says rational seconds
 
 The host type is `java.time.Duration`, so `PT0.0000000001S` is refused rather than rounded. Chosen because
 `time_type` and `datetime_type` already work at nanosecond resolution for the same fractional-second component,
