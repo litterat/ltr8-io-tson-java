@@ -3038,4 +3038,34 @@ runs, and a request for the one sentence that would let the fix stop being a lis
 #29's directive design, which this is a hole in, is newer than it: the two have never been read against each
 other, which is how a rule that only works for one of §5's two spellings survived review.
 
+**The fix above is a validated hypothesis, not the recommendation — and what validating it found is that §8.3
+itself is the thing to remove.** Three measurements, taken after the carry was built and running:
+
+- **§8.3's flattening does not deliver the identity it claims.** With `id => uuid`, `box<id>` and `box<uuid>`
+  mint two entries (`box_id_5afce8c4`, `box_uuid_536a9a66`) whose bodies are identical. Flattening runs after
+  materialisation, so `source`'s argument names are never flattened, and §8.2 keys identity on `source`.
+- **Where the rule *would* apply, it would break #29.** `box<hexdigest>` and `box<bytes>`, over
+  `@bytes_encoding:HEX hexdigest => bytes`, are two entries that genuinely read differently — `"deadbeef"` as
+  four hex octets against `"3q2+7w=="` as four base64 ones. Flattening arguments recursively, as §8.3
+  prescribes, collapses them into one and loses the directive. **§8.3's identity rule and #29's directive
+  design are in direct collision**, unnoticed because no implementation has flattened arguments.
+- **Two names for one type break assignability meanwhile.** `!via_target { … }` is refused at a `via_alias`
+  position (`UNKNOWN_TYPE_REF`, naming a minted entry the author never wrote), and `( via_alias | via_target )`
+  is accepted as a two-variant choice rather than refused as a duplicate.
+
+And the walk was never eliminated: §8.3 requires the chain stay walkable, `TsonSchemaCompiler`,
+`DiscriminationClass` and `TypeInhabitance` each walk it independently, and `@alias` is a *lossy summary* of
+that walk — §8.3 keeps only the source-site name and discards intermediate hops, which is exactly the hop that
+carried the directive in `digest_chain => digest_alias => bytes`. The carry above re-derives, in the annotation
+channel, information the summary threw away from a walk that still happens.
+
+**So the direction is removal, and it is what this entry becomes.** A reference is a hop, not a rewrite: a
+processor MAY collapse a chain at resolution, at reader construction, or not at all, because the chain must
+remain walkable in every case, and resolved output states the chain rather than a summary of it. Identity is
+then structural — **two entries are the same type iff their resolved bodies are equal** — which needs no
+argument flattening and gets the directive case right, the two bodies genuinely differing. What survives of
+this entry either way is its last request: §6 needs to say that an annotation may be *positional*, which is the
+same missing paragraph #25(a) needs for *checked* and which is what would tell a transparent alias from a
+load-bearing one.
+
 ---
