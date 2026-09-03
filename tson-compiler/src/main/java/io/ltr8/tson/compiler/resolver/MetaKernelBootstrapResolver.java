@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.ast.ArrayValue;
@@ -103,17 +102,7 @@ public final class MetaKernelBootstrapResolver {
     public static TsonSchema getMetaKernelSchema() {
         String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
-        // §8.3 applies here as it does to any other schema. The bootstrap is a shorter route to the same
-        // resolved form, not a different one, and this output governs anything whose !!meta is meta-kernel
-        // -- so a use site flattened by ordinary resolution and unflattened here would be two answers to
-        // one question. No minted entries to stop at: the bootstrap runs no materialisation, and meta-kernel
-        // imports nothing, so its own map is the whole namespace a chain can walk.
-        Map<String, TypeDefinition> resolved = resolveEntries(document);
-        // No key annotations to carry: this route binds none (it is producing the very entries a reader
-        // would bind them through), so a hop's name-position annotations contribute nothing here where
-        // ordinary resolution would carry them. The definition-position ones travel, names without values.
-        Map<String, TypeDefinition> entries =
-                ReferenceFlattener.flatten(resolved, resolved, Set.of(), name -> Annotations.empty());
+        Map<String, TypeDefinition> entries = resolveEntries(document);
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "meta-kernel.tn has no !!id -- this should never happen for the real, bundled fixture"));
         return new TsonSchema(id, document.meta(), document.imports(), entries, true);

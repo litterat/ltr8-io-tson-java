@@ -475,7 +475,7 @@
   @synthetic array_type_name_1_xxhash => !type_definition {
     kind: PRODUCT
     source: array
-    body: !array { element_type: @alias:type_name identifier  min_items: 1 }
+    body: !array { element_type: type_name  min_items: 1 }
   }
 
   @synthetic map_uri_array_type_name_1_ef020ac1_OPTIONAL_1_xxhash => !type_definition {

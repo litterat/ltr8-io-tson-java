@@ -443,11 +443,4 @@
     source: documentation
     body: !reference { target: documentation }
   }
-
-  @doc:"Source-level alias name preserved on a resolved type reference."
-  alias => @annotation !type_definition {
-    kind: REFERENCE
-    source: text
-    body: !reference { target: text }
-  }
 }

@@ -199,21 +199,21 @@ class BytesEncodingDirectiveTest {
     }
 
     /**
-     * Only a directive travels. The alias also carries a {@code @doc}, and carrying that to the use site
-     * would document four unrelated positions with one declaration's sentence -- measured against the bundled
-     * schemas, where meta-kernel's group {@code @doc} on {@code type_name} was the only annotation an
-     * unfiltered walk moved at all.
+     * Nothing is copied to the use site to make this work. The field names the alias, the alias keeps its own
+     * annotations, and the directive is applied where the alias is compiled -- so resolved output carries one
+     * statement of the fact rather than a copy of it at every position that reaches the type.
      */
     @Test
-    void documentationDoesNotTravelWithTheDirective() {
+    void theDirectiveStaysOnTheDeclarationRatherThanTravelling() {
         var entries = Tson.builder().build().resolve(SCHEMA).schema().entries();
         var holder = (io.ltr8.tson.schema.meta.RecordBody) entries.get("holder").body();
         var aliased = holder.fields().stream().filter(f -> f.name().equals("aliased")).findFirst().orElseThrow();
-        assertEquals(List.of("alias", "bytes_encoding"),
-                aliased.type().annotations().values().stream().map(io.ltr8.annotation.Annotation::name).toList());
+
+        assertEquals("digest_alias", aliased.type().name(), "the use site names what the author wrote");
+        assertTrue(aliased.type().annotations().isEmpty(), "and carries nothing of the declaration's");
         assertEquals(List.of("bytes_encoding", "doc"),
                 entries.getAnnotations("digest_alias").values().stream()
                         .map(io.ltr8.annotation.Annotation::name).toList(),
-                "the declaration keeps both -- it is the use site that takes only the directive");
+                "which is where both of them stay");
     }
 }

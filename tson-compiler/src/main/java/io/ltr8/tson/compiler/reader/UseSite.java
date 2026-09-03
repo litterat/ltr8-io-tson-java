@@ -3,19 +3,25 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.BytesParser;
+import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
  * The reader for a child position, named the way the author wrote that position.
  *
- * <p><b>Why a position needs a name of its own.</b> [TSON-SCHEMA] §8.3 flattens a type position past a
- * {@code REFERENCE} entry, rewriting the reference to the end of its chain and recording the name the author
- * wrote as {@code @alias} on the type-ref. So a field declared {@code c: pct} over {@code pct => small}
- * arrives here as {@code type: @alias:pct small}, and the reader the resolver hands back is {@code small}'s
- * -- one reader, shared by every position that reaches that entry, and correctly named {@code small} for a
- * position that named it directly. A message from it against {@code c} then reads {@code 'small': '500' is
- * greater than the maximum 100}, naming a declaration the author did write but did not write <em>here</em>,
- * and for a chain ending in an imported type ({@code my_int => int32}) naming a file they never opened.
+ * <p><b>Why a position needs a name of its own.</b> A field declared {@code c: pct} over {@code pct => small}
+ * reads with {@code small}'s reader, that being the type at the end of the chain. A message from it against
+ * {@code c} would otherwise read {@code 'small': '500' is greater than the maximum 100}, naming a declaration
+ * the author did write but did not write <em>here</em>, and for a chain ending in an imported type
+ * ({@code my_int => int32}) naming a file they never opened. So the {@code REFERENCE} entry's own compile
+ * names the target's reader for the entry doing the referring ({@code TsonSchemaCompiler}), and a use site
+ * naming {@code pct} gets a reader called {@code pct}.
+ *
+ * <p><b>A use site needs nothing of its own for that</b>, which it used to. Resolved output no longer
+ * rewrites a type position past a reference, so the name a position names is the name the author wrote and
+ * the entry it names is where the display name is settled. What is left here is the two seams a compiled
+ * reader offers a caller that has one -- {@link Renamed} and {@link Respelled} -- and the {@link #named}
+ * helper the reference compile uses.
  *
  * <p>This is the naming twin of the rule {@code SchemaLocation} already follows for pointers: the pointer is
  * the path taken ({@code /person/age}), never the leaf it resolves to ({@code /int32} in core.tn), "because
@@ -39,49 +45,43 @@ public final class UseSite {
     private UseSite() {
     }
 
-    /**
-     * The already-compiled reader for {@code ref}'s target, renamed to the author's own name for this
-     * position when §8.3 left one and the reader has a name to change.
-     */
+    /** The already-compiled reader for the entry {@code ref} names -- which is the name the author wrote. */
     static TsonTypeReader<?> reader(TypeRef ref, TsonTypeReaderResolver resolver) {
-        TsonTypeReader<?> reader = respelled(resolver.resolve(ref.name()), ref);
-        return named(reader, ref.annotations().value("alias", String.class).orElse(null));
+        return resolver.resolve(ref.name());
     }
 
     /**
-     * {@code reader} in the alphabet this position asks for, where it asks for one and is a {@code bytes}
-     * reader -- otherwise {@code reader} itself.
+     * {@code target} respelled by the {@code @bytes_encoding} that {@code name}'s own declaration states, at
+     * either of §6's declaration positions -- the schema-map key first, then the {@code TypeDefinition}.
      *
-     * <p><b>Why a use site can carry a directive at all.</b> §8.3 flattens a position naming a {@code
-     * REFERENCE} entry straight to the end of its chain, so a declaration-level {@code @bytes_encoding} on an
-     * alias ({@code @bytes_encoding:HEX digest => bytes}) would be unreachable from every use of it -- while
-     * the same intent written as a refinement keeps a {@code supertypes} edge and is found. The flattening
-     * walk therefore carries a dropped hop's annotations onto the reference, and this is where they are read.
-     *
-     * <p><b>Here rather than per container.</b> Every position -- a record field, an array element, a map key
-     * or value, a tuple element, a choice variant -- reaches its child reader through this method, so one
-     * place serves all of them. A record field's own directive is handled a step earlier ({@code
-     * BytesEncoding.fieldReader}), which has the field in hand and so can also state a directive on a field
-     * whose type names no alias at all.
+     * <p>Called where a {@code REFERENCE} entry is compiled, which is where a chain is collapsed: a directive
+     * on an alias ({@code @bytes_encoding:HEX digest => bytes}) then directs every use of that alias without
+     * the alias having to be a refinement to be heard. <b>This entry only, never its chain</b> -- a chain
+     * compiles innermost-first, so each hop respells what the hop below produced and the outermost, the one
+     * nearest the use site, is left standing. Nearest-first with no walk and no ordering rule of its own.
      */
-    private static TsonTypeReader<?> respelled(TsonTypeReader<?> reader, TypeRef ref) {
-        if (ref.annotations().isEmpty() || !(reader instanceof Respelled respellable)) {
-            return reader;
+    public static TsonTypeReader<?> respelledByDeclaration(TsonTypeReader<?> target, String name,
+            TypeDefinition definition, ValueReaderContext context) {
+        if (!(target instanceof Respelled respellable)) {
+            return target;
         }
-        return BytesEncoding.stated(ref.annotations())
+        return BytesEncoding.stated(context.schema().entries().getAnnotations(name))
+                .or(() -> BytesEncoding.stated(definition.annotations()))
                 .<TsonTypeReader<?>>map(respellable::inEncoding)
-                .orElse(reader);
+                .orElse(target);
     }
 
     /**
      * A reader that can restate itself in another RFC 4648 alphabet -- the {@code bytes} half of what a use
      * site may ask for, and the sibling of {@link Renamed}.
      *
-     * <p>Two implementations for the same reason {@code Renamed} has two: a leaf reader, and the tree-mode
-     * wrapper that boxes it. A reader is compiled once per entry and shared by every position that names it,
-     * so a per-position alphabet cannot come from the entry -- what a position can do is ask the shared
-     * reader for itself over the same constraints in a different spelling. A reader this does not apply to
-     * hands itself back, exactly as {@code renamed} does.
+     * <p>Three implementations, for the same reason {@code Renamed} has three: the leaf reader, tree mode's
+     * boxing wrapper, and the subtype dispatcher, each delegating through to the one below. An alias entry
+     * that states a directive asks its target's reader for itself over the same constraints in a different
+     * spelling ({@code TsonSchemaCompiler}'s reference branch), and a reader this does not apply to hands
+     * itself back, exactly as {@code renamed} does. <b>Nearest-first falls out of the recursion</b>: a chain
+     * compiles innermost-first, so each hop respells what the hop below it produced and the outermost
+     * directive -- the one nearest the use site -- is the one left standing.
      */
     interface Respelled {
         TsonTypeReader<?> inEncoding(BytesParser.Encoding encoding);

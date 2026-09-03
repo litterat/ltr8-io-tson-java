@@ -55,19 +55,9 @@ are kept in step deliberately.
   four hex octets `deadbeef`. It used to read six base64 octets (`75e69d6de79f`) — a different value, with no
   diagnostic, because dropping the inherited annotations dropped the directive with them.
   `RestatedFieldAnnotationsTest` covers each case; §5.8/§8.1 owe the rule, which is `SPEC-FEEDBACK.md` #25(c).
-- **§8.3's flattening walk carries a dropped hop's directives to the use site** (`ReferenceFlattener.plusCarried`,
-  read by `UseSite.respelled`). A declaration's annotations are reachable from a use site only while the use
-  site names that declaration, and flattening is what stops it: `@bytes_encoding:HEX digest => bytes` is a
-  `REFERENCE` entry rewritten away at every use, where the same intent as a refinement keeps a `supertypes`
-  edge and is found. Two spellings, one of which silently read base64 — a different value, with no diagnostic.
-  So each dropped hop's annotations are appended to the reference, nearest hop first, after the `@alias`;
-  ordering and additivity are the restated-field rule above, reused. **Only a directive travels** (`CARRIED`):
-  carrying everything was built first and measured, and across all three bundled schemas exactly one
-  annotation moved — meta-kernel's group `@doc` on `type_name`, which then documented four unrelated positions
-  including `schema`'s key type. The set is enumerated because §6 gives an annotation a type and no way to say
-  it is positional (`SPEC-FEEDBACK.md` #32, and #25(a) is the same gap from the other side). **Every decorator
-  in the reader stack must delegate through `UseSite.Respelled`** — the leaf, tree mode's boxing, and the
-  subtype dispatcher — or the directive silently does not apply at that position.
+- **A declaration's annotations stay on the declaration.** Nothing is copied to a use site, because nothing
+  needs to be: a use site names the entry the author wrote, so a directive on an alias is found by compiling
+  that alias. See "References are hops, not rewrites" below.
 - **What resolves:** record construction; composition (`A & B & { ... }`, §5.8, with kind from the literal
   base-kind names in the transitive supertype chain, and tightening in the trailing body per §5.7); the
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
@@ -565,44 +555,43 @@ recorded open form, and replacing the application with a reference to the entry 
     possible was `type_argument` becoming readable, value channel included
     (`docs/linking-and-compilation.md`).
 
-## Use-site flattening (`tson-compiler/.../resolver/ReferenceFlattener.java`)
+## References are hops, not rewrites (`tson-compiler/.../TsonSchemaCompiler.java`)
 
-§8.3, and the last thing resolution does: **a type position naming a `REFERENCE` entry is rewritten to the
-end of its chain, and the name the author wrote survives on the reference as `@alias`.** meta-kernel's own
-resolved fixture states the rule in a line — "Reference-kind names at type positions are flattened with
-@alias" — and spells the result `type: @alias:field_name token`.
+§8.3's use-site flattening **is gone, and `@alias` with it**. Resolved output states the chain the author
+wrote: a type position naming a `REFERENCE` entry keeps that name, nothing is attached to record where it
+"really" points, and the chain stays walkable through the entries themselves.
 
-- **What it buys is §8.2's single-level identity.** An instantiation's `source` is compared as a flat
-  application, so a use site still naming an alias would have to be chased before two of them could be told
-  apart. Flattening moves that walk to schema-load time, once per use site; the `@alias` is what keeps the
-  author's own word recoverable for a diagnostic, a renderer or a writer.
-- **The representation came first.** `TypeRef` carries an `Annotations` component for this — §8.3 attaches
-  the alias to the *type value*, not to the field around it — with `equals`/`hashCode` excluding it, exactly
-  as `RecordField` does. That exclusion is what makes the carrier safe to add: identity is where a reference
-  *points*, an alias records where it *came from*, so two use sites of one type stay equal however spelled.
-- **An alias entry keeps its own hop.** `doc => documentation` stays one hop though `documentation` aliases
-  `text`, and the fixture agrees. The chain has to stay walkable for anything that wants the intermediate
-  names, and the entry is what records it — flattening there would erase the alias rather than relocate it.
-  `supertypes`/`subtypes` are untouched for a different reason: they are name lists with no annotation
-  channel, and §8.2 calls them resolver-managed indexes rather than use sites.
-- **The walk stops at a materialised instantiation.** This model gives one an extra `REFERENCE` hop over the
-  form that holds the shape, which the spec's model does not have, and that entry is what §8.2 keys identity
-  on — walking through it leaves a use site naming a form nobody wrote. An author's alias *to* an application
-  still flattens onto it, which is §8.3's own worked example (`type: @alias:string_triple array_ranged_text_9d4`).
-- **Runs after materialisation**, so an alias to an application lands on the entry that application minted
-  rather than on the alias in front of it — and **on the bootstrap route too**
-  (`MetaKernelBootstrapResolver`), which is a shorter route to the same resolved form and whose output
-  governs every schema whose `!!meta` is meta-kernel. Leaving that one unflattened would be two answers to
-  one question.
-- Pinned end to end by `ResolvedFixtureTest`, which compares this resolver against the spec's own
-  `spec/m/*-resolved.tn` — the check those files ask for in their own `@doc`.
+**A processor collapses the chain when it compiles readers** — after linking, once per entry, where the whole
+namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a `REFERENCE` entry's reader
+*is* its target's reader, resolved recursively, named for the entry doing the referring, so a use site naming
+`pct` over `pct => small` reads and reports as `pct`.
+
+- **The walk was never avoidable, which is why the rewrite was not worth its price.** `TsonSchemaCompiler`,
+  `DiscriminationClass` and `TypeInhabitance` each walk a chain independently, `TsonSchemaLinker` walks one
+  for choice-variant distinctness and for §5.2's field-value check, and §8.3 itself required the chain stay
+  walkable (`reference.target` was never flattened). Rewriting the output as well left two representations to
+  keep in step, and `@alias` was a *lossy* summary of the one it duplicated — it kept only the source-site
+  name, so in `digest_chain => digest_alias => bytes` it recorded the hop that carried nothing.
+- **A directive on an alias is applied where the alias is compiled** (`UseSite.respelledByDeclaration`). An
+  entry that declares `@bytes_encoding` respells the reader its target produced. **Nearest-first falls out of
+  the recursion** — a chain compiles innermost-first, so the hop nearest the use site respells last and wins —
+  which is a rule that used to need stating and now needs none.
+- **Anything that needs the chain end walks it and says so.** `TsonSchemaLinker.checkFieldValue` walks to the
+  terminal before checking a `~`/`=` value, since a field typed by an alias states a value of whatever the
+  alias names; `FieldValueConformanceTest` pins both directions.
+- **The bootstrap route needs no special case any more.** It used to have to flatten identically or diverge
+  from ordinary resolution, while binding no name-position annotations of its own — a divergence waiting to
+  matter. Neither route rewrites anything now (`BootstrapReferencesTest`).
+- Pinned by `ReferenceChainTest` — the chain stated as written, a read still reaching the end of it, and a
+  diagnostic naming the hop the author wrote — and end to end by `ResolvedFixtureTest` against the spec's own
+  `spec/m/*-resolved.tn`.
 
 ## The `@synthetic` marker (`tson-compiler/.../resolver/SchemaResolver.java`)
 
 §8.2 puts a bare **`@synthetic` on the key of every entry the resolver materialised from a sugar form**, and
-on no other. Like `@alias` above it is *derived* — attached by the resolver rather than written by an author,
-and discarded and recomputed on ingest (§8.1), so it carries no decode force and cannot be forged into a
-resolved document to change how it reads. Both are built by name rather than resolved through the governing
+on no other. It is *derived* — attached by the resolver rather than written by an author, and discarded and
+recomputed on ingest (§8.1), so it carries no decode force and cannot be forged into a resolved document to
+change how it reads. It is built by name rather than resolved through the governing
 meta the way an author-written annotation is: there is no author to resolve against, and the value is fixed.
 
 - **Why a marker at all, when the names are distinctive.** A synthetic is named by derivation from its own
@@ -630,8 +619,7 @@ meta the way an author-written annotation is: there is no author to resolve agai
   gave it.
 - **The bootstrap route attaches none, deliberately.** `MetaKernelBootstrapResolver` exists to be *just*
   enough to load the real meta-kernel from its own file, and nothing in the pipeline reads this marker — it is
-  informational, where `@alias` (which the bootstrap does apply) changes the structure identity is compared
-  by. meta-kernel's own nine synthetics are marked anyway, because the entries anything else sees come from
+  informational. meta-kernel's own nine synthetics are marked anyway, because the entries anything else sees come from
   ordinary resolution: the bootstrap output stands in only as the transient governing meta for its own
   resolution.
 - Cross-checked against the spec's own output by

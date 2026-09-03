@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=74d7282e5a7ec53a3ab182eda90eeea5b7b5d22f9e948322946779a7a6e4d592"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0bb89291b899258a0bbdf8e304782b7f6a33379076e3743d5f1c2faaf7cd0d7f"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -51,10 +51,12 @@
     substitution is the same walk over a body at every shape and no
     template needs its arguments recorded beside its body.
 
-    A use site is flattened past a REFERENCE entry ([TSON-SCHEMA] §8.3)
-    but this slot is not: the chain must stay walkable, and an alias
-    records where it points. The walk stops at an argument-bearing
-    target, which is an application rather than a further hop.
+    A reference is a hop, not a rewrite: resolved output states the
+    chain as the author wrote it, and a use site names whatever entry
+    it names. A processor collapses the chain when it compiles readers
+    — after linking, once per entry — where the whole namespace is
+    present. A walk stops at an argument-bearing target, which is an
+    application rather than a further hop.
     """
   reference => top & {
     target: type_ref
@@ -347,15 +349,13 @@
   type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA]
 
   @doc:"""
-    Annotation type markers. `alias` and `synthetic` are resolver-attached
-    and derived: discarded and recomputed on ingest ([TSON-SCHEMA] §6, §8.1).
-    `synthetic` marks a resolver-materialised synthetic entry at its
-    schema-map key ([TSON-SCHEMA] §8.2).
+    Annotation type markers. `synthetic` is resolver-attached and derived:
+    discarded and recomputed on ingest ([TSON-SCHEMA] §6, §8.1), and marks a
+    resolver-materialised synthetic entry at its schema-map key (§8.2).
     """
   annotation    => @annotation void
   documentation => @annotation text
   doc           => @annotation documentation
-  alias         => @annotation text
   synthetic     => @annotation void
 
   @doc:"""
