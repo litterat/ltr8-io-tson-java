@@ -1761,9 +1761,13 @@ tightening kind is needed, and this implementation's shared facet machinery alre
 3. **Identity is [TSON-DATA] §4.3's, and it is already the rule.** `0x50` and `80` are one member, so
    `[80 0x50]` is a duplicate — which the set catches and the array silently keeps, tying this back to (1).
    §8.2 already states the shape ("recorded as written and compared as the value denoted") and `NumericIdentity`
-   already implements it for type arguments; the facet reuses it rather than adding a rule. The base-type line
-   holds too: `1` and `1.0` are two members of a `decimal_type` member set, §4 resolving them to different
-   classes.
+   already implements it for type arguments; the facet reuses it rather than adding a rule. **The base-type
+   line does not survive the slot's own type, and it is the one thing this entry had wrong.** `1` and `1.0`
+   are two base types under §4 and one member of a `decimal_type` set: `members` is typed `set<value>`, so §4
+   is what an element is decoded *by*, never what it is compared *as*, and the atom the member stands in is
+   `number`. Comparing them as §4 left them makes the set's own uniqueness rule hold an integer beside a
+   decimal and find them distinct — a claim nobody would write down, and one meta.tn's `@doc` already
+   contradicts.
 
 **What the facet buys beyond the enum itself.** A mixed-scalar source enum (`["AUTO", "MANUAL", 80, 443]`, the
 shape a converter meets constantly) becomes a choice over an identifier enum and a member-set numeric, which is
@@ -1789,12 +1793,20 @@ All three of the entry's under-determined points landed as it argues them. **The
 than refused. **Coherence**: `AtomCoherence.checkMembers` requires every member to satisfy the body's other
 facets, including the range `integer_type.size` derives rather than stores, so `{ members: [443]  size: { bits:
 8 } }` fails the way a stated bound outside the width does. **Identity is §4.3's**: members compare as the value
-denoted, so `[80 0x50]` is a duplicate the set catches. §5.7's member-set kind needed no new text —
-`AtomNarrowing.checkSubset` was generalised from `enum.members` and now serves both.
+denoted, so `[80 0x50]` is a duplicate the set catches, and `[1 1.0]` is one in the decimal family once each
+member is read under the atom it constrains. §5.7's member-set kind needed no new text —
+`AtomNarrowing.checkSubset` was generalised from `enum.members` and now serves both, taking the family's own
+identity where `equals` is not it.
 
-**What is not built is the read.** No parser applies the facet, so a value outside the member set is currently
-accepted at read time; the narrowing and the schema-load coherence are what run. That is a gap in this
-implementation rather than an open question about the shape.
+**The read applies it too, and building that half is where the third point earned its keep.** `IntegerParser`
+and `DecimalParser` check the member set beside the bounds and `multiple_of`, so `!integer ^ { members:
+[80 443 8080] }` refuses `22` and admits `0x50`. The decimal family needed one thing first, and it is a note
+for §7.4 rather than for the facet: `decimal_type.members` is `set<value>`, so its elements arrive as whatever
+§4 resolved them to — `1` an integer beside `2.50` a float — and the set's own uniqueness rule, running on
+those, sees two host types and compares neither. Reading each member under the constrained atom before the set
+is formed is what makes `1` and `1.0` one member, and it is also what the schema-load coherence check needs:
+comparing an unread member against a bound is a type error, not a verdict. meta.tn's own `@doc` already says
+the resolver does this; the sentence is load-bearing and worth keeping in whatever text the facet lands in.
 
 **Suggested resolution:** ordinary constraint vocabulary, in the family each tier's bounds already sit in.
 
@@ -1810,6 +1822,12 @@ implementation rather than an open question about the shape.
   say what this needs.
 - Coherence: one sentence wherever the schema-load coherence check is stated — every member must satisfy the
   body's other facets, including a range the family derives rather than stores.
+- Identity, for the `value`-typed set only: one sentence saying that a member is read under the atom it
+  constrains before the set is formed, so the set's uniqueness rule and §5.7's tightening compare decimals
+  rather than whatever §4 decoded each element to. meta.tn's `@doc` on `decimal_type` already carries it; §7.4
+  is where a processor implementing a `value`-typed constraint field would look for it, and it is not there.
+  Without it a conforming processor may read `[1 1.0]` as two members and then have nothing to compare a
+  member against a bound with.
 
 Being a kernel edit, this cannot land as a patch: it re-stamps all three companion digests bottom-up and moves
 the `*-resolved.tn` fixtures with them.

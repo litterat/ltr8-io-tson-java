@@ -842,6 +842,13 @@ final class DefinitionResolver {
             String where = "'" + name + "': " + e.getMessage();
             throw e instanceof TsonMissingBindingException ? new TsonMissingBindingException(where)
                     : new TsonBindMismatchException(where);
+        } catch (TsonSchemaValidationException e) {
+            // A constructor's own record refusing the values it was handed. `decimal_type`'s member set is the
+            // case: `members` is typed `set<value>`, so the wire admits anything and the family itself is what
+            // says a member must be a number the atom reads. The author's error either way -- the verdict on
+            // `members: ["abc"]` does not change when this library improves -- so it keeps its classification
+            // rather than being relabelled a gap by the catch-all below.
+            throw new TsonSchemaValidationException("'" + name + "': " + e.getMessage(), e);
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to bind '" + constructorName + "' via the compiled meta-schema reader: "
