@@ -2700,10 +2700,14 @@ spec's own example. Fixed here, and worth noting in the register because the pro
 an implementation still got it wrong four times: the rule reads like a spelling rule, and only the parenthetical
 example says otherwise.
 
-**Not in the conformance corpus, deliberately** — the same treatment #30 gets. Revision 34 states neither end,
-so a vector asserting `P400000D` invalid would fail a conforming processor; this repo's own tests carry the two
-ends instead. The `precision`-as-a-value-constraint vectors *are* in the corpus, because that rule is not a
-proposal: Revision 34 already states it, and a processor counting digits fails them today.
+**In the conformance corpus**, on the branch that carries this revision's proposals. Seven vocabulary vectors
+for the two ends and two validate-layer vectors for `precision`. Three of them turn on the ceiling being the
+*format's* and not the reader's: `P400000D` is about 1095 years written in days, so no single component is
+large and several runtimes' duration types would hold it comfortably; and
+`-PT9223372036.854775808S` is the one value a signed 64-bit count holds and a magnitude rule does not, so a
+processor bounding by casting to its own `int64` passes every other vector here and fails that one. The floor's
+vectors pin rather than newly enforce — this implementation already refused a tenth digit, having nowhere to
+put it — which is the shape of the whole entry: the floor was forced by the hosts and the ceiling is a choice.
 
 **Suggested resolution:**
 
