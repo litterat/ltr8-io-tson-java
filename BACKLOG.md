@@ -90,11 +90,6 @@ they carry force. §6 owes the category itself a description (`SPEC-FEEDBACK.md`
 two declaration positions honours one (#25(b)); this implementation consults both for `@disjoint` and should do
 the same here.
 
-- [ ] **`@bytes_encoding` is not checked against the type it annotates.** The directive works — resolved
-  nearest-first, field then the field's type walking its supertypes then base64 (`BytesEncoding`) — but its own
-  `@doc` promises that the annotated field or definition resolves to `bytes`, or the schema fails to load, and
-  nothing enforces that. A directive on an `int32` field is silently inert, which is the worst of the three
-  outcomes: it looks applied and does nothing.
 - [ ] **`@rest` is not checked.** Two checks, both ordinary now: the annotated field's type resolves to a
   text-keyed map, and at most one field per composed chain carries the mark — the chain being countable since a
   restatement merges annotations rather than dropping them.

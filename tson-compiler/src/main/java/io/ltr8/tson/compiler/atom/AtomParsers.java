@@ -79,7 +79,7 @@ public final class AtomParsers {
             case RationalType t -> new RationalParser(t);
             case UuidType t -> new UuidParser(t);
             // No @bytes_encoding here: this path has a body and no position, so it takes the default.
-            case BytesType t -> new BytesParser(BytesParser.DEFAULT, t);
+            case BytesType t -> new BytesParser(t);
             case DateType t -> new DateParser(t);
             case TimeType t -> new TimeParser(t);
             case DateTimeType t -> new DateTimeParser(t);

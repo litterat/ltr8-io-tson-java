@@ -47,17 +47,12 @@ are kept in step deliberately.
   composition alike. **Concatenation rather than replacement by name**, because [TSON-DATA] §3.1 makes a name
   repeatable on one value with every occurrence preserved — annotations are a list, not a map, so "the
   inherited `@doc`" names nothing when the source wrote two. **Restatement first**, because order *is* the
-  precedence mechanism: `Annotations.get`/`value` and `BytesEncoding.stated` all take the first occurrence, so
-  leading with the nearer declaration is what makes `@bytes_encoding`'s nearest-first resolution come out right
-  at a restated field without either of them knowing about composition. The case that pins it is read-side: under
-  `envelope => { @bytes_encoding:HEX  digest: bytes? }`, a `sealed_envelope => envelope & { digest: bytes }` that
-  tightens presence and writes no annotation of its own now inherits the directive and reads `"deadbeef"` as the
-  four hex octets `deadbeef`. It used to read six base64 octets (`75e69d6de79f`) — a different value, with no
-  diagnostic, because dropping the inherited annotations dropped the directive with them.
-  `RestatedFieldAnnotationsTest` covers each case; §5.8/§8.1 owe the rule, which is `SPEC-FEEDBACK.md` #25(c).
-- **A declaration's annotations stay on the declaration.** Nothing is copied to a use site, because nothing
-  needs to be: a use site names the entry the author wrote, so a directive on an alias is found by compiling
-  that alias. See "References are hops, not rewrites" below.
+  precedence mechanism: `Annotations.get`/`value` take the first occurrence, so leading with the nearer
+  declaration is what a first-occurrence lookup reads. **The ordering half has no read-side witness any more**
+  — `@bytes_encoding` was the one field annotation with decode force, and the alphabet is a type selector now
+  (`bytes_type.encoding`), so no annotation the meta layer declares changes how a value reads. The rule is
+  unchanged; only its demonstration is now over resolved output. `RestatedFieldAnnotationsTest` covers each
+  case; §5.8/§8.1 owe the rule, which is `SPEC-FEEDBACK.md` #25(c).
 - **What resolves:** record construction; composition (`A & B & { ... }`, §5.8, with kind from the literal
   base-kind names in the transitive supertype chain, and tightening in the trailing body per §5.7); the
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
@@ -308,8 +303,10 @@ recorded open form, and replacing the application with a reference to the entry 
   and keep their own applications, which is what makes those two spellings mean something. **Identity is
   normalised, not provenance**: the minted `source` becomes the canonical application, and the name the author
   wrote survives at the use site, which states it as written — a division that only became available once
-  flattening stopped rewriting use sites. Known wrong for a reference carrying `@bytes_encoding`, which is not
-  a pure rename (`SPEC-FEEDBACK.md` #32); `AliasedArgumentIdentityTest` pins the rest.
+  flattening stopped rewriting use sites. `AliasedArgumentIdentityTest` pins it. The one case this used to get
+  wrong — a reference carrying an alphabet directive, which was not a pure rename — cannot arise now: the
+  alphabet is `bytes_type`'s own `encoding` selector, so it is part of the type and travels with it
+  (`SPEC-FEEDBACK.md` #29).
 - **It runs over the resolved form, not the AST**, as a pass in `SchemaResolver` after the driving loop.
   Two reasons. An application arrives here as a `schema.meta.TypeRef` carrying `arguments` — the one thing
   that shape means, since a closed form is always an entry named by a bare reference — so substitution is a
@@ -591,10 +588,6 @@ namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a 
   parameter is its own terminal) and the second has none. **`ParameterKinds` keeps its own loop deliberately**:
   it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the template
   being the answer there. `ReferenceChainWalkTest` pins all four stops.
-- **A directive on an alias is applied where the alias is compiled** (`UseSite.respelledByDeclaration`). An
-  entry that declares `@bytes_encoding` respells the reader its target produced. **Nearest-first falls out of
-  the recursion** — a chain compiles innermost-first, so the hop nearest the use site respells last and wins —
-  which is a rule that used to need stating and now needs none.
 - **Anything that needs the chain end walks it and says so.** `TsonSchemaLinker.checkFieldValue` walks to the
   terminal before checking a `~`/`=` value, since a field typed by an alias states a value of whatever the
   alias names; `FieldValueConformanceTest` pins both directions.

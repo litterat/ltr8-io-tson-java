@@ -4,16 +4,13 @@ import io.ltr8.annotation.Annotation;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.tree.TsonValue;
 
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
 
-import java.util.HexFormat;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,7 +28,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Concatenation rather than replacement by name because [TSON-DATA] §3.1 makes a name repeatable on one
  * value with all occurrences preserved; restatement first because order is what every first-occurrence
- * lookup reads as precedence, {@code @bytes_encoding}'s nearest-first resolution included.
+ * lookup reads as precedence.
+ *
+ * <p><b>The ordering half has no read-side witness here, and that is a gap in the tests rather than in the
+ * rule.</b> It used to have one: {@code @bytes_encoding} was a field annotation with decode force, so a
+ * restatement that dropped it read the same characters as different octets. The alphabet is a type selector
+ * now ({@code bytes_type.encoding}), and no annotation the meta layer declares changes how a value reads --
+ * so the ordering can only be asserted over resolved output until one does.
  */
 class RestatedFieldAnnotationsTest {
 
@@ -66,15 +69,6 @@ class RestatedFieldAnnotationsTest {
 
               refined_account => account ^ {
                 legacy_id: = _
-              }
-
-              envelope => {
-                @bytes_encoding:HEX
-                digest: bytes?
-              }
-
-              sealed_envelope => envelope & {
-                digest: bytes
               }
             }
             """.formatted(ID);
@@ -132,21 +126,6 @@ class RestatedFieldAnnotationsTest {
     @Test
     void refinementMergesTheSameWayComposalDoes() {
         assertEquals(List.of("doc", "deprecated"), names("refined_account", "legacy_id"));
-    }
-
-    /**
-     * The rule has read-side force, and this is the case that shows the ordering matters rather than only the
-     * merging. {@code @bytes_encoding} is resolved nearest-first by first occurrence, so a restated field that
-     * kept none of its inherited annotations silently fell back to base64 -- reading four bytes of hex as
-     * whatever base64 made of the same characters, or failing outright.
-     */
-    @Test
-    void aRestatedFieldKeepsTheAlphabetItsSourceDirected() {
-        Tson tson = Tson.builder().build();
-        tson.resolve(SCHEMA);
-        TsonValue read = tson.treeReader().withSchema(ID)
-                .readAs("!sealed_envelope { digest: \"deadbeef\" }", "sealed_envelope");
-        assertArrayEquals(HexFormat.of().parseHex("deadbeef"), read.get("digest").as(byte[].class).orElseThrow());
     }
 
     /** Nothing is removable: every inherited annotation survives every restatement above. */

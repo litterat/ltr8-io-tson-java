@@ -269,11 +269,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 return AtomTypeReader.of(name, RawTokenParser.INSTANCE, location);
             }
             // A field's own @bytes_encoding needs a reader the type does not share -- see FieldReaders.byType,
-            // which does the same for tree mode.
-            // Bind mode wants the atom itself, so the mode wrapper is the identity here where tree mode
-            // boxes the leaf in a TsonAtom.
-            return BytesEncoding.fieldReader(field, context, (reader, leafName) -> reader)
-                    .orElseGet(() -> resolver.resolve(field.type().name()));
+            return resolver.resolve(field.type().name());
         };
     }
 

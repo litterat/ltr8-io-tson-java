@@ -205,8 +205,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
          */
         static FieldReaders byType(TsonTypeReaderResolver resolver, ValueReaderContext context,
                 java.util.function.BiFunction<TsonTypeReader<?>, String, TsonTypeReader<?>> leaf) {
-            return field -> BytesEncoding.fieldReader(field, context, leaf)
-                    .orElseGet(() -> resolver.resolve(field.type().name()));
+            return field -> resolver.resolve(field.type().name());
         }
     }
 

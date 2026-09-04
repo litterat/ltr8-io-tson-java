@@ -272,7 +272,7 @@
   bytes => !type_definition {
     kind: ATOM
     source: bytes_type
-    body: !bytes_type {}
+    body: !bytes_type { encoding: BASE64 }
   }
 
 
