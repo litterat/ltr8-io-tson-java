@@ -27,7 +27,6 @@
   @doc:"Octet-sequence constraint vocabulary. Instance is bytes in core. The value is the octets; encoding is a selector picking the text spelling."
   bytes_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: encoding    type: bytes_encoding  state: REQUIRED_DEFAULT  value: BASE64 }
@@ -60,7 +59,6 @@
     """
   scoped => !type_definition {
     kind: SUM
-    constructor: true
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
       !record_field { name: scope    type: set_scope_kind_xxhash }
@@ -78,7 +76,6 @@
   @doc:"Approximate-numeric constraint vocabulary (SQL approximate tier; ISO/IEC 11404 approximate real). Instances are `float32` and `float64` in core. Pinned to IEEE 754-2019."
   float_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec                 type: uri      state: REQUIRED_FIXED  value: "https://ieeexplore.ieee.org/document/8766229" }
@@ -101,7 +98,6 @@
   @doc:"Exact-numeric constraint vocabulary (SQL exact tier; ISO/IEC 11404 scaled, radix 10). Instance is `number` in core."
   decimal_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: min              type: value    state: OPTIONAL }
@@ -122,7 +118,6 @@
   @doc:"Rational constraint vocabulary. Instance is `rational` in core. Exact (ℚ; ISO/IEC 11404 rational)."
   rational_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: min            type: value  state: OPTIONAL }
@@ -147,7 +142,6 @@
   @doc:"Complex constraint vocabulary. Instance is `complex` in core. `component` selects the parts' type from complex_component, default NUMBER."
   complex_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: component  type: complex_component  state: REQUIRED_DEFAULT  value: NUMBER }
@@ -157,7 +151,6 @@
   @doc:"Date constraint vocabulary. Instance is `date` in core."
   date_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
@@ -175,7 +168,6 @@
   @doc:"Time constraint vocabulary. Instance is `time` in core. `precision` bounds fractional-second digits (at most N, on the written token)."
   time_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec              type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
@@ -194,7 +186,6 @@
   @doc:"Datetime constraint vocabulary. Instance is `datetime` in core. `precision` as for `time_type`."
   datetime_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec              type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
@@ -213,7 +204,6 @@
   @doc:"Duration constraint vocabulary. Instance is `duration` in core."
   duration_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
@@ -238,7 +228,6 @@
     """
   period_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
@@ -257,7 +246,6 @@
   @doc:"UUID constraint vocabulary. Instance is `uuid` in core."
   uuid_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec     type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9562" }
@@ -268,7 +256,6 @@
   @doc:"Email constraint vocabulary. Instance is `email` in core."
   email_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
       !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
@@ -282,7 +269,6 @@
   @doc:"IPv4 address constraint vocabulary. Instance is `ipv4` in core."
   ipv4_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec       type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
@@ -294,7 +280,6 @@
   @doc:"IPv6 address constraint vocabulary. Instance is `ipv6` in core."
   ipv6_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec       type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
@@ -306,7 +291,6 @@
   @doc:"IPv4 network constraint vocabulary. Instance is `cidr4` in core."
   cidr4_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
@@ -320,7 +304,6 @@
   @doc:"IPv6 network constraint vocabulary. Instance is `cidr6` in core."
   cidr6_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
@@ -334,7 +317,6 @@
   @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac` in core."
   mac_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec  type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9542" }

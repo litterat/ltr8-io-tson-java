@@ -66,14 +66,14 @@ are kept in step deliberately.
 - **A template closes by application, never by construction**, and naming one at a construction site is an
   author error (`DefinitionResolver.resolveInstance`). `C<...>` substitutes a template's parameters away
   (§5.10); `!C { ... }` fills a *constructor's* own vocabulary (§4.2). Different operations, and the check
-  is on being a template — having parameters — not on carrying `~`, so an unmarked §5.10 template gets the
+  is on being a template — having parameters — so any §5.10 template gets the
   same advice instead of the "did you mean atom refinement?" hint, which cannot help when what is missing is
   the argument list. **This is why the `RecordBody` check below it is genuinely unreachable**: its own
   comment used to claim so and was wrong, because an *open* declaration holds its body (`holdIfOpen`) and a
-  parameterised `~` declaration is exactly one — so `!my_set { … }` reached an `IllegalStateException`,
+  parameterised declaration is exactly one — so `!my_set { … }` reached an `IllegalStateException`,
   which is this project's spelling of *an internal invariant broke*, and the CLI reported an author's schema
   mistake as a library fault at exit 70. `TemplateClosesByApplicationTest` pins all of it.
-- **What `!C { … }` may apply is IS-A `top` (§4.1), not the `~` marker** (`requireApplicable`). §4.1 makes
+- **What `!C { … }` may apply is IS-A `top` (§4.1)** (`requireApplicable`). §4.1 makes
   every base kind IS-A `top` and every constructor transitively so, while IS-A stops at construction — an
   instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond
   them, exactly the entries describing *a type* rather than a part of one. Measured over the bundled schemas:
@@ -107,28 +107,22 @@ are kept in step deliberately.
   hint in the refusal rides on the same applicability question, so `!top ^ { … }` gets the plain answer rather
   than advice that would fail in turn. And the governed-compile factory lookup asks IS-A `top`, so a
   construction that resolved reaches a factory rather than failing "out of scope" on a narrower test.
-  **Two readers of the marker are left** — §2.2.2's eligibility check in the linker and §4.2's level
-  discipline — and `SPEC-FEEDBACK.md` #36 proposes removing `~` and `type_definition.constructor` outright:
-  the first restates as "may declare an entry that IS-A `top`", and the second dissolves, composition already
-  propagating the chain so the level is inherited rather than declared. That last is a change of meaning
-  rather than spelling and is the entry's one open question; the removal is not built.
-  `ApplicabilityIsIsATopTest` pins it.
-- **§4.2's three declaration-time rules for `~`, and where each is answered.** **Placement** (a `~`
-  declaration only in a schema whose own `!!meta` names the meta-kernel) is checked at the declaration.
-  **Level discipline** (an entry composing with, refining, or subtracting from a constructor MUST itself be
-  `~`) is checked on each operand, at two sites — `resolveComposition`'s supertype loop and
-  `resolveRefinement`'s source — which is all three operations, §5.9's removal clause applying to a
-  composition so its operand arrives as a supertype. The check asks only whether the *operand* is a
-  constructor, because the rule is one-directional: a non-constructor operand in a `~` declaration stays
-  legal, which is what lets a base kind seed the level (`record => ~product & { … }` — the base kinds are
-  non-constructors) and `atom_specification` lend vocabulary. What it protects is the two indexes §7.2's
-  subsumption rule reads: unchecked, an ordinary type composing with a constructor resolved to
-  `constructor: false` carrying that constructor in `supertypes`, and the constructor gained a
-  non-constructor `subtypes` entry. Construction is exempt and needs no marker — §5.5 transfers kind and no
-  supertypes, so `!C { … }` mixes no index, and it is the remedy the refusal names.
-  `ConstructorLevelDisciplineTest` pins all of it, including that no bundled schema mixes the two levels.
+  **There is no marker.** `~` is gone from §12.1's grammar and `constructor` from §8.1's `type_definition`:
+  what makes an entry a constructor is that it IS-A `top`, which its supertype chain records, and the two
+  rules that used to read the marker are answered by that. **§2.2.2 eligibility** — who may declare one —
+  asks the linker whether the entry IS-A `top`, so an ordinary type library still cannot reach constructor
+  level, by composing its way there or otherwise. **§4.2's level discipline dissolves**: composition
+  propagates the chain, so an entry deriving from a constructor *is* one, and there is nothing left to
+  refuse. What that used to protect for an ordinary schema, eligibility protects better — it refuses the
+  declaration outright rather than only the unmarked spelling of it — and in a meta-schema, where extending
+  a vocabulary is the point, it is simply allowed. `ApplicabilityIsIsATopTest` and
+  `ConstructorLevelDisciplineTest` pin both halves; `SPEC-FEEDBACK.md` #36 is the spec side.
+- **§4.2's two remaining declaration-time rules.** **Placement** (a constructor declared only in a schema
+  whose own `!!meta` names the meta-kernel) is the eligibility rule above, checked in the linker.
+  **Construction is exempt** and always was — §5.5 transfers kind and no supertypes, so `!C { … }` yields an
+  entry with an empty chain, which is why an instance is not itself a constructor.
 - **§4.2's value-route-only rule is enforced where the argument lands, not at the declaration.** A `~`
-  declaration's parameter routed into a *vocabulary slot* typed `type_ref` — `my_set => <T> ~array ^ {
+  declaration's parameter routed into a *vocabulary slot* typed `type_ref` — `my_set => <T> array ^ {
   element_type: = T }` — is refused when it closes, by §5.2's rule that a fixed value is available on a
   field typed by an atom or an enum and nowhere else; the legal value-routed form (`max_items: = N`, an
   atom-typed slot) closes normally. What is **not** checked is the channel §5.2 never sees, a parameter
@@ -617,7 +611,7 @@ recorded open form, and replacing the application with a reference to the entry 
     (`closeHeldAlias`). The first two steps are shared — substitute, then close the application in the slot —
     and what differs is that there is nothing left to build. That is also why `close` tells the three cases
     apart by the constructor head: the body shape no longer distinguishes them, every open entry's being held.
-  - **`reference` is not a `~` constructor and its kind is not a base kind**, so `DefinitionResolver`
+  - **`reference`'s kind is not a base kind**, so `DefinitionResolver`
     dispatches the head instead of judging it by the generic `!C value` rule: §4.1 gives an alias
     `kind: REFERENCE`, which is a `type_kind` with nothing in the supertype chain to supply it, and the
     kernel leaves `reference` unmarked because it describes no value. Both facts are the kernel's own. The

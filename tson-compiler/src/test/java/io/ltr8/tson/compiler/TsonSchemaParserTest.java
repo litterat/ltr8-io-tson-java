@@ -157,7 +157,6 @@ class TsonSchemaParserTest {
     void recordConstruction() {
         TypeDef def = declOf("person => { name: text  age: integer }").typeDef();
         StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
-        assertFalse(structural.constructor());
         RecordDef record = assertInstanceOf(RecordDef.class, structural.body());
         assertEquals(2, record.entries().size());
         FieldDef name = assertInstanceOf(FieldDef.class, record.entries().get(0));
@@ -221,11 +220,10 @@ class TsonSchemaParserTest {
     }
 
     @Test
-    void constructorDefinitionWithTypeParamAndRefinementHead() {
-        TypeDef def = declOf("set => <T> ~array<T> ^ { unordered: = true }").typeDef();
+    void parameterisedRefinementHead() {
+        TypeDef def = declOf("set => <T> array<T> ^ { unordered: = true }").typeDef();
         StructuralTypeDef structural = assertInstanceOf(StructuralTypeDef.class, def);
         assertEquals(List.of("T"), structural.typeParams());
-        assertTrue(structural.constructor());
         RefinedDef refined = assertInstanceOf(RefinedDef.class, structural.body());
         assertEquals(new GenericRef("array", List.of(new TypeArg.Ref(new SimpleRef("T")))), refined.target());
     }
@@ -475,7 +473,7 @@ class TsonSchemaParserTest {
     @Test
     void fieldGroupRequiredAndOptional() {
         StructuralTypeDef structural = (StructuralTypeDef) declOf("""
-                integer_type => ~atom & {
+                integer_type => atom & {
                   size:  integer_size?
                   ( min: integer | exclusive_min: integer )?
                   multiple_of: integer?

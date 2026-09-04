@@ -1104,7 +1104,7 @@ compatibility).
   edges an open operand does and does not give. `DefinitionResolver`'s Javadoc is the exact current boundary.
   Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
-  **No gap reaches a read either**, `scoped` having been the last: every `~`-marked constructor
+  **No gap reaches a read either**, `scoped` having been the last: every constructor
   meta-kernel.tn and meta.tn declare builds a real reader, and `CoreSchemaImportTest` asserts that no entry
   of core.tn — the whole standard library — compiles to an `ErrorReader`. `ErrorReader` stays, and so does
   `NOT_IMPLEMENTED`'s machinery: §2.2.2's extension point still reaches one, a meta-layer constructor this

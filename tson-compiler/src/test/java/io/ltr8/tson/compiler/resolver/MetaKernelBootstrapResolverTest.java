@@ -87,7 +87,7 @@ class MetaKernelBootstrapResolverTest {
 
     @Test
     void booleanResolvesEvenThoughEnumItselfIsDeclaredLaterInTheFile() {
-        // boolean => !enum [true false] appears near the top of the file; enum => ~atom & {...}
+        // boolean => !enum [true false] appears near the top of the file; enum => atom & {...}
         // isn't declared until much later -- the two-pass design exists precisely for this.
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 

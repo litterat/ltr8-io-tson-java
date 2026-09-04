@@ -3576,24 +3576,38 @@ question `~` was asked turned out to be answerable from the type system, and bet
 what §4.1 has said all along, and "constructor level" becomes a position in the IS-A chain rather than a
 property an author asserts.
 
-**The one thing a revision must decide, stated plainly.** §4.2's level discipline exists so that "the two
-IS-A relations never mix: types relate to types, and constructors relate to constructors and kinds". Under
-this proposal there is one relation, and `composed => c & { extra: identifier }` over a constructor `c` is
-simply IS-A `top` and therefore applicable — where today it is a resolver error. Two readings, and the
-register cannot settle which:
+**The one thing a revision must weigh, now measured rather than guessed.** §4.2's level discipline exists so
+that "the two IS-A relations never mix: types relate to types, and constructors relate to constructors and
+kinds". Under this proposal there is one relation, and `composed => c & { extra: identifier }` over a
+constructor `c` is simply IS-A `top` and therefore applicable — where under Revision 34 it is a resolver
+error. Building it settled the question the entry could not: **in an ordinary schema the declaration is
+refused anyway**, by §2.2.2 eligibility, which asks the same IS-A `top` question of every declared entry; and
+**in a meta-schema it is exactly what the author is doing**, extending a constructor's vocabulary. The
+separation the rule protected is protected by placement, one layer up, without a marker to repeat.
 
-1. **That is correct and the rule was working around the marker.** Extending a constructor's vocabulary is
-   exactly what a meta-schema author is doing, and refusing it because they did not repeat a marker is
-   ceremony. The kinds still separate what a thing *describes*; nothing is mixed that was not already.
-2. **The separation is load-bearing for something the reference implementation has not reached.** If so, the
-   marker stays and this entry reduces to its first half — §3.3.1's predicate — which is running and is worth
-   taking either way.
+**What is running: all of it.** `~` is gone from the schema grammar and `constructor` from
+`type_definition`. The three bundled schemas are written without the marker and their resolved companions
+without the field; every digest is re-stamped. Applicability, atom refinement, the factory lookup and the
+desugar route all ask the type system. §2.2.2 eligibility asks the linker whether the entry IS-A `top`, and
+§4.2's level discipline is deleted rather than reimplemented.
 
-**What is running, and what is not.** The applicability change is running, with the by-name `reference`
-exception deleted and the alias's own entry produced for the closed spelling. The atom-refinement, factory
-and desugar readers are gone. **The removal itself is not built**: `~` still parses, `constructor` still
-rides in §8.1 output, and the two readers above still read it. This entry is therefore a report up to the
-table and a proposal after it, and says so rather than claiming a removal it has not made.
+**Two things fell out that the proposal did not predict, and both are arguments for it.**
+
+1. **Eligibility strictly subsumes what level discipline protected.** The old rule refused an *unmarked*
+   declaration deriving from a constructor. The eligibility rule refuses *any* declaration of an entry that
+   IS-A `top` outside a meta-kernel-governed schema — so an ordinary type library cannot reach constructor
+   level by composing its way there, which is the case level discipline existed for, and it is refused at the
+   declaration rather than at the spelling. The reading this entry could not settle is settled by building
+   it: nothing was lost.
+2. **One test lost its subject, which is the removal working.** `box => <T> base & { value: T }` was asserted
+   to be a constructor; without the marker it is not one, because composing with an ordinary record reaches
+   no base kind. It is a §5.10 template, which is what it always was — the marker had been asserting
+   something the type system did not agree with.
+
+**In the conformance corpus**, on the branch carrying this revision's proposals: `class2/schema/invalid`
+gains a vector whose subject writes `~`, which is the observable difference between a revision that has the
+marker and one that does not. Its category is `resolver`, §8.1 making every error that stops a schema loading
+one however early the phase that caught it.
 
 **Suggested resolution:**
 
@@ -3606,7 +3620,8 @@ table and a proposal after it, and says so rather than claiming a removal it has
   the opposite of what a reader expects — it is true of the constructor and false of every instance, §4.1's
   "IS-A does not extend below construction" being why.
 - §4.2: delete the `~` marker and its three rules. Placement becomes a rule about declaring an entry that
-  IS-A `top`; level discipline goes; the value-route-only rule is already proposed for deletion in #35.
+  IS-A `top`; level discipline goes, and §2.2.2's placement rule covers what it protected; the
+  value-route-only rule is already proposed for deletion in #35.
 - §12.1: remove `~` from `type-def`.
 - §8.1: remove `constructor` from `type_definition`. It is derivable from `supertypes` where it is wanted at
   all, and the `*-resolved.tn` companions lose one field per entry.
@@ -3614,9 +3629,10 @@ table and a proposal after it, and says so rather than claiming a removal it has
   rather than a coincidence of it.
 
 **Status against Revision 34:** open, and new against this revision — a re-spelling that became a removal
-while being built, which is the shape this register exists to produce. It is the second entry in this cycle
-where enforcing a neighbouring rule is what exposed the defect: §3.3.1's own by-name exception for
-`reference` had been invisible until the open and closed paths were compared. The removal half is a proposal
-and not a report, and the entry marks the boundary rather than blurring it.
+while being built, and is now running end to end. It is the second entry in this cycle where enforcing a
+neighbouring rule is what exposed the defect: §3.3.1's own by-name exception for `reference` had been
+invisible until the open and closed paths were compared. What a revision adopting this gets is one fewer
+production, one fewer field in §8.1's output, and three rules where there were five — with the two questions
+that remain asked of the supertype chain, which §4.1 already fixes.
 
 ---

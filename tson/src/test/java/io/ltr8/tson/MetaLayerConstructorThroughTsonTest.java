@@ -49,13 +49,13 @@ class MetaLayerConstructorThroughTsonTest {
             !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/35/m/meta.tn"
             {
-              operation => ~data & {
+              operation => data & {
                 path:     text
                 method:   text
                 request:  type_ref
                 response: type_ref
               }
-              webhook => ~data & {
+              webhook => data & {
                 path:     text
                 delivers: [type_ref]?
               }

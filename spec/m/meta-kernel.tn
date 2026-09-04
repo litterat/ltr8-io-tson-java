@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0bb89291b899258a0bbdf8e304782b7f6a33379076e3743d5f1c2faaf7cd0d7f"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=6991f932be2f61e8e6e59d7f45287e9c50f6c559c4c437163b6eeb1a01d1155f"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -69,7 +69,7 @@
     opaque atoms distinguished by name and prose-level parsing contract,
     not by schema shape.
     """
-  unit => ~atom & {}
+  unit => atom & {}
 
   @doc:"""
     Escape hatch primitive. Instance of the unit atom constructor. The
@@ -220,7 +220,7 @@
     facets; with a coherent set the second test is implied by the
     first.
     """
-  integer_type => ~atom & {
+  integer_type => atom & {
     size:  integer_size?
     ( min: integer | exclusive_min: integer )?
     ( max: integer | exclusive_max: integer )?
@@ -248,7 +248,7 @@
     `text`, is the kernel's Unicode code point sequence type. Lengths
     count code points.
     """
-  text_type => ~atom & {
+  text_type => atom & {
     min_length:  non_negative_integer?
     max_length:  non_negative_integer?
     length:      non_negative_integer?
@@ -267,7 +267,7 @@
     fields. The composition draws shape directly from the constructor
     rather than going through the text instance.
     """
-  uri_type => ~text_type & atom_specification & {
+  uri_type => text_type & atom_specification & {
     spec:    = "https://www.rfc-editor.org/rfc/rfc3986"
     scheme:  text?
   }
@@ -275,7 +275,7 @@
   uri => !uri_type {}
 
   @doc:"Regex constraint vocabulary. Same shape pattern as uri_type, pinned to I-Regexp."
-  regex_type => ~text_type & atom_specification & {
+  regex_type => text_type & atom_specification & {
     spec: = "https://www.rfc-editor.org/rfc/rfc9485"
   }
 
@@ -418,7 +418,7 @@
     governs the entry value, as `array.state` governs the element;
     a map key can never be absent.
     """
-  record => ~product & {
+  record => product & {
     access_pattern:  product_access_type = NAMED
     size_type:       product_size_type = FIXED
     fields:          [record_field]
@@ -426,7 +426,7 @@
     supertypes:      [type_name]?
   }
 
-  array => ~product & {
+  array => product & {
     access_pattern:  product_access_type = INDEX
     size_type:       product_size_type = VARIABLE
     element_type:    type_ref
@@ -457,14 +457,14 @@
     so a field reads `tags: set<text>`. The kernel, below meta, has
     no such template and applies the constructor directly.
     """
-  set_type => ~array ^ {
+  set_type => array ^ {
     state:        = REQUIRED
     unordered:    = true
     unique_items: = true
     min_items:     non_negative_integer ~ 1
   }
 
-  map => ~product & {
+  map => product & {
     access_pattern:  product_access_type = NAMED
     size_type:       product_size_type = VARIABLE
     key_type:        type_ref
@@ -474,7 +474,7 @@
     max_items:       non_negative_integer?
   }
 
-  tuple => ~product & {
+  tuple => product & {
     access_pattern:  product_access_type = INDEX
     size_type:       product_size_type = FIXED
     elements:        [tuple_element]
@@ -488,11 +488,11 @@
     """
   enum_set => !set_type { element_type: identifier }
 
-  enum => ~atom & {
+  enum => atom & {
     members: enum_set
   }
 
-  choice => ~sum & {
+  choice => sum & {
     variants: [type_ref]
   }
 
@@ -510,7 +510,6 @@
     source:       type_ref?
     kind:         type_kind
     parameters:   [param_name]?
-    constructor:  boolean ~ false
     supertypes:   [type_name]?
     subtypes:     [type_name]?
     disjoint:     boolean?
