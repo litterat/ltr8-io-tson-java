@@ -361,8 +361,14 @@ final class SchemaDesugarer {
                 // §5.2's own rewrite, applied where the body is written: a bare record body denotes
                 // `!record { fields: [ ... ] }`, so a record template becomes the construction it always
                 // was and is held like every other open form. See recordBinding.
-                if (!structural.typeParams().isEmpty() && !structural.constructor()
-                        && body instanceof RecordDef record) {
+                //
+                // Every parameterised record body takes this path, `~`-marked or not. Marked ones used to
+                // skip it and be held one phase later by `DefinitionResolver.holdIfOpen` instead, which
+                // wraps an open RecordBody into the same `!record { ... }` -- so the two routes produced
+                // identical bodies and the marker decided only which phase did the work. The "flatten
+                // first" reason the second route exists belongs to composition and refinement, which
+                // absorb fields from a source; a bare record has none.
+                if (!structural.typeParams().isEmpty() && body instanceof RecordDef record) {
                     yield instance(recordBinding(record), structural.typeParams());
                 }
                 yield body == structural.body() ? structural

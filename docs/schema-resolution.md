@@ -73,6 +73,46 @@ are kept in step deliberately.
   parameterised `~` declaration is exactly one — so `!my_set { … }` reached an `IllegalStateException`,
   which is this project's spelling of *an internal invariant broke*, and the CLI reported an author's schema
   mistake as a library fault at exit 70. `TemplateClosesByApplicationTest` pins all of it.
+- **What `!C { … }` may apply is IS-A `top` (§4.1), not the `~` marker** (`requireApplicable`). §4.1 makes
+  every base kind IS-A `top` and every constructor transitively so, while IS-A stops at construction — an
+  instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond
+  them, exactly the entries describing *a type* rather than a part of one. Measured over the bundled schemas:
+  `constructor ⊂ IS-A top`, the difference being the four base kinds plus `reference`, and no constructor
+  failing to be IS-A `top`.
+  **Asking for the marker was both too narrow and inconsistent.** `reference` is deliberately unmarked (it
+  describes no value) and the language needs it applicable, so it took a by-name exception in the template
+  path and none in the closed one — `<T> !reference { target: T }` resolved while `!reference { target:
+  int32 }` did not, one construction with two answers. The exception is gone. A base kind is now admitted and
+  refuses itself through its own reader, naming the subtypes that would satisfy the position, which is the
+  better message. What stays out is the component set — `record_field`, `type_ref`, `type_argument`,
+  `tuple_element`, `field_group`, `integer_size`, `atom_specification`, `type_definition` — record-bodied
+  with empty chains; without a check those fail anyway on `Top` being sealed, but as a `ClassCastException`
+  surfaced as `NOT_IMPLEMENTED`, a non-verdict for an author error. `TsonCompiledMetaSchema.buildConstructors`
+  filters on the same predicate, so a head the gate admits has a reader.
+  **Admitting `reference` closed means giving it the alias's own entry**, not just letting it through:
+  `!reference { target: X }` resolves to `kind: REFERENCE` with `X` as source and body, the same entry
+  `name => X` denotes (§8.3), where a construction of any other head takes the head's kind and names the head
+  as its source. The closed path dispatches on the *body* being a `Reference`, having already read it;
+  `resolveInstanceTemplate` holds its body unread and so still needs the head's name — which is the whole of
+  what its `alias` flag is now for, the eligibility half having gone.
+  **Two readers of `constructor` went with it**, both restated in the type system's own terms. Atom
+  refinement asks §5.5's question — *is this an atom instance?* — as **ATOM-kinded and not itself applicable**,
+  which is exactly what an instance is: §4.1's "IS-A does not extend below construction" is what separates the
+  pair, `!T {}` transferring kind and not supertypes, so `integer` carries an empty chain where
+  `integer_type => ~atom & { … }` carries `[atom, top]`.
+  **Both halves are needed, and the obvious single test runs backwards.** IS-A `atom` is true of the
+  *constructor* and false of every instance — measured, it disagrees with the truth on 103 of the 211 bundled
+  entries, selecting precisely the wrong side — while kind alone cannot separate them either, an atom
+  constructor being ATOM-kinded exactly like its instances. Together they agree on all 211. The construction
+  hint in the refusal rides on the same applicability question, so `!top ^ { … }` gets the plain answer rather
+  than advice that would fail in turn. And the governed-compile factory lookup asks IS-A `top`, so a
+  construction that resolved reaches a factory rather than failing "out of scope" on a narrower test.
+  **Two readers of the marker are left** — §2.2.2's eligibility check in the linker and §4.2's level
+  discipline — and `SPEC-FEEDBACK.md` #36 proposes removing `~` and `type_definition.constructor` outright:
+  the first restates as "may declare an entry that IS-A `top`", and the second dissolves, composition already
+  propagating the chain so the level is inherited rather than declared. That last is a change of meaning
+  rather than spelling and is the entry's one open question; the removal is not built.
+  `ApplicabilityIsIsATopTest` pins it.
 - **§4.2's three declaration-time rules for `~`, and where each is answered.** **Placement** (a `~`
   declaration only in a schema whose own `!!meta` names the meta-kernel) is checked at the declaration.
   **Level discipline** (an entry composing with, refining, or subtracting from a constructor MUST itself be

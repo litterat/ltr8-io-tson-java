@@ -1103,9 +1103,12 @@ class DefinitionResolverTest {
 
     @Test
     void atomRefinementRejectsRefiningAConstructorInsteadOfAnInstance() {
-        // integer_type itself is a constructor (constructor: true) -- refining it directly
-        // ("!integer_type ^ {...}") is a resolver error; the diagnostic should point at
-        // constructor application instead (§3.3.1).
+        // integer_type is the integer family's *constructor*, so its body is the family's constraint
+        // vocabulary where an instance's body is an atom value ("integer" carries an IntegerType). Refining
+        // it directly ("!integer_type ^ {...}") is a resolver error -- there is no atom value to narrow --
+        // and the diagnostic points at constructor application instead (§5.5). The test is whether the body
+        // IS-A `Atom`, which neither the kind nor the `~` marker answers: `integer_type => ~atom & { ... }`
+        // is ATOM-kinded too.
         Map<String, TypeDefinition> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
@@ -1114,7 +1117,7 @@ class DefinitionResolverTest {
 
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
-        assertTrue(thrown.getMessage().contains("refines a constructor, not an instance"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("is a constraint vocabulary"), thrown.getMessage());
     }
 
     @Test
@@ -1129,7 +1132,8 @@ class DefinitionResolverTest {
 
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
-        assertTrue(thrown.getMessage().contains("is not an atom-family instance"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("needs an atom-family instance to narrow"),
+                thrown.getMessage());
     }
 
     /**

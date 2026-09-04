@@ -237,6 +237,9 @@ final class DefinitionResolver {
      */
     private static final String REFERENCE = "reference";
 
+    /** [TSON-SCHEMA] §4.1's structural root -- the name {@link #requireApplicable} tests IS-A against. */
+    private static final String TOP = "top";
+
     /**
      * Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see
      * {@link #resolveAtomRefinement}. Structural, not incidental: the merge has to happen on the wire
@@ -532,27 +535,65 @@ final class DefinitionResolver {
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────
 
     /**
+     * Whether {@code !C { ... }} may apply {@code C} at all: <b>{@code C} IS-A {@code top}</b>
+     * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain.
+     *
+     * <p><b>This replaces asking whether {@code C} is a constructor, and it is a wider and more exact
+     * question.</b> §4.1 makes every base kind IS-A {@code top} and every constructor transitively so, while
+     * IS-A stops at construction -- an instance or a fresh record carries an empty chain. So the predicate
+     * admits every constructor, and beyond them exactly the entries that describe <em>a type</em> rather than
+     * a part of one.
+     *
+     * <p>What it lets in that {@code constructor} did not:
+     * <ul>
+     *   <li>{@code reference}, which the kernel deliberately leaves unmarked because it describes no value,
+     *   and which the language nonetheless needs applicable. It used to take a by-name exception in {@link
+     *   #resolveTemplateInstance} and none here, so {@code <T> !reference { target: T }} resolved while
+     *   {@code !reference { target: int32 }} did not -- one construction legal open and illegal closed.</li>
+     *   <li>the four base kinds, which cost nothing: each is an abstract union whose own reader refuses a
+     *   direct application by naming the subtypes that would satisfy it.</li>
+     * </ul>
+     *
+     * <p>What it keeps out is the set that matters -- {@code record_field}, {@code type_ref}, {@code
+     * type_argument}, {@code tuple_element}, {@code field_group}, {@code integer_size}, {@code
+     * atom_specification}, {@code type_definition}: record-bodied entries with empty chains, every one a
+     * component of a type rather than a type. Without a check they fail anyway, on {@code Top} being sealed,
+     * but as a {@code ClassCastException} reported {@code NOT_IMPLEMENTED} -- a non-verdict, for an author
+     * error.
+     */
+    private static void requireApplicable(String name, String target, TypeDefinition applied) {
+        if (applied.supertypes().contains(TOP)) {
+            return;
+        }
+        throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' is not applicable -- it is "
+                + "not IS-A 'top' (§4.1), so it describes a part of a type rather than a type, and there is "
+                + "nothing for '!" + target + " { ... }' to build. Did you mean atom refinement ('!" + target
+                + " ^ { ... }')?");
+    }
+
+    /**
      * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance filled
-     * with {@code value}. {@code C} resolves against the structure namespace only (see {@link
-     * #resolveConstructorTarget}); the found entry MUST be a constructor ({@code constructor: true})
-     * or this is a resolver error (the spec's own suggested diagnostic: "did you mean atom
-     * refinement?") -- and MUST be closed: a template ({@code C} declaring type parameters) closes by
-     * application, {@code C<...>}, never by construction, so naming one here is a resolver error whether or
-     * not it also carries {@code ~}. {@code value} is bound via {@link #bindAtomInstance} directly --
-     * {@code instance.value().typeRef()} already names {@code C} (per {@code Instance}'s own
-     * reshape, matching §12.1's {@code instance = "!" type-name ws core-value}); positional form (§5.6) and
-     * schema-composed defaults
-     * (§5.2/§5.7) are handled uniformly by the compiled {@code Record*Reader} itself (see {@code
-     * RecordAbstractReader}'s own Javadoc), not by a separate normalization step here -- {@code C}'s
-     * own body is always record-shaped (checked below), so every real call reaches one. Construction
-     * transfers only {@code C}'s {@code kind} (§5.5): no supertypes, no parameters, {@code
-     * constructor: false} on the result.
+     * with {@code value}.
+     *
+     * <p>{@code C} resolves against the structure namespace only (see {@link #resolveConstructorTarget}),
+     * and faces two questions. It MUST be <b>applicable</b> -- IS-A {@code top} (§4.1), see {@link
+     * #requireApplicable} -- and it MUST be <b>closed</b>: a template ({@code C} declaring type parameters)
+     * closes by application, {@code C<...>}, never by construction, so naming one here is a resolver error
+     * whether or not it also carries {@code ~}.
+     *
+     * <p>{@code value} is bound via {@link #bindAtomInstance} directly -- {@code instance.value().typeRef()}
+     * already names {@code C} (per {@code Instance}'s own reshape, matching §12.1's {@code instance = "!"
+     * type-name ws core-value}); positional form (§5.6) and schema-composed defaults (§5.2/§5.7) are handled
+     * uniformly by the compiled {@code Record*Reader} itself (see {@code RecordAbstractReader}'s own
+     * Javadoc), not by a separate normalization step here. Construction transfers only {@code C}'s {@code
+     * kind} (§5.5): no supertypes, no parameters, {@code constructor: false} on the result -- except for an
+     * alias, where the result is the entry {@code name => X} denotes, since {@code !reference { target: X }}
+     * is that alias written out (§8.3).
      *
      * <p>Binds against {@link Top}, not the narrower {@code Atom} -- some constructors (e.g. {@code
-     * unknown_type => ~sum & {}}) compose with {@code sum}, not {@code atom}. {@code C}'s own body
-     * must also already be a {@link RecordBody} -- true for every real constructor (a constructor's
-     * own declared vocabulary is always record-shaped, whatever the resulting instance's bound Java
-     * class looks like, atom-family or not).
+     * unknown_type => ~sum & {}}) compose with {@code sum}, not {@code atom}. {@code C}'s own body is
+     * always a {@link RecordBody} by the time it is read, which the two questions above establish rather
+     * than check: see the note at the binding site.
      */
     private TypeDefinition resolveInstance(String name, Instance instance) {
         String target = instance.target();
@@ -565,24 +606,22 @@ final class DefinitionResolver {
                     + "<...>' with its arguments (§5.10). '!" + target + " { ... }' fills a constructor's own "
                     + "vocabulary (§4.2), which is a different operation and needs a closed constructor");
         }
-        if (!constructor.constructor()) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' does not resolve to a "
-                    + "constructor (§3.3.1) -- did you mean atom refinement ('!" + target + " ^ { ... }')?");
-        }
-        if (!(constructor.body() instanceof RecordBody _)) {
-            // Unreachable, and the template check above is what makes that true. §12.1 attaches `~` to a
-            // structural-def only (refined-def / construction-def / record-def), each of which resolves to a
-            // record body, and §7.2 says a constructor *is* a record-shaped type -- but an *open* declaration
-            // holds its body instead (`holdIfOpen`), and a parameterised `~` declaration is exactly that. It
-            // is refused above as a template, so what reaches here has no parameters and therefore no held
-            // body. Any other non-record body is a malformed TypeDefinition that entered the structure
-            // namespace by some route other than parsing -- an invariant violation, not a schema this
-            // resolver should be explaining to an author.
-            throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
-                    + constructor.body().getClass().getSimpleName() + " body; a constructor is record-shaped "
-                    + "(§7.2) and cannot be declared otherwise");
-        }
+        requireApplicable(name, target, constructor);
+        // No check that the head's own body is a record: the two above leave nothing else. `supertypes` is
+        // populated only by composition and refinement, both of which build a `RecordBody` -- except where
+        // `holdIfOpen` wraps one for an open declaration, and a declaration with parameters is refused as a
+        // template above. Every other body shape (a construction's bound value, an alias's `Reference`)
+        // comes with an empty chain, since IS-A stops at construction (§4.1), so `requireApplicable` refuses
+        // it. Parameters empty and IS-A `top` therefore imply a record body.
         Top body = bindAtomInstance(name, instance.value());
+        if (body instanceof io.ltr8.tson.schema.meta.Reference reference) {
+            // `!reference { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
+            // denotes the same entry: `kind: REFERENCE` (§4.1 -- a type_kind, not one the supertype chain
+            // could give) with `X` as both source and body. Dispatched on the *body* rather than on the head's
+            // name because this path has already read it; `resolveInstanceTemplate` holds its body unread and
+            // so has only the name to go on, which is what its own `alias` flag is for.
+            return TypeDefinition.reference(reference.target());
+        }
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
                 List.of(), false, List.of(), List.of(), Optional.empty(), body);
     }
@@ -613,16 +652,12 @@ final class DefinitionResolver {
     private TypeDefinition resolveInstanceTemplate(String name, Instance template) {
         String target = template.target();
         TypeDefinition constructor = resolveConstructorTarget(name, target);
-        // `reference` is the one head whose kind cannot come from its supertype chain and whose eligibility
-        // cannot come from a `~`: §4.1 gives an alias `kind: REFERENCE`, which is a type_kind and not a base
-        // kind, and the kernel deliberately leaves `reference` unmarked because it describes no value. Both
-        // facts are the kernel's own, so the head is dispatched here rather than judged by the generic rule.
-        // The binding check below still runs -- `reference`'s vocabulary is a record like any other.
+        // `reference` needs no exception here any more: it IS-A `top`, so the generic rule admits it, which
+        // is what makes the open and closed spellings of one construction agree. Its `kind` still cannot come
+        // from its supertype chain -- §4.1 gives an alias `kind: REFERENCE`, a type_kind and not a base kind
+        // -- so that fact alone stays the kernel's own, below.
         boolean alias = REFERENCE.equals(target);
-        if (!alias && !constructor.constructor()) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' does not resolve to a "
-                    + "constructor (§3.3.1), so there is nothing for '<...> !" + target + " { ... }' to build");
-        }
+        requireApplicable(name, target, constructor);
         if (!(constructor.body() instanceof RecordBody vocabulary)) {
             throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
                     + constructor.body().getClass().getSimpleName() + " body; a constructor is record-shaped "
@@ -703,14 +738,24 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
                     + "' does not resolve against the type-name namespace (§3.3.1)");
         }
-        if (source.constructor()) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' refines a "
-                    + "constructor, not an instance (§3.3.1) -- did you mean constructor application ('!"
-                    + sourceName + " { ... }')?");
-        }
-        if (source.kind() != TypeKind.ATOM) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
-                    + "' is not an atom-family instance (§5.5), kind=" + source.kind());
+        // §5.5's question, in the type system's own terms: is this an atom *instance*? An atom-kinded entry
+        // that is not itself applicable is exactly one -- §4.1's "IS-A does not extend below construction"
+        // is what makes the pair separable, since `!T {}` transfers kind and not supertypes, so `integer`
+        // carries an empty chain where `integer_type => ~atom & { ... }` carries `[atom, top]`.
+        //
+        // Note which way round that runs: IS-A `atom` is true of the *constructor* and false of every
+        // instance, so it is the constructors it selects. Kind alone does not separate them either --
+        // `integer_type` is ATOM-kinded exactly like its instances. It takes both halves.
+        if (source.kind() != TypeKind.ATOM || source.supertypes().contains(TOP)) {
+            // The construction hint is offered only where construction would actually work, which is the
+            // same applicability question (§4.1) -- so `top`, not applicable, gets the plain answer rather
+            // than advice that would fail in turn.
+            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an "
+                    + "atom-family instance to narrow (§5.5), and '" + sourceName + "' is "
+                    + (source.supertypes().contains(TOP)
+                            ? "a constraint vocabulary -- '^' narrows one of its instances. Did you mean "
+                                    + "constructor application ('!" + sourceName + " { ... }')?"
+                            : "kind=" + source.kind() + ", which has no atom constraints to tighten"));
         }
         // Not an author error, unlike the three checks above: an atom-family instance always records the
         // constructor it came from, so one that doesn't is a malformed TypeDefinition, not a schema anyone
@@ -979,25 +1024,6 @@ final class DefinitionResolver {
     // ── Composition (§5.8) and subtraction (§5.9) ─────────────────────────
 
     /**
-     * {@code A & B & { ... }}: each supertype's fields and groups are copied into the result, left
-     * to right (§5.8's field-ordering rule, §5.11's "supertypes contribute their groups whole"),
-     * checked for name overlap across supertypes; the trailing body's own entries are then resolved
-     * against {@code inheritedFieldIndex} (name -&gt; position in {@code fields}, populated by the
-     * supertype loop above) -- a body field naming an inherited field is a *tightening* entry
-     * (§5.7, via {@link #resolveTighteningField}) and replaces that field in place; a body field
-     * naming nothing inherited is genuinely new and is appended, same as before (§5.8's "new fields
-     * are permitted; existing fields may be tightened" and "tightening entries replace inherited
-     * fields in place; new fields are appended after all inherited fields"). {@code
-     * type_definition.supertypes} accumulates by induction: each supertype's own {@code
-     * supertypes()} is already its full transitive chain (by the same induction, computed when
-     * *that* entry was resolved), so {@code direct + parent.supertypes()} for every direct
-     * supertype, deduplicated, is the complete transitive chain -- no separate graph walk needed.
-     * {@code parameters} (a template's own {@code <T, ...>} list, §5.10) threads straight through
-     * from the declaration's {@code typeParams} into the result -- {@code array}'s own shape
-     * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
-     * actually uses each parameter.
-     */
-    /**
      * [TSON-SCHEMA] §4.2's <b>level discipline</b>: an entry that composes with, refines, or subtracts from a
      * constructor MUST itself be declared {@code ~}.
      *
@@ -1031,6 +1057,25 @@ final class DefinitionResolver {
                 + "deriving from it ('!" + operandName + " { ... }', §5.5)");
     }
 
+    /**
+     * {@code A & B & { ... }}: each supertype's fields and groups are copied into the result, left
+     * to right (§5.8's field-ordering rule, §5.11's "supertypes contribute their groups whole"),
+     * checked for name overlap across supertypes; the trailing body's own entries are then resolved
+     * against {@code inheritedFieldIndex} (name -&gt; position in {@code fields}, populated by the
+     * supertype loop above) -- a body field naming an inherited field is a *tightening* entry
+     * (§5.7, via {@link #resolveTighteningField}) and replaces that field in place; a body field
+     * naming nothing inherited is genuinely new and is appended, same as before (§5.8's "new fields
+     * are permitted; existing fields may be tightened" and "tightening entries replace inherited
+     * fields in place; new fields are appended after all inherited fields"). {@code
+     * type_definition.supertypes} accumulates by induction: each supertype's own {@code
+     * supertypes()} is already its full transitive chain (by the same induction, computed when
+     * *that* entry was resolved), so {@code direct + parent.supertypes()} for every direct
+     * supertype, deduplicated, is the complete transitive chain -- no separate graph walk needed.
+     * {@code parameters} (a template's own {@code <T, ...>} list, §5.10) threads straight through
+     * from the declaration's {@code typeParams} into the result -- {@code array}'s own shape
+     * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
+     * actually uses each parameter.
+     */
     private TypeDefinition resolveComposition(String name, ConstructionDef construction, boolean constructor,
                                                List<String> parameters) {
         List<String> directSupertypes = new ArrayList<>();

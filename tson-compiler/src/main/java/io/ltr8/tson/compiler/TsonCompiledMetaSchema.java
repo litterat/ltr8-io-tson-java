@@ -116,7 +116,12 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
             TsonCompiledSchema compiledSchema, ValueReaderFactoryResolver resolver) {
         Map<String, ReaderResolver> constructors = new HashMap<>();
         for (Map.Entry<String, TypeDefinition> entry : compiledSchema.schema().entries().entrySet()) {
-            if (!entry.getValue().constructor()) {
+            // Applicability is IS-A `top` ([TSON-SCHEMA] §4.1), the same predicate `DefinitionResolver`'s
+            // own gate asks -- so a head that gate admits has a reader here, and one it refuses never
+            // reaches this table. Wider than `constructor`, by the base kinds and `reference`; narrower
+            // than the whole namespace, by every component record (`record_field`, `type_ref`, …), which
+            // is a part of a type and not one.
+            if (!entry.getValue().supertypes().contains("top")) {
                 continue;
             }
             String name = entry.getKey();

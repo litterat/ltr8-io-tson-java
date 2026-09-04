@@ -147,26 +147,49 @@ class MetaLayerDataConstructorTest {
                 core(consumerContext()).resolveLinked(META_HTTP).schema().entries().get("operation");
 
         assertEquals(TypeKind.DATA, operation.kind());
-        assertTrue(operation.constructor(), "`~` marks it applicable as `!operation { ... }`");
+        assertTrue(operation.constructor(), "the `~` marker, which is what §4.2's level discipline reads");
         assertEquals(List.of("data", "top"), operation.supertypes(),
-                "the transitive chain -- `data` is itself `top & {}`");
+                "the transitive chain -- `data` is itself `top & {}` -- and IS-A `top` is what makes"
+                        + " `!operation { ... }` applicable");
     }
 
     /**
-     * {@code ~} is the permission for a <em>schema</em> to write {@code !C ...} (§3.3.1/§5.6), not a claim
-     * about type-ness -- so it is required here even though an operation is not a type.
+     * <b>Applicability is IS-A {@code top} (§4.1), not the {@code ~} marker.</b> Dropping the marker leaves
+     * {@code operation => data & { ... }} still composing with a base kind, so it still IS-A {@code top} and
+     * a governed schema may still write {@code !operation { ... }}.
+     *
+     * <p>The marker has not become meaningless -- it is what §4.2's level discipline reads, and what
+     * {@code atom_specification}-style mixins are told apart from -- but it is not the permission to apply.
+     * Making it the permission is what left {@code reference} needing a by-name exception, and left one
+     * construction legal open and illegal closed.
      */
     @Test
-    void withoutTheTildeTheConstructorCannotBeApplied() {
+    void applicabilityIsIsATopRatherThanTheMarker() {
         DOCUMENTS.put(META_HTTP, META_HTTP_SCHEMA.replace("operation => ~data &", "operation => data &"));
         try {
-            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                    () -> linked("notilde", SEARCH));
+            TypeDefinition operation = core(consumerContext()).resolveLinked(META_HTTP).schema()
+                    .entries().get("operation");
+            assertFalse(operation.constructor(), "the marker is gone");
+            assertEquals(List.of("data", "top"), operation.supertypes(), "and IS-A top is not");
 
-            assertTrue(thrown.getMessage().contains("does not resolve to a constructor"), thrown.getMessage());
+            assertNotNull(linked("notilde", SEARCH), "so the governed schema still applies it");
         } finally {
             DOCUMENTS.put(META_HTTP, META_HTTP_SCHEMA);
         }
+    }
+
+    /**
+     * The other side of the same predicate: a record-bodied entry with an empty chain is a <em>part</em> of a
+     * type ({@code record_field}, {@code type_ref}, {@code integer_size}, …) and is refused where it is
+     * written. Without the check it fails anyway, on {@code Top} being sealed -- but as a {@code
+     * ClassCastException} surfaced as {@code NOT_IMPLEMENTED}, a non-verdict, for an author's mistake.
+     */
+    @Test
+    void aComponentOfATypeIsNotApplicable() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> linked("component", "  bad => !record_field { name: x  type: text }"));
+
+        assertTrue(thrown.getMessage().contains("not IS-A 'top'"), thrown.getMessage());
     }
 
     // ── Binding the constructor to the consumer's class ──────────────────────────────────────────
