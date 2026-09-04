@@ -368,6 +368,13 @@ and recurse; and it is **transparent to `UseSite` renaming and to bind-mode cont
 which look at the reader it wraps — the first or a diagnostic names the entry instead of the author's
 alias, the second or a bound `Map` field silently loses its rebinding.
 
+**Which names mean an entry is one index, built once per compile** (`Subsumption.namesMeaning`, held by
+`Compilation`). It is a property of the schema, not of the entry being guarded — the names whose *chain*
+ends at that entry, transitively, so a two-hop alias counts. Answering it per entry meant scanning every
+entry for every entry compiled, each scan walking a chain: the schema's size squared, recomputing a fact
+that cannot change between calls. An entry with no aliases is absent from the index rather than present with
+a singleton, which is the overwhelming majority of them.
+
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
 §4's three scalar classes — `boolean`, `number` (every numeric family: an `integer` and a `decimal`
 are one class, so never disjoint), `string` (every text-form family: `text`, enums by their members' shared

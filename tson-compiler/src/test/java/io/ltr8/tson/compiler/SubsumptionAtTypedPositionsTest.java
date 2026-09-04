@@ -120,6 +120,25 @@ class SubsumptionAtTypedPositionsTest {
         assertNotNull(compiled.get("h").read(TestDocuments.document("{ f: !base { name: \"x\" } }")));
     }
 
+    /**
+     * And through a chain, which is the case the alias index has to get right: the names that mean an entry
+     * are the ones whose <em>chain</em> ends at it, not the ones pointing directly at it. A one-hop index
+     * would admit {@code !hop} here and refuse {@code !far}.
+     */
+    @Test
+    void anAliasTwoHopsFromThePositionsTypeIsAdmitted() {
+        TsonCompiledSchema compiled = compile("""
+                  base => { name: text }
+                  hop  => base
+                  far  => hop
+                  h    => { f: far }""");
+
+        for (String tag : new String[] { "far", "hop", "base" }) {
+            assertNotNull(compiled.get("h").read(
+                    TestDocuments.document("{ f: !" + tag + " { name: \"x\" } }")), tag);
+        }
+    }
+
     /** A choice keeps its own membership relation (§5.4), which subsumption must not override. */
     @Test
     void aChoiceStillDispatchesOnItsVariants() {
