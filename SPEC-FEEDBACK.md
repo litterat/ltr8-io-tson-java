@@ -2716,10 +2716,24 @@ things are wrong with it here, and two of them are one deletion.
    alphabet explicitly in core is load-bearing rather than cosmetic. But nothing stops a schema declaring
    `mybytes => !bytes_type {}`, leaving it at the default, and then `hex => !mybytes ^ { encoding: HEX }`.
    That is permitted by the clause as written and rebuilds the degenerate IS-A.
-3. **The kind is not homogeneous.** `complex_type.component` is also a selector and set-from-default is
-   *right* there: complex numbers over float64 components are a subset of those over number components, so it
-   narrows the value space and the IS-A is sound. One rule cannot serve both, and the property that separates
-   them is **whether the facet narrows the value space at all**.
+3. **The kind is not homogeneous.** A width selector is one where narrowing is a real relation — an `int8`
+   value space is a subset of an `int16`'s, which is why §5.7 can refuse `!int8 ^ { size: { bits: 16 } }` as
+   widening. `encoding` has no such relation for any pair of members: every octet string is writable in every
+   alphabet. The property that separates them is **whether the change narrows the value space**, and for a
+   spelling facet no change ever does.
+
+**A third case sits under the same clause and is worse than either, which this entry raises rather than
+solves.** `complex_type.component` narrows for *some* pairs and not others: its five members are a partial
+order, not a chain — `INTEGER ⊂ NUMBER ⊂ RATIONAL` and `FLOAT32 ⊂ FLOAT64`, with the exact and approximate
+families incomparable, since `FLOAT64` carries ±inf and NaN that no exact decimal represents. core.tn
+documents both kinds in one breath: `!complex ^ { component: INTEGER }` for Gaussian integers, a genuine
+narrowing with a sound IS-A, and `!complex ^ { component: FLOAT64 }` for floating-point complex, which is not
+a narrowing and whose IS-A is unsound in exactly the way `hexbytes ^ bytes` would be. §5.7's set-from-default
+test admits both, so the clause is not merely unenforceable as `BACKLOG.md` records — **as written it permits
+an unsound IS-A even where it is enforced**, because whether a change narrows depends on which pair of members
+it moves between and not on whether the source had written the facet. What that case needs is a stated subset
+relation among the members and a rule over it; it is out of scope here, and named so that the spelling kind
+below is not mistaken for a fix to it.
 
 **Concretely, §5.7 wants a sixth facet kind and one deletion.** Add to the kind list:
 
@@ -2730,8 +2744,10 @@ things are wrong with it here, and two of them are one deletion.
 > lexical form is a different type, declared as its own instance of the constructor
 > (`hexdigest => !bytes_type { encoding: HEX }`).
 
-and strike `binary`'s `encoding` from the selector clause's examples, leaving the width selector and
-`complex`'s component kind, which are both narrowing and both want the set-from-default permission kept.
+and strike `binary`'s `encoding` from the selector clause's examples, leaving the width selector — where
+narrowing is a real relation and the set-from-default permission is sound. `complex`'s component kind should
+come out of that list too, or the clause acquires the third case above as an example of a rule that does not
+cover it.
 
 **Two things worth knowing while deciding.** The new kind **arrives enforced where the old one is still
 owed**: §5.7's selector rule turns on whether the source *wrote* the facet or took the default, and resolved

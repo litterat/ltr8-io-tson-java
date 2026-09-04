@@ -61,14 +61,18 @@ own prose (which had gone stale on at least one of them):
 
 ## Built-in types
 
-- [ ] **§5.7's selector rule is unenforced, and for a defaulted selector needs something the value model
-  does not keep.** "A selector may be set where the source leaves it at the constructor's default" — nothing
-  checks it. `complex_type.component` (`~ NUMBER`) is the case that bites: after resolution `complex` and an
-  explicit `^ { component: NUMBER }` are the same record, so a legal set-from-default and an illegal re-set
-  are indistinguishable, and `ComplexType` says so at the class. Enforcing it means the resolver keeping which
-  facets a refinement's *source* actually wrote, which the atom-refinement merge erases — that is the work,
-  and whether it is worth the carrying cost for one facet is the first thing to decide. The other selector,
-  `float_type.format`, is REQUIRED with no default, so the rule has nothing to fire on there at all.
+- [ ] **§5.7's selector rule is unenforced for `complex_type.component`, and deciding what to enforce comes
+  first** (`SPEC-FEEDBACK.md` #29). Two problems, and the second is the reason not to just write the check.
+  **It is unenforceable as stated**: "a selector may be set where the source leaves it at the constructor's
+  default", but after resolution `complex` and an explicit `^ { component: NUMBER }` are the same record, so a
+  legal set-from-default and an illegal re-set are indistinguishable; enforcing it means the resolver keeping
+  which facets a refinement's *source* wrote, which the atom-refinement merge erases. **And enforcing it would
+  still admit an unsound IS-A**: the five members are a partial order, not a chain — `INTEGER ⊂ NUMBER ⊂
+  RATIONAL` and `FLOAT32 ⊂ FLOAT64`, the exact and approximate families incomparable because `FLOAT64` carries
+  ±inf and NaN — and core.tn documents both `^ { component: INTEGER }` (a real narrowing) and
+  `^ { component: FLOAT64 }` (not one). Set-from-default admits both. What the case wants is a stated subset
+  relation among the members and a rule over it, which is a spec question before it is work here. The other
+  selector, `float_type.format`, is REQUIRED with no default, so the rule has nothing to fire on there.
 
 - [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
   (issue #50) now rejects an atom body whose own facets admit nothing, but two gaps are left, each
