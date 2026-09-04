@@ -74,10 +74,21 @@ public record TextType(
      * leave. {@code { length: 5  max_length: 3 }} is the third case and would otherwise pass, since
      * neither stated facet contradicts the other <em>as a pair</em>.
      *
-     * <p>{@link #pattern} is unchecked here for the same reason it is unchecked in {@link
-     * #constraintsCheck}, one question over: deciding that a pattern's language is empty, or that it
-     * admits no string of a permitted length, needs the regex engine {@code tson-schema} has no
-     * dependency on.
+     * <p><b>{@link #pattern} emptiness is deliberately not checked, and this is a decision rather than a
+     * gap.</b> A pattern matching no string would leave the type uninhabited, and the check is cheap to
+     * write -- {@code tson-regex}'s disjointness asked of a pattern against itself decides it exactly, from
+     * {@code tson-compiler}, which has the engine this module does not. It was built and removed, because
+     * <b>an empty language is not reachable by mistake in RFC 9485</b>: I-Regexp has no lookaround, no
+     * anchors and no character-class subtraction, and the two errors an author actually makes -- an inverted
+     * range ({@code [z-a]}) and a backwards quantifier ({@code a{2,1}}) -- are <em>syntax</em> errors the
+     * parser already reports, earlier and better. The one construction that works is a negated class holding
+     * a property and its own complement ({@code [^\p{L}\P{L}]}), which nobody writes by accident. The check
+     * would have run a product-NFA emptiness computation over every pattern facet at every schema load to
+     * catch a deliberate act.
+     *
+     * <p>Whether a pattern admits no string of a length the same body permits ({@code min_length: 5} beside
+     * {@code pattern: "a"}) is a separate question and equally unchecked, needing length-bounded emptiness
+     * the engine does not expose.
      */
     @Override
     public List<String> coherenceCheck() {

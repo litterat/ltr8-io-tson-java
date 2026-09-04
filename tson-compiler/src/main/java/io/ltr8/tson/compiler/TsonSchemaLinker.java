@@ -37,7 +37,6 @@ import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.compiler.resolver.PatternCoherence;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RegexType;
@@ -1287,15 +1286,12 @@ public final class TsonSchemaLinker {
      * application supplied them.
      */
     private static void checkCoherent(Top body) {
-        List<String> violations = new ArrayList<>(switch (body) {
+        List<String> violations = switch (body) {
             case Atom atom -> atom.coherenceCheck();
             case Product product -> product.coherenceCheck();
             case Sum sum -> sum.coherenceCheck();
             default -> List.of();
-        });
-        // The half that needs a regex engine, which the value model has no dependency on -- see
-        // PatternCoherence for why it runs here rather than on the family.
-        violations.addAll(PatternCoherence.check(body));
+        };
         if (!violations.isEmpty()) {
             // No name leads this one, deliberately. Only an entry resolution never produced can reach here --
             // a declared body failed the same check one phase earlier, under its own declaration's name -- and
