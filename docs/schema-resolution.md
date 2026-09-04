@@ -164,8 +164,16 @@ are kept in step deliberately.
     own divisor.
   - Unchecked by design, each documented on its class and matching that family's existing narrowing gap:
     `duration_type`'s text bounds (ordering them means parsing them — `"P1M"` vs `"P30D"` does not order
-    lexically, and judging them as strings would call a coherent body empty), `pattern` emptiness, selector
-    facets, and CIDR `within`/`excluding` overlap (containment arithmetic this family has no parser for).
+    lexically, and judging them as strings would call a coherent body empty), `pattern` emptiness, and
+    selector facets.
+  - **The four network families check their own `within`/`excluding` entries here**, through
+    `AtomCoherence.checkNetworks`: the facets are typed `[value]` in meta.tn and must stay so (they list
+    networks, and meta declares no network instance to type them by — core.tn does, and core imports meta),
+    so they arrive as text and the family that owns the rule is the only place that can judge them. That is
+    why `schema.atom` carries `CidrNetwork` and `InternetAddress` at all: a check in the linker or the
+    resolver would be a second home for one family's rule, which is what `Atom.coherenceCheck` exists to
+    prevent. What is still unchecked is a *pair* admitting nothing — an `excluding` set that covers every
+    `within` — which `BACKLOG.md` holds.
   - **The three temporal families' rules are correct but not yet reachable from schema text**, for a reason
     that predates them and is nothing to do with coherence: `date_type.min`/`max` are declared `value?` in
     meta.tn (the untyped escape hatch), so a bound arrives as a `String` and the bind into `DateType`'s

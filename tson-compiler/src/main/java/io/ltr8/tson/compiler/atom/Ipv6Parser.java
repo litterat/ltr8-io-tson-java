@@ -1,6 +1,10 @@
 package io.ltr8.tson.compiler.atom;
 
+import io.ltr8.tson.schema.meta.Ipv6Type;
+import java.util.List;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.atom.CidrNetwork;
+import io.ltr8.tson.schema.atom.InternetAddress;
 
 import java.net.Inet6Address;
 import java.net.UnknownHostException;
@@ -17,9 +21,10 @@ import java.util.regex.Pattern;
  * whole string to a JDK compiler would silently reintroduce {@link Ipv4Parser}'s exact leniency gap
  * (leading zeros, short forms) through the back door of that tail. This class parses the full RFC
  * 4291 §2.2 grammar itself -- the 8-group preferred form, at most one {@code ::} run-of-zeros
- * compression, and an optional dotted-quad tail validated against the same strict {@link
- * Ipv4Parser#IPV4_ADDRESS} grammar -- and builds the address from raw bytes via {@code
- * InetAddress.getByAddress(byte[])}, never a JDK text compiler.
+ * compression, and an optional dotted-quad tail validated against the same strict grammar a bare IPv4
+ * address gets -- and builds the address from raw bytes via {@code InetAddress.getByAddress(byte[])}, never a
+ * JDK text compiler. The grammar itself lives in {@link io.ltr8.tson.schema.atom.InternetAddress}, so that
+ * the families that must judge a {@code within} entry can reach it; this class is the reader over it.
  *
  * <p>Zone identifiers ({@code %eth0}) need no special-case rejection: {@code %} simply isn't in
  * this grammar's character set, so a zone suffix fails as an ordinary malformed group -- matching
@@ -47,20 +52,47 @@ import java.util.regex.Pattern;
  * generic method's result for every non-mapped address tried) sidesteps the JDK's own
  * auto-downcast entirely.
  */
-public record Ipv6Parser() implements AtomType<Inet6Address> {
+public record Ipv6Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
+        implements AtomType<Inet6Address> {
 
     /** §5.5's built-in annotation name -- {@code !ipv6}. */
     public static final String TYPENAME = "ipv6";
 
     /** {@code ipv6 => !ipv6_type {}} -- the unconstrained IPv6 address, §5.5's {@code !ipv6}. */
-    public static final Ipv6Parser UNCONSTRAINED = new Ipv6Parser();
+    public static final Ipv6Parser UNCONSTRAINED = new Ipv6Parser(List.of(), List.of());
+
+    /**
+     * The parser {@code constraints} asks for. A malformed entry in either list is refused before a reader is
+     * ever
+     * built ({@code Ipv6Type.coherenceCheck}), so reaching here with one is an internal fault rather than an
+     * author error.
+     */
+    public static Ipv6Parser of(Ipv6Type constraints) {
+        return new Ipv6Parser(networks(constraints.within()), networks(constraints.excluding()));
+    }
+
+    /**
+     * The facet's text entries as networks. Every entry has already been checked to be one at schema load
+     * ({@code Ipv6Type.coherenceCheck}), so a malformed entry cannot reach here; one that somehow did is dropped
+     * rather than silently treated as matching nothing, and the schema-load check is where it is reported.
+     */
+    private static List<CidrNetwork> networks(List<String> entries) {
+        return entries.stream()
+                .map(entry -> CidrNetwork.parse(entry, 128))
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
 
     private static final Pattern HEX_GROUP = Pattern.compile("[0-9a-fA-F]{1,4}");
 
     @Override
     public Inet6Address read(TokenValue token) {
         String text = token.text();
-        byte[] bytes = parse(text);
+        byte[] bytes = InternetAddress.ipv6(text);
+        if (bytes == null) {
+            throw malformed(text);
+        }
+        checkNetworks(text, bytes);
         try {
             return Inet6Address.getByAddress(null, bytes, -1);
         } catch (UnknownHostException e) {
@@ -75,6 +107,27 @@ public record Ipv6Parser() implements AtomType<Inet6Address> {
      * {@code ::} canonicalization) -- still valid per {@link #read}'s own grammar, just not the
      * shortest legal spelling; canonicalizing isn't needed for round-tripping to work.
      */
+
+    /**
+     * §5.5's {@code within}/{@code excluding}: the address must lie inside at least one {@code within}
+     * network when the list is non-empty, and inside none of {@code excluding}. As meta.tn puts it,
+     * "{@code excluding} carves holes out of {@code within}".
+     *
+     * <p>The lists are parsed once, when the reader is compiled, so a read is bit comparisons over the octets
+     * it already has.
+     */
+    private void checkNetworks(String text, byte[] octets) {
+        if (!within.isEmpty() && within.stream().noneMatch(network -> network.contains(octets))) {
+            throw new AtomValidationException("'" + text + "' lies inside none of this type's permitted "
+                    + "networks", "an address within one of " + within.size() + " permitted network"
+                    + (within.size() == 1 ? "" : "s"));
+        }
+        if (excluding.stream().anyMatch(network -> network.contains(octets))) {
+            throw new AtomValidationException("'" + text + "' lies inside a network this type excludes",
+                    "an address outside every excluded network");
+        }
+    }
+
     @Override
     public String write(Inet6Address value) {
         return value.getHostAddress();
@@ -87,99 +140,7 @@ public record Ipv6Parser() implements AtomType<Inet6Address> {
      * caller's own token is the network, not the address, and it names that in its own message.
      */
     static byte[] tryParseBytes(String text) {
-        try {
-            return parse(text);
-        } catch (AtomParseException e) {
-            return null;
-        }
-    }
-
-    private static byte[] parse(String text) {
-        int compressionAt = text.indexOf("::");
-        boolean compressed = compressionAt >= 0;
-        String before = compressed ? text.substring(0, compressionAt) : text;
-        String after = compressed ? text.substring(compressionAt + 2) : "";
-        if (compressed && after.indexOf("::") >= 0) {
-            throw malformed(text);
-        }
-
-        String[] beforeGroups = splitGroups(before);
-        String[] afterGroups = splitGroups(after);
-        for (String group : beforeGroups) {
-            if (group.isEmpty()) {
-                throw malformed(text);
-            }
-        }
-        for (String group : afterGroups) {
-            if (group.isEmpty()) {
-                throw malformed(text);
-            }
-        }
-
-        // The IPv4-tail form is only recognised as the address's very last group -- either the
-        // last group before "::" when there's no compression at all, or the last group after
-        // "::" when there is. A dot anywhere else is simply an invalid hex group.
-        boolean ipv4TailInBefore = !compressed && beforeGroups.length > 0
-                && beforeGroups[beforeGroups.length - 1].indexOf('.') >= 0;
-        boolean ipv4TailInAfter = compressed && afterGroups.length > 0
-                && afterGroups[afterGroups.length - 1].indexOf('.') >= 0;
-
-        int beforeHexCount = beforeGroups.length - (ipv4TailInBefore ? 1 : 0);
-        int afterHexCount = afterGroups.length - (ipv4TailInAfter ? 1 : 0);
-        int ipv4Slots = (ipv4TailInBefore || ipv4TailInAfter) ? 2 : 0;
-        int explicitSlots = beforeHexCount + afterHexCount + ipv4Slots;
-
-        if (compressed) {
-            if (explicitSlots >= 8) {
-                // "::" must stand for at least one group of zeros -- otherwise it's redundant
-                // and ambiguous with the non-compressed preferred form.
-                throw malformed(text);
-            }
-        } else if (explicitSlots != 8) {
-            throw malformed(text);
-        }
-
-        byte[] result = new byte[16];
-        int offset = 0;
-        for (int i = 0; i < beforeHexCount; i++) {
-            offset = writeHexGroup(result, offset, beforeGroups[i], text);
-        }
-        if (ipv4TailInBefore) {
-            offset = writeIpv4Tail(result, offset, beforeGroups[beforeGroups.length - 1], text);
-        }
-        if (compressed) {
-            offset += (8 - explicitSlots) * 2; // already zero-initialised
-        }
-        for (int i = 0; i < afterHexCount; i++) {
-            offset = writeHexGroup(result, offset, afterGroups[i], text);
-        }
-        if (ipv4TailInAfter) {
-            offset = writeIpv4Tail(result, offset, afterGroups[afterGroups.length - 1], text);
-        }
-        return result;
-    }
-
-    private static String[] splitGroups(String s) {
-        return s.isEmpty() ? new String[0] : s.split(":", -1);
-    }
-
-    private static int writeHexGroup(byte[] result, int offset, String group, String fullText) {
-        if (!HEX_GROUP.matcher(group).matches()) {
-            throw malformed(fullText);
-        }
-        int value = Integer.parseInt(group, 16);
-        result[offset] = (byte) (value >> 8);
-        result[offset + 1] = (byte) value;
-        return offset + 2;
-    }
-
-    private static int writeIpv4Tail(byte[] result, int offset, String group, String fullText) {
-        byte[] octets = Ipv4Parser.tryParseOctets(group);
-        if (octets == null) {
-            throw malformed(fullText);
-        }
-        System.arraycopy(octets, 0, result, offset, 4);
-        return offset + 4;
+        return InternetAddress.ipv6(text);
     }
 
     private static AtomParseException malformed(String text) {

@@ -23,6 +23,7 @@ import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomValidationException;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.atom.Complex;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -698,12 +699,23 @@ class ConformanceSuiteTest {
                 assertArrayEquals(HexFormat.of().parseHex(((TokenValue) payload).text()), actual.getAddress(),
                         "vocabulary value");
             }
-            case "text", "cidr4", "cidr6", "mac", "email" -> {
+            // A network is a value here (prefix octets plus prefix length), so the oracle is the sidecar's
+            // canonical text parsed into one and compared as a value -- which is what the `text` family
+            // means for cidr4/cidr6: the *canonical* form, never whichever spelling the subject used.
+            // A vector must therefore author its subject canonically, or a text-preserving implementation
+            // and a value-parsing one cannot both satisfy it (§5.2 leaves the host type open).
+            case "cidr4", "cidr6" -> {
+                CidrNetwork actual = (CidrNetwork) atomType.read(token, CidrNetwork.class);
+                int familyBits = typeRef.equals("cidr4") ? 32 : 128;
+                assertEquals(CidrNetwork.parse(((TokenValue) payload).text(), familyBits), actual,
+                        "vocabulary value");
+            }
+            case "text", "mac", "email" -> {
                 // The atoms whose host value is the authored text itself, so the oracle is a plain string
                 // compare with no parse in between. Deliberately not folded into the numeric default arm
-                // below. Three reasons converge here: `text` is text by definition (§5.5, "the host value is
-                // the token's text"), while `cidr4`/`cidr6`/`mac` keep their text because Java has no type to
-                // map onto (see Cidr4Parser/MacParser) and `email` because the address shape is the contract.
+                // below. `text` is text by definition (§5.5, "the host value is the token's text"), `mac`
+                // keeps its text because Java has no type to map onto (see MacParser), and `email` because
+                // the address shape is the contract.
                 String actual = (String) atomType.read(token, String.class);
                 assertEquals(((TokenValue) payload).text(), actual, "vocabulary value");
             }

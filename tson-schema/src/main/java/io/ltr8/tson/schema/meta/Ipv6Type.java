@@ -48,4 +48,24 @@ public record Ipv6Type(String spec, List<String> within, List<String> excluding)
         AtomNarrowing.checkSuperset(violations, "excluding", excluding, other.excluding);
         return java.util.List.copyOf(violations);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Every entry of {@code within} and {@code excluding} must be a network. The facets are typed
+     * {@code [value]} in meta.tn -- they list networks, and meta declares no network instance to type them
+     * by, core.tn doing that and core importing meta -- so any token satisfies the vocabulary and a missing
+     * prefix length or a transposed octet reaches here as ordinary text.
+     *
+     * <p>It is checked here rather than anywhere downstream because it is this family's rule: a malformed
+     * entry makes the facet unreadable, which is the same kind of defect as a floor above a ceiling. Every
+     * bad entry is named rather than the first, a list being written in one go.
+     */
+    @Override
+    public java.util.List<String> coherenceCheck() {
+        java.util.List<String> violations = new java.util.ArrayList<>();
+        AtomCoherence.checkNetworks(violations, "within", within, 128);
+        AtomCoherence.checkNetworks(violations, "excluding", excluding, 128);
+        return java.util.List.copyOf(violations);
+    }
 }

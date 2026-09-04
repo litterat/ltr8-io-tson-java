@@ -138,4 +138,24 @@ final class AtomCoherence {
             }
         });
     }
+
+    /**
+     * Every entry of a {@code within}/{@code excluding} list must be a network of the family's own width.
+     *
+     * <p>The facets are typed {@code [value]} (meta.tn cannot name a network instance -- core declares those,
+     * and core imports meta), so they arrive as text and the family that owns the rule is the only place that
+     * can judge them. {@link io.ltr8.tson.schema.atom.CidrNetwork#parse} is the grammar, and it refuses a
+     * malformed address, a prefix outside the family range, and nonzero host bits alike.
+     */
+    static void checkNetworks(List<String> out, String facet, List<String> entries, int familyBits) {
+        for (String entry : entries) {
+            io.ltr8.tson.schema.atom.CidrNetwork network =
+                    io.ltr8.tson.schema.atom.CidrNetwork.parse(entry, familyBits);
+            if (network == null || !network.hostBitsAreZero()) {
+                out.add(facet + " lists '" + entry + "', which is not an IPv" + (familyBits == 32 ? "4" : "6")
+                        + " network -- expected CIDR notation, an address followed by '/' and a prefix length "
+                        + "of 0-" + familyBits + ", with zero host bits beyond the prefix");
+            }
+        }
+    }
 }

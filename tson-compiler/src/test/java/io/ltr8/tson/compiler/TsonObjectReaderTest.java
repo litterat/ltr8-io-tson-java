@@ -7,6 +7,7 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.atom.Complex;
 import io.ltr8.tson.schema.atom.Rational;
 import io.ltr8.annotation.Annotated;
@@ -957,16 +958,27 @@ class TsonObjectReaderTest {
 
     // ── CIDR networks (§5.5) ─────────────────────────────────────────────
 
-    public record CidrHolder(String value) {
+    public record CidrHolder(CidrNetwork value) {
     }
 
     @Test
-    void builtinCidrAnnotationsBindAsTheAuthoredTextThroughTheMapper() throws DataBindException {
-        // Host type is String, not a parsed pair -- Java has no CIDR type, so the network is validated
-        // and handed back exactly as written (see Cidr4Parser's Javadoc). Both must be quoted: '/' is
+    void builtinCidrAnnotationsBindAsNetworkValuesThroughTheMapper() throws DataBindException {
+        // The host type is CidrNetwork -- the prefix octets and the prefix length -- so two spellings of
+        // one network bind equal and a holder can ask what the value contains. Both must be quoted: '/' is
         // not a legal unquoted-token character (§7.2), and an IPv6 network also contains ':'.
-        assertEquals("10.0.0.0/8", mapper.read("{ value: !cidr4 \"10.0.0.0/8\" }", CidrHolder.class).value());
-        assertEquals("2001:db8::/32", mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", CidrHolder.class).value());
+        assertEquals(CidrNetwork.parse("10.0.0.0/8", 32),
+                mapper.read("{ value: !cidr4 \"10.0.0.0/8\" }", CidrHolder.class).value());
+        assertEquals(CidrNetwork.parse("2001:db8::/32", 128),
+                mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", CidrHolder.class).value());
+    }
+
+    @Test
+    void aNonCanonicalNetworkSpellingBindsToTheSameValueAsItsCanonicalOne() throws DataBindException {
+        // What it means for the value to be the octets rather than the text: the expanded RFC 4291 form and
+        // the RFC 5952 canonical one are one network, and equality says so.
+        assertEquals(mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", CidrHolder.class).value(),
+                mapper.read("{ value: !cidr6 \"2001:0db8:0000:0000:0000:0000:0000:0000/32\" }",
+                        CidrHolder.class).value());
     }
 
     @Test
@@ -983,7 +995,7 @@ class TsonObjectReaderTest {
             throws DataBindException {
         // /33 is out of range for IPv4 and perfectly ordinary for IPv6 -- the range is per family.
         assertThrows(TsonReadException.class, () -> mapper.read("{ value: !cidr4 \"10.0.0.0/33\" }", CidrHolder.class));
-        assertEquals("2001:db8:8000::/33",
+        assertEquals(CidrNetwork.parse("2001:db8:8000::/33", 128),
                 mapper.read("{ value: !cidr6 \"2001:db8:8000::/33\" }", CidrHolder.class).value());
     }
 

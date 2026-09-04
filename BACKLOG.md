@@ -74,15 +74,13 @@ own prose (which had gone stale on at least one of them):
   relation among the members and a rule over it, which is a spec question before it is work here. The other
   selector, `float_type.format`, is REQUIRED with no default, so the rule has nothing to fire on there.
 
-- [ ] **`within`/`excluding` are declared and never applied.** meta.tn gives `ipv4_type`, `ipv6_type`,
-  `cidr4_type` and `cidr6_type` a `within` list and an `excluding` list; `Ipv4Parser` is `record Ipv4Parser()`
-  and holds no constraints at all, and `Cidr4Parser`'s own Javadoc records that the two "stay unmodeled". So a
-  schema writing `within: ["10.0.0.0/8"]` resolves, links, compiles, and accepts any address. Set membership
-  and non-overlap against an array of CIDR blocks is the work. **Their narrowing rules are written and their
-  coherence is not, and both are downstream of this**: checking that a refinement narrows a facet nothing
-  applies, or that two such facets are mutually satisfiable, is polishing a rule that has no effect.
-- [ ] **CIDR `within`/`excluding` coherence — a pair admitting no network between them.** Needs the
-  containment arithmetic the entry above needs, and is worth doing with it rather than before it.
+- [ ] **`within`/`excluding` coherence — a pair admitting no network between them.** `within: ["10.0.0.0/8"]`
+  beside `excluding: ["10.0.0.0/8"]` admits nothing, and `Atom.coherenceCheck`'s question is exactly whether a
+  body's own facets admit anything. The containment arithmetic is `schema.atom.CidrNetwork` and the check has a
+  home in each family's own `coherenceCheck`, so this is the rule rather than the machinery: an excluded
+  network that covers every permitted one leaves the type uninhabited. The awkward part is partial cover —
+  several `excluding` entries that between them tile a `within` — which is a set-cover question over prefix
+  trees rather than a pairwise one.
 
 ## Checked annotations
 

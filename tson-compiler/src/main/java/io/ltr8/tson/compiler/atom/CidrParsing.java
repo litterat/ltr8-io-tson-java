@@ -29,13 +29,31 @@ final class CidrParsing {
     }
 
     /**
+     * §5.5's family-range rule, reported where {@code CidrNetwork.parse} could only say "not a network".
+     *
+     * <p>The two refusals are different in kind and the messages have always said so: a prefix of 999 on an
+     * IPv4 network is a well-formed thing naming an impossible one, where {@code 10.0.0/8} is not
+     * well-formed at all. The value model returns one null for both, so the reader asks this before
+     * concluding the text was malformed.
+     */
+    static void checkFamilyRange(String text, int familyBits) {
+        int slash = text.indexOf('/');
+        if (slash < 0) {
+            return;
+        }
+        int prefixLength = tryParsePrefixLength(text.substring(slash + 1));
+        if (prefixLength > familyBits) {
+            throw new AtomValidationException("'" + text + "' has prefix length " + prefixLength
+                    + ", outside the family range 0-" + familyBits, ">= 0 and <= " + familyBits);
+        }
+    }
+
+    /**
      * The decimal prefix length after the {@code /}, or {@code -1} if the text is not one. Leading zeros are
-     * rejected for the same reason {@link Ipv4Parser} rejects them in a {@code dec-octet}: {@code /8} and
-     * {@code /08} would otherwise be two spellings of one network, which is the confusable-input class that
-     * strictness exists to shut down.
+     * rejected because {@code /8} and {@code /08} would otherwise be two spellings of one network.
      */
     static int tryParsePrefixLength(String text) {
-        if (text.isEmpty() || text.length() > MAX_PREFIX_DIGITS) {
+        if (text.isEmpty() || text.length() > 3) {
             return -1;
         }
         if (text.length() > 1 && text.charAt(0) == '0') {
@@ -53,22 +71,12 @@ final class CidrParsing {
     }
 
     /**
-     * §5.5's two validation rules plus {@code cidr4_type}/{@code cidr6_type}'s own prefix facets, in that
-     * order: the family range first (a prefix the family cannot express makes the host-bits question
-     * meaningless), then host bits, then the schema's own narrowing.
+     * {@code cidr4_type}/{@code cidr6_type}'s own prefix facets. The family range and the host-bits rule are
+     * not here: a value failing either is not a network at all, so {@code CidrNetwork.parse} refuses it and
+     * the caller reports a malformed value rather than a violated constraint.
      */
-    static void validateNetwork(String text, byte[] address, int prefixLength, Optional<Integer> minPrefix,
+    static void checkPrefixBounds(String text, int prefixLength, Optional<Integer> minPrefix,
             Optional<Integer> maxPrefix) {
-        int addressBits = address.length * 8;
-        if (prefixLength > addressBits) {
-            throw new AtomValidationException("'" + text + "' has prefix length " + prefixLength
-                    + ", outside the family range 0-" + addressBits, ">= 0 and <= " + addressBits);
-        }
-        if (!hostBitsAreZero(address, prefixLength)) {
-            throw new AtomValidationException("'" + text + "' has nonzero host bits under prefix length "
-                    + prefixLength + " -- the value is a network, so every bit beyond the prefix must be zero",
-                    "zero host bits beyond the prefix");
-        }
         minPrefix.ifPresent(min -> {
             if (prefixLength < min) {
                 throw new AtomValidationException("'" + text + "' has prefix length " + prefixLength
@@ -81,15 +89,5 @@ final class CidrParsing {
                         + ", more than the maximum " + max, "<= " + max);
             }
         });
-    }
-
-    /** Bit-at-a-time rather than byte-masked: at most 128 iterations, and no boundary case to get wrong. */
-    private static boolean hostBitsAreZero(byte[] address, int prefixLength) {
-        for (int bit = prefixLength; bit < address.length * 8; bit++) {
-            if ((address[bit / 8] & (0x80 >> (bit % 8))) != 0) {
-                return false;
-            }
-        }
-        return true;
     }
 }

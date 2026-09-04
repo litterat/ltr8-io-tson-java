@@ -56,6 +56,8 @@ public record Cidr6Type(String spec, @Field("min_prefix") Optional<Integer> minP
         AtomCoherence.checkWithin(violations, "min_prefix", minPrefix, 0, PREFIX_BITS);
         AtomCoherence.checkWithin(violations, "max_prefix", maxPrefix, 0, PREFIX_BITS);
         AtomCoherence.checkOrdered(violations, "min_prefix", minPrefix, "max_prefix", maxPrefix);
+        AtomCoherence.checkNetworks(violations, "within", within, 128);
+        AtomCoherence.checkNetworks(violations, "excluding", excluding, 128);
         return List.copyOf(violations);
     }
 
