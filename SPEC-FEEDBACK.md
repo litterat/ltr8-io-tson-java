@@ -3480,7 +3480,7 @@ spelling.
 
 ---
 
-## 36. §3.3.1 makes `!C { … }` require a constructor, which is too narrow for `reference` and too wide for nothing — proposal: applicability is IS-A `top`
+## 36. The `~` marker decides nothing that the type system does not already say — proposal: applicability is IS-A `top`, and `~` and `type_definition.constructor` are removed
 
 **Section:** [TSON-SCHEMA] §3.3.1 (constructor application resolves against the structure namespace and the
 entry MUST be a constructor), §4.1 (the base kinds, and IS-A `top`), §4.2 (the `~` marker), §5.6.
@@ -3549,18 +3549,74 @@ with a base kind, so it IS-A `top`, and a governed schema may write `!operation 
 extension point becoming reachable without a marker whose other meaning (constructor level) the author may
 not want. `MetaLayerDataConstructorTest` asserts it.
 
+**The marker's other readers fell away as this was built, which is what turns one fix into a removal.** Every
+question `~` was asked turned out to be answerable from the type system, and better:
+
+| Asked the marker | Asks now | Why the new question is the right one |
+|---|---|---|
+| may `!C { … }` apply `C`? | `C` IS-A `top` (§4.1) | separates a type from a part of one; admits `reference`, which the marker refused |
+| may `!I ^ { … }` refine `I`? | `I` is ATOM-kinded and not itself applicable | §5.5 asks whether there is an atom value to narrow; the marker answered something else, and kind alone cannot separate an atom constructor from its instances |
+| does the schema being compiled declare `C`? | `C` IS-A `top` | one predicate throughout, so a construction that resolved reaches a factory |
+| does this record template rewrite at desugar? | *nothing* — every one does | the marked route deferred the identical rewrite to `holdIfOpen` one phase later; measured, both produce the same held body |
+
+**What is left reading it, and what each becomes without it.** Two, and neither needs the marker to survive:
+
+- **§2.2.2 eligibility** — who may declare a constructor. Becomes *only a schema whose own `!!meta` names the
+  meta-kernel may declare an entry that IS-A `top`*, which is the same rule stated in the same vocabulary as
+  everything above. It broadens slightly, to an unmarked composition with a base kind, which is the same act
+  by another spelling.
+- **§4.2 level discipline** — an entry deriving from a constructor must itself be one. This one does not
+  restate; it **dissolves**. Composition already propagates the supertype chain, so an entry composing with
+  something IS-A `top` is IS-A `top`: the level is inherited rather than declared, and there is nothing left
+  to refuse. That is the one place the proposal changes meaning rather than spelling, and it is the part a
+  revision has to adjudicate — see below.
+
+**Proposal: remove the marker and the field.** `~` leaves §12.1's grammar; `constructor` leaves §8.1's
+`type_definition`. What replaces them is nothing: a constructor becomes *an entry that IS-A `top`*, which is
+what §4.1 has said all along, and "constructor level" becomes a position in the IS-A chain rather than a
+property an author asserts.
+
+**The one thing a revision must decide, stated plainly.** §4.2's level discipline exists so that "the two
+IS-A relations never mix: types relate to types, and constructors relate to constructors and kinds". Under
+this proposal there is one relation, and `composed => c & { extra: identifier }` over a constructor `c` is
+simply IS-A `top` and therefore applicable — where today it is a resolver error. Two readings, and the
+register cannot settle which:
+
+1. **That is correct and the rule was working around the marker.** Extending a constructor's vocabulary is
+   exactly what a meta-schema author is doing, and refusing it because they did not repeat a marker is
+   ceremony. The kinds still separate what a thing *describes*; nothing is mixed that was not already.
+2. **The separation is load-bearing for something the reference implementation has not reached.** If so, the
+   marker stays and this entry reduces to its first half — §3.3.1's predicate — which is running and is worth
+   taking either way.
+
+**What is running, and what is not.** The applicability change is running, with the by-name `reference`
+exception deleted and the alias's own entry produced for the closed spelling. The atom-refinement, factory
+and desugar readers are gone. **The removal itself is not built**: `~` still parses, `constructor` still
+rides in §8.1 output, and the two readers above still read it. This entry is therefore a report up to the
+table and a proposal after it, and says so rather than claiming a removal it has not made.
+
 **Suggested resolution:**
 
 - §3.3.1: replace "the found entry MUST be a constructor" with *the found entry MUST be IS-A `top` (§4.1)*.
   One sentence of why: IS-A stops at construction, so the predicate separates a type from a part of one, and
   the base kinds and `reference` are types by that measure while `record_field` and its siblings are not.
-- §4.1: no change; the rule this proposes is read off what it already says.
-- §4.2: no change. The marker keeps level discipline and placement.
-- §8.1: no change to `type_definition.constructor`.
+  **Worth taking on its own**, whatever is decided about the marker.
+- §5.5: state the refinement source as *an atom-kinded entry that is not itself applicable*. An atom
+  constructor is ATOM-kinded exactly like its instances, so kind alone does not say it, and IS-A `atom` says
+  the opposite of what a reader expects — it is true of the constructor and false of every instance, §4.1's
+  "IS-A does not extend below construction" being why.
+- §4.2: delete the `~` marker and its three rules. Placement becomes a rule about declaring an entry that
+  IS-A `top`; level discipline goes; the value-route-only rule is already proposed for deletion in #35.
+- §12.1: remove `~` from `type-def`.
+- §8.1: remove `constructor` from `type_definition`. It is derivable from `supertypes` where it is wanted at
+  all, and the `*-resolved.tn` companions lose one field per entry.
+- §4.1: no change. Everything above is read off what it already says, which is the argument for the removal
+  rather than a coincidence of it.
 
-**Status against Revision 34:** open, and new against this revision — a re-spelling of one predicate, proposed
-after building it. It is the second entry in this cycle where enforcing a neighbouring rule is what exposed the
-defect: §3.3.1's own by-name exception for `reference` had been invisible until the open and closed paths were
-compared, and it is the kind of thing a first implementation finds and a reader of the prose does not.
+**Status against Revision 34:** open, and new against this revision — a re-spelling that became a removal
+while being built, which is the shape this register exists to produce. It is the second entry in this cycle
+where enforcing a neighbouring rule is what exposed the defect: §3.3.1's own by-name exception for
+`reference` had been invisible until the open and closed paths were compared. The removal half is a proposal
+and not a report, and the entry marks the boundary rather than blurring it.
 
 ---

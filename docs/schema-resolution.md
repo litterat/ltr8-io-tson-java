@@ -107,8 +107,11 @@ are kept in step deliberately.
   hint in the refusal rides on the same applicability question, so `!top ^ { … }` gets the plain answer rather
   than advice that would fail in turn. And the governed-compile factory lookup asks IS-A `top`, so a
   construction that resolved reaches a factory rather than failing "out of scope" on a narrower test.
-  **The marker keeps its other jobs** — §4.2's level discipline reads it, and §8.1 records it —
-  and `SPEC-FEEDBACK.md` #36 asks §3.3.1 to state applicability this way.
+  **Two readers of the marker are left** — §2.2.2's eligibility check in the linker and §4.2's level
+  discipline — and `SPEC-FEEDBACK.md` #36 proposes removing `~` and `type_definition.constructor` outright:
+  the first restates as "may declare an entry that IS-A `top`", and the second dissolves, composition already
+  propagating the chain so the level is inherited rather than declared. That last is a change of meaning
+  rather than spelling and is the entry's one open question; the removal is not built.
   `ApplicabilityIsIsATopTest` pins it.
 - **§4.2's three declaration-time rules for `~`, and where each is answered.** **Placement** (a `~`
   declaration only in a schema whose own `!!meta` names the meta-kernel) is checked at the declaration.
