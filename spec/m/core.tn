@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/35/m/core.tn?sha256=cfcbf73740657c30bca5216245ac42d24595fd167e628fefdf05c94ad408eefd"
-!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=70824428389a6c5a2c7b3bf51f7240408c8bb7b11c9805059bb576414abb1ba2"
+!!id:"https://tson.io/2026/35/m/core.tn?sha256=90d046798f2975887ff9cf4809cea802e61f8fa56431d53c0542280eea91b2d7"
+!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=637b9b8cac1c8b8e4652af7946a91386da786895a4aae1b15c4a9242d3c4d641"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 35 draft).
@@ -101,8 +101,12 @@
     Complex number, a pair of components (real and imaginary parts).
     Components default to `NUMBER` (exact); a narrowing may set
     `component` to another member of the closed vocabulary — e.g.
-    `!complex ^ { component: INTEGER }` for Gaussian integers,
-    `!complex ^ { component: FLOAT64 }` for floating-point complex.
+    `!complex ^ { component: INTEGER }` for Gaussian integers — a
+    refinement, ℤ+ℤi sitting inside the exact-decimal complexes — and
+    `!complex_type { component: FLOAT64 }` for floating-point complex,
+    which is its own type rather than a refinement: binary64 carries
+    ±inf and NaN that no exact decimal represents, so it narrows
+    nothing and is not a `complex`.
     Exactness follows the component type, so `complex` carries no
     `@exact` marker. Spellings are the text class's concern (TSON
     text accepts a+bi and a+bj); component representation is host-defined.

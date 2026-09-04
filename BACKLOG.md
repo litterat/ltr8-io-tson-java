@@ -74,16 +74,15 @@ own prose (which had gone stale on at least one of them):
   relation among the members and a rule over it, which is a spec question before it is work here. The other
   selector, `float_type.format`, is REQUIRED with no default, so the rule has nothing to fire on there.
 
-- [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
-  (issue #50) now rejects an atom body whose own facets admit nothing, but two gaps are left, each
-  matching that family's existing *narrowing* gap and each blocked on the same thing — `tson-schema` has no
-  dependency on a parser for the values involved:
-    - `pattern` emptiness — a regex matching no string at all, or none of a permitted length. Needs
-      `tson-regex`, the same boundary the narrowing check's containment gap sits behind.
-    - CIDR `within`/`excluding` admitting no network between them. Needs real containment arithmetic; the
-      family has no CIDR parser.
-    - The natural fix for both is the same one the narrowing check would want: an injected oracle, rather
-      than moving the value model's dependencies.
+- [ ] **`within`/`excluding` are declared and never applied.** meta.tn gives `ipv4_type`, `ipv6_type`,
+  `cidr4_type` and `cidr6_type` a `within` list and an `excluding` list; `Ipv4Parser` is `record Ipv4Parser()`
+  and holds no constraints at all, and `Cidr4Parser`'s own Javadoc records that the two "stay unmodeled". So a
+  schema writing `within: ["10.0.0.0/8"]` resolves, links, compiles, and accepts any address. Set membership
+  and non-overlap against an array of CIDR blocks is the work. **Their narrowing rules are written and their
+  coherence is not, and both are downstream of this**: checking that a refinement narrows a facet nothing
+  applies, or that two such facets are mutually satisfiable, is polishing a rule that has no effect.
+- [ ] **CIDR `within`/`excluding` coherence — a pair admitting no network between them.** Needs the
+  containment arithmetic the entry above needs, and is worth doing with it rather than before it.
 
 ## Checked annotations
 

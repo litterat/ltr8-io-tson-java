@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta.tn?sha256=70824428389a6c5a2c7b3bf51f7240408c8bb7b11c9805059bb576414abb1ba2"
+!!id:"https://tson.io/2026/35/m/meta.tn?sha256=637b9b8cac1c8b8e4652af7946a91386da786895a4aae1b15c4a9242d3c4d641"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0bb89291b899258a0bbdf8e304782b7f6a33379076e3743d5f1c2faaf7cd0d7f"
 !!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0bb89291b899258a0bbdf8e304782b7f6a33379076e3743d5f1c2faaf7cd0d7f"
 @doc:"""
@@ -331,6 +331,17 @@
     `RATIONAL` (ℚ+ℚi); approximate `FLOAT32`, `FLOAT64`. Being an enum,
     it restricts `complex_type.component` at schema-load time and is
     self-contained in meta (no dependency on the core type namespace).
+
+    The members are a partial order, not a chain, and a refinement may
+    move `component` only to a member whose value set is a subset of
+    the source's: `INTEGER ⊂ NUMBER ⊂ RATIONAL` are the exact tiers and
+    `FLOAT32 ⊂ FLOAT64` the approximate ones, and the two families are
+    incomparable — binary64 carries ±inf and NaN that no exact decimal
+    represents, and exact values carry precision no binary64 holds. So
+    `!complex ^ { component: INTEGER }` narrows and its IS-A holds,
+    while `!complex ^ { component: FLOAT64 }` is refused: a float64
+    complex is not a `complex`, and is declared as its own type,
+    `!complex_type { component: FLOAT64 }`.
     """
   complex_component => !enum [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64]
 
