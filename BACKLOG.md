@@ -59,21 +59,6 @@ own prose (which had gone stale on at least one of them):
   about — it starts from a held body, where §4.2 speaks about a `~` constructor's own declaration — and what a
   head it cannot resolve should mean.
 
-## Built-in types
-
-- [ ] **§5.7's selector rule is unenforced for `complex_type.component`, and deciding what to enforce comes
-  first** (`SPEC-FEEDBACK.md` #29). Two problems, and the second is the reason not to just write the check.
-  **It is unenforceable as stated**: "a selector may be set where the source leaves it at the constructor's
-  default", but after resolution `complex` and an explicit `^ { component: NUMBER }` are the same record, so a
-  legal set-from-default and an illegal re-set are indistinguishable; enforcing it means the resolver keeping
-  which facets a refinement's *source* wrote, which the atom-refinement merge erases. **And enforcing it would
-  still admit an unsound IS-A**: the five members are a partial order, not a chain — `INTEGER ⊂ NUMBER ⊂
-  RATIONAL` and `FLOAT32 ⊂ FLOAT64`, the exact and approximate families incomparable because `FLOAT64` carries
-  ±inf and NaN — and core.tn documents both `^ { component: INTEGER }` (a real narrowing) and
-  `^ { component: FLOAT64 }` (not one). Set-from-default admits both. What the case wants is a stated subset
-  relation among the members and a rule over it, which is a spec question before it is work here. The other
-  selector, `float_type.format`, is REQUIRED with no default, so the rule has nothing to fire on there.
-
 ## Checked annotations
 
 [TSON-SCHEMA] §5.4's `@disjoint` is the precedent both follow: an annotation with **no** decode force and
