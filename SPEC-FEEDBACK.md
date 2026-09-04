@@ -2703,13 +2703,44 @@ another **type**, declared as its own instance — `hexdigest => !bytes_type { e
 and refining for *length* is unaffected and inherits the alphabet, `sha256 => !bytes ^ { length: 32 }` being
 a base64 sha256.
 
-**This is not a rule about selectors, and the difference is worth §5.7 saying.** `complex_type.component` is
-also a selector and *is* refinable, correctly: complex numbers over float64 components are a subset of those
-over number components, so it narrows the value space and its IS-A is sound. The property that decides is
-**whether the facet narrows the value space at all** — `component` does, `encoding` does not. §5.7's existing
-"a selector may be set where the source leaves it at the constructor's default" is right for the first and
-wrong for the second, and the sentence it needs is: *a facet that does not narrow the value space is not
-refinable, because a refinement means IS-A and narrower, and such a facet can only deliver the first half.*
+**This is not a rule about selectors, and §5.7 already has one that nearly covers it.** Its selector clause
+reads: *"a **selector** facet (an encoding or format discriminant, such as `binary`'s `encoding`, a width
+selector, or `complex`'s component kind) may be set where the source leaves it at the constructor's default …
+and is thereafter identity-only: a refinement may restate a source-bound selector, never change it."* Three
+things are wrong with it here, and two of them are one deletion.
+
+1. **Its own exemplar is the counter-example.** It offers `binary`'s `encoding` as the selector to think of —
+   the one facet that must never be settable by a refinement at all.
+2. **Set-from-default is precisely the hole.** Core writes `bytes => !bytes_type { encoding: BASE64 }`, so
+   `bytes` is *source-bound* and the existing clause already forbids changing it — which is why stating the
+   alphabet explicitly in core is load-bearing rather than cosmetic. But nothing stops a schema declaring
+   `mybytes => !bytes_type {}`, leaving it at the default, and then `hex => !mybytes ^ { encoding: HEX }`.
+   That is permitted by the clause as written and rebuilds the degenerate IS-A.
+3. **The kind is not homogeneous.** `complex_type.component` is also a selector and set-from-default is
+   *right* there: complex numbers over float64 components are a subset of those over number components, so it
+   narrows the value space and the IS-A is sound. One rule cannot serve both, and the property that separates
+   them is **whether the facet narrows the value space at all**.
+
+**Concretely, §5.7 wants a sixth facet kind and one deletion.** Add to the kind list:
+
+> a **spelling** facet (a discriminant choosing among lexical forms of one value space, such as `bytes`'s
+> `encoding`) is never set or changed by a refinement: it may only equal the source's own value. Unlike a
+> selector it has no value-space consequence, so a refinement that changed it would produce an IS-A carrying
+> no narrowing — a `hexbytes` claiming to be a `bytes` at positions no base64 reader can honour. A different
+> lexical form is a different type, declared as its own instance of the constructor
+> (`hexdigest => !bytes_type { encoding: HEX }`).
+
+and strike `binary`'s `encoding` from the selector clause's examples, leaving the width selector and
+`complex`'s component kind, which are both narrowing and both want the set-from-default permission kept.
+
+**Two things worth knowing while deciding.** The new kind **arrives enforced where the old one is still
+owed**: §5.7's selector rule turns on whether the source *wrote* the facet or took the default, and resolved
+output cannot tell those apart — which is why `complex_type.component` is unchecked here and sits in
+`BACKLOG.md`. A spelling facet needs no such distinction, comparing effective values, which is what
+`BytesType.constraintsCheck` does. And the **remedy clause is doing real work**: without "a different lexical
+form is a different type", the rule refuses and leaves the author no route. That sentence is already in
+meta.tn's own `@doc` and in the error message, so the spec would be catching up to what runs rather than
+inventing.
 
 **What is running, and what is not.** All of the above is running and pinned — `BytesEncodingSelectorTest`
 covers one value spelled three ways, the base64 default, every position such a type reaches (field, array
