@@ -3363,11 +3363,10 @@ than as a schema failing to load.
 
 ---
 
-## 35. §4.2's value-route-only rule forbids a shape that resolves, closes and validates — proposal: admit a type-channel parameter on a `~` declaration, and keep the two rules beside it
+## 35. §4.2's value-route-only rule survives the marker's removal, and its justifying clause is still false — proposal: delete it
 
-**Section:** [TSON-SCHEMA] §4.2 (the three declaration-time rules for `~`: placement, value-route-only
-parameters, level discipline), §5.10 (templates, and what materialisation substitutes), §8.2 (identity settles
-after Pass 2).
+**Section:** [TSON-SCHEMA] §4.2 (value-route-only parameters), §5.10 (templates, and what materialisation
+substitutes), §8.2 (identity settles after Pass 2), §5.2 (which fields may carry a value).
 
 **Problem.** §4.2's second rule reads:
 
@@ -3381,102 +3380,65 @@ after Pass 2).
 **The justifying clause is not true.** Materialisation *is* body rewriting. §5.10 closes an open entry by
 substituting its parameters away over the resolved form, and §8.2 keys the resulting entry on the closed
 record — so a held body whose parameter stands in a field type is exactly what the machinery already handles.
-A `~` marker changes nothing about that: the body is held for the same reason and substituted by the same
-pass.
 
-**Measured.** This implementation does not enforce the rule, and the forbidden shape closes into a working
-type rather than into a tolerated one:
+**#36 changes the rule's subject but does not remove it.** With the `~` marker gone, "a constructor" is an
+entry that IS-A `top`, so the rule reads: *an entry composing, transitively, with a base kind may not have a
+parameter in a type channel.* That shape still exists and still resolves clean here:
 
 ```tson
-!!meta:"…/m/meta-kernel.tn"
-!!import:"…/m/meta-kernel.tn"
-{
-  base     => {}
-  ctor_box => <T> ~base & { value: T }     # §4.2: resolver error at this line
-  flagged  => ctor_box<boolean>
-}
+ctor_box => <T> product & { value: T }      # supertypes [product, top] -- a constructor
+flagged  => ctor_box<boolean>               # closes; resolver reports nothing
 ```
 
-`ctor_box` resolves to `constructor: true, parameters: [T]` with a held body; `flagged` materialises to a
-`PRODUCT` entry, compiles to a reader, accepts `{ value: true }`, and refuses `{ value: banana }` with a type
-error located at `/value` against schema pointer `/flagged/value`. The **variant** channel behaves the same:
-`<T> ~base & { v: ( T | boolean ) }` closed with `integer` accepts `42` and `true` and refuses `banana`.
-Nothing here is being tolerated — the substituted field type is enforced exactly as a written one is.
+**The evidence this entry used to carry is withdrawn.** It measured `<T> ~base & { value: T }` over a plain
+record `base => {}`. Without the marker that composes with an ordinary record, reaches no base kind, and is
+therefore *not a constructor at all* — an ordinary §5.10 template, which the rule never governed. The
+measurement was of the wrong shape, and it took removing the marker to see that: the marker had been
+asserting constructor level over a chain that did not support it.
 
-**The two channels the rule names beyond those are already answered, by other rules.**
+**And the "no legal spelling" argument is withdrawn with it.** It rested on §4.2's level discipline forcing
+the marker onto anything composing with a constructor, so that value-route-only refused the marked spelling
+and level discipline the unmarked one. Level discipline is gone (#36), and with it the dilemma.
 
-- **A vocabulary slot typed `type_ref`** — `<T> ~array ^ { element_type: = T }` — is refused when it closes,
+**What replaces both, and it is weaker.** The shape resolves and closes, and this implementation cannot
+currently show it *working*, for a reason that has nothing to do with §4.2: closing a parameterised entry
+yields a `kind: REFERENCE` alias to the materialised entry, and applicability does not follow a reference
+chain — so `!flagged { … }` is refused as not applicable, exactly as `!some_alias_of_array { … }` is. That is
+a defect on this side, recorded in `BACKLOG.md`, not a property of the rule. Until it is fixed the honest
+claim is narrower than the one this entry used to make: **the rule forbids a shape that resolves and closes,
+for a reason that does not hold** — not one demonstrated end to end.
+
+**The two channels the rule names beyond the field-type one are already answered elsewhere.**
+
+- **A vocabulary slot typed `type_ref`** — `<T> array ^ { element_type: = T }` — is refused when it closes,
   because §5.2 admits a fixed or default value only on a field typed by an atom or an enum, and `type_ref` is
-  a record. That is a rule about field values, applied where the value lands, and it does not need §4.2 to
-  restate it. The corresponding legal form closes normally: `<N> ~array ^ { max_items: = N }` with
-  `my_bounded<3>` resolves clean, `max_items` being atom-typed.
-- **A non-routed argument of the source chain** is a §5.10 application like any other and is closed by
-  materialisation, or refused by the arity and kind rules §5.10 already carries.
+  a record. Measured, unchanged by the marker's removal. The corresponding legal form still closes normally:
+  `<N> array ^ { max_items: = N }` with `my_bounded<3>`, `max_items` being atom-typed.
+- **A non-routed argument of the source chain** is a §5.10 application like any other, closed by
+  materialisation or refused by the arity and kind rules §5.10 already carries.
 
-So the rule's own three channels divide into two that other sections decide and one — a parameter as a field
-type or a variant — that is forbidden for a reason that does not hold.
+So of the rule's three channels, two are decided by other sections and one is forbidden for a stated reason
+that is false.
 
-**What the rule costs where it is not merely redundant.** A `~` declaration that wants a parameter has exactly
-one legal shape left: a value route into an atom-typed vocabulary slot. That admits a parameterised *refinement
-of a constructor's own facets* and nothing else. It excludes the ordinary case a meta-schema author reaches
-for — a constructor with a parameterised field — and the exclusion is not recoverable by dropping the marker,
-because §4.2's **level discipline** requires `~` on anything composing with a constructor. Written out:
+**Recommendation: delete the value-route-only rule.** With #36 removing the marker, §4.2's three
+declaration-time rules become one — placement, restated as who may declare an entry that IS-A `top`. If a
+revision keeps the marker and rejects #36, the recommendation is unchanged and the rule still goes: its
+justification is false either way, and the two channels it shares with §5.2 and §5.10 do not need it.
 
-```tson
-my_ctor => ~product & { id: identifier }
-boxed   => <T> ~my_ctor & { value: T }    # value-route-only: error (T is a field type)
-boxed   => <T>  my_ctor & { value: T }    # level discipline: error (unmarked, constructor operand)
-```
+If §4.2 wants to keep a statement about the two parameter kinds, the true one is §5.10's: an argument is read
+by the position it lands in, and a slot typed `type_ref` takes a type where an atom-typed slot takes a value.
+That is a statement about *slots*, already load-bearing in §9's "a slot holding a type reference MUST be
+typed `type_ref`".
 
-Under §4.2 as written, **neither spelling is legal**, and the author has no third. That is a reading of the
-text rather than a measurement — this implementation now enforces level discipline and does not enforce
-value-route-only, so it has never had to answer the pair — and a revision keeping the rule should say which of
-the two gives way.
+**What is running.** The rule is not enforced, and after #36 the pipeline has no marker to enforce it from —
+a parameterised entry composing with a base kind resolves and closes without complaint. What this
+implementation cannot yet do is apply the closed result, for the reference-chain reason above.
 
-**Recommendation: delete the value-route-only rule.** The three declaration-time rules for `~` become two,
-and nothing else in §4.2 moves:
-
-- **Placement** stays as written. It is checked here at the declaration and is the rule that makes "who may
-  declare a constructor" answerable from the document's own header.
-- **Level discipline** stays as written, and is worth keeping precisely because it is what the deleted rule was
-  colliding with. It is checked here on each operand of a composition, refinement or subtraction; a
-  non-constructor operand in a `~` declaration stays legal, which is what lets a base kind seed the level
-  (`record => ~product & { … }`, the base kinds being non-constructors) and `atom_specification` lend
-  vocabulary.
-- The sentence justifying the deleted rule goes with it. If §4.2 wants to keep a statement about the two
-  parameter kinds, the true one is §5.10's: an argument is read by the position it lands in, and a slot typed
-  `type_ref` takes a type where an atom-typed slot takes a value. That is a statement about *slots*, and it is
-  already load-bearing (§9's "a slot holding a type reference MUST be typed `type_ref`").
-
-**What this does not propose.** No change to what a `~` declaration *is*, to construction (`!C { … }`
-transfers kind and no supertypes, §5.5), or to §5.10's own rules. A parameterised `~` declaration is a
-template and closes by application — `C<…>` — never by construction; naming one at a construction site is an
-ordinary resolver error, which this implementation reports at the declaration that wrote it. That is not a
-consequence of this proposal, it is true either way.
-
-**What is running.** The relaxation, in the sense that matters for evidence: this implementation resolves,
-materialises, compiles and validates the shape §4.2 forbids, and
-`DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord` has pinned it since before the
-question was asked. The two rules the proposal keeps are both enforced —
-`ConstructorLevelDisciplineTest` for level discipline, and the placement refusal names the governing `!!meta`
-it found. Nothing was built *for* this entry; what changed is that the other two rules are now checked, which
-is what made the collision above visible.
-
-**Suggested resolution:**
-
-- §4.2: delete the "Value-route-only parameters" bullet in full, including its justifying sentence. The
-  remaining two bullets need no edit.
-- §4.2, optionally, one sentence in its place: *a `~` declaration may take type parameters; it is then a
-  template and closes by application (§5.10) like any other.* Without it a reader has to infer from §5.10 that
-  the marker and a parameter list compose.
-- §5.10: no change. Its "two parameter kinds, inferred by use" already says what the deleted sentence was
-  reaching for, and says it about slots rather than about markers.
-
-**Status against Revision 34:** open, and new against this revision — a deletion, proposed after building the
-two rules that stay. It is the one entry here whose evidence is a shape this implementation never deliberately
-implemented: the rule went unenforced, the shape worked, and what turned that from an oversight into an
-argument was enforcing §4.2's *other* two rules and finding that they leave the forbidden case no legal
-spelling.
+**Status against Revision 34:** open, and new against this revision — a deletion. It is the entry this cycle
+most changed by another: #36's removal of the marker moved its subject, withdrew its worked example and
+killed its second argument, leaving a narrower claim resting on the false justifying clause alone. Recorded
+that way rather than restated at its old strength, because the register is read as evidence and the evidence
+changed.
 
 ---
 
