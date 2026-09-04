@@ -95,11 +95,17 @@ are kept in step deliberately.
   as its source. The closed path dispatches on the *body* being a `Reference`, having already read it;
   `resolveInstanceTemplate` holds its body unread and so still needs the head's name — which is the whole of
   what its `alias` flag is now for, the eligibility half having gone.
-  **Two readers of `constructor` went with it**, both replaced by a question about shape rather than about
-  the marker: atom refinement asks whether the source's body is a vocabulary (an atom *instance* carries its
-  bound value — `IntegerType`, `Unit` — where the family's constructor carries a record), which is §5.5's own
-  question of whether there is a value to narrow; and the governed-compile factory lookup asks IS-A `top`, so
-  a construction that resolved reaches a factory rather than failing "out of scope" on a narrower test.
+  **Two readers of `constructor` went with it**, both replaced by a question the shape answers. Atom
+  refinement asks whether the source's body **IS-A `Atom`** — the sealed family of atom value bodies, and the
+  interface whose `narrows` the refinement goes on to call — which is §5.5's own question of whether there is
+  a value to narrow: an instance passes (`integer` carries an `IntegerType`, `void` a `Unit`) and the family's
+  constructor does not, carrying the vocabulary as a record. That is *one* test where there were two, and
+  neither of the old ones could have been it alone: `integer_type => ~atom & { … }` is ATOM-kinded like its
+  instances, so kind cannot separate them, and the marker answers a different question. The construction hint
+  in the refusal is offered only where construction would work — an applicable vocabulary — so `!top ^ { … }`
+  gets the plain answer rather than advice that would fail in turn. And the governed-compile factory lookup
+  asks IS-A `top`, so a construction that resolved reaches a factory rather than failing "out of scope" on a
+  narrower test.
   **The marker keeps its other jobs** — §4.2's level discipline reads it, and §8.1 records it —
   and `SPEC-FEEDBACK.md` #36 asks §3.3.1 to state applicability this way.
   `ApplicabilityIsIsATopTest` pins it.

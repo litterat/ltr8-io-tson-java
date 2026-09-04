@@ -738,20 +738,24 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
                     + "' does not resolve against the type-name namespace (§3.3.1)");
         }
-        if (source.kind() != TypeKind.ATOM) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
-                    + "' is not an atom-family instance (§5.5), kind=" + source.kind());
-        }
-        // An atom *instance* carries its bound value as its body (`IntegerType`, `TextType`, `Unit`); an atom
-        // *constructor* carries the family's vocabulary as a record. So the body shape is what tells them
-        // apart, and it asks the question §5.5 actually poses -- is there a value here to narrow? -- rather
-        // than reading the `~` marker, which answers a different one. The kind check runs first so a record
-        // or a choice is told what it is, instead of being offered construction it does not admit.
-        if (source.body() instanceof RecordBody) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' refines a "
-                    + "constraint vocabulary, not an instance (§5.5) -- '" + sourceName + "' is the family's "
-                    + "constructor, and '^' narrows one of its instances. Did you mean constructor "
-                    + "application ('!" + sourceName + " { ... }')?");
+        // §5.5's own question, asked of the body: is there an atom value here to narrow? {@link Atom} is the
+        // sealed family of atom value bodies -- and the interface whose `narrows` this refinement goes on to
+        // call -- so an *instance* passes (`integer` carries an `IntegerType`, `void` a `Unit`) and the
+        // family's *constructor* does not, carrying the constraint vocabulary as a record instead. One
+        // question rather than a kind test beside a marker test: `integer_type => ~atom & { ... }` is
+        // ATOM-kinded too, so kind cannot tell the two apart, and the marker answers something else.
+        if (!(source.body() instanceof Atom)) {
+            // The construction hint is offered only where construction would actually work -- a vocabulary
+            // that is itself applicable (§4.1). `top` has a record body and is not applicable, so it gets
+            // the plain answer rather than advice that would fail in turn.
+            boolean applicableVocabulary =
+                    source.body() instanceof RecordBody && source.supertypes().contains(TOP);
+            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an "
+                    + "atom-family instance to narrow (§5.5), and '" + sourceName + "' is "
+                    + (applicableVocabulary
+                            ? "a constraint vocabulary -- '^' narrows one of its instances. Did you mean "
+                                    + "constructor application ('!" + sourceName + " { ... }')?"
+                            : "kind=" + source.kind() + ", which has no atom constraints to tighten"));
         }
         // Not an author error, unlike the three checks above: an atom-family instance always records the
         // constructor it came from, so one that doesn't is a malformed TypeDefinition, not a schema anyone
