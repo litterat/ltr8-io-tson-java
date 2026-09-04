@@ -1126,7 +1126,9 @@ compatibility).
   "Not yet implemented".
 - **The atom vocabulary is complete** — `complex`/`ipv4`/`ipv6`/`cidr4`/`cidr6`/`mac`/`email` all have
   parsers, the CIDR pair reusing the two address grammars and validating §5.5's family-range and
-  host-bits-zero rules on top. All four network families apply `within`/`excluding`, and **`cidr4`/`cidr6`
+  host-bits-zero rules on top. All four network families apply `within`/`excluding` and judge the pair
+  for emptiness at schema load — exactly, prefix-tree cover being counting rather than searching, with a
+  network family's prefix bounds folded in (`SPEC-FEEDBACK.md` #34) — and **`cidr4`/`cidr6`
   read to `schema.atom.CidrNetwork`** rather than to text — the address grammars and the network value live
   in `tson-schema` so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries
   without the linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its siblings**, and its format check is

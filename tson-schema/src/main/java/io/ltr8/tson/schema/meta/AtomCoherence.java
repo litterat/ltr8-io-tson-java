@@ -1,5 +1,8 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.schema.atom.CidrNetwork;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.ToIntFunction;
@@ -149,13 +152,113 @@ final class AtomCoherence {
      */
     static void checkNetworks(List<String> out, String facet, List<String> entries, int familyBits) {
         for (String entry : entries) {
-            io.ltr8.tson.schema.atom.CidrNetwork network =
-                    io.ltr8.tson.schema.atom.CidrNetwork.parse(entry, familyBits);
+            CidrNetwork network = CidrNetwork.parse(entry, familyBits);
             if (network == null || !network.hostBitsAreZero()) {
                 out.add(facet + " lists '" + entry + "', which is not an IPv" + (familyBits == 32 ? "4" : "6")
                         + " network -- expected CIDR notation, an address followed by '/' and a prefix length "
                         + "of 0-" + familyBits + ", with zero host bits beyond the prefix");
             }
         }
+    }
+
+    /**
+     * The address families' emptiness rule: {@code within} and {@code excluding} must leave a value between
+     * them. {@code within: ["10.0.0.0/8"]} beside {@code excluding: ["10.0.0.0/8"]} admits nothing, which is
+     * {@code { min: 10 max: 3 }}'s exact twin -- two individually legal facets that between them describe no
+     * value -- and is a pair an author reaches by editing rather than by trying.
+     *
+     * <p><b>Cover over a prefix tree is counting, not searching.</b> Two CIDR blocks are nested or disjoint
+     * and never partly overlapping, so an exclusion meeting a permitted block either contains it (the block
+     * is gone) or lies wholly within one of its halves. {@link #shortestSurviving} descends on that, and the
+     * walk is exact, total, and bounded by the address width -- there is no approximation here to declare.
+     *
+     * <p><b>The prefix bounds are folded in, and have to be.</b> A network family's value is a block, and a
+     * block is refused for <em>overlapping</em> an exclusion rather than only for being covered by one --
+     * so {@code within: ["10.0.0.0/24"] excluding: ["10.0.0.5/32"] max_prefix: 24} admits nothing while
+     * almost every address in the range survives. Judging the two facets alone would call that body
+     * coherent. This is the same fold {@code integer} already does with its {@code size}-derived range.
+     *
+     * @param noun what the family's values are, for the message: an address, or a network
+     */
+    static void checkAdmitsAValue(List<String> out, String noun, List<String> within, List<String> excluding,
+            int familyBits) {
+        checkAdmitsAValue(out, noun, within, excluding, Optional.empty(), Optional.empty(), familyBits);
+    }
+
+    /** {@link #checkAdmitsAValue(List, String, List, List, int)} for a family that also bounds the prefix length. */
+    static void checkAdmitsAValue(List<String> out, String noun, List<String> within, List<String> excluding,
+            Optional<Integer> minPrefix, Optional<Integer> maxPrefix, int familyBits) {
+        int floor = minPrefix.orElse(0);
+        int ceiling = maxPrefix.orElse(familyBits);
+        if (floor < 0 || ceiling > familyBits || floor > ceiling) {
+            return; // an inverted or out-of-range bound is its own check's to report, and explains the body
+        }
+        List<CidrNetwork> permitted = networks(within, familyBits);
+        List<CidrNetwork> excluded = networks(excluding, familyBits);
+        if (permitted == null || excluded == null) {
+            return; // a malformed entry is checkNetworks' to report, and there is nothing to judge under it
+        }
+        if (permitted.isEmpty()) {
+            permitted = List.of(new CidrNetwork(new byte[familyBits / 8], 0)); // no `within` permits everything
+        }
+        // The shortest surviving block is the most permissive one, so it is the only one worth testing: any
+        // value has to sit inside some survivor, and a longer survivor bounds the prefix length harder.
+        int shortest = -1;
+        for (CidrNetwork block : permitted) {
+            int surviving = shortestSurviving(block, excluded);
+            if (surviving >= 0 && (shortest < 0 || surviving < shortest)) {
+                shortest = surviving;
+            }
+        }
+        if (shortest >= 0 && Math.max(floor, shortest) <= ceiling) {
+            return;
+        }
+        out.add(shortest < 0
+                ? "within and excluding admit no " + noun + ": excluding covers every network within permits"
+                : "within and excluding admit no " + noun + " of a permitted prefix length: the largest block "
+                        + "they leave is a /" + shortest + ", and max_prefix is " + ceiling);
+    }
+
+    /**
+     * The shortest prefix length among the maximal blocks inside {@code block} that no exclusion meets, or
+     * {@code -1} where the block is covered outright. Shortest because a shorter prefix is a bigger block:
+     * it is the survivor that constrains a permitted prefix length least.
+     */
+    private static int shortestSurviving(CidrNetwork block, List<CidrNetwork> excluded) {
+        List<CidrNetwork> inside = new ArrayList<>();
+        for (CidrNetwork exclusion : excluded) {
+            if (exclusion.contains(block)) {
+                return -1;
+            }
+            if (block.contains(exclusion)) {
+                inside.add(exclusion);
+            }
+        }
+        if (inside.isEmpty()) {
+            return block.prefixLength();
+        }
+        // Nothing here is equal to the block (that returned above) and nothing is disjoint from it, so every
+        // remaining exclusion is strictly longer -- the block is splittable, and each half faces its own share.
+        int shortest = -1;
+        for (CidrNetwork half : block.halves()) {
+            int surviving = shortestSurviving(half, inside);
+            if (surviving >= 0 && (shortest < 0 || surviving < shortest)) {
+                shortest = surviving;
+            }
+        }
+        return shortest;
+    }
+
+    /** The facet's entries as networks, or {@code null} where any one of them is not a network of this family. */
+    private static List<CidrNetwork> networks(List<String> entries, int familyBits) {
+        List<CidrNetwork> parsed = new ArrayList<>(entries.size());
+        for (String entry : entries) {
+            CidrNetwork network = CidrNetwork.parse(entry, familyBits);
+            if (network == null || !network.hostBitsAreZero()) {
+                return null;
+            }
+            parsed.add(network);
+        }
+        return parsed;
     }
 }

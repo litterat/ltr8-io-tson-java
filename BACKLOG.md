@@ -74,14 +74,6 @@ own prose (which had gone stale on at least one of them):
   relation among the members and a rule over it, which is a spec question before it is work here. The other
   selector, `float_type.format`, is REQUIRED with no default, so the rule has nothing to fire on there.
 
-- [ ] **`within`/`excluding` coherence — a pair admitting no network between them.** `within: ["10.0.0.0/8"]`
-  beside `excluding: ["10.0.0.0/8"]` admits nothing, and `Atom.coherenceCheck`'s question is exactly whether a
-  body's own facets admit anything. The containment arithmetic is `schema.atom.CidrNetwork` and the check has a
-  home in each family's own `coherenceCheck`, so this is the rule rather than the machinery: an excluded
-  network that covers every permitted one leaves the type uninhabited. The awkward part is partial cover —
-  several `excluding` entries that between them tile a `within` — which is a set-cover question over prefix
-  trees rather than a pairwise one.
-
 ## Checked annotations
 
 [TSON-SCHEMA] §5.4's `@disjoint` is the precedent both follow: an annotation with **no** decode force and

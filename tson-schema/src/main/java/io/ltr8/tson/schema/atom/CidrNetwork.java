@@ -1,6 +1,7 @@
 package io.ltr8.tson.schema.atom;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -83,6 +84,24 @@ public record CidrNetwork(byte[] prefix, int prefixLength) {
      */
     public boolean contains(CidrNetwork other) {
         return other.prefixLength >= prefixLength && contains(other.prefix);
+    }
+
+    /**
+     * This network's two children in the prefix tree -- the same addresses, split at one more bit. RFC 4632's
+     * subnetting, and the step a set-difference walk descends by: an exclusion strictly inside this network
+     * lies wholly in one half or the other, never across both, which is what makes the walk a partition
+     * rather than a search.
+     *
+     * @throws IllegalStateException if this network is a single address, which has no halves
+     */
+    public List<CidrNetwork> halves() {
+        if (prefixLength >= prefix.length * 8) {
+            throw new IllegalStateException(
+                    "a /" + prefixLength + " network is a single address and has no halves");
+        }
+        byte[] upper = prefix.clone();
+        upper[prefixLength / 8] |= (byte) (0x80 >> (prefixLength % 8));
+        return List.of(new CidrNetwork(prefix, prefixLength + 1), new CidrNetwork(upper, prefixLength + 1));
     }
 
     /** Whether the two share any address, which for prefix-tree nodes means one contains the other. */

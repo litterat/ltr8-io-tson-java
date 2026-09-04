@@ -12,8 +12,8 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The thirty-three below are what is open against Revision 34 — the eight it left open, renumbered from #1,
-and twenty-five raised since; which of the two an entry is, its own `Status` line says, so the split stays
+The thirty-four below are what is open against Revision 34 — the eight it left open, renumbered from #1,
+and twenty-six raised since; which of the two an entry is, its own `Status` line says, so the split stays
 checkable rather than counted once. The fourteen Revision 34 resolved of the seventeen raised against Revision 33 are gone
 from here, because the spec now carries their rules and that is where the answer belongs. **This file is the as-built
 record**, not a pointer to one: where an entry proposes a design this implementation has built, the entry states
@@ -3233,5 +3233,96 @@ of language rather than by a limit.
 in the type system — it asks that a section which already knows the right shape apply it consistently, name
 the limits that bound shape rather than size, and settle the one question that decides what a sender is told:
 whether being too large for this processor is a verdict on the document. It is not.
+
+---
+
+## 34. §5.5 gives four families a `within`/`excluding` pair and never says a pair must admit a value — proposal: state the emptiness rule, and say that a network family's prefix bounds are part of it
+
+**Section:** [TSON-SCHEMA] §5.5 (`ipv4_type`, `ipv6_type`, `cidr4_type`, `cidr6_type`); §5.7 (facet kinds);
+meta.tn's `@doc` for the four constructors; RFC 4632.
+
+**Problem:** §5.5 declares `within` and `excluding` on all four network families and states what each does to
+a *value* — an address must lie inside some `within` network and inside no `excluding` one; a network must be
+a subnet of some `within` and must not overlap any `excluding`. It never states the schema-load question:
+**must the two facets between them admit anything?**
+
+Every other bounded family in the spec has that question answered. meta.tn's own header `@doc` says
+"value-level coherence (the lower bound not exceeding the upper) remains a schema-load check", and `cidr4_type`'s
+`@doc` adds the family range in the same voice — "bounds outside that range are invalid at the schema level".
+So the register of what a body may not say is real and these two facets are simply not in it, which leaves
+
+```
+addr => !ipv4 ^ { within: ["10.0.0.0/8"]  excluding: ["10.0.0.0/8"] }
+```
+
+a type that loads, links, compiles, and refuses every document. It is `{ min: 10  max: 3 }` with a different
+spelling, and unlike a pattern that matches no string it is a pair an author reaches by **editing** — copying
+the `within` line to write the `excluding` one and forgetting to narrow it — rather than by trying.
+
+**Two things make this worth stating rather than leaving to implementations.**
+
+**1. It is decidable exactly, so there is no latitude to grant.** The natural worry — that deciding whether
+several `excluding` entries between them cover a `within` entry is a set-cover problem — does not survive
+contact with CIDR. Two blocks are nested or disjoint and never partly overlapping, so an exclusion meeting a
+permitted block either contains it or lies wholly inside one of its halves; the walk descends on that and
+terminates at the address width. `10.0.0.0/9` and `10.128.0.0/9` cover `10.0.0.0/8` by counting, not by
+searching. A spec asking for this is asking for something total and two-valued, which is the shape this series
+prefers.
+
+**2. For a network family the prefix bounds are part of the question, and a reader will not guess that.**
+`cidr4`/`cidr6` values are *blocks*, and §5.5 refuses a block for **overlapping** an exclusion rather than only
+for being covered by one — the clause meta.tn glosses as "overlap, not containment, so a wider value cannot
+smuggle an excluded block". That makes the network question different in kind from the address one:
+
+```
+net => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]  max_prefix: 24 }
+```
+
+Every address in the range survives but one. But a value must be a subnet of `10.0.0.0/24`, so its prefix is
+at least 24, and `max_prefix` says at most 24 — leaving `10.0.0.0/24` itself, which overlaps the hole. The
+body admits **no network at all** while admitting almost every address. An implementation that judges the two
+list facets on their own — the obvious reading of a section that never mentions the interaction — calls that
+body coherent.
+
+**Interpretation chosen: both, as one coherence rule per family.** `Atom.coherenceCheck` asks whether a single
+body's own facets admit anything, which is where `{ min: 10 max: 3 }` is refused, so the pair is refused there
+too and by the same mechanism — not by inhabitance, which is about an entry graph rather than one body's
+facets. The rule is stated once, in `AtomCoherence`, and each family names only its own fields: the address
+families pass their two lists, the network families pass their two lists **and** their prefix bounds. Folding
+the bounds in is the same fold `integer` already performs with its `size`-derived range, which is what makes a
+single stated bound incoherent there.
+
+Two messages, because the two causes want different edits — `excluding covers every network within permits`,
+and `the largest block they leave is a /25, and max_prefix is 24`, which names the number the author moves.
+A malformed entry or an inverted bound suppresses the emptiness message rather than adding to it: those are
+their own checks' to report, and the emptiness is their consequence.
+
+**Suggested resolution.**
+
+- **State the emptiness rule for all four families**, in the voice §5.5 already uses for the family range: a
+  `within`/`excluding` pair that admits no value is invalid at the schema level.
+- **Say that a network family's `min_prefix`/`max_prefix` participate in it**, with the worked case above or
+  one like it. This is the half a careful implementer gets wrong, because it is invisible unless the overlap
+  rule and the prefix bounds are read together.
+- **Say the rule is exact**, rather than leaving room for a partial check. Prefix-tree cover is counting; an
+  implementation that only refuses the pairwise case (`within` entry equal to or contained in an `excluding`
+  entry) would be conforming under a looser wording and would miss the tiling case, which is the one that
+  arises from a real edit.
+- **Leave the narrowing direction alone here.** Whether a *refinement* may replace `within` with a strictly
+  smaller network is #29's question — a set facet with no stated relation — and this entry is only about one
+  body judged on its own.
+
+**What is running.** All of it, in `AtomCoherence.checkAdmitsAValue` over `schema.atom.CidrNetwork`, called
+from all four families' `coherenceCheck`. The address grammars and the network value live in `tson-schema`
+precisely so that each family can judge its own `[value]`-typed entries without the linker or the resolver
+holding one family's rule — the facets are typed `[value]` in meta.tn and must stay so, since they list
+networks and meta declares no network instance to type them by (core.tn does, and core imports meta). Tests:
+`AtomCoherenceTest`'s `within`/`excluding` block for the arithmetic, `NetworkFacetsTest` for the schema-load
+path.
+
+**Status against Revision 34:** open, and new against this revision. The rule is running here; what is asked
+is that the spec state it, so that two implementations agree on which bodies load — a body that admits nothing
+is the case where silence costs the most, since the divergence shows up as every document being refused rather
+than as a schema failing to load.
 
 ---

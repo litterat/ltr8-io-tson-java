@@ -35,10 +35,12 @@ public record Ipv4Type(String spec, List<String> within, List<String> excluding)
      * removes addresses, so a refinement narrows by <b>growing</b> it. {@code spec} is fixed by the
      * constructor and has nothing to compare.
      *
-     * <p><b>Both are compared as written.</b> Deciding that one network sits inside another is arithmetic
-     * this module has no parser for, so a refinement naming a strictly smaller network than the source's is
-     * refused here even though it narrows. That is the conservative direction -- it refuses a legal
-     * refinement rather than admitting an illegal one -- and it is what a stated relation would replace.
+     * <p><b>Both are compared as written</b>, by entry rather than by containment, so a refinement naming a
+     * strictly smaller network than the source's is refused here even though it narrows. That is the
+     * conservative direction -- it refuses a legal refinement rather than admitting an illegal one -- and it
+     * is what a stated relation would replace. The containment arithmetic to decide it properly does exist
+     * now ({@code schema.atom.CidrNetwork}); what is missing is the spec rule saying which way a set facet
+     * narrows, which {@code SPEC-FEEDBACK.md} #29 asks for.
      */
     @Override
     public java.util.List<String> constraintsCheck(Atom refined) {
@@ -62,12 +64,18 @@ public record Ipv4Type(String spec, List<String> within, List<String> excluding)
      * <p>It is checked here rather than anywhere downstream because it is this family's rule: a malformed
      * entry makes the facet unreadable, which is the same kind of defect as a floor above a ceiling. Every
      * bad entry is named rather than the first, a list being written in one go.
+     *
+     * <p>The two are then judged <b>together</b>: an {@code excluding} list covering every network {@code
+     * within} permits admits no address, and the emptiness question is exactly what this check is for. Cover
+     * over a prefix tree is decidable exactly -- see {@code AtomCoherence.checkAdmitsAValue} -- so nothing is
+     * approximated and no pair is left undecided.
      */
     @Override
     public java.util.List<String> coherenceCheck() {
         java.util.List<String> violations = new java.util.ArrayList<>();
         AtomCoherence.checkNetworks(violations, "within", within, 32);
         AtomCoherence.checkNetworks(violations, "excluding", excluding, 32);
+        AtomCoherence.checkAdmitsAValue(violations, "address", within, excluding, 32);
         return java.util.List.copyOf(violations);
     }
 }

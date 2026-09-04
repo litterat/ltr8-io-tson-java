@@ -127,4 +127,57 @@ class NetworkFacetsTest {
         assertTrue(thrown.getMessage().contains("not-a-network"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("10.0.0.0"), "every bad entry is named: " + thrown.getMessage());
     }
+
+    /**
+     * The pair's own emptiness rule, reached from schema text. An {@code excluding} list covering every
+     * network {@code within} permits describes no value, and a body describing no value fails to load —
+     * {@code { min: 10 max: 3 }}'s treatment, for the same reason.
+     */
+    @Test
+    void aWithinAndExcludingPairThatAdmitsNothingIsRefusedAtSchemaLoad() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> Tson.builder().build().resolve("""
+                        !!id:"https://example.test/empty-network-pair.tn"
+                        !!meta:"https://tson.io/2026/35/m/meta.tn"
+                        !!import:"https://tson.io/2026/35/m/core.tn"
+                        { oops => !ipv4 ^ { within: ["10.0.0.0/8"]  excluding: ["10.0.0.0/9" "10.128.0.0/9"] } }
+                        """));
+
+        assertTrue(thrown.getMessage().contains("admit no address"), thrown.getMessage());
+    }
+
+    /**
+     * And the network family folds its prefix bounds into the same question, because its value is a block:
+     * every address here survives but {@code 10.0.0.5}, and the only block short enough for {@code
+     * max_prefix} is the {@code within} entry itself, which overlaps the hole.
+     */
+    @Test
+    void aNetworkFamilyPairEmptiedByItsPrefixBoundIsRefusedAtSchemaLoad() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> Tson.builder().build().resolve("""
+                        !!id:"https://example.test/empty-network-bound.tn"
+                        !!meta:"https://tson.io/2026/35/m/meta.tn"
+                        !!import:"https://tson.io/2026/35/m/core.tn"
+                        { oops => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]
+                                             max_prefix: 24 } }
+                        """));
+
+        assertTrue(thrown.getMessage().contains("admit no network"), thrown.getMessage());
+    }
+
+    /** The same body with the ceiling lifted past the largest surviving block loads and reads. */
+    @Test
+    void liftingTheCeilingPastTheSurvivingBlockLoadsTheSameBody() {
+        Tson tson = Tson.builder().build();
+        tson.resolve("""
+                !!id:"https://example.test/inhabited-network-bound.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
+                { ok => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]  max_prefix: 25 }
+                  holder => { n: ok? } }
+                """);
+        String document = "!!schema:\"https://example.test/inhabited-network-bound.tn\"\n"
+                + "!holder { n: \"10.0.0.128/25\" }";
+        assertTrue(tson.validate(document).isEmpty(), () -> "the surviving block reads: " + tson.validate(document));
+    }
 }
