@@ -536,7 +536,9 @@ final class DefinitionResolver {
      * with {@code value}. {@code C} resolves against the structure namespace only (see {@link
      * #resolveConstructorTarget}); the found entry MUST be a constructor ({@code constructor: true})
      * or this is a resolver error (the spec's own suggested diagnostic: "did you mean atom
-     * refinement?"). {@code value} is bound via {@link #bindAtomInstance} directly --
+     * refinement?") -- and MUST be closed: a template ({@code C} declaring type parameters) closes by
+     * application, {@code C<...>}, never by construction, so naming one here is a resolver error whether or
+     * not it also carries {@code ~}. {@code value} is bound via {@link #bindAtomInstance} directly --
      * {@code instance.value().typeRef()} already names {@code C} (per {@code Instance}'s own
      * reshape, matching §12.1's {@code instance = "!" type-name ws core-value}); positional form (§5.6) and
      * schema-composed defaults
@@ -555,16 +557,27 @@ final class DefinitionResolver {
     private TypeDefinition resolveInstance(String name, Instance instance) {
         String target = instance.target();
         TypeDefinition constructor = resolveConstructorTarget(name, target);
+        if (!constructor.parameters().isEmpty()) {
+            int declared = constructor.parameters().size();
+            throw new TsonSchemaValidationException("'" + name + "': '" + target + "' is a template taking "
+                    + declared + " type argument" + (declared == 1 ? "" : "s") + " " + constructor.parameters()
+                    + ", and a template closes by application, not by construction -- write '" + target
+                    + "<...>' with its arguments (§5.10). '!" + target + " { ... }' fills a constructor's own "
+                    + "vocabulary (§4.2), which is a different operation and needs a closed constructor");
+        }
         if (!constructor.constructor()) {
             throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' does not resolve to a "
                     + "constructor (§3.3.1) -- did you mean atom refinement ('!" + target + " ^ { ... }')?");
         }
         if (!(constructor.body() instanceof RecordBody _)) {
-            // Unreachable from anything this parser produces: §12.1 attaches `~` to a structural-def only
-            // (refined-def / construction-def / record-def), each of which resolves to a record body, and §7.2
-            // says a constructor *is* a record-shaped type. So a constructor with any other body means a
-            // malformed TypeDefinition reached the structure namespace by some route other than parsing --
-            // an invariant violation, not a schema this resolver should be explaining to an author.
+            // Unreachable, and the template check above is what makes that true. §12.1 attaches `~` to a
+            // structural-def only (refined-def / construction-def / record-def), each of which resolves to a
+            // record body, and §7.2 says a constructor *is* a record-shaped type -- but an *open* declaration
+            // holds its body instead (`holdIfOpen`), and a parameterised `~` declaration is exactly that. It
+            // is refused above as a template, so what reaches here has no parameters and therefore no held
+            // body. Any other non-record body is a malformed TypeDefinition that entered the structure
+            // namespace by some route other than parsing -- an invariant violation, not a schema this
+            // resolver should be explaining to an author.
             throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
                     + constructor.body().getClass().getSimpleName() + " body; a constructor is record-shaped "
                     + "(§7.2) and cannot be declared otherwise");

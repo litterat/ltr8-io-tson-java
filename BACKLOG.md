@@ -47,17 +47,19 @@ own prose (which had gone stale on at least one of them):
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 
-- [ ] **§4.2's value-route-only rule is not enforced** — a `~` constructor's parameters may occur only as value
-  routes, and a type-channel one is a resolver error at the declaration. Nothing checks it, so a parameterized
-  container constructor resolves, links and compiles, and the first symptom is a *read* failing with "'set' is
-  a template taking 1 type argument": a diagnostic about a data document, for a mistake in a schema. A check
-  written against the held body alone false-positives, `element_type: = T` and `max_items: = N` being spelled
-  identically where the first is a type channel and the second a legal value route. **The distinction does
-  exist in the pipeline**: `ParameterKinds` resolves the constructor head and walks each written slot against
-  the field the constructor declares for it, classifying a parameter in `element_type` as `TYPE` and one in
-  `max_items` as `VALUE`. What needs establishing is whether that walk reaches the declarations this rule is
-  about — it starts from a held body, where §4.2 speaks about a `~` constructor's own declaration — and what a
-  head it cannot resolve should mean.
+- [ ] **§4.2's value-route-only rule reaches one of its three channels.** A `~` declaration's parameter
+  standing in a *field type* or a *variant* is a resolver error at the declaration; nothing checks it, and
+  `ctor_box => <T> ~base & { value: T }` with `closed => ctor_box<text>` resolves and closes cleanly. (The
+  third channel, a parameter routed into a `type_ref`-typed vocabulary slot, is already refused where it
+  closes — by §5.2's rule that a fixed value is available on an atom- or enum-typed field and nowhere else —
+  so what is missing there is only §4.2's *timing*, a declaration nobody ever closes going unrefused.)
+  **Settle the spec question first**: §4.2's stated reason is that a type-channel parameter "could close only
+  by rewriting the body — the materialisation constructors never get", which is not true here, since §5.10
+  materialisation rewrites held bodies and closes exactly this shape;
+  `DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord` pins that it does. So the work
+  is either a check plus retiring that test's `~`, or a `SPEC-FEEDBACK.md` entry asking §4.2 to admit the
+  field-type channel. `ParameterKinds` is the machinery either way: it resolves the constructor head and
+  classifies each written slot against the field the constructor declares for it.
 
 ## Checked annotations
 
