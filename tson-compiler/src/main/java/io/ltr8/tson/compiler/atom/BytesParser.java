@@ -16,41 +16,18 @@ import java.util.Optional;
  * class). Holds a {@link BytesType} -- the pure constraint values, unchanged by this split --
  * rather than declaring those fields itself.
  */
-public record BytesParser(Encoding encoding, BytesType constraints) implements AtomType<byte[]> {
+public record BytesParser(BytesType constraints) implements AtomType<byte[]> {
 
     /**
-     * The RFC 4648 base encodings a text encoding may spell a {@code bytes} value in -- meta.tn's
-     * {@code base_encoding}. It lives here rather than on {@link BytesType} because it is not part of
-     * the type: it is what a *reader* was told, from Part 1's own {@code !hex}/{@code !base64} tags in
-     * a schemaless document, or from the {@code @bytes_encoding} directive under a schema.
+     * Part 1's one binary tag, {@code !bytes}, and the alphabet it reads in: base64 (§4, padded). A
+     * schemaless document has no type to carry a selector, so there is nothing for a reader to consult and
+     * no way one spelling could be more right than another.
      */
-    public enum Encoding {
-        BASE64("base64"), BASE64URL("base64url"), BASE32("base32"), HEX("hex");
+    public static final BytesParser BASE64 = new BytesParser(BytesType.UNCONSTRAINED);
 
-        private final String typeName;
-
-        Encoding(String typeName) {
-            this.typeName = typeName;
-        }
-
-        /** §5.3's built-in annotation name for this encoding, e.g. {@code !base64}. */
-        public String typeName() {
-            return typeName;
-        }
-    }
-
-
-    /** {@code base64 => !binary BASE64}, and so on for the other three -- §5.3's four built-in annotations, all unconstrained beyond {@code encoding}. */
-    public static final BytesParser BASE64 = new BytesParser(Encoding.BASE64, BytesType.UNCONSTRAINED);
-    public static final BytesParser BASE64URL = new BytesParser(Encoding.BASE64URL, BytesType.UNCONSTRAINED);
-    public static final BytesParser BASE32 = new BytesParser(Encoding.BASE32, BytesType.UNCONSTRAINED);
-    public static final BytesParser HEX = new BytesParser(Encoding.HEX, BytesType.UNCONSTRAINED);
-
-    /** The alphabet an unannotated position takes -- §4, padded, and what every neighbouring format chose. */
-    public static final Encoding DEFAULT = Encoding.BASE64;
-
-    public BytesParser(Encoding encoding, Optional<Integer> minLength, Optional<Integer> maxLength) {
-        this(encoding, new BytesType(Optional.empty(), minLength, maxLength));
+    /** The alphabet this parser reads and writes -- the type's own selector. */
+    public BytesType.Encoding encoding() {
+        return constraints.encoding();
     }
 
     private static final HexFormat HEX_FORMAT = HexFormat.of();
@@ -69,9 +46,9 @@ public record BytesParser(Encoding encoding, BytesType constraints) implements A
     @Override
     public byte[] read(TokenValue token) {
         String text = token.text();
-        byte[] value = switch (encoding) {
-            case BASE64 -> Base64Decoding.decode(text, Base64.getDecoder(), encoding.typeName());
-            case BASE64URL -> Base64Decoding.decode(text, Base64.getUrlDecoder(), encoding.typeName());
+        byte[] value = switch (encoding()) {
+            case BASE64 -> Base64Decoding.decode(text, Base64.getDecoder(), "base64");
+            case BASE64URL -> Base64Decoding.decode(text, Base64.getUrlDecoder(), "base64url");
             case BASE32 -> Base32Decoding.decode(text);
             case HEX -> decodeHex(text);
         };
@@ -95,7 +72,7 @@ public record BytesParser(Encoding encoding, BytesType constraints) implements A
      */
     @Override
     public String write(byte[] value) {
-        return switch (encoding) {
+        return switch (encoding()) {
             case BASE64 -> Base64.getEncoder().encodeToString(value);
             case BASE64URL -> Base64.getUrlEncoder().encodeToString(value);
             case BASE32 -> Base32Decoding.encode(value);

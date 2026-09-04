@@ -68,7 +68,7 @@ import io.ltr8.tson.schema.meta.UuidType;
  * additionally in {@link #ENUM_OBJECT_MODE}/{@link #UNIT}, both keyed on the declaration's own name rather
  * than its resolved shape -- see each one's own note.
  */
-final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed, UseSite.Respelled {
+final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
     static final ValueReaderFactory INTEGER_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new IntegerParser((IntegerType) definition.body()),
@@ -85,12 +85,9 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed, Use
                     context.locationOf(name, definition));
     static final ValueReaderFactory UUID_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new UuidParser((UuidType) definition.body()), context.locationOf(name, definition));
-    // The alphabet is not in the body: it is @bytes_encoding's, resolved from this definition and its
-    // supertypes, defaulting to base64. A field carrying its own directive overrides it where the record
-    // reader wires its children.
+    // The alphabet is the type's own `encoding` selector, so the body is the whole of what this needs.
     static final ValueReaderFactory BYTES_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name,
-                    new BytesParser(BytesEncoding.of(name, definition, context), (BytesType) definition.body()),
+            new AtomTypeReader<>(name, new BytesParser((BytesType) definition.body()),
                     context.locationOf(name, definition));
     static final ValueReaderFactory DATE_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new DateParser((DateType) definition.body()), context.locationOf(name, definition));
@@ -219,19 +216,6 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed, Use
      */
     TsonTypeReader<?> overAtom(String displayName, AtomType<?> replacement) {
         return new AtomTypeReader<>(displayName, replacement, schemaLocation);
-    }
-
-    /**
-     * {@inheritDoc} <p>The constraints are the shared parser's own; only the alphabet moves. A reader over
-     * anything but {@code bytes} hands itself back, since no other atom has a spelling to choose.
-     */
-    @Override
-    public TsonTypeReader<?> inEncoding(io.ltr8.tson.compiler.atom.BytesParser.Encoding encoding) {
-        if (!(delegate instanceof io.ltr8.tson.compiler.atom.BytesParser bytes) || bytes.encoding() == encoding) {
-            return this;
-        }
-        return new AtomTypeReader<>(name,
-                new io.ltr8.tson.compiler.atom.BytesParser(encoding, bytes.constraints()), schemaLocation);
     }
 
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {

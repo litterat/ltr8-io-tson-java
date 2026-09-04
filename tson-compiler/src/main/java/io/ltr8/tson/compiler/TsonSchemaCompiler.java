@@ -239,12 +239,7 @@ public final class TsonSchemaCompiler {
                 // so the target's reader is named for the entry doing the referring -- which is what a use
                 // site naming `pct` over `pct => small` needs, and what knows that `b<10>` was written where
                 // `integer_type_10_100_786fbcfb` will be read.
-                //
-                // A directive this hop declares respells what the hop below produced; nearest-first is the
-                // recursion's own order, the outermost hop respelling last.
-                TsonTypeReader<?> target = UseSite.respelledByDeclaration(resolve(r.target().name()), name,
-                        definition, new ValueReaderContext(linked, readers, foreign));
-                return UseSite.named(target, EntryDisplayName.of(name, definition));
+                return UseSite.named(resolve(r.target().name()), EntryDisplayName.of(name, definition));
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
             TsonTypeReader<?> built = factory.create(name, definition, new ValueReaderContext(linked, readers, foreign));

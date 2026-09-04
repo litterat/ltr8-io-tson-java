@@ -132,9 +132,9 @@ class AtomCoherenceTest {
     /** Binary carries the same two length facets, minus {@code length}, and counts decoded bytes rather than code points. */
     @Test
     void binaryRejectsAFloorAboveItsCeiling() {
-        assertViolation(new BytesType(java.util.Optional.empty(), some(10), some(3)),
+        assertViolation(new BytesType(BytesType.Encoding.BASE64, java.util.Optional.empty(), some(10), some(3)),
                 "min_length 10 is above max_length 3");
-        assertCoherent(new BytesType(java.util.Optional.empty(), some(3), some(10)));
+        assertCoherent(new BytesType(BytesType.Encoding.BASE64, java.util.Optional.empty(), some(3), some(10)));
     }
 
     // ── Range families ───────────────────────────────────────────────────────

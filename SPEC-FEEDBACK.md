@@ -2617,24 +2617,46 @@ all. So the selector is not gratuitous. What is questionable is satisfying that 
 identity**, which exports a reference-encoding concern into the type model — where §5.4's classes, §8.2's
 identity and every other encoding then have to carry it, and only one of them can act on it.
 
-**Interpretation chosen — a design this implementation now runs, and not the one this entry first proposed.**
-The four sibling types are gone. There is one type, `bytes`, whose value is the octets; the alphabet is a
-directive that no longer touches the type system at all.
+**Interpretation chosen — a design this implementation now runs, and the third of three: not the entry's own
+first proposal, and not the directive that replaced it.** The four sibling types are gone. There is one type,
+`bytes`, whose value is the octets, and the alphabet is a **selector facet** of it (§5.7).
 
 ```
-meta.tn:  base_encoding  => !enum [BASE64 BASE64URL BASE32 HEX]
-          bytes_encoding => @annotation base_encoding
-          bytes_type     => ~atom & { length: non_negative_integer?
+meta.tn:  bytes_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
+          bytes_type     => ~atom & { encoding: bytes_encoding ~ BASE64
+                                      length: non_negative_integer?
                                       min_length: non_negative_integer?  max_length: non_negative_integer? }
-core.tn:  bytes => !bytes_type {}          — and no spelled subtypes at all
+core.tn:  bytes => !bytes_type { encoding: BASE64 }   — and no spelled subtypes at all
 ```
 
-`@bytes_encoding` directs the text class of encodings to read and write a `bytes` value in the named
-alphabet, and is resolved **nearest-first**: the field, then the field's type's definition walking its
-supertypes, then base64. An encoding whose values are octets ignores it. `bytes_type` composes with `atom`
-alone and carries no `spec`: RFC 4648 governs spellings, not octets, so an octet sequence has no
-specification to name. The length facets count decoded octets, so `length: 32` is a 32-byte digest whether
-it arrives as 64 hex characters, 44 base64 characters or 32 raw bytes.
+An author who wants another alphabet declares another type —
+`hexdigest => !bytes_type { encoding: HEX  length: 4 }`, a fresh instance of the constructor rather than a
+refinement of `bytes` (below). `bytes_type` composes with `atom` alone and carries no
+`spec`: RFC 4648 governs spellings, not octets, so an octet sequence has no specification to name. The length
+facets count decoded octets, so `length: 32` is a 32-byte digest whether it arrives as 64 hex characters, 44
+base64 characters or 32 raw bytes.
+
+**The directive was built, run, and replaced — and what replaced it is what the entry's own reasoning implies
+once "type" is read carefully.** The argument for a directive was that the alphabet is lexical metadata of a
+text encoding and so no part of the type. That is true *of values* — the octets are the value, and a selector
+never changes what two values compare as. But a type does two jobs: it names a value space, **and** it says
+which documents are valid. In a text encoding the alphabet decides the second, so it is part of the type's
+contract even though it is no part of its value space. The directive design equivocated between the two.
+
+**What settles it is the container element.** `[hexdigest]` can only work if the element's own type carries
+the alphabet — an element has no annotation position, and none of the container readers consults one — so an
+annotation can never express "an array of hex-spelled digests" without new syntax at every container. Carried
+as a facet it costs nothing, because a type is exactly what an element names. The same argument reaches a
+template argument: §8.2 dereferences a pure rename in an application's argument (#32), so an alphabet carried
+outside the type is normalised away at `box<hexdigest>` — measured, four hex octets read as six base64 ones,
+silently. As a facet, `box<hexdigest>` and `box<bytes>` are different types and the question does not arise.
+
+**The cost, stated plainly.** An octet-valued encoding sees `encoding: HEX` in the type and must ignore it —
+the only facet some encodings disregard entirely, where `length` and `pattern` constrain values and every
+encoding honours them. That is the objection the directive design was built to avoid, and it is real. It buys:
+the alphabet reaching every position a type reaches, no annotation-force category needed to make identity
+behave, and two types differing only in alphabet being two types — which is what a reader of either needs them
+to be.
 
 Part 1's built-in vocabulary follows: **`!bytes` is the only binary tag, and it is base64.** A schemaless
 document has no schema to carry a directive, so there is nothing for a reader to consult and no way one
@@ -2664,20 +2686,38 @@ whose values are octets neither carries nor contradicts it; equality, identity a
 over the octets and never over the spelling (#28's clause, of which this family is the sharpest case); a
 round trip through a non-text encoding preserves the value and re-spells it from the schema.
 
-The second half is **withdrawn and replaced**: rather than giving the value space a type *and* keeping the
-four as subtypes of it, give the value space the only type and make the alphabet a directive. Concretely, for
-§5.5, §9 and Part 1 §5: one `bytes_type` constructor with length facets and no selector; a `@bytes_encoding`
-annotation over a `base_encoding` enum, resolved nearest-first with base64 as the floor; no spelled types in
-core; and `!bytes` as Part 1's single binary tag. §5.4's classes and §8.2's identity then carry nothing about
-spelling, which is what the entry asked for and what the refinement route could not deliver.
+The second half is **withdrawn twice over**. Not four sibling types over one value space, which is what the
+entry opened against; and not an annotation, which was built and replaced for the reasons above. Concretely,
+for §5.5, §9 and Part 1 §5: **one `bytes_type` constructor whose facets are `encoding` (a §5.7 selector,
+defaulting to BASE64) plus the three lengths**; a `bytes_encoding` enum naming RFC 4648's four alphabets; no
+spelled types in core; and `!bytes` as Part 1's single binary tag, base64, a schemaless document having no
+type to carry a selector. §5.4's classes carry nothing about spelling, and §8.2's identity carries it exactly
+where it should — two types with different alphabets are two types.
 
-**What is running, and what is not.** All of the above is running and pinned — `BytesEncodingDirectiveTest`
-covers one value spelled four ways, the base64 floor, declaration-level inheritance, field-over-type
-precedence, and that two declarations with the same facets are the *same type* whatever directive they carry.
-Two things are not. The schema-load check the directive's own `@doc` promises — the annotated field or
-definition resolves to `bytes`, or the schema fails to load — is unwritten, along with the matching checks for
-`@rest` and `@discriminator`; all three want doing together. And this implementation's binary equality is
-still absent rather than merely undefined, which is #28 and unchanged by any of this.
+**And `encoding` is not refinable**, which is the rule that keeps the facet from rebuilding the very defect
+this entry opened against. An alphabet narrows nothing — every octet string is writable in every one of them —
+so `hexbytes => !bytes ^ { encoding: HEX }` would claim `hexbytes` IS-A `bytes` while narrowing no value, and
+a hex-spelled document is not readable at a base64 position. That is the degenerate IS-A the four sibling
+types were removed for; permitting the refinement would let an author rebuild it by hand. Another alphabet is
+another **type**, declared as its own instance — `hexdigest => !bytes_type { encoding: HEX  length: 4 }` —
+and refining for *length* is unaffected and inherits the alphabet, `sha256 => !bytes ^ { length: 32 }` being
+a base64 sha256.
+
+**This is not a rule about selectors, and the difference is worth §5.7 saying.** `complex_type.component` is
+also a selector and *is* refinable, correctly: complex numbers over float64 components are a subset of those
+over number components, so it narrows the value space and its IS-A is sound. The property that decides is
+**whether the facet narrows the value space at all** — `component` does, `encoding` does not. §5.7's existing
+"a selector may be set where the source leaves it at the constructor's default" is right for the first and
+wrong for the second, and the sentence it needs is: *a facet that does not narrow the value space is not
+refinable, because a refinement means IS-A and narrower, and such a facet can only deliver the first half.*
+
+**What is running, and what is not.** All of the above is running and pinned — `BytesEncodingSelectorTest`
+covers one value spelled three ways, the base64 default, every position such a type reaches (field, array
+element, map value, tuple element, alias, template argument), that two alphabets are two types, that
+`encoding` is refused at a refinement, and that refining for length inherits the source's alphabet. What is
+not: the matching schema-load checks for `@rest` and `@discriminator` (#25), which no longer have a
+`@bytes_encoding` sibling to be done alongside. And this implementation's binary equality is settled, not
+open — `ValueIdentity` compares octets, which is #28's answer for this family whatever the alphabet.
 
 **Status against Revision 34:** open, and new against this revision. Companion to #28 and a different
 question: #28 asks what equality over a binary value *is*; this asks what the type is and what part of it is
@@ -2996,17 +3036,17 @@ application, and the name the author wrote survives where they wrote it — at t
 written. Removing flattening is what made that division available; before it, the use site had been rewritten
 and provenance had nowhere to live but `@alias`.
 
-**One case is left unresolved, deliberately, and it is not an identity question.** A reference carrying
-`@bytes_encoding` is not a pure rename: values at its positions are spelled in another alphabet, so
-`box<hexdigest>` is not `box<bytes>`, and dereferencing loses the directive — `"deadbeef"` reads as six base64
-octets rather than four hex ones. Every other position reads it correctly; only an application argument does
-not, and this implementation accepts that rather than making identity guess
-(`BytesEncodingDirectiveTest.aDirectiveIsLostThroughATemplateApplication` asserts the wrong answer so it is
-visible rather than latent). **The question it really poses is what a directive on a reference means at all** —
-whether such an entry is a rename that may not carry one, or must be spelled `!bytes ^ {}` and be a type. The
-tidy answer is that a directive describes a type and a reference is a name for one, so a reference should not
-carry one; it is stated as the open question rather than adopted, because it reverses what an author can write
-today.
+**The one case that was left unresolved here is closed, and not by an identity rule.** A reference carrying
+`@bytes_encoding` was not a pure rename — values at its positions were spelled in another alphabet — so
+dereferencing it lost the directive, and `box<hexdigest>` read four hex octets as six base64 ones. That is
+fixed at the source: the alphabet is now `bytes_type`'s own `encoding` selector (#29), so it is part of the
+type, an author writes `hexdigest => !bytes ^ { encoding: HEX }`, and a refinement is not a rename. Nothing
+here has to decide what a directive on a reference means, because the meta layer no longer declares one.
+
+**That is the shape of the general answer, and worth stating as such.** Dereferencing a rename is safe exactly
+when a rename carries nothing that changes how values read. Rather than giving identity a rule for telling
+load-bearing aliases from transparent ones, the fix was to stop a rename from being able to carry such a thing
+— by putting what changes reads into the type, where a type is what every position already names.
 
 **Suggested resolution:**
 
@@ -3023,8 +3063,9 @@ today.
   and it is the *only* nominal-subtype spelling in the language, so a revision tightening that into a MUST
   would delete it without anyone connecting the two changes.
 - **meta-kernel and core: drop the `alias` annotation declaration.** Nothing derives it any more.
-- **§6 still owes the checked/positional category**, which is what would let the directive case above be
-  decided rather than accepted. Same missing paragraph as #25(a).
+- **§6 still owes the checked category** (#25(a)) for `@rest` and `@discriminator`. It is no longer needed
+  for identity: #29 moved the one decode-affecting annotation into the type, so no annotation the meta layer
+  declares changes how a value reads.
 
 **What is running, and what is not.** All of the above is running except the directive case, which is running
 wrongly and knowingly. `ReferenceChainTest`, `BootstrapReferencesTest`, `FieldValueConformanceTest` and

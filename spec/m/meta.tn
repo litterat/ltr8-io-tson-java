@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta.tn?sha256=ff3eb594f52ec65f2a2b788d486cf2f5c936322b19846ebd3f410f9c391c3f28"
+!!id:"https://tson.io/2026/35/m/meta.tn?sha256=70824428389a6c5a2c7b3bf51f7240408c8bb7b11c9805059bb576414abb1ba2"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0bb89291b899258a0bbdf8e304782b7f6a33379076e3743d5f1c2faaf7cd0d7f"
 !!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0bb89291b899258a0bbdf8e304782b7f6a33379076e3743d5f1c2faaf7cd0d7f"
 @doc:"""
@@ -21,9 +21,9 @@
 
   Three families of constructors live here:
 
-  1. Structural constructors: `binary_type` (with the
-     `binary_encoding` enum), whose instance in core is `bytes`, its
-     text spelling directed by `@bytes_encoding`; and `scoped` (with
+  1. Structural constructors: `bytes_type` (with the
+     `bytes_encoding` enum selecting its text spelling), whose
+     instance in core is `bytes`; and `scoped` (with
      the `scope_kind` enum), whose instances in core are `declared`,
      `extern` and `dynamic` and whose applications are `extern_of`
      and `extern_type`. Fixed-size arrays need no constructor of their
@@ -46,8 +46,8 @@
 
   Plus annotation types — the classifying markers `ordered`,
   `bounded`, `exact`, `numeric`; the checked assertion `disjoint`;
-  the representation directives `bytes_encoding`, `rest`,
-  `discriminator`; and the documentary `deprecated`, `since`, `todo`,
+  the representation directives `rest` and `discriminator`; and the
+  documentary `deprecated`, `since`, `todo`,
   `lang`, `title`, `examples`, `read_only`, `write_only`. Annotation
   types must reside in the governing target's namespace (per Part 2
   §6); placing them in meta makes them reachable from core and from
@@ -125,23 +125,7 @@
     different octets, which is why a text reader must be told which
     alphabet is in force.
     """
-  base_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
-
-  @doc:"""
-    Directs the text class of encodings — TSON text, JSON, and any
-    encoding whose values are character sequences — to read and write
-    a `bytes` value in the named RFC 4648 alphabet; an encoding whose
-    values are octets ignores it. Resolved nearest-first: the field,
-    then the field's type's definition walking its supertypes, then
-    BASE64 (§4, padded — the choice of JSON Schema's contentEncoding,
-    Protobuf's JSON mapping and CBOR's), so an unannotated `bytes`
-    position is base64 in every text encoding. Core declares no
-    spelled subtypes: a schema designer annotates the field or the
-    type, or takes the default. Checked at schema load on `@rest`'s
-    terms: the annotated field or definition resolves to `bytes`, or
-    the schema fails to load.
-    """
-  bytes_encoding => @annotation base_encoding
+  bytes_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
 
   @doc:"""
     Octet-sequence constraint vocabulary. Instance is `bytes` in
@@ -149,13 +133,38 @@
     addressing and the length facets are all over octets, never over
     a spelling — `length: 32` is a 32-byte digest whether it arrives
     as 64 hex characters, 44 base64 characters, or 32 raw bytes — so a
-    round trip through any encoding preserves the value. The type
-    says nothing about how a text encoding spells the octets, as
-    `text` says nothing about UTF-8: that is the `@bytes_encoding`
-    directive's job, and its default is base64. No spec pin: RFC 4648
-    governs spellings, not octets.
+    round trip through any encoding preserves the value.
+
+    `encoding` is a selector ([TSON-SCHEMA] §5.7): it picks which
+    RFC 4648 alphabet the text class of encodings — TSON text, JSON,
+    and any encoding whose values are character sequences — spells the
+    octets in, and an encoding whose values are octets ignores it. A
+    selector picks a spelling, so it never changes what two values
+    compare as. It defaults to BASE64 (§4, padded — the choice of JSON
+    Schema's contentEncoding, Protobuf's JSON mapping and CBOR's), so
+    a `bytes` position is base64 in every text encoding, and core
+    declares no spelled subtypes.
+
+    `encoding` is **not refinable**: an alphabet narrows nothing —
+    every octet string is writable in every one of them — so a
+    refinement that only respells would claim an IS-A carrying no
+    narrowing, and a hex-spelled document is not readable at a base64
+    position. That is the defect four sibling types were removed for.
+    Another alphabet is another type, declared as its own instance —
+    `hexdigest => !bytes_type { encoding: HEX  length: 4 }`. Refining
+    for *length* is unaffected and inherits the alphabet:
+    `sha256 => !bytes ^ { length: 32 }` is a base64 sha256.
+
+    It is a facet rather than an annotation because a container
+    element has no annotation position: `[hexdigest]` can only work if
+    the element's own type carries the alphabet. And once the type
+    carries it, two types differing only in alphabet are two types,
+    which is what a reader of either needs them to be.
+
+    No spec pin: RFC 4648 governs spellings, not octets.
     """
   bytes_type => ~atom & {
+    encoding:    bytes_encoding ~ BASE64
     length:      non_negative_integer?
     min_length:  non_negative_integer?
     max_length:  non_negative_integer?

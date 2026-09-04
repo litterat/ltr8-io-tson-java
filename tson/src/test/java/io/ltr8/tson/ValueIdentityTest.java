@@ -29,8 +29,7 @@ class ValueIdentityTest {
               tags    => set<text>
               by_hash => { bytes => text }
 
-              @bytes_encoding:HEX
-              hex_digest => !bytes ^ { length: 2 }
+              hex_digest => !bytes_type { encoding: HEX  length: 2 }
               hexes   => set<hex_digest>
 
               stamped => { k: bytes = "SGk=" }
@@ -64,8 +63,8 @@ class ValueIdentityTest {
     @Test
     void aSetComparesOctetsAndNotTheSpellingThatCarriedThem() {
         // Hex is case-insensitive by every definition of it, and `HexFormat` decodes both -- so "abcd" and
-        // "ABCD" are one octet string and a set holds one of them. The spelling is `@bytes_encoding`'s, and
-        // an encoding is not part of the value (#29).
+        // "ABCD" are one octet string and a set holds one of them. The alphabet is the type's own `encoding`
+        // selector, which picks a spelling and never changes what two values compare as (§5.7).
         assertEquals(List.of(), read("!hexed { h: [ \"abcd\" \"ef01\" ] }"));
 
         List<Diagnostic> refused = read("!hexed { h: [ \"abcd\" \"ABCD\" ] }");

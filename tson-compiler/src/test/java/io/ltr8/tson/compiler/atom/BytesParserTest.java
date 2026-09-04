@@ -73,17 +73,17 @@ class BytesParserTest {
         // Bytes chosen so the standard alphabet would need '+'/'/' -- forces '-'/'_' in the url form.
         byte[] original = {(byte) 0xFB, (byte) 0xFF, (byte) 0xBE};
         String urlEncoded = Base64.getUrlEncoder().encodeToString(original);
-        assertArrayEquals(original, BytesParser.BASE64URL.read(token(urlEncoded)));
+        assertArrayEquals(original, new BytesParser(BytesType.in(BytesType.Encoding.BASE64URL)).read(token(urlEncoded)));
     }
 
     @Test
     void base64UrlStandardAlphabetCharactersAreRejected() {
-        assertThrows(AtomParseException.class, () -> BytesParser.BASE64URL.read(token("+/==")));
+        assertThrows(AtomParseException.class, () -> new BytesParser(BytesType.in(BytesType.Encoding.BASE64URL)).read(token("+/==")));
     }
 
     @Test
     void base64UrlMissingPaddingIsRejected() {
-        assertThrows(AtomParseException.class, () -> BytesParser.BASE64URL.read(token("TWE")));
+        assertThrows(AtomParseException.class, () -> new BytesParser(BytesType.in(BytesType.Encoding.BASE64URL)).read(token("TWE")));
     }
 
     // ── HEX ──────────────────────────────────────────────────────────────────
@@ -91,28 +91,28 @@ class BytesParserTest {
     @Test
     void hexDecodesLowercase() {
         assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF},
-                BytesParser.HEX.read(token("deadbeef")));
+                new BytesParser(BytesType.in(BytesType.Encoding.HEX)).read(token("deadbeef")));
     }
 
     @Test
     void hexDecodesUppercase() {
         assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF},
-                BytesParser.HEX.read(token("DEADBEEF")));
+                new BytesParser(BytesType.in(BytesType.Encoding.HEX)).read(token("DEADBEEF")));
     }
 
     @Test
     void hexEmptyStringDecodesToEmptyArray() {
-        assertArrayEquals(new byte[0], BytesParser.HEX.read(token("")));
+        assertArrayEquals(new byte[0], new BytesParser(BytesType.in(BytesType.Encoding.HEX)).read(token("")));
     }
 
     @Test
     void hexOddLengthIsRejected() {
-        assertThrows(AtomParseException.class, () -> BytesParser.HEX.read(token("abc")));
+        assertThrows(AtomParseException.class, () -> new BytesParser(BytesType.in(BytesType.Encoding.HEX)).read(token("abc")));
     }
 
     @Test
     void hexNonHexCharacterIsRejected() {
-        assertThrows(AtomParseException.class, () -> BytesParser.HEX.read(token("zz")));
+        assertThrows(AtomParseException.class, () -> new BytesParser(BytesType.in(BytesType.Encoding.HEX)).read(token("zz")));
     }
 
     // ── BASE32 ───────────────────────────────────────────────────────────────
@@ -130,52 +130,54 @@ class BytesParserTest {
             "foobar, MZXW6YTBOI======"
     })
     void base32Rfc4648TestVectors(String decoded, String encoded) {
-        assertArrayEquals(decoded.getBytes(StandardCharsets.UTF_8), BytesParser.BASE32.read(token(encoded)));
+        assertArrayEquals(decoded.getBytes(StandardCharsets.UTF_8), new BytesParser(BytesType.in(BytesType.Encoding.BASE32)).read(token(encoded)));
     }
 
     @Test
     void base32LowercaseIsRejected() {
-        assertThrows(AtomParseException.class, () -> BytesParser.BASE32.read(token("my======")));
+        assertThrows(AtomParseException.class, () -> new BytesParser(BytesType.in(BytesType.Encoding.BASE32)).read(token("my======")));
     }
 
     @Test
     void base32WrongLengthIsRejected() {
-        assertThrows(AtomParseException.class, () -> BytesParser.BASE32.read(token("MY=====")));
+        assertThrows(AtomParseException.class, () -> new BytesParser(BytesType.in(BytesType.Encoding.BASE32)).read(token("MY=====")));
     }
 
     @Test
     void base32IllegalPaddingCountIsRejected() {
-        assertThrows(AtomParseException.class, () -> BytesParser.BASE32.read(token("MZXW6Y==")));
+        assertThrows(AtomParseException.class, () -> new BytesParser(BytesType.in(BytesType.Encoding.BASE32)).read(token("MZXW6Y==")));
     }
 
     @Test
     void base32AllPaddingCharactersIsRejected() {
         // Regression check for the padding-count array bounds bug caught while writing this.
-        assertThrows(AtomParseException.class, () -> BytesParser.BASE32.read(token("========")));
+        assertThrows(AtomParseException.class, () -> new BytesParser(BytesType.in(BytesType.Encoding.BASE32)).read(token("========")));
     }
 
     @Test
     void base32NonAlphabetCharacterIsRejected() {
-        assertThrows(AtomParseException.class, () -> BytesParser.BASE32.read(token("MY1=====")));
+        assertThrows(AtomParseException.class, () -> new BytesParser(BytesType.in(BytesType.Encoding.BASE32)).read(token("MY1=====")));
     }
 
     @Test
     void base32PaddingInTheMiddleIsRejected() {
-        assertThrows(AtomParseException.class, () -> BytesParser.BASE32.read(token("MZ=W6YTB")));
+        assertThrows(AtomParseException.class, () -> new BytesParser(BytesType.in(BytesType.Encoding.BASE32)).read(token("MZ=W6YTB")));
     }
 
     // ── min_length / max_length (unexercised by any built-in, but implemented) ──────────────
 
     @Test
     void minLengthRejectsShorterDecodedValue() {
-        BytesParser type = new BytesParser(BytesParser.Encoding.HEX, Optional.of(4), Optional.empty());
+        BytesParser type = new BytesParser(new BytesType(BytesType.Encoding.HEX, Optional.empty(), Optional.of(4),
+                Optional.empty()));
         assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF}, type.read(token("deadbeef")));
         assertThrows(AtomValidationException.class, () -> type.read(token("dead")));
     }
 
     @Test
     void maxLengthRejectsLongerDecodedValue() {
-        BytesParser type = new BytesParser(BytesParser.Encoding.HEX, Optional.empty(), Optional.of(2));
+        BytesParser type = new BytesParser(new BytesType(BytesType.Encoding.HEX, Optional.empty(), Optional.empty(),
+                Optional.of(2)));
         assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD}, type.read(token("dead")));
         assertThrows(AtomValidationException.class, () -> type.read(token("deadbeef")));
     }
@@ -193,14 +195,14 @@ class BytesParserTest {
     @Test
     void writeBase64UrlUsesTheUrlSafeAlphabet() {
         byte[] value = {(byte) 0xFB, (byte) 0xFF, (byte) 0xBE};
-        String written = BytesParser.BASE64URL.write(value);
-        assertArrayEquals(value, BytesParser.BASE64URL.read(token(written)));
+        String written = new BytesParser(BytesType.in(BytesType.Encoding.BASE64URL)).write(value);
+        assertArrayEquals(value, new BytesParser(BytesType.in(BytesType.Encoding.BASE64URL)).read(token(written)));
     }
 
     @Test
     void writeHexRoundTrips() {
         byte[] value = {(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF};
-        assertArrayEquals(value, BytesParser.HEX.read(token(BytesParser.HEX.write(value))));
+        assertArrayEquals(value, new BytesParser(BytesType.in(BytesType.Encoding.HEX)).read(token(new BytesParser(BytesType.in(BytesType.Encoding.HEX)).write(value))));
     }
 
     // Same RFC 4648 §10 test vectors as the decode side, exercised in the encode direction --
@@ -216,6 +218,6 @@ class BytesParserTest {
             "foobar, MZXW6YTBOI======"
     })
     void writeBase32Rfc4648TestVectors(String decoded, String encoded) {
-        assertEquals(encoded, BytesParser.BASE32.write(decoded.getBytes(StandardCharsets.UTF_8)));
+        assertEquals(encoded, new BytesParser(BytesType.in(BytesType.Encoding.BASE32)).write(decoded.getBytes(StandardCharsets.UTF_8)));
     }
 }
