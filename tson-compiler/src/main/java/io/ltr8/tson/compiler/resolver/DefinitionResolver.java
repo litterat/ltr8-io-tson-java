@@ -620,6 +620,14 @@ final class DefinitionResolver {
                     + "(§7.2) and cannot be declared otherwise");
         }
         Top body = bindAtomInstance(name, instance.value());
+        if (body instanceof io.ltr8.tson.schema.meta.Reference reference) {
+            // `!reference { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
+            // denotes the same entry: `kind: REFERENCE` (§4.1 -- a type_kind, not one the supertype chain
+            // could give) with `X` as both source and body. Dispatched on the *body* rather than on the head's
+            // name because this path has already read it; `resolveInstanceTemplate` holds its body unread and
+            // so has only the name to go on, which is what its own `alias` flag is for.
+            return TypeDefinition.reference(reference.target());
+        }
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
                 List.of(), false, List.of(), List.of(), Optional.empty(), body);
     }

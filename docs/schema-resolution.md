@@ -89,6 +89,12 @@ are kept in step deliberately.
   with empty chains; without a check those fail anyway on `Top` being sealed, but as a `ClassCastException`
   surfaced as `NOT_IMPLEMENTED`, a non-verdict for an author error. `TsonCompiledMetaSchema.buildConstructors`
   filters on the same predicate, so a head the gate admits has a reader.
+  **Admitting `reference` closed means giving it the alias's own entry**, not just letting it through:
+  `!reference { target: X }` resolves to `kind: REFERENCE` with `X` as source and body, the same entry
+  `name => X` denotes (§8.3), where a construction of any other head takes the head's kind and names the head
+  as its source. The closed path dispatches on the *body* being a `Reference`, having already read it;
+  `resolveInstanceTemplate` holds its body unread and so still needs the head's name — which is the whole of
+  what its `alias` flag is now for, the eligibility half having gone.
   **The marker keeps its other jobs** — §4.2's level discipline reads it, and §8.1 records it —
   and `SPEC-FEEDBACK.md` #36 asks §3.3.1 to state applicability this way.
   `ApplicabilityIsIsATopTest` pins it.

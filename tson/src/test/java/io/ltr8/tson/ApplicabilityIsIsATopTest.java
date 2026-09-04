@@ -2,6 +2,8 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.Diagnostic;
 import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.List;
 import java.util.Map;
@@ -55,6 +57,40 @@ class ApplicabilityIsIsATopTest {
                   r => <T> !reference { target: T }
                   c => r<int32>
                 """));
+    }
+
+    /**
+     * <b>The closed spelling denotes the same entry the bare alias does.</b> Admitting it is only half the
+     * job: {@code !reference { target: X }} is the explicit form of {@code name => X} (§8.3), so it must
+     * resolve to {@code kind: REFERENCE} with {@code X} as source and body — not to the head's own kind with
+     * {@code reference} as source, which is what a construction of any other head yields.
+     *
+     * <p>The distinction was unreachable while the closed form was refused, which is why it is asserted here
+     * against all three spellings at once rather than left to the one that already worked.
+     */
+    @Test
+    void everySpellingOfAnAliasDenotesTheSameEntry() {
+        String source = """
+                !!id:"https://example.test/u.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
+                {
+                  bare    => int32
+                  closed  => !reference { target: int32 }
+                  open    => <T> !reference { target: T }
+                  applied => open<int32>
+                }
+                """;
+        var entries = Tson.builder().schemaSource(TsonSchemaSource.ofMap(Map.of(ID, source))).build()
+                .resolve(source).schema().entries();
+
+        for (String name : List.of("bare", "closed", "applied")) {
+            TypeDefinition definition = entries.get(name);
+            assertEquals(TypeKind.REFERENCE, definition.kind(), name);
+            assertEquals("int32", definition.source().orElseThrow().name(), name);
+        }
+        // The open one is a template until it closes, so its own source is the head it holds.
+        assertEquals(TypeKind.REFERENCE, entries.get("open").kind());
     }
 
     /** Every ordinary constructor is IS-A top, so nothing that worked before stops working. */

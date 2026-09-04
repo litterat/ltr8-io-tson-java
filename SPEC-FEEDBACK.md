@@ -3534,8 +3534,13 @@ what §4.2's level discipline reads (an entry composing with, refining or subtra
 itself be `~`), and §8.1 still records it. What it stops deciding is applicability.
 
 **Interpretation chosen, and running.** `!C { … }` and `<…> !C { … }` both require `C` IS-A `top`; the
-by-name `reference` exception is deleted; the meta-schema's applicable-head table is built on the same
-predicate, so a head the gate admits has a reader. `ApplicabilityIsIsATopTest` pins the closed/open symmetry,
+by-name `reference` exception is deleted from the eligibility question; the meta-schema's applicable-head
+table is built on the same predicate, so a head the gate admits has a reader. **Admitting `reference` closed
+carries a second obligation** worth stating for anyone implementing this: `!reference { target: X }` is the
+explicit form of `X` (§8.3), so it must denote that alias — `kind: REFERENCE` with `X` as source and body —
+and not the head's own kind with `reference` as source, which is what a construction of every other head
+yields. §4.1 already requires it (an alias's kind is a `type_kind`, not one a supertype chain can give); it is
+simply unreachable while the closed spelling is refused. `ApplicabilityIsIsATopTest` pins the closed/open symmetry,
 the component refusal and the base-kind self-refusal.
 
 **One consequence worth stating, because it is a behaviour change and not only a re-spelling.** A
