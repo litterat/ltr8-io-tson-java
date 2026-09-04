@@ -39,6 +39,7 @@ public record Cidr6Type(String spec, @Field("min_prefix") Optional<Integer> minP
         AtomNarrowing.checkAtLeast(violations, "min_prefix", minPrefix, other.minPrefix);
         AtomNarrowing.checkAtMost(violations, "max_prefix", maxPrefix, other.maxPrefix);
         AtomNarrowing.checkSubset(violations, "within", within, other.within);
+        AtomNarrowing.checkSuperset(violations, "excluding", excluding, other.excluding);
         return List.copyOf(violations);
     }
 

@@ -882,12 +882,15 @@ final class DefinitionResolver {
      * body never mentioned is already filled in from the constructor's own schema-composed default.
      */
     private static void checkCoherent(String name, String constructorName, Top body) {
-        List<String> violations = switch (body) {
+        List<String> violations = new ArrayList<>(switch (body) {
             case Atom atom -> atom.coherenceCheck();
             case Product product -> product.coherenceCheck();
             case Sum sum -> sum.coherenceCheck();
             default -> List.of();
-        };
+        });
+        // The half that needs a regex engine, which the value model has no dependency on -- see
+        // PatternCoherence for why it runs here rather than on the family.
+        violations.addAll(PatternCoherence.check(body));
         if (!violations.isEmpty()) {
             throw new TsonSchemaValidationException("'" + name + "': the body's own '" + constructorName
                     + "' constraints contradict each other: " + String.join("; ", violations));

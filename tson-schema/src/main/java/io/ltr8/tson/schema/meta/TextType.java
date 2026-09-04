@@ -60,6 +60,7 @@ public record TextType(
         AtomNarrowing.checkAtLeast(violations, "length", effectiveMinLength(), other.length);
         AtomNarrowing.checkAtMost(violations, "max_length", effectiveMaxLength(), other.maxLength);
         AtomNarrowing.checkAtMost(violations, "length", effectiveMaxLength(), other.length);
+        AtomNarrowing.checkSettableOnce(violations, "pattern", pattern, other.pattern);
         return List.copyOf(violations);
     }
 

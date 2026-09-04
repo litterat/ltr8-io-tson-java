@@ -147,6 +147,39 @@ final class AtomNarrowing {
      * is [TSON-DATA] §4.3's identity where a member's host type has one value per number -- an identifier,
      * a {@link java.math.BigInteger}, so {@code 0x50} and {@code 80} are one member.
      */
+    /**
+     * A facet a refinement may <b>set where the source left it unset, and thereafter only restate</b> --
+     * §5.7's identity-only rule, for a facet where narrowing is decidable in principle and not cheaply.
+     *
+     * <p>{@code pattern} is the case: whether one regular language contains another is decidable, but a
+     * schema-load check is the wrong place to spend it, and getting it wrong in the permissive direction
+     * admits a refinement that is not one. Adding a pattern to a source that has none narrows -- from every
+     * string to the ones it matches -- so that stays permitted; replacing one is refused.
+     *
+     * <p><b>Enforceable because the facet is optional.</b> "The source left it unset" is visible in resolved
+     * output, which is what §5.7's selector rule cannot say of a facet whose default is injected.
+     */
+    static <T> void checkSettableOnce(List<String> out, String facet, Optional<T> source, Optional<T> refined) {
+        if (source.isPresent() && refined.isPresent() && !source.get().equals(refined.get())) {
+            out.add(facet + " " + refined.get() + " replaces the source's own " + source.get()
+                    + "; whether one narrows the other is not decided here, so a set " + facet
+                    + " may be restated but not changed");
+        }
+    }
+
+    /**
+     * A facet that narrows by <b>growing</b>: every member of the source's list must still be present, and a
+     * refinement may add more. {@code excluding} is the case -- each entry removes values, so more entries is
+     * a smaller type, which is the opposite direction from {@code within}'s subset rule.
+     */
+    static <T> void checkSuperset(List<String> out, String facet, List<T> source, List<T> refined) {
+        List<T> dropped = source.stream().filter(member -> !refined.contains(member)).toList();
+        if (!dropped.isEmpty()) {
+            out.add(facet + " drops " + dropped + " from the source's own list; each entry removes values, so "
+                    + facet + " may grow but never shrink");
+        }
+    }
+
     static <T> void checkSubset(List<String> out, String facet, List<T> source, List<T> refined) {
         checkSubset(out, facet, source, refined, Object::equals);
     }
