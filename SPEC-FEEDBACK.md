@@ -2006,7 +2006,8 @@ either annotation lands, and is the one settled below.**
 
 **(a) A checked annotation is a category §6 does not describe.** §6 accounts for three kinds — validated against
 its own type, advisory (`@annotation`, "carries no runtime force"), and resolver-derived (`@alias`,
-`@synthetic`). It never says an annotation may be checked against a fact the resolver derives and make the
+`@synthetic` — and #32 proposes removing `@alias`, which would leave that kind one member). It never says an
+annotation may be checked against a fact the resolver derives and make the
 schema fail to load. §5.4 nonetheless makes `@disjoint` do exactly that, and this implementation implements it
 (`TsonSchemaLinker.checkDisjointAssertions`: `disjoint: true` verifies silently, `disjoint: false` is a resolver
 error, no third outcome). One such annotation reads as a special case; three make a category, and §6 is where it
