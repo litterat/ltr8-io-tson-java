@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/35/m/core.tn?sha256=929e35e0a3417128faf7bb354f5a271c449538d75de800e3ea1dbaa739af21cd"
-!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=450ede71027f98665ec2cb6368a5fac094efba8c1524c3b6002f8a5c3df883a0"
+!!id:"https://tson.io/2026/35/m/core.tn?sha256=78d6ea553c28c6eb962f39a5ad49754a05afb81df86d63639329dfb3b7f696f1"
+!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=ff3eb594f52ec65f2a2b788d486cf2f5c936322b19846ebd3f410f9c391c3f28"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 35 draft).
@@ -27,7 +27,7 @@
   against the governing target's namespace (Part 2 §3.3.3, §6), so
   for this schema document they must be reachable through the
   `!!meta` chain; they appear here only by use. Core's own
-  `annotation`, `documentation`, `doc`, and `alias` declarations (and
+  `annotation`, `documentation`, and `doc` declarations (and
   its `void` and `set` siblings) face the other direction: they exist
   so that *data documents* and user schemas governed by or importing
   core can use them — the same one-hop rule, seen from the other
@@ -403,6 +403,4 @@
   @doc:"Short alias for documentation annotation."
   doc => @annotation documentation
 
-  @doc:"Source-level alias name preserved on a resolved type reference."
-  alias => @annotation text
 }

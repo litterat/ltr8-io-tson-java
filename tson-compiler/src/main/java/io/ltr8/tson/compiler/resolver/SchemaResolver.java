@@ -333,12 +333,10 @@ public final class SchemaResolver {
             republish(namespace, resolvedLocals, instantiations);
         }
 
-        // §6's name-position annotations, resolved here rather than after flattening because §8.3's walk
-        // consults them: an alias's declaration annotations are carried to the use site the flattening drops
-        // it from, and a hop whose annotations had not been bound yet would contribute nothing. Binding one
-        // can fail the way a definition's can (an annotation type §3.3.3 cannot reach), and this loop runs
-        // outside the memoized getter that catches those -- so it catches its own, once per name, leaving
-        // the entry intact and unannotated rather than losing the whole schema to a bad @doc.
+        // §6's name-position annotations. Binding one can fail the way a definition's can (an annotation type
+        // §3.3.3 cannot reach), and this loop runs outside the memoized getter that catches those -- so it
+        // catches its own, once per name, leaving the entry intact and unannotated rather than losing the
+        // whole schema to a bad @doc.
         for (String name : declarations.keySet()) {
             // A merged form is keyed by the name it merged onto, and contributes nothing at all where that
             // name belongs to the materialised half -- the entry is there, marked, and this is its old key.
@@ -358,22 +356,17 @@ public final class SchemaResolver {
             }
         }
 
-        // §8.3, last because it needs everything above already in the namespace: a type position naming a
-        // REFERENCE entry is rewritten to the end of its chain and keeps the author's own name as @alias.
-        // After materialisation specifically, so an alias to an application flattens onto the entry that
-        // application minted rather than onto the alias in front of it.
-        Map<String, TypeDefinition> flatLocals = ReferenceFlattener.flatten(resolvedLocals, namespace,
-                instantiations.keySet(), nameAnnotations::get);
-        resolvedLocals.putAll(flatLocals);
-        instantiations = ReferenceFlattener.flatten(instantiations, namespace, instantiations.keySet(),
-                nameAnnotations::get);
-        republish(namespace, resolvedLocals, instantiations);
+        // §8.3 use-site flattening used to run here and no longer exists. A reference is a hop, not a
+        // rewrite: resolved output states the chain the author wrote, every use site keeps the name it
+        // names, and a processor collapses the chain when it compiles readers -- after linking, where the
+        // whole namespace is present and the walk is done once per entry rather than once per output.
+        // See docs/schema-resolution.md and SPEC-FEEDBACK.md #32.
 
         // §6: an annotation written before the declared name binds to the *name*, not to the definition,
         // and "the resolver does not hoist annotations from key to value". A resolved schema is a
         // {type_name => type_definition}, so the name is this map's key -- which is where they go. The two
-        // sets stay separate: a declaration's own annotations are on its TypeDefinition. Bound above,
-        // because §8.3's walk needs them; this only places them.
+        // sets stay separate: a declaration's own annotations are on its TypeDefinition. Bound above; this
+        // only places them.
         AnnotatedMap<String, TypeDefinition> localOnly = new AnnotatedMap<>();
         for (String name : declarations.keySet()) {
             String key = merged.getOrDefault(name, name);

@@ -16,11 +16,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A {@code type_ref} keeps the wire annotations written on the reference itself.
  *
- * <p>[TSON-SCHEMA] §8.3 attaches {@code @alias:name} to the <em>type value</em> when a use site is
- * flattened past a {@code REFERENCE} entry — {@code type: @alias:field_name token} says both where the
- * reference now points and what the author wrote. The annotation belongs to the reference, not to the
- * field around it, so {@link TypeRef} is where it has to live; before it had a carrier, a read discarded
- * one and a write could not produce one.
+ * <p>§6 lets an annotation precede any value, and a {@code type_ref} at a field's type position is one:
+ * {@code type: @doc:"..." token} annotates the <em>reference</em>, not the field around it, so {@link
+ * TypeRef} is where it has to live. Before it had a carrier, a read discarded one and a write could not
+ * produce one.
  */
 class TypeRefAnnotationTest {
 
@@ -34,16 +33,16 @@ class TypeRefAnnotationTest {
         return assertInstanceOf(RecordBody.class, definition.body()).fields().getFirst().type();
     }
 
-    /** §8.3's own shape, read off a document. */
+    /** An annotation written on the reference itself, read off a document. */
     @Test
-    void anAliasOnATypeRefIsKept() {
+    void anAnnotationOnATypeRefIsKept() {
         TypeRef type = fieldType(read("""
                 !type_definition { kind: PRODUCT  body: !record { fields: [
-                  !record_field { name: n  type: @alias:field_name token }
+                  !record_field { name: n  type: @doc:"the token itself" token }
                 ] } }"""));
 
         assertEquals("token", type.name());
-        assertEquals("field_name", type.annotations().get("alias").orElseThrow().value().orElseThrow());
+        assertEquals("the token itself", type.annotations().get("doc").orElseThrow().value().orElseThrow());
     }
 
     /** A reference with nothing written on it carries an empty carrier, not null. */
@@ -55,35 +54,35 @@ class TypeRefAnnotationTest {
                 ] } }""")).annotations().values().isEmpty());
     }
 
-    /** And it writes back out, which is the half §8.3 needs to emit a flattened use site. */
+    /** And it writes back out, so a resolved-form round trip does not quietly drop it. */
     @Test
-    void anAliasedTypeRefWritesBackAsOne() {
+    void anAnnotatedTypeRefWritesBackAsOne() {
         TypeRef type = fieldType(read("""
                 !type_definition { kind: PRODUCT  body: !record { fields: [
-                  !record_field { name: n  type: @alias:field_name token }
+                  !record_field { name: n  type: @doc:"the token itself" token }
                 ] } }"""));
 
         String written = new TsonObjectWriter(SchemaMetaNameBinder.defaultContext()).toTson(type);
 
-        assertTrue(written.contains("@alias"), written);
-        assertTrue(written.contains("field_name"), written);
+        assertTrue(written.contains("@doc"), written);
+        assertTrue(written.contains("the token itself"), written);
     }
 
     /**
-     * An alias does not change what a reference <em>is</em>. §8.2 keys entry identity on where a reference
-     * points, and two use sites of one type differ only in what the author happened to write, so equality
-     * and hashing exclude the carrier — the same call {@code RecordField} already makes.
+     * An annotation does not change what a reference <em>is</em>. §8.2 keys entry identity on where a
+     * reference points, and two use sites of one type differ only in what the author wrote around it, so
+     * equality and hashing exclude the carrier — the same call {@code RecordField} already makes.
      */
     @Test
-    void anAliasIsNotPartOfAReferencesIdentity() {
+    void anAnnotationIsNotPartOfAReferencesIdentity() {
         TypeRef plain = TypeRef.of("token");
-        TypeRef aliased = plain.withAnnotations(
+        TypeRef annotated = plain.withAnnotations(
                 new io.ltr8.annotation.Annotations.Builder()
-                        .add(new io.ltr8.annotation.Annotation("alias", java.util.Optional.of("field_name")))
+                        .add(new io.ltr8.annotation.Annotation("doc", java.util.Optional.of("a token")))
                         .build());
 
-        assertEquals(plain, aliased);
-        assertEquals(plain.hashCode(), aliased.hashCode());
-        assertEquals("field_name", aliased.annotations().get("alias").orElseThrow().value().orElseThrow());
+        assertEquals(plain, annotated);
+        assertEquals(plain.hashCode(), annotated.hashCode());
+        assertEquals("a token", annotated.annotations().get("doc").orElseThrow().value().orElseThrow());
     }
 }

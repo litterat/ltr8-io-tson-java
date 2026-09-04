@@ -406,7 +406,6 @@ class DefinitionResolverTest {
         TypeDefinition annotation = resolver.resolve(schemaMap.declarations().get("annotation"));
         TypeDefinition documentation = resolver.resolve(schemaMap.declarations().get("documentation"));
         TypeDefinition doc = resolver.resolve(schemaMap.declarations().get("doc"));
-        TypeDefinition alias = resolver.resolve(schemaMap.declarations().get("alias"));
 
         // type_name/field_name/param_name => identifier; each is its own fresh REFERENCE entry, not
         // three views of the same one -- source/target both name "identifier" for all three.
@@ -416,7 +415,6 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.REFERENCE, annotation.kind());
         assertEquals(TypeKind.REFERENCE, documentation.kind());
         assertEquals(TypeKind.REFERENCE, doc.kind());
-        assertEquals(TypeKind.REFERENCE, alias.kind());
 
         assertEquals("{ source: { name: \"identifier\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
                 + "constructor: false supertypes: [] subtypes: [] "
@@ -440,9 +438,6 @@ class DefinitionResolverTest {
         assertEquals("@annotation { source: { name: \"documentation\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
                 + "constructor: false supertypes: [] subtypes: [] "
                 + "body: !reference { target: { name: \"documentation\" arguments: [] } } }", write(doc));
-
-        // alias => @annotation text -- same shape as documentation (both target "text").
-        assertEquals(write(documentation), write(alias));
     }
 
     // ── A sugar form must be lifted before resolution ────────────────────

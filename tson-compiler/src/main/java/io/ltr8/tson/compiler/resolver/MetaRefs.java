@@ -18,7 +18,7 @@ import java.util.function.UnaryOperator;
  * The {@code schema.meta} reference walk: every {@link TypeRef} an entry holds, rewritten or merely visited.
  *
  * <p><b>One walk, four callers, and none of them is about templates.</b> {@code TemplateMaterialiser} closes
- * an application through it, {@code ReferenceFlattener} rewrites a use site to the end of its chain (§8.3),
+ * an application through it,
  * {@code SyntheticMerge} renames onto a merged entry (§8.2), and {@code TemplateRegularity} uses it as a
  * visitor by returning each reference unchanged. Which body shape carries which references is a fact about
  * the value model, not about any of those four, so it is stated once here.

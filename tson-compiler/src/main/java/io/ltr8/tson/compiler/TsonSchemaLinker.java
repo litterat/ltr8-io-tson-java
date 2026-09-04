@@ -1131,7 +1131,8 @@ public final class TsonSchemaLinker {
     /**
      * §5.4: "The resolver validates that each variant resolves to a distinct type."
      *
-     * <p><b>Judged after flattening, which is the whole point of the rule.</b> §8.3 makes an alias and its
+     * <p><b>Judged at the end of each variant's reference chain, which is the whole point of the rule.</b>
+     * §8.3 makes an alias and its
      * target one type, so {@code (text | my_text)} with {@code my_text => text} is the same duplicate {@code
      * (text | text)} is -- spelled so that an author cannot see it. Comparing the written names would catch
      * only the spelling an author would have caught themselves. A duplicate variant is never merely
@@ -1168,7 +1169,7 @@ public final class TsonSchemaLinker {
     /**
      * A variant must not resolve to {@code void} (§5.4): {@code (T | void)} spells
      * optionality as a choice, and optionality belongs to the position -- a field's {@code ?} state, the
-     * {@code _} sentinel -- never to the type occupying it. Judged after §8.3 flattening, like
+     * {@code _} sentinel -- never to the type occupying it. Judged at the end of the chain, like
      * distinctness, so an alias of {@code void} is caught under whatever name the author wrote.
      */
     private static void checkVariantsAreNotVoid(String entryName, ChoiceBody choice,
@@ -1349,17 +1350,21 @@ public final class TsonSchemaLinker {
         if (field.value().isEmpty() || ownParameters.contains(field.type().name())) {
             return;
         }
-        TypeDefinition target = namespace.get(field.type().name());
+        // The chain end is what has to be checked, not the hop: a field typed by an alias
+        // (`a => text`, `f: a = hello`) states a value of whatever the alias names. Resolved output states
+        // the chain rather than rewriting the use site past it, so the walk happens here.
+        String terminal = terminalName(field.type().name(), namespace);
+        TypeDefinition target = namespace.get(terminal);
         // An unresolved reference is already reported by validateTypeRef; a target that is still open (or an
-        // application of one) has no single body to check against until materialisation closes it. A
-        // REFERENCE target should not occur -- §8.3 flattens a type position past one -- and skipping is the
-        // right answer if it ever does: the chain end is what would have to be checked, not the hop.
+        // application of one) has no single body to check against until materialisation closes it. A body
+        // still a Reference means the walk stopped on a cycle or an argument-bearing target, neither of
+        // which has one either.
         if (target == null || !target.parameters().isEmpty() || !field.type().arguments().isEmpty()
                 || target.body() instanceof Reference) {
             return;
         }
         Token value = field.value().get();
-        Optional<AtomType<?>> parser = AtomParsers.forType(field.type().name(), target.body());
+        Optional<AtomType<?>> parser = AtomParsers.forType(terminal, target.body());
         if (parser.isEmpty()) {
             throw notAScalarType(entryName, field, value, target.body());
         }

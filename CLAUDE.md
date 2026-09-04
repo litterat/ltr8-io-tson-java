@@ -480,25 +480,27 @@ the reference channel, so a parameter passed to another template takes the calle
 two templates may wait on each other. An application closed on demand (a composition supertype, a refinement
 source) infers its one template itself, that template having already resolved.
 
-**Use-site flattening (`ReferenceFlattener`)** is §8.3 and the last thing resolution does: a type position
-naming a `REFERENCE` entry is rewritten to the end of its chain and keeps the name the author wrote as
-`@alias` (`type: @alias:field_name token`), which is what makes §8.2's instantiation identity a single-level
-comparison. `TypeRef` carries an `Annotations` component for it, excluded from `equals` — identity is where
-a reference *points*, an alias records where it *came from*. An alias entry keeps its own hop (the chain
-must stay walkable) and the walk stops at a materialised instantiation (this model gives one an extra
-`REFERENCE` hop the spec's does not, and that entry is what identity keys on). Runs on the bootstrap route
-too, whose output governs anything whose `!!meta` is meta-kernel.
+**A reference is a hop, not a rewrite.** §8.3's use-site flattening is gone and `@alias` with it: resolved
+output states the chain the author wrote, a type position naming a `REFERENCE` entry keeps that name, and the
+chain stays walkable through the entries. **A processor collapses the chain when it compiles readers** — after
+linking, once per entry (`TsonSchemaCompiler`'s reference branch, whose reader *is* its target's, named for
+the entry doing the referring). The walk was never avoidable — the compiler, `DiscriminationClass`,
+`TypeInhabitance` and the linker each do one, and §8.3 required `reference.target` stay unflattened anyway —
+so rewriting the output as well was a second representation to keep in step, whose `@alias` summary kept only
+the source-site name and dropped the hops that mattered. A directive on an alias is applied where the alias
+compiles (`UseSite.respelledByDeclaration`), nearest-first falling out of the innermost-first recursion.
+`SPEC-FEEDBACK.md` #32 and `docs/schema-resolution.md` have the measurements.
 
-**The `@synthetic` marker** is `@alias`'s derived sibling (§8.1): §8.2 puts the bare marker on the schema-map
+**The `@synthetic` marker** is the one derived marker (§8.1): §8.2 puts the bare marker on the schema-map
 **key** of every entry the resolver materialised from a sugar form, and on no other — an instantiation entry
 deliberately carries none, its `source` being an application where a synthetic's is a bare constructor, and a
 declaration's own sugar body never lifts at all. Its two mint sites are the desugar lift
 (`SchemaDesugarer.lifted`, the document's own set difference) and materialisation closing an open synthetic
 (`TemplateMaterialiser.syntheticNames`); `SchemaResolver` attaches it where it assembles the entry map. Key
 position, never the `TypeDefinition` value — §6 forbids hoisting between the two — so `AnnotatedMap` carries
-it and the linker re-attaches it, imports included. The bootstrap route attaches none (it is informational,
-where `@alias` changes what identity compares), and meta-kernel's own nine are marked anyway, by the ordinary
-resolution everything but the transient governing-meta stand-in comes from.
+it and the linker re-attaches it, imports included. The bootstrap route attaches none (it is informational),
+and meta-kernel's own nine are marked anyway, by the ordinary resolution everything but the transient
+governing-meta stand-in comes from.
 
 ### Meta-kernel bootstrap (`MetaKernelBootstrapResolver`) — `docs/schema-resolution.md`
 
@@ -528,7 +530,7 @@ discrimination class, the same `DiscriminationClass` untagged reading dispatches
 every reference — refusing one that names a **DATA-kinded entry** (an entry describing
 something other than a data value is declared by its schema but is not a type; without this the misuse
 resolves, links *and* compiles and fails only at read), including choice-variant
-distinctness after §8.3 flattening, rejection of a variant resolving to `void` (optionality is not choice,
+distinctness at the end of each variant's reference chain, rejection of a variant resolving to `void` (optionality is not choice,
 §5.4), the author's `@disjoint` marker against the derived fact (`false` is
 an error; no third outcome exists), and
 constructor eligibility from both ends (§2.2.2/§4.2). The linker materializes nothing —
@@ -550,7 +552,7 @@ is no reader family and no factory entry, the ordinary record reader binding the
 in full, and an unresolvable class is an error where the constructor is applied.
 `Data.references()` is how a body's own type references reach the linker, declared rather than discovered.
 §9's guidance for extension meta-schemas is the other half: a slot holding a type reference MUST be typed
-`type_ref`, which is what makes it participate in flattening and identity.
+`type_ref`, which is what makes it participate in reference walking and identity.
 
 ### Class 2 compilation (`TsonSchemaCompiler`, `.../reader/`) — `docs/linking-and-compilation.md`
 
@@ -610,9 +612,9 @@ is an error where omission injects silently; `{}` is
 the empty container of the position's own type (§2.8), so a zero-entry map faces `min_items` like any
 other value; and a reader names itself in a message by what the author wrote, never by a
 content-derived entry name — `EntryDisplayName` renders a minted entry as the sugar or application that
-produced it (told apart by having no source position), and `UseSite` names a *position* as that position
-wrote it, following §8.3's `@alias` where flattening left one and the referring entry's own `source`
-where it did not. Both run where a composite reader wires its children, so neither costs a read anything.
+produced it (told apart by having no source position), and a `REFERENCE` entry's reader takes that entry's
+own name, so a position naming an alias reports as the alias rather than as the type at the end of its chain.
+Both run where a reader is built, so neither costs a read anything.
 
 **§7.8's scope push is `ScopedReader`, and who may open one is `ScopePush`.** At a `scoped` position the
 value's own shape picks the cell: a nested `!!schema` is EXTERN, a bare type-ref is LOCAL, and neither is a

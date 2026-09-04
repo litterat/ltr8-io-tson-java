@@ -18,8 +18,10 @@
   - Source annotations are preserved in their authored positions.
     A conforming resolver carries the source schema's document-level
     @doc here; this fixture substitutes this conventions note.
-  - Reference-kind names at type positions are flattened with @alias
-    (Part 2 Section 8.3), recursively inside type arguments.
+  - Reference-kind names at type positions are stated as written: a
+    reference is a hop, not a rewrite, so a use site naming an alias
+    names the alias. A processor collapses the chain when it compiles
+    readers, after linking, not in resolved output.
   - Type-reference positions (`record_field.type`,
     `tuple_element.element_type`, `type_definition.source`, choice
     variant elements, and binding-record type slots) hold type_ref
@@ -59,7 +61,7 @@
   - Synthetic entries — the closed forms the sugar lifts to — carry
     the derived `@synthetic` marker at their schema-map keys
     (Part 2 Sections 6, 8.2); on ingest the marker is discarded and
-    recomputed, like `@alias`. Their internal names here follow the
+    recomputed. Their internal names here follow the
     convention `<constructor>_<operands>_xxhash`, where the trailing
     `xxhash` is a placeholder for a content hash of the resolved
     binding record: the *shape* of the data — one internally named,
@@ -297,7 +299,7 @@
   type_ref => !type_definition {
     kind: PRODUCT
     body: !record { fields: [
-      !record_field { name: name       type: @alias:type_name identifier }
+      !record_field { name: name       type: type_name }
       !record_field { name: arguments  type: array_type_argument_xxhash  state: OPTIONAL }
     ] }
   }
@@ -364,12 +366,6 @@
     body: !reference { target: documentation }
   }
 
-  alias => @annotation !type_definition {
-    kind: REFERENCE
-    source: text
-    body: !reference { target: text }
-  }
-
   synthetic => @annotation !type_definition {
     kind: REFERENCE
     source: void
@@ -380,7 +376,7 @@
   record_field => !type_definition {
     kind: PRODUCT
     body: !record { fields: [
-      !record_field { name: name         type: @alias:field_name identifier }
+      !record_field { name: name         type: field_name }
       !record_field { name: type         type: type_ref }
       !record_field { name: state        type: field_state  state: REQUIRED_DEFAULT  value: REQUIRED }
       !record_field { name: value        type: value  state: OPTIONAL }
@@ -534,7 +530,7 @@
   schema => !type_definition {
     kind: PRODUCT
     source: map
-    body: !map { key_type: @alias:type_name identifier  value_type: type_definition }
+    body: !map { key_type: type_name  value_type: type_definition }
   }
 
   @doc:"""
@@ -554,19 +550,19 @@
   @synthetic array_type_name_xxhash => !type_definition {
     kind: PRODUCT
     source: array
-    body: !array { element_type: @alias:type_name identifier }
+    body: !array { element_type: type_name }
   }
 
   @synthetic array_field_name_xxhash => !type_definition {
     kind: PRODUCT
     source: array
-    body: !array { element_type: @alias:field_name identifier }
+    body: !array { element_type: field_name }
   }
 
   @synthetic array_param_name_xxhash => !type_definition {
     kind: PRODUCT
     source: array
-    body: !array { element_type: @alias:param_name identifier }
+    body: !array { element_type: param_name }
   }
 
   @synthetic array_type_ref_xxhash => !type_definition {

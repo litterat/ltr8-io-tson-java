@@ -226,12 +226,17 @@ public final class TsonSchemaCompiler {
             }
             Top body = definition.body();
             if (body instanceof Reference r) {
-                // The target's reader, named for the entry doing the referring rather than the one referred
-                // to. §8.3 flattens an ordinary use site past a reference and records the author's name as
-                // `@alias` there, but the walk stops at a materialised instantiation -- so this is the only
-                // place that knows `b<10>` was written where `integer_type_10_100_786fbcfb` will be read.
-                return UseSite.named(resolve(r.target().name()),
-                        EntryDisplayName.of(name, definition));
+                // A reference is a hop, and this is where the chain is collapsed: after linking, once per
+                // entry, at the moment a reader is built. Resolved output states the chain the author wrote,
+                // so the target's reader is named for the entry doing the referring -- which is what a use
+                // site naming `pct` over `pct => small` needs, and what knows that `b<10>` was written where
+                // `integer_type_10_100_786fbcfb` will be read.
+                //
+                // A directive this hop declares respells what the hop below produced; nearest-first is the
+                // recursion's own order, the outermost hop respelling last.
+                TsonTypeReader<?> target = UseSite.respelledByDeclaration(resolve(r.target().name()), name,
+                        definition, new ValueReaderContext(linked, readers, foreign));
+                return UseSite.named(target, EntryDisplayName.of(name, definition));
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
             TsonTypeReader<?> built = factory.create(name, definition, new ValueReaderContext(linked, readers, foreign));
