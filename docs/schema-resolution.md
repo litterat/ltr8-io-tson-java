@@ -164,8 +164,23 @@ are kept in step deliberately.
     own divisor.
   - Unchecked by design, each documented on its class and matching that family's existing narrowing gap:
     `duration_type`'s text bounds (ordering them means parsing them — `"P1M"` vs `"P30D"` does not order
-    lexically, and judging them as strings would call a coherent body empty), `pattern` emptiness, selector
-    facets, and CIDR `within`/`excluding` overlap (containment arithmetic this family has no parser for).
+    lexically, and judging them as strings would call a coherent body empty), `pattern` emptiness, and
+    selector facets.
+  - **The four network families check their own `within`/`excluding` entries here**, through
+    `AtomCoherence.checkNetworks`: the facets are typed `[value]` in meta.tn and must stay so (they list
+    networks, and meta declares no network instance to type them by — core.tn does, and core imports meta),
+    so they arrive as text and the family that owns the rule is the only place that can judge them. That is
+    why `schema.atom` carries `CidrNetwork` and `InternetAddress` at all: a check in the linker or the
+    resolver would be a second home for one family's rule, which is what `Atom.coherenceCheck` exists to
+    prevent. **The pair's own emptiness is judged there too** (`checkAdmitsAValue`): an `excluding` set
+    covering every network `within` permits admits nothing, which is `{ min: 10 max: 3 }` with a different
+    spelling. Cover over a prefix tree is counting rather than searching — two blocks are nested or disjoint,
+    so an exclusion meeting a permitted block either contains it or lies wholly inside one half — so the rule
+    is exact and total, not a partial prover. **A network family folds its prefix bounds in**, because its
+    value is a block and a block is refused for *overlapping* an exclusion: `within: ["10.0.0.0/24"]
+    excluding: ["10.0.0.5/32"] max_prefix: 24` admits no network while admitting almost every address. That is
+    the same fold `integer` performs with its `size`-derived range. `SPEC-FEEDBACK.md` #34 asks §5.5 to state
+    both halves.
   - **The three temporal families' rules are correct but not yet reachable from schema text**, for a reason
     that predates them and is nothing to do with coherence: `date_type.min`/`max` are declared `value?` in
     meta.tn (the untyped escape hatch), so a bound arrives as a `String` and the bind into `DateType`'s

@@ -33,6 +33,8 @@ import io.ltr8.tson.compiler.atom.UuidParser;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.schema.meta.Ipv6Type;
+import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -134,10 +136,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * definition}'s own body.
      */
     static final ValueReaderFactory IPV4_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, Ipv4Parser.UNCONSTRAINED, context.locationOf(name, definition));
+            new AtomTypeReader<>(name, Ipv4Parser.of((Ipv4Type) definition.body()),
+                    context.locationOf(name, definition));
     /** Same reasoning as {@link #IPV4_TYPE}, for {@link Ipv6Parser}. */
     static final ValueReaderFactory IPV6_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, Ipv6Parser.UNCONSTRAINED, context.locationOf(name, definition));
+            new AtomTypeReader<>(name, Ipv6Parser.of((Ipv6Type) definition.body()),
+                    context.locationOf(name, definition));
     /**
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean}
      * ({@link BooleanReader}), every other enum instance its member text ({@link EnumParser}). Dispatch is

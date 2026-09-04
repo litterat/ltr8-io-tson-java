@@ -262,10 +262,19 @@ fixed, closed name→`AtomType` table (§5).
   `Ipv4Parser`'s Javadoc documents is shut down once, in one place. What the CIDR pair adds on top is
   §5.5's own two validation rules (prefix length inside the family range; host bits zero under that
   prefix, since a network that accepted and masked would be lossy) plus the `min_prefix`/`max_prefix`
-  facets; `within`/`excluding` stay unmodeled across all four, set membership against a list of networks
-  being a materially bigger piece of work than a scalar bound. Their host type is `String` — the authored
-  text, validated and handed back — for `MacParser`'s reason: Java has no type to map onto, and the
-  round trip stays exact.
+  facets. **`within`/`excluding` apply across all four**, each family asking its own question of the same
+  arithmetic: an address must fall inside some permitted network and outside every excluded one, and a
+  network must be a subnet of a permitted one and must not overlap an excluded one — the difference being
+  that a block partly inside an exclusion is partly excluded, which for a value denoting a whole block is a
+  rejection.
+- **A CIDR value is a network, not its text** — `cidr4`/`cidr6` read to `schema.atom.CidrNetwork` (the prefix
+  octets and the prefix length), so two spellings of one network are one value and `2001:0db8:0000:…/32`
+  binds equal to `2001:db8::/32`. Writing goes back through RFC 5952's canonical form rather than the
+  authored spelling, which is what it means for the value to be the octets. `mac` and `email` keep `String`
+  for the reason the CIDR pair no longer does: nothing about their text decomposes into a value a schema
+  compares. `CidrNetwork` is a Java record and is registered as an **atom**
+  (`TsonAtomContext.registerDefaults`), or tson-bind's record auto-detection would expect
+  `{ prefix: … prefixLength: … }` on the wire where one token stands.
 - **The exact tiers' sparse `members` set is a facet, and its identity is [TSON-DATA] §4.3's.** `integer`
   and `number` carry a member set (§5.6) for a value set that is neither a contiguous range nor an
   arithmetic progression, so none of the other facets denotes it; `IntegerParser`/`DecimalParser` apply it

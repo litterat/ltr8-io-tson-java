@@ -17,7 +17,7 @@ import java.util.UUID;
 /**
  * The default built-in-vocabulary atom registrations every {@link DataBindContext} consumer in
  * this library needs (UUID/byte[]/LocalDate/OffsetTime/OffsetDateTime/Duration/Period/URI/Inet4Address/
- * Inet6Address/SourcePosition) -- the shared {@code defaultContext()} that {@code TsonObjectReader}'s
+ * Inet6Address/CidrNetwork/SourcePosition) -- the shared {@code defaultContext()} that {@code TsonObjectReader}'s
  * and {@code TsonObjectWriter}'s own no-arg constructors, and this package's own {@code
  * SchemaMetaNameBinder}'s {@link #registerDefaults}-based {@code defaultContext()}, all delegate to.
  * Lives here, alongside the other configuration/wiring classes ("how a caller configures a working
@@ -55,6 +55,10 @@ public final class TsonAtomContext {
             context.registerAtom(URI.class);
             context.registerAtom(Inet4Address.class);
             context.registerAtom(Inet6Address.class);
+            // An atom, not a record, though it is a Java record: cidr4/cidr6 read to one network value from
+            // one token, and tson-bind's record auto-detection would otherwise make a `{ prefix: ...
+            // prefixLength: ... }` of it and refuse the scalar the wire actually carries.
+            context.registerAtom(io.ltr8.tson.schema.atom.CidrNetwork.class);
             // An atom, not a record: a Token *is* one token on the wire -- the text plus the form that
             // produced it -- where binding it structurally writes it as `{ text: ... form: ... }`, a record
             // where [TSON-SCHEMA] §8's resolved form has a scalar. Reading is unaffected (the slot's own

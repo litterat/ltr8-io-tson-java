@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.reader.Dom;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -149,9 +150,9 @@ class CoreSchemaImportTest {
         TsonCompiledSchema compiledCore =
                 TsonCompiledSchemaRegistry.tree(loaded.registry()).get(TsonBundledSchemas.CORE_ID);
 
-        assertEquals("10.0.0.0/8",
+        assertEquals(CidrNetwork.parse("10.0.0.0/8", 32),
                 Dom.of((TsonValue) compiledCore.get("cidr4").read(TestDocuments.document("\"10.0.0.0/8\""))));
-        assertEquals("2001:db8::/32",
+        assertEquals(CidrNetwork.parse("2001:db8::/32", 128),
                 Dom.of((TsonValue) compiledCore.get("cidr6").read(TestDocuments.document("\"2001:db8::/32\""))));
     }
 }

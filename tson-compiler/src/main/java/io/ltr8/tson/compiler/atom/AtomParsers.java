@@ -92,8 +92,8 @@ public final class AtomParsers {
             case Cidr6Type t -> new Cidr6Parser(t);
             case EnumBody t -> new EnumParser(t);
             case ComplexType ignored -> ComplexParser.UNCONSTRAINED;
-            case Ipv4Type ignored -> Ipv4Parser.UNCONSTRAINED;
-            case Ipv6Type ignored -> Ipv6Parser.UNCONSTRAINED;
+            case Ipv4Type t -> Ipv4Parser.of(t);
+            case Ipv6Type t -> Ipv6Parser.of(t);
             default -> null;
         });
     }

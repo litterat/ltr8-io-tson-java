@@ -354,4 +354,104 @@ class AtomCoherenceTest {
         assertCoherent(new Ipv4Type("s", List.of("10.0.0.0/8"), List.of("10.1.0.0/16")));
         assertCoherent(new EnumBody(List.of("A", "B")));
     }
+
+    // ── within/excluding must leave a value between them (§5.5) ──────────────
+
+    /**
+     * The pair an author reaches by editing rather than by trying: a {@code within} entry and the identical
+     * {@code excluding} entry. {@code { min: 10 max: 3 }}'s exact twin, and the reason this rule is worth
+     * having where the {@code pattern}-emptiness one was not -- that one needed {@code [^\p{L}\P{L}]}.
+     */
+    @Test
+    void anExclusionCoveringItsOwnWithinEntryAdmitsNothing() {
+        assertViolation(new Ipv4Type("s", List.of("10.0.0.0/8"), List.of("10.0.0.0/8")),
+                "excluding covers every network within permits");
+        assertViolation(new Cidr4Type("s", NONE, NONE, List.of("10.0.0.0/8"), List.of("10.0.0.0/8")),
+                "excluding covers every network within permits");
+    }
+
+    /** A wider exclusion covers it too -- containment, not equality, is what empties the pair. */
+    @Test
+    void anExclusionWiderThanItsWithinEntryAdmitsNothing() {
+        assertViolation(new Ipv4Type("s", List.of("10.1.0.0/16"), List.of("10.0.0.0/8")),
+                "excluding covers every network within permits");
+    }
+
+    /**
+     * <b>Partial cover is the case the arithmetic exists for.</b> Neither exclusion covers the {@code within}
+     * entry, and between them they tile it exactly -- which is a counting question over a prefix tree, not a
+     * search: two halves of a /8 are two /9s, and their sizes sum to it.
+     */
+    @Test
+    void exclusionsThatTileAWithinEntryBetweenThemAdmitNothing() {
+        assertViolation(new Ipv4Type("s", List.of("10.0.0.0/8"), List.of("10.0.0.0/9", "10.128.0.0/9")),
+                "excluding covers every network within permits");
+    }
+
+    /** One tile short, and the type is inhabited again -- the rule is cover, not "several exclusions". */
+    @Test
+    void exclusionsThatLeaveOneTileUncoveredAreCoherent() {
+        assertCoherent(new Ipv4Type("s", List.of("10.0.0.0/8"), List.of("10.0.0.0/9")));
+        // A /10, a /10 and a /9 do tile a /8, so this pair leaves exactly the third quarter and no more.
+        assertCoherent(new Ipv4Type("s", List.of("10.0.0.0/8"), List.of("10.0.0.0/10", "10.128.0.0/9")));
+    }
+
+    /** Cover has to be reached in every {@code within} entry: one uncovered entry inhabits the type. */
+    @Test
+    void aSecondWithinEntryTheExclusionsDoNotReachIsCoherent() {
+        assertCoherent(new Ipv4Type("s", List.of("10.0.0.0/8", "192.168.0.0/16"), List.of("10.0.0.0/8")));
+    }
+
+    /** No {@code within} is the whole address space, so excluding it wholesale still empties the body. */
+    @Test
+    void excludingTheWholeSpaceWithNoWithinAdmitsNothing() {
+        assertViolation(new Ipv4Type("s", List.of(), List.of("0.0.0.0/0")),
+                "excluding covers every network within permits");
+        assertCoherent(new Ipv4Type("s", List.of(), List.of("10.0.0.0/8")));
+    }
+
+    /** The same walk over sixteen octets. */
+    @Test
+    void theV6FamiliesUseTheSameArithmetic() {
+        assertViolation(new Ipv6Type("s", List.of("2001:db8::/32"), List.of("2001:db8::/32")),
+                "excluding covers every network within permits");
+        assertCoherent(new Ipv6Type("s", List.of("2001:db8::/32"), List.of("2001:db8:1::/48")));
+    }
+
+    /**
+     * <b>The prefix bounds are folded in, and this is why.</b> A network family's value is a block, refused
+     * for <em>overlapping</em> an exclusion rather than only for being covered by one. Every address here
+     * survives but one, and the only block short enough for {@code max_prefix} is the {@code within} entry
+     * itself, which contains that one -- so the body admits no network while admitting almost every address.
+     * The message names the largest survivor ({@code 10.0.0.128/25}) rather than the rule, since that is the
+     * number an author moves {@code max_prefix} to.
+     */
+    @Test
+    void aSurvivingBlockTooSmallForMaxPrefixAdmitsNoNetwork() {
+        assertViolation(new Cidr4Type("s", NONE, some(24), List.of("10.0.0.0/24"), List.of("10.0.0.5/32")),
+                "the largest block they leave is a /25, and max_prefix is 24");
+        // Lift the ceiling to the surviving block's own length and the same body is inhabited.
+        assertCoherent(new Cidr4Type("s", NONE, some(32), List.of("10.0.0.0/24"), List.of("10.0.0.5/32")));
+    }
+
+    /** And the address family is not troubled by it: an uncovered address is a value there. */
+    @Test
+    void theAddressFamilyAdmitsWhatTheNetworkFamilyRefuses() {
+        assertCoherent(new Ipv4Type("s", List.of("10.0.0.0/24"), List.of("10.0.0.5/32")));
+    }
+
+    /**
+     * A malformed entry is {@code checkNetworks}' to report, and reporting the emptiness it causes on top
+     * would name a consequence as a second cause. Same for an inverted prefix pair.
+     */
+    @Test
+    void anUnreadableFacetIsReportedOnceByTheCheckThatOwnsIt() {
+        List<String> violations = new Ipv4Type("s", List.of("nonsense"), List.of("0.0.0.0/0")).coherenceCheck();
+        assertEquals(1, violations.size(), () -> "one cause, one message: " + violations);
+        assertTrue(violations.getFirst().contains("not an IPv4 network"), violations::toString);
+
+        List<String> inverted =
+                new Cidr4Type("s", some(24), some(8), List.of("10.0.0.0/8"), List.of("10.0.0.0/8")).coherenceCheck();
+        assertEquals(1, inverted.size(), () -> "one cause, one message: " + inverted);
+    }
 }

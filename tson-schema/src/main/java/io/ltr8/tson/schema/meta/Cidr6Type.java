@@ -10,10 +10,11 @@ import java.util.Optional;
 /**
  * meta.tn's {@code cidr6_type} constructor (IPv6-network constraint vocabulary, RFC 4291) --
  * {@link Cidr4Type}'s exact IPv6 counterpart, same shape, different RFC citation and prefix-length
- * family range (0-128 instead of 0-32, not enforced here either way). See {@link Cidr4Type}'s own
+ * family range (0-128 instead of 0-32). See {@link Cidr4Type}'s own
  * Javadoc for why {@code spec} is a flat {@link String} rather than a {@link java.net.URI} and why
- * {@code within}/{@code excluding} are bare {@code List<String>} with a defensive compact constructor. {@code tson-compiler}'s {@code
- * Cidr6Parser} holds one of these and does the actual reading/writing.
+ * {@code within}/{@code excluding} are bare {@code List<String>} with a defensive compact constructor, and
+ * for both of this family's rules. {@code tson-compiler}'s {@code Cidr6Parser} holds one of these and does
+ * the actual reading/writing.
  */
 @Typename(name = "cidr6_type")
 public record Cidr6Type(String spec, @Field("min_prefix") Optional<Integer> minPrefix,
@@ -29,7 +30,7 @@ public record Cidr6Type(String spec, @Field("min_prefix") Optional<Integer> minP
     public static final Cidr6Type UNCONSTRAINED = new Cidr6Type(
             "https://www.rfc-editor.org/rfc/rfc4291", Optional.empty(), Optional.empty(), List.of(), List.of());
 
-    /** {@inheritDoc} <p>The IPv6 twin of {@link Cidr4Type#constraintsCheck}, including its {@code excluding} gap. */
+    /** {@inheritDoc} <p>The IPv6 twin of {@link Cidr4Type#constraintsCheck}, including its by-entry comparison of both list facets. */
     @Override
     public List<String> constraintsCheck(Atom refined) {
         if (!(refined instanceof Cidr6Type other)) {
@@ -47,7 +48,7 @@ public record Cidr6Type(String spec, @Field("min_prefix") Optional<Integer> minP
      * {@inheritDoc}
      *
      * <p>The IPv6 twin of {@link Cidr4Type#coherenceCheck} -- same two judgements, same {@code
-     * within}/{@code excluding} gap, over the 128 bits meta.tn's own {@code @doc} names as this
+     * within}/{@code excluding} rules, over the 128 bits meta.tn's own {@code @doc} names as this
      * family's range.
      */
     @Override
@@ -56,6 +57,9 @@ public record Cidr6Type(String spec, @Field("min_prefix") Optional<Integer> minP
         AtomCoherence.checkWithin(violations, "min_prefix", minPrefix, 0, PREFIX_BITS);
         AtomCoherence.checkWithin(violations, "max_prefix", maxPrefix, 0, PREFIX_BITS);
         AtomCoherence.checkOrdered(violations, "min_prefix", minPrefix, "max_prefix", maxPrefix);
+        AtomCoherence.checkNetworks(violations, "within", within, 128);
+        AtomCoherence.checkNetworks(violations, "excluding", excluding, 128);
+        AtomCoherence.checkAdmitsAValue(violations, "network", within, excluding, minPrefix, maxPrefix, 128);
         return List.copyOf(violations);
     }
 

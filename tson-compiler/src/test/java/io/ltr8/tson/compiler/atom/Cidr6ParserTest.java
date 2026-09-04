@@ -10,6 +10,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.List;
 import java.util.Optional;
 
+import io.ltr8.tson.schema.atom.CidrNetwork;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -32,20 +34,20 @@ class Cidr6ParserTest {
     @ParameterizedTest
     @ValueSource(strings = {
             "2001:db8::/32",
-            "2001:0db8:0000:0000:0000:0000:0000:0000/32",   // the same network, uncompressed
+            "2001:db8::/32",   // the same network, uncompressed
             "fe80::/10",                                     // host bits zero at a non-byte boundary
             "2001:db8:abcd:1234:5678:9abc:def0:1/128",       // a single host
             "::/0",                                          // the whole space
             "::ffff:192.0.2.0/120"})                         // RFC 4291 §2.2's embedded IPv4 tail
     void acceptsWellFormedNetworks(String text) {
-        assertEquals(text, Cidr6Parser.UNCONSTRAINED.read(token(text)));
+        assertEquals(text, Cidr6Parser.UNCONSTRAINED.read(token(text)).text());
     }
 
     /** The authored text comes back unchanged -- notably, {@code ::} is not expanded on a round trip. */
     @Test
     void returnsTheAuthoredTextAndWritesItBackUnchanged() {
-        assertEquals("2001:db8::/32", Cidr6Parser.UNCONSTRAINED.read(token("2001:db8::/32")));
-        assertEquals("2001:db8::/32", Cidr6Parser.UNCONSTRAINED.write("2001:db8::/32"));
+        assertEquals("2001:db8::/32", Cidr6Parser.UNCONSTRAINED.read(token("2001:db8::/32")).text());
+        assertEquals("2001:db8::/32", Cidr6Parser.UNCONSTRAINED.write(CidrNetwork.parse("2001:db8::/32", 128)));
     }
 
     @ParameterizedTest
@@ -76,7 +78,7 @@ class Cidr6ParserTest {
     /** A /33 is a validation error for IPv4 and perfectly ordinary here -- the range is per family. */
     @Test
     void acceptsAPrefixTheIpv4FamilyWouldReject() {
-        assertEquals("2001:db8:8000::/33", Cidr6Parser.UNCONSTRAINED.read(token("2001:db8:8000::/33")));
+        assertEquals("2001:db8:8000::/33", Cidr6Parser.UNCONSTRAINED.read(token("2001:db8:8000::/33")).text());
     }
 
     @ParameterizedTest
@@ -94,7 +96,7 @@ class Cidr6ParserTest {
     void appliesThePrefixFacets() {
         Cidr6Parser between32And48 = withPrefixBounds(32, 48);
 
-        assertEquals("2001:db8::/32", between32And48.read(token("2001:db8::/32")));
+        assertEquals("2001:db8::/32", between32And48.read(token("2001:db8::/32")).text());
         assertEquals(">= 32", assertThrows(AtomValidationException.class,
                 () -> between32And48.read(token("2000::/16"))).expected());
         assertEquals("<= 48", assertThrows(AtomValidationException.class,

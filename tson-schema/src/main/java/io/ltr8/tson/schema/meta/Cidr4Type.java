@@ -11,8 +11,8 @@ import java.util.Optional;
  * meta.tn's {@code cidr4_type} constructor (IPv4-network constraint vocabulary, RFC 4632):
  * prefix-length bounds plus CIDR-text network lists. Pure constraint values, no parsing/validation
  * behavior -- {@code tson-compiler}'s {@code Cidr4Parser} holds one of these and does the actual
- * reading/writing, applying {@code min_prefix}/{@code max_prefix} but not {@code within}/{@code
- * excluding} (see its own Javadoc).
+ * reading/writing, applying all four facets: a value's prefix length against the bounds, and the value
+ * itself against {@code within} and {@code excluding}.
  *
  * <p><b>{@code spec} is flat, and a bare {@link String}</b> -- two separate requirements, both confirmed
  * empirically, not assumed. <b>Flat</b>, because {@code atom_specification}'s own {@code spec} field
@@ -56,11 +56,12 @@ public record Cidr4Type(String spec, @Field("min_prefix") Optional<Integer> minP
      * min_prefix} may only rise, {@code max_prefix} may only fall. {@link #within} may only shrink,
      * each entry being a network the value is permitted to fall inside.
      *
-     * <p>{@link #excluding} is left unchecked: adding an exclusion narrows and removing one widens,
-     * the opposite direction from every other set facet here, and deciding it properly means
-     * comparing networks for containment rather than entries for membership -- {@code 10.0.0.0/8}
-     * subsumes an excluded {@code 10.1.0.0/16} without either list mentioning the other. That
-     * belongs with a real CIDR parser, which this family does not have.
+     * <p>{@link #excluding} narrows the other way -- adding an exclusion narrows and removing one widens --
+     * so it is compared as a superset. Both list facets are compared <b>by entry</b>, not by containment, so
+     * a refinement excluding {@code 10.1.0.0/16} where its source excluded {@code 10.0.0.0/8} is refused even
+     * though it narrows. That is the conservative direction, and what a stated relation would replace
+     * ({@code SPEC-FEEDBACK.md} #29); the containment arithmetic itself exists now, in {@code
+     * schema.atom.CidrNetwork}.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
@@ -84,11 +85,12 @@ public record Cidr4Type(String spec, @Field("min_prefix") Optional<Integer> minP
      * the schema level". So both facets are judged twice -- against each other, and against the 32
      * bits an IPv4 address has.
      *
-     * <p>{@link #within}/{@link #excluding} are left out, as they are in {@link #constraintsCheck}
-     * and for the same reason: deciding that a {@code within} list and an {@code excluding} list
-     * between them admit no network is CIDR containment arithmetic, which this family has no parser
-     * for. A malformed entry in either list is separately not this check's business -- it is data the
-     * constructor's own vocabulary already validated.
+     * <p>{@link #within}/{@link #excluding} are judged twice over too: every entry must be a network of this
+     * family, and the two must between them leave one. The second half folds in the prefix bounds, and has
+     * to -- a value here is a block, refused for <em>overlapping</em> an exclusion rather than only for being
+     * covered by one, so {@code within: ["10.0.0.0/24"] excluding: ["10.0.0.5/32"] max_prefix: 24} admits
+     * nothing while almost every address in the range survives. See {@code AtomCoherence.checkAdmitsAValue}
+     * for why cover over a prefix tree is decided exactly rather than approximated.
      */
     @Override
     public List<String> coherenceCheck() {
@@ -96,6 +98,9 @@ public record Cidr4Type(String spec, @Field("min_prefix") Optional<Integer> minP
         AtomCoherence.checkWithin(violations, "min_prefix", minPrefix, 0, PREFIX_BITS);
         AtomCoherence.checkWithin(violations, "max_prefix", maxPrefix, 0, PREFIX_BITS);
         AtomCoherence.checkOrdered(violations, "min_prefix", minPrefix, "max_prefix", maxPrefix);
+        AtomCoherence.checkNetworks(violations, "within", within, 32);
+        AtomCoherence.checkNetworks(violations, "excluding", excluding, 32);
+        AtomCoherence.checkAdmitsAValue(violations, "network", within, excluding, minPrefix, maxPrefix, 32);
         return List.copyOf(violations);
     }
 
