@@ -29,7 +29,7 @@ class ValueIdentityTest {
               tags    => set<text>
               by_hash => { bytes => text }
 
-              hex_digest => !bytes ^ { encoding: HEX  length: 2 }
+              hex_digest => !bytes_type { encoding: HEX  length: 2 }
               hexes   => set<hex_digest>
 
               stamped => { k: bytes = "SGk=" }

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta.tn?sha256=bfcfcb1b29ea191093c864c101f83ce1b33a1193ab952e92fc18e4a17d266d88"
+!!id:"https://tson.io/2026/35/m/meta.tn?sha256=70824428389a6c5a2c7b3bf51f7240408c8bb7b11c9805059bb576414abb1ba2"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0bb89291b899258a0bbdf8e304782b7f6a33379076e3743d5f1c2faaf7cd0d7f"
 !!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0bb89291b899258a0bbdf8e304782b7f6a33379076e3743d5f1c2faaf7cd0d7f"
 @doc:"""
@@ -142,10 +142,18 @@
     selector picks a spelling, so it never changes what two values
     compare as. It defaults to BASE64 (§4, padded — the choice of JSON
     Schema's contentEncoding, Protobuf's JSON mapping and CBOR's), so
-    an unrefined `bytes` position is base64 in every text encoding,
-    and core declares no spelled subtypes: an author who wants another
-    alphabet refines one type and names it — `hexdigest => !bytes ^
-    { encoding: HEX  length: 4 }`.
+    a `bytes` position is base64 in every text encoding, and core
+    declares no spelled subtypes.
+
+    `encoding` is **not refinable**: an alphabet narrows nothing —
+    every octet string is writable in every one of them — so a
+    refinement that only respells would claim an IS-A carrying no
+    narrowing, and a hex-spelled document is not readable at a base64
+    position. That is the defect four sibling types were removed for.
+    Another alphabet is another type, declared as its own instance —
+    `hexdigest => !bytes_type { encoding: HEX  length: 4 }`. Refining
+    for *length* is unaffected and inherits the alphabet:
+    `sha256 => !bytes ^ { length: 32 }` is a base64 sha256.
 
     It is a facet rather than an annotation because a container
     element has no annotation position: `[hexdigest]` can only work if

@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/35/m/core.tn?sha256=4a72403a9b2eafd9f7067bb90656daffc81f7470386f173572e95668bcd9a9fd"
-!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=bfcfcb1b29ea191093c864c101f83ce1b33a1193ab952e92fc18e4a17d266d88"
+!!id:"https://tson.io/2026/35/m/core.tn?sha256=cfcbf73740657c30bca5216245ac42d24595fd167e628fefdf05c94ad408eefd"
+!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=70824428389a6c5a2c7b3bf51f7240408c8bb7b11c9805059bb576414abb1ba2"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 35 draft).
@@ -208,13 +208,16 @@
     field is `avatar: bytes`, a digest `sha256 => !bytes ^ { length: 32 }`.
     Equality and the length facets are over octets; the type says
     nothing about spelling, as `text` says nothing about UTF-8. The
-    text class of encodings spells `bytes` in base64 (RFC 4648 §4)
-    unless the type's own `encoding` selector says otherwise
-    (`hexdigest => !bytes ^ { encoding: HEX  length: 4 }`); an
-    encoding whose values are octets writes them raw.
+    text class of encodings spells `bytes` in base64 (RFC 4648 §4).
+    Another alphabet is another type, declared as its own instance of
+    the constructor (`hexdigest => !bytes_type { encoding: HEX
+    length: 4 }`) — never as a refinement of this one, since a
+    spelling narrows nothing and `hexdigest ^ bytes` would claim an
+    IS-A that no base64 position can honour. An encoding whose values
+    are octets writes them raw.
     """
   @ordered:NONE @bounded:false
-  bytes => !bytes_type {}
+  bytes => !bytes_type { encoding: BASE64 }
 
   @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
   @ordered:TOTAL @bounded:false

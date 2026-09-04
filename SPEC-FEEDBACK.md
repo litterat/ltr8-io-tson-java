@@ -2626,11 +2626,12 @@ meta.tn:  bytes_encoding => !enum [BASE64 BASE64URL BASE32 HEX]
           bytes_type     => ~atom & { encoding: bytes_encoding ~ BASE64
                                       length: non_negative_integer?
                                       min_length: non_negative_integer?  max_length: non_negative_integer? }
-core.tn:  bytes => !bytes_type {}          — and no spelled subtypes at all
+core.tn:  bytes => !bytes_type { encoding: BASE64 }   — and no spelled subtypes at all
 ```
 
-An author who wants another alphabet refines one type and names it —
-`hexdigest => !bytes ^ { encoding: HEX  length: 4 }`. `bytes_type` composes with `atom` alone and carries no
+An author who wants another alphabet declares another type —
+`hexdigest => !bytes_type { encoding: HEX  length: 4 }`, a fresh instance of the constructor rather than a
+refinement of `bytes` (below). `bytes_type` composes with `atom` alone and carries no
 `spec`: RFC 4648 governs spellings, not octets, so an octet sequence has no specification to name. The length
 facets count decoded octets, so `length: 32` is a 32-byte digest whether it arrives as 64 hex characters, 44
 base64 characters or 32 raw bytes.
@@ -2693,14 +2694,27 @@ spelled types in core; and `!bytes` as Part 1's single binary tag, base64, a sch
 type to carry a selector. §5.4's classes carry nothing about spelling, and §8.2's identity carries it exactly
 where it should — two types with different alphabets are two types.
 
-§5.7 needs one sentence it does not have: **a selector picks among lexical forms of one value space, so it
-neither narrows nor widens and a refinement is not asked to tighten it.** That is what makes
-`!bytes ^ { encoding: HEX }` legal without weakening §5.7's tightening rule, and it is the same clause #28
-asks for from the other side.
+**And `encoding` is not refinable**, which is the rule that keeps the facet from rebuilding the very defect
+this entry opened against. An alphabet narrows nothing — every octet string is writable in every one of them —
+so `hexbytes => !bytes ^ { encoding: HEX }` would claim `hexbytes` IS-A `bytes` while narrowing no value, and
+a hex-spelled document is not readable at a base64 position. That is the degenerate IS-A the four sibling
+types were removed for; permitting the refinement would let an author rebuild it by hand. Another alphabet is
+another **type**, declared as its own instance — `hexdigest => !bytes_type { encoding: HEX  length: 4 }` —
+and refining for *length* is unaffected and inherits the alphabet, `sha256 => !bytes ^ { length: 32 }` being
+a base64 sha256.
+
+**This is not a rule about selectors, and the difference is worth §5.7 saying.** `complex_type.component` is
+also a selector and *is* refinable, correctly: complex numbers over float64 components are a subset of those
+over number components, so it narrows the value space and its IS-A is sound. The property that decides is
+**whether the facet narrows the value space at all** — `component` does, `encoding` does not. §5.7's existing
+"a selector may be set where the source leaves it at the constructor's default" is right for the first and
+wrong for the second, and the sentence it needs is: *a facet that does not narrow the value space is not
+refinable, because a refinement means IS-A and narrower, and such a facet can only deliver the first half.*
 
 **What is running, and what is not.** All of the above is running and pinned — `BytesEncodingSelectorTest`
-covers one value spelled three ways, the base64 default, every position a refined type reaches (field, array
-element, map value, tuple element, alias, template argument), and that two alphabets are two types. What is
+covers one value spelled three ways, the base64 default, every position such a type reaches (field, array
+element, map value, tuple element, alias, template argument), that two alphabets are two types, that
+`encoding` is refused at a refinement, and that refining for length inherits the source's alphabet. What is
 not: the matching schema-load checks for `@rest` and `@discriminator` (#25), which no longer have a
 `@bytes_encoding` sibling to be done alongside. And this implementation's binary equality is settled, not
 open — `ValueIdentity` compares octets, which is #28's answer for this family whatever the alphabet.

@@ -1,6 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 
 import org.junit.jupiter.api.Test;
@@ -10,6 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,8 +30,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * annotation could never express "an array of hex-spelled digests" without new syntax at every container.
  * Carried as a facet it costs nothing: {@code hexdigest} is a type, and a type is what an element names.
  *
- * <p>Core declares no spelled subtypes. An unrefined {@code bytes} position is base64 in every text encoding,
- * and an author who wants another alphabet refines one type and names it.
+ * <p><b>And it is not refinable</b>, which is what keeps the facet from rebuilding the defect that removed
+ * the four sibling {@code base64}/{@code hex} types. An alphabet narrows nothing — every octet string is
+ * writable in every one of them — so {@code hexbytes ^ bytes} would claim an IS-A carrying no narrowing, and
+ * a hex-spelled document is not readable at a base64 position. Another alphabet is another <em>type</em>,
+ * declared as its own instance of the constructor. Refining for length is unaffected and inherits the
+ * alphabet.
+ *
+ * <p>This is what tells {@code encoding} from {@link io.ltr8.tson.schema.meta.ComplexType}'s {@code
+ * component}, also a selector and refinable: {@code component} narrows the value space, and this does not.
  */
 class BytesEncodingSelectorTest {
 
@@ -40,8 +49,8 @@ class BytesEncodingSelectorTest {
             !!meta:"https://tson.io/2026/35/m/meta.tn"
             !!import:"https://tson.io/2026/35/m/core.tn"
             {
-              hexdigest => !bytes ^ { encoding: HEX  length: 4 }
-              b32       => !bytes ^ { encoding: BASE32 }
+              hexdigest => !bytes_type { encoding: HEX  length: 4 }
+              b32       => !bytes_type { encoding: BASE32 }
               aliased   => hexdigest
               box => <T> { value: T }
 
@@ -151,6 +160,42 @@ class BytesEncodingSelectorTest {
     void lengthCountsDecodedOctets() {
         assertEquals(4, at(read(), "/hex").length);
         assertTrue(hasProblem(DOCUMENT.replace("hex:       \"deadbeef\"", "hex:       \"deadbeefaa\"")));
+    }
+
+    /**
+     * The rule the facet needs: a refinement may not respell. Without it an author rebuilds by hand the
+     * degenerate IS-A that four sibling types were removed for -- every hexbytes claimed to be a bytes, at a
+     * position no base64 reader can honour.
+     */
+    @Test
+    void encodingCannotBeRefined() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> Tson.builder().build().resolve("""
+                        !!id:"https://example.test/refine-encoding.tn"
+                        !!meta:"https://tson.io/2026/35/m/meta.tn"
+                        !!import:"https://tson.io/2026/35/m/core.tn"
+                        { hexbytes => !bytes ^ { encoding: HEX } }
+                        """));
+
+        assertTrue(thrown.getMessage().contains("not refinable"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("!bytes_type { encoding: HEX }"), thrown.getMessage());
+    }
+
+    /** Refining for length is a real narrowing and unaffected -- it inherits the source's alphabet. */
+    @Test
+    void refiningForLengthKeepsTheSourcesAlphabet() {
+        String id = "https://example.test/refine-length.tn";
+        Tson tson = Tson.builder().build();
+        tson.resolve("""
+                !!id:"%s"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
+                { sha4 => !bytes ^ { length: 4 }  holder => { d: sha4 } }
+                """.formatted(id));
+
+        assertArrayEquals(DEADBEEF, tson.treeReader().withSchema(id)
+                .readAs("!holder { d: \"3q2+7w==\" }", "holder")
+                .at("/d").as(byte[].class).orElseThrow(), "base64, inherited from bytes");
     }
 
     private static List<Diagnostic> problems(String body) {

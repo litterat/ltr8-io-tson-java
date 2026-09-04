@@ -1217,7 +1217,7 @@ class DefinitionResolverTest {
 
         TsonSchemaValidationException widerThanTheWidth = assertThrows(TsonSchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("escapesSize")));
-        assertTrue(widerThanTheWidth.getMessage().contains("widens rather than tightens"), widerThanTheWidth.getMessage());
+        assertTrue(widerThanTheWidth.getMessage().contains("not a valid refinement of"), widerThanTheWidth.getMessage());
         assertTrue(widerThanTheWidth.getMessage().contains("min -10"), widerThanTheWidth.getMessage());
         assertTrue(widerThanTheWidth.getMessage().contains("max 300"), widerThanTheWidth.getMessage());
 

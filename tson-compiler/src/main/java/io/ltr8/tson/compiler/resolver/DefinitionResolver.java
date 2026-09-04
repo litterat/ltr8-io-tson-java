@@ -740,8 +740,8 @@ final class DefinitionResolver {
         }
         List<String> violations = sourceAtom.constraintsCheck(refinedAtom);
         if (!violations.isEmpty()) {
-            throw new TsonSchemaValidationException("'" + name + "': refinement of '!" + sourceName
-                    + "' widens rather than tightens it (§5.7): " + String.join("; ", violations));
+            throw new TsonSchemaValidationException("'" + name + "': not a valid refinement of '!" + sourceName
+                    + "' (§5.7): " + String.join("; ", violations));
         }
     }
 

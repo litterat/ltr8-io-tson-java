@@ -61,9 +61,19 @@ public record BytesType(Encoding encoding, Optional<Integer> length,
     /**
      * {@inheritDoc}
      *
-     * <p>Only the length bounds are ordered facets. {@code encoding} is a <b>selector</b>, and §5.7 does not
-     * ask a selector to narrow: it picks among lexical forms of one value space, so there is no wider and no
-     * tighter to compare. The same reasoning {@link ComplexType} gives for {@code component}.
+     * <p>The length bounds are the ordered facets. <b>{@code encoding} may not be refined at all</b>, and the
+     * reason is what tells it from {@link ComplexType}'s {@code component}, which is also a selector and may
+     * be: {@code component} narrows the value space (complex numbers over float64 components are a subset of
+     * those over number components), where {@code encoding} narrows nothing -- every octet string is writable
+     * in every alphabet. A refinement means IS-A <em>and narrower</em>, so a refinement that only respells
+     * gives a subtype relationship carrying no narrowing: {@code hexbytes ^ bytes} would say every hexbytes
+     * is a bytes, and a hex-spelled document is not readable at a base64 position. That degenerate IS-A is
+     * the defect the four sibling {@code base64}/{@code hex} types were removed for, and permitting the
+     * refinement would let an author rebuild it by hand.
+     *
+     * <p>The remedy names itself in the message: a different alphabet is a different type, declared as a
+     * fresh instance of this constructor ({@code hexbytes => !bytes_type { encoding: HEX }}) rather than as a
+     * refinement of one.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {
@@ -71,6 +81,11 @@ public record BytesType(Encoding encoding, Optional<Integer> length,
             return List.of("refines a bytes with " + refined.getClass().getSimpleName());
         }
         List<String> violations = new ArrayList<>();
+        if (encoding != other.encoding) {
+            violations.add("encoding " + other.encoding + " replaces the source's own " + encoding
+                    + "; an alphabet is a spelling and not a narrowing, so it is not refinable -- declare a "
+                    + "new type instead (!bytes_type { encoding: " + other.encoding + " })");
+        }
         AtomNarrowing.checkAtLeast(violations, "min_length", minLength, other.minLength);
         AtomNarrowing.checkAtMost(violations, "max_length", maxLength, other.maxLength);
         if (length.isPresent() && !length.equals(other.length)) {
