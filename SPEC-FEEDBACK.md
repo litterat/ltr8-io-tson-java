@@ -12,8 +12,8 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The thirty-five below are what is open against Revision 34 — the eight it left open, renumbered from #1,
-and twenty-seven raised since; which of the two an entry is, its own `Status` line says, so the split stays
+The thirty-six below are what is open against Revision 34 — the eight it left open, renumbered from #1,
+and twenty-eight raised since; which of the two an entry is, its own `Status` line says, so the split stays
 checkable rather than counted once. The fourteen Revision 34 resolved of the seventeen raised against Revision 33 are gone
 from here, because the spec now carries their rules and that is where the answer belongs. **This file is the as-built
 record**, not a pointer to one: where an entry proposes a design this implementation has built, the entry states
@@ -3477,5 +3477,85 @@ two rules that stay. It is the one entry here whose evidence is a shape this imp
 implemented: the rule went unenforced, the shape worked, and what turned that from an oversight into an
 argument was enforcing §4.2's *other* two rules and finding that they leave the forbidden case no legal
 spelling.
+
+---
+
+## 36. §3.3.1 makes `!C { … }` require a constructor, which is too narrow for `reference` and too wide for nothing — proposal: applicability is IS-A `top`
+
+**Section:** [TSON-SCHEMA] §3.3.1 (constructor application resolves against the structure namespace and the
+entry MUST be a constructor), §4.1 (the base kinds, and IS-A `top`), §4.2 (the `~` marker), §5.6.
+
+**Problem: the marker is the wrong predicate for applicability, and the kernel already contains the
+counter-example.** §4.1 leaves `reference` unmarked, deliberately — it describes no value — and the language
+nonetheless needs `!reference { target: T }` to work, since §8.1 makes a `reference` body how an alias is
+written. Under §3.3.1 as stated that construction is a resolver error.
+
+**This implementation had the defect in its sharpest form**: the template path carried a by-name exception
+for `reference` and the closed path did not, so one construction had two answers —
+
+```
+r => <T> !reference { target: T }     resolved
+r => !reference { target: int32 }     '!reference' does not resolve to a constructor (§3.3.1)
+```
+
+A rule that needs a hardcoded exception for one kernel name, and gets it in one of two places, is not
+carrying the distinction it is supposed to carry.
+
+**The predicate that does carry it is §4.1's own.** §4.1 already says every base kind IS-A `top` and every
+constructor transitively so, and that **IS-A stops at construction** — `!T {}` transfers kind, not
+supertypes, so instances and fresh records carry empty chains. So "IS-A `top`" is exactly "describes a type"
+as against "describes a part of one", which is the question a construction site is asking.
+
+**Measured over meta-kernel.tn, meta.tn and core.tn:** `constructor` is a strict subset of IS-A `top`, with
+no constructor failing to be IS-A `top` in any of the three. The difference set is exactly the four base
+kinds and `reference`:
+
+| | admitted by IS-A `top` | admitted by `constructor` |
+|---|---|---|
+| `record`, `array`, `choice`, `integer_type`, … | yes | yes |
+| `reference` | yes | **no** — the case that needed the exception |
+| `atom`, `product`, `sum`, `data` | yes | no — harmless, see below |
+| `record_field`, `type_ref`, `type_argument`, `tuple_element`, `field_group`, `integer_size`, `atom_specification`, `type_definition` | **no** | no |
+
+**Admitting the base kinds costs nothing and reads better.** Each is an abstract union whose own reader
+refuses a direct application by naming what would satisfy it — `!product {}` answers *"'product' has no data
+of its own to bind — provide an explicit type annotation naming one of its subtypes [record, array, set_type,
+map, tuple]"*, which tells an author what to write where "not a constructor" does not.
+
+**Excluding the component set is the part that matters, and it is not merely cosmetic.** Those eight are
+record-bodied like a constructor is; nothing in their *shape* separates them. Removing the check entirely
+does not make them succeed — this implementation's body model is a sealed `Top`, and a `record_field` is not
+a member — but it fails as a host-language cast error reported in the "could not be checked" category rather
+than as a verdict on the schema. Any implementation whose model is less sealed would do worse. The rule is
+what makes the refusal a spec-level one.
+
+**What the marker keeps.** This is not a proposal to remove `~`. It still marks constructor level, which is
+what §4.2's level discipline reads (an entry composing with, refining or subtracting from a constructor MUST
+itself be `~`), and §8.1 still records it. What it stops deciding is applicability.
+
+**Interpretation chosen, and running.** `!C { … }` and `<…> !C { … }` both require `C` IS-A `top`; the
+by-name `reference` exception is deleted; the meta-schema's applicable-head table is built on the same
+predicate, so a head the gate admits has a reader. `ApplicabilityIsIsATopTest` pins the closed/open symmetry,
+the component refusal and the base-kind self-refusal.
+
+**One consequence worth stating, because it is a behaviour change and not only a re-spelling.** A
+meta-schema's own `data`-kinded extension no longer needs the marker: `operation => data & { … }` composes
+with a base kind, so it IS-A `top`, and a governed schema may write `!operation { … }`. That is §2.2.2's
+extension point becoming reachable without a marker whose other meaning (constructor level) the author may
+not want. `MetaLayerDataConstructorTest` asserts it.
+
+**Suggested resolution:**
+
+- §3.3.1: replace "the found entry MUST be a constructor" with *the found entry MUST be IS-A `top` (§4.1)*.
+  One sentence of why: IS-A stops at construction, so the predicate separates a type from a part of one, and
+  the base kinds and `reference` are types by that measure while `record_field` and its siblings are not.
+- §4.1: no change; the rule this proposes is read off what it already says.
+- §4.2: no change. The marker keeps level discipline and placement.
+- §8.1: no change to `type_definition.constructor`.
+
+**Status against Revision 34:** open, and new against this revision — a re-spelling of one predicate, proposed
+after building it. It is the second entry in this cycle where enforcing a neighbouring rule is what exposed the
+defect: §3.3.1's own by-name exception for `reference` had been invisible until the open and closed paths were
+compared, and it is the kind of thing a first implementation finds and a reader of the prose does not.
 
 ---

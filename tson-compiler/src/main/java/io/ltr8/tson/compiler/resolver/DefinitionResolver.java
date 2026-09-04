@@ -237,6 +237,9 @@ final class DefinitionResolver {
      */
     private static final String REFERENCE = "reference";
 
+    /** [TSON-SCHEMA] §4.1's structural root -- the name {@link #requireApplicable} tests IS-A against. */
+    private static final String TOP = "top";
+
     /**
      * Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see
      * {@link #resolveAtomRefinement}. Structural, not incidental: the merge has to happen on the wire
@@ -554,6 +557,43 @@ final class DefinitionResolver {
      * own declared vocabulary is always record-shaped, whatever the resulting instance's bound Java
      * class looks like, atom-family or not).
      */
+    /**
+     * Whether {@code !C { ... }} may apply {@code C} at all: <b>{@code C} IS-A {@code top}</b>
+     * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain.
+     *
+     * <p><b>This replaces asking whether {@code C} is a constructor, and it is a wider and more exact
+     * question.</b> §4.1 makes every base kind IS-A {@code top} and every constructor transitively so, while
+     * IS-A stops at construction -- an instance or a fresh record carries an empty chain. So the predicate
+     * admits every constructor, and beyond them exactly the entries that describe <em>a type</em> rather than
+     * a part of one.
+     *
+     * <p>What it lets in that {@code constructor} did not:
+     * <ul>
+     *   <li>{@code reference}, which the kernel deliberately leaves unmarked because it describes no value,
+     *   and which the language nonetheless needs applicable. It used to take a by-name exception in {@link
+     *   #resolveTemplateInstance} and none here, so {@code <T> !reference { target: T }} resolved while
+     *   {@code !reference { target: int32 }} did not -- one construction legal open and illegal closed.</li>
+     *   <li>the four base kinds, which cost nothing: each is an abstract union whose own reader refuses a
+     *   direct application by naming the subtypes that would satisfy it.</li>
+     * </ul>
+     *
+     * <p>What it keeps out is the set that matters -- {@code record_field}, {@code type_ref}, {@code
+     * type_argument}, {@code tuple_element}, {@code field_group}, {@code integer_size}, {@code
+     * atom_specification}, {@code type_definition}: record-bodied entries with empty chains, every one a
+     * component of a type rather than a type. Without a check they fail anyway, on {@code Top} being sealed,
+     * but as a {@code ClassCastException} reported {@code NOT_IMPLEMENTED} -- a non-verdict, for an author
+     * error.
+     */
+    private static void requireApplicable(String name, String target, TypeDefinition applied) {
+        if (applied.supertypes().contains(TOP)) {
+            return;
+        }
+        throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' is not applicable -- it is "
+                + "not IS-A 'top' (§4.1), so it describes a part of a type rather than a type, and there is "
+                + "nothing for '!" + target + " { ... }' to build. Did you mean atom refinement ('!" + target
+                + " ^ { ... }')?");
+    }
+
     private TypeDefinition resolveInstance(String name, Instance instance) {
         String target = instance.target();
         TypeDefinition constructor = resolveConstructorTarget(name, target);
@@ -565,10 +605,7 @@ final class DefinitionResolver {
                     + "<...>' with its arguments (§5.10). '!" + target + " { ... }' fills a constructor's own "
                     + "vocabulary (§4.2), which is a different operation and needs a closed constructor");
         }
-        if (!constructor.constructor()) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' does not resolve to a "
-                    + "constructor (§3.3.1) -- did you mean atom refinement ('!" + target + " ^ { ... }')?");
-        }
+        requireApplicable(name, target, constructor);
         if (!(constructor.body() instanceof RecordBody _)) {
             // Unreachable, and the template check above is what makes that true. §12.1 attaches `~` to a
             // structural-def only (refined-def / construction-def / record-def), each of which resolves to a
@@ -613,16 +650,12 @@ final class DefinitionResolver {
     private TypeDefinition resolveInstanceTemplate(String name, Instance template) {
         String target = template.target();
         TypeDefinition constructor = resolveConstructorTarget(name, target);
-        // `reference` is the one head whose kind cannot come from its supertype chain and whose eligibility
-        // cannot come from a `~`: §4.1 gives an alias `kind: REFERENCE`, which is a type_kind and not a base
-        // kind, and the kernel deliberately leaves `reference` unmarked because it describes no value. Both
-        // facts are the kernel's own, so the head is dispatched here rather than judged by the generic rule.
-        // The binding check below still runs -- `reference`'s vocabulary is a record like any other.
+        // `reference` needs no exception here any more: it IS-A `top`, so the generic rule admits it, which
+        // is what makes the open and closed spellings of one construction agree. Its `kind` still cannot come
+        // from its supertype chain -- §4.1 gives an alias `kind: REFERENCE`, a type_kind and not a base kind
+        // -- so that fact alone stays the kernel's own, below.
         boolean alias = REFERENCE.equals(target);
-        if (!alias && !constructor.constructor()) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' does not resolve to a "
-                    + "constructor (§3.3.1), so there is nothing for '<...> !" + target + " { ... }' to build");
-        }
+        requireApplicable(name, target, constructor);
         if (!(constructor.body() instanceof RecordBody vocabulary)) {
             throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
                     + constructor.body().getClass().getSimpleName() + " body; a constructor is record-shaped "

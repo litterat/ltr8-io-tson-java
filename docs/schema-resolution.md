@@ -73,6 +73,25 @@ are kept in step deliberately.
   parameterised `~` declaration is exactly one — so `!my_set { … }` reached an `IllegalStateException`,
   which is this project's spelling of *an internal invariant broke*, and the CLI reported an author's schema
   mistake as a library fault at exit 70. `TemplateClosesByApplicationTest` pins all of it.
+- **What `!C { … }` may apply is IS-A `top` (§4.1), not the `~` marker** (`requireApplicable`). §4.1 makes
+  every base kind IS-A `top` and every constructor transitively so, while IS-A stops at construction — an
+  instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond
+  them, exactly the entries describing *a type* rather than a part of one. Measured over the bundled schemas:
+  `constructor ⊂ IS-A top`, the difference being the four base kinds plus `reference`, and no constructor
+  failing to be IS-A `top`.
+  **Asking for the marker was both too narrow and inconsistent.** `reference` is deliberately unmarked (it
+  describes no value) and the language needs it applicable, so it took a by-name exception in the template
+  path and none in the closed one — `<T> !reference { target: T }` resolved while `!reference { target:
+  int32 }` did not, one construction with two answers. The exception is gone. A base kind is now admitted and
+  refuses itself through its own reader, naming the subtypes that would satisfy the position, which is the
+  better message. What stays out is the component set — `record_field`, `type_ref`, `type_argument`,
+  `tuple_element`, `field_group`, `integer_size`, `atom_specification`, `type_definition` — record-bodied
+  with empty chains; without a check those fail anyway on `Top` being sealed, but as a `ClassCastException`
+  surfaced as `NOT_IMPLEMENTED`, a non-verdict for an author error. `TsonCompiledMetaSchema.buildConstructors`
+  filters on the same predicate, so a head the gate admits has a reader.
+  **The marker keeps its other jobs** — §4.2's level discipline reads it, and §8.1 records it —
+  and `SPEC-FEEDBACK.md` #36 asks §3.3.1 to state applicability this way.
+  `ApplicabilityIsIsATopTest` pins it.
 - **§4.2's three declaration-time rules for `~`, and where each is answered.** **Placement** (a `~`
   declaration only in a schema whose own `!!meta` names the meta-kernel) is checked at the declaration.
   **Level discipline** (an entry composing with, refining, or subtracting from a constructor MUST itself be
