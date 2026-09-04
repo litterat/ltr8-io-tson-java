@@ -67,6 +67,14 @@ final class ResolvedForm {
      * resolver-managed</b>: they are sets the representation happens to write as lists, so one side's
      * alphabetical order and another's resolution order say the same thing. Nothing else is normalised; a
      * difference anywhere else is a real one.
+     *
+     * <p><b>Including {@code enum.members}, which [TSON-SCHEMA] §7.5 makes a set</b> -- the only {@code !set}
+     * in meta-kernel, meta.tn and core.tn combined, and so the only field reached by that section's comparison
+     * MUST: "implementations comparing resolver outputs MUST compare set-typed fields as sets, not ordered
+     * lists". This compares it as an ordered list, which is a <b>deliberate divergence</b> recorded in
+     * {@code SPEC-FEEDBACK.md} #27 -- source order is what every producer emits, §7.4 gives a reader a reason
+     * to care about it, and the freedom the MUST compensates for is one nobody exercises. Honouring the MUST
+     * instead is one sort, here, reaching both callers.
      */
     static TypeDefinition canonical(TypeDefinition definition) {
         return new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
