@@ -92,11 +92,14 @@ are kept in step deliberately.
   element_type: = T }` — is refused when it closes, by §5.2's rule that a fixed value is available on a
   field typed by an atom or an enum and nowhere else; the legal value-routed form (`max_items: = N`, an
   atom-typed slot) closes normally. What is **not** checked is the channel §5.2 never sees, a parameter
-  standing as a *field type* or a *variant*: `<T> ~base & { value: T }` resolves and closes cleanly here.
-  §4.2 calls that a resolver error at the declaration and its stated reason — that a type-channel parameter
-  "could close only by rewriting the body — the materialisation constructors never get" — does not hold in
-  this implementation, where §5.10 materialisation rewrites held bodies and closes it. `BACKLOG.md` carries
-  the gap.
+  standing as a *field type* or a *variant*. §4.2 calls that a resolver error at the declaration, and its
+  stated reason — that a type-channel parameter "could close only by rewriting the body — the materialisation
+  constructors never get" — does not hold here: §5.10 materialisation rewrites held bodies and closes exactly
+  this shape, which `DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord` pins. **It
+  closes into a working type, not a tolerated one**: `ctor_box => <T> ~base & { value: T }` with
+  `flagged => ctor_box<boolean>` materialises, compiles, accepts `{ value: true }` and rejects
+  `{ value: banana }` with a `TYPE_MISMATCH` at `/value`; the variant channel behaves the same. That is what
+  the decision turns on, and it is why the entry in `BACKLOG.md` is a decision before it is a check.
 - **All six of §5.2's field-state spellings resolve**, including `field: type? = _` — `OPTIONAL_FIXED`
   carrying *no* value, so §8.1 writes a `record_field` without a `value` member and the field must be
   omitted or written `_`. Its three resolver errors are enforced: `~ _` on any field, `= _` on a REQUIRED

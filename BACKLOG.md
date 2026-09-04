@@ -47,20 +47,13 @@ own prose (which had gone stale on at least one of them):
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 
-- [ ] **§4.2's value-route-only rule: decide whether it survives, then act on the answer.** A `~`
-  declaration's parameter standing in a *field type* or a *variant* is, per §4.2, a resolver error at the
-  declaration. Nothing checks it, and the shape works end to end: `ctor_box => <T> ~base & { value: T }` with
-  `flagged => ctor_box<boolean>` resolves, materialises, compiles, accepts `{ value: true }` and rejects
-  `{ value: banana }` with a `TYPE_MISMATCH` at `/value`; the variant channel behaves the same. §4.2's stated
-  reason — that such a parameter "could close only by rewriting the body — the materialisation constructors
-  never get" — does not hold here, since §5.10 materialisation rewrites held bodies and closes exactly this
-  shape, and `DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord` pins that it does.
-  **Relax:** write the `SPEC-FEEDBACK.md` entry; nothing to build. **Keep:** implement the check
-  (`ParameterKinds` resolves the constructor head and classifies each written slot against the field the
-  constructor declares for it) and retire that test's `~`. The third channel — a parameter routed into a
-  `type_ref`-typed vocabulary slot — needs nothing either way: §5.2 already refuses a fixed value on a
-  record-typed field where the argument lands, and a held body is unread by design, so there is no earlier
-  point to move it to.
+- [ ] **§4.2's value-route-only rule: decide whether it survives, then act.** A `~` declaration's parameter
+  standing in a *field type* or a *variant* is a resolver error at the declaration; nothing checks it.
+  **Relax** — write the `SPEC-FEEDBACK.md` entry, and there is nothing to build. **Keep** — implement the
+  check, and drop the `~` from `DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord`,
+  which pins the shape today. `ParameterKinds` is the machinery either way: it classifies each written slot
+  against the field the constructor declares for it. `docs/schema-resolution.md` has what the decision turns
+  on.
 
 ## Checked annotations
 
