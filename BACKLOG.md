@@ -139,7 +139,10 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **[TSON-DATA] §9.1's resource limits — and the `StackOverflowError` that escapes for want of them.**
+- [ ] **[TSON-DATA] §9.1's resource limits — and the `StackOverflowError` that escapes for want of them**
+  (`SPEC-FEEDBACK.md` #33, which asks §9.1 for one policy of limits with defaults, reported the way §8.2's is,
+  and for the shape limits it does not name at all — elements per container, fields per record, annotations
+  per value, values per document, foreign schemas loaded per document).
   Nothing bounds nesting depth, token length or document size. A document about 5,000 containers deep
   overflows the stack inside `TsonDataStream.fill`, and a `StackOverflowError` is an `Error`: it passes
   through every `catch (RuntimeException)` in the reader stack and in `TsonCli.run` alike, so `tson validate`

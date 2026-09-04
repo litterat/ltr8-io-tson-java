@@ -12,8 +12,8 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-The thirty-two below are what is open against Revision 34 — the eight it left open, renumbered from #1, and
-twenty-four raised since; which of the two an entry is, its own `Status` line says, so the split stays
+The thirty-three below are what is open against Revision 34 — the eight it left open, renumbered from #1,
+and twenty-five raised since; which of the two an entry is, its own `Status` line says, so the split stays
 checkable rather than counted once. The fourteen Revision 34 resolved of the seventeen raised against Revision 33 are gone
 from here, because the spec now carries their rules and that is where the answer belongs. **This file is the as-built
 record**, not a pointer to one: where an entry proposes a design this implementation has built, the entry states
@@ -3078,5 +3078,113 @@ three spellings minting one entry, two entries and two entries respectively. The
 building the thing removed, the fix that would have preserved it, and the rule that replaced both. §8.3's
 flattening paragraph, its `@alias` example, and §8.2's single-level-comparison sentence are the text this asks
 the revision to delete; the two identity sentences and the three-spellings table are what it asks for instead.
+
+---
+
+## 33. §9.1 gets the shape of a resource limit right once and generalises it to none of the others — proposal: one policy of limits, with defaults, reported the way §8.2's is
+
+**Section:** [TSON-DATA] §9.1 (denial of service), §8.1 (the four error categories), §8.2 (name hygiene — the
+fifth outcome, and the policy shape this entry asks §9.1 to copy); [TSON-SCHEMA] §2.2.3 (the import closure),
+§7.8 (cross-schema scope push).
+
+**Problem.** §9.1 names five limits and treats them two ways. **Numeric literal length** gets the full
+treatment — a suggested default (4096 digits), a MUST that it be configurable or documented, and a MUST that
+exceeding it report the threshold "rather than failing with an out-of-memory condition". **Nesting depth,
+token length and document size** get one SHOULD sentence between them: no defaults, no configuration
+requirement, no reporting requirement. **Decoded binary size** gets a SHOULD and nothing else.
+
+So the section already demonstrates what a well-specified limit looks like and then applies it to one of the
+five. That is the defect, and it is worth fixing as a set rather than a sixth paragraph, because a limit
+nobody can discover is a limit a sender cannot write against.
+
+**The list is also incomplete, and the gaps are not exotic.** What §9.1 names bounds *bytes* and *depth*;
+nothing bounds *shape*.
+
+| | bounded by §9.1 today |
+|---|---|
+| nesting depth | yes |
+| token length | yes |
+| document size in bytes | yes |
+| numeric literal digits | yes |
+| decoded binary size, per value | yes |
+| **elements in one array or set** | no |
+| **entries in one map** | no |
+| **fields in one record** | no |
+| **annotations on one value** | no — §3.1 permits a name to repeat "any number of times" |
+| **total values in a document** | no |
+| **decoded text length after escape processing** | no — §9.1 makes this point for binary and not for text |
+| **foreign schemas loaded by one document** | no |
+
+Three of those want saying out loud.
+
+**The total is not bounded by the parts.** Ten thousand arrays of ten thousand elements sits inside any
+per-container limit and is 10⁸ values. A processor that bounds depth and per-container size and believes
+itself safe has bounded neither the work nor the allocation. The aggregate counter is a different mechanism
+from the per-position check, and only one of them is implied by the current text.
+
+**Per-container limits are where the superlinear work lives.** §2.5's unique field names, §2.6's key identity
+and §7.5's element uniqueness are all *set* operations over a container's own contents. Bounding the document
+in bytes does not bound them, because the pathological input is small.
+
+**§7.8 gives a document a way to make a processor fetch.** A nested `!!schema` pushes a scope and loads a
+foreign schema as the value arrives; a document carrying a thousand distinct ones asks for a thousand loads.
+That is a fetch amplification vector no byte limit describes, and it is specific to this format.
+
+**And §9.1 is Part 1, so it speaks only of documents.** A schema is untrusted input too wherever one is
+accepted over the wire or reached through `!!import`, and nothing bounds an import closure, a schema's entry
+count, a reference chain, a supertype chain, or template instantiation depth. This implementation's one
+existing limit of any kind is exactly there — `TemplateMaterialiser.MAX_CLOSING_DEPTH = 64`, a bare constant
+guarding non-regular recursion — which is evidence the need is real and currently met by whatever each
+implementation happens to hard-code.
+
+**What §9.1 does not say at all, and §8.2 already does.** The parallel is close enough to be the proposal:
+§8.2 is a policy with a level, a default, a requirement that it be settable in code, and a rule that a
+refusal under it is **not** one of §8.1's four categories. Every one of those has a counterpart here.
+
+1. **A limit refusal is not a verdict on the document.** The document may be well-formed, valid, and accepted
+   in full by the next processor along; what happened is that *this* deployment declined to spend the
+   resources. That is §8.2's fifth outcome exactly, and §9.1 says nothing about which category it falls in —
+   so an implementation will reach for one of the four, and the sender will read "your document is invalid"
+   about a document that is not.
+2. **A sender needs the limits before writing, not after.** #14's argument transfers verbatim: a limit
+   reported only on failure arrives one round trip after the point it would have been useful. A generator
+   that can read the limits emits a document that fits.
+3. **Configurable without defaults is not portable.** If every deployment picks its own, a document's
+   acceptability is a property of who received it. Defaults make "a conforming document" mean something —
+   and §9.1 already supplies one for the single limit it specifies properly.
+
+**Interpretation chosen: none of them are enforced, and the omission has a wrong answer rather than a missing
+one.** A document a few thousand containers deep overflows the stack inside `TsonDataStream`, and a
+`StackOverflowError` is an `Error`: it passes through every `catch (RuntimeException)` in the reader stack and
+in the CLI alike, so `tson validate` prints a bare JVM stack trace to stderr, nothing to stdout, and **exits
+1** — the code that means *your document is invalid*, which is the one verdict this case must not get. That
+is the sharpest argument for point 1 above: with no category stated, the fallback is the wrong one.
+
+**Suggested resolution.**
+
+- **One policy, not six paragraphs.** Name the limits as a set — the five §9.1 has plus the shape limits
+  above — each with a default, each configurable, in the way §8.2 names its level and unit. The natural
+  implementation is one value beside §8.2's, reported by the same surface (`Tson.processorPolicy()`, either
+  facade's, and `tson policy` on the command line), which is what makes point 2 real rather than aspirational.
+- **Say the refusal is not one of §8.1's four**, on §8.2's own terms: a limit refusal means the processor
+  declined, not that the document is wrong, and it MUST be distinguishable from a verdict. §8.2 already
+  carries the sentence that does this; §9.1 needs the same one.
+- **Add the aggregate limit explicitly**, because it is the one a careful implementer will otherwise
+  reasonably believe is implied by the per-container ones and is not.
+- **Say that the schema is subject to the same treatment**, or say in [TSON-SCHEMA] where its limits live.
+  Part 1's §9.1 cannot be the whole answer for a format whose schemas are fetched over the network.
+- **Keep the numeric-literal paragraph as the model** and lift its three requirements — a default, MUST
+  configurable-or-documented, MUST report the threshold — to the whole set.
+
+**What is running, and what is not.** None of it. `BACKLOG.md` carries the work, depth first, because depth is
+the one reachable from a request body with no cooperation from the sender. What is *not* a gap is regex: TSON
+pins its `regex` atom to RFC 9485 I-Regexp and `tson-regex` is a Thompson-NFA/Pike-VM simulation, linear-time
+by construction, so the ReDoS vector every other format's §9.1 has to warn about is closed here by the choice
+of language rather than by a limit.
+
+**Status against Revision 34:** open, and new against this revision. It is not a proposal for new vocabulary
+in the type system — it asks that a section which already knows the right shape apply it consistently, name
+the limits that bound shape rather than size, and settle the one question that decides what a sender is told:
+whether being too large for this processor is a verdict on the document. It is not.
 
 ---
