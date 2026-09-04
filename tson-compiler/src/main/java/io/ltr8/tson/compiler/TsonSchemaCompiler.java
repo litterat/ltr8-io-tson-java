@@ -164,6 +164,13 @@ public final class TsonSchemaCompiler {
         private final Set<String> building = new LinkedHashSet<>();
 
         /**
+         * §7.2's alias index, built once: which written names mean each entry. A property of the schema
+         * rather than of the entry being guarded, so computing it per entry made the walk quadratic in the
+         * schema's size for an answer that never changed.
+         */
+        private final Map<String, Set<String>> namesMeaning;
+
+        /**
          * What every built reader is handed for its own name lookups. Resolves through this compilation
          * while the walk runs, then is rebound to the finished schema so nothing here outlives the call --
          * a reader that resolves at read time (dispatch, annotations) holds this, not {@code this}.
@@ -176,6 +183,7 @@ public final class TsonSchemaCompiler {
             this.schema = linked.schema();
             this.factoryFor = factoryFor;
             this.foreign = foreign;
+            this.namesMeaning = Subsumption.namesMeaning(schema.entries());
         }
 
         TsonTypeReader<?> resolve(String name) {
@@ -242,7 +250,7 @@ public final class TsonSchemaCompiler {
             TsonTypeReader<?> built = factory.create(name, definition, new ValueReaderContext(linked, readers, foreign));
             // §7.2's subsumption rule, applied at every position it governs rather than only where a record
             // happened to have subtypes -- see Subsumption for which kinds it deliberately leaves alone.
-            return Subsumption.guard(name, definition, built, linked.schema().entries(), readers);
+            return Subsumption.guard(name, definition, built, namesMeaning, readers);
         }
     }
 }
