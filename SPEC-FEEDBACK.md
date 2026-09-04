@@ -3400,13 +3400,11 @@ asserting constructor level over a chain that did not support it.
 the marker onto anything composing with a constructor, so that value-route-only refused the marked spelling
 and level discipline the unmarked one. Level discipline is gone (#36), and with it the dilemma.
 
-**What replaces both, and it is weaker.** The shape resolves and closes, and this implementation cannot
-currently show it *working*, for a reason that has nothing to do with §4.2: closing a parameterised entry
-yields a `kind: REFERENCE` alias to the materialised entry, and applicability does not follow a reference
-chain — so `!flagged { … }` is refused as not applicable, exactly as `!some_alias_of_array { … }` is. That is
-a defect on this side, recorded in `BACKLOG.md`, not a property of the rule. Until it is fixed the honest
-claim is narrower than the one this entry used to make: **the rule forbids a shape that resolves and closes,
-for a reason that does not hold** — not one demonstrated end to end.
+**What replaces both.** The shape resolves, closes, and is applicable: `flagged` materialises to an alias of
+the closed entry, and applicability follows a reference chain (§8.3), so `!flagged { … }` reaches the
+constructor at the end of it. Checking that is what turned up a defect on this side — the chain was not being
+walked at a construction head, so an alias to *any* constructor was refused — which is now fixed and pinned.
+The rule therefore forbids a shape that resolves, closes and applies, for a stated reason that does not hold.
 
 **The two channels the rule names beyond the field-type one are already answered elsewhere.**
 
@@ -3431,8 +3429,7 @@ That is a statement about *slots*, already load-bearing in §9's "a slot holding
 typed `type_ref`".
 
 **What is running.** The rule is not enforced, and after #36 the pipeline has no marker to enforce it from —
-a parameterised entry composing with a base kind resolves and closes without complaint. What this
-implementation cannot yet do is apply the closed result, for the reference-chain reason above.
+a parameterised entry composing with a base kind resolves, closes, and the closed result applies.
 
 **Status against Revision 34:** open, and new against this revision — a deletion. It is the entry this cycle
 most changed by another: #36's removal of the marker moved its subject, withdrew its worked example and

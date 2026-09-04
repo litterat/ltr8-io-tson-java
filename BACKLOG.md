@@ -39,17 +39,6 @@ callers hand-sequencing registration themselves. What follows is what's missing 
 spec-required case, found by re-auditing Part 2 against the current source rather than CLAUDE.md's
 own prose (which had gone stale on it):
 
-- [ ] **Applicability does not follow a reference chain.** `alias_array => array` then
-  `!alias_array { … }` is refused as "not applicable -- it is not IS-A 'top'", because `requireApplicable`
-  reads `supertypes` off the alias, and a `kind: REFERENCE` entry's own chain is empty. §8.3 makes a
-  reference a hop and every other consumer walks it (`ReferenceChain`, the compiler, `DiscriminationClass`,
-  `TypeInhabitance`); this one does not. Same defect reaches a closed parameterised constructor, since
-  `ctor_box<boolean>` materialises to an alias: the entry resolves and closes and then cannot be applied.
-  The fix is to resolve through the chain before asking, at both application sites and at
-  `TsonCompiledMetaSchema.buildConstructors`, which filters on the same predicate. Pre-dates the predicate —
-  the old `constructor: true` was hardcoded `false` on a reference, so the chain was not walked then either;
-  what changed is only which message says so.
-
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
   dependencies-first; every caller (including this session's own `TinySchemaImportsCoreTn1Test`) has to

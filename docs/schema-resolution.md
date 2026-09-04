@@ -73,7 +73,15 @@ are kept in step deliberately.
   parameterised declaration is exactly one — so `!my_set { … }` reached an `IllegalStateException`,
   which is this project's spelling of *an internal invariant broke*, and the CLI reported an author's schema
   mistake as a library fault at exit 70. `TemplateClosesByApplicationTest` pins all of it.
-- **What `!C { … }` may apply is IS-A `top` (§4.1)** (`requireApplicable`). §4.1 makes
+- **A construction head resolves through its reference chain first** (§8.3, `resolveConstructorTarget`).
+  A reference is a hop, not a rewrite, so `alias_array => array` makes `!alias_array { … }` an application of
+  `array`, and every question the head is then asked — is it a template, is it applicable, what kind does
+  construction transfer, whose vocabulary reads the payload — is a question about the entry at the end.
+  Asking the alias answered all four from an empty supertype chain and a `REFERENCE` kind, which is what a
+  hop looks like rather than what it points at; the old `constructor` flag had the same hole, hardcoded
+  `false` on a reference. The author's spelling survives where it is visible: `source` records the name they
+  wrote, so the chain stays walkable from resolved output.
+- **What `!C { … }` may apply is IS-A `top` (§4.1)** (`requireApplicable`), asked of that terminal entry. §4.1 makes
   every base kind IS-A `top` and every constructor transitively so, while IS-A stops at construction — an
   instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond
   them, exactly the entries describing *a type* rather than a part of one. Measured over the bundled schemas:

@@ -93,6 +93,44 @@ class ApplicabilityIsIsATopTest {
         assertEquals(TypeKind.REFERENCE, entries.get("open").kind());
     }
 
+    /**
+     * <b>A reference is a hop, not a rewrite (§8.3), so applicability follows the chain.</b> An alias to a
+     * constructor is applicable, because the entry at the end of the chain is — and so is an alias to that
+     * alias. Everything the head is asked (is it a template, is it applicable, what kind does construction
+     * transfer, whose vocabulary reads the payload) is a question about the terminal entry.
+     *
+     * <p>Asking the alias instead answered every one of them from an empty supertype chain and a {@code
+     * REFERENCE} kind, which is what a hop looks like rather than what it points at. The old {@code
+     * constructor: true} flag had the same hole — it was hardcoded {@code false} on a reference — so this is
+     * a defect the predicate inherited rather than one it introduced.
+     */
+    @Test
+    void applicationFollowsAnAliasToItsTarget() {
+        String meta = """
+                !!id:"https://example.test/m.tn"
+                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
+                {
+                  alias_array => array
+                  two_hops    => alias_array
+                }
+                """;
+        for (String head : List.of("array", "alias_array", "two_hops")) {
+            String user = """
+                    !!id:"https://example.test/u.tn"
+                    !!meta:"https://example.test/m.tn"
+                    !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
+                    { tags => !%s { element_type: identifier } }
+                    """.formatted(head);
+            List<Diagnostic> problems = Tson.builder()
+                    .schemaSource(TsonSchemaSource.ofMap(Map.of(
+                            "https://example.test/m.tn", meta, "https://example.test/u.tn", user)))
+                    .build().validateSchema(user);
+
+            assertEquals(List.of(), problems, () -> "!" + head + " { ... }: " + problems);
+        }
+    }
+
     /** Every ordinary constructor is IS-A top, so nothing that worked before stops working. */
     @Test
     void anOrdinaryConstructorStillApplies() {

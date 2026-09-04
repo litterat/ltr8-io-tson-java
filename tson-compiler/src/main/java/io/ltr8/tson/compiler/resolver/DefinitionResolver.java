@@ -596,7 +596,8 @@ final class DefinitionResolver {
      */
     private TypeDefinition resolveInstance(String name, Instance instance) {
         String target = instance.target();
-        TypeDefinition constructor = resolveConstructorTarget(name, target);
+        ConstructorHead head = resolveConstructorTarget(name, target);
+        TypeDefinition constructor = head.definition();
         if (!constructor.parameters().isEmpty()) {
             int declared = constructor.parameters().size();
             throw new TsonSchemaValidationException("'" + name + "': '" + target + "' is a template taking "
@@ -612,7 +613,7 @@ final class DefinitionResolver {
         // template above. Every other body shape (a construction's bound value, an alias's `Reference`)
         // comes with an empty chain, since IS-A stops at construction (§4.1), so `requireApplicable` refuses
         // it. Parameters empty and IS-A `top` therefore imply a record body.
-        Top body = bindAtomInstance(name, instance.value());
+        Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
         if (body instanceof io.ltr8.tson.schema.meta.Reference reference) {
             // `!reference { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
             // denotes the same entry: `kind: REFERENCE` (§4.1 -- a type_kind, not one the supertype chain
@@ -650,12 +651,13 @@ final class DefinitionResolver {
      */
     private TypeDefinition resolveInstanceTemplate(String name, Instance template) {
         String target = template.target();
-        TypeDefinition constructor = resolveConstructorTarget(name, target);
+        ConstructorHead head = resolveConstructorTarget(name, target);
+        TypeDefinition constructor = head.definition();
         // `reference` needs no exception here any more: it IS-A `top`, so the generic rule admits it, which
         // is what makes the open and closed spellings of one construction agree. Its `kind` still cannot come
         // from its supertype chain -- §4.1 gives an alias `kind: REFERENCE`, a type_kind and not a base kind
         // -- so that fact alone stays the kernel's own, below.
-        boolean alias = REFERENCE.equals(target);
+        boolean alias = REFERENCE.equals(head.name());
         requireApplicable(name, target, constructor);
         if (!(constructor.body() instanceof RecordBody vocabulary)) {
             throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
@@ -864,13 +866,51 @@ final class DefinitionResolver {
      * declared in the *governing* meta-schema, one hop via {@code !!meta}, so the structure namespace
      * alone is enough.
      */
-    private TypeDefinition resolveConstructorTarget(String name, String target) {
-        TypeDefinition structural = metaDefinitions.getTypeDefinition(target);
-        if (structural != null) {
-            return structural;
+    /**
+     * The constructor a {@code !C ...} head names, and the name to read its payload against -- <b>after
+     * following {@code C}'s reference chain</b> ([TSON-SCHEMA] §8.3).
+     *
+     * <p>A reference is a hop, not a rewrite: resolved output states the chain the author wrote, and a
+     * processor collapses it when it needs the type. So {@code alias_array => array} makes
+     * {@code !alias_array { ... }} an application of {@code array}, and everything this resolver then asks of
+     * the head -- is it a template, is it applicable, what kind does construction transfer, whose vocabulary
+     * reads the payload -- is a question about the entry at the end. Asking the alias instead answered every
+     * one of them from an empty supertype chain and a {@code REFERENCE} kind, which is what a hop looks like
+     * rather than what it points at.
+     *
+     * <p>The author's own spelling survives where it is visible: {@link #resolveInstance} records {@code C} in
+     * {@code source}, not the terminal, so the chain stays walkable from resolved output.
+     */
+    private ConstructorHead resolveConstructorTarget(String name, String target) {
+        if (metaDefinitions.getTypeDefinition(target) == null) {
+            throw new TsonSchemaValidationException("'" + name + "': '!" + target
+                    + "' does not resolve against the structure namespace (§3.3.1)");
         }
-        throw new TsonSchemaValidationException("'" + name + "': '!" + target
-                + "' does not resolve against the structure namespace (§3.3.1)");
+        String terminal = ReferenceChain.terminal(target, metaDefinitions::getTypeDefinition);
+        TypeDefinition atEnd = metaDefinitions.getTypeDefinition(terminal);
+        if (atEnd == null) {
+            // The walk stopped at a name the structure namespace does not declare -- a broken hop, which is
+            // the alias's own problem and not this declaration's, but this is where it becomes visible.
+            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' is an alias whose chain "
+                    + "ends at '" + terminal + "', which the structure namespace does not declare (§8.3)");
+        }
+        return new ConstructorHead(terminal, atEnd);
+    }
+
+    /**
+     * {@code value} re-typed to the name its payload is read against -- the terminal of the head's chain
+     * (§8.3), where the author may have written an alias. A no-op for the ordinary case, where they are the
+     * same name; the meta-schema's reader table is keyed by the constructor's own name, so an alias reaches
+     * one only by asking under it.
+     */
+    private static DataValue readAs(DataValue value, String constructorName) {
+        return value.typeRef().filter(constructorName::equals).isPresent()
+                ? value
+                : new DataValue(value.annotations(), Optional.of(constructorName), value.coreValue());
+    }
+
+    /** A construction head resolved through §8.3's chain: the name to read against, and the entry it names. */
+    private record ConstructorHead(String name, TypeDefinition definition) {
     }
 
     /**
