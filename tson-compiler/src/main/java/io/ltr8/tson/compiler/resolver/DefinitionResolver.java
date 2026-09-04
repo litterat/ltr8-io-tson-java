@@ -535,29 +535,6 @@ final class DefinitionResolver {
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────
 
     /**
-     * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance filled
-     * with {@code value}. {@code C} resolves against the structure namespace only (see {@link
-     * #resolveConstructorTarget}); the found entry MUST be a constructor ({@code constructor: true})
-     * or this is a resolver error (the spec's own suggested diagnostic: "did you mean atom
-     * refinement?") -- and MUST be closed: a template ({@code C} declaring type parameters) closes by
-     * application, {@code C<...>}, never by construction, so naming one here is a resolver error whether or
-     * not it also carries {@code ~}. {@code value} is bound via {@link #bindAtomInstance} directly --
-     * {@code instance.value().typeRef()} already names {@code C} (per {@code Instance}'s own
-     * reshape, matching §12.1's {@code instance = "!" type-name ws core-value}); positional form (§5.6) and
-     * schema-composed defaults
-     * (§5.2/§5.7) are handled uniformly by the compiled {@code Record*Reader} itself (see {@code
-     * RecordAbstractReader}'s own Javadoc), not by a separate normalization step here -- {@code C}'s
-     * own body is always record-shaped (checked below), so every real call reaches one. Construction
-     * transfers only {@code C}'s {@code kind} (§5.5): no supertypes, no parameters, {@code
-     * constructor: false} on the result.
-     *
-     * <p>Binds against {@link Top}, not the narrower {@code Atom} -- some constructors (e.g. {@code
-     * unknown_type => ~sum & {}}) compose with {@code sum}, not {@code atom}. {@code C}'s own body
-     * must also already be a {@link RecordBody} -- true for every real constructor (a constructor's
-     * own declared vocabulary is always record-shaped, whatever the resulting instance's bound Java
-     * class looks like, atom-family or not).
-     */
-    /**
      * Whether {@code !C { ... }} may apply {@code C} at all: <b>{@code C} IS-A {@code top}</b>
      * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain.
      *
@@ -594,6 +571,30 @@ final class DefinitionResolver {
                 + " ^ { ... }')?");
     }
 
+    /**
+     * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance filled
+     * with {@code value}.
+     *
+     * <p>{@code C} resolves against the structure namespace only (see {@link #resolveConstructorTarget}),
+     * and faces two questions. It MUST be <b>applicable</b> -- IS-A {@code top} (§4.1), see {@link
+     * #requireApplicable} -- and it MUST be <b>closed</b>: a template ({@code C} declaring type parameters)
+     * closes by application, {@code C<...>}, never by construction, so naming one here is a resolver error
+     * whether or not it also carries {@code ~}.
+     *
+     * <p>{@code value} is bound via {@link #bindAtomInstance} directly -- {@code instance.value().typeRef()}
+     * already names {@code C} (per {@code Instance}'s own reshape, matching §12.1's {@code instance = "!"
+     * type-name ws core-value}); positional form (§5.6) and schema-composed defaults (§5.2/§5.7) are handled
+     * uniformly by the compiled {@code Record*Reader} itself (see {@code RecordAbstractReader}'s own
+     * Javadoc), not by a separate normalization step here. Construction transfers only {@code C}'s {@code
+     * kind} (§5.5): no supertypes, no parameters, {@code constructor: false} on the result -- except for an
+     * alias, where the result is the entry {@code name => X} denotes, since {@code !reference { target: X }}
+     * is that alias written out (§8.3).
+     *
+     * <p>Binds against {@link Top}, not the narrower {@code Atom} -- some constructors (e.g. {@code
+     * unknown_type => ~sum & {}}) compose with {@code sum}, not {@code atom}. {@code C}'s own body is
+     * always a {@link RecordBody} by the time it is read, which the two questions above establish rather
+     * than check: see the note at the binding site.
+     */
     private TypeDefinition resolveInstance(String name, Instance instance) {
         String target = instance.target();
         TypeDefinition constructor = resolveConstructorTarget(name, target);
@@ -606,19 +607,12 @@ final class DefinitionResolver {
                     + "vocabulary (§4.2), which is a different operation and needs a closed constructor");
         }
         requireApplicable(name, target, constructor);
-        if (!(constructor.body() instanceof RecordBody _)) {
-            // Unreachable, and the template check above is what makes that true. §12.1 attaches `~` to a
-            // structural-def only (refined-def / construction-def / record-def), each of which resolves to a
-            // record body, and §7.2 says a constructor *is* a record-shaped type -- but an *open* declaration
-            // holds its body instead (`holdIfOpen`), and a parameterised `~` declaration is exactly that. It
-            // is refused above as a template, so what reaches here has no parameters and therefore no held
-            // body. Any other non-record body is a malformed TypeDefinition that entered the structure
-            // namespace by some route other than parsing -- an invariant violation, not a schema this
-            // resolver should be explaining to an author.
-            throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
-                    + constructor.body().getClass().getSimpleName() + " body; a constructor is record-shaped "
-                    + "(§7.2) and cannot be declared otherwise");
-        }
+        // No check that the head's own body is a record: the two above leave nothing else. `supertypes` is
+        // populated only by composition and refinement, both of which build a `RecordBody` -- except where
+        // `holdIfOpen` wraps one for an open declaration, and a declaration with parameters is refused as a
+        // template above. Every other body shape (a construction's bound value, an alias's `Reference`)
+        // comes with an empty chain, since IS-A stops at construction (§4.1), so `requireApplicable` refuses
+        // it. Parameters empty and IS-A `top` therefore imply a record body.
         Top body = bindAtomInstance(name, instance.value());
         if (body instanceof io.ltr8.tson.schema.meta.Reference reference) {
             // `!reference { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
@@ -1020,25 +1014,6 @@ final class DefinitionResolver {
     // ── Composition (§5.8) and subtraction (§5.9) ─────────────────────────
 
     /**
-     * {@code A & B & { ... }}: each supertype's fields and groups are copied into the result, left
-     * to right (§5.8's field-ordering rule, §5.11's "supertypes contribute their groups whole"),
-     * checked for name overlap across supertypes; the trailing body's own entries are then resolved
-     * against {@code inheritedFieldIndex} (name -&gt; position in {@code fields}, populated by the
-     * supertype loop above) -- a body field naming an inherited field is a *tightening* entry
-     * (§5.7, via {@link #resolveTighteningField}) and replaces that field in place; a body field
-     * naming nothing inherited is genuinely new and is appended, same as before (§5.8's "new fields
-     * are permitted; existing fields may be tightened" and "tightening entries replace inherited
-     * fields in place; new fields are appended after all inherited fields"). {@code
-     * type_definition.supertypes} accumulates by induction: each supertype's own {@code
-     * supertypes()} is already its full transitive chain (by the same induction, computed when
-     * *that* entry was resolved), so {@code direct + parent.supertypes()} for every direct
-     * supertype, deduplicated, is the complete transitive chain -- no separate graph walk needed.
-     * {@code parameters} (a template's own {@code <T, ...>} list, §5.10) threads straight through
-     * from the declaration's {@code typeParams} into the result -- {@code array}'s own shape
-     * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
-     * actually uses each parameter.
-     */
-    /**
      * [TSON-SCHEMA] §4.2's <b>level discipline</b>: an entry that composes with, refines, or subtracts from a
      * constructor MUST itself be declared {@code ~}.
      *
@@ -1072,6 +1047,25 @@ final class DefinitionResolver {
                 + "deriving from it ('!" + operandName + " { ... }', §5.5)");
     }
 
+    /**
+     * {@code A & B & { ... }}: each supertype's fields and groups are copied into the result, left
+     * to right (§5.8's field-ordering rule, §5.11's "supertypes contribute their groups whole"),
+     * checked for name overlap across supertypes; the trailing body's own entries are then resolved
+     * against {@code inheritedFieldIndex} (name -&gt; position in {@code fields}, populated by the
+     * supertype loop above) -- a body field naming an inherited field is a *tightening* entry
+     * (§5.7, via {@link #resolveTighteningField}) and replaces that field in place; a body field
+     * naming nothing inherited is genuinely new and is appended, same as before (§5.8's "new fields
+     * are permitted; existing fields may be tightened" and "tightening entries replace inherited
+     * fields in place; new fields are appended after all inherited fields"). {@code
+     * type_definition.supertypes} accumulates by induction: each supertype's own {@code
+     * supertypes()} is already its full transitive chain (by the same induction, computed when
+     * *that* entry was resolved), so {@code direct + parent.supertypes()} for every direct
+     * supertype, deduplicated, is the complete transitive chain -- no separate graph walk needed.
+     * {@code parameters} (a template's own {@code <T, ...>} list, §5.10) threads straight through
+     * from the declaration's {@code typeParams} into the result -- {@code array}'s own shape
+     * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
+     * actually uses each parameter.
+     */
     private TypeDefinition resolveComposition(String name, ConstructionDef construction, boolean constructor,
                                                List<String> parameters) {
         List<String> directSupertypes = new ArrayList<>();
