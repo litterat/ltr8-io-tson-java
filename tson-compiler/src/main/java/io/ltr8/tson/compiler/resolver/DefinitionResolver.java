@@ -997,6 +997,40 @@ final class DefinitionResolver {
      * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
      * actually uses each parameter.
      */
+    /**
+     * [TSON-SCHEMA] §4.2's <b>level discipline</b>: an entry that composes with, refines, or subtracts from a
+     * constructor MUST itself be declared {@code ~}.
+     *
+     * <p><b>The rule is one-directional</b>, so this asks only the one question. Deriving <em>from</em> a
+     * constructor keeps the result at constructor level; a non-constructor operand in a {@code ~} declaration
+     * stays legal, which is what lets a base kind seed the level ({@code record => ~product & { ... }}) and a
+     * record mixin lend vocabulary ({@code atom_specification}).
+     *
+     * <p><b>What it protects is the two IS-A indexes.</b> Without it an ordinary type composing with a
+     * constructor resolves to {@code constructor: false} with that constructor in its {@code supertypes},
+     * and the constructor gains a non-constructor {@code subtypes} entry -- so the two relations §4.2 keeps
+     * apart ("types relate to types, and constructors relate to constructors and kinds") are mixed in exactly
+     * the two indexes §7.2's subsumption rule reads.
+     *
+     * <p>Subtraction needs no site of its own: §5.9's removal clause applies to a composition, so its operand
+     * has already passed through here as a supertype.
+     *
+     * @param role how the operand was written, for the message -- {@code "supertype"} or
+     *             {@code "refinement source"}
+     */
+    private static void requireConstructorLevel(String name, boolean constructor, String operandName,
+                                                TypeDefinition operand, String role) {
+        if (constructor || !operand.constructor()) {
+            return;
+        }
+        throw new TsonSchemaValidationException("'" + name + "': " + role + " '" + operandName
+                + "' is a type constructor, so '" + name + "' must be declared one too ('" + name
+                + " => ~...', §4.2's level discipline) -- deriving from a constructor keeps the result at "
+                + "constructor level, which is what keeps a type's supertypes and a constructor's subtypes "
+                + "from mixing the two levels. For an ordinary type, apply the constructor instead of "
+                + "deriving from it ('!" + operandName + " { ... }', §5.5)");
+    }
+
     private TypeDefinition resolveComposition(String name, ConstructionDef construction, boolean constructor,
                                                List<String> parameters) {
         List<String> directSupertypes = new ArrayList<>();
@@ -1043,6 +1077,7 @@ final class DefinitionResolver {
                 throw new TsonSchemaValidationException("'" + name + "': supertype '" + supertypeName
                         + "' names no type this schema declares or imports");
             }
+            requireConstructorLevel(name, constructor, supertypeName, supertypeDef, "supertype");
             if (!(supertypeDef.body() instanceof RecordBody supertypeBody)) {
                 // §4.3 generalises §5.7's vocabulary-body requirement to composition, which has the same
                 // need: it copies the parent's fields, and a binding record has none to copy.
@@ -1253,6 +1288,7 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + name + "': refinement source '" + sourceName
                     + "' names no type this schema declares or imports");
         }
+        requireConstructorLevel(name, constructor, sourceName, sourceDef, "refinement source");
         if (!(sourceDef.body() instanceof RecordBody sourceBody)) {
             // §5.7's "Refinement requires a vocabulary body": the source of ^ MUST be a definition whose body
             // is a !record, and one whose body is a binding record -- a top-level constructor application, a

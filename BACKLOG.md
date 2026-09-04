@@ -35,9 +35,9 @@ distinction, and a misfiled entry is how a wrong classification gets adopted rat
 
 Every real schema resolved so far (meta-kernel, meta.tn, core.tn, and hand-built test fixtures)
 happens to fit a narrow shape this pipeline already handles — declared in dependency order, with
-callers hand-sequencing registration themselves. These items are what's missing for the *general*,
+callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case, found by re-auditing Part 2 against the current source rather than CLAUDE.md's
-own prose (which had gone stale on at least one of them):
+own prose (which had gone stale on it):
 
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
@@ -46,20 +46,6 @@ own prose (which had gone stale on at least one of them):
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
-
-- [ ] **§4.2's value-route-only rule reaches one of its three channels.** A `~` declaration's parameter
-  standing in a *field type* or a *variant* is a resolver error at the declaration; nothing checks it, and
-  `ctor_box => <T> ~base & { value: T }` with `closed => ctor_box<text>` resolves and closes cleanly. (The
-  third channel, a parameter routed into a `type_ref`-typed vocabulary slot, is already refused where it
-  closes — by §5.2's rule that a fixed value is available on an atom- or enum-typed field and nowhere else —
-  so what is missing there is only §4.2's *timing*, a declaration nobody ever closes going unrefused.)
-  **Settle the spec question first**: §4.2's stated reason is that a type-channel parameter "could close only
-  by rewriting the body — the materialisation constructors never get", which is not true here, since §5.10
-  materialisation rewrites held bodies and closes exactly this shape;
-  `DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord` pins that it does. So the work
-  is either a check plus retiring that test's `~`, or a `SPEC-FEEDBACK.md` entry asking §4.2 to admit the
-  field-type channel. `ParameterKinds` is the machinery either way: it resolves the constructor head and
-  classifies each written slot against the field the constructor declares for it.
 
 ## Checked annotations
 

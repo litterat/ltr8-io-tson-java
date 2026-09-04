@@ -289,7 +289,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
             !!meta:"https://tson.io/2026/35/m/meta.tn"
             !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
             {
-              my_type => unit & {}
+              my_type => atom & {}
             }
             """;
 
@@ -297,16 +297,22 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     void resolveSchemaGenuinelyMergesImportedEntriesIntoTheTypeNameNamespace() {
         // A bare type-ref (§8.3) is carried through unverified regardless of whether the target
         // exists anywhere, so that alone wouldn't prove anything -- composition is the real test:
-        // resolveComposition does exactly one resolved.get(supertypeName), no fallback, so "unit"
+        // resolveComposition does exactly one resolved.get(supertypeName), no fallback, so "atom"
         // (meta-kernel's own, zero fields) is only findable here if !!import's own entries were
         // genuinely merged into the type-name namespace, not just validated as well-formed URIs.
+        //
+        // "atom" rather than "unit", which this used before: unit is a *constructor*, and §4.2's level
+        // discipline makes an unmarked declaration deriving from one a resolver error. Marking this one
+        // is not the fix either -- the document's !!meta is meta.tn, so §4.2's placement rule refuses a
+        // constructor declaration here. A base kind is a non-constructor with a supertype chain of its
+        // own, so it demonstrates the same merge and the same transitivity.
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_IMPORT_MERGED).parseSchemaDocument();
 
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
         // Transitive, per SchemaResolver's own induction: direct supertype + its own supertype chain.
-        assertEquals(List.of("unit", "atom", "top"), resolved.entries().get("my_type").supertypes());
+        assertEquals(List.of("atom", "top"), resolved.entries().get("my_type").supertypes());
         // Imported entries are visible during resolution but never part of the result itself.
         assertEquals(Set.of("my_type"), resolved.entries().keySet());
     }

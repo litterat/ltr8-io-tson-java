@@ -73,16 +73,35 @@ are kept in step deliberately.
   parameterised `~` declaration is exactly one — so `!my_set { … }` reached an `IllegalStateException`,
   which is this project's spelling of *an internal invariant broke*, and the CLI reported an author's schema
   mistake as a library fault at exit 70. `TemplateClosesByApplicationTest` pins all of it.
+- **§4.2's three declaration-time rules for `~`, and where each is answered.** **Placement** (a `~`
+  declaration only in a schema whose own `!!meta` names the meta-kernel) is checked at the declaration.
+  **Level discipline** (an entry composing with, refining, or subtracting from a constructor MUST itself be
+  `~`) is checked on each operand, at two sites — `resolveComposition`'s supertype loop and
+  `resolveRefinement`'s source — which is all three operations, §5.9's removal clause applying to a
+  composition so its operand arrives as a supertype. The check asks only whether the *operand* is a
+  constructor, because the rule is one-directional: a non-constructor operand in a `~` declaration stays
+  legal, which is what lets a base kind seed the level (`record => ~product & { … }` — the base kinds are
+  non-constructors) and `atom_specification` lend vocabulary. What it protects is the two indexes §7.2's
+  subsumption rule reads: unchecked, an ordinary type composing with a constructor resolved to
+  `constructor: false` carrying that constructor in `supertypes`, and the constructor gained a
+  non-constructor `subtypes` entry. Construction is exempt and needs no marker — §5.5 transfers kind and no
+  supertypes, so `!C { … }` mixes no index, and it is the remedy the refusal names.
+  `ConstructorLevelDisciplineTest` pins all of it, including that no bundled schema mixes the two levels.
 - **§4.2's value-route-only rule is enforced where the argument lands, not at the declaration.** A `~`
   declaration's parameter routed into a *vocabulary slot* typed `type_ref` — `my_set => <T> ~array ^ {
   element_type: = T }` — is refused when it closes, by §5.2's rule that a fixed value is available on a
   field typed by an atom or an enum and nowhere else; the legal value-routed form (`max_items: = N`, an
   atom-typed slot) closes normally. What is **not** checked is the channel §5.2 never sees, a parameter
-  standing as a *field type* or a *variant*: `<T> ~base & { value: T }` resolves and closes cleanly here.
-  §4.2 calls that a resolver error at the declaration and its stated reason — that a type-channel parameter
-  "could close only by rewriting the body — the materialisation constructors never get" — does not hold in
-  this implementation, where §5.10 materialisation rewrites held bodies and closes it. `BACKLOG.md` carries
-  the gap.
+  standing as a *field type* or a *variant*. §4.2 calls that a resolver error at the declaration, and its
+  stated reason — that a type-channel parameter "could close only by rewriting the body — the materialisation
+  constructors never get" — does not hold here: §5.10 materialisation rewrites held bodies and closes exactly
+  this shape, which `DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord` pins. **It
+  closes into a working type, not a tolerated one**: `ctor_box => <T> ~base & { value: T }` with
+  `flagged => ctor_box<boolean>` materialises, compiles, accepts `{ value: true }` and rejects
+  `{ value: banana }` with a `TYPE_MISMATCH` at `/value`; the variant channel behaves the same. That is the
+  evidence `SPEC-FEEDBACK.md` #35 rests on, which proposes §4.2 delete the rule: its other two channels are
+  decided by §5.2 and §5.10 anyway, and its remaining one has no legal spelling once level discipline is
+  enforced beside it.
 - **All six of §5.2's field-state spellings resolve**, including `field: type? = _` — `OPTIONAL_FIXED`
   carrying *no* value, so §8.1 writes a `record_field` without a `value` member and the field must be
   omitted or written `_`. Its three resolver errors are enforced: `~ _` on any field, `= _` on a REQUIRED
