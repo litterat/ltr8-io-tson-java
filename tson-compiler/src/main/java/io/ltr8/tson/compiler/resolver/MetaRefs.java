@@ -42,7 +42,7 @@ final class MetaRefs {
     static TypeDefinition mapRefs(TypeDefinition definition, UnaryOperator<TypeRef> map) {
         Optional<TypeRef> source = definition.source().map(map);
         return new TypeDefinition(source, definition.kind(), definition.parameters(),
-                definition.constructor(), definition.supertypes(), definition.subtypes(),
+                definition.supertypes(), definition.subtypes(),
                 definition.disjoint(), mapBodyRefs(definition.body(), map), definition.position(),
                 definition.annotations());
     }

@@ -43,7 +43,7 @@ class BindMismatchClassificationTest {
             !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/35/m/meta.tn"
             {
-              notification => ~data & { path: text }
+              notification => data & { path: text }
             }
             """;
 

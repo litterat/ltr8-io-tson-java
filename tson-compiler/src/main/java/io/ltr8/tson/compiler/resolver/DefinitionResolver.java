@@ -442,7 +442,6 @@ final class DefinitionResolver {
     private TypeDefinition resolveTypeDef(String name, TypeDef typeDef) {
         if (typeDef instanceof StructuralTypeDef structural) {
             List<String> parameters = structural.typeParams();
-            boolean constructor = structural.constructor();
             if (structural.body() instanceof RecordDef recordDef) {
                 RecordBody body = resolveRecordBody(recordDef.entries(), parameters);
                 // Only an error placeholder is both parameterised and still a bare RecordDef here -- the
@@ -450,13 +449,13 @@ final class DefinitionResolver {
                 // denotes. Holding it anyway is what leaves no parameterised RecordBody anywhere, so
                 // materialisation needs only the one substitution path. See WireForm.heldEmptyRecord.
                 return holdIfOpen(name, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters,
-                        constructor, List.of(), List.of(), Optional.empty(), body));
+                        List.of(), List.of(), Optional.empty(), body));
             }
             if (structural.body() instanceof ConstructionDef construction) {
-                return holdIfOpen(name, resolveComposition(name, construction, constructor, parameters));
+                return holdIfOpen(name, resolveComposition(name, construction, parameters));
             }
             if (structural.body() instanceof RefinedDef refined) {
-                return holdIfOpen(name, resolveRefinement(name, refined, constructor, parameters));
+                return holdIfOpen(name, resolveRefinement(name, refined, parameters));
             }
         }
         if (typeDef instanceof ReferenceTypeDef referenceTypeDef) {
@@ -623,7 +622,7 @@ final class DefinitionResolver {
             return TypeDefinition.reference(reference.target());
         }
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
-                List.of(), false, List.of(), List.of(), Optional.empty(), body);
+                List.of(), List.of(), List.of(), Optional.empty(), body);
     }
 
     /**
@@ -668,7 +667,7 @@ final class DefinitionResolver {
         }
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)),
                 alias ? TypeKind.REFERENCE : constructor.kind(),
-                template.typeParams(), false, List.of(), List.of(), Optional.empty(),
+                template.typeParams(), List.of(), List.of(), Optional.empty(),
                 new HeldBody(template.value()));
     }
 
@@ -769,7 +768,7 @@ final class DefinitionResolver {
         Top body = bindAtomInstance(name, merged);
         checkNarrows(name, sourceName, source.body(), body);
 
-        return new TypeDefinition(Optional.of(constructorRef), source.kind(), List.of(), false,
+        return new TypeDefinition(Optional.of(constructorRef), source.kind(), List.of(),
                 List.of(sourceName), List.of(), Optional.empty(), body);
     }
 
@@ -1023,39 +1022,6 @@ final class DefinitionResolver {
 
     // ── Composition (§5.8) and subtraction (§5.9) ─────────────────────────
 
-    /**
-     * [TSON-SCHEMA] §4.2's <b>level discipline</b>: an entry that composes with, refines, or subtracts from a
-     * constructor MUST itself be declared {@code ~}.
-     *
-     * <p><b>The rule is one-directional</b>, so this asks only the one question. Deriving <em>from</em> a
-     * constructor keeps the result at constructor level; a non-constructor operand in a {@code ~} declaration
-     * stays legal, which is what lets a base kind seed the level ({@code record => ~product & { ... }}) and a
-     * record mixin lend vocabulary ({@code atom_specification}).
-     *
-     * <p><b>What it protects is the two IS-A indexes.</b> Without it an ordinary type composing with a
-     * constructor resolves to {@code constructor: false} with that constructor in its {@code supertypes},
-     * and the constructor gains a non-constructor {@code subtypes} entry -- so the two relations §4.2 keeps
-     * apart ("types relate to types, and constructors relate to constructors and kinds") are mixed in exactly
-     * the two indexes §7.2's subsumption rule reads.
-     *
-     * <p>Subtraction needs no site of its own: §5.9's removal clause applies to a composition, so its operand
-     * has already passed through here as a supertype.
-     *
-     * @param role how the operand was written, for the message -- {@code "supertype"} or
-     *             {@code "refinement source"}
-     */
-    private static void requireConstructorLevel(String name, boolean constructor, String operandName,
-                                                TypeDefinition operand, String role) {
-        if (constructor || !operand.constructor()) {
-            return;
-        }
-        throw new TsonSchemaValidationException("'" + name + "': " + role + " '" + operandName
-                + "' is a type constructor, so '" + name + "' must be declared one too ('" + name
-                + " => ~...', §4.2's level discipline) -- deriving from a constructor keeps the result at "
-                + "constructor level, which is what keeps a type's supertypes and a constructor's subtypes "
-                + "from mixing the two levels. For an ordinary type, apply the constructor instead of "
-                + "deriving from it ('!" + operandName + " { ... }', §5.5)");
-    }
 
     /**
      * {@code A & B & { ... }}: each supertype's fields and groups are copied into the result, left
@@ -1076,7 +1042,7 @@ final class DefinitionResolver {
      * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
      * actually uses each parameter.
      */
-    private TypeDefinition resolveComposition(String name, ConstructionDef construction, boolean constructor,
+    private TypeDefinition resolveComposition(String name, ConstructionDef construction,
                                                List<String> parameters) {
         List<String> directSupertypes = new ArrayList<>();
         List<String> transitiveSupertypes = new ArrayList<>();
@@ -1122,7 +1088,6 @@ final class DefinitionResolver {
                 throw new TsonSchemaValidationException("'" + name + "': supertype '" + supertypeName
                         + "' names no type this schema declares or imports");
             }
-            requireConstructorLevel(name, constructor, supertypeName, supertypeDef, "supertype");
             if (!(supertypeDef.body() instanceof RecordBody supertypeBody)) {
                 // §4.3 generalises §5.7's vocabulary-body requirement to composition, which has the same
                 // need: it copies the parent's fields, and a binding record has none to copy.
@@ -1166,7 +1131,7 @@ final class DefinitionResolver {
         // reason §5.9 gives: the clause is head-level, so its effect must be readable without scanning the
         // parents' field sets. An author wanting partial IS-A subtracts first and composes second.
         List<String> contract = construction.removal().isPresent() ? List.of() : transitiveSupertypes;
-        return new TypeDefinition(Optional.empty(), kind, parameters, constructor, contract, List.of(),
+        return new TypeDefinition(Optional.empty(), kind, parameters, contract, List.of(),
                 Optional.empty(), body);
     }
 
@@ -1315,14 +1280,14 @@ final class DefinitionResolver {
      * determined the same way composition determines it (the transitive chain's literal
      * atom/product/sum name, not the source's own resolved kind).
      */
-    private TypeDefinition resolveRefinement(String name, RefinedDef refined, boolean constructor,
+    private TypeDefinition resolveRefinement(String name, RefinedDef refined,
                                               List<String> parameters) {
         if (refined.target() instanceof GenericRef generic && namesOwnParameter(generic, parameters)) {
             // §5.7 against an open source: the same absorption composition does, and the same two omissions.
             // The source names no entry, so it is neither `source` nor a supertype -- but its own ancestors
             // are types and its whole field set arrives, which is what `^` re-emits and then tightens.
             OpenOperand operand = openOperand(name, generic, parameters, "refinement source");
-            return refineOnto(name, refined, constructor, parameters, Optional.empty(),
+            return refineOnto(name, refined, parameters, Optional.empty(),
                     new ArrayList<>(operand.ancestors()), operand.body());
         }
         io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target(), parameters);
@@ -1333,7 +1298,6 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + name + "': refinement source '" + sourceName
                     + "' names no type this schema declares or imports");
         }
-        requireConstructorLevel(name, constructor, sourceName, sourceDef, "refinement source");
         if (!(sourceDef.body() instanceof RecordBody sourceBody)) {
             // §5.7's "Refinement requires a vocabulary body": the source of ^ MUST be a definition whose body
             // is a !record, and one whose body is a binding record -- a top-level constructor application, a
@@ -1351,7 +1315,7 @@ final class DefinitionResolver {
         for (String ancestor : sourceDef.supertypes()) {
             addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
         }
-        return refineOnto(name, refined, constructor, parameters, Optional.of(sourceRef), transitiveSupertypes,
+        return refineOnto(name, refined, parameters, Optional.of(sourceRef), transitiveSupertypes,
                 sourceBody);
     }
 
@@ -1362,7 +1326,7 @@ final class DefinitionResolver {
      * own ancestors survive. Everything after that -- restating groups, tightening fields, the presence check,
      * the kind -- is one rule and lives here once.
      */
-    private TypeDefinition refineOnto(String name, RefinedDef refined, boolean constructor,
+    private TypeDefinition refineOnto(String name, RefinedDef refined,
             List<String> parameters, Optional<io.ltr8.tson.schema.meta.TypeRef> source,
             List<String> transitiveSupertypes, RecordBody sourceBody) {
         List<RecordField> fields = new ArrayList<>(sourceBody.fields());
@@ -1395,7 +1359,7 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups);
-        return new TypeDefinition(source, kind, parameters, constructor, transitiveSupertypes,
+        return new TypeDefinition(source, kind, parameters, transitiveSupertypes,
                 List.of(), Optional.empty(), body);
     }
 

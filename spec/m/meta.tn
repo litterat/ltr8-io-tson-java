@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/35/m/meta.tn?sha256=637b9b8cac1c8b8e4652af7946a91386da786895a4aae1b15c4a9242d3c4d641"
-!!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0bb89291b899258a0bbdf8e304782b7f6a33379076e3743d5f1c2faaf7cd0d7f"
-!!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0bb89291b899258a0bbdf8e304782b7f6a33379076e3743d5f1c2faaf7cd0d7f"
+!!id:"https://tson.io/2026/35/m/meta.tn?sha256=bae2658bbefd1e4ab9b996835d68f5bc8aaaca808c7a253d00398348937f0208"
+!!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=6991f932be2f61e8e6e59d7f45287e9c50f6c559c4c437163b6eeb1a01d1155f"
+!!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=6991f932be2f61e8e6e59d7f45287e9c50f6c559c4c437163b6eeb1a01d1155f"
 @doc:"""
   TSON meta-schema — 2026 Revision 35 draft.
 
@@ -163,7 +163,7 @@
 
     No spec pin: RFC 4648 governs spellings, not octets.
     """
-  bytes_type => ~atom & {
+  bytes_type => atom & {
     encoding:    bytes_encoding ~ BASE64
     length:      non_negative_integer?
     min_length:  non_negative_integer?
@@ -207,7 +207,7 @@
     application is not one, so a schema the resolver materialises can
     write it where it stands.
     """
-  scoped => ~sum & {
+  scoped => sum & {
     scope:    set<scope_kind>
     schemas:  {uri => [type_name; 1..]?; 1..}?
   }
@@ -255,7 +255,7 @@
     encoding that carries the format's bits delivers a grid value
     directly and rounds nothing.
     """
-  float_type => ~atom & atom_specification & {
+  float_type => atom & atom_specification & {
     spec:                 = "https://ieeexplore.ieee.org/document/8766229"
     format:               ieee_format
     ( min: value | exclusive_min: value )?
@@ -299,7 +299,7 @@
     every member inside the bounds and on the step, refinements only
     shrink the set.
     """
-  decimal_type => ~atom & {
+  decimal_type => atom & {
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
     multiple_of:      value?
@@ -318,7 +318,7 @@
     token: tokens are not normalized, so `"2/4"` and `"1/2"` satisfy
     the same constraints.
     """
-  rational_type => ~atom & {
+  rational_type => atom & {
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
     multiple_of:  value?
@@ -361,12 +361,12 @@
     components give an exact complex, `FLOAT32`/`FLOAT64` an approximate
     one — which is why `complex` carries no `@exact` marker of its own.
     """
-  complex_type => ~atom & {
+  complex_type => atom & {
     component:  complex_component ~ NUMBER
   }
 
   @doc:"Date constraint vocabulary. Instance is `date` in core."
-  date_type => ~atom & atom_specification & {
+  date_type => atom & atom_specification & {
     spec:  = "https://www.rfc-editor.org/rfc/rfc3339"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
@@ -385,7 +385,7 @@
     No timezone facet: RFC 3339 `full-time` already makes the offset
     mandatory.
     """
-  time_type => ~atom & atom_specification & {
+  time_type => atom & atom_specification & {
     spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
@@ -399,7 +399,7 @@
     No timezone facet: RFC 3339 `date-time` already makes the offset
     mandatory.
     """
-  datetime_type => ~atom & atom_specification & {
+  datetime_type => atom & atom_specification & {
     spec:       = "https://www.rfc-editor.org/rfc/rfc3339"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
@@ -449,7 +449,7 @@
     uniform rule: `PT15M` admits only quarter-hour values, and `-PT30M`
     is a multiple of `PT15M`.
     """
-  duration_type => ~atom & atom_specification & {
+  duration_type => atom & atom_specification & {
     spec:        = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
@@ -470,7 +470,7 @@
     not the token. `multiple_of` is a period under the header's
     uniform rule: `P3M` admits only whole quarters.
     """
-  period_type => ~atom & atom_specification & {
+  period_type => atom & atom_specification & {
     spec:        = "https://www.rfc-editor.org/rfc/rfc3339#appendix-A"
     ( min: value | exclusive_min: value )?
     ( max: value | exclusive_max: value )?
@@ -478,13 +478,13 @@
   }
 
   @doc:"UUID constraint vocabulary. Instance is `uuid` in core."
-  uuid_type => ~atom & atom_specification & {
+  uuid_type => atom & atom_specification & {
     spec:     = "https://www.rfc-editor.org/rfc/rfc9562"
     version:  non_negative_integer?
   }
 
   @doc:"Email constraint vocabulary. Instance is `email` in core."
-  email_type => ~text_type & atom_specification & {
+  email_type => text_type & atom_specification & {
     spec: = "https://www.rfc-editor.org/rfc/rfc5322"
   }
 
@@ -497,7 +497,7 @@
     network when the field is present, and inside no `excluding`
     network. `excluding` carves holes out of `within`.
     """
-  ipv4_type => ~atom & atom_specification & {
+  ipv4_type => atom & atom_specification & {
     spec:       = "https://www.rfc-editor.org/rfc/rfc3986"
     within:     [value]?
     excluding:  [value]?
@@ -509,7 +509,7 @@
     the address must lie inside at least one `within` network when
     the field is present, and inside no `excluding` network.
     """
-  ipv6_type => ~atom & atom_specification & {
+  ipv6_type => atom & atom_specification & {
     spec:       = "https://www.rfc-editor.org/rfc/rfc4291"
     within:     [value]?
     excluding:  [value]?
@@ -524,7 +524,7 @@
     value must not overlap any listed network — overlap, not
     containment, so a wider value cannot smuggle an excluded block.
     """
-  cidr4_type => ~atom & atom_specification & {
+  cidr4_type => atom & atom_specification & {
     spec:        = "https://www.rfc-editor.org/rfc/rfc4632"
     min_prefix:  non_negative_integer?
     max_prefix:  non_negative_integer?
@@ -539,7 +539,7 @@
     in CIDR text (quoted), with the semantics of `cidr4_type`:
     subnet-of for `within`, non-overlap for `excluding`.
     """
-  cidr6_type => ~atom & atom_specification & {
+  cidr6_type => atom & atom_specification & {
     spec:        = "https://www.rfc-editor.org/rfc/rfc4291"
     min_prefix:  non_negative_integer?
     max_prefix:  non_negative_integer?
@@ -553,7 +553,7 @@
     predicates and OUI (vendor) prefixes were considered and rejected
     as niche, and OUI is a living registry.
     """
-  mac_type => ~atom & atom_specification & {
+  mac_type => atom & atom_specification & {
     spec: = "https://www.rfc-editor.org/rfc/rfc9542"
   }
 

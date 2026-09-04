@@ -43,7 +43,7 @@ import java.util.Optional;
  * fails outright (see {@link IntegerSize}'s own Javadoc for the identical situation).
  */
 public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters,
-                              boolean constructor, List<String> supertypes, List<String> subtypes,
+                              List<String> supertypes, List<String> subtypes,
                               Optional<Boolean> disjoint, Top body, @Unbound Optional<SourcePosition> position,
                               Annotations annotations) {
 
@@ -59,22 +59,22 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
     }
 
     /** Same as the canonical constructor with no annotations -- every caller that has none to carry. */
-    public TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters, boolean constructor,
+    public TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters,
                            List<String> supertypes, List<String> subtypes, Optional<Boolean> disjoint, Top body,
                            Optional<SourcePosition> position) {
-        this(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body, position,
+        this(source, kind, parameters, supertypes, subtypes, disjoint, body, position,
                 Annotations.empty());
     }
 
     /** Same as the canonical constructor, {@code position} defaulted to absent -- every existing caller that doesn't know its own source position. */
-    public TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters, boolean constructor,
+    public TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters,
                            List<String> supertypes, List<String> subtypes, Optional<Boolean> disjoint, Top body) {
-        this(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body, Optional.empty());
+        this(source, kind, parameters, supertypes, subtypes, disjoint, body, Optional.empty());
     }
 
-    /** A fresh (non-constructor, no source/supertypes/parameters) PRODUCT definition -- {@code integer_size}'s own shape. */
+/** A fresh PRODUCT definition with no source, supertypes or parameters -- {@code integer_size}'s own shape. */
     public static TypeDefinition product(Top body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false, List.of(), List.of(),
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(), List.of(),
                 Optional.empty(), body);
     }
 
@@ -109,25 +109,25 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
      * because they answer different questions, not because either is missing the other's.
      */
     public static TypeDefinition reference(TypeRef target, List<String> parameters) {
-        return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, parameters, false, List.of(),
+        return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, parameters, List.of(),
                 List.of(), Optional.empty(), new Reference(target));
     }
 
     /** A copy of this definition with {@code body} replaced -- every other component unchanged. */
     public TypeDefinition withBody(Top body) {
-        return new TypeDefinition(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body,
+        return new TypeDefinition(source, kind, parameters, supertypes, subtypes, disjoint, body,
                 position, annotations);
     }
 
     /** A copy of this definition with {@code position} replaced -- every other component unchanged. */
     public TypeDefinition withPosition(Optional<SourcePosition> position) {
-        return new TypeDefinition(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body,
+        return new TypeDefinition(source, kind, parameters, supertypes, subtypes, disjoint, body,
                 position, annotations);
     }
 
     /** A copy of this definition with {@code annotations} replaced -- every other component unchanged. */
     public TypeDefinition withAnnotations(Annotations annotations) {
-        return new TypeDefinition(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body,
+        return new TypeDefinition(source, kind, parameters, supertypes, subtypes, disjoint, body,
                 position, annotations);
     }
 
@@ -138,7 +138,6 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
                 && Objects.equals(source, other.source)
                 && kind == other.kind
                 && Objects.equals(parameters, other.parameters)
-                && constructor == other.constructor
                 && Objects.equals(supertypes, other.supertypes)
                 && Objects.equals(subtypes, other.subtypes)
                 && Objects.equals(disjoint, other.disjoint)
@@ -148,6 +147,6 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
     /** Excludes {@code position} -- see this class's own Javadoc for why. */
     @Override
     public int hashCode() {
-        return Objects.hash(source, kind, parameters, constructor, supertypes, subtypes, disjoint, body);
+        return Objects.hash(source, kind, parameters, supertypes, subtypes, disjoint, body);
     }
 }

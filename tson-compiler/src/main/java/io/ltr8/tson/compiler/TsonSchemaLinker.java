@@ -118,6 +118,9 @@ public final class TsonSchemaLinker {
     /** meta.tn's {@code void}-targeted marker (§5.4), written bare -- presence is the assertion. */
     private static final String DISJOINT = "disjoint";
 
+    /** [TSON-SCHEMA] §4.1's structural root -- what an entry IS-A when it is a constructor. */
+    private static final String TOP = "top";
+
     private TsonSchemaLinker() {
     }
 
@@ -530,7 +533,10 @@ public final class TsonSchemaLinker {
                 }
             }
             TypeDefinition def = entry.getValue();
-            if (def.constructor()) {
+            // §2.2.2's meta-programming case, asked of the type system rather than of a marker: a constructor
+            // is an entry that IS-A `top` (§4.1), which is to say one composing, transitively, with a base
+            // kind. Only a schema chaining directly to the meta-kernel may declare one.
+            if (def.supertypes().contains(TOP)) {
                 if (constructorsAllowed == null) {
                     constructorsAllowed = isMetaKernelGoverned(schema);
                 }
@@ -539,8 +545,8 @@ public final class TsonSchemaLinker {
                     // here, so keeping it lets every reference to it check normally instead of turning one
                     // eligibility error into an unresolved reference at every use site.
                     report(receiver, schema, entry.getKey(), def, "'" + entry.getKey()
-                            + "' declares a type constructor "
-                            + "(the '~' marker), but '" + schema.id() + "' is not governed directly by the "
+                            + "' declares a type constructor -- it composes with a base kind, so it IS-A 'top' "
+                            + "(§4.1) -- but '" + schema.id() + "' is not governed directly by the "
                             + "meta-kernel (its own !!meta is '" + schema.meta() + "') -- only a schema chaining "
                             + "to meta-kernel.tn directly may declare new constructors (§2.2.2's "
                             + "meta-programming case); an ordinary type library or application schema may only "
@@ -843,7 +849,7 @@ public final class TsonSchemaLinker {
     private static TypeDefinition withAddedSubtypes(TypeDefinition def, Set<String> newSubtypes) {
         Set<String> combined = new LinkedHashSet<>(def.subtypes());
         combined.addAll(newSubtypes);
-        return new TypeDefinition(def.source(), def.kind(), def.parameters(), def.constructor(),
+        return new TypeDefinition(def.source(), def.kind(), def.parameters(),
                 def.supertypes(), List.copyOf(combined), def.disjoint(), def.body(), def.position(),
                 def.annotations());
     }
@@ -861,7 +867,7 @@ public final class TsonSchemaLinker {
             if (entry.getValue().body() instanceof ChoiceBody choice) {
                 TypeDefinition def = entry.getValue();
                 result.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
-                        def.constructor(), def.supertypes(), def.subtypes(),
+                        def.supertypes(), def.subtypes(),
                         Optional.of(ChoiceDisjointness.derive(choice, merged)), def.body(), def.position(),
                         def.annotations()));
             }

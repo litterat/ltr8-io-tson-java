@@ -5,8 +5,7 @@
   Parse the source schema, run the resolver, canonicalise, compare.
 
   Conventions:
-  - Fields at their default values are omitted (`constructor: false`,
-    `state: REQUIRED`).
+  - Fields at their default values are omitted (`state: REQUIRED`).
   - `type_definition.supertypes` and `subtypes` are complete and
     lexically sorted; a resolver's native ordering is
     implementation-defined, so comparison tools canonicalise both
@@ -137,7 +136,6 @@
     """
   unit => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [] }
   }
@@ -182,7 +180,6 @@
   @doc:"Integer constraint vocabulary. Its instance `integer` is the kernel's arbitrary-precision integer."
   integer_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: size           type: integer_size  state: OPTIONAL }
@@ -209,7 +206,6 @@
   @doc:"Text constraint vocabulary. Its instance `text` is the kernel's Unicode code point sequence type."
   text_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom top]
     subtypes: [regex_type uri_type]
     body: !record { supertypes: [atom]  fields: [
@@ -238,7 +234,6 @@
   @doc:"URI constraint vocabulary. Composes with `text_type` and the `atom_specification` mixin."
   uri_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
       !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
@@ -259,7 +254,6 @@
   @doc:"Regex constraint vocabulary. Same shape pattern as uri_type, pinned to I-Regexp."
   regex_type => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
       !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
@@ -403,7 +397,6 @@
   @doc:"Constructors — ~ marks type factories."
   record => !type_definition {
     kind: PRODUCT
-    constructor: true
     supertypes: [product top]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: NAMED }
@@ -416,7 +409,6 @@
 
   array => !type_definition {
     kind: PRODUCT
-    constructor: true
     supertypes: [product top]
     subtypes: [set_type]
     body: !record { supertypes: [product]  fields: [
@@ -433,7 +425,6 @@
 
   set_type => !type_definition {
     kind: PRODUCT
-    constructor: true
     source: array
     supertypes: [array product top]
     body: !record { fields: [
@@ -449,7 +440,6 @@
   }
   map => !type_definition {
     kind: PRODUCT
-    constructor: true
     supertypes: [product top]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: NAMED }
@@ -464,7 +454,6 @@
 
   tuple => !type_definition {
     kind: PRODUCT
-    constructor: true
     supertypes: [product top]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: INDEX }
@@ -496,7 +485,6 @@
 
   enum => !type_definition {
     kind: ATOM
-    constructor: true
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: members  type: enum_set }
@@ -505,7 +493,6 @@
 
   choice => !type_definition {
     kind: SUM
-    constructor: true
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
       !record_field { name: variants  type: array_type_ref_xxhash }
@@ -519,7 +506,6 @@
       !record_field { name: source       type: type_ref  state: OPTIONAL }
       !record_field { name: kind         type: type_kind }
       !record_field { name: parameters   type: array_param_name_xxhash  state: OPTIONAL }
-      !record_field { name: constructor  type: boolean  state: REQUIRED_DEFAULT  value: false }
       !record_field { name: supertypes   type: array_type_name_xxhash  state: OPTIONAL }
       !record_field { name: subtypes     type: array_type_name_xxhash  state: OPTIONAL }
       !record_field { name: disjoint     type: boolean  state: OPTIONAL }

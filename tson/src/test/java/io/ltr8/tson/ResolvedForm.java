@@ -78,7 +78,7 @@ final class ResolvedForm {
      */
     static TypeDefinition canonical(TypeDefinition definition) {
         return new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
-                definition.constructor(), definition.supertypes().stream().sorted().toList(),
+                definition.supertypes().stream().sorted().toList(),
                 definition.subtypes().stream().sorted().toList(), definition.disjoint(), definition.body(),
                 definition.position(), definition.annotations());
     }
@@ -94,7 +94,7 @@ final class ResolvedForm {
         // sides so this comparison stays about everything else the entry states, which both sides do agree on.
         TypeDefinition compared = definition.parameters().isEmpty() ? definition
                 : new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
-                        definition.constructor(), definition.supertypes(), definition.subtypes(),
+                        definition.supertypes(), definition.subtypes(),
                         definition.disjoint(), HELD_BODY_COMPARED_SEPARATELY, definition.position(),
                         definition.annotations());
         String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(compared)))

@@ -67,14 +67,14 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   `!!import` confusion, and core.tn declares no constructors to supply). The target half is judged only when
   the loader actually produced the target; an unresolvable `!!meta` is left to whoever owns fetching, which
   is also what keeps meta-kernel's self-naming `!!meta` linkable mid-registration. **The declaring half is a
-  lint, not a guard**: a `~` in a user schema is *inert*, because `constructor: true` is read in exactly one
-  place — resolving a `!C value` against the **governing meta's** entries — and the target half already
-  refuses to let a user-level schema be named as anyone's `!!meta`, on the same predicate. Nothing can chain
-  to it, so no `!xxx_type` can ever occupy a schema position, so the flag is never consulted. (In a *data*
+  lint, not a guard**: an entry that IS-A `top` in a user schema is *inert*, because applicability is read in
+  exactly one place — resolving a `!C value` against the **governing meta's** entries — and the target half
+  already refuses to let a user-level schema be named as anyone's `!!meta`, on the same predicate. Nothing
+  can chain to it, so no `!xxx_type` can ever occupy a schema position. (In a *data*
   document `!xxx_type { ... }` is an ordinary record annotation and reads fine, which is what makes §8
   resolver-output bodies like `!record { ... }` expressible at all.) Worth keeping anyway, at one comparison:
-  "you wrote something that can never do anything" is better said at the `~` than in whichever document later
-  tries to name the schema as its `!!meta`. In the shipped wiring
+  "you wrote something that can never do anything" is better said at the declaration than in whichever
+  document later tries to name the schema as its `!!meta`. In the shipped wiring
   `TsonCompiledMetaRegistry.loadMeta` reaches that verdict a phase earlier (it must *compile* the meta to
   resolve against it) and raises the linker's own `TsonSchemaLinker.notAMetaSchema` — one wording, one module,
   and a **`TsonSchemaValidationException` rather than an `IllegalStateException`**
@@ -182,7 +182,7 @@ sit at the schema layer because that is the only layer able to name request and 
   the constructor from the scoped vocabulary silently, so a governing meta compiled and registered looking
   healthy and the complaint landed against a *different* document: the first governed schema to apply it was
   told the meta-schema does not declare it, which is both false and unactionable. **This is now the only
-  route to an `ErrorReader` at all**: every `~`-marked constructor the kernel and meta.tn declare builds a
+  route to an `ErrorReader` at all**: every constructor the kernel and meta.tn declare builds a
   real reader, `scoped` having been the last, and `CoreSchemaImportTest` asserts that no entry of core.tn
   compiles to one.
 

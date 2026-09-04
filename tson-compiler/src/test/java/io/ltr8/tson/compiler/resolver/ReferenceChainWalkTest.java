@@ -42,7 +42,7 @@ class ReferenceChainWalkTest {
     }
 
     private static TypeDefinition reference(TypeRef target) {
-        return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, List.of(), false,
+        return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, List.of(), 
                 List.of(), List.of(), Optional.empty(), new Reference(target));
     }
 

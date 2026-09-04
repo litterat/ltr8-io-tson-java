@@ -48,13 +48,13 @@ class ChoiceUntaggedRecoveryTest {
     };
 
     private void variant(String name, TypeKind kind, Top body) {
-        entries.put(name, new TypeDefinition(Optional.empty(), kind, List.of(), false,
+        entries.put(name, new TypeDefinition(Optional.empty(), kind, List.of(), 
                 List.of(), List.of(), Optional.empty(), body));
     }
 
     private TsonTypeReader<?> choice(Optional<Boolean> disjoint, String... variants) {
         List<TypeRef> refs = List.of(variants).stream().map(TypeRef::of).toList();
-        TypeDefinition choiceDef = new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), false,
+        TypeDefinition choiceDef = new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), 
                 List.of(), List.of(), disjoint, new ChoiceBody(refs));
         entries.put("contact", choiceDef);
         ValueReaderContext context = new ValueReaderContext(

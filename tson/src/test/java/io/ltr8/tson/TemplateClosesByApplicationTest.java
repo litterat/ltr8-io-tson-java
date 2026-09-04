@@ -46,8 +46,8 @@ class TemplateClosesByApplicationTest {
                 !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
                 {
                   base       => {}
-                  my_bounded => <N> ~array ^ { max_items: = N }
-                  my_set     => <T> ~array ^ { element_type: = T  unordered: = true  unique_items: = true }
+                  my_bounded => <N> array ^ { max_items: = N }
+                  my_set     => <T> array ^ { element_type: = T  unordered: = true  unique_items: = true }
                   box        => <T> base & { value: T }
                   %s
                 }

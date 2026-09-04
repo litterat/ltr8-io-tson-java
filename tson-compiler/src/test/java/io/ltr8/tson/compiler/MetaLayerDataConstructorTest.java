@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>The wiring, in full, is three things</b> -- there is nothing else to register:
  * <ol>
  *   <li>a meta-layer schema chaining {@code !!meta} to meta-kernel and declaring
- *       {@code operation => ~data & { ... }} ({@link #META_HTTP_SCHEMA});</li>
+ *       {@code operation => data & { ... }} ({@link #META_HTTP_SCHEMA});</li>
  *   <li>a Java class carrying {@code @Typename(name = "operation")} and implementing {@link Data}
  *       ({@link Operation});</li>
  *   <li>a {@link DataBindContext} whose {@link DataNameBinder} can find that class
@@ -63,13 +63,13 @@ class MetaLayerDataConstructorTest {
             !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
             !!import:"https://tson.io/2026/35/m/meta.tn"
             {
-              operation => ~data & {
+              operation => data & {
                 path:     text
                 method:   text
                 request:  type_ref
                 response: type_ref
               }
-              webhook => ~data & {
+              webhook => data & {
                 path:     text
                 delivers: [type_ref]?
               }
@@ -147,35 +147,10 @@ class MetaLayerDataConstructorTest {
                 core(consumerContext()).resolveLinked(META_HTTP).schema().entries().get("operation");
 
         assertEquals(TypeKind.DATA, operation.kind());
-        assertTrue(operation.constructor(), "the `~` marker, which is what §4.2's level discipline reads");
+        assertTrue(operation.supertypes().contains("top"), "a constructor: IS-A top, via the base kind");
         assertEquals(List.of("data", "top"), operation.supertypes(),
                 "the transitive chain -- `data` is itself `top & {}` -- and IS-A `top` is what makes"
                         + " `!operation { ... }` applicable");
-    }
-
-    /**
-     * <b>Applicability is IS-A {@code top} (§4.1), not the {@code ~} marker.</b> Dropping the marker leaves
-     * {@code operation => data & { ... }} still composing with a base kind, so it still IS-A {@code top} and
-     * a governed schema may still write {@code !operation { ... }}.
-     *
-     * <p>The marker has not become meaningless -- it is what §4.2's level discipline reads, and what
-     * {@code atom_specification}-style mixins are told apart from -- but it is not the permission to apply.
-     * Making it the permission is what left {@code reference} needing a by-name exception, and left one
-     * construction legal open and illegal closed.
-     */
-    @Test
-    void applicabilityIsIsATopRatherThanTheMarker() {
-        DOCUMENTS.put(META_HTTP, META_HTTP_SCHEMA.replace("operation => ~data &", "operation => data &"));
-        try {
-            TypeDefinition operation = core(consumerContext()).resolveLinked(META_HTTP).schema()
-                    .entries().get("operation");
-            assertFalse(operation.constructor(), "the marker is gone");
-            assertEquals(List.of("data", "top"), operation.supertypes(), "and IS-A top is not");
-
-            assertNotNull(linked("notilde", SEARCH), "so the governed schema still applies it");
-        } finally {
-            DOCUMENTS.put(META_HTTP, META_HTTP_SCHEMA);
-        }
     }
 
     /**

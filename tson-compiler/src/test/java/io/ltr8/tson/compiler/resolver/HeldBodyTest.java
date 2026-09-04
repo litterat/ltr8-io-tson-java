@@ -32,7 +32,7 @@ class HeldBodyTest {
 
     /** {@code box => <T> !<head> {}} -- the smallest held application that differs by its constructor. */
     private static TypeDefinition template(String head) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("T"), false, List.of(),
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of("T"),  List.of(),
                 List.of(), Optional.empty(),
                 new HeldBody(new DataValue(List.of(), Optional.of(head), new RecordValue(List.of()))));
     }

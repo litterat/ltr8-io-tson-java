@@ -23,7 +23,7 @@ class TsonSchemaRegistryTest {
 
     private static TsonSchema schemaWithARecordField() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("token", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(),
+        entries.put("token", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(),  List.of(),
                 List.of(), Optional.empty(), new Unit()));
         entries.put("set_token", TypeDefinition.product(RecordBody.of(List.of())));
         entries.put("container", TypeDefinition.product(RecordBody.of(List.of(

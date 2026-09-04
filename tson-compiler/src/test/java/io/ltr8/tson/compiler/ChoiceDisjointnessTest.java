@@ -45,13 +45,13 @@ class ChoiceDisjointnessTest {
     private final Map<String, TypeDefinition> namespace = new LinkedHashMap<>();
 
     private TypeRef atom(String name, Top body, String... supertypes) {
-        namespace.put(name, new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false,
+        namespace.put(name, new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), 
                 List.of(supertypes), List.of(), Optional.empty(), body));
         return TypeRef.of(name);
     }
 
     private TypeRef product(String name, Top body) {
-        namespace.put(name, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), false,
+        namespace.put(name, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), 
                 List.of(), List.of(), Optional.empty(), body));
         return TypeRef.of(name);
     }
@@ -237,7 +237,7 @@ class ChoiceDisjointnessTest {
     void aNestedChoiceVariantMakesTheChoiceNotDisjoint() {
         atom("integer", IntegerType.UNCONSTRAINED);
         atom("text", TextType.UNCONSTRAINED);
-        namespace.put("inner", new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), false,
+        namespace.put("inner", new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), 
                 List.of(), List.of(), Optional.empty(),
                 new ChoiceBody(List.of(TypeRef.of("integer"), TypeRef.of("text")))));
         TypeRef record = product("point", RecordBody.of(List.of()));

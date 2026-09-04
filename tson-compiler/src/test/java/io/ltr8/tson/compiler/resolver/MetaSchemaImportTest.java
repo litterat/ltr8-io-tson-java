@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * (resolved via {@link SchemaResolver#resolveSchema}, mirroring the now-deleted {@code MetaTn1Parser}'s
  * own bootstrap steps -- see {@link #parseMetaTn1}), and confirm meta-kernel's names (e.g. {@code
  * atom}, {@code text_type}) are visible and correctly referenced from meta.tn's own
- * composition-based declarations (e.g. {@code date_type => ~atom & atom_specification & {...}}).
+ * composition-based declarations (e.g. {@code date_type => atom & atom_specification & {...}}).
  *
  * <p><b>meta.tn now registers in full, all 31 declarations</b> (2026-07-24, once {@code
  * SchemaResolver} gained generic {@code Instance} resolution -- Phase B step 4) -- previously 4 of

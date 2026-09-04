@@ -166,7 +166,7 @@ final class SchemaDesugarer {
      * is what lets that path delete.
      */
     private static TypeDef absorbed(SchemaMap.Declaration declaration) {
-        return new StructuralTypeDef(typeParams(declaration.typeDef()), false, new RecordDef(List.of()));
+        return new StructuralTypeDef(typeParams(declaration.typeDef()), new RecordDef(List.of()));
     }
 
     /**
@@ -372,7 +372,7 @@ final class SchemaDesugarer {
                     yield instance(recordBinding(record), structural.typeParams());
                 }
                 yield body == structural.body() ? structural
-                        : new StructuralTypeDef(structural.typeParams(), structural.constructor(), body);
+                        : new StructuralTypeDef(structural.typeParams(), body);
             }
             // A declaration's own body reference names what this declaration *is*; only its arguments are
             // expandable, so the head stays put and its own handling is unchanged.
