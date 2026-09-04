@@ -63,6 +63,26 @@ are kept in step deliberately.
   restating a field group in a refinement or composition body (§5.11 — same member labels in the same order,
   types verbatim, state tightening OPTIONAL→REQUIRED only; only the *group's* state moves, since members
   flatten as `OPTIONAL` regardless).
+- **A template closes by application, never by construction**, and naming one at a construction site is an
+  author error (`DefinitionResolver.resolveInstance`). `C<...>` substitutes a template's parameters away
+  (§5.10); `!C { ... }` fills a *constructor's* own vocabulary (§4.2). Different operations, and the check
+  is on being a template — having parameters — not on carrying `~`, so an unmarked §5.10 template gets the
+  same advice instead of the "did you mean atom refinement?" hint, which cannot help when what is missing is
+  the argument list. **This is why the `RecordBody` check below it is genuinely unreachable**: its own
+  comment used to claim so and was wrong, because an *open* declaration holds its body (`holdIfOpen`) and a
+  parameterised `~` declaration is exactly one — so `!my_set { … }` reached an `IllegalStateException`,
+  which is this project's spelling of *an internal invariant broke*, and the CLI reported an author's schema
+  mistake as a library fault at exit 70. `TemplateClosesByApplicationTest` pins all of it.
+- **§4.2's value-route-only rule is enforced where the argument lands, not at the declaration.** A `~`
+  declaration's parameter routed into a *vocabulary slot* typed `type_ref` — `my_set => <T> ~array ^ {
+  element_type: = T }` — is refused when it closes, by §5.2's rule that a fixed value is available on a
+  field typed by an atom or an enum and nowhere else; the legal value-routed form (`max_items: = N`, an
+  atom-typed slot) closes normally. What is **not** checked is the channel §5.2 never sees, a parameter
+  standing as a *field type* or a *variant*: `<T> ~base & { value: T }` resolves and closes cleanly here.
+  §4.2 calls that a resolver error at the declaration and its stated reason — that a type-channel parameter
+  "could close only by rewriting the body — the materialisation constructors never get" — does not hold in
+  this implementation, where §5.10 materialisation rewrites held bodies and closes it. `BACKLOG.md` carries
+  the gap.
 - **All six of §5.2's field-state spellings resolve**, including `field: type? = _` — `OPTIONAL_FIXED`
   carrying *no* value, so §8.1 writes a `record_field` without a `value` member and the field must be
   omitted or written `_`. Its three resolver errors are enforced: `~ _` on any field, `= _` on a REQUIRED
