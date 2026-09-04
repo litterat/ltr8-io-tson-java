@@ -95,17 +95,18 @@ are kept in step deliberately.
   as its source. The closed path dispatches on the *body* being a `Reference`, having already read it;
   `resolveInstanceTemplate` holds its body unread and so still needs the head's name — which is the whole of
   what its `alias` flag is now for, the eligibility half having gone.
-  **Two readers of `constructor` went with it**, both replaced by a question the shape answers. Atom
-  refinement asks whether the source's body **IS-A `Atom`** — the sealed family of atom value bodies, and the
-  interface whose `narrows` the refinement goes on to call — which is §5.5's own question of whether there is
-  a value to narrow: an instance passes (`integer` carries an `IntegerType`, `void` a `Unit`) and the family's
-  constructor does not, carrying the vocabulary as a record. That is *one* test where there were two, and
-  neither of the old ones could have been it alone: `integer_type => ~atom & { … }` is ATOM-kinded like its
-  instances, so kind cannot separate them, and the marker answers a different question. The construction hint
-  in the refusal is offered only where construction would work — an applicable vocabulary — so `!top ^ { … }`
-  gets the plain answer rather than advice that would fail in turn. And the governed-compile factory lookup
-  asks IS-A `top`, so a construction that resolved reaches a factory rather than failing "out of scope" on a
-  narrower test.
+  **Two readers of `constructor` went with it**, both restated in the type system's own terms. Atom
+  refinement asks §5.5's question — *is this an atom instance?* — as **ATOM-kinded and not itself applicable**,
+  which is exactly what an instance is: §4.1's "IS-A does not extend below construction" is what separates the
+  pair, `!T {}` transferring kind and not supertypes, so `integer` carries an empty chain where
+  `integer_type => ~atom & { … }` carries `[atom, top]`.
+  **Both halves are needed, and the obvious single test runs backwards.** IS-A `atom` is true of the
+  *constructor* and false of every instance — measured, it disagrees with the truth on 103 of the 211 bundled
+  entries, selecting precisely the wrong side — while kind alone cannot separate them either, an atom
+  constructor being ATOM-kinded exactly like its instances. Together they agree on all 211. The construction
+  hint in the refusal rides on the same applicability question, so `!top ^ { … }` gets the plain answer rather
+  than advice that would fail in turn. And the governed-compile factory lookup asks IS-A `top`, so a
+  construction that resolved reaches a factory rather than failing "out of scope" on a narrower test.
   **The marker keeps its other jobs** — §4.2's level discipline reads it, and §8.1 records it —
   and `SPEC-FEEDBACK.md` #36 asks §3.3.1 to state applicability this way.
   `ApplicabilityIsIsATopTest` pins it.
