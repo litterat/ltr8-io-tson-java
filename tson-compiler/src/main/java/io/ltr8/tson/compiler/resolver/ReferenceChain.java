@@ -7,6 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Following a chain of {@code REFERENCE} entries to the type at the end of it -- [TSON-SCHEMA] §8.3's walk,
@@ -45,12 +46,20 @@ public final class ReferenceChain {
      * the name the walk stopped at when it cannot reach a type (see this class's own note).
      */
     public static String terminal(String name, Map<String, TypeDefinition> entries) {
+        return terminal(name, entries::get);
+    }
+
+    /**
+     * The same walk over a namespace still being built, which has a lookup rather than a finished map --
+     * {@code TemplateMaterialiser} normalises an application's arguments through this while resolution runs.
+     */
+    public static String terminal(String name, Function<String, TypeDefinition> entries) {
         return walk(name, entries).name();
     }
 
     /** The entry at the end of {@code name}'s chain, or empty where the walk reaches no type. */
     public static Optional<TypeDefinition> terminalDefinition(String name, Map<String, TypeDefinition> entries) {
-        Stop stop = walk(name, entries);
+        Stop stop = walk(name, entries::get);
         return stop.reached() ? Optional.ofNullable(entries.get(stop.name())) : Optional.empty();
     }
 
@@ -58,11 +67,11 @@ public final class ReferenceChain {
     private record Stop(String name, boolean reached) {
     }
 
-    private static Stop walk(String name, Map<String, TypeDefinition> entries) {
+    private static Stop walk(String name, Function<String, TypeDefinition> entries) {
         Set<String> walked = new LinkedHashSet<>();
         String current = name;
         while (walked.add(current)) {
-            TypeDefinition definition = entries.get(current);
+            TypeDefinition definition = entries.apply(current);
             if (definition == null) {
                 return new Stop(current, false);
             }

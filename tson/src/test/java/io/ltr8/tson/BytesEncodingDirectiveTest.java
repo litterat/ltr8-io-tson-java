@@ -199,6 +199,45 @@ class BytesEncodingDirectiveTest {
     }
 
     /**
+     * <b>A known-wrong case, asserted so it is visible rather than latent</b> (`SPEC-FEEDBACK.md` #32).
+     *
+     * <p>§8.2 dereferences a pure rename in an application's arguments, so {@code box<digest_alias>} and
+     * {@code box<bytes>} are one entry -- correct for a rename, and {@code digest_alias} is not one: values
+     * at its positions are spelled in hex, so it is not interchangeable with {@code bytes} the way the
+     * dereference assumes. The directive is lost through the application, and {@code "deadbeef"} reads as six
+     * base64 octets rather than four hex ones.
+     *
+     * <p>Accepted rather than special-cased: the fix is to decide what a directive on a reference means at
+     * all -- whether such an entry is a rename, or must be spelled {@code !bytes ^ {}} and be a type -- not
+     * to make identity guess at it. Every other position in this class reads it correctly; only an
+     * application argument does not.
+     */
+    @Test
+    void aDirectiveIsLostThroughATemplateApplication() {
+        Tson tson = Tson.builder().build();
+        String id = "https://example.test/bytes-through-application.tn";
+        tson.resolve("""
+                !!id:"%s"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
+                {
+                  @bytes_encoding:HEX
+                  digest_alias => bytes
+                  box => <T> { value: T }
+                  boxed => box<digest_alias>
+                  holder => { b: boxed }
+                }
+                """.formatted(id));
+
+        byte[] read = tson.treeReader().withSchema(id)
+                .readAs("!holder { b: { value: \"deadbeef\" } }", "holder")
+                .at("/b/value").as(byte[].class).orElseThrow();
+
+        assertEquals(6, read.length, "six base64 octets -- the directive did not survive the application");
+        assertArrayEquals(HexFormat.of().parseHex("75e69d6de79f"), read);
+    }
+
+    /**
      * Nothing is copied to the use site to make this work. The field names the alias, the alias keeps its own
      * annotations, and the directive is applied where the alias is compiled -- so resolved output carries one
      * statement of the fact rather than a copy of it at every position that reaches the type.

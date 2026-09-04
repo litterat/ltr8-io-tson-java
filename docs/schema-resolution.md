@@ -299,6 +299,17 @@ silently skip a reference rather than fail.
 §5.10's other half: closing a template application by substituting its arguments into the template's
 recorded open form, and replacing the application with a reference to the entry that results.
 
+- **An application's arguments are dereferenced before it is closed** (`dereferenced`). A reference is a pure
+  rename — §7.2 compares "after reference flattening of both", so `user_id => uuid` makes the two
+  interchangeable at every position — which means `box<user_id>` *is* `box<uuid>` and must be one entry.
+  Without it the model said the arguments were the same type while the applications were not: interchangeable
+  at a scalar position, refused one layer of application up. **Only a reference is dereferenced**; a refinement
+  (`!uuid ^ {}`, IS-A `uuid`) and a fresh instance (`!uuid_type {}`, related to neither) are ordinary entries
+  and keep their own applications, which is what makes those two spellings mean something. **Identity is
+  normalised, not provenance**: the minted `source` becomes the canonical application, and the name the author
+  wrote survives at the use site, which states it as written — a division that only became available once
+  flattening stopped rewriting use sites. Known wrong for a reference carrying `@bytes_encoding`, which is not
+  a pure rename (`SPEC-FEEDBACK.md` #32); `AliasedArgumentIdentityTest` pins the rest.
 - **It runs over the resolved form, not the AST**, as a pass in `SchemaResolver` after the driving loop.
   Two reasons. An application arrives here as a `schema.meta.TypeRef` carrying `arguments` — the one thing
   that shape means, since a closed form is always an entry named by a bare reference — so substitution is a

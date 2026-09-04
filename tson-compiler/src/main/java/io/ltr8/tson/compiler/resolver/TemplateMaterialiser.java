@@ -280,11 +280,44 @@ final class TemplateMaterialiser {
         List<TypeArgument> arguments = new ArrayList<>();
         for (TypeArgument argument : ref.arguments()) {
             arguments.add(argument instanceof TypeArgument.Ref nested
-                    ? new TypeArgument.Ref(close(nested.ref()))
+                    ? new TypeArgument.Ref(dereferenced(close(nested.ref())))
                     : argument);
         }
         String entry = instantiate(ref.name(), arguments);
         return entry == null ? new TypeRef(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
+    }
+
+    /**
+     * A type argument named by its own type rather than by a name for it: a bare reference is replaced with
+     * the entry at the end of its chain.
+     *
+     * <p><b>Because a reference is a pure rename, and an application of one denotes the same type.</b>
+     * {@code user_id => uuid} makes {@code user_id} and {@code uuid} interchangeable at every position (§7.2
+     * compares "after reference flattening of both"), so {@code box<user_id>} and {@code box<uuid>} are one
+     * type and must be one entry. Without this they were two, which left the model saying the arguments were
+     * the same type while the applications were not -- interchangeable at a scalar position and refused one
+     * layer of application up.
+     *
+     * <p><b>An author who wants two boxes told apart has two spellings that say so</b>, and this is what
+     * makes them mean something: {@code user_id => !uuid ^ {}} is a refinement, IS-A {@code uuid} and not its
+     * siblings, and {@code user_id => !uuid_type {}} is a fresh type related to neither. Both are ordinary
+     * entries rather than references, so neither is dereferenced here.
+     *
+     * <p><b>What this normalises is identity, not provenance.</b> The minted entry's {@code source} becomes
+     * the canonical application, and the name the author wrote survives where they wrote it -- at the use
+     * site, which states it as written. The two facts have one home each.
+     *
+     * <p><b>Known wrong for a reference carrying {@code @bytes_encoding}</b> (`SPEC-FEEDBACK.md` #32): such
+     * an alias is not a pure rename -- values at its positions are spelled in another alphabet -- so
+     * dereferencing it loses the directive. It is accepted here rather than special-cased, because the fix
+     * is to decide what a directive on a reference means at all, not to make identity guess.
+     */
+    private TypeRef dereferenced(TypeRef ref) {
+        if (!ref.arguments().isEmpty()) {
+            return ref; // an application, already closed above to the entry it denotes
+        }
+        String terminal = ReferenceChain.terminal(ref.name(), namespace::getTypeDefinition);
+        return terminal.equals(ref.name()) ? ref : new TypeRef(terminal, ref.arguments(), ref.annotations());
     }
 
     /**
