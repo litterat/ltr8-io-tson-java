@@ -90,8 +90,11 @@ public final class TsonSchemaCompiler {
         if (inherited != null) {
             return inherited;
         }
+        // Applicable is IS-A `top` (§4.1) -- the same predicate the resolver's own gate and the meta-schema's
+        // head table ask, so a construction that resolved reaches a factory lookup here rather than falling
+        // through to "out of scope" on a narrower question.
         TypeDefinition own = schema.entries().get(constructorName);
-        if (own != null && own.constructor()) {
+        if (own != null && own.supertypes().contains("top")) {
             return governingMeta.globalResolver().resolve(constructorName);
         }
         throw new IllegalStateException("constructor '" + constructorName + "' is out of scope: not in the "

@@ -1103,9 +1103,11 @@ class DefinitionResolverTest {
 
     @Test
     void atomRefinementRejectsRefiningAConstructorInsteadOfAnInstance() {
-        // integer_type itself is a constructor (constructor: true) -- refining it directly
-        // ("!integer_type ^ {...}") is a resolver error; the diagnostic should point at
-        // constructor application instead (§3.3.1).
+        // integer_type is the integer family's *constructor*, so its body is the family's constraint
+        // vocabulary where an instance's body is a bound value ("integer" carries an IntegerType). Refining
+        // it directly ("!integer_type ^ {...}") is a resolver error -- there is no value here to narrow --
+        // and the diagnostic points at constructor application instead (§5.5). Told apart by the body shape
+        // rather than by the `~` marker, which answers a different question.
         Map<String, TypeDefinition> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
@@ -1114,7 +1116,8 @@ class DefinitionResolverTest {
 
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
-        assertTrue(thrown.getMessage().contains("refines a constructor, not an instance"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("refines a constraint vocabulary, not an instance"),
+                thrown.getMessage());
     }
 
     @Test

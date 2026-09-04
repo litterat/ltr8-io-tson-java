@@ -95,6 +95,11 @@ are kept in step deliberately.
   as its source. The closed path dispatches on the *body* being a `Reference`, having already read it;
   `resolveInstanceTemplate` holds its body unread and so still needs the head's name — which is the whole of
   what its `alias` flag is now for, the eligibility half having gone.
+  **Two readers of `constructor` went with it**, both replaced by a question about shape rather than about
+  the marker: atom refinement asks whether the source's body is a vocabulary (an atom *instance* carries its
+  bound value — `IntegerType`, `Unit` — where the family's constructor carries a record), which is §5.5's own
+  question of whether there is a value to narrow; and the governed-compile factory lookup asks IS-A `top`, so
+  a construction that resolved reaches a factory rather than failing "out of scope" on a narrower test.
   **The marker keeps its other jobs** — §4.2's level discipline reads it, and §8.1 records it —
   and `SPEC-FEEDBACK.md` #36 asks §3.3.1 to state applicability this way.
   `ApplicabilityIsIsATopTest` pins it.

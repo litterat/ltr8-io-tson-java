@@ -738,14 +738,20 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
                     + "' does not resolve against the type-name namespace (§3.3.1)");
         }
-        if (source.constructor()) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' refines a "
-                    + "constructor, not an instance (§3.3.1) -- did you mean constructor application ('!"
-                    + sourceName + " { ... }')?");
-        }
         if (source.kind() != TypeKind.ATOM) {
             throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
                     + "' is not an atom-family instance (§5.5), kind=" + source.kind());
+        }
+        // An atom *instance* carries its bound value as its body (`IntegerType`, `TextType`, `Unit`); an atom
+        // *constructor* carries the family's vocabulary as a record. So the body shape is what tells them
+        // apart, and it asks the question §5.5 actually poses -- is there a value here to narrow? -- rather
+        // than reading the `~` marker, which answers a different one. The kind check runs first so a record
+        // or a choice is told what it is, instead of being offered construction it does not admit.
+        if (source.body() instanceof RecordBody) {
+            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' refines a "
+                    + "constraint vocabulary, not an instance (§5.5) -- '" + sourceName + "' is the family's "
+                    + "constructor, and '^' narrows one of its instances. Did you mean constructor "
+                    + "application ('!" + sourceName + " { ... }')?");
         }
         // Not an author error, unlike the three checks above: an atom-family instance always records the
         // constructor it came from, so one that doesn't is a malformed TypeDefinition, not a schema anyone
