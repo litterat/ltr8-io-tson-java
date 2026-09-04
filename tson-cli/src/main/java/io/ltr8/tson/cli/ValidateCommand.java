@@ -78,7 +78,7 @@ final class ValidateCommand {
         // at link time and the data documents' names at read time alike -- it is one processor, and a flag
         // that reached only one of the two ends would be a trap.
         Tson tson = policies.applyTo(Tson.builder().schemaSource(source)).build();
-        CliPolicy policy = CliPolicy.from(tson.processorPolicy());
+        CliPolicy policy = CliPolicy.from(tson.processorPolicy(), tson.limitsPolicy());
 
         for (ValidateInput input : inputs) {
             // Standard input is a data document by definition -- classification opens the document a second

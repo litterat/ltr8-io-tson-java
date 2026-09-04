@@ -45,7 +45,7 @@ public final class TsonCli {
               init-example [<dir>]                 write an example schema + data file to try
               validate [<options>] <file|->...     validate data documents against the schemas they name
               compile [<options>] <schema>         check that a schema document resolves and compiles
-              policy [<options>]                   print the Unicode policy this run would apply
+              policy [<options>]                   print the Unicode policy and limits this run would apply
               hash <file>                          stamp a document's content hash onto its own !!id
 
             options:
@@ -64,8 +64,9 @@ public final class TsonCli {
      * is stated once -- a second copy is a second thing to keep true.
      */
     private static final String POLICY_OPTIONS = """
-            policy options -- [TSON-DATA] §8.2 name hygiene, which is what decides whether a name is
-            refused here but accepted elsewhere. Every report states what it was judged under.
+            policy options -- what decides whether a document is refused here but accepted elsewhere:
+            [TSON-DATA] §8.2 name hygiene, and §9.1's resource limits. Every report states what it was
+            judged under.
               --identifier-policy <level>   level for identifiers (default: highly-restrictive)
               --identifier-per-segment      apply it per _/- segment rather than the whole identifier,
                                             which admits url_адрес while still refusing id_pаy
@@ -75,6 +76,9 @@ public final class TsonCli {
               --token-scripts <A+B>         the same for values; on its own it raises the token level to
                                             single-script, a list of combinations being no configuration
                                             at all under a level that scans nothing (repeatable)
+              --max-depth <n>               how deeply a document may nest before this refuses to read it
+                                            (default: 64). A refusal is not a verdict: the document may be
+                                            read in full by a processor configured for more.
 
             <level> is a UTS #39 §5.2 restriction level: ascii-only, single-script, highly-restrictive,
             moderately-restrictive, minimally-restrictive, unrestricted. The spelling `tson policy` prints
@@ -275,6 +279,14 @@ public final class TsonCli {
      * portable-sensitive about a refusal -- that another deployment may accept the same document -- is
      * carried by the diagnostic's own code and by the run's own {@link CliPolicy}.
      * {@code SPEC-FEEDBACK.md} #14 proposes §8.2 stop asking for the separate channel.
+     *
+     * <p><b>A [TSON-DATA] §9.1 limit refusal is also 1, and it is the one place an {@link
+     * Outcome#NOT_CHECKED} run exits 1.</b> Everywhere else the two agree, because everywhere else a
+     * non-verdict means nobody present can act. Here the runner can: {@code --max-depth} is a flag, and a
+     * smaller document is theirs to send. The envelope still says {@code NOT_CHECKED}, which is the truth
+     * about the document -- it was not read -- and the exit code still answers what to do now, which is the
+     * question it has always answered. A consumer that needs the first question routes on {@code outcome} or
+     * on {@link Diagnostic.Code#verdict()}, both of which say so.
      *
      * <p><b>78 rather than 70 for a bind mismatch</b>, because {@code EX_CONFIG} is "found in an
      * unconfigured or misconfigured state" and unconfigured is what this is: no class is registered for a

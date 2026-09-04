@@ -1,6 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.TsonConfig;
+import io.ltr8.tson.compiler.TsonLimitsPolicy;
 import io.ltr8.tson.compiler.TsonUnicodePolicy;
 
 import java.lang.Character.UnicodeScript;
@@ -22,15 +23,16 @@ import java.util.Locale;
  * <p><b>Every flag is consumed here and nowhere else</b> ({@link #consume}), which is what lets the three
  * subcommands' own argument loops go on seeing only {@code --output} and their positionals.
  */
-record PolicyOptions(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy tokenPolicy) {
+record PolicyOptions(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy tokenPolicy,
+                     TsonLimitsPolicy limits) {
 
     /**
      * What {@code TsonConfig} applies to a run that configures nothing, restated here because this is where
      * the CLI decides whether a report is worth printing to a person ({@link CliPolicy#isDefault()}).
      * {@code PolicyOptionsTest} pins the restatement against a real {@code Tson}.
      */
-    static final PolicyOptions DEFAULTS =
-            new PolicyOptions(TsonUnicodePolicy.highlyRestrictive(), TsonUnicodePolicy.unrestricted());
+    static final PolicyOptions DEFAULTS = new PolicyOptions(TsonUnicodePolicy.highlyRestrictive(),
+            TsonUnicodePolicy.unrestricted(), TsonLimitsPolicy.defaults());
 
     /**
      * The level a script list brings with it on a surface whose default scans nothing.
@@ -45,7 +47,7 @@ record PolicyOptions(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy token
 
     /** This run's policies on a fresh {@link TsonConfig}. */
     TsonConfig applyTo(TsonConfig config) {
-        return config.identifierPolicy(identifierPolicy).tokenPolicy(tokenPolicy);
+        return config.identifierPolicy(identifierPolicy).tokenPolicy(tokenPolicy).limits(limits);
     }
 
     /**
@@ -61,6 +63,7 @@ record PolicyOptions(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy token
     static PolicyOptions consume(List<String> args) {
         TsonUnicodePolicy.Level identifierLevel = null;
         TsonUnicodePolicy.Level tokenLevel = null;
+        int maxDepth = TsonLimitsPolicy.DEFAULT_MAX_DEPTH;
         boolean perSegment = false;
         List<UnicodeScript[]> identifierScripts = new ArrayList<>();
         List<UnicodeScript[]> tokenScripts = new ArrayList<>();
@@ -74,6 +77,7 @@ record PolicyOptions(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy token
                 case "--identifier-scripts" ->
                         identifierScripts.add(scripts(value(args, ++i, "--identifier-scripts")));
                 case "--token-scripts" -> tokenScripts.add(scripts(value(args, ++i, "--token-scripts")));
+                case "--max-depth" -> maxDepth = depth(value(args, ++i, "--max-depth"));
                 default -> rest.add(args.get(i));
             }
         }
@@ -83,7 +87,29 @@ record PolicyOptions(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy token
         return new PolicyOptions(
                 assemble("identifier", identifierLevel, DEFAULTS.identifierPolicy().level(), perSegment,
                         identifierScripts),
-                assemble("token", tokenLevel, DEFAULTS.tokenPolicy().level(), false, tokenScripts));
+                assemble("token", tokenLevel, DEFAULTS.tokenPolicy().level(), false, tokenScripts),
+                new TsonLimitsPolicy(maxDepth));
+    }
+
+    /**
+     * A [TSON-DATA] §9.1 nesting-depth bound, as a positive integer.
+     *
+     * <p>Refused where it is not one, rather than clamped: a caller who wrote {@code --max-depth 0} meant
+     * something, and reading a document under a bound they did not ask for is the one outcome that leaves
+     * them unable to explain the result. The library refuses the same value for the same reason.
+     */
+    private static int depth(String value) {
+        int depth;
+        try {
+            depth = Integer.parseInt(value.strip());
+        } catch (NumberFormatException e) {
+            throw new UsageException("--max-depth needs a whole number, not '" + value + "'");
+        }
+        if (depth < 1) {
+            throw new UsageException("--max-depth must be at least 1, not " + depth
+                    + " -- a document has to be allowed at least one container to be read at all");
+        }
+        return depth;
     }
 
     /**

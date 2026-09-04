@@ -2,6 +2,7 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.compiler.Diagnostic;
 
+import io.ltr8.tson.compiler.TsonLimitsPolicy;
 import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -320,6 +321,7 @@ class TsonCliTest {
         assertTrue(text.contains("identifier policy: HIGHLY_RESTRICTIVE"), text);
         assertTrue(text.contains("token policy:      UNRESTRICTED"), text);
         assertTrue(text.contains("unicode data:      " + TsonUnicodePolicy.dataVersion()), text);
+        assertTrue(text.contains("max depth:         " + TsonLimitsPolicy.DEFAULT_MAX_DEPTH), text);
 
         String json = captureStdout(() ->
                 assertEquals(0, TsonCli.run(new String[] {"policy", "--output", "json"})));
@@ -377,6 +379,60 @@ class TsonCliTest {
                 "--identifier-scripts", "Latin+Cyrillic", data.toString()})));
         assertTrue(admitted.contains("OK"), admitted);
         assertTrue(admitted.contains("note: judged under identifier policy SINGLE_SCRIPT"), admitted);
+    }
+
+    /**
+     * <b>[TSON-DATA] §9.1's depth limit through the command line</b> -- 6000 nested containers, about 10 KB,
+     * which used to exhaust the Java stack inside the reader and escape as a {@link StackOverflowError}: an
+     * {@link Error}, so it passed through every {@code catch (RuntimeException)} here and printed a bare JVM
+     * stack trace to stderr, nothing to stdout, and exited 1. Exit 1 is still the answer, and now it is one
+     * the run actually made: the report is on stdout, the code is {@code LIMIT_EXCEEDED}, and the outcome is
+     * {@code NOT_CHECKED} because the document was not read.
+     *
+     * <p>The refusal note is the §8.2 one, and belongs here for the same reason: what refused the document is
+     * this deployment's configuration, and {@code --max-depth} is where the reader can see that stated.
+     */
+    @Test
+    void aDocumentPastTheDepthLimitIsRefusedRatherThanOverflowingTheStack(@TempDir Path dir)
+            throws IOException {
+        Path data = writeFile(dir, "deep.tson", "[".repeat(6000) + "1" + "]".repeat(6000));
+
+        String refused = captureStdout(() -> assertEquals(1, TsonCli.run(new String[] {
+                "validate", data.toString()})));
+        assertTrue(refused.contains("[LIMIT_EXCEEDED]"), refused);
+        assertTrue(refused.contains("note: refused under"), refused);
+        assertTrue(refused.contains("max depth 64"), refused);
+
+        // Raised against a document that fits the raised bound, not the 6000-deep one: a bound above what
+        // the host stack carries reintroduces the StackOverflowError this exists to replace, which is what
+        // TsonLimitsPolicy.withMaxDepth says and what raising it here to 8000 actually does.
+        Path shallower = writeFile(dir, "less-deep.tson", "[".repeat(200) + "1" + "]".repeat(200));
+        String raised = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {
+                "validate", "--max-depth", "300", shallower.toString()})));
+        assertTrue(raised.contains("OK"), raised);
+        assertTrue(raised.contains("note: judged under"), raised);
+        assertTrue(raised.contains("max depth 300"), raised);
+    }
+
+    /** The run says {@code NOT_CHECKED} where the exit code says 1 -- the one place the two diverge. */
+    @Test
+    void aLimitRefusalIsNotCheckedInTheEnvelopeThoughItExitsOne(@TempDir Path dir) throws IOException {
+        Path data = writeFile(dir, "deep.tson", "[".repeat(200) + "1" + "]".repeat(200));
+
+        String json = captureStdout(() -> assertEquals(1, TsonCli.run(new String[] {
+                "validate", "--output", "json", data.toString()})));
+
+        assertTrue(json.contains("\"outcome\":\"NOT_CHECKED\""), json);
+        assertTrue(json.contains("\"code\":\"LIMIT_EXCEEDED\""), json);
+        assertTrue(json.contains("\"max_depth\":64"), json);
+    }
+
+    /** A bound below one admits no document at all, so it is a usage error rather than a silent clamp. */
+    @Test
+    void aMaxDepthBelowOneIsAUsageError() throws IOException {
+        String err = captureStderr(() -> assertEquals(2, TsonCli.run(new String[] {
+                "policy", "--max-depth", "0"})));
+        assertTrue(err.contains("--max-depth must be at least 1"), err);
     }
 
     /** A flag whose combination configures nothing is a usage error, not a silent no-op. */

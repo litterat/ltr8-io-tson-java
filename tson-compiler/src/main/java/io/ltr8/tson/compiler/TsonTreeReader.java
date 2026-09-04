@@ -72,6 +72,9 @@ public final class TsonTreeReader {
     private final TsonUnicodePolicy tokenPolicy;
     private final TsonUnicodePolicy identifierPolicy;
 
+    /** [TSON-DATA] §9.1's bounds on what this reader will spend. Never {@code null}. */
+    private final TsonLimitsPolicy limits;
+
     /**
      * Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved and
      * compiled through {@code tree}. Used by {@code Tson#treeReader()}.
@@ -86,7 +89,8 @@ public final class TsonTreeReader {
      */
     public TsonTreeReader(TsonCompiledSchemaRegistry tree) {
         this(requireTreeMode(tree), TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(),
-                TsonUnicodePolicy.unrestricted(), TsonUnicodePolicy.highlyRestrictive());
+                TsonUnicodePolicy.unrestricted(), TsonUnicodePolicy.highlyRestrictive(),
+                TsonLimitsPolicy.defaults());
     }
 
     /**
@@ -111,19 +115,21 @@ public final class TsonTreeReader {
     /** Schemaless (Class 1) -- reads the wire structure into a tree, ignoring any {@code !!schema} the document declares. */
     public TsonTreeReader() {
         this(null, TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(),
-                TsonUnicodePolicy.unrestricted(), TsonUnicodePolicy.highlyRestrictive());
+                TsonUnicodePolicy.unrestricted(), TsonUnicodePolicy.highlyRestrictive(),
+                TsonLimitsPolicy.defaults());
     }
 
     /** Shares {@code tree} rather than rebuilding it -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
     private TsonTreeReader(TsonCompiledSchemaRegistry tree, TsonDiagnosticsReceiver receiver, String schemaUri,
                            SchemalessTreeReader schemaless, TsonUnicodePolicy tokenPolicy,
-                           TsonUnicodePolicy identifierPolicy) {
+                           TsonUnicodePolicy identifierPolicy, TsonLimitsPolicy limits) {
         this.tree = tree;
         this.receiver = receiver;
         this.schemaUri = schemaUri;
         this.schemaless = schemaless;
         this.tokenPolicy = tokenPolicy;
         this.identifierPolicy = identifierPolicy;
+        this.limits = limits;
     }
 
     /**
@@ -137,7 +143,7 @@ public final class TsonTreeReader {
             throw new IllegalStateException("a schemaless TsonTreeReader has no schema environment to resolve '"
                     + schemaUri + "' through -- obtain one from Tson.treeReader()");
         }
-        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy, identifierPolicy);
+        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy, identifierPolicy, limits);
     }
 
     /**
@@ -154,7 +160,7 @@ public final class TsonTreeReader {
      */
     public TsonTreeReader preservingUnknownTypeRefs() {
         return new TsonTreeReader(tree, receiver, schemaUri, SchemalessTreeReader.preserving(), tokenPolicy,
-                identifierPolicy);
+                identifierPolicy, limits);
     }
 
     /**
@@ -184,7 +190,7 @@ public final class TsonTreeReader {
             throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
                     + "characters in a value, not word separators -- use the whole-text policy instead");
         }
-        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, policy, identifierPolicy);
+        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, policy, identifierPolicy, limits);
     }
 
     /**
@@ -209,7 +215,7 @@ public final class TsonTreeReader {
      */
     public TsonTreeReader withIdentifierPolicy(TsonUnicodePolicy policy) {
         Objects.requireNonNull(policy, "policy");
-        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy, policy);
+        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy, policy, limits);
     }
 
     /**
@@ -231,7 +237,7 @@ public final class TsonTreeReader {
      * carries its own receiver, and that one wins.
      */
     public TsonTreeReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
-        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy, identifierPolicy);
+        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy, identifierPolicy, limits);
     }
 
     /**
@@ -247,16 +253,37 @@ public final class TsonTreeReader {
         return TsonUnicodeProcessorPolicy.of(identifierPolicy, tokenPolicy);
     }
 
+    /**
+     * This reader under {@code limits} -- a new reader, leaving this one unchanged, sharing its
+     * compiled-schema registry. [TSON-DATA] §9.1 requires the bounds be configurable, and requires it in
+     * code rather than from the ambient environment, for the reason {@link #withTokenPolicy} is: a limit a
+     * deployment did not choose is one it cannot explain.
+     */
+    public TsonTreeReader withLimits(TsonLimitsPolicy limits) {
+        return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy, identifierPolicy, limits);
+    }
+
+    /**
+     * The resource limits this reader applies -- what a caller states beside the diagnostics from a read, and
+     * what a deployment publishes so a sender never writes a document that would be refused for its shape.
+     *
+     * <p>Read off the reader that judged, for {@link #processorPolicy}'s own reason: {@link #withLimits} is
+     * where a derived reader and its parent can differ.
+     */
+    public TsonLimitsPolicy limitsPolicy() {
+        return limits;
+    }
+
     // ── Whole-document entry points ──────────────────────────────────────
 
     /** Reads {@code source}'s whole document into a {@link TsonValue} tree, fail-fast -- validated against its {@code !!schema} if this reader is schema-aware and the document declares one, schemaless otherwise. */
     public TsonValue read(String source) {
-        return readRoot(new TsonDataStream(source), false);
+        return readRoot(new TsonDataStream(source, limits), false);
     }
 
     /** {@link #read(String)} straight off a stream -- reads {@code source}'s bytes (UTF-8) incrementally, never buffering the whole document into a {@code String} first; {@code source} is not closed here. */
     public TsonValue read(InputStream source) {
-        return readRoot(new TsonDataStream(source), false);
+        return readRoot(new TsonDataStream(source, limits), false);
     }
 
     /**
@@ -278,22 +305,22 @@ public final class TsonTreeReader {
      *         will not lex or parse, reported through this read's receiver rather than thrown past it
      */
     public TsonDocument readDocument(String source) {
-        return readDocument(new TsonDataStream(source));
+        return readDocument(new TsonDataStream(source, limits));
     }
 
     /** {@link #readDocument(String)} straight off a stream; {@code source} is not closed here. */
     public TsonDocument readDocument(InputStream source) {
-        return readDocument(new TsonDataStream(source));
+        return readDocument(new TsonDataStream(source, limits));
     }
 
     /** Like {@link #read(String)} but always schemaless -- reads the wire structure, even when the document declares a {@code !!schema}. (A schemaless reader's {@link #read} already does this.) */
     public TsonValue readWithoutSchema(String source) {
-        return readRoot(new TsonDataStream(source), true);
+        return readRoot(new TsonDataStream(source, limits), true);
     }
 
     /** {@link #readWithoutSchema(String)} straight off a stream. */
     public TsonValue readWithoutSchema(InputStream source) {
-        return readRoot(new TsonDataStream(source), true);
+        return readRoot(new TsonDataStream(source, limits), true);
     }
 
     /**
@@ -303,12 +330,12 @@ public final class TsonTreeReader {
      * type-ref the data does carry is read as part of the value, not used to select the type.
      */
     public TsonValue readAs(String source, String typeName) {
-        return readRootAs(new TsonDataStream(source), typeName);
+        return readRootAs(new TsonDataStream(source, limits), typeName);
     }
 
     /** {@link #readAs(String, String)} straight off a stream. */
     public TsonValue readAs(InputStream source, String typeName) {
-        return readRootAs(new TsonDataStream(source), typeName);
+        return readRootAs(new TsonDataStream(source, limits), typeName);
     }
 
     /**
@@ -338,7 +365,7 @@ public final class TsonTreeReader {
             requireDocumentEnd(ctx);
             return new TsonDocument(start.id(), start.schema(), root);
         } catch (RuntimeException e) {
-            baseSyntaxFailure(e);
+            readFailure(e);
             return null;
         }
     }
@@ -353,7 +380,7 @@ public final class TsonTreeReader {
             requireDocumentEnd(ctx);
             return result;
         } catch (RuntimeException e) {
-            return baseSyntaxFailure(e);
+            return readFailure(e);
         }
     }
 
@@ -368,7 +395,7 @@ public final class TsonTreeReader {
             requireDocumentEnd(ctx);
             return result;
         } catch (RuntimeException e) {
-            return baseSyntaxFailure(e);
+            return readFailure(e);
         }
     }
 
@@ -392,9 +419,16 @@ public final class TsonTreeReader {
      *
      * <p>{@code ofBaseSyntaxError} rethrows anything that is not one of §8.1's three base-syntax failures,
      * so a fault in this library still reaches the caller as itself: a bug is not a verdict on the document.
+     *
+     * <p><b>A limit refusal comes through here too, and is classified apart</b> ([TSON-DATA] §9.1): the read
+     * ends the same way -- report once, hand back nothing -- but what is reported says this processor
+     * declined rather than that the document is malformed, which is the whole of {@link
+     * Diagnostic#ofLimitExceeded}'s reason for existing beside {@code ofBaseSyntaxError}.
      */
-    private TsonValue baseSyntaxFailure(RuntimeException e) {
-        receiver.report(Diagnostic.ofBaseSyntaxError(e));
+    private TsonValue readFailure(RuntimeException e) {
+        receiver.report(e instanceof TsonLimitExceededException limit
+                ? Diagnostic.ofLimitExceeded(limit)
+                : Diagnostic.ofBaseSyntaxError(e));
         return null;
     }
 

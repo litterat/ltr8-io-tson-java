@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -125,8 +126,15 @@ public final class TsonDataStream implements TsonEventSource {
 
     private boolean started;
 
+    /** [TSON-DATA] §9.1's bounds -- consulted by {@link #advance()} as containers open. */
+    private final TsonLimitsPolicy limits;
+
     public TsonDataStream(String source) {
-        this(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)));
+        this(source, TsonLimitsPolicy.defaults());
+    }
+
+    public TsonDataStream(String source, TsonLimitsPolicy limits) {
+        this(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)), limits);
     }
 
     /**
@@ -136,7 +144,16 @@ public final class TsonDataStream implements TsonEventSource {
      * a caller that opened it owns closing it.
      */
     public TsonDataStream(InputStream source) {
+        this(source, TsonLimitsPolicy.defaults());
+    }
+
+    /**
+     * As {@link #TsonDataStream(InputStream)}, under a caller's own resource limits rather than the
+     * defaults -- what the facades pass when a {@code TsonConfig} states one.
+     */
+    public TsonDataStream(InputStream source, TsonLimitsPolicy limits) {
         this.lexer = new Lexer(source);
+        this.limits = Objects.requireNonNull(limits, "limits");
     }
 
     @Override
@@ -338,7 +355,15 @@ public final class TsonDataStream implements TsonEventSource {
         lastEndColumn = t.endColumn();
         lastEndByteOffset = t.endByteOffset();
         switch (t.type()) {
-            case LBRACE, LBRACKET, LPAREN -> nesting++;
+            case LBRACE, LBRACKET, LPAREN -> {
+                nesting++;
+                if (nesting > limits.maxDepth()) {
+                    throw new TsonLimitExceededException("nested deeper than this processor reads ("
+                            + limits.maxDepth() + "); the document is not being judged, and a processor "
+                            + "configured for more would read it", limits.maxDepth(),
+                            new Position(t.startLine(), t.startColumn(), t.startByteOffset()));
+                }
+            }
             case RBRACE, RBRACKET, RPAREN -> nesting = Math.max(0, nesting - 1);
             default -> { }
         }

@@ -117,17 +117,16 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **[TSON-DATA] §9.1's resource limits — and the `StackOverflowError` that escapes for want of them**
-  (`SPEC-FEEDBACK.md` #33, which asks §9.1 for one policy of limits with defaults, reported the way §8.2's is,
-  and for the shape limits it does not name at all — elements per container, fields per record, annotations
-  per value, values per document, foreign schemas loaded per document).
-  Nothing bounds nesting depth, token length or document size. A document about 5,000 containers deep
-  overflows the stack inside `TsonDataStream.fill`, and a `StackOverflowError` is an `Error`: it passes
-  through every `catch (RuntimeException)` in the reader stack and in `TsonCli.run` alike, so `tson validate`
-  on one prints a bare JVM stack trace to stderr, nothing to stdout, and **exits 1** — the code that means
-  *your document is invalid*, which is the one verdict this case must not get. Depth is the half that is
-  reachable from a request body and wants doing first; §9.1 asks for all three and asks that they be
-  configurable, which puts the knob on `TsonConfig` beside the two Unicode policies and on the readers as a
-  derivation, the way `withTokenPolicy` already is. A document past the limit must be refused with a
-  diagnostic carrying a position, never a host `Error`. The numeric-literal length limit named in
-  `CLAUDE.md`'s "Not yet implemented" is the fourth limit of the same section and comes with it.
+- [ ] **The rest of [TSON-DATA] §9.1's resource limits** (`SPEC-FEEDBACK.md` #33). `TsonLimitsPolicy` is the
+  policy value and carries nesting depth; four of §9.1's own limits are unenforced — **token length**,
+  **document size in bytes**, **numeric-literal length** (§9.1's own worked example, with a suggested default
+  of 4096 digits) and **decoded binary size per value** — as are the shape limits §9.1 does not name at all:
+  elements per container, entries per map, fields per record, annotations per value, total values per
+  document, decoded text length after escape processing, and foreign schemas loaded by one document. Each is a
+  component on `TsonLimitsPolicy`, a `CliPolicy.CliLimits` field, and a `--flag`; what needs deciding per
+  limit is the default and where it is counted, since the ones that bound *shape* are per-container state the
+  stream does not currently keep, where depth was a counter it already had. The aggregate ones (total values,
+  total foreign schemas) are the case §33 argues is not implied by the per-container ones and needs its own
+  counter. Schema-side limits are the other half and have no home yet: nothing bounds an import closure, a
+  schema's entry count, a reference chain or a supertype chain, and `TemplateMaterialiser.MAX_CLOSING_DEPTH`
+  is a bare constant that should move onto this policy when there is somewhere for it to go.

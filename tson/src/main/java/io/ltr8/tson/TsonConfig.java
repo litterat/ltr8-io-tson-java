@@ -5,6 +5,7 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.TsonLimitsPolicy;
 import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
@@ -36,6 +37,8 @@ public final class TsonConfig {
     private TsonUnicodePolicy identifierPolicy = TsonUnicodePolicy.highlyRestrictive();
 
     private TsonUnicodePolicy tokenPolicy = TsonUnicodePolicy.unrestricted();
+
+    private TsonLimitsPolicy limits = TsonLimitsPolicy.defaults();
     private boolean strictBinding = true;
     private Map<String, Class<?>> bindings;
     private String profile;
@@ -303,6 +306,25 @@ public final class TsonConfig {
     }
 
     /**
+     * The [TSON-DATA] §9.1 resource limits every read off this instance applies -- {@link
+     * TsonLimitsPolicy#defaults()} unless this says otherwise.
+     *
+     * <p><b>In code, for {@link #identifierPolicy}'s reason.</b> §9.1 requires the bounds be configurable;
+     * taking them from the ambient environment instead would let a deployment's behaviour change without any
+     * statement of it in the deployment, which is the property that makes a refusal explainable. A caller
+     * that raises the depth is choosing to spend more Java stack on one document, and {@link
+     * TsonLimitsPolicy#withMaxDepth} says what the ceiling on that choice actually is.
+     *
+     * <p>Reported back by {@link Tson#limitsPolicy()} and by each reader ({@link
+     * io.ltr8.tson.compiler.TsonTreeReader#limitsPolicy()}), which is where a derived reader's own {@code
+     * withLimits} shows.
+     */
+    public TsonConfig limits(TsonLimitsPolicy limits) {
+        this.limits = Objects.requireNonNull(limits, "limits");
+        return this;
+    }
+
+    /**
      * Lets a bound class hold fewer fields than the schema declares, silently -- off by default.
      *
      * <p>By default the two must agree, and a mismatch is a {@link
@@ -352,7 +374,7 @@ public final class TsonConfig {
                 : fileSchemas != null ? fileSchemas.build() : schemaSource;
         TsonCompiledMetaRegistry core =
                 TsonCompiledMetaRegistry.withStandardLibrary(schemaContext, source, identifierPolicy);
-        return new Tson(core, dataBindContext, strictBinding, tokenPolicy);
+        return new Tson(core, dataBindContext, strictBinding, tokenPolicy, limits);
     }
 
     /**

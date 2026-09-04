@@ -646,7 +646,8 @@ what a consumer routes on, so a field beside it was a second carrier for one fac
 because consumers partition the reasons differently and no partition is privileged. The exception's own
 `Reason` stays, as the throwing channel's vocabulary and the single input to the mapping, so the thrown and
 the collected channel cannot disagree. `Code.verdict()` answers the other question a consumer asks — whether
-the code is a verdict on the document at all, which the five, `NOT_IMPLEMENTED` and `BIND_MISMATCH` are not.
+the code is a verdict on the document at all, which the five, `NOT_IMPLEMENTED`, `BIND_MISMATCH` and
+`LIMIT_EXCEEDED` are not.
 **A §8.2 name-hygiene refusal is a diagnostic like any other and carries nothing extra**: which rule
 refused is the `Code` — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT`, one each, since the
 three want three different remedies and the code is what a consumer routes on — and the Unicode data
@@ -699,14 +700,28 @@ where a level says what would be accepted. That last is why the standalone surfa
 envelope one: a generator that reads the policy first never writes the name that would be refused, which is
 the round trip the format exists to avoid. `SPEC-FEEDBACK.md` #14 proposes §8.2 ask for this shape.
 
+**`TsonLimitsPolicy` is §9.1's half of the same statement, and it sits beside rather than inside.** What this
+processor will *spend* reading a document, where the above is what it will *admit as a name* —
+`Tson.limitsPolicy()`, either facade's, `TsonTreeReader.withLimits`, `tson policy`, and a `limits` record in
+every CLI envelope's `policy` field. Two values because they answer two questions and a deployment changing
+one has said nothing about the other. **Only nesting depth is bounded** (default 64 — the tightest in common
+use, so a document that fits travels; `SPEC-FEEDBACK.md` #33 asks §9.1 for the rest, `BACKLOG.md` carries it).
+**Counted in `TsonDataStream.advance`**, the one place every token is consumed, so the refusal lands before
+any reader descends — which matters because the stream is iterative and every reader over it recurses, and
+`EventSkip` recurses through values no reader keeps. The same counter reaches a schema document. A refusal is
+`LIMIT_EXCEEDED`, is **not a verdict**, and has its own classifier (`Diagnostic.ofLimitExceeded`, caught ahead
+of `ofBaseSyntaxError` in both facades) — a base-syntax failure is a verdict every processor repeats, this is
+a statement about the reader. It replaced a `StackOverflowError` that escaped every `catch (RuntimeException)`
+and got exit 1 with nothing on stdout.
+
 ### Read facades and writers — `docs/facades-and-tree.md`
 
 `TsonObjectReader` (bound Java object) and `TsonTreeReader` (`TsonValue` tree) are the whole
 document-reading surface, dual-mode fixed at construction: standalone = schemaless (Class 1,
 Jackson-style); from a `Tson` facade = schema-aware (a self-describing document validates against its
 `!!schema` as it's read). Jackson-`ObjectReader`-style derivation (`withDiagnostics`, `withSchema(uri)`,
-`preservingUnknownTypeRefs`, `withTokenPolicy`) keeps source form / error policy / schema selection / Unicode
-policy orthogonal; derived
+`preservingUnknownTypeRefs`, `withTokenPolicy`, `withLimits`) keeps source form / error policy / schema
+selection / Unicode policy / resource limits orthogonal; derived
 readers share the original's compiled-schema registry. Failures reaching or resolving the schema are
 diagnostics, not exceptions. A schemaless read still checks type-refs (`TypeRefCheck`: built-in name →
 must satisfy the atom; names-the-target → accepted, bind only; else `UNKNOWN_TYPE_REF` — a reader policy,
@@ -811,16 +826,21 @@ invocation. **Exit codes: 0 all valid, 1 any data file invalid, 2 usage/classifi
 would supply, 70 a library gap or fault** — the split is load-bearing and rides on the exception-classification
 policy. 1 is a verdict on the document — *checked and rejected*, a §8.2 refusal included, since the sender
 still holds the fix; **69, 75, 78 and 70 are the absence of one**, naming who could not give it (whoever was
-to serve the schema, permanently or not; whoever wired this application; this library).
+to serve the schema, permanently or not; whoever wired this application; this library). A **§9.1 limit
+refusal** is 1 as well, and is the one place an `outcome` of `NOT_CHECKED` exits 1: the envelope answers *was
+it read* and the exit code answers *what now*, and here the runner can act (`--max-depth`, or a smaller
+document) where every other non-verdict has nobody present who can.
 `TsonCli.exitCodeFor` **ranks by who must act first, permanence breaking the tie** where nobody present can
 act: `70 > 78 > 69 > 75 > 1`. Every non-verdict rides in the report as a code with a stderr note, the report
 on stdout unchanged. 70's halves print differently: a gap that escapes as an exception prints
 `not implemented yet: <message>`, whose text usually names the workaround; a fault gets the please-report-it
 banner and its stack trace. Also `tson compile`, `tson hash` (stamps a
 `?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `TsonUnicodeProcessorPolicy`
-with no document in hand, the same record every `validate`/`compile` envelope carries in its `policy` field.
+and §9.1's `TsonLimitsPolicy` with no document in hand, the same record every `validate`/`compile` envelope
+carries in its `policy` field.
 **Those three commands also take the policy flags** (`PolicyOptions`, which consumes them so each subcommand's
-own loop still sees only `--output` and positionals): `--identifier-policy`/`--token-policy` take a level in
+own loop still sees only `--output` and positionals): `--max-depth` takes §9.1's nesting bound (refused below
+1 rather than clamped), `--identifier-policy`/`--token-policy` take a level in
 either spelling the CLI prints or a person types, `--identifier-per-segment` the unit, and
 `--identifier-scripts`/`--token-scripts` a `Latin+Cyrillic` combination, repeatable. Two rules keep a flag from
 meaning nothing: **`--token-scripts` alone raises the token level** to `SINGLE_SCRIPT` (its `UNRESTRICTED`
@@ -1171,9 +1191,9 @@ compatibility).
   `docs/`, and that guarantee is what decides between one instance and one per request
   (`SharedInstanceConcurrencyTest` pins it at that surface). What is still open is everything *outside* a
   read: registering schemas concurrently, and mutating a `DataBindContext` after use.
-- **§9.1's resource limits** (SHOULD, DoS-hardening) — none of them enforced: not nesting depth, token
-  length, document size, or numeric-literal length. Depth is the one that bites, a document a few
-  thousand containers deep overflowing the stack as an `Error` that no `catch (RuntimeException)` in
-  the reader stack or the CLI sees; `BACKLOG.md` has what enforcing them needs.
+- **§9.1's resource limits** (SHOULD, DoS-hardening) — the policy exists (`TsonLimitsPolicy`, above) and
+  bounds **nesting depth**; token length, document size, numeric-literal length and decoded binary size are
+  unenforced, as are the shape limits §9.1 does not name and the schema-side ones it cannot
+  (`TemplateMaterialiser.MAX_CLOSING_DEPTH` is still a bare constant). `BACKLOG.md` has what each needs.
 - **JSON** — a future JSON reader is a whole separate stack (its own `JsonEventStream` and its own readers,
   deliberately not reusing the TSON readers). Not started, not backlogged.
