@@ -37,6 +37,7 @@ import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
@@ -1153,7 +1154,7 @@ public final class TsonSchemaLinker {
                                                   Map<String, TypeDefinition> namespace) {
         Map<TypeRef, String> seen = new LinkedHashMap<>();
         for (TypeRef variant : choice.variants()) {
-            TypeRef flattened = new TypeRef(terminalName(variant.name(), namespace), variant.arguments());
+            TypeRef flattened = new TypeRef(ReferenceChain.terminal(variant.name(), namespace), variant.arguments());
             String first = seen.putIfAbsent(flattened, variant.name());
             if (first == null) {
                 continue;
@@ -1175,7 +1176,7 @@ public final class TsonSchemaLinker {
     private static void checkVariantsAreNotVoid(String entryName, ChoiceBody choice,
                                                  Map<String, TypeDefinition> namespace) {
         for (TypeRef variant : choice.variants()) {
-            if (terminalName(variant.name(), namespace).equals("void")) {
+            if (ReferenceChain.terminal(variant.name(), namespace).equals("void")) {
                 throw new TsonSchemaValidationException("'" + entryName + "' has a variant"
                         + (variant.name().equals("void") ? "" : " '" + variant.name() + "'")
                         + " resolving to 'void' -- optionality is not choice (§5.4): a value's absence is the "
@@ -1183,29 +1184,6 @@ public final class TsonSchemaLinker {
                         + "type with void");
             }
         }
-    }
-
-    /**
-     * The name a reference chain ends at (§8.3): the first entry whose body is not a {@code Reference}. A
-     * name this schema does not declare is returned unchanged -- it is a type parameter, already accepted by
-     * {@link #validateTypeRef}.
-     *
-     * <p>A reference cycle stops the walk rather than hanging. Detecting and diagnosing one is a separate
-     * unimplemented concern ({@code BACKLOG.md}); stopping at the repeat is enough here, because the name it
-     * stops at depends on where the walk started, so a cycle yields no false duplicate.
-     */
-    private static String terminalName(String name, Map<String, TypeDefinition> namespace) {
-        Set<String> walked = new LinkedHashSet<>();
-        String current = name;
-        while (walked.add(current)) {
-            TypeDefinition def = namespace.get(current);
-            if (def == null || !(def.body() instanceof Reference reference)
-                    || !reference.target().arguments().isEmpty()) {
-                return current; // an argument-bearing target is an application, not a hop to another entry
-            }
-            current = reference.target().name();
-        }
-        return current;
     }
 
     /** {@code fallback} entries, overridden by {@code primary} on collision -- {@code primary} isn't mutated. */
@@ -1353,7 +1331,7 @@ public final class TsonSchemaLinker {
         // The chain end is what has to be checked, not the hop: a field typed by an alias
         // (`a => text`, `f: a = hello`) states a value of whatever the alias names. Resolved output states
         // the chain rather than rewriting the use site past it, so the walk happens here.
-        String terminal = terminalName(field.type().name(), namespace);
+        String terminal = ReferenceChain.terminal(field.type().name(), namespace);
         TypeDefinition target = namespace.get(terminal);
         // An unresolved reference is already reported by validateTypeRef; a target that is still open (or an
         // application of one) has no single body to check against until materialisation closes it. A body
