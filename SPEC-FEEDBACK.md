@@ -2932,101 +2932,110 @@ document.
 
 ---
 
-## 32. §8.3's use-site flattening is a second representation of a walk that happens anyway — proposal: remove it and `@alias`, and state identity structurally
+## 32. §8.3's use-site flattening is a second representation of a walk that happens anyway — proposal: remove it and `@alias`, and settle identity as nominal for a declaration and canonical for an application
 
 **Section:** [TSON-SCHEMA] §8.3 (use-site reference flattening and `@alias`), §8.2 (instantiation identity),
-§6 (annotation positions), §5.7 (refinement); meta-kernel's `alias` annotation, meta.tn's `bytes_encoding`
-(#29's directive). Companion to #25, whose (a) is the rule the residue of this entry still needs.
+§7.2 (a value's type annotation at a typed position), §5.7 (refinement), §6 (annotation positions);
+meta-kernel's `alias` annotation, meta.tn's `bytes_encoding` (#29's directive).
 
-**Problem, as first found.** A declaration's annotations are reachable from a use site only while the use site
-names that declaration, and §8.3 is what stops it naming one. The same intent, written the two ways the
-grammar offers, got two answers:
+**Problem:** a declaration's annotations are reachable from a use site only while the use site names that
+declaration, and §8.3 is what stops it. The same intent, written the two ways the grammar offers, got two
+answers — `@bytes_encoding:HEX digest_refined => !bytes ^ { length: 4 }` read hex, and the same directive over
+`digest_alias => bytes` read base64, a different value with no diagnostic.
 
-```
-@bytes_encoding:HEX  digest_refined => !bytes ^ { length: 4 }     a refinement
-@bytes_encoding:HEX  digest_alias   => bytes                      a pure alias
+**The first fix carried the annotations along §8.3's walk. Building it found that the walk is the only thing
+worth keeping.** §8.3 requires the chain stay walkable and leaves `reference.target` alone; the entries stay in
+the namespace; and four passes walk a chain independently of flattening — the reader compile,
+discrimination-class classification, inhabitance, and the linker's own choice-variant distinctness. So
+flattening was a *second* representation of a walk that happens anyway, and `@alias` was a **lossy summary** of
+it: §8.3 keeps only the source-site name, so in `digest_chain => digest_alias => bytes` it records the hop that
+carried nothing and drops the one that carried the directive. The carry re-derived, in the annotation channel,
+what the summary had discarded.
 
-!holder { refined: "deadbeef"  alias: "deadbeef" }
-    refined  -> deadbeef       4 octets, hex     the supertypes edge is walkable
-    alias    -> 75e69d6de79f   6 octets, base64  the REFERENCE entry is rewritten away
-```
+**Interpretation chosen — flattening and `@alias` are removed, and this implementation runs without them.**
+Resolved output states the chain as written; a type position naming a `REFERENCE` entry keeps that name; the
+chain is collapsed when readers are compiled, after linking, once per entry, where a `REFERENCE` entry's reader
+*is* its target's, named for the entry doing the referring. Net −235 lines, `ReferenceFlattener` deleted
+entire, and the one thing `@alias` was still buying — a diagnostic naming the alias the author wrote rather
+than the type at the end of its chain — comes free from naming the reader where the reference compiles.
 
-A different value, not an error, and the alias is the spelling an author reaches for first. Array elements and
-map values were worse off: with no field of their own to state a directive on, an alias is the only way they
-could ever get one.
+**What the removal exposed, and what §8.2 actually needs.** §8.3 claims flattening is "what makes instantiation
+identity a single-level comparison". It never delivered that: `box<id>` and `box<uuid>` minted two entries even
+with flattening, because it ran after materialisation and §8.2 keys identity on `source`. Removing it made the
+question answerable instead of merely wrong, and the answer is **two rules, not one**:
 
-**The first fix was to carry the annotations along §8.3's walk, and building it is what found the real
-answer.** Three measurements, each taken with the carry running:
+**Identity is nominal for a declaration.** Each declared name is its own type entity, and an identical body
+does not merge two of them — which core.tn's own `void` already states: *"A fresh sibling of the meta-kernel's
+`void` under the same name — the same `!unit {}` construction and contract, a distinct type entity."* Measured:
+`stock_id => !uuid_type {}` and `other_id => !uuid_type {}` have byte-identical resolved bodies (`UuidType`,
+unconstrained, no supertypes) and are two types — `!other_id` is refused at a `stock_id` position, and so is
+`!uuid`. A purely structural identity rule would collapse all three and destroy a distinction §7.2 currently
+enforces correctly.
 
-1. **§8.3's flattening does not deliver the identity it claims.** §8.3 says flattening "applies recursively
-   inside `arguments` — every name in a flattened application is a terminal entry name — which is what makes
-   instantiation identity a single-level comparison (§8.2)". With `id => uuid`, `box<id>` and `box<uuid>` mint
-   two entries whose resolved bodies are identical, because flattening runs after materialisation and §8.2
-   keys identity on `source`. The property the section credits to flattening is not one it produces.
-2. **Where the rule *would* apply, it breaks #29.** `box<hexdigest>` and `box<bytes>`, over
-   `@bytes_encoding:HEX hexdigest => bytes`, are two entries that genuinely read differently — `"deadbeef"` as
-   four hex octets against `"3q2+7w=="` as four base64 ones. Flattening arguments recursively collapses them
-   into one and loses the directive. **§8.3's identity rule and #29's directive design are in direct
-   collision**, unnoticed because no implementation has flattened arguments.
-3. **Two names for one type break assignability meanwhile.** `!via_target { … }` is refused at a `via_alias`
-   position, the diagnostic naming a minted entry the author never wrote; `( via_alias | via_target )` is
-   accepted as a two-variant choice rather than refused as a duplicate.
+**Identity is canonical for an application.** A minted entry has no declared name to be its identity, so §8.2's
+content-derived naming governs — and *content* must name each argument by its type rather than by a name for
+it. That is the rule this entry asks for, and it follows from §7.2 rather than being new:
 
-**And the walk was never eliminated, which is the whole of the argument.** §8.3 requires the chain stay
-walkable and leaves `reference.target` alone; the entries stay in the namespace; and four passes walk a chain
-independently of flattening — the reader compile, discrimination-class classification, inhabitance, and the
-linker's own choice-variant distinctness. `@alias` is then a *lossy summary* of that walk, and §8.3 says so:
-"only the source-site alias is preserved; intermediate hops in a chain are not aliased". In
-`digest_chain => digest_alias => bytes` the name it keeps is the hop that carried nothing and the hop it drops
-is the one that carried the directive. The carry fix re-derived, in the annotation channel, information the
-summary discarded from a walk that still happened.
+> An application's arguments are compared after following reference chains. `box<user_id>` over
+> `user_id => uuid` denotes the same type as `box<uuid>`, and mints the same entry.
 
-**Interpretation chosen — flattening and `@alias` are removed, and this implementation now runs without
-them.** Resolved output states the chain as written. A type position naming a `REFERENCE` entry keeps that
-name and carries nothing recording where it points; `alias` is gone from meta-kernel and core; the chain is
-collapsed when readers are compiled — after linking, once per entry — where a `REFERENCE` entry's reader
-*is* its target's, named for the entry doing the referring. A directive an alias declares respells that
-reader there, and **nearest-first falls out of the recursion** rather than needing a rule: a chain compiles
-innermost-first, so the hop nearest the use site respells last.
+**Because the three ways to name a type after another are three different things**, and only the first is a
+rename. All three are running, and the difference is exactly what a reader enforces:
 
-**What it cost and what it saved.** Net **−235 lines** of main source, `ReferenceFlattener` deleted entire.
-Two things had to be written: the linker's §5.2 field-value check now walks to the chain end itself (it
-skipped a `REFERENCE` target before, on the assumption flattening had removed them), and four entry-count
-assertions moved by one where `alias` left the namespace. Two things stopped needing to exist: the
-name-annotation binding no longer has to run before flattening, and the bootstrap route no longer has to
-flatten identically to ordinary resolution or diverge — it binds no name-position annotations of its own, so
-anything carried to a use site could travel on one route and not the other. Diagnostics are unchanged and
-were the one thing `@alias` was still buying: a position naming `pct` over `pct => small` still reports as
-`pct`, because the reader is named where the reference is compiled.
+| spelling | relation to `uuid` | `!uuid` at its position | a sibling's tag |
+|---|---|---|---|
+| `user_id => uuid` — **reference** | the same type | accepted | accepted |
+| `user_id => !uuid ^ {}` — **refinement** | IS-A `uuid`; usable at a `uuid` position | refused | refused |
+| `user_id => !uuid_type {}` — **fresh type** | unrelated in either direction | refused | refused |
+
+Without the dereference the model said the arguments of the first row were the same type while the
+applications were not — interchangeable at a scalar position, refused one layer of application up. With it,
+`box<user_id>`, `box<uuid>` and `box<stock_id>` are one entry, while `box<!uuid ^ {}>` and `box<!uuid_type {}>`
+keep their own. **What is normalised is identity, not provenance**: the minted `source` becomes the canonical
+application, and the name the author wrote survives where they wrote it — at the use site, which states it as
+written. Removing flattening is what made that division available; before it, the use site had been rewritten
+and provenance had nowhere to live but `@alias`.
+
+**One case is left unresolved, deliberately, and it is not an identity question.** A reference carrying
+`@bytes_encoding` is not a pure rename: values at its positions are spelled in another alphabet, so
+`box<hexdigest>` is not `box<bytes>`, and dereferencing loses the directive — `"deadbeef"` reads as six base64
+octets rather than four hex ones. Every other position reads it correctly; only an application argument does
+not, and this implementation accepts that rather than making identity guess
+(`BytesEncodingDirectiveTest.aDirectiveIsLostThroughATemplateApplication` asserts the wrong answer so it is
+visible rather than latent). **The question it really poses is what a directive on a reference means at all** —
+whether such an entry is a rename that may not carry one, or must be spelled `!bytes ^ {}` and be a type. The
+tidy answer is that a directive describes a type and a reference is a name for one, so a reference should not
+carry one; it is stated as the open question rather than adopted, because it reverses what an author can write
+today.
 
 **Suggested resolution:**
 
 - **§8.3: delete use-site flattening and `@alias`.** State instead that a reference is a hop: resolved output
   records the chain as written, and **a processor MAY collapse a chain after linking, when it compiles for
-  reading** — not in resolved output, which is what two conforming processors compare. The chain must stay
-  walkable, which §8.3 already requires.
-- **§8.2: state identity structurally.** *Two entries are the same type iff their resolved bodies are equal.*
-  That needs no argument flattening, is what "identity is structural" already claims, and gets measurement 2
-  right for free: `box<hexdigest>` and `box<bytes>` have different bodies, so they are different types, which
-  is what reading them proves.
+  reading** — not in resolved output, which is what two conforming processors compare.
+- **§8.2: two sentences where there is now one.** *A declared entry's identity is its name; two declarations
+  are two types however alike their bodies.* And: *a minted entry's identity is its canonical content, an
+  application's arguments compared after following reference chains.* §8.2's "identity is structural" is true
+  of the minted half only, and reading it over declarations is what makes it wrong.
+- **§8.3 or §5.7: name the three spellings and what each buys.** An author writing `user_id => uuid` and
+  expecting a `stock_id` to be refused gets no protection and nothing tells them the other two forms exist.
+  While that is written, say that an empty refinement (`!uuid ^ {}`) is legal — §5.7 says a refinement narrows,
+  and it is the *only* nominal-subtype spelling in the language, so a revision tightening that into a MUST
+  would delete it without anyone connecting the two changes.
 - **meta-kernel and core: drop the `alias` annotation declaration.** Nothing derives it any more.
-- **§6 still owes the category**, and it is the residue of this entry: an annotation may be **positional** —
-  directing how values at a position of its type are read — which is the same missing paragraph #25(a) needs
-  for *checked*, and which is what would tell a transparent alias from a load-bearing one if identity ever
-  needed to.
+- **§6 still owes the checked/positional category**, which is what would let the directive case above be
+  decided rather than accepted. Same missing paragraph as #25(a).
 
-**What is running, and what is not.** All of the above is running. `ReferenceChainTest` pins the chain stated
-as written, a read still reaching the end of it, and a diagnostic naming the hop the author wrote;
-`BootstrapReferencesTest` pins the two routes agreeing; `FieldValueConformanceTest` pins the linker's walk in
-both directions; `BytesEncodingDirectiveTest` pins a directive on an alias reaching a field, an array element
-and a map value. The bundled schemas and their `*-resolved.tn` fixtures are re-stamped, and the shared corpus's
-`alias-flattens-at-the-use-site` vector is now `a-reference-is-stated-as-written`. What is *not* running is any
-notion of a positional annotation a schema declares; there is still nowhere to write one.
+**What is running, and what is not.** All of the above is running except the directive case, which is running
+wrongly and knowingly. `ReferenceChainTest`, `BootstrapReferencesTest`, `FieldValueConformanceTest` and
+`AliasedArgumentIdentityTest` pin the chain, the two resolution routes agreeing, the linker's own walk, and the
+three spellings minting one entry, two entries and two entries respectively. The bundled schemas and their
+`*-resolved.tn` fixtures are re-stamped, and the corpus's `alias-flattens-at-the-use-site` vector is now
+`a-reference-is-stated-as-written`.
 
-**Status against Revision 34:** open, and new against this revision — a removal, proposed after building both
-the thing removed and the fix that would have preserved it. This is the branch's own method: the carry was
-merged as a validated hypothesis, and what validating it established is that the mechanism it served is not
-worth its price. §8.3's flattening paragraph, its `@alias` example, and §8.2's single-level-comparison sentence
-are the text this asks the revision to delete.
+**Status against Revision 34:** open, and new against this revision — a removal and a rule, proposed after
+building the thing removed, the fix that would have preserved it, and the rule that replaced both. §8.3's
+flattening paragraph, its `@alias` example, and §8.2's single-level-comparison sentence are the text this asks
+the revision to delete; the two identity sentences and the three-spellings table are what it asks for instead.
 
 ---
