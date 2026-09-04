@@ -560,8 +560,9 @@ The `tson-cli` module is a small, zero-dependency CLI (ajv-cli-style) for checki
 no Java to write. Four commands: **`init-example`** scaffolds an example schema + data file to start
 from, **`validate`** checks data files (each against the schema its own `!!schema` names, or
 schemalessly), **`compile`** checks that a
-schema document itself resolves and compiles cleanly, and **`policy`** prints the Unicode name/value policy
-this build applies — the one thing that can make the same document pass here and fail elsewhere.
+schema document itself resolves and compiles cleanly, and **`policy`** prints what this build would judge a
+document by — the Unicode name/value policy and the resource limits, the two things that can make the same
+document pass here and fail elsewhere.
 
 Build and install it — the installed command is `tson`:
 
@@ -575,7 +576,7 @@ write `tson` for that launcher path.
 
 ```
 tson init-example [<dir>]
-tson validate     [--output text|json|tson] <file>...
+tson validate     [--output text|json|tson] [<policy options>] <file>...
 tson compile      [--output text|json|tson] [<policy options>] <schema>
 tson policy       [--output text|json|tson] [<policy options>]
 tson hash         <file>
@@ -586,18 +587,25 @@ policy options (validate, compile, policy):
   --identifier-scripts <A+B>    admit one script combination over the level (repeatable)
   --token-policy <level>        level for values (default: unrestricted, which scans nothing)
   --token-scripts <A+B>         the same for values (repeatable)
+  --max-depth <n>               how deeply a document may nest before this refuses it (default: 64)
 ```
 
-**`tson policy`** prints the [TSON-DATA] §8.2 policy in force — the restriction level applied to names and
-to values, whether it applies per `_`/`-` segment, any script combinations specially admitted, and the
-Unicode data version behind them:
+**`tson policy`** prints what this build applies — the [TSON-DATA] §8.2 restriction level for names and for
+values, whether it applies per `_`/`-` segment, any script combinations specially admitted, the Unicode data
+version behind them, and §9.1's resource limits:
 
 ```
 $ tson policy
 identifier policy: HIGHLY_RESTRICTIVE
 token policy:      UNRESTRICTED
 unicode data:      16.0
+max depth:         64
 ```
+
+**A limit refusal is not a verdict on your document.** A document nested deeper than `--max-depth` is
+reported as `LIMIT_EXCEEDED` with the run's outcome `NOT_CHECKED`: it was never read, and a processor
+configured for more would read it in full. (`tson validate` still exits 1, because at a command line you hold
+the fix — raise the bound, or send something shallower.)
 
 Every `validate`/`compile` report carries the same record in its `policy` field, so a refusal is always
 readable beside what produced it. The useful direction is the other one: read the policy *before* you

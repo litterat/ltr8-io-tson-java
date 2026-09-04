@@ -33,7 +33,7 @@ final class CompileCommand {
         // Read off the Tson that judged, not rebuilt from a default: a schema's declared names face
         // [TSON-DATA] §8.2 at link time, so this run can refuse one, and a refusal is only interpretable
         // beside the policy that produced it.
-        CliPolicy policy = CliPolicy.from(tson.processorPolicy());
+        CliPolicy policy = CliPolicy.from(tson.processorPolicy(), tson.limitsPolicy());
         List<Diagnostic> problems;
         try {
             problems = tson.validateSchema(Io.readFile(schemaFile));

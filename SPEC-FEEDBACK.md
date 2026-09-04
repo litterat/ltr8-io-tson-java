@@ -3211,8 +3211,12 @@ is the sharpest argument for point 1 above: with no category stated, the fallbac
 
 - **One policy, not six paragraphs.** Name the limits as a set — the five §9.1 has plus the shape limits
   above — each with a default, each configurable, in the way §8.2 names its level and unit. The natural
-  implementation is one value beside §8.2's, reported by the same surface (`Tson.processorPolicy()`, either
-  facade's, and `tson policy` on the command line), which is what makes point 2 real rather than aspirational.
+  implementation is one value beside §8.2's, reported by the same surfaces (`Tson.limitsPolicy()` beside
+  `processorPolicy()`, either facade's, and `tson policy` on the command line), which is what makes point 2
+  real rather than aspirational. **Beside and not inside**: the two answer different questions — what this
+  processor will *read*, and what it will *admit as a name* — and a deployment that has changed one has said
+  nothing about the other, which is the same argument §8.2 already makes for keeping its own two surfaces
+  apart. One envelope field carries both, since "what judged this run" is one question to a consumer.
 - **Say the refusal is not one of §8.1's four**, on §8.2's own terms: a limit refusal means the processor
   declined, not that the document is wrong, and it MUST be distinguishable from a verdict. §8.2 already
   carries the sentence that does this; §9.1 needs the same one.
@@ -3223,13 +3227,45 @@ is the sharpest argument for point 1 above: with no category stated, the fallbac
 - **Keep the numeric-literal paragraph as the model** and lift its three requirements — a default, MUST
   configurable-or-documented, MUST report the threshold — to the whole set.
 
-**What is running, and what is not.** None of it. `BACKLOG.md` carries the work, depth first, because depth is
-the one reachable from a request body with no cooperation from the sender. What is *not* a gap is regex: TSON
-pins its `regex` atom to RFC 9485 I-Regexp and `tson-regex` is a Thompson-NFA/Pike-VM simulation, linear-time
-by construction, so the ReDoS vector every other format's §9.1 has to warn about is closed here by the choice
-of language rather than by a limit.
+**What is running: the shape, and one limit in it.** `TsonLimitsPolicy` is the policy value this entry asks
+§9.1 for — configurable in code (`TsonConfig.limits`, `TsonTreeReader.withLimits`), reported with no document
+in hand (`Tson.limitsPolicy()`, either facade's, `tson policy`, and a `limits` field inside every report's
+`policy` record), and carrying a **nesting depth** with a stated default. The other four §9.1 limits and the
+shape limits above are not built; the record is where each lands, which is why it is a record with one
+component rather than an `int`. `BACKLOG.md` carries the rest.
 
-**Status against Revision 34:** open, and new against this revision. It is not a proposal for new vocabulary
+**Building the first one settled three things the proposal could not.**
+
+1. **A default is a portability claim, so it should be the tightest in common use, not the most generous.**
+   64, against `serde_json`'s 128 and Jackson's 1000. A document that fits the tightest common limit fits every
+   processor above it; the reverse choice makes "a conforming document" a property of whoever received it,
+   which is the failure mode point 3 above names. §9.1's own existing default (4096 numeric digits) reads like
+   a generous bound rather than a portable one, and is worth revisiting on the same argument.
+2. **The refusal has to be raised where depth is *counted*, not where it is spent.** The token stream here is
+   iterative and never overflows; every reader over it descends by recursion, and `EventSkip` recurses through
+   a value no reader is even keeping. Counting in the stream as containers open — one comparison per opening
+   bracket — is what stops the read before any of them descends, and it reaches a schema document through the
+   same counter, which is the "schemas are subject to the same treatment" bullet met for free rather than by a
+   second mechanism.
+3. **`Code.verdict()` carries the non-verdict; the exit code answers a different question.** A limit refusal is
+   `LIMIT_EXCEEDED` with `verdict()` false, and the CLI envelope says `NOT_CHECKED` — but it exits **1**, not
+   one of the no-verdict codes, because at a command line the runner can act (`--max-depth`, or a smaller
+   document) and 1 is that CLI's "you hold the fix". It is the one place `NOT_CHECKED` and exit 1 meet. A
+   revision adopting this entry should say the refusal is not one of §8.1's four categories and stop there:
+   what a *transport* does with it is that transport's mapping, and §8.2 is already the precedent for a fifth
+   outcome whose HTTP status nobody legislates.
+
+**Not in the conformance corpus, deliberately.** A depth vector encodes one processor's configured bound, and a
+conforming implementation with a different one would fail it — the same reason §8.2's `refused` vectors have to
+name the data version they were computed against. If a revision fixes defaults, the vector becomes writable and
+should be written.
+
+What is *not* a gap is regex: TSON pins its `regex` atom to RFC 9485 I-Regexp and `tson-regex` is a
+Thompson-NFA/Pike-VM simulation, linear-time by construction, so the ReDoS vector every other format's §9.1 has
+to warn about is closed here by the choice of language rather than by a limit.
+
+**Status against Revision 34:** open, and new against this revision — a proposal, and now one this
+implementation runs in part: the policy shape, and nesting depth in it. It is not a proposal for new vocabulary
 in the type system — it asks that a section which already knows the right shape apply it consistently, name
 the limits that bound shape rather than size, and settle the one question that decides what a sender is told:
 whether being too large for this processor is a verdict on the document. It is not.

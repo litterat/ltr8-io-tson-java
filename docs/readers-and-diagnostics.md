@@ -502,6 +502,43 @@ one is worse than quoting none. `TsonUnicodePolicy.dataVersion()` remains the ve
 the constant behind it (`Xid.UNICODE_VERSION`) is in the unexported `lexer` package and unreachable
 otherwise. `SPEC-FEEDBACK.md` #14 proposes §8.2 require this shape rather than the per-refusal copy.
 
+## `TsonLimitsPolicy` — §9.1's bounds, on the same terms
+
+What this processor will *spend* reading a document, where the policy above is what it will *admit as a
+name*: `Tson.limitsPolicy()`, either facade's `limitsPolicy()`, `TsonTreeReader.withLimits`, `tson policy`,
+and a `limits` record inside every `tson-cli` envelope's `policy` field. **Beside the Unicode policy, not
+inside it** — the two answer different questions, and a deployment that changed one has said nothing about
+the other. The three arguments above transfer whole: a bound is constant for a run, a sender needs it before
+it writes, and a number a caller can act on beats a refusal after the fact.
+
+**Only nesting depth is bounded.** [TSON-DATA] §9.1 names four more and omits the ones bounding shape rather
+than size; `SPEC-FEEDBACK.md` #33 asks for the set, and `BACKLOG.md` carries what is left. It is a record with
+one component so each lands on it rather than beside it.
+
+**Counted in the token stream, not in the readers.** `TsonDataStream.advance` already tracked bracket depth
+for the schema parser's error recovery, and that is the one place every token is consumed — so the check is
+one comparison per opening bracket and the refusal happens *before* any reader descends. That ordering is the
+whole point: the stream is iterative and never overflows, while every reader over it recurses
+(`SchemalessTreeReader.readNode` → `readArray` → `readNode`), and `EventSkip` recurses through values no
+reader keeps and no context path steps. A limit enforced at the readers would have to be enforced at each of
+them; enforced at the counter it also reaches schema documents, which are untrusted input wherever one is
+fetched or `!!import`ed, through the same code.
+
+**What it replaced.** A document a few thousand containers deep — about 10 KB, an ordinary request body —
+exhausted the Java stack. A `StackOverflowError` is an `Error`, so it passed through every
+`catch (RuntimeException)` in the reader stack and in `TsonCli.run` alike: no report on stdout, a JVM stack
+trace on stderr, and exit 1, the code meaning *your document is invalid*. `LimitsPolicyTest` pins that the
+same document now reports.
+
+**The refusal is not a verdict** (`Diagnostic.Code.LIMIT_EXCEEDED`, `verdict()` false): the document may be
+well-formed, valid, and read in full by the next processor along. It has its own classifier
+(`Diagnostic.ofLimitExceeded`) rather than a case inside `ofBaseSyntaxError`, because a base-syntax failure is
+a verdict every processor repeats and this one is a statement about the reader's configuration; both facades
+catch it ahead of the `RuntimeException` that reaches the other. The CLI still **exits 1** — its envelope says
+`NOT_CHECKED`, the truth about the document, while the exit code answers what the runner should do now, and
+here they can act (`--max-depth`, or a smaller document). It is the one place the two diverge, and
+`TsonCli.exitCodeFor` says so.
+
 ### When a fact earns a component
 
 Every component is now a location, and the rule that keeps it that way is one line: **carry a fact as a
@@ -517,6 +554,7 @@ belongs in the `Code`, which is what a consumer already switches over.
 | §8.2 refusal: which rule | it is the `Code` | no |
 | why a schema was not obtained | nowhere — it is about the world | no — it is the `Code`, one per reason |
 | §8.2 refusal: the policy and the Unicode tables | nowhere — it is this processor's configuration | no — `TsonUnicodeProcessorPolicy`, once per run |
+| §9.1 refusal: which bound, and what it is | nowhere — it is this processor's configuration | no — `TsonLimitsPolicy`, once per run; the bound itself rides in `expected`/`actual` |
 
 Most diagnostics are about something the consumer is already holding, which is why `expected`/`actual` are
 enough for them: a rendered `<= 100` is a convenience, and the authoritative copy is a file the consumer has.

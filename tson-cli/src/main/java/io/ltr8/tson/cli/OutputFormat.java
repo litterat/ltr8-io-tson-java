@@ -178,17 +178,24 @@ enum OutputFormat {
                 + " in full.";
     }
 
-    /** [TSON-DATA] §8.2's three name-hygiene rules, one code each -- the outcomes {@link CliPolicy} explains. */
+    /**
+     * The codes {@link CliPolicy} explains -- [TSON-DATA] §8.2's three name-hygiene rules, one code each,
+     * plus §9.1's limit refusal.
+     *
+     * <p>All four say the same thing about portability: this deployment declined, and another configured
+     * differently would not have. That is the whole of why the policy is worth printing beside them.
+     */
     private static boolean isRefusal(Diagnostic.Code code) {
         return code == Diagnostic.Code.CONFUSABLE_NAMES || code == Diagnostic.Code.RESTRICTED_CHARACTER
-                || code == Diagnostic.Code.RESTRICTED_SCRIPT;
+                || code == Diagnostic.Code.RESTRICTED_SCRIPT || code == Diagnostic.Code.LIMIT_EXCEEDED;
     }
 
     /** A policy on one line: what differs between two deployments that disagree about one name. */
     private static String summary(CliPolicy policy) {
         return "identifier policy " + summary(policy.identifierPolicy())
                 + ", token policy " + summary(policy.tokenPolicy())
-                + ", Unicode " + policy.unicodeDataVersion();
+                + ", Unicode " + policy.unicodeDataVersion()
+                + ", max depth " + policy.limits().maxDepth();
     }
 
     private static String summary(CliPolicy.CliUnicodePolicy policy) {
@@ -206,7 +213,8 @@ enum OutputFormat {
     private static String renderText(CliPolicy policy) {
         return "identifier policy: " + summary(policy.identifierPolicy()) + System.lineSeparator()
                 + "token policy:      " + summary(policy.tokenPolicy()) + System.lineSeparator()
-                + "unicode data:      " + policy.unicodeDataVersion();
+                + "unicode data:      " + policy.unicodeDataVersion() + System.lineSeparator()
+                + "max depth:         " + policy.limits().maxDepth();
     }
 
     /**
@@ -313,7 +321,8 @@ enum OutputFormat {
         jsonUnicodePolicy(json, policy.identifierPolicy());
         json.append(",\"token_policy\":");
         jsonUnicodePolicy(json, policy.tokenPolicy());
-        json.append(",\"unicode_data_version\":").append(jsonString(policy.unicodeDataVersion())).append('}');
+        json.append(",\"unicode_data_version\":").append(jsonString(policy.unicodeDataVersion()));
+        json.append(",\"limits\":{\"max_depth\":").append(policy.limits().maxDepth()).append("}}");
     }
 
     private static void jsonUnicodePolicy(StringBuilder json, CliPolicy.CliUnicodePolicy policy) {

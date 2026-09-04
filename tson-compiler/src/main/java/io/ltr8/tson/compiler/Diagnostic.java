@@ -120,7 +120,9 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * this parser doesn't implement (§8.1 requires that last distinction be visible rather than folded into
      * "malformed").
      *
-     * <p><b>Anything else is rethrown, deliberately.</b> {@code Tson.validate} promises never to throw for a
+     * <p><b>Anything else is rethrown, deliberately</b> -- including {@link TsonLimitExceededException},
+     * which has its own classifier ({@link #ofLimitExceeded}) and is caught ahead of this. {@code
+     * Tson.validate} promises never to throw for a
      * bad input <i>document</i>, which is not the same as never throwing: an exception that isn't one of
      * these three is a fault in this library, and turning it into a diagnostic would tell a caller their
      * document is invalid when it isn't -- burying the real failure and its stack trace behind a false
@@ -159,6 +161,27 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         }
         return new Diagnostic(Optional.of(""), Optional.empty(), "", Code.VALIDATION_ERROR, e.getMessage(),
                 expected, actual, Optional.ofNullable(position), Optional.empty());
+    }
+
+    /**
+     * A document this processor's {@link TsonLimitsPolicy} declined to read ([TSON-DATA] §9.1) -- {@link
+     * #ofBaseSyntaxError}'s sibling, and deliberately not a case inside it.
+     *
+     * <p><b>The two are separated at the type, because they are separated in what they claim.</b> A
+     * base-syntax failure is a verdict every processor reaching the same bytes repeats; this one is a
+     * statement about the reader's configuration, which is why it carries {@link Code#LIMIT_EXCEEDED}
+     * ({@link Code#verdict()} {@code false}) and why a facade catches {@link TsonLimitExceededException}
+     * before the {@code RuntimeException} that reaches {@code ofBaseSyntaxError}. Routing it through that
+     * method instead would report a configured bound as malformed input.
+     *
+     * <p>{@code expected}/{@code actual} carry the pair a sender can act on: the depth the reader admits
+     * against the depth the document reached at the point it was stopped. They are the constraint that
+     * failed, in {@code AtomTypeException}'s own vocabulary, rather than the type's name.
+     */
+    public static Diagnostic ofLimitExceeded(TsonLimitExceededException e) {
+        return new Diagnostic(Optional.of(""), Optional.empty(), "", Code.LIMIT_EXCEEDED, e.getMessage(),
+                "at most " + e.limit() + " levels of nesting", "more than " + e.limit(),
+                Optional.of(e.position()), Optional.empty());
     }
 
     /**
@@ -421,6 +444,18 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         NOT_IMPLEMENTED,
         BIND_MISMATCH,
 
+        /**
+         * The document asked for more than this processor's {@link TsonLimitsPolicy} will spend ([TSON-DATA]
+         * §9.1) -- nested deeper than {@link TsonLimitsPolicy#maxDepth()}, so far.
+         *
+         * <p><b>Not a verdict, and the one code here where that is a property of the reader rather than of
+         * the document.</b> The bytes may be well-formed, valid, and read in full by the next processor
+         * along; what happened is that this deployment declined. Which is also why the run's own {@code
+         * TsonLimitsPolicy} is stated beside the diagnostics rather than copied into each one -- the same
+         * division §8.2's name policy makes.
+         */
+        LIMIT_EXCEEDED,
+
         // ── A schema was not obtained: one code per reason ───────────────────────────────────────
         //
         // Why a fetch failed is a *routing* question, and a code is what a consumer routes on -- the same
@@ -462,11 +497,11 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
          * Whether this code is a verdict on the document -- <b>the document was checked, and this is what
          * checking found</b>.
          *
-         * <p>The three that are not say so for three different reasons: {@link #NOT_IMPLEMENTED} that this
+         * <p>The four that are not say so for four different reasons: {@link #NOT_IMPLEMENTED} that this
          * library could not check it, {@link #BIND_MISMATCH} that the reading application is wired wrong,
-         * and the five {@code SCHEMA_*} fetch codes that no schema was obtained to check against. Nothing
-         * about the document is being asserted by any of them, which is what a caller routing on the answer
-         * needs to know.
+         * {@link #LIMIT_EXCEEDED} that this deployment declined to spend the resources, and the five {@code
+         * SCHEMA_*} fetch codes that no schema was obtained to check against. Nothing about the document is
+         * being asserted by any of them, which is what a caller routing on the answer needs to know.
          *
          * <p><b>A §8.2 name-hygiene refusal is a verdict</b>, though not a validity one: the processor
          * looked and declined, and the sender holds the fix. What it is not is an {@link #SCHEMA_ERROR}-style
@@ -478,7 +513,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
          */
         public boolean verdict() {
             return switch (this) {
-                case NOT_IMPLEMENTED, BIND_MISMATCH, SCHEMA_NOT_PERMITTED, SCHEMA_NOT_FOUND,
+                case NOT_IMPLEMENTED, BIND_MISMATCH, LIMIT_EXCEEDED, SCHEMA_NOT_PERMITTED, SCHEMA_NOT_FOUND,
                         SCHEMA_UNREACHABLE, SCHEMA_TIMEOUT, SCHEMA_TOO_LARGE -> false;
                 default -> true;
             };

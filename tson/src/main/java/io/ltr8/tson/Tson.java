@@ -84,9 +84,13 @@ public final class Tson {
      * two policies, where {@code core.identifierPolicy()} is the declared-name half. */
     private final TsonUnicodePolicy tokenPolicy;
 
+    /** [TSON-DATA] §9.1's bounds every read off this instance applies -- {@link TsonConfig#limits}. */
+    private final TsonLimitsPolicy limits;
+
     Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext, boolean strictBinding,
-         TsonUnicodePolicy tokenPolicy) {
+         TsonUnicodePolicy tokenPolicy, TsonLimitsPolicy limits) {
         this.tokenPolicy = tokenPolicy;
+        this.limits = limits;
         this.core = core;
         this.dataBindContext = dataBindContext;
         this.tree = TsonCompiledSchemaRegistry.tree(core);
@@ -111,7 +115,7 @@ public final class Tson {
      */
     public TsonObjectReader objectReader() {
         return new TsonObjectReader(bind, dataBindContext)
-                .withTokenPolicy(tokenPolicy).withIdentifierPolicy(core.identifierPolicy());
+                .withTokenPolicy(tokenPolicy).withIdentifierPolicy(core.identifierPolicy()).withLimits(limits);
     }
 
     /**
@@ -125,7 +129,7 @@ public final class Tson {
      */
     public TsonTreeReader treeReader() {
         return new TsonTreeReader(tree)
-                .withTokenPolicy(tokenPolicy).withIdentifierPolicy(core.identifierPolicy());
+                .withTokenPolicy(tokenPolicy).withIdentifierPolicy(core.identifierPolicy()).withLimits(limits);
     }
 
     /** A fresh, schemaless (Class 1) {@link TsonObjectWriter} bound to {@link #dataBindContext()} -- the inverse of {@link #objectReader()}. */
@@ -152,6 +156,20 @@ public final class Tson {
      */
     public TsonUnicodeProcessorPolicy processorPolicy() {
         return TsonUnicodeProcessorPolicy.of(core.identifierPolicy(), tokenPolicy);
+    }
+
+    /**
+     * The [TSON-DATA] §9.1 resource limits this instance applies -- {@link TsonConfig#limits}.
+     *
+     * <p><b>{@link #processorPolicy()}'s companion, and stated for the same reason.</b> A limit is the
+     * reading deployment's own choice, so the same bytes may be read here and refused elsewhere; a sender
+     * that can consult the bound writes a document that fits, where one that cannot learns it from a refusal.
+     * The two are separate values rather than one because they answer separate questions -- what this
+     * processor will <em>read</em>, and what it will <em>admit as a name</em> -- and a deployment that has
+     * changed one has said nothing about the other.
+     */
+    public TsonLimitsPolicy limitsPolicy() {
+        return limits;
     }
 
     /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/{@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBindContext} to customize it. */
