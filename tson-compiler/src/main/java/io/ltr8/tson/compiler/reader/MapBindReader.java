@@ -52,9 +52,9 @@ final class MapBindReader extends MapAbstractReader<Object> {
                          TsonTypeReaderResolver resolver,
                          SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
         super(name, displayName, body,
-                ElementBridging.wrap(AnnotationBoxing.wrap(UseSite.reader(body.keyType(), resolver),
+                ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.keyType().name()),
                         descriptor.keyDataClass(), annotationTypes), descriptor.keyDataClass()),
-                ElementBridging.wrap(AnnotationBoxing.wrap(UseSite.reader(body.valueType(), resolver),
+                ElementBridging.wrap(AnnotationBoxing.wrap(resolver.resolve(body.valueType().name()),
                         descriptor.valueDataClass(), annotationTypes), descriptor.valueDataClass()),
                 schemaLocation);
         this.descriptor = descriptor;

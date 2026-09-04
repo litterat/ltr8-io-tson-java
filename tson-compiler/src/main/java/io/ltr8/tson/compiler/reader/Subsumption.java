@@ -1,10 +1,10 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Product;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.HashSet;
@@ -55,9 +55,9 @@ public final class Subsumption {
     }
 
     /**
-     * The written names that mean {@code name}: itself, plus every {@code REFERENCE} entry that flattens to
-     * it. §7.2 compares "after reference flattening of <b>both</b>", and §8.3 makes an alias and its target
-     * one type -- so {@code !created} at a {@code created}-typed position names the position's own type even
+     * The written names that mean {@code name}: itself, plus every {@code REFERENCE} entry whose chain ends
+     * at it. §7.2 compares "after reference flattening of <b>both</b>", and an alias and its target are one
+     * type -- so {@code !created} at a {@code created}-typed position names the position's own type even
      * though the reader running there belongs to the instantiation {@code created} aliases. Computed once,
      * at compile time, because the reader cannot know which of its aliases a given position was written as.
      */
@@ -65,25 +65,10 @@ public final class Subsumption {
         Set<String> names = new LinkedHashSet<>();
         names.add(name);
         entries.forEach((alias, definition) -> {
-            if (flatten(alias, entries).equals(name)) {
+            if (ReferenceChain.terminal(alias, entries).equals(name)) {
                 names.add(alias);
             }
         });
         return names;
-    }
-
-    /** An entry name with every {@code REFERENCE} hop followed; a cycle stops at the name it re-enters. */
-    private static String flatten(String name, Map<String, TypeDefinition> entries) {
-        Set<String> walked = new HashSet<>();
-        String current = name;
-        while (walked.add(current)) {
-            TypeDefinition definition = entries.get(current);
-            if (definition == null || !(definition.body() instanceof Reference reference)
-                    || !reference.target().arguments().isEmpty()) {
-                return current;
-            }
-            current = reference.target().name();
-        }
-        return current;
     }
 }

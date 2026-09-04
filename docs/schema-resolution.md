@@ -566,12 +566,20 @@ namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a 
 *is* its target's reader, resolved recursively, named for the entry doing the referring, so a use site naming
 `pct` over `pct => small` reads and reports as `pct`.
 
-- **The walk was never avoidable, which is why the rewrite was not worth its price.** `TsonSchemaCompiler`,
-  `DiscriminationClass` and `TypeInhabitance` each walk a chain independently, `TsonSchemaLinker` walks one
-  for choice-variant distinctness and for §5.2's field-value check, and §8.3 itself required the chain stay
-  walkable (`reference.target` was never flattened). Rewriting the output as well left two representations to
-  keep in step, and `@alias` was a *lossy* summary of the one it duplicated — it kept only the source-site
-  name, so in `digest_chain => digest_alias => bytes` it recorded the hop that carried nothing.
+- **The walk was never avoidable, which is why the rewrite was not worth its price.** §8.3 itself required
+  the chain stay walkable (`reference.target` was never flattened), and several passes walk one. Rewriting the
+  output as well left two representations to keep in step, and `@alias` was a *lossy* summary of the one it
+  duplicated — it kept only the source-site name, so in `digest_chain => digest_alias => bytes` it recorded the
+  hop that carried nothing.
+- **`ReferenceChain` is that walk, stated once** (`resolver/ReferenceChain.java`). The linker's choice-variant
+  distinctness and its §5.2 field-value check, `Subsumption`'s subtype naming and `DiscriminationClass`'s
+  classification each had their own loop, and the one decision inside — *stop at a non-reference, at an
+  **argument-bearing** target (an application, with no entry until materialisation mints one), or on a cycle*
+  — was four decisions that could drift. `terminal` answers with a name, `terminalDefinition` with the entry;
+  they differ only on an undeclared name and a cycle, where the first has an answer its caller wants (a type
+  parameter is its own terminal) and the second has none. **`ParameterKinds` keeps its own loop deliberately**:
+  it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the template
+  being the answer there. `ReferenceChainWalkTest` pins all four stops.
 - **A directive on an alias is applied where the alias is compiled** (`UseSite.respelledByDeclaration`). An
   entry that declares `@bytes_encoding` respells the reader its target produced. **Nearest-first falls out of
   the recursion** — a chain compiles innermost-first, so the hop nearest the use site respells last and wins —

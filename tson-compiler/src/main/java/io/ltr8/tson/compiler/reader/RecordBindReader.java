@@ -273,7 +273,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             // Bind mode wants the atom itself, so the mode wrapper is the identity here where tree mode
             // boxes the leaf in a TsonAtom.
             return BytesEncoding.fieldReader(field, context, (reader, leafName) -> reader)
-                    .orElseGet(() -> UseSite.reader(field.type(), resolver));
+                    .orElseGet(() -> resolver.resolve(field.type().name()));
         };
     }
 

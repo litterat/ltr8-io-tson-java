@@ -21,11 +21,11 @@ import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
@@ -68,22 +68,9 @@ public enum DiscriminationClass {
      * stays required.
      */
     public static Optional<DiscriminationClass> of(String name, Map<String, TypeDefinition> namespace) {
-        Set<String> walked = new HashSet<>();
-        String current = name;
-        while (walked.add(current)) {
-            TypeDefinition def = namespace.get(current);
-            if (def == null) {
-                return Optional.empty();
-            }
-            // An argument-bearing target is an application rather than a hop, and has no entry to classify
-            // until materialisation mints one -- which it has, for every entry a compiled choice can reach.
-            if (def.body() instanceof Reference reference && reference.target().arguments().isEmpty()) {
-                current = reference.target().name();
-                continue;
-            }
-            return classify(def);
-        }
-        return Optional.empty(); // a reference cycle has no terminal entry, so no class
+        // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
+        // neither has a class, which is what the empty result means to every caller.
+        return ReferenceChain.terminalDefinition(name, namespace).flatMap(DiscriminationClass::classify);
     }
 
     private static Optional<DiscriminationClass> classify(TypeDefinition def) {

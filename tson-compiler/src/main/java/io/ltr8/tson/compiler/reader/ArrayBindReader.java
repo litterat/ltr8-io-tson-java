@@ -64,7 +64,7 @@ final class ArrayBindReader extends ArrayAbstractReader<Object> {
                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
         super(name, displayName, body,
                 ElementBridging.wrap(
-                        AnnotationBoxing.wrap(UseSite.reader(body.elementType(), resolver),
+                        AnnotationBoxing.wrap(resolver.resolve(body.elementType().name()),
                                 descriptor.arrayDataClass(), annotationTypes),
                         descriptor.arrayDataClass()),
                 schemaLocation);

@@ -1,10 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.BytesParser;
 import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
  * The reader for a child position, named the way the author wrote that position.
@@ -18,10 +16,10 @@ import io.ltr8.tson.schema.meta.TypeRef;
  * naming {@code pct} gets a reader called {@code pct}.
  *
  * <p><b>A use site needs nothing of its own for that</b>, which it used to. Resolved output no longer
- * rewrites a type position past a reference, so the name a position names is the name the author wrote and
- * the entry it names is where the display name is settled. What is left here is the two seams a compiled
- * reader offers a caller that has one -- {@link Renamed} and {@link Respelled} -- and the {@link #named}
- * helper the reference compile uses.
+ * rewrites a type position past a reference, so a position reaches its child reader by resolving the name it
+ * names and nothing more -- every container and record field calls the resolver directly. What is left here
+ * is the two seams a compiled reader offers a caller holding one, {@link Renamed} and {@link Respelled}, and
+ * the two helpers the reference compile applies them through.
  *
  * <p>This is the naming twin of the rule {@code SchemaLocation} already follows for pointers: the pointer is
  * the path taken ({@code /person/age}), never the leaf it resolves to ({@code /int32} in core.tn), "because
@@ -43,11 +41,6 @@ import io.ltr8.tson.schema.meta.TypeRef;
 public final class UseSite {
 
     private UseSite() {
-    }
-
-    /** The already-compiled reader for the entry {@code ref} names -- which is the name the author wrote. */
-    static TsonTypeReader<?> reader(TypeRef ref, TsonTypeReaderResolver resolver) {
-        return resolver.resolve(ref.name());
     }
 
     /**
@@ -110,7 +103,7 @@ public final class UseSite {
      *
      * <p>Implemented by the families whose diagnostics name the type they were reading. A family that does
      * not -- or one whose name is already the use site's, like a record template's single substituted entry
-     * -- simply does not implement it, and {@link #reader} hands its reader straight back.
+     * -- simply does not implement it, and {@link #named} hands its reader straight back.
      */
     public interface Renamed {
 
