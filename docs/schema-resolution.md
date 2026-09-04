@@ -98,8 +98,10 @@ are kept in step deliberately.
   this shape, which `DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord` pins. **It
   closes into a working type, not a tolerated one**: `ctor_box => <T> ~base & { value: T }` with
   `flagged => ctor_box<boolean>` materialises, compiles, accepts `{ value: true }` and rejects
-  `{ value: banana }` with a `TYPE_MISMATCH` at `/value`; the variant channel behaves the same. That is what
-  the decision turns on, and it is why the entry in `BACKLOG.md` is a decision before it is a check.
+  `{ value: banana }` with a `TYPE_MISMATCH` at `/value`; the variant channel behaves the same. That is the
+  evidence `SPEC-FEEDBACK.md` #35 rests on, which proposes §4.2 delete the rule: its other two channels are
+  decided by §5.2 and §5.10 anyway, and its remaining one has no legal spelling once level discipline is
+  enforced beside it.
 - **All six of §5.2's field-state spellings resolve**, including `field: type? = _` — `OPTIONAL_FIXED`
   carrying *no* value, so §8.1 writes a `record_field` without a `value` member and the field must be
   omitted or written `_`. Its three resolver errors are enforced: `~ _` on any field, `= _` on a REQUIRED

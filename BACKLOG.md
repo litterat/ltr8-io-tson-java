@@ -35,9 +35,9 @@ distinction, and a misfiled entry is how a wrong classification gets adopted rat
 
 Every real schema resolved so far (meta-kernel, meta.tn, core.tn, and hand-built test fixtures)
 happens to fit a narrow shape this pipeline already handles — declared in dependency order, with
-callers hand-sequencing registration themselves. These items are what's missing for the *general*,
+callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case, found by re-auditing Part 2 against the current source rather than CLAUDE.md's
-own prose (which had gone stale on at least one of them):
+own prose (which had gone stale on it):
 
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
@@ -46,14 +46,6 @@ own prose (which had gone stale on at least one of them):
   `TsonCompiledMetaRegistry.withStandardLibrary` already does, which is scoped to just the three bundled
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
-
-- [ ] **§4.2's value-route-only rule: decide whether it survives, then act.** A `~` declaration's parameter
-  standing in a *field type* or a *variant* is a resolver error at the declaration; nothing checks it.
-  **Relax** — write the `SPEC-FEEDBACK.md` entry, and there is nothing to build. **Keep** — implement the
-  check, and drop the `~` from `DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord`,
-  which pins the shape today. `ParameterKinds` is the machinery either way: it classifies each written slot
-  against the field the constructor declares for it. `docs/schema-resolution.md` has what the decision turns
-  on.
 
 ## Checked annotations
 
