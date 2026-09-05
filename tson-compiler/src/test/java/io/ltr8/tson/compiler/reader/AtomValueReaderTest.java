@@ -49,7 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class AtomValueReaderTest {
 
     private static Object readValue(Top atomBody, String source) {
-        TypeDefinition atomEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), 
+        TypeDefinition atomEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
                 List.of(), List.of(), Optional.empty(), atomBody);
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("field", atomEntry);

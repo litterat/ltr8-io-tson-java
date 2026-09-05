@@ -11,6 +11,7 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -84,12 +85,12 @@ final class ParameterKinds {
                                                     FailureReporter reporter) {
         Map<String, Occurrences> observed = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
-            if (definition.parameters().isEmpty() || !(definition.body() instanceof HeldBody held)) {
+            if (definition.parameters().isEmpty() || !(definition.body() instanceof TemplateBody held)) {
                 return;
             }
             Occurrences occurrences = new Occurrences(definition.parameters());
             try {
-                new Walk(occurrences, meta).body(held);
+                new Walk(occurrences, meta).body(HeldBody.of(held));
             } catch (TsonSchemaValidationException e) {
                 if (declared.contains(name)) {
                     reporter.report(name, e);
@@ -112,12 +113,12 @@ final class ParameterKinds {
      * is reported by the batch pass, which is the one that knows which declarations this schema wrote.
      */
     static Map<String, Kind> inferOne(TypeDefinition template, Function<String, TypeDefinition> meta) {
-        if (template.parameters().isEmpty() || !(template.body() instanceof HeldBody held)) {
+        if (template.parameters().isEmpty() || !(template.body() instanceof TemplateBody held)) {
             return Map.of();
         }
         Occurrences occurrences = new Occurrences(template.parameters());
         try {
-            new Walk(occurrences, meta).body(held);
+            new Walk(occurrences, meta).body(HeldBody.of(held));
         } catch (TsonSchemaValidationException e) {
             return Map.of();
         }

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0185d18d3f3e3d3d3aeb62adcf0d1f4ee496cbe8372da71c8ca7bef78c2e3886"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=63167ce964cbc90cdf5b44a33bbaa5207768ef801a087ba0437924c185063275"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -60,6 +60,35 @@
     """
   reference => top & {
     target: type_ref
+  }
+
+  @doc:"""
+    Held body — the body of an entry that declares type parameters
+    ([TSON-SCHEMA] §5.10). `template` is the constructor application
+    as written, unread until materialisation substitutes the
+    parameters away, and `parameters` are the names it binds.
+
+    Text, because that is what "held" means. A held body is not a
+    value of this vocabulary and cannot be one: a parameter stands
+    wherever a token stands — `min_items: N` as readily as
+    `element_type: T` — so a body carrying one is not typed by any
+    constructor's own record shape until it closes. Writing it as
+    though it were leaves the two halves disagreeing, since a value
+    parameter refuses to read at all and a type parameter reads as a
+    reference to a type nobody declared.
+
+    So an open entry's body is this, and `type_definition.body` is a
+    `top` with no exception. What is compared is the parsed form and
+    never the text: an open synthetic's identity is derived from its
+    held binding record, so two spellings of one form must reduce to
+    one entry, and whitespace is free.
+
+    Composes with `top` directly, like `reference` and `data`: it
+    describes no value's shape, and nothing is ever typed by it.
+    """
+  template => top & {
+    parameters:  [param_name]
+    template:    text
   }
 
   @doc:"""
@@ -346,7 +375,7 @@
   field_state         => !enum [REQUIRED REQUIRED_DEFAULT REQUIRED_FIXED
                                        OPTIONAL OPTIONAL_FIXED]
   element_state       => !enum [REQUIRED OPTIONAL]
-  type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA]
+  type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA TEMPLATE]
 
   @doc:"""
     Annotation type markers. `synthetic` is resolver-attached and derived:
@@ -509,7 +538,6 @@
   type_definition => {
     source:       type_ref?
     kind:         type_kind
-    parameters:   [param_name]?
     supertypes:   [type_name]?
     subtypes:     [type_name]?
     disjoint:     boolean?

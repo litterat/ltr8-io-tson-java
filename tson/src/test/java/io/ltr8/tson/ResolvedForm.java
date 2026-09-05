@@ -51,8 +51,6 @@ final class ResolvedForm {
     /** The placeholder both sides reduce a synthetic's content hash to. */
     static final String HASH_PLACEHOLDER = "_xxhash";
 
-    /** Stands in for an open entry's body in {@link #rendered}, the two sides representing it differently. */
-    private static final Top HELD_BODY_COMPARED_SEPARATELY = RecordBody.of(List.of());
 
     private ResolvedForm() {
     }
@@ -77,7 +75,7 @@ final class ResolvedForm {
      * Honouring the MUST instead is one sort, here, reaching both callers.
      */
     static TypeDefinition canonical(TypeDefinition definition) {
-        return new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
+        return new TypeDefinition(definition.source(), definition.kind(),
                 definition.supertypes().stream().sorted().toList(),
                 definition.subtypes().stream().sorted().toList(), definition.disjoint(), definition.body(),
                 definition.position(), definition.annotations());
@@ -90,13 +88,14 @@ final class ResolvedForm {
      * it in place would mean rebuilding every body shape here.
      */
     static String rendered(TypeDefinition definition) {
-        // An open entry's body is compared separately, as wire form -- see heldBodies. Blanked here on both
-        // sides so this comparison stays about everything else the entry states, which both sides do agree on.
-        TypeDefinition compared = definition.parameters().isEmpty() ? definition
-                : new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
-                        definition.supertypes(), definition.subtypes(),
-                        definition.disjoint(), HELD_BODY_COMPARED_SEPARATELY, definition.position(),
-                        definition.annotations());
+        // An open entry's body is text, and [TSON-SCHEMA] §5.10 compares the *parsed* form: one spelling is
+        // required of the application, not of the whitespace around it. Both sides are reduced to their
+        // parsed application here, so a held body compares like every other body and needs no side channel.
+        TypeDefinition compared = definition.body() instanceof TemplateBody held
+                ? new TypeDefinition(definition.source(), definition.kind(),
+                        definition.supertypes(), definition.subtypes(), definition.disjoint(),
+                        parsedForComparison(held), definition.position(), definition.annotations())
+                : definition;
         String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(compared)))
                 .replaceAll(HASH_PLACEHOLDER);
         // `position` is this model's own: an @Unbound component recording where a declaration was written,
@@ -122,70 +121,17 @@ final class ResolvedForm {
     }
 
     /**
-     * The <b>held</b> bodies a fixture document writes, by entry name -- the wire form, parsed and not read.
+     * A held body with its text replaced by the structure that text denotes.
      *
-     * <p>[TSON-SCHEMA] §8.1's shadowing rule makes a token in an open entry's body a parameter reference
-     * rather than a value of the slot's declared type, and no reader can apply it: a held body is an
-     * <em>AST</em> -- the application as written -- where a reader reads a closed type, so both readers apply
-     * the slot's own type regardless. Where the parameter's spelling happens to satisfy that type it binds a
-     * <em>misreading</em> ({@code extern_of}'s {@code S} binds as a relative URI), and where it does not it
-     * fails outright ({@code min_items: N} against {@code integer}). Either way a bound comparison of an open
-     * entry compares the wrong things.
-     *
-     * <p>So an open entry's body is compared as wire form on both sides, which is what §8.1 says it is on
-     * both sides: an open entry is a {@code type_definition} whose body is the held application in wire form,
-     * "compared as wire form and never as bound values". This resolver holds the application unread
-     * ({@code HeldBody}) and the fixture writes it verbatim; the AST is the common ground -- no emitter, no
-     * binder, and whitespace already gone.
+     * <p>[TSON-SCHEMA] §5.10's one-spelling rule is about the application, not about the whitespace around
+     * it: an open synthetic's identity is derived from its held binding record, so what must agree between
+     * two resolvers is the parsed form. Reducing both sides here is that rule applied once, and it is what
+     * lets an open entry be compared by {@link #rendered} like every other entry rather than through a
+     * second channel of its own.
      */
-    static Map<String, DataValue> heldBodies(String resolvedText) {
-        Map<String, DataValue> held = new LinkedHashMap<>();
-        CoreValue root = new TsonDataParser(resolvedText).parseDocument().root().coreValue();
-        if (!(root instanceof MapValue entries)) {
-            return held;
-        }
-        for (MapValue.MapEntry entry : entries.entries()) {
-            if (!(entry.key().coreValue() instanceof TokenValue name)
-                    || !(entry.value().value().coreValue() instanceof RecordValue definition)) {
-                continue;
-            }
-            if (!isOpen(definition)) {
-                continue;
-            }
-            field(definition, "body").ifPresent(body -> held.put(withoutHash(name.text()), body));
-        }
-        return held;
-    }
-
-    /** An entry is open when it writes a non-empty {@code parameters} list -- §8.1's own test for a held body. */
-    private static boolean isOpen(RecordValue definition) {
-        return field(definition, "parameters")
-                .map(DataValue::coreValue)
-                .filter(ArrayValue.class::isInstance)
-                .map(ArrayValue.class::cast)
-                .filter(parameters -> !parameters.elements().isEmpty())
-                .isPresent();
-    }
-
-    private static Optional<DataValue> field(RecordValue record, String name) {
-        return record.fields().stream()
-                .filter(field -> field.name().equals(name))
-                .map(field -> field.value().value())
-                .findFirst();
-    }
-
-    /**
-     * This resolver's own held body for {@code definition}, in the same wire form {@link #heldBodies} reads
-     * -- written out and parsed straight back. {@code HeldBody} is {@code @Transparent}, so the writer emits
-     * the application it holds rather than a wrapper naming a type nothing declares, which is what makes the
-     * round trip land on the very tree the fixture spells.
-     */
-    static Optional<DataValue> ourHeldBody(Tson tson, TypeDefinition definition) {
-        if (!(definition.body() instanceof TemplateBody)) {
-            return Optional.empty();
-        }
-        return Optional.of(new TsonDataParser(tson.objectWriter().toTson(definition.body()))
-                .parseDocument().root());
+    private static Top parsedForComparison(TemplateBody held) {
+        return new TemplateBody(held.parameters(),
+                String.valueOf(new TsonDataParser(held.template()).parseDocument().root()));
     }
 
     /**

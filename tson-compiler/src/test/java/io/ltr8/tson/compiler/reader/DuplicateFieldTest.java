@@ -45,7 +45,7 @@ class DuplicateFieldTest {
     @Test
     void aMalformedFirstOccurrenceStillReportsEvenThoughTheValidSecondOccurrenceWins() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("int8", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(),  List.of(),
+        entries.put("int8", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
                 List.of(), Optional.empty(), new IntegerType(new IntegerSize(8, true))));
         entries.put("holder", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("value", TypeRef.of("int8"))))));
@@ -80,7 +80,7 @@ class DuplicateFieldTest {
     @Test
     void everyRepeatIsReported() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("int8", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(),  List.of(),
+        entries.put("int8", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
                 List.of(), Optional.empty(), new IntegerType(new IntegerSize(8, true))));
         entries.put("holder", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("value", TypeRef.of("int8"))))));

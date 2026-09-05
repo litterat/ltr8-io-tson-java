@@ -565,7 +565,7 @@ public final class SchemaResolver {
         if (!(resolved.body() instanceof io.ltr8.tson.schema.meta.TemplateBody held)) {
             return;
         }
-        for (io.ltr8.tson.schema.meta.TypeRef application : held.applications()) {
+        for (io.ltr8.tson.schema.meta.TypeRef application : HeldBody.of(held).applications()) {
             if (resolved.parameters().contains(application.name())) {
                 throw new TsonSchemaValidationException("'" + name + "': '" + application.name()
                         + "' is a type parameter applied to arguments -- a parameter stands for a type, never "
@@ -606,8 +606,9 @@ public final class SchemaResolver {
         // An open placeholder holds its body like every other open entry, so nothing downstream has to keep
         // a second substitution path for the one shape that did not -- see WireForm.heldEmptyRecord.
         Top body = parameters.isEmpty() ? RecordBody.of(List.of())
-                : new HeldBody(WireForm.heldEmptyRecord());
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, List.of(), List.of(),
+                : HeldBody.held(parameters, WireForm.heldEmptyRecord());
+        return new TypeDefinition(Optional.empty(),
+                parameters.isEmpty() ? TypeKind.PRODUCT : TypeKind.TEMPLATE, List.of(), List.of(),
                 Optional.empty(), body, position, Annotations.empty());
     }
 

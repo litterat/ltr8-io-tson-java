@@ -18,8 +18,10 @@ package io.ltr8.tson.schema.meta;
  * own README "Under development" history for the bug this fixed).
  *
  * <p>Two branches describe something other than a constructed value, and both compose with {@code top}
- * directly for that reason: {@link Data}, the meta layer's extension point, and {@link TemplateBody}, the held
- * body of an entry that declares type parameters.
+ * directly for that reason: {@link Data}, the meta layer's extension point, and {@link TemplateBody}, the
+ * held body of an entry that declares type parameters. {@link Data} is the only {@code non-sealed} branch --
+ * its implementations are consumer classes this library has never seen -- where a held body is an ordinary
+ * record here, carrying the application as text.
  */
 public sealed interface Top permits Atom, Product, Sum, Reference, Data, TemplateBody {
 }

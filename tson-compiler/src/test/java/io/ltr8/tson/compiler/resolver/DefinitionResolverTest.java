@@ -101,7 +101,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DefinitionResolverTest {
 
     private static final String EXPECTED_INTEGER_SIZE =
-            "{ kind: \"PRODUCT\" parameters: [] supertypes: [] subtypes: [] "
+            "{ kind: \"PRODUCT\" supertypes: [] subtypes: [] "
                     + "body: !record { supertypes: [] fields: [ "
                     + "{ name: \"bits\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" } "
                     + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } state: \"REQUIRED\" } "
@@ -235,20 +235,20 @@ class DefinitionResolverTest {
     @Test
     void writesAUnitBody() throws DataBindException {
         // Structurally: value => !type_definition { kind: ATOM source: unit body: !unit {} }
-        TypeDefinition value = new TypeDefinition(Optional.of(TypeRef.of("unit")), TypeKind.ATOM, List.of(), 
+        TypeDefinition value = new TypeDefinition(Optional.of(TypeRef.of("unit")), TypeKind.ATOM, 
                 List.of(), List.of(), Optional.empty(), new Unit());
 
-        assertEquals("{ source: { name: \"unit\" arguments: [] } kind: \"ATOM\" parameters: [] "
+        assertEquals("{ source: { name: \"unit\" arguments: [] } kind: \"ATOM\" "
                 + "supertypes: [] subtypes: [] body: !unit {} }", write(value));
     }
 
     @Test
     void writesAnEnumBody() throws DataBindException {
         // Structurally: boolean => !type_definition { kind: ATOM source: enum body: !enum { members: [true false] } }
-        TypeDefinition booleanDef = new TypeDefinition(Optional.of(TypeRef.of("enum")), TypeKind.ATOM, List.of(),
+        TypeDefinition booleanDef = new TypeDefinition(Optional.of(TypeRef.of("enum")), TypeKind.ATOM,
                  List.of(), List.of(), Optional.empty(), new EnumBody(List.of("true", "false")));
 
-        assertEquals("{ source: { name: \"enum\" arguments: [] } kind: \"ATOM\" parameters: [] "
+        assertEquals("{ source: { name: \"enum\" arguments: [] } kind: \"ATOM\" "
                         + "supertypes: [] subtypes: [] body: !enum { members: [ \"true\" \"false\" ] } }",
                 write(booleanDef));
     }
@@ -259,7 +259,7 @@ class DefinitionResolverTest {
         TypeDefinition choice = TypeDefinition.product(
                 new ChoiceBody(List.of(TypeRef.of("email"), TypeRef.of("phone"))));
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [] subtypes: [] "
                         + "body: !choice { variants: [ { name: \"email\" arguments: [] } { name: \"phone\" arguments: [] } ] } }",
                 write(choice));
     }
@@ -268,7 +268,7 @@ class DefinitionResolverTest {
     void writesAnArrayBody() throws DataBindException {
         TypeDefinition intList = TypeDefinition.product(ArrayBody.of(TypeRef.of("integer")));
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [] subtypes: [] "
                         + "body: !array { element_type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" "
                         + "unordered: false unique_items: false } }",
                 write(intList));
@@ -278,7 +278,7 @@ class DefinitionResolverTest {
     void writesAMapBody() throws DataBindException {
         TypeDefinition translations = TypeDefinition.product(MapBody.of(TypeRef.of("text"), TypeRef.of("text")));
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [] subtypes: [] "
                         + "body: !map { key_type: { name: \"text\" arguments: [] } value_type: { name: \"text\" arguments: [] } "
                         + "state: \"REQUIRED\" } }",
                 write(translations));
@@ -289,7 +289,7 @@ class DefinitionResolverTest {
         TypeDefinition point = TypeDefinition.product(new TupleBody(List.of(
                 TupleElement.required(TypeRef.of("number")), TupleElement.required(TypeRef.of("number")))));
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [] subtypes: [] "
                         + "body: !tuple { elements: [ "
                         + "{ element_type: { name: \"number\" arguments: [] } state: \"REQUIRED\" } "
                         + "{ element_type: { name: \"number\" arguments: [] } state: \"REQUIRED\" } ] } }",
@@ -310,7 +310,7 @@ class DefinitionResolverTest {
 
         assertEquals(TypeKind.PRODUCT, top.kind());
         assertEquals(List.of(), top.supertypes());
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [] subtypes: [] "
                 + "body: !record { supertypes: [] fields: [] groups: [] } }", write(top));
     }
 
@@ -341,20 +341,20 @@ class DefinitionResolverTest {
         assertEquals(List.of("top"), reference.supertypes());
 
         // atom, sum: empty trailing body, no fields inherited from top (which has none) -- just the composition itself.
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [ \"top\" ] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] } }", write(atom));
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [ \"top\" ] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] } }", write(sum));
 
         // product: two brand-new fields added by the trailing body (top contributes none).
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [ \"top\" ] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ \"top\" ] fields: [ "
                 + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } state: \"REQUIRED\" } "
                 + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } state: \"REQUIRED\" } "
                 + "] groups: [] } }", write(product));
 
         // reference: one brand-new field.
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [ \"top\" ] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ \"top\" ] fields: [ "
                 + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
                 + "] groups: [] } }", write(reference));
@@ -376,7 +376,7 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.ATOM, integerType.kind());
         assertEquals(List.of("atom", "top"), integerType.supertypes());
 
-        assertEquals("{ kind: \"ATOM\" parameters: [] supertypes: [ \"atom\" \"top\" ] subtypes: [] "
+        assertEquals("{ kind: \"ATOM\" supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"atom\" ] fields: [ "
                         + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } state: \"OPTIONAL\" } "
                         + "{ name: \"min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
@@ -416,7 +416,7 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.REFERENCE, documentation.kind());
         assertEquals(TypeKind.REFERENCE, doc.kind());
 
-        assertEquals("{ source: { name: \"identifier\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+        assertEquals("{ source: { name: \"identifier\" arguments: [] } kind: \"REFERENCE\" "
                 + "supertypes: [] subtypes: [] "
                 + "body: !reference { target: { name: \"identifier\" arguments: [] } } }", write(typeName));
         assertEquals(write(typeName), write(fieldName));
@@ -426,16 +426,16 @@ class DefinitionResolverTest {
         // the definition and it is now carried on the resolved entry. It writes back as a wire annotation
         // ahead of the record (§7.4's `*annotation [type-ref] core-value`), which is how §8.1 represents one:
         // type_definition has no annotations field, and does not need one.
-        assertEquals("@annotation { source: { name: \"void\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+        assertEquals("@annotation { source: { name: \"void\" arguments: [] } kind: \"REFERENCE\" "
                 + "supertypes: [] subtypes: [] "
                 + "body: !reference { target: { name: \"void\" arguments: [] } } }", write(annotation));
 
         // doc => @annotation documentation => @annotation text -- a chain of references, each
         // resolved independently (no following the chain here, just the immediate target).
-        assertEquals("@annotation { source: { name: \"text\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+        assertEquals("@annotation { source: { name: \"text\" arguments: [] } kind: \"REFERENCE\" "
                 + "supertypes: [] subtypes: [] "
                 + "body: !reference { target: { name: \"text\" arguments: [] } } }", write(documentation));
-        assertEquals("@annotation { source: { name: \"documentation\" arguments: [] } kind: \"REFERENCE\" parameters: [] "
+        assertEquals("@annotation { source: { name: \"documentation\" arguments: [] } kind: \"REFERENCE\" "
                 + "supertypes: [] subtypes: [] "
                 + "body: !reference { target: { name: \"documentation\" arguments: [] } } }", write(doc));
     }
@@ -536,10 +536,11 @@ class DefinitionResolverTest {
         TypeDefinition pair = resolveSnippet("pair => <A, B> { first: A  second: B }");
 
         assertEquals(List.of("A", "B"), pair.parameters());
-        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" "
-                        + "parameters: [ \"A\" \"B\" ] supertypes: [] subtypes: [] "
-                        + "body: !record { fields: [ "
-                        + "{ name: first type: A } { name: second type: B } ] } }",
+        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"TEMPLATE\" "
+                        + "supertypes: [] subtypes: [] "
+                        + "body: !template { parameters: [ \"A\" \"B\" ] "
+                        + "template: \"!record { fields: [ "
+                        + "{ name: first type: A } { name: second type: B } ] }\" } }",
                 write(pair));
     }
 
@@ -548,7 +549,7 @@ class DefinitionResolverTest {
     void resolvesAClosedRecordAsAnOrdinaryRecordBody() throws DataBindException {
         TypeDefinition pair = resolveSnippet("pair => { first: text  second: text }");
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"first\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" } "
                         + "{ name: \"second\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" } "
@@ -576,9 +577,10 @@ class DefinitionResolverTest {
 
         assertEquals(List.of("T"), box.parameters());
         assertEquals(List.of("base"), box.supertypes());
-        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] supertypes: [ \"base\" ] "
-                        + "subtypes: [] body: !record { supertypes: [ base ] "
-                        + "fields: [ { name: value type: T } ] } }",
+        assertEquals("{ kind: \"TEMPLATE\" supertypes: [ \"base\" ] "
+                        + "subtypes: [] body: !template { parameters: [ \"T\" ] "
+                        + "template: \"!record { supertypes: [ base ] "
+                        + "fields: [ { name: value type: T } ] }\" } }",
                 write(box));
     }
 
@@ -596,9 +598,10 @@ class DefinitionResolverTest {
                 box  => <T> base & { value: T }
                 """);
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] supertypes: [ \"base\" ] "
-                        + "subtypes: [] body: !record { supertypes: [ base ] "
-                        + "fields: [ { name: id type: text } { name: value type: T } ] } }",
+        assertEquals("{ kind: \"TEMPLATE\" supertypes: [ \"base\" ] "
+                        + "subtypes: [] body: !template { parameters: [ \"T\" ] "
+                        + "template: \"!record { supertypes: [ base ] "
+                        + "fields: [ { name: id type: text } { name: value type: T } ] }\" } }",
                 write(entries.get("box")));
     }
 
@@ -612,7 +615,7 @@ class DefinitionResolverTest {
 
         TypeDefinition tupleElement = resolver.resolve(schemaMap.declarations().get("tuple_element"));
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
@@ -632,7 +635,7 @@ class DefinitionResolverTest {
 
         TypeDefinition fieldGroup = resolver.resolve(schemaMap.declarations().get("field_group"));
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
@@ -647,7 +650,7 @@ class DefinitionResolverTest {
         // composition, so it isn't also blocked by tightening -- an ordinary (non-parameter) fixed value.
         TypeDefinition pinned = resolveSnippet("pinned => { access_pattern: product_access_type = INDEX }");
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" value: INDEX } "
@@ -670,10 +673,11 @@ class DefinitionResolverTest {
         TypeDefinition sized = resolveSnippet("sized => <T> { value: type_ref = T }");
 
         assertEquals(List.of("T"), sized.parameters());
-        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" parameters: [ \"T\" ] "
+        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"TEMPLATE\" "
                         + "supertypes: [] subtypes: [] "
-                        + "body: !record { fields: [ "
-                        + "{ name: value type: type_ref value: T } ] } }",
+                        + "body: !template { parameters: [ \"T\" ] "
+                        + "template: \"!record { fields: [ "
+                        + "{ name: value type: type_ref value: T } ] }\" } }",
                 write(sized));
     }
 
@@ -685,10 +689,11 @@ class DefinitionResolverTest {
     void aParametricDefaultValueIsPromotedToRequiredDefault() throws DataBindException {
         TypeDefinition retry = resolveSnippet("retry_policy => <N> { attempts: integer ~ N }");
 
-        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" parameters: [ \"N\" ] "
+        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"TEMPLATE\" "
                         + "supertypes: [] subtypes: [] "
-                        + "body: !record { fields: [ "
-                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] } }",
+                        + "body: !template { parameters: [ \"N\" ] "
+                        + "template: \"!record { fields: [ "
+                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] }\" } }",
                 write(retry));
     }
 
@@ -710,7 +715,7 @@ class DefinitionResolverTest {
         assertEquals(List.of(), array.parameters(), "the container constructors carry no parameters");
         assertTrue(array.supertypes().contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("product", "top"), array.supertypes());
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] "
+        assertEquals("{ kind: \"PRODUCT\" "
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"product\" ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
@@ -744,7 +749,7 @@ class DefinitionResolverTest {
         assertEquals(List.of(), map.parameters(), "the container constructors carry no parameters");
         assertTrue(map.supertypes().contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("product", "top"), map.supertypes());
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] "
+        assertEquals("{ kind: \"PRODUCT\" "
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"product\" ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
@@ -794,7 +799,7 @@ class DefinitionResolverTest {
 
         TypeDefinition production = resolver.resolve(schemaMap.declarations().get("production"));
 
-        assertEquals("{ kind: \"PRODUCT\" parameters: [] supertypes: [ \"config\" ] subtypes: [] "
+        assertEquals("{ kind: \"PRODUCT\" supertypes: [ \"config\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"config\" ] fields: [ "
                         + "{ name: \"host\" type: { name: \"text\" arguments: [] } state: \"REQUIRED_FIXED\" "
                         + "value: \"prod.example.com\" } "
@@ -848,7 +853,7 @@ class DefinitionResolverTest {
         assertTrue(set.supertypes().contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("array", "product", "top"), set.supertypes());
         assertEquals("{ source: { name: \"array\" arguments: [] } "
-                        + "kind: \"PRODUCT\" parameters: [] "
+                        + "kind: \"PRODUCT\" "
                         + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
@@ -909,7 +914,7 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.ATOM, enumDef.kind());
         assertTrue(enumDef.supertypes().contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("atom", "top"), enumDef.supertypes());
-        assertEquals("{ kind: \"ATOM\" parameters: [] supertypes: [ \"atom\" \"top\" ] subtypes: [] "
+        assertEquals("{ kind: \"ATOM\" supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"atom\" ] fields: [ "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } state: \"REQUIRED\" } "
                         + "] groups: [] } }",
@@ -1784,12 +1789,13 @@ class DefinitionResolverTest {
                 """);
 
         TemplateBody held = assertInstanceOf(TemplateBody.class, entries.get("bounded").body());
-        assertTrue(held.names().contains("MIN"), () -> "the parameter is in the body: " + held.names());
-        assertTrue(held.names().contains("integer"), () -> "the type came from the source: " + held.names());
+        Set<String> names = HeldBody.of(held).names();
+        assertTrue(names.contains("MIN"), () -> "the parameter is in the body: " + names);
+        assertTrue(names.contains("integer"), () -> "the type came from the source: " + names);
         // REQUIRED is the constructor's own default and so is not written at all -- which is the assertion:
         // the inherited OPTIONAL did not survive, and no FIXED state was reached either.
-        assertFalse(held.names().contains(FieldState.OPTIONAL.name()), () -> held.names().toString());
-        assertFalse(held.names().contains(FieldState.OPTIONAL_FIXED.name()), () -> held.names().toString());
+        assertFalse(names.contains(FieldState.OPTIONAL.name()), names::toString);
+        assertFalse(names.contains(FieldState.OPTIONAL_FIXED.name()), names::toString);
     }
 
     // ── Group presence under tightening (§5.11) ───────────────────────────

@@ -41,9 +41,12 @@ is derived at resolution but taken as unverified input at ingest, so an entry ca
 contradicts (#6). And `source` has three incompatible definitions for an open entry across §5.10 and §8.1
 (#7). They are separable — each can be adopted alone — but #5's shape depends on #7's answer, and #6 is what
 makes #5's new `kind: TEMPLATE` cost nothing. **The evidence in all three is measured output from this
-build; the recommendations are proposals and say so where they are made.** None is implemented: these are
-changes to `type_definition`, whose identity Revision 35 has not yet published, and getting the shape settled
-before building it is the cheaper order.
+build.** All three are now **partly running**: the bundled `meta-kernel.tn` declares the
+`template` constructor, `type_definition` has lost `parameters` to the held body, `type_kind` has gained
+`TEMPLATE`, and `source` never carries a parameter — so the artifacts are ahead of the spec text on every
+one. What is left of each is the spec edit, plus #6's reclassification of `kind` as derived, which is the one
+recommendation with no implementation behind it. Each entry's Status paragraph states exactly which half is
+built and which is not.
 
 ---
 
@@ -418,7 +421,7 @@ any depth is a token like any other". So the claim fails for exactly the case th
 mechanism for, and it fails on §5.10's own headline example.
 
 **Measured, both ways.** Each document below is the resolved form §8.1 prescribes, validated as data against
-`meta-kernel.tn` by this implementation's CLI.
+`meta-kernel.tn`.
 
 `vector => <T, N> !array { element_type: T  min_items: N  max_items: N }` — §5.10's own example — **does not
 validate**:
@@ -443,21 +446,7 @@ core.tn-shaped forms — `extern_of` is core.tn's, verbatim. An ingest implement
 them and builds a wrong schema with no diagnostic anywhere. This is the worse half: the failing case at least
 fails.
 
-**The exception is already documented three times, and never in the vocabulary.** `core-resolved.tn`'s own
-`@doc` warns that "a processor comparing these compares wire form, not bound values"; §8.1 says the same in
-prose ("What sets it apart is the reading, not the shape"); and this implementation carries it a third time
-in code, blanking an open entry's body before comparing and comparing the wire form through a separate parse.
-A rule that has to be restated at every site that meets it is a rule the type is not carrying.
-
-**Interpretation chosen:** the body is held as the parsed application and **never serialized as values**.
-`TemplateBody` is a branch of the body model that no reader reads and no writer emits as a
-`type_definition` value; `TypeDefinition.parameters` being non-empty and the body being held imply each other
-with no exception. Comparison of two open entries is of the parsed wire form on both sides. This matches
-§8.1's letter and is why the defect above is visible here at all — a resolver that bound open bodies would
-have failed on core.tn.
-
-**Suggested resolution: give the held body a vocabulary that is true.** Add a kernel constructor whose
-instances *are* held bodies, and move the parameter list into it:
+**Recommendation — a kernel constructor whose instances *are* held bodies.** This is running (below):
 
 ```tson
 template => top & {
@@ -470,19 +459,21 @@ so that
 
 ```tson
 set => !type_definition {
-  kind:    TEMPLATE
+  kind:    PRODUCT
   source:  set_type
   body:    !template { parameters: [T]  template: "!set_type { element_type: T }" }
 }
 ```
 
-`type_definition.parameters` is deleted, and `type_kind` gains `TEMPLATE` (see #6). The gains are four:
+with `type_definition.parameters` deleted and `type_kind` gaining `TEMPLATE` (#6). It composes with `top`
+directly, like `reference` and `data`: it describes no value's shape, and nothing is ever typed by it. The
+gains are four:
 
 1. **`body: top` becomes true with no exception**, so §8.1's "body values are annotated with the
    structurally-appropriate type" holds universally and the open-entry paragraph's caveat goes.
 2. **Both failure modes above disappear.** There is nothing left to misread, because nothing is read.
-3. **"Open" is one question with one answer.** Today §5.10's "Closed entries are parameter-free" is a MUST
-   over two fields that must agree, and §8.1 asks ingest to verify it. With `parameters` inside `!template`
+3. **"Open" is one question with one answer.** §5.10's "Closed entries are parameter-free" is today a MUST
+   over two fields that must agree, which §8.1 asks ingest to verify. With `parameters` inside `!template`
    the invariant is structural and unstatable-as-violated.
 4. **Text is what "held" already means.** §5.10 defines a held body as "the constructor application as
    written, held and *unread*", and §8.1's Ingest paragraph already treats it as source — "an open entry ...
@@ -501,8 +492,7 @@ renamed positionally (`p0`, `p1`, ...), so two spellings of one open form must r
 a: [T] }` written twice mints two entries for one type. That is what "One spelling" exists for, and it is a
 comparison of the parsed form by construction. *Ingest*: §8.1 already requires that an open entry's "wire
 form MUST equal the one-spelling form §5.10 requires". *Conformance*: two resolvers' outputs, or one against
-the published `*-resolved.tn` — where this implementation compares open bodies today. Only the third could
-plausibly be textual, and it should not be.
+the published `*-resolved.tn`.
 
 **What this costs, stated plainly.** A resolved document stops being fully inspectable by a generic TSON
 reader: an open body becomes a blob only a schema parser can open. §1.3 bounds the blast radius — "a consumer
@@ -514,16 +504,30 @@ consumers never see.
 
 **This proposal depends on #7.** Moving `parameters` inside `body` is only sound if no parameter reference
 can appear outside a held body — that is, if `source` never holds an open application. §8.1's alias paragraph
-says it does not; §5.10's "Open bodies in output" and §8.1's "Reading parameter references" say it does. If
-the latter wins, `parameters` stays on `type_definition` and this entry shrinks to `body: !template {
-template: "..." }`, which still removes the lie and still leaves the openness signal split across two fields.
+says it does not; §5.10's "Open bodies in output" and §8.1's "Reading parameter references" say it does.
 
-**Status against Revision 35:** open, and **nothing here is implemented** — the recommendation above is a
-proposal, not a report. What is running is the diagnosis: this implementation holds open bodies unread,
-which is what makes the two measured cases reproducible, and it already declines to use the value model for
-them. `type_definition`'s identity is not yet published for this revision, so the shape is still free; the
-change touches `meta-kernel.tn`, all three `*-resolved.tn` fixtures, four digest pins including §13.2's
-hand-stamped table, and roughly ninety `TypeDefinition` construction sites here.
+**Status against Revision 35: the constructor and the held-as-text body are running here.** The bundled
+`meta-kernel.tn` declares `template`, `schema.meta.TemplateBody` carries `parameters` and the application as
+text, and both `*-resolved.tn` fixtures write open entries in the new form. `vector` above now validates and
+`extern_of` reads back as the application it holds, both asserted in `OpenEntryResolvedFormTest` — the same
+two cases that produced the measurements above.
+
+What is **not** running, and is the remaining ask of the spec rather than of this implementation:
+
+- **`type_definition.parameters` is still written**, alongside the list inside `!template`, so an open entry
+  states its parameters twice. Deleting the outer one waits on #7.
+- **`type_kind` has no `TEMPLATE` member yet** (#6), so an open entry still takes its kind from the
+  constructor its held body applies.
+- **Nothing checks that a held body *re-resolves* as source.** The round trip that is pinned is narrower:
+  the text a resolver writes parses back to the tree it was written from (`HeldBodyTest`). §8.1's Ingest rule
+  asks for more — that the parsed application resolve against a namespace — and this library has no ingest
+  path at all, so no implementation evidence stands behind that half of the recommendation.
+
+Two things the change cost less than expected, worth recording for whoever adopts it. Adding the constructor
+needed no reader factory and minted no new synthetic: `template.parameters: [param_name]` landed on the entry
+`type_definition.parameters` had already lifted, which is §8.2's schema-wide form identity with no special
+case. And it **removed** roughly sixty lines of comparison machinery that existed only because an open entry
+could not be compared like any other entry.
 
 
 ## 6. `type_definition.kind` is derived at resolution and taken as unverified input at ingest
@@ -610,11 +614,28 @@ matching `type_kind`'s existing precedent that not every member is a base kind (
   channel for a question nobody has asked, and it would be the same unverified restatement this entry is
   about.
 
-**Status against Revision 35:** open, and the recommendation is a **proposal**; what is running is the
-derivation and the hole. §8.1's field list and Ingest paragraph are unchanged from Revision 34 on this
-point. Reclassifying `kind` needs no artifact change at all — it is prose in §8.1 plus a `@doc` line in
-meta-kernel.tn's `type_definition`. Adding `TEMPLATE` moves the kernel and therefore all four digest pins,
-so it should land with #5 or not at all.
+**Status against Revision 35: `TEMPLATE` is running; the reclassification is still a proposal.**
+
+`type_kind` carries a sixth member here and every open entry takes it, so the ask of the spec on that half is
+to describe what the artifacts already do. It cost what the entry said it would and paid for itself twice
+over. Materialisation stopped being able to take the closed entry's kind from the template's own field, and
+what replaced it is the derivation this entry states — `kindOfClosed` reads the branch of `Top` the
+substituted body occupies, which is §4.1's "construction transfers kind" asked of the construction rather
+than inherited from an entry that is not a type. Two conflations fell out with it: `DefinitionResolver`
+carried an `alias` flag whose only job was reading an open alias's kind off its head, and a test asserted
+`REFERENCE` for an entry its own comment called "a template until it closes". Both are gone.
+
+**And the derivation is now total**, which is the argument for stating it in §8.1. An open entry was the one
+case that could not be answered from what the entry states — its kind came from the constructor its held body
+applies, which needs the governing meta — and `TEMPLATE` answers it locally.
+`OpenEntryResolvedFormTest.kindAgreesWithWhatTheEntryAlreadyStates` runs the whole four-branch rule over
+every entry of every schema, and is the rule §8.1's Ingest paragraph should carry.
+
+**What is not running is the reclassification**, which is this entry's actual ask: `kind` is still a REQUIRED
+input that nothing verifies, and §8.1's Ingest paragraph still never names it. That needs no artifact change
+— prose in §8.1 plus a `@doc` line — and it has no implementation evidence behind it here for the same reason
+#5's ingest half has none: this library has no ingest path, so the check would have nowhere to live but a
+test.
 
 
 ## 7. `source` has three incompatible definitions for an open entry
@@ -699,7 +720,22 @@ against the entry's own `parameters`, which is (c)'s rule implemented against a 
    first also leaves `source: reference` saying nothing a reader could not see from the body, which argues
    for the second.
 
-**Status against Revision 35:** open. Passages (a) and (c) are Revision 35 text; (b) is new in Revision 35,
+**Status against Revision 35: (b) is running, and the divergence in the table is fixed.**
+
+`TsonSchemaLinker` no longer passes the entry's parameters when validating `source`, so a parameter reaching
+that position is an unresolved reference — the verdict every other reference form gives it
+(`aParameterStandingInSourceIsUnresolved`). Nothing produces one: an open entry records the constructor its
+held body applies, and a partial application states the arguments it binds in its own `reference.target`,
+written through `WireForm.heldReference`. The closed/open alias divergence is gone with the factory that
+caused it — `TypeDefinition.reference(target, parameters)` built an open entry with a bare `Reference` body,
+which the model now forbids outright, since an open entry's body is held whatever shape it takes.
+
+**Point 3 is therefore settled the first way**: an open entry's `source` is the constructor its held body
+applies, uniformly across all five open forms, and the alias is no longer the exception. What remains is the
+spec edit — striking `source` from (a) and (c), and stating the invariant positively: a parameter reference
+appears only inside a held body, so `source` can be read without knowing whether the entry is open.
+
+The passages themselves are untouched. Passages (a) and (c) are Revision 35 text; (b) is new in Revision 35,
 introduced with the `reference.target` widening, which is why the three now disagree — the widening did the
 work that made `source`'s role obsolete without the other two passages being updated to match. What is
 running here is (b), and the alias `source` divergence in the table, which is unchosen and should be fixed

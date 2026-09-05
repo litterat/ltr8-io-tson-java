@@ -49,7 +49,7 @@ class MultiErrorCollectionTest {
     @Test
     void threeIndependentProblemsInOneFileAllSurfaceInOnePass() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(),  List.of(),
+        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
                 List.of(), Optional.empty(), new IntegerType(new IntegerSize(8, true))));
         entries.put("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer"))));
         entries.put("my_record", TypeDefinition.product(RecordBody.of(List.of(
