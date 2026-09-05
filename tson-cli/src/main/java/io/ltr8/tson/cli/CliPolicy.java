@@ -1,6 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.annotation.Field;
+import io.ltr8.tson.compiler.TsonLimitsPolicy;
 import io.ltr8.tson.compiler.TsonUnicodeProcessorPolicy;
 import io.ltr8.tson.compiler.TsonUnicodePolicy;
 
@@ -30,14 +31,16 @@ import java.util.Set;
  */
 public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierPolicy,
                         @Field("token_policy") CliUnicodePolicy tokenPolicy,
-                        @Field("unicode_data_version") String unicodeDataVersion) {
+                        @Field("unicode_data_version") String unicodeDataVersion,
+                        CliLimits limits) {
 
     /**
      * The policy a run that passed no flag is judged under -- what {@link OutputFormat#TEXT} compares against
      * to decide whether a person needs to be told the policy at all.
      */
     private static final CliPolicy DEFAULTS = from(TsonUnicodeProcessorPolicy.of(
-            PolicyOptions.DEFAULTS.identifierPolicy(), PolicyOptions.DEFAULTS.tokenPolicy()));
+            PolicyOptions.DEFAULTS.identifierPolicy(), PolicyOptions.DEFAULTS.tokenPolicy()),
+            PolicyOptions.DEFAULTS.limits());
 
     /**
      * Whether this is what a run configures by saying nothing.
@@ -50,9 +53,22 @@ public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierP
         return equals(DEFAULTS);
     }
 
-    static CliPolicy from(TsonUnicodeProcessorPolicy policy) {
+    static CliPolicy from(TsonUnicodeProcessorPolicy policy, TsonLimitsPolicy limits) {
         return new CliPolicy(CliUnicodePolicy.from(policy.identifierPolicy()),
-                CliUnicodePolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion());
+                CliUnicodePolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion(),
+                new CliLimits(limits.maxDepth()));
+    }
+
+    /**
+     * This run's [TSON-DATA] §9.1 resource limits -- what it will spend reading one document, where the two
+     * {@code *_policy} fields say what it will admit as a name.
+     *
+     * <p>Inside {@code policy} rather than beside it in the envelope because the envelope's one question is
+     * "what judged this run", and a limit refusal answers it as much as a name refusal does. It also gets
+     * {@link CliPolicy#isDefault()} for free, so a run that raised the depth states it even when nothing was
+     * refused -- the same rule §8.2 imposes on a relaxation, and true here for the same reason.
+     */
+    public record CliLimits(@Field("max_depth") int maxDepth) {
     }
 
     /**

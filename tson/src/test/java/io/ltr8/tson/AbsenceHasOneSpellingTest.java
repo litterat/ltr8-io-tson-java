@@ -15,27 +15,26 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Where the {@code null} token means absence and where it does not -- the boundary [TSON-DATA] §4's own
- * applicability clause draws, pinned end to end because it is easy to move by accident in either direction.
+ * Absence has one spelling, {@code _}, and this pins it end to end -- schemaless and under a schema, reading
+ * and writing. It is the class that would notice a second spelling growing back.
  *
- * <p><b>Schemaless (§4 applies).</b> Base type resolution identifies {@code null} and the tree model spells
- * the result {@link io.ltr8.tson.tree.TsonAbsent} -- there is one no-value node, not a separate null node
- * beside it. {@code _} and {@code null} are therefore indistinguishable once read, and both write back as
- * {@code _}.
+ * <p><b>{@code null} is not that spelling.</b> §4 resolves boolean, then number, then string, so the unquoted
+ * token {@code null} is the string {@code null} the way {@code frobnicate} is: at a {@code text} position it
+ * is text, at an {@code int32} position a type error, and at a {@code void} position an error too, {@code
+ * void} admitting the sentinel and nothing else. A JSON document's {@code null} reaches absence through a
+ * JSON reader, which maps it in the model, where the position's own state decides whether absence is
+ * admitted at all.
  *
- * <p><b>Under a schema (§4 does not apply).</b> [TSON-SCHEMA] §7.3: "The tokens {@code true}, {@code false},
- * and {@code null} have no special status when a schema is in scope -- their meaning is determined entirely
- * by the position's type." So {@code null} at a {@code text} position is the string {@code "null"}, and the
- * sole exception is a {@code void}-typed position, where §7.3 accepts it as a spelling of {@code _} on the
- * grounds that {@code void} has a single inhabitant and so loses no distinction.
+ * <p><b>What {@code _} means is [TSON-DATA] §2.9's distinction</b>, and the tree keeps it: a field written
+ * {@code _} is present with an absent value, and a field never written is not there.
  */
-class NullIsAbsentTest {
+class AbsenceHasOneSpellingTest {
 
     private static final String ID = "https://example.test/person-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/person-1.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             {
               person => {
                 name: text
@@ -62,29 +61,23 @@ class NullIsAbsentTest {
                 !person { name: "Ada"  %s }""".formatted(fields));
     }
 
-    // ── Schemaless: §4 applies, and the tree has one no-value node ──
+    // ── Schemaless: §4 applies, and it resolves three classes ──
 
     @Test
-    void schemalessNullAndTheSentinelBothReadAsAbsent() {
+    void schemalessNullIsAStringAndOnlyTheSentinelIsAbsent() {
+        TsonValue node = tson().treeReader().read("{ a: null  b: _  c: \"null\" }");
+
+        assertEquals(Optional.of("null"), node.at("/a").asString());
+        assertTrue(node.at("/b").isAbsent());
+        assertEquals(Optional.of("null"), node.at("/c").asString(), "quoted or not, it is the same string");
+    }
+
+    /** Each writes back as what it is: a string in the writer's uniform quoted form, and the sentinel bare. */
+    @Test
+    void schemalessEachSpellingWritesBackAsWhatItIs() {
         TsonValue node = tson().treeReader().read("{ a: null  b: _ }");
 
-        assertTrue(node.at("/a").isAbsent());
-        assertTrue(node.at("/b").isAbsent());
-        assertEquals(node.at("/b"), node.at("/a"), "one no-value node, so the two spellings are one value");
-    }
-
-    /** §4.4 is untouched: a quoted {@code "null"} is an ordinary string, schemaless or not. */
-    @Test
-    void schemalessQuotedNullIsStillTheStringNull() {
-        assertEquals(Optional.of("null"), tson().treeReader().read("{ a: \"null\" }").at("/a").asString());
-    }
-
-    /** Absence has one written form, so a schemaless {@code null} normalizes to {@code _} on the way out. */
-    @Test
-    void schemalessNullWritesBackAsTheSentinel() {
-        TsonValue node = tson().treeReader().read("{ a: null }");
-
-        assertEquals("{ a: _ }", new TsonTreeWriter().toTson(node));
+        assertEquals("{ a: \"null\" b: _ }", new TsonTreeWriter().toTson(node));
     }
 
     // ── Under a schema: a field written `_` is present, and one never written is not ──
@@ -130,10 +123,9 @@ class NullIsAbsentTest {
     // ── Under a schema: §7.3, the position's own type decides ──
 
     /**
-     * The rule that makes the schemaless behaviour safe to have: {@code null} is <em>not</em> special under a
-     * schema, so a {@code text} position reads it as the text it is. A JSON converter aiming this at an
-     * OPTIONAL {@code text?} field gets the string, not absence -- deliberate, and the reason §7.3 carves out
-     * {@code void} rather than widening the concession.
+     * A {@code text} position reads {@code null} as the text it is. A JSON converter aiming this at an
+     * OPTIONAL {@code text?} field gets the string, not absence -- which is the case that argues for routing
+     * such input through a JSON reader rather than for a keyword in the notation.
      */
     @Test
     void underASchemaNullAtATextPositionIsTheStringNull() {
@@ -141,19 +133,17 @@ class NullIsAbsentTest {
     }
 
     /**
-     * §7.3's sole concession: at a {@code void}-typed position {@code null} is accepted as a spelling of
-     * {@code _} and normalized to absence, where at any other position it would be handed to the declared
-     * atom (and, at {@code text}, be a string).
-     *
-     * <p>It reads as a present {@link io.ltr8.tson.tree.TsonAbsent} rather than dropping out of the record
-     * the way a stated {@code _} does. That difference is the record reader's own OPTIONAL-field handling --
-     * it answers a stated {@code _} itself, before the field's reader runs -- and predates this concession;
-     * both spellings mean absence either way. {@code VoidReaderTest} pins the equivalence at the reader
-     * level, where the record's short-circuit isn't in the way.
+     * A {@code void} position is where a second spelling would be cheapest to admit -- the type has one
+     * inhabitant, so nothing is lost by conceding -- and it is refused there too. Conceding is what would make
+     * absence's spelling depend on the position's type, which is a rule an author computes rather than
+     * remembers. {@code VoidReaderTest} pins the same refusal at the reader level.
      */
     @Test
-    void underASchemaNullAtAVoidPositionIsAbsence() {
-        assertTrue(readPerson("deleted: null").at("/deleted").isAbsent());
+    void underASchemaNullAtAVoidPositionIsAnError() {
+        TsonReadException thrown =
+                assertThrows(TsonReadException.class, () -> readPerson("deleted: null"));
+
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, thrown.diagnostic().code());
     }
 
     /** And absence is still absence -- a REQUIRED field written {@code _} fails as it always did. */

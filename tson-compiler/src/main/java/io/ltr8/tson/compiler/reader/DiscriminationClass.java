@@ -4,13 +4,14 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
@@ -20,11 +21,11 @@ import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.TimeType;
 import io.ltr8.tson.schema.meta.TupleBody;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
@@ -37,7 +38,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The granularity at which TSON text discriminates an untagged value: [TSON-DATA] §4's four scalar
+ * The granularity at which TSON text discriminates an untagged value: [TSON-DATA] §4's three scalar
  * base-type classes plus the two container delimiter forms. One class function serves both §5.4 consumers --
  * {@code ChoiceDisjointness} derives a choice's {@code disjoint} fact as "every variant classifies, and no
  * class repeats", and {@link ChoiceReader} recovers an untagged value to the variant of its own class -- so
@@ -50,9 +51,9 @@ import java.util.Set;
  */
 public enum DiscriminationClass {
 
-    NULL, BOOLEAN, NUMBER, STRING, BRACE, BRACKET;
+    BOOLEAN, NUMBER, STRING, BRACE, BRACKET;
 
-    /** The four §4 scalar classes -- what {@link #ofValue} can produce, and what untagged token recovery handles. */
+    /** The three §4 scalar classes -- what {@link #ofValue} can produce, and what untagged token recovery handles. */
     public boolean scalar() {
         return this != BRACE && this != BRACKET;
     }
@@ -67,22 +68,9 @@ public enum DiscriminationClass {
      * stays required.
      */
     public static Optional<DiscriminationClass> of(String name, Map<String, TypeDefinition> namespace) {
-        Set<String> walked = new HashSet<>();
-        String current = name;
-        while (walked.add(current)) {
-            TypeDefinition def = namespace.get(current);
-            if (def == null) {
-                return Optional.empty();
-            }
-            // An argument-bearing target is an application rather than a hop, and has no entry to classify
-            // until materialisation mints one -- which it has, for every entry a compiled choice can reach.
-            if (def.body() instanceof Reference reference && reference.target().arguments().isEmpty()) {
-                current = reference.target().name();
-                continue;
-            }
-            return classify(def);
-        }
-        return Optional.empty(); // a reference cycle has no terminal entry, so no class
+        // A chain is followed to the type at its end, and an unresolved name or a cycle reaches none -- so
+        // neither has a class, which is what the empty result means to every caller.
+        return ReferenceChain.terminalDefinition(name, namespace).flatMap(DiscriminationClass::classify);
     }
 
     private static Optional<DiscriminationClass> classify(TypeDefinition def) {
@@ -98,7 +86,8 @@ public enum DiscriminationClass {
             case TimeType ignored -> Optional.of(STRING);
             case DateTimeType ignored -> Optional.of(STRING);
             case DurationType ignored -> Optional.of(STRING);
-            case BinaryType ignored -> Optional.of(STRING);
+            case PeriodType ignored -> Optional.of(STRING);
+            case BytesType ignored -> Optional.of(STRING);
             case EmailType ignored -> Optional.of(STRING);
             case Ipv4Type ignored -> Optional.of(STRING);
             case Ipv6Type ignored -> Optional.of(STRING);
@@ -132,7 +121,6 @@ public enum DiscriminationClass {
     /** The base-type class of a §4-resolved host value (as {@link ValueParser} produces). Always scalar. */
     static DiscriminationClass ofValue(Object hostValue) {
         return switch (hostValue) {
-            case null -> NULL;
             case Boolean ignored -> BOOLEAN;
             case BigInteger ignored -> NUMBER;
             case BigDecimal ignored -> NUMBER;

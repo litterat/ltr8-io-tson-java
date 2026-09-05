@@ -42,7 +42,7 @@ import java.util.Objects;
  * @param identifierPolicy    the policy applied to names -- {@code TsonConfig.identifierPolicy}
  * @param tokenPolicy         the policy applied to token values -- {@code TsonConfig.tokenPolicy}
  * @param unicodeDataVersion  {@link TsonUnicodePolicy#dataVersion()}, the UCD release whose tables the
- *                            rules were computed against ({@code SPEC-FEEDBACK.md} #6 on why that is the
+ *                            rules were computed against ([TSON-DATA] §8.2 on why that is the
  *                            version §8.2's "UTS #39 data version" means)
  */
 public record TsonUnicodeProcessorPolicy(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy tokenPolicy,

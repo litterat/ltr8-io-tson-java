@@ -2,179 +2,210 @@ package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.DurationType;
-import io.ltr8.tson.schema.atom.IsoDuration;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import java.math.BigInteger;
 import java.time.Duration;
-import java.time.Period;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Parses and validates against meta-kernel's {@code duration_type} constructor (§5.4's {@code
- * duration} atom, ISO 8601's {@code PnYnMnDTnHnMnS}). A from-scratch compiler -- confirmed
- * empirically that neither {@link Period#parse} nor {@link Duration#parse} covers the combined
- * form (see {@link IsoDuration}'s Javadoc) -- built as a single anchored regex with each
- * designator's digits as its own named group, rather than delegating shape recognition to either
- * JDK compiler and inheriting whichever ISO 8601 extensions it happens to accept beyond the strict
- * grammar (both {@code Period.parse}/{@code Duration.parse} accept a leading {@code -} sign and
- * lowercase {@code p}/{@code t}, neither of which TSON's own {@code PnYnMnDTnHnMnS} notation
- * shows). Holds a {@link DurationType} -- the pure constraint values, unchanged by this split --
- * rather than declaring those fields itself.
+ * Parses and validates against meta's {@code duration_type} constructor ([TSON-SCHEMA] §5.5's {@code
+ * duration} atom): elapsed time, as a signed <b>exact decimal</b> number of seconds. The lexical form permits
+ * a decimal fraction on the seconds component and nowhere else, so no non-terminating fraction is writable --
+ * {@code PT1/3S} is not a token -- and every duration is therefore a terminating decimal count of seconds.
+ * That is {@code number}'s value space measured in seconds, which is what makes {@code precision} exactly
+ * {@code fraction_digits} on that count and {@code multiple_of} exactly {@code number}'s own: the facets are
+ * definitions rather than rules of their own.
  *
- * <p>{@code P}/{@code PT} alone (every designator absent) is rejected -- checked after the regex
- * match succeeds, since the regex's own optionality would otherwise accept either as a technically
- * complete but empty match.
+ * <p><b>The grammar is RFC 3339 Appendix A's {@code duration} production with three extensions and one
+ * restriction</b>, and the restriction is what makes the family orderable. Extensions: an optional leading
+ * {@code -}; a fraction on the seconds component only, written with {@code .} ({@code PT0.5S}, never {@code
+ * PT1.5H} or {@code PT0,5S}); and any subset of D, H, M, S may be omitted provided at least one component is
+ * present and order is kept, so {@code PT1H30S} is admitted as {@link Duration} itself writes it.
+ * Restriction: the Y and month-M components are <b>not</b> admitted -- {@code P1M} is one month and belongs
+ * to {@code period}, a minute being {@code PT1M}. {@code PnW} stands alone as in the ABNF, so {@code P1W2D}
+ * is an error.
  *
- * <p>Not implemented: ISO 8601's alternative week form ({@code PnW}, e.g. {@code P3W}) -- TSON's own
- * table gives the accepted format as literally {@code PnYnMnDTnHnMnS}, with no {@code W}, so this
- * reads that as exhaustive rather than illustrative; see {@code SPEC-FEEDBACK.md} #1, still open, for why
- * that's a real ambiguity rather than a confident call.
+ * <p>A day is exactly 86400 s and a week 7 days, so {@code PT90M}, {@code PT1H30M} and {@code P0DT5400S} are
+ * one value, and {@code PT0S}, {@code P0D} and {@code -PT0S} are one value. That is why bounds compare the
+ * value and never the token, and why this family can enforce them at all: while one type carried both
+ * calendar and clock components the order was partial and the bounds it declared went unchecked.
  *
- * <p>{@link DurationType#min}/{@link DurationType#max} are raw {@code String} text, not {@link
- * IsoDuration} (matching the {@code TextType.pattern}/{@code UriType.pattern} precedent, so the
- * field binds generically with no {@code DataBridge}) -- {@link #parseDuration} is the one place the
- * {@code PnYnMnDTnHnMnS} grammar is recognized, reused by both {@link #read} (the instance value)
- * and, on demand, by anything needing the parsed form of a constraint string. No min/max bound
- * validation is performed yet -- {@link IsoDuration}'s own Javadoc explains why (not {@code
- * Comparable}: a calendar-based duration has no fixed length to compare against a clock-based one).
+ * <p><b>Both ends of the value space are fixed at a signed 64-bit count of nanoseconds</b> -- see {@link
+ * #MAX_FRACTION_DIGITS}. Within that, {@code precision} constrains the <em>value</em> and never the spelling,
+ * as {@code time_type}'s own {@code @doc} states for the same facet: {@code PT0.50S} is a whole number of
+ * tenths and {@code precision: 1} admits it. Nothing is truncated; a value genuinely off the grid is
+ * rejected. {@code multiple_of} is tested on the magnitude, so {@code -PT30M} is a multiple of {@code PT15M}.
  */
-public record DurationParser(DurationType constraints) implements AtomType<IsoDuration> {
+public record DurationParser(DurationType constraints) implements AtomType<Duration> {
 
-    /** §5.4's built-in annotation name -- {@code !duration}. */
+    /** §5.5's built-in annotation name -- {@code !duration}. */
     public static final String TYPENAME = "duration";
 
-    /** {@code duration => !duration_type {}} -- the unconstrained duration, §5.4's {@code !duration}. */
+    /** {@code duration => !duration_type {}} -- the unconstrained duration. */
     public static final DurationParser UNCONSTRAINED = new DurationParser(DurationType.UNCONSTRAINED);
 
-    public DurationParser(Optional<String> min, Optional<String> max) {
+    public DurationParser(Optional<Duration> min, Optional<Duration> max) {
         this(new DurationType(min, max));
     }
 
+    /**
+     * The week form and the day/time form are alternatives, never mixed: {@code PnW} stands alone in the
+     * ABNF. Everything else is a subset in order, with the fraction confined to the seconds component.
+     */
     private static final Pattern DURATION = Pattern.compile(
-            "P(?:(?<years>\\d+)Y)?(?:(?<months>\\d+)M)?(?:(?<days>\\d+)D)?"
-            + "(?:T(?:(?<hours>\\d+)H)?(?:(?<minutes>\\d+)M)?(?:(?<seconds>\\d+(?:\\.\\d+)?)S)?)?");
+            "(?<sign>-)?P(?:(?<weeks>\\d+)W"
+            + "|(?:(?<days>\\d+)D)?(?:T(?:(?<hours>\\d+)H)?(?:(?<minutes>\\d+)M)?"
+            + "(?:(?<seconds>\\d+(?:\\.(?<fraction>\\d+))?)S)?)?)");
+
+    /**
+     * The finest resolution the value space carries, and the widest magnitude: a signed 64-bit count of
+     * nanoseconds. RFC 3339's {@code time-secfrac} is {@code "." 1*DIGIT} and its seconds component {@code
+     * 1*DIGIT}, so the grammar alone admits values no host runtime has a type for -- a nanosecond is the
+     * finest resolution any of them offers and several are coarser, and Go's {@code time.Duration} is a
+     * signed 64-bit nanosecond count exactly. A range that depends on which implementation read the document
+     * is not a range, so both ends are fixed here rather than left to what {@code java.time.Duration}
+     * happens to reach (±292 <em>billion</em> years, three orders past the tightest host).
+     *
+     * <p>Stated as a magnitude rather than the asymmetric {@code int64} range, so negating an admitted
+     * duration always yields an admitted one.
+     *
+     * <p>Longer spans are not lost, they are spelled better: a span of centuries is a calendar span and is a
+     * {@code period}, and a count of SI seconds beyond that is a physical quantity, where {@code number} in
+     * the unit the schema names says what a duration cannot.
+     *
+     * <p>The ceiling also makes {@link Duration#toNanos} total for every admitted value, which is what {@link
+     * DurationType#isMultiple} tests on: the range is the range {@code toNanos} has, so the overflow it used
+     * to throw past ±292 years is now unreachable rather than merely unlikely.
+     */
+    private static final int MAX_FRACTION_DIGITS = 9;
+
+    /** The ceiling as a count of seconds -- {@link #MAX_FRACTION_DIGITS} says why this number and not another. */
+    private static final BigDecimal MAX_SECONDS =
+            new BigDecimal(BigInteger.valueOf(Long.MAX_VALUE)).movePointLeft(MAX_FRACTION_DIGITS);
+
+    private static final BigDecimal SECONDS_PER_DAY = BigDecimal.valueOf(86_400);
+    private static final BigDecimal SECONDS_PER_WEEK = BigDecimal.valueOf(604_800);
+    private static final BigDecimal SECONDS_PER_HOUR = BigDecimal.valueOf(3_600);
+    private static final BigDecimal SECONDS_PER_MINUTE = BigDecimal.valueOf(60);
 
     @Override
-    public IsoDuration read(TokenValue token) {
-        return parseDuration(token.text());
-    }
-
-    /** The {@code PnYnMnDTnHnMnS} grammar itself, shared by {@link #read} and constraint parsing. */
-    private static IsoDuration parseDuration(String text) {
+    public Duration read(TokenValue token) {
+        String text = token.text();
         Matcher m = DURATION.matcher(text);
         if (!m.matches()) {
-            throw new AtomParseException(
-                    "'" + text + "' is not a valid ISO 8601 duration -- expected PnYnMnDTnHnMnS (§5.4)",
-                    "an ISO 8601 duration");
+            throw new AtomParseException("'" + text + "' is not a valid duration -- expected the RFC 3339 "
+                    + "Appendix A form without Y or month-M components (a month is a period, a minute is "
+                    + "PT1M), the week form standing alone (§5.5)", "a duration");
+        }
+        if (m.group("weeks") == null && m.group("days") == null && m.group("hours") == null
+                && m.group("minutes") == null && m.group("seconds") == null) {
+            throw new AtomParseException("'" + text + "' is not a valid duration -- at least one component is "
+                    + "required (§5.5)", "a duration");
         }
 
-        String years = m.group("years");
-        String months = m.group("months");
-        String days = m.group("days");
-        String hours = m.group("hours");
-        String minutes = m.group("minutes");
-        String seconds = m.group("seconds");
-
-        if (years == null && months == null && days == null && hours == null && minutes == null && seconds == null) {
-            throw new AtomParseException(
-                    "'" + text + "' is not a valid ISO 8601 duration -- at least one designator is required (§5.4)",
-                    "an ISO 8601 duration");
+        String fraction = m.group("fraction");
+        if (fraction != null && fraction.length() > MAX_FRACTION_DIGITS) {
+            throw new AtomParseException("'" + text + "' states " + fraction.length() + " fractional-second "
+                    + "digits, where a duration carries at most " + MAX_FRACTION_DIGITS + " -- one nanosecond is "
+                    + "the finest resolution the value space admits (§5.5)",
+                    "at most " + MAX_FRACTION_DIGITS + " fractional-second digits");
         }
 
-        Period calendarPart = Period.of(
-                years == null ? 0 : Integer.parseInt(years),
-                months == null ? 0 : Integer.parseInt(months),
-                days == null ? 0 : Integer.parseInt(days));
-
-        Duration clockPart = Duration.ZERO;
-        if (hours != null) {
-            clockPart = clockPart.plusHours(Long.parseLong(hours));
-        }
-        if (minutes != null) {
-            clockPart = clockPart.plusMinutes(Long.parseLong(minutes));
-        }
-        if (seconds != null) {
-            clockPart = clockPart.plus(secondsToDuration(seconds));
+        BigDecimal seconds = BigDecimal.ZERO
+                .add(scaled(m.group("weeks"), SECONDS_PER_WEEK))
+                .add(scaled(m.group("days"), SECONDS_PER_DAY))
+                .add(scaled(m.group("hours"), SECONDS_PER_HOUR))
+                .add(scaled(m.group("minutes"), SECONDS_PER_MINUTE))
+                .add(m.group("seconds") == null ? BigDecimal.ZERO : new BigDecimal(m.group("seconds")));
+        if (m.group("sign") != null) {
+            seconds = seconds.negate();
         }
 
-        return new IsoDuration(calendarPart, clockPart);
+        Duration value = toDuration(seconds, text);
+        validate(value, seconds, text);
+        return value;
+    }
+
+    private static BigDecimal scaled(String digits, BigDecimal secondsPerUnit) {
+        return digits == null ? BigDecimal.ZERO : new BigDecimal(digits).multiply(secondsPerUnit);
     }
 
     /**
-     * §5.4's {@code PnYnMnDTnHnMnS}, unsigned only -- matching {@link #read}'s own grammar exactly,
-     * including its fractional-seconds handling (nanoseconds only ever enter {@code clockPart}
-     * through the seconds designator via {@link #secondsToDuration}, so they're read back out
-     * through it too). {@code clockPart} is never day-normalized ({@link #read} accumulates it via
-     * {@code plusHours}/{@code plusMinutes}/{@code plus} with no rollover), so this uses {@link
-     * Duration#getSeconds()} (the running total) with its own hour/minute/second decomposition, not
-     * {@code toHoursPart()}/{@code toMinutesPart()} (which assume a day-normalized value and would
-     * silently wrap a duration of, say, 30 hours down to 6 -- confirmed empirically, not assumed).
+     * The value as a {@link Duration}, once the magnitude is known to fit one. The fraction is already
+     * capped at nine digits by the grammar, so the only thing left to refuse here is a span past the
+     * ceiling -- which {@link Duration} itself would take (its {@code long} seconds reach ±292 billion
+     * years) and which no implementation with a nanosecond-counting duration type could.
+     */
+    private static Duration toDuration(BigDecimal seconds, String text) {
+        if (seconds.abs().compareTo(MAX_SECONDS) > 0) {
+            throw new AtomValidationException("'" + text + "' is longer than " + MAX_SECONDS + " seconds, the "
+                    + "widest magnitude a duration carries -- a span this long is a calendar span (a period) "
+                    + "or a quantity in a unit a schema names (§5.5)",
+                    "a magnitude of at most " + MAX_SECONDS + " seconds");
+        }
+        BigInteger nanos = seconds.movePointRight(MAX_FRACTION_DIGITS).toBigIntegerExact();
+        return Duration.ofSeconds(nanos.divide(NANOS_PER_SECOND).longValueExact(),
+                nanos.remainder(NANOS_PER_SECOND).longValueExact());
+    }
+
+    private static final BigInteger NANOS_PER_SECOND = BigInteger.valueOf(1_000_000_000L);
+
+    private void validate(Duration value, BigDecimal seconds, String text) {
+        // `precision: N` is `fraction_digits: N` on the seconds count, which is a constraint on the value and
+        // not on the spelling -- so PT0.50S is a whole number of tenths and `precision: 1` admits it, the
+        // same rule and the same wording time_type's own @doc already carries.
+        constraints.precision().ifPresent(precision -> {
+            if (BigInteger.valueOf(Math.max(seconds.stripTrailingZeros().scale(), 0)).compareTo(precision) > 0) {
+                throw new AtomValidationException("'" + text + "' is not a whole number of 10^-" + precision
+                        + " seconds, which is the resolution this duration admits",
+                        "a whole number of 10^-" + precision + " seconds");
+            }
+        });
+        constraints.min().ifPresent(min -> require(value.compareTo(min) >= 0, text, ">= " + min));
+        constraints.exclusiveMin().ifPresent(min -> require(value.compareTo(min) > 0, text, "> " + min));
+        constraints.max().ifPresent(max -> require(value.compareTo(max) <= 0, text, "<= " + max));
+        constraints.exclusiveMax().ifPresent(max -> require(value.compareTo(max) < 0, text, "< " + max));
+        constraints.multipleOf().ifPresent(step -> require(DurationType.isMultiple(value, step), text,
+                "a multiple of " + step));
+    }
+
+    private static void require(boolean holds, String text, String expected) {
+        if (!holds) {
+            throw new AtomValidationException("'" + text + "' is not " + expected, expected);
+        }
+    }
+
+    /**
+     * Written in the form {@link Duration} itself uses -- a day is not a distinct unit of the value, so
+     * hours carry it. The seconds component takes the fraction, and only it can.
      */
     @Override
-    public String write(IsoDuration value) {
-        Period period = value.calendarPart();
-        Duration clock = value.clockPart();
-
-        StringBuilder sb = new StringBuilder("P");
-        if (period.getYears() != 0) {
-            sb.append(period.getYears()).append('Y');
+    public String write(Duration value) {
+        if (value.isZero()) {
+            return "PT0S";
         }
-        if (period.getMonths() != 0) {
-            sb.append(period.getMonths()).append('M');
+        Duration magnitude = value.abs();
+        StringBuilder out = new StringBuilder(value.isNegative() ? "-PT" : "PT");
+        long hours = magnitude.toHours();
+        int minutes = magnitude.toMinutesPart();
+        int seconds = magnitude.toSecondsPart();
+        int nanos = magnitude.toNanosPart();
+        if (hours != 0) {
+            out.append(hours).append('H');
         }
-        if (period.getDays() != 0) {
-            sb.append(period.getDays()).append('D');
+        if (minutes != 0) {
+            out.append(minutes).append('M');
         }
-
-        long totalSeconds = clock.getSeconds();
-        int nanos = clock.getNano();
-        long hours = totalSeconds / 3600;
-        long minutes = (totalSeconds % 3600) / 60;
-        long seconds = totalSeconds % 60;
-
-        if (hours != 0 || minutes != 0 || seconds != 0 || nanos != 0) {
-            sb.append('T');
-            if (hours != 0) {
-                sb.append(hours).append('H');
+        if (seconds != 0 || nanos != 0) {
+            out.append(seconds);
+            if (nanos != 0) {
+                out.append('.').append(String.format("%09d", nanos).replaceFirst("0+$", ""));
             }
-            if (minutes != 0) {
-                sb.append(minutes).append('M');
-            }
-            if (seconds != 0 || nanos != 0) {
-                sb.append(seconds);
-                if (nanos != 0) {
-                    sb.append('.').append(fractionDigits(nanos));
-                }
-                sb.append('S');
-            }
+            out.append('S');
         }
-
-        if (sb.length() == 1) {
-            // At least one designator is required (read() rejects a bare "P"/"PT").
-            sb.append("T0S");
-        }
-        return sb.toString();
-    }
-
-    private static String fractionDigits(int nanos) {
-        String nineDigits = String.format("%09d", nanos);
-        int end = nineDigits.length();
-        while (end > 1 && nineDigits.charAt(end - 1) == '0') {
-            end--;
-        }
-        return nineDigits.substring(0, end);
-    }
-
-    private static Duration secondsToDuration(String secondsText) {
-        BigDecimal seconds = new BigDecimal(secondsText);
-        long whole = seconds.longValue();
-        BigDecimal fraction = seconds.subtract(BigDecimal.valueOf(whole));
-        // Nanosecond is Duration's own finest grain -- round rather than reject anything more
-        // precise than that, the same rounding-to-the-representable-grid reasoning FloatParser uses.
-        long nanos = fraction.movePointRight(9).setScale(0, RoundingMode.HALF_UP).longValueExact();
-        return Duration.ofSeconds(whole, nanos);
+        return out.toString();
     }
 }

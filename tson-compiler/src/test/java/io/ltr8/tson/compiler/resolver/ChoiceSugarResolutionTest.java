@@ -34,7 +34,7 @@ class ChoiceSugarResolutionTest {
     private static TsonSchema resolve(String body) {
         String document = """
                 !!id:"https://example.test/choice-sugar.tn"
-                !!meta:"https://tson.io/2026/34/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
                 {
                 %s
                 }

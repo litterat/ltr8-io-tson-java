@@ -3,11 +3,15 @@ package io.ltr8.tson.compiler.atom;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.IntegerSize;
+import io.ltr8.tson.schema.meta.IntegerType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.math.BigInteger;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -235,6 +239,51 @@ class IntegerParserTest {
         assertEquals(-8_388_608, int24.read(token("-8388608")).intValue());
         assertThrows(AtomValidationException.class, () -> int24.read(token("8388608")));
         assertThrows(AtomValidationException.class, () -> int24.read(token("-8388609")));
+    }
+
+    // ── the sparse member set (§5.6's `members`) ────────────────────────
+
+    @Test
+    void aMemberSetAdmitsItsMembersAndNothingElse() {
+        IntegerParser port = members(80, 443, 8080);
+
+        assertEquals(BigInteger.valueOf(443), big(port, "443"));
+        assertThrows(AtomValidationException.class, () -> port.read(token("22")));
+        // Adjacent to a member on both sides, so nothing about the set reads as a range.
+        assertThrows(AtomValidationException.class, () -> port.read(token("79")));
+        assertThrows(AtomValidationException.class, () -> port.read(token("81")));
+    }
+
+    @Test
+    void membershipIsTheValueDenotedNotTheSpelling() {
+        // [TSON-DATA] §4.3: 0x50 and 80 are one number, and the member set compares on the decoded value.
+        IntegerParser port = members(80, 443, 8080);
+        assertEquals(BigInteger.valueOf(80), big(port, "0x50"));
+        assertEquals(BigInteger.valueOf(80), big(port, "0b101_0000"));
+        assertEquals(BigInteger.valueOf(80), big(port, "+80"));
+    }
+
+    @Test
+    void aRefusedMemberNamesTheSetAsTheViolatedConstraint() {
+        AtomValidationException refused = assertThrows(AtomValidationException.class,
+                () -> members(80, 443, 8080).read(token("22")));
+        assertEquals("one of (80, 443, 8080)", refused.expected());
+    }
+
+    @Test
+    void aMemberSetComposesWithTheFacetsBesideIt() {
+        // §5.6: "a value must satisfy all present facets" -- the width still applies to a member that fits it.
+        IntegerParser small = new IntegerParser(new IntegerType(Optional.of(new IntegerSize(BigInteger.valueOf(8), true)),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(List.of(BigInteger.valueOf(80)))));
+        assertEquals(BigInteger.valueOf(80), big(small, "80"));
+        assertThrows(AtomValidationException.class, () -> small.read(token("81")));
+    }
+
+    private static IntegerParser members(long... admitted) {
+        return new IntegerParser(new IntegerType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(Arrays.stream(admitted).mapToObj(BigInteger::valueOf).toList())));
     }
 
     /** The table is keyed by the whole size, so a signed and an unsigned width of the same bits differ. */

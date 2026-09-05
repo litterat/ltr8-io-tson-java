@@ -41,13 +41,16 @@ class PolicyOptionsTest {
      */
     @Test
     void theRestatedDefaultsMatchTheOnesTsonActuallyApplies() {
-        var applied = Tson.builder().build().processorPolicy();
+        var tson = Tson.builder().build();
+        var applied = tson.processorPolicy();
 
         assertEquals(applied.identifierPolicy().level(), PolicyOptions.DEFAULTS.identifierPolicy().level());
         assertEquals(applied.identifierPolicy().isPerSegment(),
                 PolicyOptions.DEFAULTS.identifierPolicy().isPerSegment());
         assertEquals(applied.tokenPolicy().level(), PolicyOptions.DEFAULTS.tokenPolicy().level());
-        assertTrue(CliPolicy.from(applied).isDefault(), () -> "a run that configures nothing: " + applied);
+        assertEquals(tson.limitsPolicy(), PolicyOptions.DEFAULTS.limits());
+        assertTrue(CliPolicy.from(applied, tson.limitsPolicy()).isDefault(),
+                () -> "a run that configures nothing: " + applied + ", " + tson.limitsPolicy());
     }
 
     /**

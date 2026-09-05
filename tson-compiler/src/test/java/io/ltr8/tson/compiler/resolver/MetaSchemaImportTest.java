@@ -28,11 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * (resolved via {@link SchemaResolver#resolveSchema}, mirroring the now-deleted {@code MetaTn1Parser}'s
  * own bootstrap steps -- see {@link #parseMetaTn1}), and confirm meta-kernel's names (e.g. {@code
  * atom}, {@code text_type}) are visible and correctly referenced from meta.tn's own
- * composition-based declarations (e.g. {@code date_type => ~atom & atom_specification & {...}}).
+ * composition-based declarations (e.g. {@code date_type => atom & atom_specification & {...}}).
  *
  * <p><b>meta.tn now registers in full, all 31 declarations</b> (2026-07-24, once {@code
  * SchemaResolver} gained generic {@code Instance} resolution -- Phase B step 4) -- previously 4 of
- * its 31 declarations ({@code binary_encoding}, {@code ieee_format}, {@code complex_component},
+ * its 31 declarations ({@code bytes_encoding}, {@code ieee_format}, {@code complex_component},
  * {@code ordered}, all {@code !enum [...]}) had to be skipped, and 3 more ({@code binary}, {@code
  * float_type}, {@code complex_type}) that reference one of those four as a field type had to be
  * excluded too (registering them without their dependency present correctly failed validation).
@@ -99,7 +99,7 @@ class MetaSchemaImportTest {
         // eight occurrences, since identical forms share a name. Its sibling sugar `[type_name]` adds
         // nothing here, because the meta-kernel already declares that same form and an import in scope is
         // referenced rather than redeclared.
-        assertEquals(31, meta.entries().size(), "expected every meta.tn declaration to resolve");
+        assertEquals(45, meta.entries().size(), "expected every meta.tn declaration to resolve");
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(meta, registry));
 
@@ -111,24 +111,26 @@ class MetaSchemaImportTest {
         // The four constructor-application (!enum [...]) declarations previously excluded now
         // resolve too, bound generically via TsonObjectReader against Atom.class.
         assertEquals(new EnumBody(List.of("BASE64", "BASE64URL", "BASE32", "HEX")),
-                registered.schema().entries().get("binary_encoding").body());
+                registered.schema().entries().get("bytes_encoding").body());
         // ...and the three declarations that reference one of those four as a field type now
         // register successfully as well, since their dependency is present in the same schema.
-        assertTrue(registered.schema().entries().containsKey("binary"));
+        assertTrue(registered.schema().entries().containsKey("bytes_type"));
         assertTrue(registered.schema().entries().containsKey("float_type"));
         assertTrue(registered.schema().entries().containsKey("complex_type"));
     }
 
     @Test
-    void registeringBinaryWithoutItsUnresolvedBinaryEncodingFieldCorrectlyFailsValidation() {
+    void registeringAConstructorWithoutItsUnresolvedVocabularyFieldCorrectlyFailsValidation() {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
 
         TsonSchema meta = parseMetaTn1(registry);
-        TypeDefinition binary = meta.entries().get("binary");
+        TypeDefinition floatType = meta.entries().get("float_type");
 
-        TsonSchema withBinaryOnly = new TsonSchema(meta.id(), meta.meta(), meta.imports(), Map.of("binary", binary));
+        // float_type's `format` is typed by ieee_format, which this schema deliberately leaves out.
+        TsonSchema withFloatOnly =
+                new TsonSchema(meta.id(), meta.meta(), meta.imports(), Map.of("float_type", floatType));
 
         assertThrows(io.ltr8.tson.schema.TsonSchemaValidationException.class,
-                () -> registry.register(TsonSchemaLinker.link(withBinaryOnly, registry)));
+                () -> registry.register(TsonSchemaLinker.link(withFloatOnly, registry)));
     }
 }

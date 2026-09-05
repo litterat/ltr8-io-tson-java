@@ -145,12 +145,12 @@ class TsonObjectWriterTest {
     }
 
     @Test
-    void writeBinaryEmitsBase64TypeRefRegardlessOfOriginalEncoding() throws DataBindException {
-        // No way to recover which of base64/base64url/base32/hex a byte[] came from -- base64 is
-        // the writer's arbitrary but reasonable default (see AtomWriter's own Javadoc).
-        BytesHolder original = reader.read("{ value: !hex deadbeef }", BytesHolder.class);
+    void writeBytesEmitsTheOnlyBuiltinTagAndRoundTrips() throws DataBindException {
+        // Nothing to choose: !bytes is the only built-in name and it is base64. An alphabet is a schema's
+        // to select, on the type (bytes_type.encoding), and a schemaless document has no type to carry one.
+        BytesHolder original = reader.read("{ value: !bytes \"3q2+7w==\" }", BytesHolder.class);
         String tson = writer.toTson(original);
-        assertEquals("{ value: !base64 \"3q2+7w==\" }", tson);
+        assertEquals("{ value: !bytes \"3q2+7w==\" }", tson);
         assertArrayEquals(original.value(), reader.read(tson, BytesHolder.class).value());
     }
 
@@ -230,8 +230,8 @@ class TsonObjectWriterTest {
         TsonObjectReader durationReader = new TsonObjectReader(durationContext);
         TsonObjectWriter durationWriter = new TsonObjectWriter(durationContext);
         UserDurationHolder duration =
-                durationReader.read("{ value: !duration P1Y2M3DT4H5M6S }", UserDurationHolder.class);
-        assertEquals("{ value: !duration \"P1Y2M3DT4H5M6S\" }", durationWriter.toTson(duration));
+                durationReader.read("{ value: !duration PT4H5M6S }", UserDurationHolder.class);
+        assertEquals("{ value: !duration \"PT4H5M6S\" }", durationWriter.toTson(duration));
     }
 
     // ── Full example, adapted from spec §2.1 ─────────────────────────────

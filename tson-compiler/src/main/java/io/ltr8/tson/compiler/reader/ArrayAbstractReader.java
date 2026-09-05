@@ -59,7 +59,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
 
     ArrayAbstractReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
                          SchemaLocation schemaLocation) {
-        this(name, displayName, body, UseSite.reader(body.elementType(), resolver), schemaLocation);
+        this(name, displayName, body, resolver.resolve(body.elementType().name()), schemaLocation);
     }
 
     /**
@@ -110,15 +110,17 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         Set<Object> seen = body.uniqueItems() ? new LinkedHashSet<>() : null;
         int index = 0;
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
+            SchemaRef push = ScopePush.notAdmitted(ctx, elementParser);
+            if (push != null) {
+                ScopePush.refuse(ctx.index(index), body.elementType().name(), push);
             }
             Object decoded = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(index, ctx)
                     : elementParser.read(ctx.index(index));
-            if (seen != null && !seen.add(decoded)) {
+            if (seen != null && !seen.add(ValueIdentity.of(decoded))) {
                 ctx.index(index).report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + displayName + "' requires unique elements, '" + decoded + "' appears more than once",
-                        "a value not already present in this array", String.valueOf(decoded));
+                        "'" + displayName + "' requires unique elements, '" + Rendered.value(decoded)
+                                + "' appears more than once",
+                        "a value not already present in this array", Rendered.value(decoded));
             }
             sink.accept(decoded);
             index++;

@@ -37,6 +37,14 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
   identity).
 - **`tson hash <file>`** stamps `?sha256=<hex>` onto the `!!id` in place (idempotent; the hashed bytes
   never change so the pin stays valid).
+- **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole bundled chain, which no
+  single-file command can do: a digest is over a document's own bytes, so an edit to meta.tn moves meta's
+  `!!id`, core.tn's `!!meta`, core's own `!!id`, `TsonBundledSchemas`' three constants, and the
+  getting-started example's pins in `README.md`/`InitCommand.java` — the example pinning meta and core, its
+  own digest moves with theirs. The script walks that order bottom-up; `--check` reports staleness and
+  writes nothing. It hashes with `tail -n +2 | shasum -a 256` rather than calling `tson hash`, so it runs
+  when the tree does not compile. Only a reference already carrying `?sha256=` is re-stamped: pinning is
+  optional, and an unpinned mention in prose is not a pin that has gone stale.
 
 ## CLI (`tson-cli`)
 
@@ -84,7 +92,10 @@ name. Every file's report is collected before anything prints, since the envelop
 across them.
 
 **Exit codes: 0 everything checked and nothing reported, 1 checked and rejected** (bad value / unknown type
-/ no root type-ref, and a §8.2 refusal — the processor looked and declined, and the sender holds the fix),
+/ no root type-ref, a §8.2 refusal — the processor looked and declined, and the sender holds the fix — and a
+§9.1 limit refusal, on the narrower ground that the runner can act: `--max-depth` is a flag and a smaller
+document is theirs to send. That last is the one case where an `outcome` of `NOT_CHECKED` exits 1, the
+envelope answering *was it read* and the exit code answering *what now*),
 **2 usage/classification** (no data files, an unreadable/`!!id`-less schema, a bad flag), **69
 (`EX_UNAVAILABLE`) a schema nothing would supply and a rerun would not either**, **75 (`EX_TEMPFAIL`) a
 schema that could not be reached, where a rerun might**, **78 (`EX_CONFIG`) a type the schema needs with no
@@ -135,8 +146,11 @@ discriminator that could contradict it.
 **What §8.2 requires a refusal to name rides on the envelope instead**, as `policy` — a `CliPolicy` on both
 `validation_run` and `validation_report`, carrying `identifier_policy` and `token_policy` (each a level, a
 `per_segment` unit, and any `permitting` relaxations) and the `unicode_data_version` the rules were computed
-against. The two surfaces keep `TsonConfig`'s own names all the way to the wire, so what a deployment set
-and what its reports say are one vocabulary. It is there rather than on each
+against — **plus `limits`, §9.1's bounds on the same terms**, currently a `max_depth` and nothing else. It is
+inside `policy` rather than beside it because the envelope's one question is "what judged this run", and a
+limit refusal answers it as much as a name refusal does; it also inherits `CliPolicy.isDefault()`, so a run
+that raised the depth states it even when nothing was refused. The two surfaces keep `TsonConfig`'s own names
+all the way to the wire, so what a deployment set and what its reports say are one vocabulary. It is there rather than on each
 diagnostic because it is a fact about the *processor*: constant for the whole run, so a per-refusal copy is N
 copies of one string; and needed by a sender *before* it writes a document rather than after being refused,
 which a channel that only opens on failure cannot give it. The level is also the half that actually explains
@@ -152,11 +166,13 @@ the root, an absent key means the diagnostic has no such end.
 
 **`tson policy` is the same record with no document in hand**, which is the surface that makes a refusal
 avoidable rather than merely explicable: a generator that reads it first never writes the name that would be
-refused. `--output text` prints three lines; `json`/`tson` print the identical `policy` shape the envelopes
-carry, so a consumer parses one thing either way.
+refused. `--output text` prints four lines; `json`/`tson` print the identical `policy` shape the envelopes
+carry, so a consumer parses one thing either way. The §9.1 limits are printed for the same reason and are in
+the same record: a depth bound is this deployment's choice too, so a generator that reads it first never
+writes the document that would be refused.
 
-**The three commands that judge a name take the policy flags** — `validate`, `compile`, `policy`, not
-`hash`/`init-example`. `PolicyOptions` consumes them off the argument list before each subcommand's own loop
+**The three commands that judge a document take the policy flags** — `validate`, `compile`, `policy`, not
+`hash`/`init-example` — the §8.2 ones and `--max-depth`. `PolicyOptions` consumes them off the argument list before each subcommand's own loop
 runs, so those loops still see only `--output` and their positionals; the pair then goes into one
 `Tson.builder()` per run, which is what makes a schema's declared names and a data document's names answer to
 one setting. §8.2 asks that a relaxation not be *silent*, and a flag written into a CI file satisfies that
@@ -182,8 +198,9 @@ they want a run that relaxed a rule to say so even when it passed. The machine f
 That makes `restriction_level` a third hand-written enum copy beside `diagnostic_code` and `outcome` —
 `DiagnosticsSchemaTest` checks all three against their Java enums in both directions.
 
-**The envelope does not yet keep a refusal apart from a verdict**, and the codes are the only thing that
-does: a run whose only problem is a refusal still sets `valid: false` and exits 1. `BACKLOG.md` carries it.
+**`--max-depth` is refused below 1 rather than clamped**, the way a relaxation that would configure nothing
+is a usage error: a caller who wrote `--max-depth 0` meant something, and reading a document under a bound they
+did not ask for is the one outcome that leaves them unable to explain the result.
 
 **70 covers both halves of the exception-classification policy's non-verdict side, printed differently.** A
 gap (`UnsupportedOperationException` — *this library hasn't implemented that yet*) renders as `not

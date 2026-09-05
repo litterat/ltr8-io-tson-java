@@ -1,8 +1,8 @@
-!!id:"https://tson.io/2026/34/m/core.tn?sha256=c2127732df2dbac80ac4bbb7cb7d35070bfe546472368088a2f76343a8d85830"
-!!meta:"https://tson.io/2026/34/m/meta.tn?sha256=a5cf63664cccaafed4b11e494fdb8b3aed0133bf47200910a039a252daed0613"
+!!id:"https://tson.io/2026/35/m/core.tn?sha256=3953b2a6b6fc6d254d013c80d9247b73b02068014df47f8858afb2db1a3c14e7"
+!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=bf967ed0e3e2cd1d56864bc06c2c9fbc69270a60c978dd81c1db83c172d3b00e"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
-  (2026 Revision 34 draft).
+  (2026 Revision 35 draft).
 
   Every type in core comes from a constructor defined in meta-kernel
   or meta. Atoms are uniformly defined as empty instances:
@@ -21,25 +21,28 @@
   meta-kernel.tn's note.
 
   Annotation types (`@ordered`, `@bounded`, `@exact`, `@numeric`,
-  `@deprecated`, `@since`, `@todo`, `@lang`) live in meta.tn —
-  annotations resolve one hop against the governing target's
-  namespace (Part 2 §3.3.3, §6), so for this schema document they
-  must be reachable through the `!!meta` chain; they appear here
-  only by use. Core's own `annotation`, `documentation`, `doc`, and
-  `alias` declarations (and its `void` sibling) face the other
-  direction: they exist so that *data documents* governed by
-  core-importing schemas can use them — the same one-hop rule, seen
-  from the data side.
+  `@disjoint`, `@discriminator`, `@rest`, `@deprecated`, `@since`,
+  `@todo`, `@lang`, `@title`, `@examples`, `@read_only`,
+  `@write_only`) live in meta.tn — annotations resolve one hop
+  against the governing target's namespace (Part 2 §3.3.3, §6), so
+  for this schema document they must be reachable through the
+  `!!meta` chain; they appear here only by use. Core's own
+  `annotation`, `documentation`, and `doc` declarations (and
+  its `void` and `set` siblings) face the other direction: they exist
+  so that *data documents* and user schemas governed by or importing
+  core can use them — the same one-hop rule, seen from the other
+  side.
 
   References:
     ISO/IEC 11404:2007    General Purpose Datatypes
     W3C XSD Part 2        Facet model and constraint vocabulary
     JSON Schema 2020-12   Modern constraint vocabulary
     IEEE 754-2019         Floating-point semantics
-    ISO 8601-1:2019       Date and time formats (duration)
-    RFC 3339              Internet date/time profile
+    RFC 3339              Internet date/time profile; Appendix A is
+                          the duration/period grammar (ISO 8601-1:2019
+                          is the informative source behind it)
     RFC 9562              UUID format
-    RFC 4648              Base encoding
+    RFC 4648              Base encodings (text spellings of `bytes`)
     RFC 3986              URI syntax (incl. IPv4address grammar)
     RFC 4291              IPv6 addressing architecture
     RFC 4632              Classless Inter-domain Routing (CIDR)
@@ -60,7 +63,11 @@
   @doc:"Two-value boolean enumeration."
   boolean => !enum [true false]
 
-  @doc:"Arbitrary-precision signed integer. Decimal, hex, octal, and binary forms; [TSON-DATA] §7.6."
+  @doc:"""
+    Arbitrary-precision signed integer. The value is the integer; TSON text
+    admits decimal, hex, octal and binary spellings ([TSON-DATA] §7.6),
+    all one value.
+    """
   @ordered:TOTAL @bounded:false @exact:true @numeric
   integer => !integer_type {}
 
@@ -68,8 +75,9 @@
     Exact number of arbitrary magnitude and precision, finite, with no
     special values (SQL exact tier; ISO/IEC 11404 `scaled`, radix 10).
     The canonical numeric type and the JSON Schema `number` mapping:
-    a bare JSON number is a TSON `number`. Preserved as written, so
-    equality is safe and ordering is TOTAL. Lossiness enters only when
+    a bare JSON number is a TSON `number`. Exact, so equality is safe
+    and ordering is TOTAL; scale is not part of the value (`1`, `1.0`
+    and `1.00` are one value). Lossiness enters only when
     a consumer narrows to an approximate type (`float32`/`float64`),
     where the value is rounded onto an IEEE grid. A value
     needing `.inf`/`.nan` is not a `number` — those belong to the
@@ -79,11 +87,12 @@
   number => !decimal_type {}
 
   @doc:"""
-    Exact fraction a/b; positive nonzero denominator by grammar. Not
-    normalized: the token is preserved as written and 2/4 round-trips
-    as 2/4. Equality and constraints operate on the value (2/4 equals
-    1/2); receivers reduce if their representation needs it. Contains
-    `/`, so data values must be quoted.
+    Exact fraction a/b with a positive nonzero denominator. The value
+    is the fraction: 2/4 and 1/2 are one value, and equality, ordering
+    and constraints are over it; receivers reduce if their
+    representation needs it. Whether a spelling survives a round trip
+    is an encoding's promise, not the type's (TSON text preserves the
+    token as written, and quotes it, since it contains `/`).
     """
   @ordered:TOTAL @bounded:false @exact:true @numeric
   rational => !rational_type {}
@@ -92,10 +101,15 @@
     Complex number, a pair of components (real and imaginary parts).
     Components default to `NUMBER` (exact); a narrowing may set
     `component` to another member of the closed vocabulary — e.g.
-    `!complex ^ { component: INTEGER }` for Gaussian integers,
-    `!complex ^ { component: FLOAT64 }` for floating-point complex. Exactness follows the component type,
-    so `complex` carries no `@exact` marker. Surface forms a+bi and
-    a+bj are both accepted; component representation is host-defined.
+    `!complex ^ { component: INTEGER }` for Gaussian integers — a
+    refinement, ℤ+ℤi sitting inside the exact-decimal complexes — and
+    `!complex_type { component: FLOAT64 }` for floating-point complex,
+    which is its own type rather than a refinement: binary64 carries
+    ±inf and NaN that no exact decimal represents, so it narrows
+    nothing and is not a `complex`.
+    Exactness follows the component type, so `complex` carries no
+    `@exact` marker. Spellings are the text class's concern (TSON
+    text accepts a+bi and a+bj); component representation is host-defined.
     """
   @ordered:NONE @bounded:false @numeric
   complex => !complex_type {}
@@ -164,11 +178,17 @@
   @ordered:TOTAL @bounded:false @exact:true @numeric
   non_positive_integer => !integer ^ { max: 0 }
 
-  @doc:"IEEE 754 binary32. Value set is the binary32 grid plus signed zeros, subnormals, both infinities, and quiet NaN."
+  @doc:"""
+    IEEE 754 binary32. Value set is the binary32 grid plus signed
+    zeros, subnormals, both infinities, and quiet NaN.
+    """
   @ordered:PARTIAL @bounded:false @exact:false @numeric
   float32 => !float_type { format: BINARY32 }
 
-  @doc:"IEEE 754 binary64. Value set is the binary64 grid plus signed zeros, subnormals, both infinities, and quiet NaN."
+  @doc:"""
+    IEEE 754 binary64. Value set is the binary64 grid plus
+    signed zeros, subnormals, both infinities, and quiet NaN.
+    """
   @ordered:PARTIAL @bounded:false @exact:false @numeric
   float64 => !float_type { format: BINARY64 }
 
@@ -187,50 +207,80 @@
   @ordered:NONE @bounded:false
   uri => !uri_type {}
 
-  @doc:"Base64-encoded binary (RFC 4648)."
-  base64 => !binary BASE64
-
-  @doc:"URL-safe base64-encoded binary (RFC 4648 §5)."
-  base64url => !binary BASE64URL
-
-  @doc:"Base32-encoded binary (RFC 4648)."
-  base32 => !binary BASE32
-
-  @doc:"Hex-encoded binary."
-  hex => !binary HEX
+  @doc:"""
+    Octet sequence. The universal binary type, and the only one: a
+    field is `avatar: bytes`, a digest `sha256 => !bytes ^ { length: 32 }`.
+    Equality and the length facets are over octets; the type says
+    nothing about spelling, as `text` says nothing about UTF-8. The
+    text class of encodings spells `bytes` in base64 (RFC 4648 §4).
+    Another alphabet is another type, declared as its own instance of
+    the constructor (`hexdigest => !bytes_type { encoding: HEX
+    length: 4 }`) — never as a refinement of this one, since a
+    spelling narrows nothing and `hexdigest ^ bytes` would claim an
+    IS-A that no base64 position can honour. An encoding whose values
+    are octets writes them raw.
+    """
+  @ordered:NONE @bounded:false
+  bytes => !bytes_type { encoding: BASE64 }
 
   @doc:"Calendar date. RFC 3339 full-date YYYY-MM-DD."
   @ordered:TOTAL @bounded:false
   date => !date_type {}
 
   @doc:"""
-    Time of day. RFC 3339 full-time HH:MM:SS. PARTIAL ordering reflects
-    that times with different timezone offsets are not unconditionally
-    comparable without resolving to a common reference; times within a
-    single timezone are totally ordered.
+    Time of day. RFC 3339 full-time HH:MM:SS[.s…] with a mandatory
+    offset. The value is the time of day in UTC, on the finite
+    interval [00:00:00, 24:00:00), so `10:00:00+01:00` and
+    `09:00:00Z` are one value, and ordering is TOTAL — the offset
+    being mandatory is what makes it so; XSD's partial order is the
+    cost of an optional one. Normalising to UTC wraps at midnight
+    (`23:30:00-02:00` is `01:30:00Z`), which is the price of a time
+    with no date: a local time of day — "09:00 wherever you are" —
+    is not this type. Equality and bounds compare the value. The
+    offset is a spelling, as an alphabet is to `bytes`: TSON text
+    preserves it as written, an encoding that stores the instant may
+    drop it.
     """
-  @ordered:PARTIAL @bounded:true
+  @ordered:TOTAL @bounded:true
   time => !time_type {}
 
   @doc:"""
-    Date and time. RFC 3339 date-time. PARTIAL ordering reflects that
-    datetimes with different timezone offsets require resolution to a
-    common reference (typically UTC) before comparison; datetimes
-    within a single timezone or all in UTC are totally ordered.
+    Date and time. RFC 3339 date-time with a mandatory offset. The
+    value is the instant on the UTC timeline, so
+    `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are one
+    value, and ordering is TOTAL for the same reason as `time`. An
+    offset of `-00:00` (offset unknown, RFC 3339 §4.3) is the same
+    instant as `Z` and compares as such. A local datetime — a wall
+    clock with no offset — is not this type. Equality and bounds
+    compare the value. The offset is a spelling, as an alphabet is to
+    `bytes`: TSON text preserves it as written, an encoding that
+    stores the instant may drop it, and a value for which the offset
+    is data — an appointment shown in its booked zone — is a different
+    value space, not this type.
     """
-  @ordered:PARTIAL @bounded:false
+  @ordered:TOTAL @bounded:false
   datetime => !datetime_type {}
 
   @doc:"""
-    Time duration. ISO 8601 PnYnMnDTnHnMnS. PARTIAL ordering reflects
-    that durations expressed with calendar units (years, months) have
-    no fixed length — P1M may be 28, 29, 30, or 31 days depending on
-    when applied — so two such durations are not unconditionally
-    comparable. Durations expressed only in fixed-length units (days,
-    hours, minutes, seconds) are totally ordered.
+    Elapsed time — a signed rational number of seconds. The clock half
+    of what one ISO 8601 duration used to carry: no Y or month-M
+    component, so every value has a fixed length and ordering is TOTAL.
+    `P1M` is a month and belongs to `period`; a minute is `PT1M`. A day
+    is exactly 86400 s and a week 7 days, so `PT90M`, `PT1H30M` and
+    `P0DT5400S` are one value.
     """
-  @ordered:PARTIAL @bounded:false
+  @ordered:TOTAL @bounded:false
   duration => !duration_type {}
+
+  @doc:"""
+    Calendar span — a signed integer number of months. The calendar
+    half, and the reason `duration` can be totally ordered: a month has
+    no fixed length, so months and seconds are two value spaces rather
+    than one partially ordered one. `P1Y` and `P12M` are one value.
+    A span that is genuinely both is a record with a field of each.
+    """
+  @ordered:TOTAL @bounded:false
+  period => !period_type {}
 
   @doc:"128-bit identifier per RFC 9562."
   @ordered:NONE @bounded:true
@@ -251,7 +301,7 @@
     IPv6 address, RFC 4291 §2.2 text representation. Zone identifiers
     (RFC 4007, `fe80::1%eth0`) are host-local and excluded from the
     contract. Totally ordered by numeric address value over a finite
-    128-bit space. Contains colons, so data values must be quoted.
+    128-bit space. (TSON text: contains colons, so quote it.)
     """
   @ordered:TOTAL @bounded:true
   ipv6 => !ipv6_type {}
@@ -261,35 +311,95 @@
     ordering is by containment: a network precedes another when its
     address range is a strict subset; CIDR blocks never partially
     overlap, so any two are nested or disjoint, and disjoint networks
-    are incomparable. Contains `/`, so data values must be quoted.
+    are incomparable. (TSON text: contains `/`, so quote it.)
     """
   @ordered:PARTIAL @bounded:true
   cidr4 => !cidr4_type {}
 
   @doc:"""
     IPv6 network, address `/` prefix length 0-128 (RFC 4291 §2.3).
-    PARTIAL ordering is by containment, as for cidr4. Contains colons
-    and `/`, so data values must be quoted.
+    PARTIAL ordering is by containment, as for cidr4. (TSON text:
+    contains colons and `/`, so quote it.)
     """
   @ordered:PARTIAL @bounded:true
   cidr6 => !cidr6_type {}
 
   @doc:"""
     MAC address, EUI-48: six hex octets, colon- or hyphen-separated
-    (RFC 9542). The colon form must be quoted; the hyphen form may be
-    written unquoted. An opaque hardware identifier — like uuid,
-    ordering is not semantically meaningful.
+    (RFC 9542). An opaque hardware identifier — like uuid, ordering
+    is not semantically meaningful. (TSON text: the colon form must be
+    quoted; the hyphen form may go unquoted.)
     """
   @ordered:NONE @bounded:true
   mac => !mac_type {}
 
   @doc:"""
-    Value whose type is unconstrained. Membership is the universe of
-    types. Distinct from absent and from the unit type. The validator
-    accepts any well-formed value of any type.
+    A type this schema declares or imports, chosen by the value. The
+    narrowest of the three scoped instances: the value names its type
+    (in TSON text, with a !type-ref) and that name resolves in the
+    governing namespace ([TSON-SCHEMA] §2.2.3), exactly as it does
+    anywhere else — what the position adds is that the choice of type
+    is the data's.
     """
   @ordered:NONE @bounded:false
-  unknown => !unknown_type {}
+  declared => !scoped { scope: [LOCAL] }
+
+  @doc:"""
+    A type from a foreign schema, which the value names for itself: it
+    carries the schema's identity and a type name resolved in that
+    schema (in TSON text, a nested !!schema, [TSON-DATA] §2.3, and a
+    !type-ref, read by §7.8's scope push). Any foreign schema is
+    admitted; `extern_of` and `extern_type` narrow to one schema,
+    or to one type in one schema, without declaring anything.
+    """
+  @ordered:NONE @bounded:false
+  extern => !scoped { scope: [EXTERN] }
+
+  @doc:"""
+    A type from either namespace — the widest scoped instance, and the
+    successor to what earlier revisions called `unknown`. Named for
+    what it says: the *data* decides the type, from any namespace. Not
+    `any`, which in every language a reader arrives from means a value
+    that is unchecked, where this one is validated in full against the
+    type it names. A value naming no type at all is a validation error
+    here as at every scoped position.
+    """
+  @ordered:NONE @bounded:false
+  dynamic => !scoped { scope: [LOCAL EXTERN] }
+
+  @doc:"""
+    A type from one named foreign schema. An application rather than a
+    declaration, so a field writes `attachment: extern_of<"https://…/claim.tn">`
+    and declares nothing. `S` stands in a uri-typed key, an atom, so it
+    is a value parameter and the argument is the scalar §5.10 admits —
+    one schema per application.
+    """
+  extern_of => <S> !scoped { scope: [EXTERN]  schemas: { S => _ } }
+
+  @doc:"""
+    One named type in one named foreign schema. As `extern_of`, with
+    `T` standing inside [type_name] — also an atom, so also a value
+    parameter, and one type per application. A no-argument reference is
+    spelled positionally ([TSON-SCHEMA] §5.6), so `T` lands in the
+    type_name slot as the identifier it is.
+    """
+  extern_type => <S, T> !scoped { scope: [EXTERN]  schemas: { S => [T] } }
+
+  @doc:"""
+    The set spelling an author writes: `set<text>` where the bare
+    construction is `!set_type { element_type: text }`. A §5.10
+    template, not a constructor: it composes with nothing and so is
+    not IS-A `top`, and `set_type` stays parameterless as §4.2
+    requires of every container constructor. The element type
+    arrives by application rather than by a parameter on the
+    constructor itself.
+
+    A sibling of meta's declaration under the same name, as `void`
+    is of the kernel's: user schemas reach it through their core
+    import, so `tags: set<text>` resolves without touching the
+    governing namespace.
+    """
+  set => <T> !set_type { element_type: T }
 
   @doc:"Marker annotation."
   annotation => @annotation void
@@ -300,6 +410,4 @@
   @doc:"Short alias for documentation annotation."
   doc => @annotation documentation
 
-  @doc:"Source-level alias name preserved on a resolved type reference."
-  alias => @annotation text
 }

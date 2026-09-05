@@ -8,6 +8,7 @@ import io.ltr8.tson.compiler.ast.EmptyBrace;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -22,12 +23,15 @@ import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UriType;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Set;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -99,13 +103,7 @@ public final class MetaKernelBootstrapResolver {
     public static TsonSchema getMetaKernelSchema() {
         String source = TsonBundledSchemas.fetch(TsonBundledSchemas.META_KERNEL_ID);
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
-        // §8.3 applies here as it does to any other schema. The bootstrap is a shorter route to the same
-        // resolved form, not a different one, and this output governs anything whose !!meta is meta-kernel
-        // -- so a use site flattened by ordinary resolution and unflattened here would be two answers to
-        // one question. No minted entries to stop at: the bootstrap runs no materialisation, and meta-kernel
-        // imports nothing, so its own map is the whole namespace a chain can walk.
-        Map<String, TypeDefinition> resolved = resolveEntries(document);
-        Map<String, TypeDefinition> entries = ReferenceFlattener.flatten(resolved, resolved, Set.of());
+        Map<String, TypeDefinition> entries = resolveEntries(document);
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "meta-kernel.tn has no !!id -- this should never happen for the real, bundled fixture"));
         return new TsonSchema(id, document.meta(), document.imports(), entries, true);
@@ -136,13 +134,20 @@ public final class MetaKernelBootstrapResolver {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         DefinitionResolver resolver = new DefinitionResolver(NEVER_CALLED, EMPTY_META_DEFINITIONS, entries::get);
         List<SchemaMap.Declaration> instances = new ArrayList<>();
+        List<SchemaMap.Declaration> refinements = new ArrayList<>();
 
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             if (declaration.typeDef() instanceof Instance) {
-                // Deferred to the second pass: an Instance's own kind is transferred from its
+                // Deferred to the instance pass: an Instance's own kind is transferred from its
                 // target, which (e.g. "enum", declared long after "boolean" uses it) may not be
                 // resolved yet in source order.
                 instances.add(declaration);
+                continue;
+            }
+            if (declaration.typeDef() instanceof AtomRefinement) {
+                // Deferred for the same reason, one step further along: a refinement's source is an
+                // instance, so it cannot resolve until the instance pass below has produced one.
+                refinements.add(declaration);
                 continue;
             }
             entries.put(declaration.name(), resolver.resolve(declaration));
@@ -154,13 +159,85 @@ public final class MetaKernelBootstrapResolver {
             if (target == null) {
                 continue;
             }
+            // An *open* instance is a §5.10 template, not a construction: its body is held -- the
+            // application as written -- and stays unread until materialisation substitutes the parameters
+            // away. Constructing it here instead would resolve `element_type: T` into a reference to a type
+            // called T, which is how `set => <T> !set_type { element_type: T }` used to fail. Held bodies are
+            // the one thing this bootstrap shares with ordinary resolution, and for the same reason:
+            // meta-kernel governs itself, so its own templates are applied by the layer below it.
+            if (!instance.typeParams().isEmpty()) {
+                entries.put(declaration.name(), new TypeDefinition(Optional.of(TypeRef.of(instance.target())),
+                        TypeKind.TEMPLATE, List.of(), List.of(),
+                        HeldBody.held(instance.typeParams(), instance.value())));
+                continue;
+            }
             // §5.5: constructor application transfers only the target's kind; no supertypes, no
             // parameters -- this is construction, not composition or refinement.
             instanceBody(instance).ifPresent(body -> entries.put(declaration.name(),
-                    new TypeDefinition(Optional.of(TypeRef.of(instance.target())), target.kind(), List.of(),
-                            false, List.of(), List.of(), Optional.empty(), body)));
+                    new TypeDefinition(Optional.of(TypeRef.of(instance.target())), target.kind(),
+                            List.of(), List.of(), body)));
+        }
+        for (SchemaMap.Declaration declaration : refinements) {
+            AtomRefinement refinement = (AtomRefinement) declaration.typeDef();
+            TypeDefinition target = entries.get(refinement.target());
+            if (target == null) {
+                throw new IllegalStateException("'" + declaration.name() + "': refines '" + refinement.target()
+                        + "', which meta-kernel does not declare");
+            }
+            entries.put(declaration.name(), new TypeDefinition(target.source(), target.kind(),
+                    List.of(refinement.target()), List.of(),
+                    refinedBody(declaration.name(), refinement, target)));
         }
         return entries;
+    }
+
+    /**
+     * The hand-written merge for an atom refinement, {@link #instanceBody}'s twin and bounded the same way:
+     * meta-kernel refines exactly one family, so this handles that one and refuses the rest by name rather
+     * than pretending to be general.
+     *
+     * <p>Ordinary resolution does this through a {@code TsonObjectWriter} round trip and the governing
+     * meta's compiled reader ({@code DefinitionResolver.resolveAtomRefinement}). The bootstrap has neither:
+     * the reader it would use is the one being produced. So the kernel pays for a refinement in hand-written
+     * code, which is the same bargain {@link #instanceBody} already strikes -- and the reason to keep the
+     * kernel's own refinements few.
+     */
+    private static Top refinedBody(String name, AtomRefinement refinement, TypeDefinition target) {
+        if (!(target.body() instanceof IntegerType source)) {
+            throw new UnsupportedOperationException("'" + name + "' refines '" + refinement.target()
+                    + "', whose body is a " + target.body().getClass().getSimpleName() + ". meta-kernel's "
+                    + "bootstrap merges an atom refinement by hand and covers the integer family only; "
+                    + "extend refinedBody to add another");
+        }
+        Optional<BigInteger> min = source.min();
+        Optional<BigInteger> max = source.max();
+        for (RecordValue.Field binding : bindingFields(name, refinement)) {
+            BigInteger value = new BigInteger(bindingText(name, binding));
+            switch (binding.name()) {
+                case "min" -> min = Optional.of(value);
+                case "max" -> max = Optional.of(value);
+                default -> throw new UnsupportedOperationException("'" + name + "' refines '"
+                        + refinement.target() + "' with '" + binding.name() + "'; meta-kernel's bootstrap "
+                        + "merges min and max only");
+            }
+        }
+        return new IntegerType(source.size(), min, source.exclusiveMin(), max, source.exclusiveMax(),
+                source.multipleOf(), source.members());
+    }
+
+    private static List<RecordValue.Field> bindingFields(String name, AtomRefinement refinement) {
+        if (!(refinement.bindings().coreValue() instanceof RecordValue record)) {
+            throw new UnsupportedOperationException("'" + name + "': a refinement's bindings are a record");
+        }
+        return record.fields();
+    }
+
+    private static String bindingText(String name, RecordValue.Field binding) {
+        if (!(binding.value().value().coreValue() instanceof TokenValue token)) {
+            throw new UnsupportedOperationException("'" + name + "': '" + binding.name()
+                    + "' takes a token in meta-kernel's own bootstrap");
+        }
+        return token.text();
     }
 
     /**
@@ -201,7 +278,7 @@ public final class MetaKernelBootstrapResolver {
             // Emitted by SchemaDesugarer above, never written by hand in the fixture. array and set differ
             // only in the defaults set tightens (§5.7): ordered/duplicating vs unordered/unique.
             case "array" -> Optional.of(toArrayBody(instance.value(), false));
-            case "set" -> Optional.of(toArrayBody(instance.value(), true));
+            case "set_type" -> Optional.of(toArrayBody(instance.value(), true));
             case "map" -> Optional.of(toMapBody(instance.value()));
             default -> Optional.empty();
         };

@@ -1,9 +1,9 @@
-!!id:"https://tson.io/2026/34/ltr8/cli/diagnostics-11.tn"
-!!meta:"https://tson.io/2026/34/m/meta.tn"
-!!import:"https://tson.io/2026/34/m/core.tn"
+!!id:"https://tson.io/2026/35/ltr8/cli/diagnostics-11.tn"
+!!meta:"https://tson.io/2026/35/m/meta.tn"
+!!import:"https://tson.io/2026/35/m/core.tn"
 @doc:"""
   This project's own schema !!id convention (see CLAUDE.md's "Project-owned schema !!id
-  convention"): /2026/34 is the spec revision this schema is written against, ltr8 is the
+  convention"): /2026/35 is the spec revision this schema is written against, ltr8 is the
   publishing org, cli is this module's own schema group, and the trailing -11 is this schema's
   own version.
 
@@ -26,7 +26,7 @@
   diagnostic_code => !enum [
     FIELD_REQUIRED FIELD_FIXED TYPE_MISMATCH WRONG_ARITY UNKNOWN_TYPE_REF ATOM_CONSTRAINT_VIOLATION
     UNRECOGNIZED_FIELD DUPLICATE_MAP_KEY DUPLICATE_FIELD CONFUSABLE_NAMES RESTRICTED_CHARACTER RESTRICTED_SCRIPT
-    SCHEMA_ERROR UNKNOWN_TYPE VALIDATION_ERROR NOT_IMPLEMENTED BIND_MISMATCH
+    SCHEMA_ERROR UNKNOWN_TYPE VALIDATION_ERROR NOT_IMPLEMENTED BIND_MISMATCH LIMIT_EXCEEDED
     SCHEMA_NOT_PERMITTED SCHEMA_NOT_FOUND SCHEMA_UNREACHABLE SCHEMA_TIMEOUT SCHEMA_TOO_LARGE
   ]
   @doc:"""
@@ -36,7 +36,7 @@
     run cannot make, and an agent reading `if (!valid)` acts on that assertion.
 
     NOT_CHECKED is exactly the set of diagnostic codes that are not a verdict (Diagnostic.Code.verdict):
-    the five SCHEMA_ codes, BIND_MISMATCH and NOT_IMPLEMENTED. A name-hygiene refusal is INVALID --
+    the five SCHEMA_ codes, BIND_MISMATCH, NOT_IMPLEMENTED and LIMIT_EXCEEDED. A name-hygiene refusal is INVALID --
     the processor looked and declined, and the sender holds the fix.
     """
   outcome => !enum [ VALID INVALID NOT_CHECKED ]
@@ -98,15 +98,28 @@
     TsonConfig gives them, so a deployment's configuration and the report it produces are one vocabulary.
 
     unicode_data_version is the UCD release whose tables the rules were computed against, which is the
-    version §8.2's "UTS #39 data version" means (SPEC-FEEDBACK.md #6). It is here rather than on each
+    version §8.2 asks a report to name. It is here rather than on each
     diagnostic because it is constant for the life of the process, and because what a sender needs in
     order not to be refused is this record *before* it writes a document -- which `tson policy` prints
     with no document in hand.
     """
+  @doc:"""
+    [TSON-DATA] §9.1's resource limits: what this processor will spend reading one document, as against
+    what it will admit as a name. Only nesting depth is bounded so far -- §9.1 states eleven more with a
+    default each, and [TSON-SCHEMA] §11.5 five on the schema side under the same policy; each lands here as
+    it is built.
+
+    A limit refusal is LIMIT_EXCEEDED and is not a verdict: the document may be well-formed, valid, and
+    read in full by the next processor along. It is here for the same reason the Unicode policy is -- the
+    bound is this deployment's own choice, so a sender that reads it writes a document that fits.
+    """
+  limits => { max_depth: int32 }
+
   policy => {
     identifier_policy: unicode_policy
     token_policy: unicode_policy
     unicode_data_version: text
+    limits: limits
   }
   validation_report => { outcome: outcome  policy: policy  errors: [diagnostic] }
   file_report => { file: text  outcome: outcome  errors: [diagnostic] }

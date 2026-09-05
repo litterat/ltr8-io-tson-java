@@ -30,16 +30,16 @@ class UnregisteredMetaConstructorTest {
     static {
         DOCUMENTS.put("https://example.test/meta-unreg.tn", """
                 !!id:"https://example.test/meta-unreg.tn"
-                !!meta:"https://tson.io/2026/34/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/34/m/meta.tn"
+                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/35/m/meta.tn"
                 {
-                  operation => ~top & { path: text }
+                  operation => top & { path: text }
                 }
                 """);
         DOCUMENTS.put("https://example.test/api-unreg.tn", """
                 !!id:"https://example.test/api-unreg.tn"
                 !!meta:"https://example.test/meta-unreg.tn"
-                !!import:"https://tson.io/2026/34/m/core.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
                 {
                   search => !operation { path: "/search" }
                 }

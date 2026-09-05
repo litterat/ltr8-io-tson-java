@@ -234,9 +234,19 @@ class TsonDataParserTest {
         assertInstanceOf(AbsentValue.class, rec.fields().get(0).value().value().coreValue());
     }
 
+    /**
+     * §2.4: <b>a comma may follow a value</b>, so one before the closing delimiter is ordinary -- it separated
+     * the last field from the delimiter, which is nothing. It cannot mean an absent field: absence is
+     * spelled {@code _} and occupies a slot, so there is nothing for a stray comma to be confused with. What
+     * stays an error is a comma following no value -- a leading one, or one following another comma.
+     */
     @Test
-    void trailingCommaInRecordIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("{ x: 1, }"));
+    void aTrailingCommaInARecordIsOrdinaryAndAStrayOneIsNot() {
+        RecordValue record = assertInstanceOf(RecordValue.class, root("{ x: 1, }").coreValue());
+        assertEquals(1, record.fields().size());
+
+        assertThrows(TsonParseException.class, () -> parse("{ x: 1, , y: 2 }"));
+        assertThrows(TsonParseException.class, () -> parse("{ , x: 1 }"));
     }
 
     @Test
@@ -296,9 +306,18 @@ class TsonDataParserTest {
         assertInstanceOf(AbsentValue.class, map.entries().get(0).key().coreValue());
     }
 
+    /**
+     * §2.4: <b>a comma may follow a value</b>, so one before the closing delimiter is ordinary -- it separated
+     * the last entry from the delimiter, which is nothing. It cannot mean an absent entry: absence is
+     * spelled {@code _} and occupies a slot, so there is nothing for a stray comma to be confused with. What
+     * stays an error is a comma following no value -- a leading one, or one following another comma.
+     */
     @Test
-    void trailingCommaInMapIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("{ a => 1, }"));
+    void aTrailingCommaInAMapIsOrdinaryAndAStrayOneIsNot() {
+        MapValue map = assertInstanceOf(MapValue.class, root("{ a => 1, }").coreValue());
+        assertEquals(1, map.entries().size());
+
+        assertThrows(TsonParseException.class, () -> parse("{ a => 1, , b => 2 }"));
     }
 
     // ── Arrays ───────────────────────────────────────────────────────────
@@ -345,9 +364,19 @@ class TsonDataParserTest {
         assertEquals("A-100", token(first.fields().get(0).value().value()).text());
     }
 
+    /**
+     * §2.4: <b>a comma may follow a value</b>, so one before the closing delimiter is ordinary -- it separated
+     * the last element from the delimiter, which is nothing. It cannot mean an absent element: absence is
+     * spelled {@code _} and occupies a slot, so there is nothing for a stray comma to be confused with. What
+     * stays an error is a comma following no value -- a leading one, or one following another comma.
+     */
     @Test
-    void trailingCommaInArrayIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("[1, 2, 3,]"));
+    void aTrailingCommaInAnArrayIsOrdinaryAndAStrayOneIsNot() {
+        ArrayValue array = assertInstanceOf(ArrayValue.class, root("[1, 2, 3,]").coreValue());
+        assertEquals(3, array.elements().size());
+
+        assertThrows(TsonParseException.class, () -> parse("[1, , 2]"));
+        assertThrows(TsonParseException.class, () -> parse("[, 1]"));
     }
 
     @Test
@@ -725,11 +754,19 @@ class TsonDataParserTest {
                 assertInstanceOf(TokenValue.class, map.entries().get(0).key().coreValue()).form());
     }
 
-    /** And a single-line quoted field name keeps working -- it is the spelling §7.1 sends out-of-profile names to. */
+    /**
+     * A quoted field name still parses -- the production has two spellings and always did. What it is not is an
+     * escape hatch from the profile: a field name is an identifier however it was written (§2.5, §7.7), so
+     * quoting carries a name the unquoted form would misread and never a key that is not a name.
+     */
     @Test
-    void aSingleLineQuotedFieldNameParses() {
-        RecordValue record = assertInstanceOf(RecordValue.class, root("{\"first name\": 1}").coreValue());
-        assertEquals("first name", record.fields().get(0).name());
+    void aSingleLineQuotedFieldNameIsStillMatchedAgainstTheProfile() {
+        RecordValue record = assertInstanceOf(RecordValue.class, root("{\"order-id\": 1}").coreValue());
+        assertEquals("order-id", record.fields().get(0).name());
+
+        TsonParseException thrown = assertThrows(TsonParseException.class, () -> root("{\"first name\": 1}"));
+        assertTrue(thrown.getMessage().contains("invalid field name"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("belongs in a map"), thrown.getMessage());
     }
 
     @Test

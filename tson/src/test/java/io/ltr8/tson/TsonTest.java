@@ -29,8 +29,8 @@ class TsonTest {
 
     private static final String TINY_DOCUMENT = """
             !!id:"https://example.test/tson-test.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             {
               my_int => int32
               my_percentage => !positive_integer ^ { max: 100 }
@@ -50,7 +50,7 @@ class TsonTest {
         TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
                 () -> tson.resolve("""
                         !!id:"https://example.test/oops.tn"
-                        !!meta:"https://tson.io/2026/34/m/core.tn"
+                        !!meta:"https://tson.io/2026/35/m/core.tn"
                         {
                           my_thing => uuid
                         }
@@ -64,10 +64,10 @@ class TsonTest {
         Tson tson = Tson.builder().build();
 
         TsonLinkedSchema linked = tson.resolve(TINY_DOCUMENT);
-        // Merged view: the two local declarations, plus core.tn's own 48 imported entries --
+        // Merged view: the two local declarations, plus core.tn's own 51 imported entries --
         // TsonSchemaLinker.link copies an import's own entries in, unlike the raw resolved TsonSchema
         // resolve()'s own resolution step produces internally, which stays local-only.
-        assertEquals(50, linked.schema().entries().size());
+        assertEquals(52, linked.schema().entries().size());
         assertTrue(linked.schema().entries().containsKey("my_int"));
         assertTrue(linked.schema().entries().containsKey("my_percentage"));
 

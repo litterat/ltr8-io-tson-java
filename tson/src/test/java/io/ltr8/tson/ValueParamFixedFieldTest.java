@@ -33,8 +33,8 @@ class ValueParamFixedFieldTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/value-param.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             {
               order    => { id: text }
               literal  => { status: int32 = 201  body: order }
@@ -73,9 +73,10 @@ class ValueParamFixedFieldTest {
      * because the obvious fix for the defect below is to make this REQUIRED_FIXED, which would put this
      * implementation at odds with the one sentence the spec is explicit about.
      *
-     * <p>The template's body is <b>held</b>, so the state and the parameter are read off the wire record it
-     * holds rather than off a {@code RecordField}: {@code record_field.value_param} is gone, the parameter
-     * standing in the ordinary {@code value} slot with §8.1's shadowing rule to tell it from a literal.
+     * <p>The template's body is <b>held</b>, so the state and the parameter are read off the application the
+     * entry holds rather than off a {@code RecordField}: {@code record_field.value_param} is gone, the
+     * parameter standing in the ordinary {@code value} slot with §8.1's shadowing rule to tell it from a
+     * literal.
      */
     @Test
     void anOpenTemplatesParametricFixedFieldStaysRequiredWithTheParameterRecorded() {
@@ -84,9 +85,11 @@ class ValueParamFixedFieldTest {
         TemplateBody held = assertInstanceOf(TemplateBody.class,
                 linked.schema().entries().get("response").body());
 
-        assertTrue(held.names().contains("S"), () -> "the parameter is named in the body: " + held.names());
-        assertFalse(held.names().contains(FieldState.REQUIRED_FIXED.name()),
-                () -> "nothing is fixed at declaration: " + held.names());
+        assertEquals(List.of("T", "S"), held.parameters(), "the entry's own parameter list, as declared");
+        assertTrue(held.template().contains("value: S"),
+                () -> "the parameter stands in the ordinary value slot: " + held.template());
+        assertFalse(held.template().contains(FieldState.REQUIRED_FIXED.name()),
+                () -> "nothing is fixed at declaration: " + held.template());
     }
 
     /**
@@ -144,8 +147,8 @@ class ValueParamFixedFieldTest {
     void everyTemplateShapeFixesARoutedValueTheSameWay() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
-                !!meta:"https://tson.io/2026/34/m/meta.tn"
-                !!import:"https://tson.io/2026/34/m/core.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
                 {
                   order    => { id: text }
                   base     => { status: int32  body: order }
@@ -181,8 +184,8 @@ class ValueParamFixedFieldTest {
     void everyTemplateShapeResolvesAgainstTheSingleValueChannel() {
         String schema = """
                 !!id:"https://example.test/value-param.tn"
-                !!meta:"https://tson.io/2026/34/m/meta.tn"
-                !!import:"https://tson.io/2026/34/m/core.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
                 {
                   order    => { id: text }
                   base     => { status: int32  body: order }

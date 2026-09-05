@@ -39,6 +39,22 @@ are kept in step deliberately.
   `=>` that land on the `TypeDefinition`, and the ones before the name that land on the entry's key — and
   `SchemaResolver` catches the second set's failures itself, since that loop runs outside the memoized getter
   that catches the first set's.
+- **A restated field's annotations merge over the inherited ones, restatement first** (`resolveField`/`merged`).
+  §5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one, and neither says what
+  becomes of the field's annotations; a resolver's two paths gave two answers, an inherited field being absorbed
+  whole while a restated one was rebuilt with only what the restatement wrote. The rule closes that: the
+  restatement's own annotations in source order, then the inherited field's, one path serving refinement and
+  composition alike. **Concatenation rather than replacement by name**, because [TSON-DATA] §3.1 makes a name
+  repeatable on one value with every occurrence preserved — annotations are a list, not a map, so "the
+  inherited `@doc`" names nothing when the source wrote two. **Restatement first**, because order *is* the
+  precedence mechanism: `Annotations.get`/`value` take the first occurrence, so leading with the nearer
+  declaration is what a first-occurrence lookup reads. **The ordering half has no read-side witness**, because
+  no annotation the meta layer declares changes how a value reads: everything that decides a spelling belongs
+  to the type, the alphabet a `bytes` value is written in included (`bytes_type.encoding`, §5.5). So the
+  ordering is demonstrated over resolved output, and §5.8 gives it read-side force wherever an annotation
+  directs reading. `RestatedFieldAnnotationsTest` covers each
+  case, and §5.8 now states the rule: the restatement's own annotations in source order, then the inherited
+  field's, adding and never removing.
 - **What resolves:** record construction; composition (`A & B & { ... }`, §5.8, with kind from the literal
   base-kind names in the transitive supertype chain, and tightening in the trailing body per §5.7); the
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
@@ -49,6 +65,84 @@ are kept in step deliberately.
   restating a field group in a refinement or composition body (§5.11 — same member labels in the same order,
   types verbatim, state tightening OPTIONAL→REQUIRED only; only the *group's* state moves, since members
   flatten as `OPTIONAL` regardless).
+- **A template closes by application, never by construction**, and naming one at a construction site is an
+  author error (`DefinitionResolver.resolveInstance`). `C<...>` substitutes a template's parameters away
+  (§5.10); `!C { ... }` fills a *constructor's* own vocabulary (§4.2). Different operations, and the check
+  is on being a template — having parameters — so any §5.10 template gets the
+  same advice instead of the "did you mean atom refinement?" hint, which cannot help when what is missing is
+  the argument list. **This is why the `RecordBody` check below it is genuinely unreachable**: its own
+  comment used to claim so and was wrong, because an *open* declaration holds its body (`holdIfOpen`) and a
+  parameterised declaration is exactly one — so `!my_set { … }` reached an `IllegalStateException`,
+  which is this project's spelling of *an internal invariant broke*, and the CLI reported an author's schema
+  mistake as a library fault at exit 70. `TemplateClosesByApplicationTest` pins all of it.
+- **A construction head resolves through its reference chain first** (§8.3, `resolveConstructorTarget`).
+  A reference is a hop, not a rewrite, so `alias_array => array` makes `!alias_array { … }` an application of
+  `array`, and every question the head is then asked — is it a template, is it applicable, what kind does
+  construction transfer, whose vocabulary reads the payload — is a question about the entry at the end.
+  Asking the alias answered all four from an empty supertype chain and a `REFERENCE` kind, which is what a
+  hop looks like rather than what it points at; the old `constructor` flag had the same hole, hardcoded
+  `false` on a reference. The author's spelling survives where it is visible: `source` records the name they
+  wrote, so the chain stays walkable from resolved output.
+- **What `!C { … }` may apply is IS-A `top` (§4.1)** (`requireApplicable`), asked of that terminal entry. §4.1 makes
+  every base kind IS-A `top` and every constructor transitively so, while IS-A stops at construction — an
+  instance or a fresh record carries an empty chain — so the predicate admits every constructor and, beyond
+  them, exactly the entries describing *a type* rather than a part of one. Measured over the bundled schemas:
+  `constructor ⊂ IS-A top`, the difference being the four base kinds plus `reference`, and no constructor
+  failing to be IS-A `top`.
+  **Asking for the marker was both too narrow and inconsistent.** `reference` is deliberately unmarked (it
+  describes no value) and the language needs it applicable, so it took a by-name exception in the template
+  path and none in the closed one — `<T> !reference { target: T }` resolved while `!reference { target:
+  int32 }` did not, one construction with two answers. The exception is gone. A base kind is now admitted and
+  refuses itself through its own reader, naming the subtypes that would satisfy the position, which is the
+  better message. What stays out is the component set — `record_field`, `type_ref`, `type_argument`,
+  `tuple_element`, `field_group`, `integer_size`, `atom_specification`, `type_definition` — record-bodied
+  with empty chains; without a check those fail anyway on `Top` being sealed, but as a `ClassCastException`
+  surfaced as `NOT_IMPLEMENTED`, a non-verdict for an author error. `TsonCompiledMetaSchema.buildConstructors`
+  filters on the same predicate, so a head the gate admits has a reader.
+  **Admitting `reference` closed means giving it the alias's own entry**, not just letting it through:
+  `!reference { target: X }` resolves to `kind: REFERENCE` with `X` as source and body, the same entry
+  `name => X` denotes (§8.3), where a construction of any other head takes the head's kind and names the head
+  as its source. The closed path dispatches on the *body* being a `Reference`, having already read it;
+  `resolveInstanceTemplate` holds its body unread and so still needs the head's name — which is the whole of
+  what its `alias` flag is now for, the eligibility half having gone.
+  **Two readers of `constructor` went with it**, both restated in the type system's own terms. Atom
+  refinement asks §5.5's question — *is this an atom instance?* — as **ATOM-kinded and not itself applicable**,
+  which is exactly what an instance is: §4.1's "IS-A does not extend below construction" is what separates the
+  pair, `!T {}` transferring kind and not supertypes, so `integer` carries an empty chain where
+  `integer_type => ~atom & { … }` carries `[atom, top]`.
+  **Both halves are needed, and the obvious single test runs backwards.** IS-A `atom` is true of the
+  *constructor* and false of every instance — measured, it disagrees with the truth on 103 of the 211 bundled
+  entries, selecting precisely the wrong side — while kind alone cannot separate them either, an atom
+  constructor being ATOM-kinded exactly like its instances. Together they agree on all 211. The construction
+  hint in the refusal rides on the same applicability question, so `!top ^ { … }` gets the plain answer rather
+  than advice that would fail in turn. And the governed-compile factory lookup asks IS-A `top`, so a
+  construction that resolved reaches a factory rather than failing "out of scope" on a narrower test.
+  **There is no marker.** `~` is gone from §12.1's grammar and `constructor` from §8.1's `type_definition`:
+  what makes an entry a constructor is that it IS-A `top`, which its supertype chain records, and the two
+  rules that used to read the marker are answered by that. **§2.2.2 eligibility** — who may declare one —
+  asks the linker whether the entry IS-A `top`, so an ordinary type library still cannot reach constructor
+  level, by composing its way there or otherwise. **§4.2's level discipline dissolves**: composition
+  propagates the chain, so an entry deriving from a constructor *is* one, and there is nothing left to
+  refuse. What that used to protect for an ordinary schema, eligibility protects better — it refuses the
+  declaration outright rather than only the unmarked spelling of it — and in a meta-schema, where extending
+  a vocabulary is the point, it is simply allowed. `ApplicabilityIsIsATopTest` and
+  `ConstructorLevelDisciplineTest` pin both halves; §3.3.1 and §4.2 are the spec side, the `~` marker and
+  `type_definition.constructor` having gone with the rule that needed them.
+- **§4.2's remaining declaration-time rule is placement** — a constructor declared only in a schema whose own
+  `!!meta` names the meta-kernel — which is the eligibility rule above, checked in the linker.
+  **Construction is exempt** and always was: §5.5 transfers kind and no supertypes, so `!C { … }` yields an
+  entry with an empty chain, which is why an instance is not itself a constructor.
+- **A constructor's parameters are confined to no channel**, which is §4.2's own rule: "an argument is
+  substituted as a token and read by the position it lands in, so a slot typed `type_ref` takes a type where
+  an atom-typed slot takes a value". Nothing is checked at the declaration, and each channel is decided where
+  the argument lands. A parameter routed into a *vocabulary slot* typed `type_ref` — `my_set => <T> array ^ {
+  element_type: = T }` — is refused when it closes, by §5.2's rule that a fixed value is available on a field
+  typed by an atom or an enum and nowhere else; the legal value-routed form (`max_items: = N`, an atom-typed
+  slot) closes normally. A parameter standing as a *field type* or a *variant* closes into a working type
+  rather than a tolerated one: `ctor_box => <T> base & { value: T }` with `flagged => ctor_box<boolean>`
+  materialises, compiles, accepts `{ value: true }` and rejects `{ value: banana }` with a `TYPE_MISMATCH` at
+  `/value`, and the variant channel behaves the same
+  (`DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord`).
 - **All six of §5.2's field-state spellings resolve**, including `field: type? = _` — `OPTIONAL_FIXED`
   carrying *no* value, so §8.1 writes a `record_field` without a `value` member and the field must be
   omitted or written `_`. Its three resolver errors are enforced: `~ _` on any field, `= _` on a REQUIRED
@@ -109,7 +203,7 @@ are kept in step deliberately.
   stated bound is judged against the source's **effective** range, folding in a derived one like an integer's
   `size` (intersecting the refinement's own bounds first would make every widening vacuous). Unchecked by
   design, each documented on its class: `pattern` against `pattern` (regular-language containment, and
-  `tson-schema` has no `tson-regex` dependency), `duration_type`'s text bounds, and **selector** facets
+  `tson-schema` has no `tson-regex` dependency) and **selector** facets
   (`component`/`format`/`encoding`/`version`) — core.tn's own prose calls a selector swap a narrowing, so
   rejecting one would reject a documented construct — §5.7 states the rule per facet kind, and a selector is
   settable where the source leaves it at the constructor's default, identity-only once bound.
@@ -150,8 +244,23 @@ are kept in step deliberately.
     own divisor.
   - Unchecked by design, each documented on its class and matching that family's existing narrowing gap:
     `duration_type`'s text bounds (ordering them means parsing them — `"P1M"` vs `"P30D"` does not order
-    lexically, and judging them as strings would call a coherent body empty), `pattern` emptiness, selector
-    facets, and CIDR `within`/`excluding` overlap (containment arithmetic this family has no parser for).
+    lexically, and judging them as strings would call a coherent body empty), `pattern` emptiness, and
+    selector facets.
+  - **The four network families check their own `within`/`excluding` entries here**, through
+    `AtomCoherence.checkNetworks`: the facets are typed `[value]` in meta.tn and must stay so (they list
+    networks, and meta declares no network instance to type them by — core.tn does, and core imports meta),
+    so they arrive as text and the family that owns the rule is the only place that can judge them. That is
+    why `schema.atom` carries `CidrNetwork` and `InternetAddress` at all: a check in the linker or the
+    resolver would be a second home for one family's rule, which is what `Atom.coherenceCheck` exists to
+    prevent. **The pair's own emptiness is judged there too** (`checkAdmitsAValue`): an `excluding` set
+    covering every network `within` permits admits nothing, which is `{ min: 10 max: 3 }` with a different
+    spelling. Cover over a prefix tree is counting rather than searching — two blocks are nested or disjoint,
+    so an exclusion meeting a permitted block either contains it or lies wholly inside one half — so the rule
+    is exact and total, not a partial prover. **A network family folds its prefix bounds in**, because its
+    value is a block and a block is refused for *overlapping* an exclusion: `within: ["10.0.0.0/24"]
+    excluding: ["10.0.0.5/32"] max_prefix: 24` admits no network while admitting almost every address. That is
+    the same fold `integer` performs with its `size`-derived range, and §5.5 states both halves: the pair MUST
+    admit a value, and for a network family the prefix bounds participate.
   - **The three temporal families' rules are correct but not yet reachable from schema text**, for a reason
     that predates them and is nothing to do with coherence: `date_type.min`/`max` are declared `value?` in
     meta.tn (the untyped escape hatch), so a bound arrives as a `String` and the bind into `DateType`'s
@@ -225,11 +334,26 @@ a held body.
   them wrong. There were three: the writer, the reader, and `ParameterKinds` matching `name`/`arguments`
   against its own string literals — the one that could have drifted silently, since nothing would have
   failed, only a parameter kind quietly not inferred.
-- **`TsonObjectWriter` cannot serve any of it.** Its output is canonical-explicit and fully quoted, a
-  different language from the one a held body is written in: `TemplateBody.names()` and substitution both key
-  on a token being *unquoted*, so a quoted body references no parameters at all.
+- **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
+  gives canonical-explicit, fully quoted output — a different language from the one a held body is written in:
+  `HeldBody.names()` and substitution both key on a token being *unquoted*, so a quoted body references no
+  parameters at all. That is why `heldRecord` builds the wire tree directly. Once built, the tree is an
+  AST, and `TsonObjectWriter` writes an AST as syntax rather than as a description of itself
+  (`AstWriter`) — which is how `HeldBody.held` turns it into `TemplateBody.template`.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the
   materialisation section below.
+- **Every walk over a held body descends into a map slot, and three of them did not.** meta.tn's
+  `scoped.schemas` is `{uri => [type_name; 1..]?; 1..}`, so core's `extern_of => <S> !scoped { scope:
+  [EXTERN]  schemas: { S => _ } }` and `extern_type => <S, T> ... { S => [T] }` are the first templates
+  putting a parameter inside a map — one in a key, one inside the array its value names. `substitute` left
+  the parameter name standing where the argument belonged; `ParameterKinds` never observed the parameter at
+  all, so its kind was never inferred and a `type_name` argument stayed on the reference channel and failed
+  as an unresolved reference; and `DerivedName`'s canonical rendering — the half §8.2 keys identity on —
+  rendered the whole map as the unknown-value mark, so two bindings differing only inside one hashed alike;
+  the readable half masked it, which is the `startsWith` hazard inverted and why `DerivedNameTest` asserts
+  `canonicalBinding` directly. A map key is a `data-value` and its
+  value a `scoped-value` ([TSON-DATA] §2.6), so the two halves rebuild through their own carriers
+  (`WireForm.rescope` and `WireForm.retyped`); both halves descend, because a parameter reaches either.
 
 **`MetaRefs`** — the `schema.meta` reference walk, `mapRefs` over a definition and `mapBodyRefs` over a body.
 Four callers use it and only one is closing a template: §8.3 flattening rewrites a use site, §8.2's synthetic
@@ -268,6 +392,18 @@ silently skip a reference rather than fail.
 §5.10's other half: closing a template application by substituting its arguments into the template's
 recorded open form, and replacing the application with a reference to the entry that results.
 
+- **An application's arguments are dereferenced before it is closed** (`dereferenced`). A reference is a pure
+  rename — §7.2 compares "after reference flattening of both", so `user_id => uuid` makes the two
+  interchangeable at every position — which means `box<user_id>` *is* `box<uuid>` and must be one entry.
+  Without it the model said the arguments were the same type while the applications were not: interchangeable
+  at a scalar position, refused one layer of application up. **Only a reference is dereferenced**; a refinement
+  (`!uuid ^ {}`, IS-A `uuid`) and a fresh instance (`!uuid_type {}`, related to neither) are ordinary entries
+  and keep their own applications, which is what makes those two spellings mean something. **Identity is
+  normalised, not provenance**: the minted `source` becomes the canonical application, and the name the author
+  wrote survives at the use site, which states it as written — a division that only became available once
+  flattening stopped rewriting use sites. `AliasedArgumentIdentityTest` pins it. The one case this used to get
+  wrong — a reference carrying an alphabet directive, which was not a pure rename — cannot arise now: the
+  alphabet is `bytes_type`'s own `encoding` selector (§5.5), so it is part of the type and travels with it.
 - **It runs over the resolved form, not the AST**, as a pass in `SchemaResolver` after the driving loop.
   Two reasons. An application arrives here as a `schema.meta.TypeRef` carrying `arguments` — the one thing
   that shape means, since a closed form is always an entry named by a bare reference — so substitution is a
@@ -367,17 +503,53 @@ recorded open form, and replacing the application with a reference to the entry 
       arity check, which reads the same accessor: materialisation runs first, and by then the parameter is
       gone — leaving either an arity error against a content-derived name nobody typed, or a wire-vocabulary
       mismatch, neither of which names what the author did.
-- **A held body writes as the application it holds, and names its carrier nowhere.** `HeldBody` is
-  `@Transparent` (`io.ltr8.annotation.Transparent`), so `tson-bind` resolves it to the held `DataValue`'s own
-  descriptor with a bridge and `TsonObjectWriter` writes no type-ref for it at a `Top` position: a template's
-  body renders `!choice { variants: [T error] }`, not a wrapper naming a type nothing declares. Two things
-  make that work and neither is incidental — the writer asks `value instanceof DataValue` *after* unwrapping a
-  bridge, so a transparent wrapper over a parsed value still reaches `AstWriter` instead of being written as a
-  faithful description of the AST; and `writeUnion` treats a transparent member as contributing no tag.
-  - **Which costs the tag a reader would dispatch on**, deliberately. A transparent union member is selectable
-    only where a position declares it, never by tag. Nothing depends on that here: an open entry's resolved
-    form is its declaration round-tripped, no binder reads one back, and `TypeDefinition.parameters` being
-    non-empty already says the body is held.
+- **`kind` is the resolver's own, not resolver output.** It is derived from an entry's `supertypes` and body,
+  so writing it restates what the record already carries; `type_definition` declares no such field and the
+  kernel declares no `type_kind`. `TypeDefinition.kind` is an `@Unbound` component — computed at resolution,
+  carried for the resolver's use, and never written. The reader stack had already worked this way:
+  nothing in `reader/` consults it, and `Subsumption` says why — "using the body rather than `kind()` is
+  deliberate: a hand-built entry can carry a `ChoiceBody` under [another kind]".
+  - **Which is what the atom-refinement test rests on now** (`DefinitionResolver`): an atom *instance's* body
+    IS an atom (`integer` carries `!integer_type {}`), where its constructor's body is the vocabulary record
+    describing one (`integer_type` carries a `!record { ... }`). So `body instanceof Atom` separates the pair
+    and establishes atom-ness at once, where neither the kind nor the supertype chain does alone — a plain
+    record has no supertypes either, and `integer_type` is ATOM-kinded exactly like its instances.
+- **Internally an open entry's `kind` is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes a
+  template not a type, so the entry that cannot validate anything no longer claims the kind an application of
+  it would take: `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than
+  REFERENCE — it is a template whose closure is a reference, not a reference that happens to have parameters.
+  Like `REFERENCE` it is a `type_kind` and not a base kind (§4.1).
+  - **Which is where materialisation reads the closed entry's kind from instead** (`kindOfClosed`): the
+    branch of `Top` the substituted body occupies, §4.1's "construction transfers kind" asked of the
+    construction. Not the constructor's *name* — a held body's head is structure-namespace vocabulary the
+    governing meta declares, and this pass holds only the type-name namespace (§3.3.1 keeps them apart). An
+    entry materialisation mints is never a constructor, so it does not compose with `top`, and for
+    everything that does not, kind is its body's branch.
+  - **And it makes the derivation total.** Every other entry's kind follows from what it already states —
+    the base-kind name in its own `supertypes` for a constructor, its body's branch otherwise — and the open
+    entry was the one case needing a lookup outside itself. `OpenEntryResolvedFormTest` asserts the whole
+    rule over every entry of every schema.
+
+- **A held body is text, and the kernel's `template` constructor is what carries it.** `schema.meta.TemplateBody`
+  is a record over `parameters` and `template`, the application as written — so `set` resolves to
+  `body: !template { parameters: [T]  template: "!set_type { element_type: T }" }`. It is an ordinary body of
+  the value model: `Top` is sealed over it, the binder finds it by the same `template` → `template_body` alias
+  `record` → `record_body` already uses, and `type_definition.body` is a `top` with no exception.
+  - **Why text and not a value of the constructor's own vocabulary.** A parameter stands wherever a token
+    stands — `element_type: T` in a type slot, `min_items: N` in a value slot, `variants: [T error]` inside a
+    collection — so a body carrying one is typed by no constructor's record shape until it closes. Writing it
+    as though it were leaves the two halves disagreeing, and both failures are measurable: `min_items: N`
+    refuses to read at all against `non_negative_integer`, and core.tn's own `extern_of` reads *cleanly* and
+    binds `S` as a schema identity literally named `S`. `OpenEntryResolvedFormTest` pins both.
+  - **The parsed form is a working value, not part of the entry** (`HeldBody`). `HeldBody.held(parameters, ast)`
+    emits the text through `TsonObjectWriter`; `HeldBody.of(body)` parses it back for the phases that need a
+    tree. Nothing outside `resolver` sees a `DataValue`, and nothing is retained: template closure is the one
+    caller that needs the tree twice, and it parses once into a local and drops it. `held` hands back no tree
+    of its own, so a writer/parser disagreement about §5.10's one spelling fails in `HeldBodyTest` rather than
+    surfacing later as two entries that ought to be equal and are not.
+  - **Which is also why comparison needs no channel of its own.** §5.10's one-spelling rule is about the
+    application, not the whitespace around it, so `ResolvedForm` reduces a held body to its *parsed* form and
+    an open entry compares like every other entry.
 - **A held body closes by one process, whatever wrote it** (`closeHeld`). `<T> [T]` and `<T> { x: T }` are both
   an application with a parameter standing in a slot — `!array { element_type: T }` and
   `!record { fields: [ { name: x  type: T } ] }` — so both substitute by the same walk and are then bound
@@ -484,7 +656,7 @@ recorded open form, and replacing the application with a reference to the entry 
     (`closeHeldAlias`). The first two steps are shared — substitute, then close the application in the slot —
     and what differs is that there is nothing left to build. That is also why `close` tells the three cases
     apart by the constructor head: the body shape no longer distinguishes them, every open entry's being held.
-  - **`reference` is not a `~` constructor and its kind is not a base kind**, so `DefinitionResolver`
+  - **`reference`'s kind is not a base kind**, so `DefinitionResolver`
     dispatches the head instead of judging it by the generic `!C value` rule: §4.1 gives an alias
     `kind: REFERENCE`, which is a `type_kind` with nothing in the supertype chain to supply it, and the
     kernel leaves `reference` unmarked because it describes no value. Both facts are the kernel's own. The
@@ -524,44 +696,47 @@ recorded open form, and replacing the application with a reference to the entry 
     possible was `type_argument` becoming readable, value channel included
     (`docs/linking-and-compilation.md`).
 
-## Use-site flattening (`tson-compiler/.../resolver/ReferenceFlattener.java`)
+## References are hops, not rewrites (`tson-compiler/.../TsonSchemaCompiler.java`)
 
-§8.3, and the last thing resolution does: **a type position naming a `REFERENCE` entry is rewritten to the
-end of its chain, and the name the author wrote survives on the reference as `@alias`.** meta-kernel's own
-resolved fixture states the rule in a line — "Reference-kind names at type positions are flattened with
-@alias" — and spells the result `type: @alias:field_name token`.
+§8.3's use-site flattening **is gone, and `@alias` with it**. Resolved output states the chain the author
+wrote: a type position naming a `REFERENCE` entry keeps that name, nothing is attached to record where it
+"really" points, and the chain stays walkable through the entries themselves.
 
-- **What it buys is §8.2's single-level identity.** An instantiation's `source` is compared as a flat
-  application, so a use site still naming an alias would have to be chased before two of them could be told
-  apart. Flattening moves that walk to schema-load time, once per use site; the `@alias` is what keeps the
-  author's own word recoverable for a diagnostic, a renderer or a writer.
-- **The representation came first.** `TypeRef` carries an `Annotations` component for this — §8.3 attaches
-  the alias to the *type value*, not to the field around it — with `equals`/`hashCode` excluding it, exactly
-  as `RecordField` does. That exclusion is what makes the carrier safe to add: identity is where a reference
-  *points*, an alias records where it *came from*, so two use sites of one type stay equal however spelled.
-- **An alias entry keeps its own hop.** `doc => documentation` stays one hop though `documentation` aliases
-  `text`, and the fixture agrees. The chain has to stay walkable for anything that wants the intermediate
-  names, and the entry is what records it — flattening there would erase the alias rather than relocate it.
-  `supertypes`/`subtypes` are untouched for a different reason: they are name lists with no annotation
-  channel, and §8.2 calls them resolver-managed indexes rather than use sites.
-- **The walk stops at a materialised instantiation.** This model gives one an extra `REFERENCE` hop over the
-  form that holds the shape, which the spec's model does not have, and that entry is what §8.2 keys identity
-  on — walking through it leaves a use site naming a form nobody wrote. An author's alias *to* an application
-  still flattens onto it, which is §8.3's own worked example (`type: @alias:string_triple array_ranged_text_9d4`).
-- **Runs after materialisation**, so an alias to an application lands on the entry that application minted
-  rather than on the alias in front of it — and **on the bootstrap route too**
-  (`MetaKernelBootstrapResolver`), which is a shorter route to the same resolved form and whose output
-  governs every schema whose `!!meta` is meta-kernel. Leaving that one unflattened would be two answers to
-  one question.
-- Pinned end to end by `ResolvedFixtureTest`, which compares this resolver against the spec's own
-  `spec/m/*-resolved.tn` — the check those files ask for in their own `@doc`.
+**A processor collapses the chain when it compiles readers** — after linking, once per entry, where the whole
+namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a `REFERENCE` entry's reader
+*is* its target's reader, resolved recursively, named for the entry doing the referring, so a use site naming
+`pct` over `pct => small` reads and reports as `pct`.
+
+- **The walk was never avoidable, which is why the rewrite was not worth its price.** §8.3 itself required
+  the chain stay walkable (`reference.target` was never flattened), and several passes walk one. Rewriting the
+  output as well left two representations to keep in step, and `@alias` was a *lossy* summary of the one it
+  duplicated — it kept only the source-site name, so in `digest_chain => digest_alias => bytes` it recorded the
+  hop that carried nothing.
+- **`ReferenceChain` is that walk, stated once** (`resolver/ReferenceChain.java`). The linker's choice-variant
+  distinctness and its §5.2 field-value check, `Subsumption`'s subtype naming and `DiscriminationClass`'s
+  classification each had their own loop, and the one decision inside — *stop at a non-reference, at an
+  **argument-bearing** target (an application, with no entry until materialisation mints one), or on a cycle*
+  — was four decisions that could drift. `terminal` answers with a name, `terminalDefinition` with the entry;
+  they differ only on an undeclared name and a cycle, where the first has an answer its caller wants (a type
+  parameter is its own terminal) and the second has none. **`ParameterKinds` keeps its own loop deliberately**:
+  it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the template
+  being the answer there. `ReferenceChainWalkTest` pins all four stops.
+- **Anything that needs the chain end walks it and says so.** `TsonSchemaLinker.checkFieldValue` walks to the
+  terminal before checking a `~`/`=` value, since a field typed by an alias states a value of whatever the
+  alias names; `FieldValueConformanceTest` pins both directions.
+- **The bootstrap route needs no special case any more.** It used to have to flatten identically or diverge
+  from ordinary resolution, while binding no name-position annotations of its own — a divergence waiting to
+  matter. Neither route rewrites anything now (`BootstrapReferencesTest`).
+- Pinned by `ReferenceChainTest` — the chain stated as written, a read still reaching the end of it, and a
+  diagnostic naming the hop the author wrote — and end to end by `ResolvedFixtureTest` against the spec's own
+  `spec/m/*-resolved.tn`.
 
 ## The `@synthetic` marker (`tson-compiler/.../resolver/SchemaResolver.java`)
 
 §8.2 puts a bare **`@synthetic` on the key of every entry the resolver materialised from a sugar form**, and
-on no other. Like `@alias` above it is *derived* — attached by the resolver rather than written by an author,
-and discarded and recomputed on ingest (§8.1), so it carries no decode force and cannot be forged into a
-resolved document to change how it reads. Both are built by name rather than resolved through the governing
+on no other. It is *derived* — attached by the resolver rather than written by an author, and discarded and
+recomputed on ingest (§8.1), so it carries no decode force and cannot be forged into a resolved document to
+change how it reads. It is built by name rather than resolved through the governing
 meta the way an author-written annotation is: there is no author to resolve against, and the value is fixed.
 
 - **Why a marker at all, when the names are distinctive.** A synthetic is named by derivation from its own
@@ -589,8 +764,7 @@ meta the way an author-written annotation is: there is no author to resolve agai
   gave it.
 - **The bootstrap route attaches none, deliberately.** `MetaKernelBootstrapResolver` exists to be *just*
   enough to load the real meta-kernel from its own file, and nothing in the pipeline reads this marker — it is
-  informational, where `@alias` (which the bootstrap does apply) changes the structure identity is compared
-  by. meta-kernel's own nine synthetics are marked anyway, because the entries anything else sees come from
+  informational. meta-kernel's own nine synthetics are marked anyway, because the entries anything else sees come from
   ordinary resolution: the bootstrap output stands in only as the transient governing meta for its own
   resolution.
 - Cross-checked against the spec's own output by

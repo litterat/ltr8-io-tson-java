@@ -14,9 +14,14 @@ import io.ltr8.tson.compiler.config.TsonAtomContext;
 import java.util.List;
 import java.util.Optional;
 
+import io.ltr8.bind.DataClassField;
+import io.ltr8.bind.DataClassRecord;
+import io.ltr8.tson.compiler.TsonObjectWriter;
+import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -39,8 +44,8 @@ class BindStrictnessTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             {
               order => { sku: text  quantity: int32  currency: text }
             }
@@ -114,6 +119,36 @@ class BindStrictnessTest {
                 TsonDiagnosticsReceiver.throwing());
 
         assertEquals(new OrderTraced("A", 1, "AUD", Optional.empty()), value);
+    }
+
+    /**
+     * <b>An {@code @Unbound} component is absent from the descriptor's field list, and present in its
+     * constructor arity.</b> That is what the marker means: the component belongs to the class and not to
+     * the wire, so nothing may fill it from a document and nothing may write it. The values array a reader
+     * fills stays dense -- the constructor supplies the class's own components itself -- so
+     * {@code fields().length} remains the only notion of size any caller needs.
+     *
+     * <p>Without the split, an unbound component reaches the writer indistinguishable from a bound one and
+     * is emitted -- which for {@code schema.meta.TypeDefinition} meant this library could not produce
+     * resolved output that validates against its own meta-kernel ([TSON-SCHEMA] §1.3, §7.2's closed record).
+     */
+    @Test
+    void anUnboundComponentIsNotAFieldAndIsNotWritten() throws Exception {
+        DataBindContext context = DataBindContext.builder()
+                .nameBinder(name -> OrderTraced.class).build();
+        DataClassRecord descriptor = (DataClassRecord) context.getDescriptor(OrderTraced.class);
+
+        List<String> published = Arrays.stream(descriptor.fields()).map(DataClassField::name).toList();
+        assertEquals(List.of("sku", "quantity", "currency"), published, "the wire-facing fields");
+
+        String written = new TsonObjectWriter(context).toTson(new OrderTraced("A", 1, "AUD", Optional.of("t")));
+        assertFalse(written.contains("trace"), written);
+
+        // And it still constructs: the class's own component arrives as the engine's absent value, not as a
+        // hole in the array, which is what keeps the read side of `@Unbound` unchanged.
+        assertEquals(new OrderTraced("A", 1, "AUD", Optional.empty()),
+                read(tson(SCHEMA, OrderTraced.class, false), OrderTraced.class,
+                        TsonDiagnosticsReceiver.throwing()));
     }
 
     /**

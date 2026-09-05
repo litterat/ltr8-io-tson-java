@@ -42,6 +42,16 @@ tokens, modes, or character-classification changes).
   token's lines are checked individually (`decodeAllEscapes` returns its argument when it finds none), since
   one token may hold both kinds of line. Halves the per-character cost of lexing a long quoted token
   (10.5 → 5.8 bytes per character of input, which `AllocationHarnessTest` pins).
+- **The escape table is `\" \\ \b \f \n \r \t \s` plus two `\u` forms, and one rule covers both of those.**
+  `\uXXXX` and `\u{1*6HEXDIG}` are two spellings of one number, checked by asking whether the value denoted is a
+  **Unicode scalar value** — so a surrogate is refused in either form and there is nothing to pair. That single
+  rule replaces the three MUST clauses UTF-16 pairing needed, and the braced form is what makes it sufficient:
+  four hex digits cannot reach past the BMP, so without it the format would either keep the pairing rules or lose
+  the ability to escape a supplementary character at all — which costs something real, plane 14 holding the
+  variation selectors and tag characters a document has reason to write visibly rather than embed invisibly.
+  **There is no `\/`**: a solidus needs no escaping anywhere in the format, and the reason it was admitted (a JSON
+  document parsing unchanged) is a claim the format no longer makes. A **leading BOM** is still stripped, on
+  §7.1's own authority as an encoding courtesy rather than a debt to another format.
 - **`Token` is a flat record of six raw `int` coordinates plus type/text**, not nested `Position` objects,
   to keep allocation off the high-throughput read path; `start()`/`end()` materialize a `Position` on
   demand.
@@ -93,7 +103,8 @@ tokens, modes, or character-classification changes).
   character (a tab never matches a space). **Closing-delimiter detection checks the line content *after*
   removing leading whitespace against `"""`** — getting this backwards makes every multi-line token
   spuriously "unterminated"; this bug happened once and is guarded by `LexerTest`.
-- When embedding BOM/NEL/LINE SEPARATOR/PARAGRAPH SEPARATOR in tests or source, use `\uXXXX` escapes — the
+- When embedding BOM/NEL/LINE SEPARATOR/PARAGRAPH SEPARATOR in tests or source, use `\uXXXX` escapes (and
+  `\u{...}` past the BMP) — the
   literal invisible character is an editing hazard and exactly the confusable-character risk §9.4 warns
   about.
 - Errors are **fail-fast** (`LexException`, unchecked), not the spec's "SHOULD continue to report multiple
@@ -120,11 +131,18 @@ Key points:
   gaps. So `ws` in the grammar needs nothing special, and strict **adjacency** (`!`, `!!`, `@`, `:` to
   their operand, §7.5) is checked via `Position` equality between one token's end and the next's start.
   **Separator detection** (§2.4) works the same way: a real comma is optional evidence, a position gap is
-  the other kind, and at least one is required unless the closing delimiter is immediately next.
+  the other kind, and at least one is required unless the closing delimiter is immediately next. **A comma
+  may follow a value, and that is the whole rule** — so a trailing one is ordinary and a leading or doubled
+  one is not, the latter two needing no rule of their own since a comma is not a value. A trailing comma is
+  admitted because nothing else could be meant by it: absence is spelled `_` and occupies a slot, so
+  `[1, 2, ]` is two elements where `[1 2 _]` is three. RFC 8259 bans it because that grammar has elision —
+  JavaScript's `[1, , 2]` is three elements with a hole — and this one does not.
+  `consumeSeparatorOrCloseCheck` therefore answers "is there another element?", and the three container
+  frames close on `false` rather than each re-checking the delimiter themselves.
 - **Layering is deliberately incomplete, matching §1.2's division of labor.** Neither tier deduplicates
   record fields or map keys ("last value wins" is a resolver rule, §2.5/§2.6), NFC-normalizes field names,
   rejects `_` as a map key (§2.9), resolves `EmptyBrace` to a record/typed container (§2.8), or interprets
-  `TokenValue` text as null/boolean/number/string (base type resolution, below). These are intentional
+  `TokenValue` text as boolean/number/string (base type resolution, below). These are intentional
   gaps, not omissions.
 - **§3.2's three type-expression forms are refused by name, not by the separation rule.** Array brackets,
   type arguments and the `?` suffix "exist only within the [TSON-SCHEMA] type-definition grammar, and their
@@ -144,13 +162,18 @@ Key points:
   token-Start carries `Nd`/`-`/`+`/`.` so a *number* can be an unquoted token, and those reach names only
   because names and values share one lexical class. So `!42x` and `@x.y` are syntax errors rather than a
   reference to an undeclared type and an annotation carrying a name the format reserves — the dot being
-  reserved as a future identifier separator. **`field-name` is the deliberate exception and stays lexical**:
-  `unquoted-token / single-line-token` (`isFieldNameTokenType`, narrower than the map key's
-  `isBareTokenType`, a key being a value and not a name, §2.6). A Class 1 document has no schema, so nothing
-  there knows which tokens are meant as names, and `{"first name": 1}` must keep reading as an ordinary
-  record; the identifier contract is stated once on *declarations* (`TsonSchemaParser.expectTypeName`,
-  `DefinitionResolver.requireIdentifier`) and data conforms by construction, a field name that is not an
-  identifier matching nothing and already being an `UNRECOGNIZED_FIELD`. §2.5 and §7.7 state both halves.
+  reserved as a future identifier separator. **`field-name` reaches the same check** (`requireFieldName`), and
+  its production's two spellings are two spellings of one name: `unquoted-token / single-line-token`
+  (`isFieldNameTokenType`, narrower than the map key's `isBareTokenType`, a key being a value and not a name,
+  §2.6) is the *token* rule, and the decoded text is matched against the profile whichever form carried it. So
+  `{"first name": 1}` is a parse error, and the diagnostic names the remedy the format already has: a key that
+  is not a name belongs in a map. A record's fields are the named members of a shape, which is what makes them
+  declarable.
+  **Normalisation runs before the match**, which is the one thing the profile does not decide here.
+  `IdentifierParser` requires NFC as a *form* and would refuse a decomposed name outright, where §2.5 gives a
+  field name its identity by NFC-normalised comparison — a decomposed spelling is the same name, and a
+  duplicate rather than a malformed one. The lexer already normalises the unquoted spelling, so refusing the
+  form here would make the quoted spelling the stricter of the two, which is the asymmetry the rule removes.
 - **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`.** This is a
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
   parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic).
@@ -159,7 +182,7 @@ Key points:
 
 ## Base type resolution (`tson-compiler/.../base/`)
 
-`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (null → boolean → number → string,
+`BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (boolean → number → string,
 §4.5) for untyped tokens. `NumberGrammar.tryParse` recognizes the `number` production (§7.6).
 
 - **Identification is separate from binding to a host numeric type.** `NumberGrammar` decides which of the
@@ -197,14 +220,15 @@ Key points:
       the spec requires it to accept; it was written down here as a defect once, before being checked
       against §7.4.
       `FieldValueConformanceTest.aQuotedNumericIsAValueOfAnIntegerFieldBecauseFormIsNotMeaning` pins it.
-- **§4's applicability clause is load-bearing, and `BaseValue.NullValue` is where it shows.** Base
-  resolution runs only where no declared type is in scope, so the `null` token identifies as a value on
-  exactly one path: schemaless data, plus `value`-typed positions, whose atom contract *is* "run base
-  resolution". Under a schema every other position hands the token to its own declared atom and `null` is
-  ordinary text ([TSON-SCHEMA] §7.3) — which is why nothing normalizes `null` in the lexer or in
-  `TsonDataStream`, where it would strip `null` out of the token vocabulary for `enum`/`token`/FIXED-`text`
-  positions too. The tree model spells the null base value `TsonAbsent` (`docs/facades-and-tree.md`); bind
-  mode binds it to Java `null`.
+- **There is no `null`, and the order has three steps rather than four.** Absence has one spelling, `_`,
+  and it is lexical: the lexer gives it `TokenType.ABSENT`, the stream an `AbsentEvent` and the parser an
+  `ast.AbsentValue`, so it is never a `TokenValue` and no order here could reach it. The unquoted token
+  `null` is the string `null`, as `frobnicate` is — §7.7 rule 3 holds with no word to except, and the
+  token stays available to `enum`/`token`/FIXED-`text` positions like any other. `BaseValue` carries an
+  `AbsentValue` member all the same, and `BaseTypeResolver` never returns it: binding an identified value
+  to a host type is one switch (`AtomBinder.bind`), and a schemaless bind reaching `_` needs a way into
+  it. A JSON document's `null` reaches absence through a JSON reader, which maps it in the model, where
+  the position's own state decides whether absence is admitted at all.
 - **§9.1's numeric-literal length limit** (SHOULD, 4096 digits, DoS-hardening) is **not enforced** — noted
   so it isn't mistaken for an oversight.
 
@@ -238,8 +262,61 @@ fixed, closed name→`AtomType` table (§5).
   `Ipv4Parser`'s Javadoc documents is shut down once, in one place. What the CIDR pair adds on top is
   §5.5's own two validation rules (prefix length inside the family range; host bits zero under that
   prefix, since a network that accepted and masked would be lossy) plus the `min_prefix`/`max_prefix`
-  facets; `within`/`excluding` stay unmodeled across all four, set membership against a list of networks
-  being a materially bigger piece of work than a scalar bound. Their host type is `String` — the authored
-  text, validated and handed back — for `MacParser`'s reason: Java has no type to map onto, and the
-  round trip stays exact.
+  facets. **`within`/`excluding` apply across all four**, each family asking its own question of the same
+  arithmetic: an address must fall inside some permitted network and outside every excluded one, and a
+  network must be a subnet of a permitted one and must not overlap an excluded one — the difference being
+  that a block partly inside an exclusion is partly excluded, which for a value denoting a whole block is a
+  rejection.
+- **A CIDR value is a network, not its text** — `cidr4`/`cidr6` read to `schema.atom.CidrNetwork` (the prefix
+  octets and the prefix length), so two spellings of one network are one value and `2001:0db8:0000:…/32`
+  binds equal to `2001:db8::/32`. Writing goes back through RFC 5952's canonical form rather than the
+  authored spelling, which is what it means for the value to be the octets. `mac` and `email` keep `String`
+  for the reason the CIDR pair no longer does: nothing about their text decomposes into a value a schema
+  compares. `CidrNetwork` is a Java record and is registered as an **atom**
+  (`TsonAtomContext.registerDefaults`), or tson-bind's record auto-detection would expect
+  `{ prefix: … prefixLength: … }` on the wire where one token stands.
+- **The exact tiers' sparse `members` set is a facet, and its identity is [TSON-DATA] §4.3's.** `integer`
+  and `number` carry a member set (§5.6) for a value set that is neither a contiguous range nor an
+  arithmetic progression, so none of the other facets denotes it; `IntegerParser`/`DecimalParser` apply it
+  beside the bounds and `multiple_of`. Membership is the value denoted, never the token: `0x50` is the
+  member written `80`, having reduced to one `BigInteger` before the check runs, and `2.5` is the member
+  written `2.50`, which needs `compareTo` — `BigDecimal` carries its scale and its own equality is not
+  §4.3's. `decimal_type.members` is typed `set<value>` (the family cannot name its own atom, §7.4), so a
+  collection element arrives as whatever §4 resolved it to and nothing narrows it the way a record field's
+  scalar is narrowed; `DecimalType`'s own constructor reads each member as a decimal before the set is
+  formed, which is where "`1` and `1.0` are one member and a duplicate rather than two" is enforced and what
+  lets the read, the tightening (`AtomNarrowing.checkSubset`) and the coherence check
+  (`AtomCoherence.checkMembers`) share one identity. `float_type` carries no member set, on the same
+  rationale it carries no `multiple_of`: a step cannot hold on a binary grid.
+- **A `value`-typed slot is read under the atom of the position it stands in.** §7.4 types a constructor's
+  constraint fields `value` and the bootstrap ordering leaves no alternative — `duration_type` is what defines
+  a duration, and `duration => !duration_type {}` is a layer up in core.tn — so a bound is decoded by §4 base
+  type resolution, which resolves boolean, number and string and none of those is a duration, a date or a
+  UUID. `ValueParser.read(token, target)` asks `HostAtoms` which built-in produces the position's own host
+  type and re-reads the token under it; `RecordBindReader.rebindValueIfNeeded` is where a field's reader is
+  swapped for one, beside `rebindContainerIfNeeded` and `tokenAware`, which specialise the same slot on the
+  same evidence. **Additive by construction**: a value the component can already hold, or that the caller's
+  own numeric narrowing reaches, is returned untouched, so `!number ^ { min: 0x10 }` stays the integer 16
+  rather than being re-read under `number`, whose grammar admits no based-integer form. Only a token the
+  position could not have held under any narrowing reaches the atom — which is also what turns
+  `!number ^ { min: "abc" }` from a cast failure reported as a library gap into `number`'s own verdict.
+- **No facet counts written digits, because scale is not part of the value.** meta.tn says it for both
+  families that carry a digit-count facet — `decimal_type`'s "`1`, `1.0` and `1.00` are one value… whether a
+  spelling's trailing zeros survive a round trip is an encoding's promise, not the type's", and
+  `time_type`'s worked example, "a text encoding may spell an admitted value with trailing zeros
+  (`12:00:00.500` under `precision: 1`)". So `precision: N` tests that the value is a whole number of 10⁻ᴺ
+  seconds (`FractionalSeconds`, over the parsed nanosecond field for `time`/`datetime` and over the seconds
+  count's own scale for `duration`), and `total_digits`/`fraction_digits` measure `stripTrailingZeros()`
+  (`DecimalParser`). The value handed back is still exactly as written — only the measurement strips, the
+  same split `members` already makes.
+- **`duration` is a signed exact decimal number of seconds, bounded at both ends by a signed 64-bit count of
+  nanoseconds.** The lexical form puts a fraction on the seconds component and nowhere else, so no
+  non-terminating fraction is writable and every duration is a terminating decimal count — `number`'s value
+  space in seconds, which is what makes `precision` exactly `fraction_digits` on that count and `multiple_of`
+  exactly `number`'s. Both ends are §5.5's and not the host's: `DurationParser` refuses a tenth fractional
+  digit and a magnitude past 2⁶³ − 1 ns, though `java.time.Duration` would take spans three orders of
+  magnitude wider. That ceiling is also what makes `DurationType.isMultiple`'s `toNanos` total — the range
+  is the range `toNanos` has — and `coherenceCheck` refuses a bound or a `precision` outside it, so a
+  `DurationType` built in Java cannot carry one either. Longer spans are `period`, finer or wider quantities
+  are `number` in the unit the schema names. [TSON-SCHEMA] §5.5 and §5.4 here state both ends.
 - The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.

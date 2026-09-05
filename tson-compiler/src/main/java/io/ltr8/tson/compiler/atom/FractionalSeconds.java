@@ -5,40 +5,51 @@ import java.util.Optional;
 
 /**
  * The {@code precision} facet of the temporal atom families (§5.5), shared by {@link TimeParser} and
- * {@link DateTimeParser} because it is one rule stated once for both: a token's fractional-second part
- * may carry <em>at most</em> {@code precision} digits, and {@code precision: 0} admits no fractional part
- * at all.
+ * {@link DateTimeParser} because it is one rule stated once for both.
  *
- * <p>The count is taken from the token <em>as written</em>, never from the parsed value: {@code
- * 12:00:00.100} carries three digits whatever instant it denotes, and the temporal atoms are exact, so
- * the facet is a validation constraint and never an instruction to truncate. Callers reach it after the
- * shape regex has matched, so the text is known to be well-formed and the fraction -- if there is one --
- * is the run of digits after the last {@code .}.
+ * <p><b>It is a constraint on the value, not on the spelling</b>, which meta.tn's own {@code @doc} for
+ * {@code time_type} states and gives the example for: {@code precision: N} admits a value that is a whole
+ * number of 10⁻ᴺ seconds, and "a text encoding may spell an admitted value with trailing zeros ({@code
+ * 12:00:00.500} under {@code precision: 1}) and writes at most N digits". So the test is on the
+ * fractional-second field of the parsed value and never on how many digits the author happened to type --
+ * counting the token would refuse {@code 12:00:00.500} at {@code precision: 1}, which denotes exactly the
+ * half-second {@code 12:00:00.5} does.
+ *
+ * <p>The atom is exact either way: nothing is truncated, and a value genuinely off the grid is rejected
+ * rather than rounded onto it.
  */
 final class FractionalSeconds {
 
     private FractionalSeconds() {
     }
 
+    /** One second in nanoseconds -- the resolution {@code java.time} carries, and the finest {@code precision} can name. */
+    private static final int NANOS_PER_SECOND_DIGITS = 9;
+
     /**
-     * Refuses {@code text} when its fractional-second part is longer than {@code precision} allows.
+     * Refuses a fractional-second part finer than a nanosecond, by name.
      *
-     * @param precision the facet, absent when the family leaves it unconstrained
-     * @param text      the token as written, already matched against its family's shape
-     * @param atom      the atom's name, for the diagnostic
+     * <p>RFC 3339's {@code time-secfrac} is {@code "." 1*DIGIT} with no upper bound, so the grammar admits a
+     * value no host runtime has a type for. The cap is enforced either way -- {@code java.time}'s own parser
+     * stops at nine digits -- but as a shape error carrying a message about a character index, which tells
+     * an author their timestamp is malformed rather than that it is finer than the format carries. Named
+     * here instead, once for the two families whose fraction reaches {@code java.time}, and matching what
+     * {@code DurationParser} says for the same rule on the same production.
+     *
+     * @param text the token as written, already matched against its family's shape
+     * @param atom the atom's name, for the diagnostic
      */
-    static void check(Optional<BigInteger> precision, String text, String atom) {
-        precision.ifPresent(allowed -> {
-            int digits = fractionalDigits(text);
-            if (BigInteger.valueOf(digits).compareTo(allowed) > 0) {
-                throw new AtomValidationException("'" + text + "' states " + digits + " fractional-second "
-                        + (digits == 1 ? "digit" : "digits") + " where this " + atom + " allows at most "
-                        + allowed, "at most " + allowed + " fractional-second digits");
-            }
-        });
+    static void checkRepresentable(String text, String atom) {
+        int digits = fractionalDigits(text);
+        if (digits > NANOS_PER_SECOND_DIGITS) {
+            throw new AtomParseException("'" + text + "' states " + digits + " fractional-second digits, where a "
+                    + atom + " carries at most " + NANOS_PER_SECOND_DIGITS + " -- one nanosecond is the finest "
+                    + "resolution the value space admits (§5.5)",
+                    "at most " + NANOS_PER_SECOND_DIGITS + " fractional-second digits");
+        }
     }
 
-    /** The digits between the fractional {@code .} and the offset, or zero where the token has no fraction. */
+    /** The digits between the fractional {@code .} and whatever follows them. */
     private static int fractionalDigits(String text) {
         int dot = text.lastIndexOf('.');
         if (dot < 0) {
@@ -49,5 +60,28 @@ final class FractionalSeconds {
             end++;
         }
         return end - dot - 1;
+    }
+
+    /**
+     * Refuses {@code nanoOfSecond} when it is not a whole number of 10⁻ᴺ seconds.
+     *
+     * @param precision the facet, absent when the family leaves it unconstrained
+     * @param nanoOfSecond the parsed value's own fractional second, in nanoseconds
+     * @param text      the token as written, for the diagnostic
+     * @param atom      the atom's name, for the diagnostic
+     */
+    static void check(Optional<BigInteger> precision, int nanoOfSecond, String text, String atom) {
+        precision.ifPresent(allowed -> {
+            // At nine digits and beyond the grid is finer than the value can be, so everything is on it.
+            if (allowed.compareTo(BigInteger.valueOf(NANOS_PER_SECOND_DIGITS)) >= 0) {
+                return;
+            }
+            int step = (int) Math.pow(10, NANOS_PER_SECOND_DIGITS - allowed.intValueExact());
+            if (nanoOfSecond % step != 0) {
+                throw new AtomValidationException("'" + text + "' is not a whole number of 10^-" + allowed
+                        + " seconds, which is the resolution this " + atom + " admits",
+                        "a whole number of 10^-" + allowed + " seconds");
+            }
+        });
     }
 }

@@ -12,7 +12,7 @@ import java.util.List;
  * split -- rather than declaring those fields itself.
  *
  * <p><b>Matches on {@link TokenValue#text()} directly, never through {@link BaseTypeResolver}'s
- * null/boolean/number/string identification.</b> This is the one thing that makes {@code boolean
+ * boolean/number/string identification.</b> This is the one thing that makes {@code boolean
  * => !enum [true false]} readable at all: routed through generic identification (as {@code
  * MetaKernelBootstrapResolver}'s own binding of the *schema* {@code !enum [true false]} instance necessarily
  * is, since it binds via {@code TsonObjectReader}'s ordinary array/atom path), {@code "true"}/

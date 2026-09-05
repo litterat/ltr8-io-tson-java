@@ -200,7 +200,8 @@ public final class SchemaResolver {
         }
 
         TsonCompiledMetaSchema metaParser = loader.loadMeta(document.meta());
-        Map<String, TypeDefinition> namespace = mergeImports(document);
+        Map<String, Annotations> nameAnnotations = new LinkedHashMap<>();
+        Map<String, TypeDefinition> namespace = mergeImports(document, nameAnnotations);
 
         // Expand the sugar forms before anything reads a declaration, so resolution below only ever sees a
         // bare reference or `!C value` (§5.3/§5.6 define these as desugarings; §3.3.1 names their targets).
@@ -332,25 +333,10 @@ public final class SchemaResolver {
             republish(namespace, resolvedLocals, instantiations);
         }
 
-        // §8.3, last because it needs everything above already in the namespace: a type position naming a
-        // REFERENCE entry is rewritten to the end of its chain and keeps the author's own name as @alias.
-        // After materialisation specifically, so an alias to an application flattens onto the entry that
-        // application minted rather than onto the alias in front of it.
-        Map<String, TypeDefinition> flatLocals =
-                ReferenceFlattener.flatten(resolvedLocals, namespace, instantiations.keySet());
-        resolvedLocals.putAll(flatLocals);
-        instantiations = ReferenceFlattener.flatten(instantiations, namespace, instantiations.keySet());
-        republish(namespace, resolvedLocals, instantiations);
-
-        // §6: an annotation written before the declared name binds to the *name*, not to the definition,
-        // and "the resolver does not hoist annotations from key to value". A resolved schema is a
-        // {type_name => type_definition}, so the name is this map's key -- which is where they are kept.
-        // The two sets stay separate: a declaration's own annotations are on its TypeDefinition.
-        // Binding a name's annotations can fail the same way a definition's can (an annotation type §3.3.3
-        // cannot reach), and this loop runs outside the memoized getter that catches those -- so it catches
-        // its own, once per name, leaving the entry itself intact and unannotated rather than losing the
+        // §6's name-position annotations. Binding one can fail the way a definition's can (an annotation type
+        // §3.3.3 cannot reach), and this loop runs outside the memoized getter that catches those -- so it
+        // catches its own, once per name, leaving the entry intact and unannotated rather than losing the
         // whole schema to a bad @doc.
-        AnnotatedMap<String, TypeDefinition> localOnly = new AnnotatedMap<>();
         for (String name : declarations.keySet()) {
             // A merged form is keyed by the name it merged onto, and contributes nothing at all where that
             // name belongs to the materialised half -- the entry is there, marked, and this is its old key.
@@ -358,21 +344,39 @@ public final class SchemaResolver {
             if (!resolvedLocals.containsKey(key)) {
                 continue;
             }
-            Annotations nameAnnotations;
             try {
-                nameAnnotations = resolver.annotationsFor(name, declarations.get(name).nameAnnotations());
+                nameAnnotations.put(key, resolver.annotationsFor(name, declarations.get(name).nameAnnotations()));
             } catch (TsonSchemaValidationException | UnsupportedOperationException
                     | TsonBindMismatchException e) {
                 if (!problems.collecting()) {
                     throw e;
                 }
                 problems.report(declarations.get(name), e);
-                nameAnnotations = Annotations.empty();
+                nameAnnotations.put(key, Annotations.empty());
+            }
+        }
+
+        // §8.3 use-site flattening used to run here and no longer exists. A reference is a hop, not a
+        // rewrite: resolved output states the chain the author wrote, every use site keeps the name it
+        // names, and a processor collapses the chain when it compiles readers -- after linking, where the
+        // whole namespace is present and the walk is done once per entry rather than once per output.
+        // See docs/schema-resolution.md and [TSON-SCHEMA] §8.3.
+
+        // §6: an annotation written before the declared name binds to the *name*, not to the definition,
+        // and "the resolver does not hoist annotations from key to value". A resolved schema is a
+        // {type_name => type_definition}, so the name is this map's key -- which is where they go. The two
+        // sets stay separate: a declaration's own annotations are on its TypeDefinition. Bound above; this
+        // only places them.
+        AnnotatedMap<String, TypeDefinition> localOnly = new AnnotatedMap<>();
+        for (String name : declarations.keySet()) {
+            String key = merged.getOrDefault(name, name);
+            if (!resolvedLocals.containsKey(key)) {
+                continue;
             }
             // §8.2: a synthetic entry's key carries the derived @synthetic marker, and a lifted declaration
             // has nothing else at its key -- there is no source text in front of a name nobody wrote.
-            localOnly.put(key, resolvedLocals.get(key),
-                    generated.contains(key) ? SYNTHETIC : nameAnnotations);
+            localOnly.put(key, resolvedLocals.get(key), generated.contains(key)
+                    ? SYNTHETIC : nameAnnotations.getOrDefault(key, Annotations.empty()));
         }
         // An entry the materialiser minted has no declared name to carry author annotations from. The
         // synthetic half of them still gets the derived marker: a template's open form closes into the same
@@ -561,7 +565,7 @@ public final class SchemaResolver {
         if (!(resolved.body() instanceof io.ltr8.tson.schema.meta.TemplateBody held)) {
             return;
         }
-        for (io.ltr8.tson.schema.meta.TypeRef application : held.applications()) {
+        for (io.ltr8.tson.schema.meta.TypeRef application : HeldBody.of(held).applications()) {
             if (resolved.parameters().contains(application.name())) {
                 throw new TsonSchemaValidationException("'" + name + "': '" + application.name()
                         + "' is a type parameter applied to arguments -- a parameter stands for a type, never "
@@ -602,9 +606,9 @@ public final class SchemaResolver {
         // An open placeholder holds its body like every other open entry, so nothing downstream has to keep
         // a second substitution path for the one shape that did not -- see WireForm.heldEmptyRecord.
         Top body = parameters.isEmpty() ? RecordBody.of(List.of())
-                : new HeldBody(WireForm.heldEmptyRecord());
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters, false, List.of(), List.of(),
-                Optional.empty(), body, position, Annotations.empty());
+                : HeldBody.held(parameters, WireForm.heldEmptyRecord());
+        return new TypeDefinition(Optional.empty(),
+                parameters.isEmpty() ? TypeKind.PRODUCT : TypeKind.TEMPLATE, List.of(), List.of(), body, position, Annotations.empty());
     }
 
     /** One already-resolved {@code DataValue} replayed through a compiled reader. */
@@ -628,7 +632,8 @@ public final class SchemaResolver {
      * {@code subtypes} is populated at link time, one phase later, so both copies are still as their
      * declaring schema resolved them and the first is kept.
      */
-    private Map<String, TypeDefinition> mergeImports(SchemaDocument document) {
+    private Map<String, TypeDefinition> mergeImports(SchemaDocument document,
+            Map<String, Annotations> importedNameAnnotations) {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         Map<String, String> origins = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
@@ -652,6 +657,10 @@ public final class SchemaResolver {
                     continue;
                 }
                 merged.put(name, entry.getValue());
+                // §8.3's walk carries a dropped hop's declaration annotations to the use site, and an alias
+                // is as often imported as local -- so the key annotations travel with the entry rather than
+                // being dropped at the import boundary, where the hop would lose them for a second reason.
+                importedNameAnnotations.put(name, imported.schema().entries().getAnnotations(name));
                 origins.put(name, origin);
             }
         }

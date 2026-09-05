@@ -7,8 +7,8 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.atom.Complex;
-import io.ltr8.tson.schema.atom.IsoDuration;
 import io.ltr8.tson.schema.atom.Rational;
 import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.Annotation;
@@ -450,18 +450,22 @@ class TsonObjectReaderTest {
     public record Nullable(String text) {
     }
 
+    /**
+     * The token {@code null} is a string and binds as one; only {@code _} is absence. A {@code String} field
+     * takes both, which is what made the two confusable and why the notation keeps one spelling.
+     */
     @Test
-    void nullKeywordBindsToJavaNull() throws DataBindException {
-        Nullable n = mapper.read("{ text: null }", Nullable.class);
-        assertNull(n.text());
+    void theNullTokenBindsAsAStringAndOnlyTheSentinelAsAbsence() throws DataBindException {
+        assertEquals("null", mapper.read("{ text: null }", Nullable.class).text());
+        assertNull(mapper.read("{ text: _ }", Nullable.class).text());
     }
 
     public record RequiresInt(int x) {
     }
 
     @Test
-    void cannotBindNullToPrimitive() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ x: null }", RequiresInt.class));
+    void cannotBindTheAbsentSentinelToPrimitive() throws DataBindException {
+        assertThrows(TsonReadException.class, () -> mapper.read("{ x: _ }", RequiresInt.class));
     }
 
     // ── Atoms: enums (EnumStringBridge) ──────────────────────────────────
@@ -954,16 +958,27 @@ class TsonObjectReaderTest {
 
     // ── CIDR networks (§5.5) ─────────────────────────────────────────────
 
-    public record CidrHolder(String value) {
+    public record CidrHolder(CidrNetwork value) {
     }
 
     @Test
-    void builtinCidrAnnotationsBindAsTheAuthoredTextThroughTheMapper() throws DataBindException {
-        // Host type is String, not a parsed pair -- Java has no CIDR type, so the network is validated
-        // and handed back exactly as written (see Cidr4Parser's Javadoc). Both must be quoted: '/' is
+    void builtinCidrAnnotationsBindAsNetworkValuesThroughTheMapper() throws DataBindException {
+        // The host type is CidrNetwork -- the prefix octets and the prefix length -- so two spellings of
+        // one network bind equal and a holder can ask what the value contains. Both must be quoted: '/' is
         // not a legal unquoted-token character (§7.2), and an IPv6 network also contains ':'.
-        assertEquals("10.0.0.0/8", mapper.read("{ value: !cidr4 \"10.0.0.0/8\" }", CidrHolder.class).value());
-        assertEquals("2001:db8::/32", mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", CidrHolder.class).value());
+        assertEquals(CidrNetwork.parse("10.0.0.0/8", 32),
+                mapper.read("{ value: !cidr4 \"10.0.0.0/8\" }", CidrHolder.class).value());
+        assertEquals(CidrNetwork.parse("2001:db8::/32", 128),
+                mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", CidrHolder.class).value());
+    }
+
+    @Test
+    void aNonCanonicalNetworkSpellingBindsToTheSameValueAsItsCanonicalOne() throws DataBindException {
+        // What it means for the value to be the octets rather than the text: the expanded RFC 4291 form and
+        // the RFC 5952 canonical one are one network, and equality says so.
+        assertEquals(mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", CidrHolder.class).value(),
+                mapper.read("{ value: !cidr6 \"2001:0db8:0000:0000:0000:0000:0000:0000/32\" }",
+                        CidrHolder.class).value());
     }
 
     @Test
@@ -980,7 +995,7 @@ class TsonObjectReaderTest {
             throws DataBindException {
         // /33 is out of range for IPv4 and perfectly ordinary for IPv6 -- the range is per family.
         assertThrows(TsonReadException.class, () -> mapper.read("{ value: !cidr4 \"10.0.0.0/33\" }", CidrHolder.class));
-        assertEquals("2001:db8:8000::/33",
+        assertEquals(CidrNetwork.parse("2001:db8:8000::/33", 128),
                 mapper.read("{ value: !cidr6 \"2001:db8:8000::/33\" }", CidrHolder.class).value());
     }
 
@@ -1023,32 +1038,39 @@ class TsonObjectReaderTest {
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), h.value());
     }
 
-    public record DurationHolder(IsoDuration value) {
+    public record DurationHolder(java.time.Duration value) {
     }
 
+    /** {@code duration} reads to {@link java.time.Duration} -- the split left it no calendar part to carry. */
     @Test
-    void directBindingToTsonsOwnIsoDurationDoesNotWork() throws DataBindException {
-        // IsoDuration is itself a Java record (calendarPart, clockPart) -- same collision as
-        // Rational/Complex, same reason: tson-bind's record auto-detection claims it first.
-        assertThrows(TsonReadException.class,
-                () -> mapper.read("{ value: !duration P1Y2M3DT4H5M6S }", DurationHolder.class));
+    void builtinDurationAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        DurationHolder h = mapper.read("{ value: !duration PT4H5M6S }", DurationHolder.class);
+        assertEquals(java.time.Duration.ofSeconds(4 * 3600L + 5 * 60L + 6L), h.value());
     }
 
-    /** Stand-in for an application's own preferred duration representation -- e.g. threeten-extra's PeriodDuration, or just a total estimate collapsing calendar units. */
-    public record UserDuration(int years, int months, int days, long totalSeconds) {
+    public record PeriodHolder(Period value) {
     }
 
-    public static class UserDurationBridge implements DataBridge<IsoDuration, UserDuration> {
+    /** And {@code period} to {@link Period}, whose {@code days} is always zero at this position. */
+    @Test
+    void builtinPeriodAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        PeriodHolder h = mapper.read("{ value: !period P1Y6M }", PeriodHolder.class);
+        assertEquals(18, h.value().toTotalMonths());
+    }
+
+    /** Stand-in for an application's own preferred elapsed-time representation. */
+    public record UserDuration(long totalSeconds) {
+    }
+
+    public static class UserDurationBridge implements DataBridge<java.time.Duration, UserDuration> {
         @Override
-        public IsoDuration toData(UserDuration d) {
-            return new IsoDuration(Period.of(d.years(), d.months(), d.days()),
-                    java.time.Duration.ofSeconds(d.totalSeconds()));
+        public java.time.Duration toData(UserDuration d) {
+            return java.time.Duration.ofSeconds(d.totalSeconds());
         }
 
         @Override
-        public UserDuration toObject(IsoDuration d) {
-            Period p = d.calendarPart();
-            return new UserDuration(p.getYears(), p.getMonths(), p.getDays(), d.clockPart().toSeconds());
+        public UserDuration toObject(java.time.Duration d) {
+            return new UserDuration(d.toSeconds());
         }
     }
 
@@ -1061,8 +1083,8 @@ class TsonObjectReaderTest {
         context.registerAtom(UserDuration.class, new UserDurationBridge());
         TsonObjectReader bridgedMapper = new TsonObjectReader(context);
 
-        UserDurationHolder h = bridgedMapper.read("{ value: !duration P1Y2M3DT4H5M6S }", UserDurationHolder.class);
-        assertEquals(new UserDuration(1, 2, 3, 4 * 3600L + 5 * 60L + 6L), h.value());
+        UserDurationHolder h = bridgedMapper.read("{ value: !duration PT4H5M6S }", UserDurationHolder.class);
+        assertEquals(new UserDuration(4 * 3600L + 5 * 60L + 6L), h.value());
     }
 
     // ── Binary types (§5.3) ──────────────────────────────────────────────
@@ -1079,36 +1101,21 @@ class TsonObjectReaderTest {
         // constructor does (see TsonAtomContext.defaultContext()). This documents *why* that
         // pre-registration exists.
         TsonObjectReader bareMapper = new TsonObjectReader(DataBindContext.builder().build());
-        assertThrows(TsonReadException.class, () -> bareMapper.read("{ value: !base64 TWFu }", BytesHolder.class));
+        assertThrows(TsonReadException.class, () -> bareMapper.read("{ value: !bytes TWFu }", BytesHolder.class));
     }
 
     @Test
-    void builtinBase64AnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.read("{ value: !base64 TWFu }", BytesHolder.class);
+    void builtinBytesAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
+        BytesHolder h = mapper.read("{ value: !bytes TWFu }", BytesHolder.class);
         assertArrayEquals("Man".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
     }
 
-    @Test
-    void builtinBase64UrlAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.read("{ value: !base64url TWFu }", BytesHolder.class);
-        assertArrayEquals("Man".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
-    }
+
+
 
     @Test
-    void builtinHexAnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.read("{ value: !hex deadbeef }", BytesHolder.class);
-        assertArrayEquals(new byte[]{(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF}, h.value());
-    }
-
-    @Test
-    void builtinBase32AnnotationBindsDirectlyThroughTheMapper() throws DataBindException {
-        BytesHolder h = mapper.read("{ value: !base32 MZXW6YTB }", BytesHolder.class);
-        assertArrayEquals("fooba".getBytes(java.nio.charset.StandardCharsets.UTF_8), h.value());
-    }
-
-    @Test
-    void builtinBase64AnnotationRejectsMissingPaddingThroughTheMapper() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !base64 TWE }", BytesHolder.class));
+    void builtinBytesAnnotationRejectsMissingPaddingThroughTheMapper() throws DataBindException {
+        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !bytes TWE }", BytesHolder.class));
     }
 
     // ── Rational/Complex: binding to a richer third-party type via DataBridge ──────────────

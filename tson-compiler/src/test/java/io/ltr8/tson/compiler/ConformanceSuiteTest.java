@@ -23,13 +23,13 @@ import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomValidationException;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.atom.Complex;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.suite.Sidecar;
 import io.ltr8.tson.suite.Vectors;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.atom.IsoDuration;
 import io.ltr8.tson.schema.atom.Rational;
 import io.ltr8.tson.tree.TsonAbsent;
 import io.ltr8.tson.tree.TsonArray;
@@ -510,7 +510,6 @@ class ConformanceSuiteTest {
         RecordValue.Field member = soleField(expected, "base-value");
         CoreValue payload = member.value().value().coreValue();
         switch (member.name()) {
-            case "null" -> assertInstanceOf(BaseValue.NullValue.class, actual, "base-value kind 'null'");
             case "boolean" -> {
                 BaseValue.BooleanValue bv = assertInstanceOf(BaseValue.BooleanValue.class, actual, "base-value kind 'boolean'");
                 assertEquals(((TokenValue) payload).text().equals("true"), bv.value(), "boolean value");
@@ -649,7 +648,9 @@ class ConformanceSuiteTest {
                 UUID actual = (UUID) atomType.read(token, UUID.class);
                 assertEquals(UUID.fromString(((TokenValue) payload).text()), actual, "vocabulary value");
             }
-            case "base64", "base64url", "base32", "hex" -> {
+            // One name, not four: Part 1 fixes base64, a schemaless document having no type to carry
+            // bytes_type's encoding selector.
+            case "bytes" -> {
                 byte[] actual = (byte[]) atomType.read(token, byte[].class);
                 assertArrayEquals(HexFormat.of().parseHex(((TokenValue) payload).text()), actual, "vocabulary value");
             }
@@ -665,11 +666,21 @@ class ConformanceSuiteTest {
                 OffsetDateTime actual = (OffsetDateTime) atomType.read(token, OffsetDateTime.class);
                 assertEquals(OffsetDateTime.parse(((TokenValue) payload).text()), actual, "vocabulary value");
             }
+            // duration and period state the *value* -- seconds and months -- rather than a canonical
+            // spelling, P3W and PT504H being one duration and P1Y and P12M one period.
             case "duration" -> {
-                IsoDuration actual = (IsoDuration) atomType.read(token, IsoDuration.class);
-                RecordValue expected = (RecordValue) payload;
-                assertEquals(Period.parse(fieldText(expected, "period")), actual.calendarPart(), "duration calendar part");
-                assertEquals(Duration.parse(fieldText(expected, "clock")), actual.clockPart(), "duration clock part");
+                Duration actual = (Duration) atomType.read(token, Duration.class);
+                java.math.BigDecimal seconds = new java.math.BigDecimal(actual.getSeconds())
+                        .add(new java.math.BigDecimal(actual.getNano()).movePointLeft(9));
+                // compareTo, not equals: a BigDecimal carries its scale, and 5400 and 5.4E+3 are the same
+                // number written two ways -- the vector states the value, not a scale.
+                assertEquals(0, new java.math.BigDecimal(((TokenValue) payload).text()).compareTo(seconds),
+                        "duration seconds: expected " + ((TokenValue) payload).text() + " but was " + seconds);
+            }
+            case "period" -> {
+                Period actual = (Period) atomType.read(token, Period.class);
+                assertEquals(Long.parseLong(((TokenValue) payload).text()), actual.toTotalMonths(),
+                        "period months");
             }
             case "uri" -> {
                 URI actual = (URI) atomType.read(token, URI.class);
@@ -688,12 +699,23 @@ class ConformanceSuiteTest {
                 assertArrayEquals(HexFormat.of().parseHex(((TokenValue) payload).text()), actual.getAddress(),
                         "vocabulary value");
             }
-            case "text", "cidr4", "cidr6", "mac", "email" -> {
+            // A network is a value here (prefix octets plus prefix length), so the oracle is the sidecar's
+            // canonical text parsed into one and compared as a value -- which is what the `text` family
+            // means for cidr4/cidr6: the *canonical* form, never whichever spelling the subject used.
+            // A vector must therefore author its subject canonically, or a text-preserving implementation
+            // and a value-parsing one cannot both satisfy it (§5.2 leaves the host type open).
+            case "cidr4", "cidr6" -> {
+                CidrNetwork actual = (CidrNetwork) atomType.read(token, CidrNetwork.class);
+                int familyBits = typeRef.equals("cidr4") ? 32 : 128;
+                assertEquals(CidrNetwork.parse(((TokenValue) payload).text(), familyBits), actual,
+                        "vocabulary value");
+            }
+            case "text", "mac", "email" -> {
                 // The atoms whose host value is the authored text itself, so the oracle is a plain string
                 // compare with no parse in between. Deliberately not folded into the numeric default arm
-                // below. Three reasons converge here: `text` is text by definition (§5.5, "the host value is
-                // the token's text"), while `cidr4`/`cidr6`/`mac` keep their text because Java has no type to
-                // map onto (see Cidr4Parser/MacParser) and `email` because the address shape is the contract.
+                // below. `text` is text by definition (§5.5, "the host value is the token's text"), `mac`
+                // keeps its text because Java has no type to map onto (see MacParser), and `email` because
+                // the address shape is the contract.
                 String actual = (String) atomType.read(token, String.class);
                 assertEquals(((TokenValue) payload).text(), actual, "vocabulary value");
             }

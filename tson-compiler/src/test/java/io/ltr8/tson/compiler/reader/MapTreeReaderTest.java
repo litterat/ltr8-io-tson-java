@@ -34,8 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MapTreeReaderTest {
 
     private static TypeDefinition integerEntry() {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(), List.of(),
-                Optional.empty(), IntegerType.UNCONSTRAINED);
+        return new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(), List.of(), IntegerType.UNCONSTRAINED);
     }
 
     private static TsonCompiledSchema compile(MapBody body) {

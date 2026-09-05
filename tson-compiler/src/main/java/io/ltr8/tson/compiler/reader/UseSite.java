@@ -1,20 +1,23 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.schema.meta.TypeRef;
 
 /**
  * The reader for a child position, named the way the author wrote that position.
  *
- * <p><b>Why a position needs a name of its own.</b> [TSON-SCHEMA] §8.3 flattens a type position past a
- * {@code REFERENCE} entry, rewriting the reference to the end of its chain and recording the name the author
- * wrote as {@code @alias} on the type-ref. So a field declared {@code c: pct} over {@code pct => small}
- * arrives here as {@code type: @alias:pct small}, and the reader the resolver hands back is {@code small}'s
- * -- one reader, shared by every position that reaches that entry, and correctly named {@code small} for a
- * position that named it directly. A message from it against {@code c} then reads {@code 'small': '500' is
- * greater than the maximum 100}, naming a declaration the author did write but did not write <em>here</em>,
- * and for a chain ending in an imported type ({@code my_int => int32}) naming a file they never opened.
+ * <p><b>Why a position needs a name of its own.</b> A field declared {@code c: pct} over {@code pct => small}
+ * reads with {@code small}'s reader, that being the type at the end of the chain. A message from it against
+ * {@code c} would otherwise read {@code 'small': '500' is greater than the maximum 100}, naming a declaration
+ * the author did write but did not write <em>here</em>, and for a chain ending in an imported type
+ * ({@code my_int => int32}) naming a file they never opened. So the {@code REFERENCE} entry's own compile
+ * names the target's reader for the entry doing the referring ({@code TsonSchemaCompiler}), and a use site
+ * naming {@code pct} gets a reader called {@code pct}.
+ *
+ * <p><b>A use site needs nothing of its own for that</b>, which it used to. Resolved output no longer
+ * rewrites a type position past a reference, so a position reaches its child reader by resolving the name it
+ * names and nothing more -- every container and record field calls the resolver directly. What is left here
+ * is the {@link Renamed} seam a compiled reader offers a caller holding one, and the {@link #named} helper
+ * the reference compile applies it through.
  *
  * <p>This is the naming twin of the rule {@code SchemaLocation} already follows for pointers: the pointer is
  * the path taken ({@code /person/age}), never the leaf it resolves to ({@code /int32} in core.tn), "because
@@ -38,26 +41,16 @@ public final class UseSite {
     private UseSite() {
     }
 
-    /**
-     * The already-compiled reader for {@code ref}'s target, renamed to the author's own name for this
-     * position when §8.3 left one and the reader has a name to change.
-     */
-    static TsonTypeReader<?> reader(TypeRef ref, TsonTypeReaderResolver resolver) {
-        return named(resolver.resolve(ref.name()), ref.annotations().value("alias", String.class).orElse(null));
-    }
 
     /**
      * {@code reader} named {@code displayName}, or {@code reader} itself where there is no name to give or
      * nothing to give it to.
      *
-     * <p><b>A {@code REFERENCE} entry is the other caller</b>, and it needs this for a reason {@code @alias}
-     * cannot cover. §8.3 flattens a use site past a reference and records the author's name there -- except
-     * at a materialised instantiation, where the walk stops, so the use site names the instantiation and
-     * carries no alias. That entry compiles to its target's reader ({@code TsonSchemaCompiler}), which is the
-     * synthetic for the closed constructor form and is named for its own content ({@code
-     * integer_type_10_100_786fbcfb}). The instantiation's own {@code source} is the application the author
-     * wrote ({@code b<10>}), which {@code EntryDisplayName} renders -- so the name is taken from the entry
-     * doing the referring rather than the entry referred to.
+     * <p><b>A {@code REFERENCE} entry is the caller.</b> Its reader is its target's, so without this a
+     * message at a {@code pct}-typed position would name {@code small}. The same applies to a materialised
+     * instantiation, named for its own content ({@code integer_type_10_100_786fbcfb}) where the entry
+     * referring to it records the application the author wrote ({@code b<10>}), which {@code
+     * EntryDisplayName} renders -- so the name comes from the entry doing the referring.
      */
     public static TsonTypeReader<?> named(TsonTypeReader<?> reader, String displayName) {
         return displayName != null && reader instanceof Renamed renameable
@@ -69,7 +62,7 @@ public final class UseSite {
      *
      * <p>Implemented by the families whose diagnostics name the type they were reading. A family that does
      * not -- or one whose name is already the use site's, like a record template's single substituted entry
-     * -- simply does not implement it, and {@link #reader} hands its reader straight back.
+     * -- simply does not implement it, and {@link #named} hands its reader straight back.
      */
     public interface Renamed {
 

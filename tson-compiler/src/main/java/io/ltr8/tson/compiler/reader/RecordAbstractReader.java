@@ -14,8 +14,8 @@ import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -194,9 +194,18 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
 
         TsonTypeReader<?> forField(RecordField field);
 
-        /** By the field's declared schema type alone, named as the author wrote it here ({@link UseSite}). */
+        /**
+         * By the field's declared schema type, named as the author wrote it here ({@link UseSite}).
+         *
+         * <p><b>Every field of a given type shares one compiled reader</b>, which is what makes compilation
+         * cheap, and nothing about a field's own declaration can change which reader it wants: a value's
+         * spelling is settled by its type. The alphabet a {@code bytes} value is written in is the clearest
+         * case, and it is a facet of {@code bytes_type} rather than anything per-position ([TSON-SCHEMA]
+         * §5.5) -- so two fields typed {@code hexdigest} and {@code sha256} name two entries and resolve to
+         * two readers by this rule alone.
+         */
         static FieldReaders byType(TsonTypeReaderResolver resolver) {
-            return field -> UseSite.reader(field.type(), resolver);
+            return field -> resolver.resolve(field.type().name());
         }
     }
 
@@ -282,8 +291,10 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                 seen[schemaIndex] = true;
                 continue;
             }
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
+            SchemaRef push = ScopePush.notAdmitted(ctx, fields.get(schemaIndex).parser());
+            if (push != null) {
+                ScopePush.refuse(ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position()),
+                        fields.get(schemaIndex).schema().type().name(), push);
             }
             Object decoded;
             if (ctx.peek() instanceof AbsentEvent) {
@@ -446,12 +457,15 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * stack uses everywhere else applies here too: if decoding reported, the contradiction check is skipped.
      */
     private void verifyFixed(TsonReadContext ctx, int schemaIndex, FieldSink sink, String fieldName) {
-        if (ctx.peek() instanceof SchemaRef) {
-            ctx.next();
-        }
+        SchemaRef push = ScopePush.notAdmitted(ctx, fields.get(schemaIndex).parser());
         FixedCheck check = fixedCheck[schemaIndex];
         RecordField schema = fields.get(schemaIndex).schema();
         TsonReadContext fieldCtx = ctx.schemaField(fieldName, schema.position());
+        if (push != null) {
+            // A FIXED field's type is an atom or an enum (§5.2), so it is never scoped and the directive is
+            // always refused here -- but it is refused rather than ignored, which is the point.
+            ScopePush.refuse(fieldCtx, schema.type().name(), push);
+        }
         if (ctx.peek() instanceof AbsentEvent) {
             ctx.next();
             if (schema.state() == FieldState.REQUIRED_FIXED) {
@@ -479,12 +493,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             // of nothing.
             return;
         }
-        if (!Objects.equals(written, check.value())) {
+        if (!Objects.equals(ValueIdentity.of(written), ValueIdentity.of(check.value()))) {
             fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
                     "'" + fieldName + "' is fixed on '" + displayName + "' and cannot be given another value -- the "
                             + "schema declares it with '=' (fixed); for a default the data may override, "
                             + "use '~'",
-                    String.valueOf(check.value()), String.valueOf(written));
+                    Rendered.value(check.value()), Rendered.value(written));
             return;
         }
         // The raw value, not the narrowed precomputed one -- every other field reaches the sink raw and is

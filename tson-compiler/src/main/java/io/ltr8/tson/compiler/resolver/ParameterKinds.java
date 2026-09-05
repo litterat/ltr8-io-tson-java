@@ -2,13 +2,16 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -56,7 +59,7 @@ import java.util.function.Function;
  * {@code groundRemainingAsType}. §5.10 makes such a parameter a resolver error ("grounded only in mutual
  * recursion between templates, with no concrete kind-determining use"); this implementation reads it as
  * having one consistent assignment instead, because being a value parameter <em>means</em> standing in a
- * scalar slot and a slot is what grounds a parameter. {@code SPEC-FEEDBACK.md} #20 carries the divergence.
+ * scalar slot and a slot is what grounds a parameter. [TSON-SCHEMA] §5.10 states the rule.
  */
 final class ParameterKinds {
 
@@ -82,12 +85,12 @@ final class ParameterKinds {
                                                     FailureReporter reporter) {
         Map<String, Occurrences> observed = new LinkedHashMap<>();
         entries.forEach((name, definition) -> {
-            if (definition.parameters().isEmpty() || !(definition.body() instanceof HeldBody held)) {
+            if (definition.parameters().isEmpty() || !(definition.body() instanceof TemplateBody held)) {
                 return;
             }
             Occurrences occurrences = new Occurrences(definition.parameters());
             try {
-                new Walk(occurrences, meta).body(held);
+                new Walk(occurrences, meta).body(HeldBody.of(held));
             } catch (TsonSchemaValidationException e) {
                 if (declared.contains(name)) {
                     reporter.report(name, e);
@@ -110,12 +113,12 @@ final class ParameterKinds {
      * is reported by the batch pass, which is the one that knows which declarations this schema wrote.
      */
     static Map<String, Kind> inferOne(TypeDefinition template, Function<String, TypeDefinition> meta) {
-        if (template.parameters().isEmpty() || !(template.body() instanceof HeldBody held)) {
+        if (template.parameters().isEmpty() || !(template.body() instanceof TemplateBody held)) {
             return Map.of();
         }
         Occurrences occurrences = new Occurrences(template.parameters());
         try {
-            new Walk(occurrences, meta).body(held);
+            new Walk(occurrences, meta).body(HeldBody.of(held));
         } catch (TsonSchemaValidationException e) {
             return Map.of();
         }
@@ -260,10 +263,24 @@ final class ParameterKinds {
             switch (written) {
                 case TokenValue token when occurrences.declares(token.text()) -> token(token.text(), slot, type);
                 case ArrayValue array -> elements(array, type);
+                case MapValue map when type instanceof MapBody entries -> entries(map, entries);
                 case RecordValue record when TYPE_REF.equals(slot) -> application(record);
                 case RecordValue record when type instanceof RecordBody nested -> record(record, nested);
                 default -> {
                 }
+            }
+        }
+
+        /**
+         * A map slot: the key against {@code key_type}, the value against {@code value_type}. Both halves,
+         * because a parameter reaches either -- core's {@code extern_type => <S, T> !scoped { scope: [EXTERN]
+         * schemas: { S => [T] } }} puts one in each, {@code S} in a {@code uri}-typed key and {@code T}
+         * inside the {@code [type_name]} the value names.
+         */
+        private void entries(MapValue map, MapBody declared) {
+            for (MapValue.MapEntry entry : map.entries()) {
+                value(entry.key().coreValue(), declared.keyType());
+                value(entry.value().value().coreValue(), declared.valueType());
             }
         }
 

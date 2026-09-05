@@ -11,6 +11,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DateTimeParserTest {
 
@@ -80,18 +81,34 @@ class DateTimeParserTest {
     }
 
     /**
-     * <b>{@code precision} bounds the fractional-second digits from above, on the token as written</b>
-     * (§5.5) -- the same rule {@code TimeParser} applies, inherited from the same {@code full-time}
-     * production, and judged on the token because the atom is exact and never truncates to fit.
+     * <b>{@code precision} constrains the value, not the spelling</b> (§5.5) -- the same rule {@code
+     * TimeParser} applies, inherited from the same {@code full-time} production: an instant that is a whole
+     * number of 10⁻ᴺ seconds, however many digits an encoding spelled it with. Exact either way; an instant
+     * off the grid is refused rather than rounded onto it.
      */
     @Test
-    void precisionBoundsTheWrittenFractionalDigits() {
+    void precisionConstrainsTheValueNotTheSpelling() {
         DateTimeParser type = new DateTimeParser(new DateTimeType(Optional.empty(), Optional.empty(),
                 Optional.of(BigInteger.valueOf(3))));
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30Z"), type.read(token("2025-03-13T10:15:30Z")));
         assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30.100Z"),
                 type.read(token("2025-03-13T10:15:30.100Z")));
+        assertEquals(OffsetDateTime.parse("2025-03-13T10:15:30.100000Z"),
+                type.read(token("2025-03-13T10:15:30.100000Z")));
         assertThrows(AtomValidationException.class, () -> type.read(token("2025-03-13T10:15:30.1234Z")));
+    }
+
+    /**
+     * A fraction finer than a nanosecond is refused <b>by name</b>. {@code java.time} stops at nine digits
+     * on its own, so the cap was always enforced -- but as a shape error quoting a character index, which
+     * says the timestamp is malformed rather than that it is finer than the format carries.
+     */
+    @Test
+    void aFractionFinerThanANanosecondIsNamedAsSuch() {
+        AtomParseException refused = assertThrows(AtomParseException.class,
+                () -> DateTimeParser.UNCONSTRAINED.read(token("2025-03-13T10:15:30.1234567890Z")));
+        assertTrue(refused.getMessage().contains("fractional-second digits"), refused.getMessage());
+        assertEquals("at most 9 fractional-second digits", refused.expected());
     }
 
     /** {@code precision: 0} admits no fractional part at all (§5.5). */

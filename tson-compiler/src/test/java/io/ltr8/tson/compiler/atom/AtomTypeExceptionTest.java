@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerSize;
@@ -91,7 +91,8 @@ class AtomTypeExceptionTest {
     /** A binary atom's length is bytes, and says so -- the decoded length, not the encoded token's. */
     @Test
     void aBinaryLengthCountsBytes() {
-        BinaryParser type = new BinaryParser(BinaryType.Encoding.HEX, Optional.of(4), Optional.empty());
+        BytesParser type = new BytesParser(new BytesType(BytesType.Encoding.HEX, Optional.empty(),
+                Optional.of(4), Optional.empty()));
         assertEquals("at least 4 bytes", rejecting(type, "aabb").expected());
     }
 

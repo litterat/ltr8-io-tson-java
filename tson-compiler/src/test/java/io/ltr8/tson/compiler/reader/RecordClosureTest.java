@@ -46,8 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RecordClosureTest {
 
     private static TypeDefinition atom(io.ltr8.tson.schema.meta.Top body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(), List.of(),
-                Optional.empty(), body);
+        return new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(), List.of(), body);
     }
 
     /** {@code person => { name: text  address: addr }}, {@code addr => { city: text }} -- a record inside a record. */

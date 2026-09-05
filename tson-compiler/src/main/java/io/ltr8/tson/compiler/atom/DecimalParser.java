@@ -8,7 +8,9 @@ import io.ltr8.tson.compiler.base.NumberNarrowing;
 import io.ltr8.tson.schema.meta.DecimalType;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Parses and validates against meta-kernel's {@code decimal_type} constructor (§5.6's {@code
@@ -20,9 +22,9 @@ import java.util.Optional;
  * already implements the exactness for (a bare decimal token already binds to {@code BigDecimal}
  * without loss); this type exists to apply the same exact-preservation contract when the token
  * additionally carries an explicit {@code !number} annotation, plus {@code decimal_type}'s
- * constraint vocabulary (bounds, {@code multiple_of}, digit-count limits) on top. Holds a {@link
- * DecimalType} -- the pure constraint values, unchanged by this split -- rather than declaring
- * those fields itself.
+ * constraint vocabulary (bounds, {@code multiple_of}, digit-count limits, a sparse {@code members} set) on
+ * top. Holds a {@link DecimalType} -- the pure constraint values, unchanged by this split -- rather than
+ * declaring those fields itself.
  */
 public record DecimalParser(DecimalType constraints) implements AtomType<BigDecimal> {
 
@@ -35,7 +37,8 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
     public DecimalParser(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
                           Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf,
                           Optional<Integer> totalDigits, Optional<Integer> fractionDigits) {
-        this(new DecimalType(min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits));
+        this(new DecimalType(min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits,
+                Optional.empty()));
     }
 
     @Override
@@ -94,8 +97,13 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
                 throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
             }
         });
+        // Both digit-count facets measure the value, never the spelling: meta.tn's own @doc says "scale is
+        // not part of the value -- 1, 1.0 and 1.00 are one value", so 1.230 has three significant digits and
+        // two after the point, and `fraction_digits: 2` admits "any hundredth" whatever the author typed.
+        // The value handed back is still exactly as written; only the measurement strips.
+        BigDecimal measured = value.stripTrailingZeros();
         constraints.totalDigits().ifPresent(td -> {
-            if (value.precision() > td) {
+            if (measured.precision() > td) {
                 throw new AtomValidationException(
                         "'" + text + "' has more than the maximum " + td + " total significant digits",
                         "at most " + td + " total significant digits");
@@ -104,10 +112,20 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
         constraints.fractionDigits().ifPresent(fd -> {
             // scale() can be negative (e.g. 1E+2 has scale -2, a whole number with no fraction
             // digits at all, not -2 of them) -- clamp at 0 before comparing.
-            if (Math.max(value.scale(), 0) > fd) {
+            if (Math.max(measured.scale(), 0) > fd) {
                 throw new AtomValidationException(
                         "'" + text + "' has more than the maximum " + fd + " digits after the decimal point",
                         "at most " + fd + " digits after the decimal point");
+            }
+        });
+        // §4.3's identity, and BigDecimal's own is not it: 2.50 and 2.5 are two objects and one number, so
+        // membership is compareTo. `DecimalType` reads every member as a decimal before the set is formed,
+        // which is what lets this compare at all -- the facet is `set<value>` on the wire.
+        constraints.members().ifPresent(members -> {
+            if (members.stream().noneMatch(member -> value.compareTo(member) == 0)) {
+                throw new AtomValidationException(
+                        "'" + text + "' is not a member of this type -- expected one of " + members,
+                        "one of (" + members.stream().map(BigDecimal::toString).collect(Collectors.joining(", ")) + ")");
             }
         });
     }

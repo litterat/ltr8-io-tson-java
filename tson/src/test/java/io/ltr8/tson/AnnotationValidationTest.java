@@ -35,8 +35,8 @@ class AnnotationValidationTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/annotated-1.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/core.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
             {
               level => int32
               plain => { id: text }

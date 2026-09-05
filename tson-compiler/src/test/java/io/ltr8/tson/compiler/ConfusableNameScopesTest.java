@@ -14,7 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-DATA] §8.2's three name-hygiene rules over the schema-layer scopes [TSON-SCHEMA] §11.4 names,
- * plus the one this implementation adds -- a template's parameters ({@code SPEC-FEEDBACK.md} #5).
+ * plus the one this implementation adds -- a template's parameters, which §11.4 and §5.10 both decline to
+ * list.
  *
  * <p><b>All three run in one walk</b> ({@code TsonSchemaLinker.checkNames}), which is what makes the scope
  * list the only place a position can be forgotten. The restricted-character rule used to run at the
@@ -32,6 +33,14 @@ class ConfusableNameScopesTest {
     /** Cyrillic а (U+0430) — the character §9.4 opens with. */
     private static final String CYR_A = new String(Character.toChars(0x0430));
 
+    /**
+     * {@code pass} in Cyrillic (р а ѕ ѕ) -- single-script, so the restricted-script rule admits it, and
+     * confusable with the Latin spelling, so the look-alike rule is the only one with anything to say.
+     */
+    private static final String CYRILLIC_PASS =
+            new String(new int[] {0x0440, 0x0430, 0x0455, 0x0455}, 0, 4);
+
+
     /** Cyrillic А (U+0410), the capital. */
     private static final String CYR_CAP_A = new String(Character.toChars(0x0410));
 
@@ -44,8 +53,8 @@ class ConfusableNameScopesTest {
     private static TsonCompiledSchema compileWith(TsonUnicodePolicy identifiers, String declarations) {
         String schema = """
                 !!id:"https://example.test/confusable.tn"
-                !!meta:"https://tson.io/2026/34/m/meta.tn"
-                !!import:"https://tson.io/2026/34/m/core.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
                 {
                 %s
                 }
@@ -80,10 +89,11 @@ class ConfusableNameScopesTest {
     }
 
     /**
-     * <b>A template's parameters, which §11.4 does not list as a scope</b> ({@code SPEC-FEEDBACK.md} #5).
-     * {@code <T, Т>} declares two parameters that read identically; a body referencing {@code T} binds one of
-     * them and a reviewer cannot see which, which is the substitution hazard §8.2 exists to refuse. §11.4's
-     * own reasoning for enum members applies to it unchanged.
+     * <b>A template's parameters, which §11.4 declines to list as a scope</b> -- one author writes the list
+     * whole on one line, so the population is empty. {@code <T, Т>} declares two parameters that read
+     * identically; a body referencing {@code T} binds one of them and a reviewer cannot see which, which is
+     * the substitution hazard §8.2 exists to refuse. Only the look-alike rule is a divergence here:
+     * mechanisms 2 and 3 are per-name and reach every identifier position anyway (§8.2).
      */
     @Test
     void twoTemplateParametersThatReadAlikeAreRefused() {
@@ -169,11 +179,15 @@ class ConfusableNameScopesTest {
     /**
      * Class 1 has no declaration to have caught it, so a schemaless record's own field set is checked where
      * it is read. This is the one scope that needs a reader rather than the linker.
+     *
+     * <p>The pair is whole-script rather than a within-word homograph, deliberately: a field name is a name
+     * (§2.5), so a mixed-script spelling is refused by the restricted-script rule before this one has a pair
+     * to compare, and isolating the look-alike rule needs two names each of which is single-script.
      */
     @Test
     void aSchemalessRecordsFieldNamesAreChecked() {
         TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
-        new TsonTreeReader().withDiagnostics(problems).read("{ admin: 1  " + CYR_A + "dmin: 2 }");
+        new TsonTreeReader().withDiagnostics(problems).read("{ pass: 1  " + CYRILLIC_PASS + ": 2 }");
 
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES),
                 problems.diagnostics().stream().map(Diagnostic::code).toList(),

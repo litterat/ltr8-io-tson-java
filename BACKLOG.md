@@ -35,9 +35,9 @@ distinction, and a misfiled entry is how a wrong classification gets adopted rat
 
 Every real schema resolved so far (meta-kernel, meta.tn, core.tn, and hand-built test fixtures)
 happens to fit a narrow shape this pipeline already handles — declared in dependency order, with
-callers hand-sequencing registration themselves. These items are what's missing for the *general*,
+callers hand-sequencing registration themselves. What follows is what's missing for the *general*,
 spec-required case, found by re-auditing Part 2 against the current source rather than CLAUDE.md's
-own prose (which had gone stale on at least one of them):
+own prose (which had gone stale on it):
 
 - [ ] **Automatic reference-closure resolution** ([TSON-DATA] §2.2.3, [TSON-SCHEMA] §3.4.1) — no code
   collects a schema's transitive `!!meta`/`!!import` closure, topologically orders it, and resolves it
@@ -47,33 +47,34 @@ own prose (which had gone stale on at least one of them):
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 
-## Built-in types
+- [ ] **A source declaration may apply `!template` directly, and §8.1 says it must not** — the kernel's
+  `template` constructor is resolver vocabulary: "nothing is ever typed by it, and a source declaration
+  applying it directly is a resolver error — the parameter list `<…>` is the authored spelling of an open
+  entry". This resolver accepts one. `sneaky => !template { parameters: [T]  template: "!array { element_type:
+  T }" }` resolves without complaint, minting an entry whose held body was hand-written rather than derived
+  from a `<T>` declaration, which sidesteps every declaration-time check §5.10 makes about a template (the
+  unreferenced-parameter rule, regularity, arity against the constructor's own vocabulary). The refusal
+  belongs with the other constructor-eligibility checks, where `requireApplicable` already asks what `!C`
+  may be applied to.
 
-- [ ] `unknown` — no compiled-parser factory (`ValueReaderFactoryRegistry` registers it, and `extern`, to
-  `ErrorReader`), pinned down exactly by
-  `CoreSchemaImportTest.exactlyTheUnknownAtomConstructorCompilesToAnErrorReader`. Not an unwritten atom
-  grammar: `unknown` accepts any well-formed value of any type, so what it needs is a reader deferring to
-  the document's own type-ref (or to schemaless base-type resolution when there is none) — a design
-  question about where that dispatch lives.
-- [ ] `extern` ([TSON-SCHEMA] §7.8) — materially bigger than the item above, and a different kind of gap
-  again. `Extern` (`schema.meta`) is a record-only placeholder with no
-  parsing/validation behavior at all (its own Javadoc says so explicitly: "not to add real
-  cross-schema reference resolution"); the real mechanism — a value at an extern-matched position
-  carrying its own scoped `!!schema` plus a mandatory `!type` tag, switching schema scope
-  mid-document — doesn't exist anywhere in the reader stack.
-- [ ] **Atom-body coherence, the parts that need a parser this module doesn't have.** `Atom.coherenceCheck`
-  (issue #50) now rejects an atom body whose own facets admit nothing, but three gaps are left, each
-  matching that family's existing *narrowing* gap and each blocked on the same thing — `tson-schema` has no
-  dependency on a parser for the values involved:
-    - `duration_type`'s bounds are unparsed ISO 8601 text. `"P1M"` vs `"P30D"` does not order lexically, so
-      judging them as strings would call a coherent body empty. Needs `DurationParser`/`IsoDuration`, which
-      live in `tson-compiler`.
-    - `pattern` emptiness — a regex matching no string at all, or none of a permitted length. Needs
-      `tson-regex`, the same boundary the narrowing check's containment gap sits behind.
-    - CIDR `within`/`excluding` admitting no network between them. Needs real containment arithmetic; the
-      family has no CIDR parser.
-    - The natural fix for all three is the same one the narrowing check would want: an injected oracle, rather
-      than moving the value model's dependencies.
+## Checked annotations
+
+[TSON-SCHEMA] §6 defines the category and §5.4's `@disjoint` is the precedent both follow: an annotation with
+**no** decode force and load-time force, verified against a fact the resolver derives, two outcomes and no
+third — verified silently, or a resolver error at schema load. §6 also settles what this implementation had to
+guess at: a checked annotation is an assertion in *either* declaration position and a processor MUST consult
+both spellings, which is what `@disjoint` already does. Each of the two below is declared in meta.tn and
+neither is checked, so both are advisory today where §6 says they carry force. Both are also re-checked on
+ingest (§8.1), which is a second call site for whatever the load-time check becomes.
+
+- [ ] **`@discriminator` is not checked.** Three checks at schema load, over the choice the annotation marks
+  (§6): every variant is a record declaring the named field; that field is `REQUIRED_FIXED` in every variant,
+  never `REQUIRED_DEFAULT`; and the fixed values are pairwise distinct. The annotation's own type does the
+  fourth — `field_name` is an `identifier`, so a non-name spelling already fails where the annotation value is
+  read. Nothing about a value's validity moves: a discriminated choice admits exactly the variants it admitted.
+- [ ] **`@rest` is not checked.** Two checks: the annotated field's type resolves to a text-keyed map, and at
+  most one field per composed chain carries the mark — the chain being countable since §5.8's restated-field
+  rule merges annotations rather than dropping them, which this implementation already applies.
 
 ## Write side
 
@@ -85,12 +86,12 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 - [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
   through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
-  `@alias`/`@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
+  `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
-  — the fixtures carry `@synthetic` on nine keys and `@doc` on many more, and the bound side
-  renders none of them, so the entries would compare equal for the wrong reason;
+  — the fixtures carry `@synthetic` on the keys the resolver minted and `@doc` on many more, and the bound
+  side renders none of them, so the entries would compare equal for the wrong reason;
   `theSameEntriesAreMarkedSyntheticOnBothSides` scans the fixture text instead. Fixing the read side lets that
   test read those keys like anything else, which is the whole of the payoff — `ResolvedFixtureTest` is the
   only consumer, and the emit side behind it has none. §8.1 settles the shape either way: derived markers
@@ -120,14 +121,51 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **[TSON-DATA] §9.1's resource limits — and the `StackOverflowError` that escapes for want of them.**
-  Nothing bounds nesting depth, token length or document size. A document about 5,000 containers deep
-  overflows the stack inside `TsonDataStream.fill`, and a `StackOverflowError` is an `Error`: it passes
-  through every `catch (RuntimeException)` in the reader stack and in `TsonCli.run` alike, so `tson validate`
-  on one prints a bare JVM stack trace to stderr, nothing to stdout, and **exits 1** — the code that means
-  *your document is invalid*, which is the one verdict this case must not get. Depth is the half that is
-  reachable from a request body and wants doing first; §9.1 asks for all three and asks that they be
-  configurable, which puts the knob on `TsonConfig` beside the two Unicode policies and on the readers as a
-  derivation, the way `withTokenPolicy` already is. A document past the limit must be refused with a
-  diagnostic carrying a position, never a host `Error`. The numeric-literal length limit named in
-  `CLAUDE.md`'s "Not yet implemented" is the fourth limit of the same section and comes with it.
+- [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `TsonLimitsPolicy` is
+  the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one
+  table with a default each, so nothing here is a judgement call any more — what is left is eleven document
+  limits and five schema-side ones, each a component on `TsonLimitsPolicy`, a `CliPolicy.CliLimits` field and a
+  `--flag`. Document side: **token length** (1,048,576 code points), **decoded text length** after escape
+  processing (1,048,576), **numeric literal length** (4,096 digits, annotated tokens included), **decoded
+  binary size** per `!bytes` value (16,777,216 octets), **document size** in bytes (16,777,216), **elements**
+  per array or set (1,048,576), **entries** per map (1,048,576), **fields** per record (65,536),
+  **annotations** on one value (64), **total values** in one document (16,777,216), and **foreign schemas** one
+  document's scope pushes may load (16). Schema side (§11.5, same policy and same reporting surfaces):
+  **import closure** (64), **entries** in one schema map (65,536), **reference chain** (64), **supertype
+  chain** (64), and **materialisation depth** (64) — which is where `TemplateMaterialiser.MAX_CLOSING_DEPTH`
+  goes, it being a bare constant with nowhere to live until now. What still needs deciding per limit is only
+  *where it is counted*: the ones that bound shape are per-container state the stream does not keep, where
+  depth was a counter it already had, and the two aggregates (total values, foreign schemas) need their own
+  counter since §9.1 is explicit that the total is not bounded by the parts.
+
+- [ ] **`scripts/restamp-bundled-schemas.sh` does not cover the spec's own §13.2 table.** The script moves
+  every pin in the repo bottom-up — the three `spec/m/*.tn` headers, `TsonBundledSchemas`, `InitCommand`,
+  `README.md` and the getting-started example — and `--check` reports staleness across all of them. It does
+  not know about `spec/tson-part2-schema.md` §13.2, which pins the same three digests, so that table is the
+  one pin a schema edit leaves behind and the only one whose drift nothing reports. It drifted once already.
+  Teaching the script to stamp it (or at least to `--check` it, leaving the write to the spec author) is a
+  few lines against the same digest computation, and makes CI able to catch what a hand edit currently must.
+  The wrinkle worth deciding first: `spec/` is a cache this repo otherwise only reads, so writing into it is
+  a small change to what the script is for — `--check` alone may be the honest scope.
+
+- [ ] **`time` and `datetime` compare by offset, where [TSON-SCHEMA] §5.5 makes them instants.** The
+  value-space clause settles the equality contract the series used to delegate without defining, and it decides
+  this family against what is running: a `datetime` is the instant on the UTC timeline and a `time` is the time
+  of day in UTC, so `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are **one value**, `-00:00` is `Z`,
+  and `23:30:00-02:00` is `01:30:00Z`. `ValueIdentity.of` falls through to Java equality for both, and
+  `OffsetDateTime.equals`/`OffsetTime.equals` compare the offset — so all three rules that delegate to value
+  identity are wrong here at once: a map admits both spellings as two keys (§2.6), a set admits both as two
+  elements (§7.5), and a `REQUIRED_FIXED` field written in another offset is rejected (§5.2). Ordering is
+  already right and needs nothing: both host types' `compareTo` compares the instant. The fix is one case each
+  in `ValueIdentity.of` — normalise to the instant before comparing — and it must not touch what a reader hands
+  back, since §5.5 has TSON text preserve the offset as written.
+
+- [ ] **`class2/schema/` carries no vector declaring a template, and the reason it could not is gone.**
+  [TSON-SCHEMA] §8.1 now says an open entry is a `type_definition` like any other — `parameters` non-empty,
+  `body` the held application in wire form under §5.10's one-spelling rule, typed by the kernel's `schema`
+  without a second value shape — which is exactly the shape this resolver holds (`TemplateBody`/`HeldBody`).
+  The two sides no longer disagree as values, so the layer can compare a template the way it compares
+  everything else and the corpus can state what one resolves to directly rather than indirectly at `link/`.
+  `ResolvedForm.heldBodies` is the comparison to keep — §8.1 makes wire form what a held body *is* on both
+  sides, not a compromise — and what is owed is the vectors, upstream, plus the note in `CONFORMANCE.md` that
+  currently explains the absence.

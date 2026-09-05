@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -125,8 +126,15 @@ public final class TsonDataStream implements TsonEventSource {
 
     private boolean started;
 
+    /** [TSON-DATA] §9.1's bounds -- consulted by {@link #advance()} as containers open. */
+    private final TsonLimitsPolicy limits;
+
     public TsonDataStream(String source) {
-        this(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)));
+        this(source, TsonLimitsPolicy.defaults());
+    }
+
+    public TsonDataStream(String source, TsonLimitsPolicy limits) {
+        this(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)), limits);
     }
 
     /**
@@ -136,7 +144,16 @@ public final class TsonDataStream implements TsonEventSource {
      * a caller that opened it owns closing it.
      */
     public TsonDataStream(InputStream source) {
+        this(source, TsonLimitsPolicy.defaults());
+    }
+
+    /**
+     * As {@link #TsonDataStream(InputStream)}, under a caller's own resource limits rather than the
+     * defaults -- what the facades pass when a {@code TsonConfig} states one.
+     */
+    public TsonDataStream(InputStream source, TsonLimitsPolicy limits) {
         this.lexer = new Lexer(source);
+        this.limits = Objects.requireNonNull(limits, "limits");
     }
 
     @Override
@@ -338,7 +355,15 @@ public final class TsonDataStream implements TsonEventSource {
         lastEndColumn = t.endColumn();
         lastEndByteOffset = t.endByteOffset();
         switch (t.type()) {
-            case LBRACE, LBRACKET, LPAREN -> nesting++;
+            case LBRACE, LBRACKET, LPAREN -> {
+                nesting++;
+                if (nesting > limits.maxDepth()) {
+                    throw new TsonLimitExceededException("nested deeper than this processor reads ("
+                            + limits.maxDepth() + "); the document is not being judged, and a processor "
+                            + "configured for more would read it", limits.maxDepth(),
+                            new Position(t.startLine(), t.startColumn(), t.startByteOffset()));
+                }
+            }
             case RBRACE, RBRACKET, RPAREN -> nesting = Math.max(0, nesting - 1);
             default -> { }
         }
@@ -428,9 +453,9 @@ public final class TsonDataStream implements TsonEventSource {
     /**
      * {@code field-name = unquoted-token / single-line-token} (§7.4). Narrower than {@link #isBareTokenType},
      * which stays the map-key shape: a key is a value (§2.6) and takes all three forms, where a name takes the
-     * two a name is ever written in. The production stays <em>lexical</em> on purpose -- a quoted field name is
-     * ordinary, so a Class 1 document keeps JSON compatibility and the identifier contract is stated once, on
-     * declarations, with data conforming by construction.
+     * two a name is ever written in. <b>This is the token rule only</b>: which of the two forms carried the
+     * name is no part of what a name is, and {@link #requireFieldName} matches the decoded text against the
+     * identifier profile either way.
      */
     private static boolean isFieldNameTokenType(TokenType type) {
         return type == TokenType.UNQUOTED || type == TokenType.SINGLE_LINE_STRING;
@@ -465,9 +490,18 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
-     * Between elements of a record/map/array (§2.4): a separator (whitespace, a comma, or both)
-     * is required unless the closing delimiter is immediately next; a trailing separator right
-     * before the closing delimiter is likewise a parse error.
+     * Between elements of a record/map/array (§2.4): a separator -- whitespace, a comma, or both -- is
+     * required unless the closing delimiter is immediately next.
+     *
+     * <p><b>A comma may follow a value, and that is the whole rule.</b> So a trailing comma is admitted
+     * ({@code [1, 2, ]}), and a leading or doubled one is not ({@code [, 1]}, {@code [1, , 2]}) -- the latter
+     * two needing no rule of their own, since a comma is not a value and they fail as one that is missing.
+     *
+     * <p>A trailing comma is admitted because it cannot mean anything else. Absence is spellable and occupies
+     * a slot, so {@code [1, 2, ]} is two elements and the three-element document is {@code [1 2 _]}; there is
+     * nothing for a stray comma to be confused with. The ban it replaces is RFC 8259's, and it exists there
+     * because that grammar has elision -- JavaScript's {@code [1, , 2]} is three elements with a hole, which
+     * makes a trailing comma genuinely ambiguous. This format has no elision, so the ambiguity cannot arise.
      */
     boolean consumeSeparatorOrCloseCheck(TokenType closing) {
         if (check(closing)) {
@@ -481,10 +515,9 @@ public final class TsonDataStream implements TsonEventSource {
         if (!sawSeparator) {
             throw parseError("adjacent values must be separated by whitespace, a comma, or both");
         }
-        if (check(closing)) {
-            throw parseError("a trailing separator is not permitted before " + describe(peekToken()));
-        }
-        return true;
+        // The comma followed the last value and the list ends here: it separated that value from the
+        // closing delimiter, which is nothing, and the caller has no further element to read.
+        return !check(closing);
     }
 
     /** Looks ahead at an upcoming {@code !!name} directive's name without consuming anything. */
@@ -577,14 +610,44 @@ public final class TsonDataStream implements TsonEventSource {
      * {@code field-name = unquoted-token / single-line-token} (§7.4) -- see {@link #isFieldNameTokenType} for why
      * the multi-line form is not a name. Shared with [TSON-SCHEMA]'s identical production (§12.1).
      * {@code construct} names the position in the author's voice, exactly as {@link #expect}'s does.
+     *
+     * <p>The two spellings are two spellings of one name: {@link #requireFieldName} matches the decoded text
+     * against the identifier profile whichever was written, so quoting carries a name that would otherwise
+     * resolve as a number and never a key that is not a name at all.
      */
     Token expectFieldNameToken(String construct) {
         Token name = peekToken();
         if (!isFieldNameTokenType(name.type())) {
             throw mismatch(construct);
         }
+        requireFieldName(name);
         advance();
         return name;
+    }
+
+    /**
+     * A field name is an identifier, at every layer (§2.5, §7.7). A record's fields are the named members of a
+     * shape, which is what makes them declarable; a key that is not a name is what a <b>map</b> is for, and the
+     * diagnostic says so, that being the one place this rule meets an author.
+     *
+     * <p>Matching runs on the <em>decoded</em> text, so it reaches both spellings the production admits -- the
+     * quoted form is not an escape hatch from the profile, only from the lexical accidents of the unquoted one.
+     *
+     * <p><b>Normalised before it is matched, which is the one thing the profile does not decide here.</b>
+     * {@code IdentifierParser} requires NFC as a <em>form</em> and would refuse a decomposed name outright, but
+     * §2.5 gives a field name its identity by NFC-normalised comparison -- a decomposed spelling is the same
+     * name, not a different one, and the corpus says so by making the pair a duplicate-field error. The lexer
+     * already normalises the unquoted spelling, so refusing the form here would make the quoted spelling the
+     * stricter of the two, which is the asymmetry this rule exists to remove.
+     */
+    private void requireFieldName(Token name) {
+        try {
+            IdentifierParser.validate(Nfc.of(name.text()));
+        } catch (AtomTypeException e) {
+            throw new TsonParseException("invalid field name -- " + e.getMessage()
+                    + ". A record's fields are names a schema can declare; a key that is not a name belongs in "
+                    + "a map, written '{ key => value }'", name.start());
+        }
     }
 
     // ── The explicit frame stack replacing recursion ────────────────────────────────────
@@ -723,6 +786,7 @@ public final class TsonDataStream implements TsonEventSource {
                     if (!isFieldNameTokenType(t1.type())) {
                         throw mismatch("a record field name");
                     }
+                    requireFieldName(t1);
                     advance(); // field-name token
                     advance(); // ':'
                     ready.add(new RecordStart(lbrace.start()));
@@ -778,12 +842,13 @@ public final class TsonDataStream implements TsonEventSource {
     private final class RecordFrame extends Frame {
         @Override
         void step() {
-            if (check(TokenType.RBRACE)) {
+            // The separator check answers "is there another field?", so it also closes the record -- both
+            // where the brace follows the last value directly and where a comma stands between them.
+            if (!consumeSeparatorOrCloseCheck(TokenType.RBRACE)) {
                 Token rb = advance();
                 ready.add(new RecordEnd(rb.start()));
                 return;
             }
-            consumeSeparatorOrCloseCheck(TokenType.RBRACE);
             Token name = expectFieldNameToken("a record field name");
             expect(TokenType.COLON, "a record field's ':'");
             ready.add(new FieldName(Nfc.of(name.text()), name.start()));
@@ -806,12 +871,11 @@ public final class TsonDataStream implements TsonEventSource {
         void step() {
             switch (mode) {
                 case AFTER_ENTRY -> {
-                    if (check(TokenType.RBRACE)) {
+                    if (!consumeSeparatorOrCloseCheck(TokenType.RBRACE)) {
                         Token rb = advance();
                         ready.add(new MapEnd(rb.start()));
                         return;
                     }
-                    consumeSeparatorOrCloseCheck(TokenType.RBRACE);
                     pushFrame(new MapFrame(Mode.AWAITING_ARROW));
                     pushFrame(new DataValueFrame()); // the next key
                 }
@@ -835,13 +899,13 @@ public final class TsonDataStream implements TsonEventSource {
 
         @Override
         void step() {
-            if (check(TokenType.RBRACKET)) {
+            // The first element has no preceding value to be separated from, so it asks the plainer question;
+            // every later one asks the separator check, which also closes the array after a trailing comma.
+            boolean ends = first ? check(TokenType.RBRACKET) : !consumeSeparatorOrCloseCheck(TokenType.RBRACKET);
+            if (ends) {
                 Token rb = advance();
                 ready.add(new ArrayEnd(rb.start()));
                 return;
-            }
-            if (!first) {
-                consumeSeparatorOrCloseCheck(TokenType.RBRACKET);
             }
             pushFrame(new ArrayFrame(false));
             pushFrame(new ScopedValueFrame());

@@ -152,8 +152,15 @@ final class DefaultTsonReadContext implements TsonReadContext {
     }
 
     /**
-     * [TSON-DATA] §8.2's <b>restricted-character and restricted-script</b> rules over the two names a Class 1
-     * document carries -- a type-ref name and an annotation name, the positions §7.4 marks {@code identifier}.
+     * [TSON-DATA] §8.2's <b>restricted-character and restricted-script</b> rules over the three names a Class 1
+     * document carries -- a type-ref name, an annotation name and a record's field names, every position §7.4
+     * marks {@code identifier}.
+     *
+     * <p>A field name reaches the same rules as the other two because it is the same thing: §2.5 makes it an
+     * identifier at every layer, so there is one name rule and no per-conformance-class exception to it. The
+     * look-alike rule is the one that is not here, and only because it is a property of a <em>set</em> rather
+     * than of a name -- {@code SchemalessTreeReader} asks it of a record's field names once the record is
+     * read.
      *
      * <p>Both default on, which §8.2 requires: the identifier profile MUST apply, and a name's scripts SHOULD
      * be judged at Highly Restrictive over the whole name. They are one report shape because they are one outcome -- the
@@ -181,6 +188,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
         String name = switch (event) {
             case io.ltr8.tson.compiler.stream.TypeRef typeRef -> typeRef.name();
             case io.ltr8.tson.compiler.stream.AnnotationStart annotation -> annotation.name();
+            case io.ltr8.tson.compiler.stream.FieldName field -> field.name();
             default -> null;
         };
         if (name == null) {

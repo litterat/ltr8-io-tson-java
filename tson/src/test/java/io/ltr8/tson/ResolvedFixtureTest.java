@@ -2,6 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.nio.file.Files;
@@ -46,12 +47,13 @@ class ResolvedFixtureTest {
     // ── The comparison ───────────────────────────────────────────────────
 
     private record Comparison(String label, Map<String, TypeDefinition> fixture,
-                               Map<String, TypeDefinition> ours) {
+                               Map<String, TypeDefinition> ours, String text) {
 
     }
 
     private static Comparison compare(String label, String fixtureFile, String id) throws Exception {
-        return new Comparison(label, fixtureEntries(fixtureFile), ourEntries(id));
+        return new Comparison(label, fixtureEntries(fixtureFile), ourEntries(id),
+                Files.readString(specDirectory().resolve(fixtureFile)));
     }
 
     private static Map<String, TypeDefinition> fixtureEntries(String file) throws Exception {
@@ -161,7 +163,7 @@ class ResolvedFixtureTest {
         // Non-vacuous: the fixtures really do mark keys, so an empty-equals-empty pass is not available to a
         // scan that stopped matching or a resolver that stopped marking.
         assertEquals(8, fixtureSynthetics("meta-kernel-resolved.tn").size(), "meta-kernel.tn marks eight keys");
-        assertEquals(1, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks one");
+        assertEquals(5, fixtureSynthetics("meta-resolved.tn").size(), "meta.tn marks five keys");
 
         assertEquals(fixtureSynthetics("meta-kernel-resolved.tn"),
                 ResolvedForm.ourSynthetics(tson(), TsonBundledSchemas.META_KERNEL_ID), "meta-kernel.tn");

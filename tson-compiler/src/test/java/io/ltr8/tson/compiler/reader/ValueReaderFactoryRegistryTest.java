@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.compiler.ForeignSchemas;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.Diagnostic;
@@ -12,7 +13,8 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.UnknownType;
+import io.ltr8.tson.schema.meta.ScopeKind;
+import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -21,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -42,7 +45,8 @@ class ValueReaderFactoryRegistryTest {
     // These atom/enum factories consult only name/definition, never the enclosing schema, so an empty one suffices.
     private static final ValueReaderContext CONTEXT =
             new ValueReaderContext(
-                    new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), Map.of())), NEVER_CALLED);
+                    new TsonLinkedSchema(new TsonSchema("id", "meta", List.of(), Map.of())), NEVER_CALLED,
+                    ForeignSchemas.none());
 
     @Test
     void resolveThrowsForAnUnregisteredConstructor() {
@@ -59,30 +63,32 @@ class ValueReaderFactoryRegistryTest {
     }
 
     /**
-     * {@code unknown_type} stands in for the group with no compiled parser; {@code CoreSchemaImportTest}
-     * pins the current membership. If it ever gains one, pick another from that set rather than deleting
-     * this -- the ErrorReader-not-compile-failure behaviour is what is under test, not the constructor.
+     * <b>Every {@code ~}-marked constructor in the table builds a real reader</b> -- there is no
+     * "registered to an {@code ErrorReader} so the schema still compiles" entry left, {@code scoped} having
+     * been the last of them. {@code CoreSchemaImportTest} pins the same fact over core.tn's own entries;
+     * this pins it at the table, where a new constructor would be added.
+     *
+     * <p>An entry the compiler can build no reader for is still possible and still becomes an
+     * {@code ErrorReader} -- but only through [TSON-SCHEMA] §2.2.2's extension point, a meta-layer
+     * constructor this library has never seen, which by construction is not in this table.
+     * {@code TsonSchemaCompilerTest} is where that behaviour lives.
      */
     @Test
-    void aConstructorWithNoCompiledParserYetStillResolvesButFailsOnlyWhenActuallyRead() {
-        ValueReaderFactoryRegistry registry = ValueReaderFactoryRegistry.tree();
-        TypeDefinition entry = new TypeDefinition(Optional.empty(), TypeKind.SUM, List.of(), true,
-                List.of(), List.of(), Optional.empty(), new UnknownType());
+    void everyRegisteredConstructorBuildsARealReader() {
+        TypeDefinition declared = new TypeDefinition(Optional.empty(), TypeKind.SUM, 
+                List.of(), List.of(), new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()));
 
-        TsonTypeReader<?> reader = registry.resolve("unknown_type").create("unknown", entry, CONTEXT);
-
-        // A real context, because the reader reports through it now rather than throwing past it -- the gap
-        // rides in `diagnostic().code()` so it can join a collecting read instead of ending it.
-        TsonReadException thrown = assertThrows(TsonReadException.class,
-                () -> reader.read(TestDocuments.document("{}")));
-        assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, thrown.diagnostic().code());
-        assertEquals(true, thrown.getMessage().contains("unknown"));
+        for (ValueReaderFactoryRegistry registry : List.of(ValueReaderFactoryRegistry.tree(),
+                ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()))) {
+            TsonTypeReader<?> reader = registry.resolve("scoped").create("declared", declared, CONTEXT);
+            assertFalse(reader instanceof ErrorReader, () -> "scoped still errors: " + reader);
+        }
     }
 
     @Test
     void treeAndBindBothReadBooleanEnumMembersAsRealBooleans() {
-        TypeDefinition booleanEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
-                List.of(), List.of(), Optional.empty(), new EnumBody(List.of("true", "false")));
+        TypeDefinition booleanEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
+                List.of(), List.of(), new EnumBody(List.of("true", "false")));
 
         TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("boolean", booleanEntry, CONTEXT);
@@ -96,8 +102,8 @@ class ValueReaderFactoryRegistryTest {
 
     @Test
     void treeAndBindReadAnOrdinaryEnumMemberAsItsText() {
-        TypeDefinition statusEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), true,
-                List.of(), List.of(), Optional.empty(), new EnumBody(List.of("ACTIVE", "INACTIVE")));
+        TypeDefinition statusEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
+                List.of(), List.of(), new EnumBody(List.of("ACTIVE", "INACTIVE")));
 
         TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("status", statusEntry, CONTEXT);

@@ -37,8 +37,8 @@ class TsonSchemaLinkerDiagnosticsTest {
     }
 
     private static TypeDefinition record(int line, RecordField... fields) {
-        return new TypeDefinition(Optional.empty(), io.ltr8.tson.schema.meta.TypeKind.PRODUCT, List.of(), false,
-                List.of(), List.of(), Optional.empty(), RecordBody.of(List.of(fields)),
+        return new TypeDefinition(Optional.empty(), io.ltr8.tson.schema.meta.TypeKind.PRODUCT, 
+                List.of(), List.of(), RecordBody.of(List.of(fields)),
                 Optional.of(new Pos(line, 3, line * 10)), io.ltr8.annotation.Annotations.empty());
     }
 
@@ -49,7 +49,7 @@ class TsonSchemaLinkerDiagnosticsTest {
         entries.put("b", record(5, RecordField.required("y", TypeRef.of("also_missing"))));
         entries.put("c", record(6, RecordField.required("z", TypeRef.of("missing_too"))));
         entries.put("fine", record(7));
-        return new TsonSchema(ID, "https://tson.io/2026/34/m/meta.tn", List.of(), entries);
+        return new TsonSchema(ID, "https://tson.io/2026/35/m/meta.tn", List.of(), entries);
     }
 
     private static final TsonSchemaLoader NO_IMPORTS = uri -> Optional.empty();
@@ -97,13 +97,13 @@ class TsonSchemaLinkerDiagnosticsTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("bad_field", record(4, RecordField.required("x", TypeRef.of("no_such_type"))));
         entries.put("bad_supertype", new TypeDefinition(Optional.empty(),
-                io.ltr8.tson.schema.meta.TypeKind.PRODUCT, List.of(), false, List.of("no_such_parent"),
-                List.of(), Optional.empty(), RecordBody.of(List.of()), Optional.of(new Pos(5, 3, 50)),
+                io.ltr8.tson.schema.meta.TypeKind.PRODUCT,  List.of("no_such_parent"),
+                List.of(), RecordBody.of(List.of()), Optional.of(new Pos(5, 3, 50)),
                 io.ltr8.annotation.Annotations.empty()));
         entries.put("fine", record(6));
 
         List<Diagnostic> diagnostics = linkCollecting(
-                new TsonSchema(ID, "https://tson.io/2026/34/m/meta.tn", List.of(), entries));
+                new TsonSchema(ID, "https://tson.io/2026/35/m/meta.tn", List.of(), entries));
 
         assertEquals(List.of("/bad_field", "/bad_supertype"),
                 diagnostics.stream().map(d -> d.schemaPointer().orElseThrow()).sorted().toList());

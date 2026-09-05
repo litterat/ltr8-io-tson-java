@@ -4,7 +4,11 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import org.junit.jupiter.api.Test;
 
+import io.ltr8.tson.schema.meta.DecimalType;
+
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -87,6 +91,61 @@ class DecimalParserTest {
         DecimalParser type = decimalType(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(2));
         assertEquals(new BigDecimal("1.23"), type.read(token("1.23")));
         assertThrows(AtomValidationException.class, () -> type.read(token("1.234")));
+    }
+
+    // ── the sparse member set (§5.6's `members`) ────────────────────────
+
+    @Test
+    void aMemberSetAdmitsItsMembersAndNothingElse() {
+        DecimalParser price = members("1", "2.50");
+
+        assertEquals(new BigDecimal("2.50"), price.read(token("2.50")));
+        assertThrows(AtomValidationException.class, () -> price.read(token("3")));
+        assertThrows(AtomValidationException.class, () -> price.read(token("2.51")));
+    }
+
+    @Test
+    void membershipIsTheValueDenotedNotTheScale() {
+        // BigDecimal's own equality is not [TSON-DATA] §4.3's identity: 2.50 and 2.5 are two objects and
+        // one number, so the comparison is compareTo. The value read back still keeps what was written.
+        DecimalParser price = members("1", "2.50");
+        assertEquals(new BigDecimal("2.5"), price.read(token("2.5")));
+        assertEquals(new BigDecimal("1.00"), price.read(token("1.00")));
+        assertEquals(new BigDecimal("1E+2"), members("100").read(token("1E+2")));
+    }
+
+    @Test
+    void aRefusedMemberNamesTheSetAsTheViolatedConstraint() {
+        AtomValidationException refused = assertThrows(AtomValidationException.class,
+                () -> members("1", "2.50").read(token("3")));
+        assertEquals("one of (1, 2.50)", refused.expected());
+    }
+
+    @Test
+    void aMemberSetComposesWithTheFacetsBesideIt() {
+        // §5.6: "a value must satisfy all present facets" -- a member still has to clear the bound beside it.
+        DecimalParser type = new DecimalParser(new DecimalType(Optional.of(new BigDecimal("2")), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(List.of(new BigDecimal("1"), new BigDecimal("2.50")))));
+        assertEquals(new BigDecimal("2.50"), type.read(token("2.50")));
+        assertThrows(AtomValidationException.class, () -> type.read(token("1")));
+    }
+
+    @Test
+    void aTrailingZeroChangesNeitherMembershipNorTheDigitCounts() {
+        // meta.tn: "scale is not part of the value -- 1, 1.0 and 1.00 are one value", so no facet may see
+        // the difference. 2.500 is the member 2.50, is a whole number of tenths, and has three significant
+        // digits rather than four.
+        DecimalParser type = new DecimalParser(new DecimalType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.of(3), Optional.of(1),
+                Optional.of(List.of(new BigDecimal("2.50")))));
+        assertEquals(new BigDecimal("2.500"), type.read(token("2.500")));
+    }
+
+    private static DecimalParser members(String... admitted) {
+        return new DecimalParser(new DecimalType(Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+                Optional.of(Arrays.stream(admitted).map(BigDecimal::new).toList())));
     }
 
     // ── read(token, target) ──────────────────────────────────────────────────

@@ -333,7 +333,9 @@ rebuilt and called a cache.
   closed by the same process. The rule is as fixed and as closed as the sugar table: §5.2's six field
   spellings decide `state` and `value` from the two marks the author wrote, and nothing else is consulted.
   - **Only a *template*.** A closed record still resolves at its declaration into a `RecordBody`, because
-    nothing about it is deferred. The two paths share the §5.2 state table (`FieldModifiers`) so the six
+    nothing about it is deferred. **Every** template takes it: there is no marker to route one elsewhere, and
+    the route that used to exist for marked ones (`DefinitionResolver.holdIfOpen`, wrapping an open
+    `RecordBody` into the same `!record { … }`) produced an identical body anyway. The two paths share the §5.2 state table (`FieldModifiers`) so the six
     spellings and the errors around them cannot drift apart between a template and the closed record beside it.
   - **Only what the author wrote is written.** `access_pattern` and `size_type` are `REQUIRED_FIXED` on the
     `record` constructor, and an unmarked field's `REQUIRED` is that constructor's own default, so none of the
@@ -364,7 +366,7 @@ rebuilt and called a cache.
       arguments: [] }` for a bare `text`, `!ref { … }` for a `type_argument`, every token quoted, `state:
       REQUIRED` written where the default covers it, and the retired `value_param` channel emitted. The
       first two are the
-      two-spellings problem; the third is fatal on its own, since `TemplateBody.names()` and substitution
+      two-spellings problem; the third is fatal on its own, since `HeldBody.names()` and substitution
       both key on a token being *unquoted*, so a fully-quoted body references no parameters at all. Its
       output is canonical-explicit — a different language from the one a held body is written in.
     - **The writer is still used for exactly one leaf**: a resolved annotation carries its value as a *bound

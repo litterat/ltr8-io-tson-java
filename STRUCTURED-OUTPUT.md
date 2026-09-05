@@ -229,6 +229,12 @@ Concrete items and decisions:
 
 ### JSON compatibility
 
+**This section is now the whole of it.** The notation no longer claims to be a JSON superset — §6 says so
+outright, and the JSON-compatibility principle is gone from §1.2 — so reading JSON is a reader's job rather
+than a property of the grammar, which is what the items below already assumed. Nothing here weakens; what changes is that a
+`TsonJsonParser` is the only place JSON compatibility lives, and it is free to map JSON's constructs rather
+than having to agree with TSON's by construction.
+
 Worth calling out as arguably the **most immediately practical** path to Tier 1, not just a nice
 interop feature: most LLM APIs' own "JSON mode"/"structured output"/tool-use features (OpenAI,
 Anthropic, Gemini) constrain generation to plain JSON today, not to an arbitrary custom format —
@@ -268,19 +274,17 @@ all, with no decoder integration required.
   alternative (routing such objects to maps at parse time) would produce a different and worse diagnostic for
   the same document.
 
-- [ ] **JSON `null` at a non-`void` position reads as the string `"null"`, and that is the spec's answer,
-  not a bug.** [TSON-SCHEMA] §7.3 gives `null` no special status under a schema — "their meaning is
-  determined entirely by the position's type" — with a single concession at `void`-typed positions, where it
-  is accepted as a spelling of `_` (`VoidReader` implements it). So a JSON-shaped `"nickname": null` aimed at
-  an OPTIONAL `text?` field satisfies the `text` contract and lands as the four-character string, where an
-  LLM emitting it means absence. This is the one place JSON's two states (present / `null`) and TSON's three
-  (omitted / `_` / `null`) fail to line up in the direction that matters here, and no front-end can paper
-  over it silently: a `TsonJsonParser` producing the same AST inherits the position-driven behaviour exactly
-  as the duplicate-member rule above does. The options are to widen §7.3's concession to every
-  absence-admitting position (a spec change — the single-inhabitant argument that justifies it at `void`
-  generalises to "the position admits absence anyway"), to require JSON-facing schemas to type nullable
-  fields as `(T | void)`, or to make it a JSON-front-end-only normalisation. Decide before the front-end
-  exists, not after documents depend on it.
+- [ ] **JSON `null` reads as the string `"null"` everywhere, and the JSON front end is where that is fixed.**
+  The notation has no `null`: §4 resolves boolean, number and string, so an unquoted `null` is the four-character
+  string at every position, a `void`-typed one included. A JSON-shaped `"nickname": null` aimed at an OPTIONAL
+  `text?` field therefore satisfies the `text` contract and lands as that string, where an LLM emitting it means
+  absence. This is the one place JSON's two states (present / `null`) and TSON's two (omitted / `_`) fail to line
+  up in the direction that matters here, and it is deliberately not papered over in the notation: `TsonJsonParser`
+  is where the mapping belongs, and it maps JSON `null` to **absence** in the model, leaving the position's own
+  state to decide whether absence is admitted — which is the answer for an optional field and a loud
+  `FIELD_REQUIRED` for a required one, both of which are what the emitter meant. What still wants deciding is
+  narrower than it was: whether the front end ever needs an opt-out (a schema that really wants the string), and
+  what it does at a position typed `(T | void)`, where absence is a variant rather than a state.
 
 - [ ] **Numeric compatibility is one-directional and already free on read.** Every valid JSON
   number is a valid TSON number, so JSON numbers parse through `NumberGrammar`/`BaseTypeResolver`

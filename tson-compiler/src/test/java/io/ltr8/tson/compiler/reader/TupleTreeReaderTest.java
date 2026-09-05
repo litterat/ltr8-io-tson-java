@@ -32,10 +32,10 @@ class TupleTreeReaderTest {
 
     private static TsonCompiledSchema compile(TupleBody body) {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(),
-                List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
-        entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(), false, List.of(),
-                List.of(), Optional.empty(), TextType.UNCONSTRAINED));
+        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
+                List.of(), IntegerType.UNCONSTRAINED));
+        entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
+                List.of(), TextType.UNCONSTRAINED));
         entries.put("pair", TypeDefinition.product(body));
         TsonSchema schema = new TsonSchema("https://example.test/s.tn",
                 "https://example.test/meta.tn", List.of(), entries);

@@ -24,7 +24,6 @@ import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.compiler.base.BaseValue;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.compiler.lexer.Nfc;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
@@ -34,7 +33,6 @@ import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
 import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
@@ -86,7 +84,7 @@ import java.util.Set;
  * answers to {@code tags} -- and {@link #preserving} is the way to ask for it anyway.
  *
  * <p>With no type-ref, binding falls through to plain untyped resolution: {@link BaseTypeResolver} (which
- * of null/boolean/number/string) then {@link AtomBinder} (that shape into whatever concrete Java type the
+ * of boolean/number/string) then {@link AtomBinder} (that shape into whatever concrete Java type the
  * target field declares). Both paths share the same final narrowing step ({@code NumberNarrowing}), so a
  * plain {@code 42} and a {@code !uint8 42} bind identically regardless of which path found them.
  *
@@ -228,7 +226,7 @@ public final class SchemalessObjectReader {
         TsonEvent e = ctx.peek();
         if (e instanceof AbsentEvent) {
             ctx.next();
-            return bindBaseValue(ctx, new BaseValue.NullValue(), dataClass.dataClass());
+            return bindBaseValue(ctx, new BaseValue.AbsentValue(), dataClass.dataClass());
         }
         if (!(e instanceof TokenEvent token)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a token for " + dataClass.typeClass() + ", found " + TypeRefCheck.describe(e),
@@ -365,9 +363,7 @@ public final class SchemalessObjectReader {
                     EventSkip.scopedValue(ctx); // a data field the target class doesn't declare -- discard
                     continue;
                 }
-                if (ctx.peek() instanceof SchemaRef) {
-                    ctx.next();
-                }
+                ScopePush.refuseSchemaless(ctx);
                 construct[fields[idx].index()] = bindField(ctx, fields[idx]);
                 seen[idx] = true; // last occurrence wins (§2.5), reached by overwrite
             }
@@ -421,9 +417,7 @@ public final class SchemalessObjectReader {
         List<Object> buffered = new ArrayList<>();
         int index = 0;
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
-            }
+            ScopePush.refuseSchemaless(ctx);
             buffered.add(bind(ctx.index(index), elementClass));
             index++;
         }
@@ -494,7 +488,7 @@ public final class SchemalessObjectReader {
                 }
                 int beforeKey = ctx.reported();
                 Object key = bind(ctx, keyClass);
-                if (ctx.reported() == beforeKey && !statedKeys.add(Nfc.keyOf(key))) {
+                if (ctx.reported() == beforeKey && !statedKeys.add(ValueIdentity.of(key))) {
                     // §2.6, by bound key value -- a key that failed to bind is left out, since it is not a
                     // key the document stated and a second failure would otherwise read as a repeat of it.
                     ctx.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
@@ -503,9 +497,7 @@ public final class SchemalessObjectReader {
                             "each key stated once", "'" + key + "' stated again");
                 }
                 ctx.next(); // MapArrow
-                if (ctx.peek() instanceof SchemaRef) {
-                    ctx.next();
-                }
+                ScopePush.refuseSchemaless(ctx);
                 Object value = bind(ctx, valueClass);
                 dataClass.put().invoke(mapData, key, value);
             }
@@ -541,9 +533,7 @@ public final class SchemalessObjectReader {
         int index = 0;
         boolean reportedExtra = false;
         while (!(ctx.peek() instanceof ArrayEnd)) {
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
-            }
+            ScopePush.refuseSchemaless(ctx);
             if (index >= slots.length) {
                 if (!reportedExtra) {
                     ctx.report(Diagnostic.Code.WRONG_ARITY, "tuple " + dataClass.typeClass() + " has " + slots.length

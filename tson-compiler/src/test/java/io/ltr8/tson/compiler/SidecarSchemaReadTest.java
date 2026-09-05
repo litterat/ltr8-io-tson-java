@@ -281,7 +281,7 @@ class SidecarSchemaReadTest {
 
     /** The two families the flat `value: text?` could not express at all, though sidecars always wrote them. */
     @Test
-    void aVocabularyValueMayBeANestedComplexOrDurationRecord() {
+    void aVocabularyValueMayBeANestedComplexRecordOrAScalarCount() {
         SuiteCheckout.assumeAvailable();
         accepts("vocabulary", """
                 {
@@ -290,12 +290,21 @@ class SidecarSchemaReadTest {
                   type-ref: "complex"
                   valid: { value: { complex: { real: "1"  imaginary: "-2" } } }
                 }""");
+        // duration and period state the value -- seconds and months -- rather than a spelling, so both
+        // ride `decimal` and neither needs a member of its own.
         accepts("vocabulary", """
                 {
-                  spec: "§5.4"
-                  description: "A duration"
+                  spec: "§5.5"
+                  description: "A duration, as seconds"
                   type-ref: "duration"
-                  valid: { value: { duration: { period: "P1Y"  clock: "PT2H" } } }
+                  valid: { value: { decimal: "7200" } }
+                }""");
+        accepts("vocabulary", """
+                {
+                  spec: "§5.5"
+                  description: "A period, as months"
+                  type-ref: "period"
+                  valid: { value: { decimal: "12" } }
                 }""");
     }
 

@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.reader.Dom;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -73,7 +74,7 @@ class CoreSchemaImportTest {
         assertTrue(registered.isPresent(), "expected core.tn to be registered");
 
         TsonSchema core = registered.get().schema();
-        assertEquals(48, core.entries().size(), "expected every core.tn declaration to resolve");
+        assertEquals(50, core.entries().size(), "expected every core.tn declaration to resolve");
 
         // A representative spread of core.tn's own real declarations -- atom refinements
         // (int32/positive_integer) and constructor applications (hex, float32, cidr4, ipv4, complex,
@@ -85,7 +86,7 @@ class CoreSchemaImportTest {
         // own `source: integer_type` validate despite integer_type living in meta-kernel, two hops up.
         assertTrue(core.entries().containsKey("int32"));
         assertTrue(core.entries().containsKey("positive_integer"));
-        assertTrue(core.entries().containsKey("hex"));
+        assertTrue(core.entries().containsKey("bytes"));
         assertTrue(core.entries().containsKey("float32"));
         assertTrue(core.entries().containsKey("float64"));
         assertTrue(core.entries().containsKey("cidr4"));
@@ -95,7 +96,11 @@ class CoreSchemaImportTest {
         assertTrue(core.entries().containsKey("ipv4"));
         assertTrue(core.entries().containsKey("ipv6"));
         assertTrue(core.entries().containsKey("complex"));
-        assertTrue(core.entries().containsKey("unknown"));
+        assertTrue(core.entries().containsKey("declared"));
+        assertTrue(core.entries().containsKey("extern"));
+        assertTrue(core.entries().containsKey("dynamic"));
+        assertTrue(core.entries().containsKey("extern_of"));
+        assertTrue(core.entries().containsKey("extern_type"));
     }
 
     /**
@@ -104,15 +109,16 @@ class CoreSchemaImportTest {
      * effect of registering it -- but {@link TsonSchemaCompiler}'s own per-entry build-failure
      * deferral means a broken entry wouldn't have failed that step; it would silently have compiled to
      * an {@code ErrorReader} instead (see that class's own Javadoc), only throwing once someone
-     * actually tries to {@code read} it. This confirms exactly which entries land there and pins the
-     * set down: {@code unknown} alone -- constructed via {@code unknown_type}, one of the two constructors
-     * {@link ValueReaderFactoryRegistry} registers to {@code ErrorReader} outright (the other, {@code
-     * extern}, has no core.tn declaration at all) -- a real, already-documented, deliberate gap (see this
-     * repo's own CLAUDE.md, "Not yet implemented"), not a regression to chase. Every *other* entry compiles
-     * to a genuinely usable reader.
+     * actually tries to {@code read} it. So this walks every entry and asserts the set is empty: core.tn is
+     * the whole standard library, so "every one of these reads" is the strongest single statement about the
+     * compiled reader stack this repo can make, and a regression here is silent everywhere else.
+     *
+     * <p>It was not always empty. {@code declared}, {@code extern} and {@code dynamic} sat here for as long
+     * as {@code scoped} had no reader, which is why this is written as a set rather than a boolean -- a new
+     * gap names itself.
      */
     @Test
-    void exactlyTheUnknownAtomConstructorCompilesToAnErrorReader() {
+    void noCoreEntryCompilesToAnErrorReader() {
         Loaded loaded = loadMetaKernelMetaAndCore();
         TsonSchema core = loaded.schemaRegistry().get(TsonBundledSchemas.CORE_ID).orElseThrow().schema();
 
@@ -130,7 +136,7 @@ class CoreSchemaImportTest {
             }
         }
 
-        assertEquals(Set.of("unknown"), errored);
+        assertEquals(Set.of(), errored, () -> "an entry with no compiled reader: " + errored);
     }
 
     /**
@@ -144,9 +150,9 @@ class CoreSchemaImportTest {
         TsonCompiledSchema compiledCore =
                 TsonCompiledSchemaRegistry.tree(loaded.registry()).get(TsonBundledSchemas.CORE_ID);
 
-        assertEquals("10.0.0.0/8",
+        assertEquals(CidrNetwork.parse("10.0.0.0/8", 32),
                 Dom.of((TsonValue) compiledCore.get("cidr4").read(TestDocuments.document("\"10.0.0.0/8\""))));
-        assertEquals("2001:db8::/32",
+        assertEquals(CidrNetwork.parse("2001:db8::/32", 128),
                 Dom.of((TsonValue) compiledCore.get("cidr6").read(TestDocuments.document("\"2001:db8::/32\""))));
     }
 }

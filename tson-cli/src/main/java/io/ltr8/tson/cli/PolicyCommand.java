@@ -3,8 +3,8 @@ package io.ltr8.tson.cli;
 import io.ltr8.tson.Tson;
 
 /**
- * {@code tson policy [--output text|json|tson]} -- prints the [TSON-DATA] §8.2 Unicode policy this build
- * applies, with no document in hand.
+ * {@code tson policy [--output text|json|tson]} -- prints what this build would judge a document by, with
+ * no document in hand: the [TSON-DATA] §8.2 Unicode policy, and §9.1's resource limits.
  *
  * <p><b>This is the surface that makes a refusal avoidable rather than merely explicable.</b> §8.2's three
  * name-hygiene rules read data the Unicode Consortium does not freeze, at a level the reading deployment
@@ -12,6 +12,10 @@ import io.ltr8.tson.Tson;
  * writes never writes the name that would be refused; one that learns it only from the refusal has already
  * spent a round trip, which is exactly the round trip TSON's one-shot aim exists to remove. The same record
  * rides on every {@link ValidationRun}, so a report and this command state one fact one way.
+ *
+ * <p><b>§9.1's limits are printed for the same reason and are in the same record.</b> A depth bound is this
+ * deployment's own choice too, so a document one processor reads another refuses; a generator that reads the
+ * bound first never writes the document that would be refused.
  *
  * <p>Takes the same policy flags {@code validate} and {@code compile} do, so it doubles as their dry run:
  * {@code tson policy --identifier-policy ascii-only} prints exactly what a validate under those flags would
@@ -29,7 +33,7 @@ final class PolicyCommand {
         // Through a real Tson rather than from the flags directly: this prints what a read would actually be
         // judged under, which is the question, and the two would only ever agree by inspection otherwise.
         Tson tson = policies.applyTo(Tson.builder()).build();
-        System.out.println(format.render(CliPolicy.from(tson.processorPolicy())));
+        System.out.println(format.render(CliPolicy.from(tson.processorPolicy(), tson.limitsPolicy())));
         return 0;
     }
 }

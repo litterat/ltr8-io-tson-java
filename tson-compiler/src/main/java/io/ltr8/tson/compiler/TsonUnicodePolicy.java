@@ -167,7 +167,7 @@ public final class TsonUnicodePolicy {
      * <p><b>It is the UCD version.</b> §8.2 asks for "the UTS #39 data version" and its detection note for
      * "the UTS #39 version they were computed against"; UTS #39's data files are versioned with the UCD
      * release that publishes them, so the two track and this states the one that exists --
-     * {@code SPEC-FEEDBACK.md} #6.
+     * [TSON-DATA] §8.2.
      */
     public static String dataVersion() {
         return Xid.UNICODE_VERSION;

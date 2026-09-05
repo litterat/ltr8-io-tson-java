@@ -226,14 +226,7 @@ public final class TsonDataEmitter {
 
     // ── Leaf tokens ──────────────────────────────────────────────────────────
 
-    /** {@code null}, the base type (§4.1) -- distinct from {@link #absentValue()}. */
-    public TsonDataEmitter nullValue() {
-        startCoreValue();
-        emit("null");
-        return this;
-    }
-
-    /** {@code _}, the absent sentinel (§2.9) -- distinct from {@link #nullValue()}. */
+    /** {@code _}, the absent sentinel (§2.9) -- the notation's only no-value spelling. */
     public TsonDataEmitter absentValue() {
         startCoreValue();
         emit('_');

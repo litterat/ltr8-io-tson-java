@@ -300,10 +300,6 @@ public final class TsonSchemaParser extends TsonDataParser {
             return parseAtomRefinementOrInstance(typeParams);
         }
 
-        if (check(TokenType.TILDE)) {
-            advance();
-            return new StructuralTypeDef(typeParams, true, parseMandatoryStructuralDef());
-        }
         if (check(TokenType.LBRACE)) {
             return braceTypeDef(typeParams);
         }
@@ -317,32 +313,16 @@ public final class TsonSchemaParser extends TsonDataParser {
         TypeRef head = parseTypeRefHead();
         if (check(TokenType.CARET)) {
             advance();
-            return new StructuralTypeDef(typeParams, false, new RefinedDef(head, parseRecordDef()));
+            return new StructuralTypeDef(typeParams, new RefinedDef(head, parseRecordDef()));
         }
         if (check(TokenType.AMPERSAND) || check(TokenType.MINUS)) {
-            return new StructuralTypeDef(typeParams, false, parseConstructionDefContinuation(head));
+            return new StructuralTypeDef(typeParams, parseConstructionDefContinuation(head));
         }
         if (check(TokenType.LBRACE)) {
             throw parseError("expected '^' (refinement) or '&' (composition) after a bare type-ref, "
                     + "found '{'");
         }
         return new ReferenceTypeDef(typeParams, head);
-    }
-
-    /** The {@code structural-def} reached after a leading {@code ~} -- unlike {@link #parseTypeDef}'s own dispatch, a bare type-ref here (nothing following) is a parse error: {@code ~} promises a refinement, composition, or record body. */
-    private StructuralDef parseMandatoryStructuralDef() {
-        if (check(TokenType.LBRACE)) {
-            return parseRecordDef();
-        }
-        TypeRef head = parseTypeRefHead();
-        if (check(TokenType.CARET)) {
-            advance();
-            return new RefinedDef(head, parseRecordDef());
-        }
-        if (check(TokenType.AMPERSAND) || check(TokenType.MINUS)) {
-            return parseConstructionDefContinuation(head);
-        }
-        throw parseError("expected '^', '&', '-', or a record body after '~' (constructor marker)");
     }
 
     /**
@@ -360,7 +340,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         if (braceOpensMap()) {
             return new ReferenceTypeDef(typeParams, parseMapBody());
         }
-        return new StructuralTypeDef(typeParams, false, parseRecordBody());
+        return new StructuralTypeDef(typeParams, parseRecordBody());
     }
 
     /** The dispatch decision itself, with the {@code '{'} already consumed -- see {@link #braceTypeDef}. */

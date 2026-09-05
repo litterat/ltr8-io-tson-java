@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.ComplexType;
@@ -78,7 +78,8 @@ public final class AtomParsers {
             case FloatType t -> new FloatParser(t);
             case RationalType t -> new RationalParser(t);
             case UuidType t -> new UuidParser(t);
-            case BinaryType t -> new BinaryParser(t);
+            // The alphabet rides the body's own encoding selector, like every other facet here.
+            case BytesType t -> new BytesParser(t);
             case DateType t -> new DateParser(t);
             case TimeType t -> new TimeParser(t);
             case DateTimeType t -> new DateTimeParser(t);
@@ -91,8 +92,8 @@ public final class AtomParsers {
             case Cidr6Type t -> new Cidr6Parser(t);
             case EnumBody t -> new EnumParser(t);
             case ComplexType ignored -> ComplexParser.UNCONSTRAINED;
-            case Ipv4Type ignored -> Ipv4Parser.UNCONSTRAINED;
-            case Ipv6Type ignored -> Ipv6Parser.UNCONSTRAINED;
+            case Ipv4Type t -> Ipv4Parser.of(t);
+            case Ipv6Type t -> Ipv6Parser.of(t);
             default -> null;
         });
     }

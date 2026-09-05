@@ -36,7 +36,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   schemas declaring one name is an error naming both, and a local declaration may not reuse a name the
   closure already binds — no hiding, no redefinition. Listing one schema twice, or under two spellings of
   one canonical identity, is redundant rather than an error. Because identities carry the spec revision, a
-  closure reaching both `/2026/32/m/core.tn` and `/2026/34/m/core.tn` is rejected here rather than surfacing
+  closure reaching both `/2026/32/m/core.tn` and `/2026/35/m/core.tn` is rejected here rather than surfacing
   later as a field conflict between two identically-spelled types; (2) **populate `subtypes`**
   (reverse of `supertypes`); (3) **derive `disjoint`** for every choice entry (`ChoiceDisjointness`, §5.4) —
   total and two-valued, detailed under "The disjointness derivation" below, so a linked choice always
@@ -67,14 +67,14 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   `!!import` confusion, and core.tn declares no constructors to supply). The target half is judged only when
   the loader actually produced the target; an unresolvable `!!meta` is left to whoever owns fetching, which
   is also what keeps meta-kernel's self-naming `!!meta` linkable mid-registration. **The declaring half is a
-  lint, not a guard**: a `~` in a user schema is *inert*, because `constructor: true` is read in exactly one
-  place — resolving a `!C value` against the **governing meta's** entries — and the target half already
-  refuses to let a user-level schema be named as anyone's `!!meta`, on the same predicate. Nothing can chain
-  to it, so no `!xxx_type` can ever occupy a schema position, so the flag is never consulted. (In a *data*
+  lint, not a guard**: an entry that IS-A `top` in a user schema is *inert*, because applicability is read in
+  exactly one place — resolving a `!C value` against the **governing meta's** entries — and the target half
+  already refuses to let a user-level schema be named as anyone's `!!meta`, on the same predicate. Nothing
+  can chain to it, so no `!xxx_type` can ever occupy a schema position. (In a *data*
   document `!xxx_type { ... }` is an ordinary record annotation and reads fine, which is what makes §8
   resolver-output bodies like `!record { ... }` expressible at all.) Worth keeping anyway, at one comparison:
-  "you wrote something that can never do anything" is better said at the `~` than in whichever document later
-  tries to name the schema as its `!!meta`. In the shipped wiring
+  "you wrote something that can never do anything" is better said at the declaration than in whichever
+  document later tries to name the schema as its `!!meta`. In the shipped wiring
   `TsonCompiledMetaRegistry.loadMeta` reaches that verdict a phase earlier (it must *compile* the meta to
   resolve against it) and raises the linker's own `TsonSchemaLinker.notAMetaSchema` — one wording, one module,
   and a **`TsonSchemaValidationException` rather than an `IllegalStateException`**
@@ -114,8 +114,8 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
     parameters the *referenced* entry declares. And nothing ever closes `chain => <T> { tail: chain<T, T>? }`,
     so deferring it would let that template ship with the mistake in it.
     - **Applications only, never bare names**, and the distinction is load-bearing.
-      `TemplateBody.applications()` returns a shape nothing else in the wire tree shares;
-      `TemplateBody.names()` returns *every* token — field names, states, literals and type references alike.
+      `HeldBody.applications()` returns a shape nothing else in the wire tree shares;
+      `HeldBody.names()` returns *every* token — field names, states, literals and type references alike.
       Asking the zero-argument half ("this token names an unapplied template") off `names()` rejects a
       correct schema whose field happens to be called `box` beside a template of that name, which is a worse
       failure than a late verdict. So that half runs on the entry materialisation mints, and an unapplied
@@ -181,8 +181,10 @@ sit at the schema layer because that is the only layer able to name request and 
   an `ErrorReader` carrying the real cause. Dropping it — which `TsonCompiledMetaSchema` used to do — lost
   the constructor from the scoped vocabulary silently, so a governing meta compiled and registered looking
   healthy and the complaint landed against a *different* document: the first governed schema to apply it was
-  told the meta-schema does not declare it, which is both false and unactionable. Same treatment
-  `extern`/`unknown_type` already get, and the reason those register a factory rather than throwing.
+  told the meta-schema does not declare it, which is both false and unactionable. **This is now the only
+  route to an `ErrorReader` at all**: every constructor the kernel and meta.tn declare builds a
+  real reader, `scoped` having been the last, and `CoreSchemaImportTest` asserts that no entry of core.tn
+  compiles to one.
 
 - **A meta layer is not a vocabulary channel, and this is the first thing an author tries.** The instinct on
   declaring `operation` in a meta layer is to put the shared types beside it — a `status_code` atom, an
@@ -270,9 +272,12 @@ alike, a character outside the identifier profile, and a script combination the 
 admit. The scopes are §11.4's — the
 merged namespace, which is where §2.2.3's own disjointness rule is exact equality and a confusable pair passes
 it by construction; each entry's record field names, its groups' member labels arriving flattened among them;
-and its enum members — plus **a template's parameters, which §11.4 does not list** (`SPEC-FEEDBACK.md` #5:
-`<T, Т>` otherwise declares two parameters that render identically, and a body referencing `T` binds one of
-them with nothing in the source to say which). A **choice's variants are deliberately not checked**: a variant
+and its enum members — plus **a template's parameters, which §11.4 declines to list** (`<T, Т>` otherwise
+declares two parameters that render identically, and a body referencing `T` binds one of them with nothing in
+the source to say which). §11.4 and §5.10 both say why they are left out — one author writes the list whole on
+one line — and this stays stricter deliberately: mechanisms 2 and 3 reach every identifier position anyway
+(§8.2), so only the look-alike rule is a divergence, and a walk with an exemption is the shape that grew the
+holes the walk was built to close. A **choice's variants are deliberately not checked**: a variant
 is a reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
 there could never fire.
 
@@ -359,22 +364,30 @@ non-empty `subtypes()`, the one case that got a `VariantSchemaReader`. Every ato
 every record whose type had no subtype, consumed the type-ref and discarded it, so a document could claim
 any type at those positions. The guard is the same `VariantSchemaReader`, now wired wherever the rule
 applies. Three things it has to get right, each a real bug found while wiring it: it **follows the body, not
-`kind()`** (a hand-built entry can carry a `ChoiceBody` under `PRODUCT`, and choices and externs have their
+`kind()`** (a hand-built entry can carry a `ChoiceBody` under `PRODUCT`, and choices and scoped instances have their
 own membership relations §7.2 excludes); it accepts an entry's **aliases as the entry itself**, since §7.2
 compares "after reference flattening of both" and resolving an alias would arrive back at the same reader
 and recurse; and it is **transparent to `UseSite` renaming and to bind-mode container rebinding**, both of
 which look at the reader it wraps — the first or a diagnostic names the entry instead of the author's
 alias, the second or a bound `Map` field silently loses its rebinding.
 
+**Which names mean an entry is one index, built once per compile** (`Subsumption.namesMeaning`, held by
+`Compilation`). It is a property of the schema, not of the entry being guarded — the names whose *chain*
+ends at that entry, transitively, so a two-hop alias counts. Answering it per entry meant scanning every
+entry for every entry compiled, each scan walking a chain: the schema's size squared, recomputing a fact
+that cannot change between calls. An entry with no aliases is absent from the index rather than present with
+a singleton, which is the overwhelming majority of them.
+
 **The class table** (`DiscriminationClass`, in `reader/` because untagged recovery dispatches on it):
-§4's four scalar classes — `null`, `boolean`, `number` (every numeric family: an `integer` and a `decimal`
+§4's three scalar classes — `boolean`, `number` (every numeric family: an `integer` and a `decimal`
 are one class, so never disjoint), `string` (every text-form family: `text`, enums by their members' shared
-class — so `[true false]` is boolean-class — `uuid`, `date`, `binary`, …) — plus `brace` (records **and**
+class — so `[true false]` is boolean-class — `uuid`, `date`, `bytes`, …) — plus `brace` (records **and**
 maps: both are `{...}` and `{}` is ambiguous between them, so calling them distinct would promise a
 discrimination the wire can't deliver) and `bracket` (arrays and tuples). A variant classifies through its
 §8.3 reference chain (an alias is its target; a cycle has no terminal, so no class). No class at all —
-`rational`/`complex` (whose typed forms straddle classes), `unit`, a mixed-class enum, `unknown`, a nested
-choice, an extern, an unresolved name — makes the choice `false`, the conservative side. A `void` variant
+`rational`/`complex` (whose typed forms straddle classes), `unit`, a mixed-class enum, a scoped instance (its
+membership is a namespace, not a shape), a nested choice, an unresolved name — makes the choice `false`, the
+conservative side. A `void` variant
 never even gets that far: the linker rejects the declaration outright (`checkVariantsAreNotVoid`, after
 §8.3 flattening) — `(T | void)` confuses optionality with choice, which belongs to the position (`?`, `_`),
 per §5.4's "a variant MUST NOT resolve to `void`", judged after §8.3 flattening as it is here.
@@ -432,9 +445,10 @@ keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
       as a 501.
   - A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and propagates
     uncaught.
-- **An open entry compiles to `OpenTemplateReader`, before its body is looked at at all.** An entry
-  declaring type parameters is a template, not a type (§5.10), so there is nothing a value could validate
-  against; the reader reports `UNKNOWN_TYPE_REF` against the data and skips the value, like any other reader
+- **An open entry compiles to `OpenTemplateReader`, before its body is looked at at all.** An entry whose
+  `kind` is `TEMPLATE` is a template, not a type (§5.10), so there is nothing a value could validate
+  against; the dispatch is on `kind`, like every other entry's, rather than on a list being non-empty. The
+  reader reports `UNKNOWN_TYPE_REF` against the data and skips the value, like any other reader
   finding data the schema does not admit. Reaching it is **always** a data error: a *schema* naming a
   template without applying it is rejected at link time (`checkArity`'s zero-argument case), so no field,
   element or supertype routes here — only a data type-ref naming the template, `!paged` against `paged =>
@@ -523,6 +537,16 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   you hold**, not a compile parameter. `get(uri)` resolves through the core (`resolveLinked`) and compiles
   the linked form standalone in its own mode, cached by identity; `compile(linked)` is the uncached
   primitive.
+  - **It also hands its own `get` to every compile it performs** (`ForeignSchemas`, threaded through
+    `TsonSchemaCompiler` into `ValueReaderContext`). [TSON-SCHEMA] §7.8's scope push resolves a schema the
+    *document* names, not one the schema being compiled does, so `ScopedReader` cannot be wired to an answer
+    the way every other reader's children are — it is wired to where to go and ask. Passing `this::get`
+    mid-construction is safe because nothing calls it until a read, long after every compile it could
+    re-enter has finished, and it is what makes a pushed schema share this cache, this loader and this read
+    mode with the schema that admitted it. A compile with no registry behind it — the bootstrap, a
+    standalone compile in a test — passes `ForeignSchemas.none()`, whose every lookup is
+    `SCHEMA_NOT_PERMITTED`: nothing was configured to supply a foreign schema, which is a fact about the
+    deployment and not a verdict on the document.
 - **Resolution is always bind-anchored, so it is delegated to the core regardless of read mode.** A
   schema's own `!enum`/`!integer` instances bind to `schema.meta.Top` objects — a tree reader's `TsonValue`
   can't stand in — so every read registry shares the one bind-mode core for resolution; only the final compile

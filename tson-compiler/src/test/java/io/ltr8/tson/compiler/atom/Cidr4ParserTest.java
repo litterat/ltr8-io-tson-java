@@ -10,6 +10,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.List;
 import java.util.Optional;
 
+import io.ltr8.tson.schema.atom.CidrNetwork;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -38,14 +40,14 @@ class Cidr4ParserTest {
             "203.0.113.5/32",        // a single host is a valid /32 network
             "0.0.0.0/0"})            // the whole space
     void acceptsWellFormedNetworks(String text) {
-        assertEquals(text, Cidr4Parser.UNCONSTRAINED.read(token(text)));
+        assertEquals(text, Cidr4Parser.UNCONSTRAINED.read(token(text)).text());
     }
 
     /** The authored text comes back unchanged, so a read/write round trip is exact. */
     @Test
     void returnsTheAuthoredTextAndWritesItBackUnchanged() {
-        assertEquals("10.0.0.0/8", Cidr4Parser.UNCONSTRAINED.read(token("10.0.0.0/8")));
-        assertEquals("10.0.0.0/8", Cidr4Parser.UNCONSTRAINED.write("10.0.0.0/8"));
+        assertEquals("10.0.0.0/8", Cidr4Parser.UNCONSTRAINED.read(token("10.0.0.0/8")).text());
+        assertEquals("10.0.0.0/8", Cidr4Parser.UNCONSTRAINED.write(CidrNetwork.parse("10.0.0.0/8", 32)));
     }
 
     @ParameterizedTest
@@ -93,7 +95,7 @@ class Cidr4ParserTest {
     void appliesTheMinPrefixFacet() {
         Cidr4Parser atLeast16 = withPrefixBounds(16, null);
 
-        assertEquals("192.168.0.0/16", atLeast16.read(token("192.168.0.0/16")));
+        assertEquals("192.168.0.0/16", atLeast16.read(token("192.168.0.0/16")).text());
         AtomValidationException thrown =
                 assertThrows(AtomValidationException.class, () -> atLeast16.read(token("10.0.0.0/8")));
         assertEquals(">= 16", thrown.expected());
@@ -103,7 +105,7 @@ class Cidr4ParserTest {
     void appliesTheMaxPrefixFacet() {
         Cidr4Parser atMost24 = withPrefixBounds(null, 24);
 
-        assertEquals("192.0.2.0/24", atMost24.read(token("192.0.2.0/24")));
+        assertEquals("192.0.2.0/24", atMost24.read(token("192.0.2.0/24")).text());
         AtomValidationException thrown =
                 assertThrows(AtomValidationException.class, () -> atMost24.read(token("192.0.2.128/25")));
         assertEquals("<= 24", thrown.expected());
@@ -118,7 +120,7 @@ class Cidr4ParserTest {
     void aPrefixBoundOutsideTheFamilyRangeNeitherFailsNorWidens() {
         Cidr4Parser atMost64 = withPrefixBounds(null, 64);
 
-        assertEquals("192.0.2.0/24", atMost64.read(token("192.0.2.0/24")));
+        assertEquals("192.0.2.0/24", atMost64.read(token("192.0.2.0/24")).text());
         assertThrows(AtomValidationException.class, () -> atMost64.read(token("10.0.0.0/33")));
     }
 }

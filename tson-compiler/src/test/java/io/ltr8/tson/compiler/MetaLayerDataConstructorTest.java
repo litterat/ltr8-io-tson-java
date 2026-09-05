@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>The wiring, in full, is three things</b> -- there is nothing else to register:
  * <ol>
  *   <li>a meta-layer schema chaining {@code !!meta} to meta-kernel and declaring
- *       {@code operation => ~data & { ... }} ({@link #META_HTTP_SCHEMA});</li>
+ *       {@code operation => data & { ... }} ({@link #META_HTTP_SCHEMA});</li>
  *   <li>a Java class carrying {@code @Typename(name = "operation")} and implementing {@link Data}
  *       ({@link Operation});</li>
  *   <li>a {@link DataBindContext} whose {@link DataNameBinder} can find that class
@@ -60,16 +60,16 @@ class MetaLayerDataConstructorTest {
     /** (1) The meta-layer schema. `~data &`: an operation describes an endpoint, not a data value. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!meta:"https://tson.io/2026/34/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/34/m/meta.tn"
+            !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/35/m/meta.tn"
             {
-              operation => ~data & {
+              operation => data & {
                 path:     text
                 method:   text
                 request:  type_ref
                 response: type_ref
               }
-              webhook => ~data & {
+              webhook => data & {
                 path:     text
                 delivers: [type_ref]?
               }
@@ -124,7 +124,7 @@ class MetaLayerDataConstructorTest {
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!meta:"https://example.test/meta-http.tn"
-                !!import:"https://tson.io/2026/34/m/core.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
                 {
                   search_request  => { q: text }
                   search_response => { hits: [text] }
@@ -147,26 +147,24 @@ class MetaLayerDataConstructorTest {
                 core(consumerContext()).resolveLinked(META_HTTP).schema().entries().get("operation");
 
         assertEquals(TypeKind.DATA, operation.kind());
-        assertTrue(operation.constructor(), "`~` marks it applicable as `!operation { ... }`");
+        assertTrue(operation.supertypes().contains("top"), "a constructor: IS-A top, via the base kind");
         assertEquals(List.of("data", "top"), operation.supertypes(),
-                "the transitive chain -- `data` is itself `top & {}`");
+                "the transitive chain -- `data` is itself `top & {}` -- and IS-A `top` is what makes"
+                        + " `!operation { ... }` applicable");
     }
 
     /**
-     * {@code ~} is the permission for a <em>schema</em> to write {@code !C ...} (§3.3.1/§5.6), not a claim
-     * about type-ness -- so it is required here even though an operation is not a type.
+     * The other side of the same predicate: a record-bodied entry with an empty chain is a <em>part</em> of a
+     * type ({@code record_field}, {@code type_ref}, {@code integer_size}, …) and is refused where it is
+     * written. Without the check it fails anyway, on {@code Top} being sealed -- but as a {@code
+     * ClassCastException} surfaced as {@code NOT_IMPLEMENTED}, a non-verdict, for an author's mistake.
      */
     @Test
-    void withoutTheTildeTheConstructorCannotBeApplied() {
-        DOCUMENTS.put(META_HTTP, META_HTTP_SCHEMA.replace("operation => ~data &", "operation => data &"));
-        try {
-            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
-                    () -> linked("notilde", SEARCH));
+    void aComponentOfATypeIsNotApplicable() {
+        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+                () -> linked("component", "  bad => !record_field { name: x  type: text }"));
 
-            assertTrue(thrown.getMessage().contains("does not resolve to a constructor"), thrown.getMessage());
-        } finally {
-            DOCUMENTS.put(META_HTTP, META_HTTP_SCHEMA);
-        }
+        assertTrue(thrown.getMessage().contains("not IS-A 'top'"), thrown.getMessage());
     }
 
     // ── Binding the constructor to the consumer's class ──────────────────────────────────────────
@@ -443,7 +441,10 @@ class MetaLayerDataConstructorTest {
 
         String written = new TsonObjectWriter(consumerContext()).toTson(entry).replaceAll("\\s+", " ");
 
-        assertTrue(written.contains("kind: \"DATA\""), written);
+        // `kind` is not written: it is derived at resolution and §8's output has no field for it. What
+        // identifies a DATA entry in output is its body -- the constructor that built it.
+        assertFalse(written.contains("kind:"), written);
+        assertEquals(TypeKind.DATA, entry.kind(), "still derived, and still the resolver's own");
         assertTrue(written.contains("body: !operation { path: \"/search\" method: \"GET\""), written);
         assertTrue(written.contains("request: { name: \"search_request\" arguments: [] }"), written);
     }

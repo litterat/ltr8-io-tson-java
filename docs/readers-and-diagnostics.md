@@ -75,8 +75,19 @@ is small and parsed once.)
   satisfies the requirement and makes the AST carry the normalised name. That is one chokepoint for all three record
   readers, and it means a name is stored in the form its identity is defined by, so an ordinary
   `record.get("café")` finds a decomposed one. A map **key** is a value and keeps its written content; only
-  its comparison normalises (`Nfc.keyOf`), which is §2.6's "textual identity is the parser's minimum" read
+  its comparison normalises (`ValueIdentity`), which is §2.6's "textual identity is the parser's minimum" read
   against a processor that decodes.
+- **One equality contract answers all three rules that compare two decoded values** (`ValueIdentity`): §7.5's
+  duplicate rule, §5.2's check of a stated FIXED value against its declared one, and §2.6's key identity.
+  Each of those delegates to "the element type's equality contract" and none of them defines it, so with the
+  comparison at each call site the three disagreed — a key normalised and a set element did not, and `bytes`
+  had no comparison at all, `byte[]` carrying Java's identity equality. That last one is the shape worth
+  remembering: an absent comparison is usually a missing verdict and here it was an **inverted** one, a FIXED
+  `bytes` field rejecting the only document it can accept. A `String` compares NFC, a `byte[]` as its octets,
+  and a tree atom by its normalised value **beside its type-ref and annotations** — stripping those is §2.6's
+  rule for a key, where the schema fixes the key type, and would merge `!cm 5` with `!inch 5` if it reached a
+  set. `Rendered` is the other half: `byte[]` inherits `Object.toString`, so a diagnostic naming one said
+  `[B@6d06d69c` until these comparisons could reach a value at all.
 - **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody`
   carries an `ElementState` governing the value — `{K => V?}`, §5.3's own row and the `state` field the
   kernel gives `map` — so `MapAbstractReader.decodedValue` gives the array element's
@@ -186,18 +197,22 @@ is small and parsed once.)
   as `[text, int32]`, a choice as `(text | int32)`, and an instantiation entry as the application its
   `source` records (`paged<order>`). Anything with no sugar spelling falls back to the entry name — honest
   rather than invented.
-- **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). §8.3
-  flattens a type position past a `REFERENCE` entry, so `c: pct` over `pct => small` reaches the reader for
-  `small` — one shared reader, right for a position that names `small` directly and wrong for one that does
-  not. The name the author wrote rides the type-ref as `@alias`, and a composite reader consults it where it
-  **wires its children**, which is compile time: an aliased position gets a copy of the reader differing only
-  in its name, an unaliased one gets the shared reader back unchanged and allocates nothing. Nothing is added
-  to `TsonReadContext` and no per-read allocation changes (`AllocationHarnessTest` is the guard).
-    - **A materialised application takes the other carrier**, because §8.3's walk stops at an instantiation
-      and leaves no alias. That entry's body is a `Reference`, and a `REFERENCE` entry compiles to its
-      target's reader — so `TsonSchemaCompiler` names it for the entry doing the referring, whose `source` is
-      the application (`b<10>`). Without it a violation against `b<10>` reads
-      `'integer_type_10_100_786fbcfb': …`, the one shape that made `EntryDisplayName`'s fallback reachable.
+- **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). A field
+  declared `c: pct` over `pct => small` reads with `small`'s reader, that being the type at the end of the
+  chain, and a message from it would otherwise name a declaration the author did write but did not write
+  *here*. §8.3 makes a reference a hop and forbids collapsing it in resolved output, so a position reaches its
+  child by resolving the name it names and nothing more — no carrier on the type-ref, and nothing added to
+  `TsonReadContext`. The renaming happens one level up instead: the `REFERENCE` entry's own compile names its
+  target's reader for the entry doing the referring (`TsonSchemaCompiler`, through `UseSite.named`), which is
+  the collapse §8.3 permits *after linking, when a processor compiles for reading*. It runs where a composite
+  reader **wires its children**, which is compile time: a position naming an alias gets a copy differing only
+  in its name, every other position gets the shared reader back unchanged and allocates nothing
+  (`AllocationHarnessTest` is the guard).
+    - **A materialised application is named the same way**, and it is why the mechanism sits on the entry
+      rather than on the position. That entry's body is a `Reference`, so it compiles to its target's reader —
+      and `TsonSchemaCompiler` names it for the entry doing the referring, whose `source` is the application
+      (`b<10>`). Without it a violation against `b<10>` reads `'integer_type_10_100_786fbcfb': …`, the one
+      shape that made `EntryDisplayName`'s fallback reachable.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per
       read — and the variant that rejected the value is the informative name anyway.
@@ -267,6 +282,60 @@ per-level structural cost (events, tokens, a node, a context) is flat and large 
 in an absolute measurement — eager building shows up as the *deep* level costing ~200 bytes more than the
 shallow one, and more at greater depth.
 
+### The scope push ([TSON-SCHEMA] §7.8): `ScopedReader`, and `ScopePush` deciding who may open one
+
+meta.tn's `scoped` constructor is the open sum: the value names its own type, and the instance's `scope`
+names the namespaces that name may be drawn from (`LOCAL`, the governing schema and its imports; `EXTERN`, a
+foreign schema the value names for itself). `schemas` narrows the foreign side. Core's three named instances
+— `declared`, `extern`, `dynamic` — are the three subsets that have a name, and `extern_of<S>`/
+`extern_type<S, T>` are per-use narrowings a schema applies rather than declares. **One reader serves all
+five**, because what separates them is two constraint values and not a shape.
+
+**The value's own shape picks the cell.** A value carrying a nested `!!schema` is EXTERN; one carrying a
+bare type-ref is LOCAL; one carrying neither names no type, and a position that is open has nothing to infer
+one from — a **validation** error, not a resolver one, and §7.8 says so outright of the extern cell ("the
+discriminant is required"), the same holding at the other. A cell the instance's `scope` does not hold
+refuses the value it would have taken, which is how `declared` refuses a push and `extern` requires one from
+the one reader rather than from three.
+
+**LOCAL is fixed at compile time and EXTERN is not.** A `scoped` entry belongs to exactly one schema, so
+"the governing namespace" is that schema's and resolves through the same `TsonTypeReaderResolver` every other
+dispatch uses. Which foreign schema an EXTERN value names is the document's choice, so it is looked up as the
+value arrives, through `ForeignSchemas` — a read registry hands its own `get` to every compile it performs,
+so a pushed schema shares that cache, that loader and that read mode with the schema that admitted it. A
+schema nothing would supply is one of the five `SCHEMA_*` codes and never a verdict: it was never read.
+
+**There is no scope stack, because the scope pops by returning.** The reader for the foreign type *is* the
+foreign schema's compiled reader, wired to that schema's entries, so everything below the pushed value
+resolves there by construction and everything after it resolves in the governing namespace again. Nothing
+tracks a current scope, and nothing can leak one.
+
+**Who may open a scope is `ScopePush`, and it is one decision rather than four.** `TsonDataStream` emits a
+`SchemaRef` ahead of a record field value, a map entry value and an array element — the three positions
+[TSON-DATA] §2.3 admits a directive at — and each of those containers used to consume it and throw it away,
+which is how a document could push a scope its schema never opted into and be read as though it had not. They
+now leave the event where it stands and ask `ScopePush.notAdmitted` on behalf of the position's own reader:
+a scoped one keeps it, and everything else has it consumed and refused (§7.8's typed-position restriction —
+"cross-schema acceptance is authored intent, not accident"). The check costs a document nothing, everything
+in it being guarded by "is the next event a directive at all", which for every value in almost every document
+it is not. The refusal is reported against the position's own context rather than the container's, so it
+names the field or the index; `notAdmitted` and `refuse` are split for exactly that reason, so a scoped copy
+of the context is built only where there is something to locate.
+
+**A schemaless document opens no scope at all** (`ScopePush.refuseSchemaless`), which is §7.8's own rule: "a
+nested `!!schema` in a document with no `!!schema` of its own is a validation error naming the directive". The
+typed-position restriction exists because acceptance is authored intent, and a
+Class 1 document states no intent to opt in to anything; honouring the directive there turns a Class 1 read
+into a Class 2 read halfway down a document with nothing on the document saying so. Both refusals report and
+keep reading — the directive is consumed and the value read as it would have been without one — so a stray
+directive costs one diagnostic rather than a value.
+
+**Tree mode keeps the push and bind mode cannot.** `scoped` is where a document says which schema a value
+belongs to, and a tree that dropped it could not be written back, so tree mode wraps an EXTERN value in a
+`TsonScopedValue`. A bound object has nowhere to carry a URI and inventing somewhere would change what a
+consumer's own class means, so bind mode hands the object back as it is — the same asymmetry `TsonAbsent`
+already makes for [TSON-DATA] §2.9.
+
 ### What a read leaves behind: nothing
 
 A read is transient by construction — the compiled schema, the reader graph and the bind descriptors are
@@ -315,12 +384,16 @@ environment is
 invisible at the call site and absent from review. The relaxation to reach for first is the *unit*
 (`perSegment()`), which still refuses `id_pаy` while admitting `url_адрес`. A token policy stricter than the
 identifier policy subsumes it: a name is a token — which §8.2 asks an implementation's documentation to say,
-and this is where it is said. §8.2 calls the identifier surface the "name policy", once and undefined; this
-implementation says *identifier* throughout, §7.7 being where that term is defined
-(`SPEC-FEEDBACK.md` #15).
+and this is where it is said. The two names are §8.2's own: it defines the **identifier policy** and the
+**token policy** as the two parts of a processor's configuration for that section, precisely so that two
+implementations reporting them agree on what they are called, and `TsonConfig` uses those names.
 
-Class 1 **field** names see neither — they are lexical rather than names (§2.5, §7.7) — and only the
-look-alike rule, whose scope they are (`SchemalessTreeReader`). A refusal reports one code per rule —
+**Field** names see all three, being names at every layer (§2.5, §7.7): the two per-name rules in the read
+context beside a type-ref's and an annotation's, and the look-alike rule in `SchemalessTreeReader`, which is
+where it belongs because it is a property of a *set* rather than of a name. One consequence worth knowing when
+reading a report: a within-word homograph in a field name is refused as a restricted script before the
+look-alike rule has a pair to compare, so a corpus vector isolating that rule wants two names each of which is
+single-script. A refusal reports one code per rule —
 `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER`, `RESTRICTED_SCRIPT` — each a verdict on the document like any other in
 that the caller must change it or relax the policy. What these codes carry that a validity error does not is
 that another processor at another Unicode version may accept the same document.
@@ -431,7 +504,47 @@ document. Every `tson-cli` envelope carries one in its `policy` field.
 (`withIdentifierPolicy`, `withTokenPolicy`) is exactly where the two can differ, and a response quoting the wrong
 one is worse than quoting none. `TsonUnicodePolicy.dataVersion()` remains the version as a static accessor;
 the constant behind it (`Xid.UNICODE_VERSION`) is in the unexported `lexer` package and unreachable
-otherwise. `SPEC-FEEDBACK.md` #14 proposes §8.2 require this shape rather than the per-refusal copy.
+otherwise. §8.2 requires exactly this shape: the policy and the data version are properties of the *report*,
+not of the refusal, and a processor MUST make both available with any report containing one and SHOULD make
+them available with no document in hand.
+
+## `TsonLimitsPolicy` — §9.1's bounds, on the same terms
+
+What this processor will *spend* reading a document, where the policy above is what it will *admit as a
+name*: `Tson.limitsPolicy()`, either facade's `limitsPolicy()`, `TsonTreeReader.withLimits`, `tson policy`,
+and a `limits` record inside every `tson-cli` envelope's `policy` field. **Beside the Unicode policy, not
+inside it** — the two answer different questions, and a deployment that changed one has said nothing about
+the other. The three arguments above transfer whole: a bound is constant for a run, a sender needs it before
+it writes, and a number a caller can act on beats a refusal after the fact.
+
+**Only nesting depth is bounded**, at §9.1's own default of 64. §9.1 states the whole set as one table with a
+default each — eleven more on the document side — and [TSON-SCHEMA] §11.5 adds five on the schema side under
+the same policy and the same reporting surfaces; `BACKLOG.md` carries what is left and where each is counted.
+It is a record with one component so each lands on it rather than beside it.
+
+**Counted in the token stream, not in the readers.** `TsonDataStream.advance` already tracked bracket depth
+for the schema parser's error recovery, and that is the one place every token is consumed — so the check is
+one comparison per opening bracket and the refusal happens *before* any reader descends. That ordering is the
+whole point: the stream is iterative and never overflows, while every reader over it recurses
+(`SchemalessTreeReader.readNode` → `readArray` → `readNode`), and `EventSkip` recurses through values no
+reader keeps and no context path steps. A limit enforced at the readers would have to be enforced at each of
+them; enforced at the counter it also reaches schema documents, which are untrusted input wherever one is
+fetched or `!!import`ed, through the same code.
+
+**What it replaced.** A document a few thousand containers deep — about 10 KB, an ordinary request body —
+exhausted the Java stack. A `StackOverflowError` is an `Error`, so it passed through every
+`catch (RuntimeException)` in the reader stack and in `TsonCli.run` alike: no report on stdout, a JVM stack
+trace on stderr, and exit 1, the code meaning *your document is invalid*. `LimitsPolicyTest` pins that the
+same document now reports.
+
+**The refusal is not a verdict** (`Diagnostic.Code.LIMIT_EXCEEDED`, `verdict()` false): the document may be
+well-formed, valid, and read in full by the next processor along. It has its own classifier
+(`Diagnostic.ofLimitExceeded`) rather than a case inside `ofBaseSyntaxError`, because a base-syntax failure is
+a verdict every processor repeats and this one is a statement about the reader's configuration; both facades
+catch it ahead of the `RuntimeException` that reaches the other. The CLI still **exits 1** — its envelope says
+`NOT_CHECKED`, the truth about the document, while the exit code answers what the runner should do now, and
+here they can act (`--max-depth`, or a smaller document). It is the one place the two diverge, and
+`TsonCli.exitCodeFor` says so.
 
 ### When a fact earns a component
 
@@ -448,6 +561,7 @@ belongs in the `Code`, which is what a consumer already switches over.
 | §8.2 refusal: which rule | it is the `Code` | no |
 | why a schema was not obtained | nowhere — it is about the world | no — it is the `Code`, one per reason |
 | §8.2 refusal: the policy and the Unicode tables | nowhere — it is this processor's configuration | no — `TsonUnicodeProcessorPolicy`, once per run |
+| §9.1 refusal: which bound, and what it is | nowhere — it is this processor's configuration | no — `TsonLimitsPolicy`, once per run; the bound itself rides in `expected`/`actual` |
 
 Most diagnostics are about something the consumer is already holding, which is why `expected`/`actual` are
 enough for them: a rendered `<= 100` is a convenience, and the authoritative copy is a file the consumer has.
@@ -735,7 +849,7 @@ error* category, so this is the same layer, not a new one.
       `final` and lives in `tson-schema`, which holds no pipeline machinery.
     - **Both filters are load-bearing.** Only a *derived* entry is retargeted, or a closed declaration's own
       typo would be blamed on any template that happens to name it; and only a `TemplateBody` declaration is
-      a candidate, since a defect no held body deferred is already located correctly. `TemplateBody.names()`
+      a candidate, since a defect no held body deferred is already located correctly. `HeldBody.names()`
       cannot tell a type reference from a field name, which is why it is asked only about a name already
       known to resolve to nothing — a field of that name is the one remaining way to mislead it, and it
       misleads no worse than naming the applier does.

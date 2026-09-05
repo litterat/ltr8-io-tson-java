@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.compiler.reader.Subsumption;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -71,7 +72,8 @@ public final class TsonSchemaCompiler {
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, TsonCompiledMetaSchema governingMeta) {
         TsonSchema schema = linkedSchema.schema();
-        return compileWith(linkedSchema, name -> governedFactory(name, schema, governingMeta));
+        return compileWith(linkedSchema, name -> governedFactory(name, schema, governingMeta),
+                ForeignSchemas.none());
     }
 
     /**
@@ -89,8 +91,11 @@ public final class TsonSchemaCompiler {
         if (inherited != null) {
             return inherited;
         }
+        // Applicable is IS-A `top` (§4.1) -- the same predicate the resolver's own gate and the meta-schema's
+        // head table ask, so a construction that resolved reaches a factory lookup here rather than falling
+        // through to "out of scope" on a narrower question.
         TypeDefinition own = schema.entries().get(constructorName);
-        if (own != null && own.constructor()) {
+        if (own != null && own.supertypes().contains("top")) {
             return governingMeta.globalResolver().resolve(constructorName);
         }
         throw new IllegalStateException("constructor '" + constructorName + "' is out of scope: not in the "
@@ -108,7 +113,20 @@ public final class TsonSchemaCompiler {
      * since meta-kernel declares its whole vocabulary itself and has no earlier meta to be governed by.
      */
     public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories) {
-        return compileWith(linkedSchema, factories::resolve);
+        return compile(linkedSchema, factories, ForeignSchemas.none());
+    }
+
+    /**
+     * {@link #compile(TsonLinkedSchema, ValueReaderFactoryResolver)} naming where a scope push goes to find
+     * the schema a document names inside itself ([TSON-SCHEMA] §7.8) -- {@code TsonCompiledSchemaRegistry}
+     * passes its own lookup, so a foreign schema resolves through the same cache and the same read mode as
+     * the schema that admitted it. The overload above passes {@link ForeignSchemas#none()}, which is the
+     * right answer for a compile with no registry behind it and the wrong one to arrive at by omission,
+     * which is why it is a separate method rather than a default.
+     */
+    public static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema, ValueReaderFactoryResolver factories,
+                                             ForeignSchemas foreign) {
+        return compileWith(linkedSchema, factories::resolve, foreign);
     }
 
     /**
@@ -116,8 +134,8 @@ public final class TsonSchemaCompiler {
      * differs between a governed and a standalone compile.
      */
     private static TsonCompiledSchema compileWith(
-            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor) {
-        Compilation compilation = new Compilation(linkedSchema, factoryFor);
+            TsonLinkedSchema linkedSchema, Function<String, ValueReaderFactory> factoryFor, ForeignSchemas foreign) {
+        Compilation compilation = new Compilation(linkedSchema, factoryFor, foreign);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
@@ -145,8 +163,16 @@ public final class TsonSchemaCompiler {
         private final TsonLinkedSchema linked;
         private final TsonSchema schema;
         private final Function<String, ValueReaderFactory> factoryFor;
+        private final ForeignSchemas foreign;
         private final Map<String, TsonTypeReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
+
+        /**
+         * §7.2's alias index, built once: which written names mean each entry. A property of the schema
+         * rather than of the entry being guarded, so computing it per entry made the walk quadratic in the
+         * schema's size for an answer that never changed.
+         */
+        private final Map<String, Set<String>> namesMeaning;
 
         /**
          * What every built reader is handed for its own name lookups. Resolves through this compilation
@@ -155,10 +181,13 @@ public final class TsonSchemaCompiler {
          */
         private final CompiledReaders readers = new CompiledReaders(this::resolve);
 
-        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor) {
+        Compilation(TsonLinkedSchema linked, Function<String, ValueReaderFactory> factoryFor,
+                ForeignSchemas foreign) {
             this.linked = linked;
             this.schema = linked.schema();
             this.factoryFor = factoryFor;
+            this.foreign = foreign;
+            this.namesMeaning = Subsumption.namesMeaning(schema.entries());
         }
 
         TsonTypeReader<?> resolve(String name) {
@@ -201,26 +230,27 @@ public final class TsonSchemaCompiler {
         }
 
         private TsonTypeReader<?> build(String name, TypeDefinition definition) {
-            if (!definition.parameters().isEmpty()) {
-                // An open entry is a template, not a type, whatever its body says -- see OpenTemplateReader
-                // for why the refusal is the entry's own reader rather than a check at the root.
+            if (definition.kind() == TypeKind.TEMPLATE) {
+                // A template is not a type ([TSON-SCHEMA] §5.10), and its kind says so -- the same field
+                // every other entry is dispatched on. See OpenTemplateReader for why the refusal is the
+                // entry's own reader rather than a check at the root.
                 return new OpenTemplateReader(name, definition.parameters(),
-                        new ValueReaderContext(linked, readers).locationOf(name, definition));
+                        new ValueReaderContext(linked, readers, foreign).locationOf(name, definition));
             }
             Top body = definition.body();
             if (body instanceof Reference r) {
-                // The target's reader, named for the entry doing the referring rather than the one referred
-                // to. §8.3 flattens an ordinary use site past a reference and records the author's name as
-                // `@alias` there, but the walk stops at a materialised instantiation -- so this is the only
-                // place that knows `b<10>` was written where `integer_type_10_100_786fbcfb` will be read.
-                return UseSite.named(resolve(r.target().name()),
-                        EntryDisplayName.of(name, definition));
+                // A reference is a hop, and this is where the chain is collapsed: after linking, once per
+                // entry, at the moment a reader is built. Resolved output states the chain the author wrote,
+                // so the target's reader is named for the entry doing the referring -- which is what a use
+                // site naming `pct` over `pct => small` needs, and what knows that `b<10>` was written where
+                // `integer_type_10_100_786fbcfb` will be read.
+                return UseSite.named(resolve(r.target().name()), EntryDisplayName.of(name, definition));
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
-            TsonTypeReader<?> built = factory.create(name, definition, new ValueReaderContext(linked, readers));
+            TsonTypeReader<?> built = factory.create(name, definition, new ValueReaderContext(linked, readers, foreign));
             // §7.2's subsumption rule, applied at every position it governs rather than only where a record
             // happened to have subtypes -- see Subsumption for which kinds it deliberately leaves alone.
-            return Subsumption.guard(name, definition, built, linked.schema().entries(), readers);
+            return Subsumption.guard(name, definition, built, namesMeaning, readers);
         }
     }
 }

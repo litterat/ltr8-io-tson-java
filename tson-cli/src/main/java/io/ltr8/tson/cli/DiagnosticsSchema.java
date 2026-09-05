@@ -39,6 +39,7 @@ final class DiagnosticsSchema {
         case "diagnostic" -> CliDiagnostic.class;
         case "policy" -> CliPolicy.class;
         case "unicode_policy" -> CliPolicy.CliUnicodePolicy.class;
+        case "limits" -> CliPolicy.CliLimits.class;
         case "diagnostic_code" -> Diagnostic.Code.class;
         case "outcome" -> Outcome.class;
         case "restriction_level" -> TsonUnicodePolicy.Level.class;

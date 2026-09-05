@@ -5,13 +5,12 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.lexer.Nfc;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
 import io.ltr8.tson.compiler.stream.MapEnd;
 import io.ltr8.tson.compiler.stream.MapStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TokenEvent;
+import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -76,8 +75,8 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
 
     MapAbstractReader(String name, String displayName, MapBody body, TsonTypeReaderResolver resolver,
                        SchemaLocation schemaLocation) {
-        this(name, displayName, body, UseSite.reader(body.keyType(), resolver),
-                UseSite.reader(body.valueType(), resolver), schemaLocation);
+        this(name, displayName, body, resolver.resolve(body.keyType().name()),
+                resolver.resolve(body.valueType().name()), schemaLocation);
     }
 
     /**
@@ -156,15 +155,16 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             String keySegment = keySegmentFor(keyPeek);
             int before = ctx.reported();
             Object key = keyParser.read(ctx.field(keySegment));
-            if (ctx.reported() == before && !seen.add(Nfc.keyOf(key))) {
+            if (ctx.reported() == before && !seen.add(ValueIdentity.of(key))) {
                 ctx.field(keySegment).report(Diagnostic.Code.DUPLICATE_MAP_KEY,
                         "duplicate key '" + keySegment + "' in '" + displayName + "' -- a map states each key at most "
                                 + "once (§2.6), and the repeat states an entry for nothing",
                         "each key stated once", "'" + keySegment + "' stated again");
             }
             ctx.next(); // MapArrow
-            if (ctx.peek() instanceof SchemaRef) {
-                ctx.next();
+            SchemaRef push = ScopePush.notAdmitted(ctx, valueParser);
+            if (push != null) {
+                ScopePush.refuse(ctx.field(keySegment), body.valueType().name(), push);
             }
             sink.accept(key, decodedValue(keySegment, ctx));
             count++;

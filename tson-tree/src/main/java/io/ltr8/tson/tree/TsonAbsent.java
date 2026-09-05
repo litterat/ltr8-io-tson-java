@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The absent sentinel as a node (§2.7) -- a position that was written but holds no value, spelled {@code _}
- * or, equivalently, {@code null}. Distinct from {@link TsonMissing} (no such node at all): this one was
+ * The absent sentinel as a node (§2.7) -- a position that was written but holds no value, spelled {@code _},
+ * the notation's only no-value spelling. Distinct from {@link TsonMissing} (no such node at all): this one was
  * written. Carries its own type-ref/annotations for the annotated case; {@link #instance()} is the bare
  * common case.
  *

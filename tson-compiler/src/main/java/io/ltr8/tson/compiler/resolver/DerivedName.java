@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -77,6 +78,10 @@ final class DerivedName {
                     .forEach(field -> appendReadable(out, field.value().value().coreValue()));
             case ArrayValue array -> array.elements()
                     .forEach(element -> appendReadable(out, element.value().coreValue()));
+            case MapValue map -> map.entries().forEach(entry -> {
+                appendReadable(out, entry.key().coreValue());
+                appendReadable(out, entry.value().value().coreValue());
+            });
             default -> out.append("_v");
         }
     }
@@ -110,6 +115,17 @@ final class DerivedName {
             case ArrayValue array -> {
                 out.append("a(");
                 array.elements().forEach(element -> appendValue(out, element.value().coreValue()));
+                out.append(')');
+            }
+            // Both halves of every entry, in written order. Without this a map slot rendered as the
+            // unknown-value mark and every binding differing only inside one was the same name --
+            // `extern_of<"a.tn">` and `extern_of<"b.tn">` are two types and were one entry.
+            case MapValue map -> {
+                out.append("m(");
+                map.entries().forEach(entry -> {
+                    appendValue(out.append('k'), entry.key().coreValue());
+                    appendValue(out.append('v'), entry.value().value().coreValue());
+                });
                 out.append(')');
             }
             default -> out.append('?');

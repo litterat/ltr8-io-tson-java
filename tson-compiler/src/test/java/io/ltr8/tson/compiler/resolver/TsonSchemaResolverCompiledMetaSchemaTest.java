@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * *reach* a compiled governing schema works.
  *
  * <p>Reading an entry that isn't itself a {@code ~}-marked constructor (e.g. {@code
- * binary_encoding}, {@code product_access_type}, {@code top} -- ordinary declarations, not vocabulary
+ * bytes_encoding}, {@code product_access_type}, {@code top} -- ordinary declarations, not vocabulary
  * this codebase's own factories build against) goes through {@link
  * TsonCompiledMetaSchema#compiledSchema()}'s own unscoped {@code get}, not {@link
  * TsonCompiledMetaSchema#reader}, which is deliberately scoped to constructor-declared entries only
@@ -56,7 +56,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
      * Now that {@code bindAtomInstance} needs a real, object-binding-mode compiled reader for the
      * schema it's resolving against (see {@code SchemaResolver}'s own field), meta.tn itself can no
      * longer be loaded via a bare DOM-mode registry -- its own Instance declarations (e.g. {@code
-     * binary_encoding => !enum [...]}) go through {@code resolveInstance}/{@code bindAtomInstance}
+     * bytes_encoding => !enum [...]}) go through {@code resolveInstance}/{@code bindAtomInstance}
      * just like any other schema's. Resolve meta-kernel ordinarily first (object mode's own {@link
      * ValueReaderFactoryRegistry#bind} needs no materialized schema up front the way the old
      * eager-validation design did -- see {@code TsonObjectBinder}'s own retirement note), then
@@ -121,7 +121,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
 
-        assertTrue(compiledMeta.schema().entries().containsKey("binary_encoding"));
+        assertTrue(compiledMeta.schema().entries().containsKey("bytes_encoding"));
     }
 
     @Test
@@ -130,7 +130,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
-        Object result = compiledMeta.compiledSchema().get("binary_encoding")
+        Object result = compiledMeta.compiledSchema().get("bytes_encoding")
                 .read(TestDocuments.document("BASE64"));
 
         assertEquals("BASE64", result);
@@ -196,7 +196,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
             {
               void => !unit {}
             }
@@ -230,7 +230,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     private static final String MINI_DOCUMENT_NO_ID = """
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
             {
               void => !unit {}
             }
@@ -249,7 +249,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_ID = """
             !!id:"mini.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
             {
               void => !unit {}
             }
@@ -267,7 +267,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
             !!import:"meta-kernel.tn"
             {
               void => !unit {}
@@ -286,10 +286,10 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
             {
-              my_type => unit & {}
+              my_type => atom & {}
             }
             """;
 
@@ -297,24 +297,30 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     void resolveSchemaGenuinelyMergesImportedEntriesIntoTheTypeNameNamespace() {
         // A bare type-ref (§8.3) is carried through unverified regardless of whether the target
         // exists anywhere, so that alone wouldn't prove anything -- composition is the real test:
-        // resolveComposition does exactly one resolved.get(supertypeName), no fallback, so "unit"
+        // resolveComposition does exactly one resolved.get(supertypeName), no fallback, so "atom"
         // (meta-kernel's own, zero fields) is only findable here if !!import's own entries were
         // genuinely merged into the type-name namespace, not just validated as well-formed URIs.
+        //
+        // "atom" rather than "unit", which this used before: unit is a *constructor*, and §4.2's level
+        // discipline makes an unmarked declaration deriving from one a resolver error. Marking this one
+        // is not the fix either -- the document's !!meta is meta.tn, so §4.2's placement rule refuses a
+        // constructor declaration here. A base kind is a non-constructor with a supertype chain of its
+        // own, so it demonstrates the same merge and the same transitivity.
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_IMPORT_MERGED).parseSchemaDocument();
 
         TsonSchema resolved = resolver.resolveSchema(miniDocument);
 
         // Transitive, per SchemaResolver's own induction: direct supertype + its own supertype chain.
-        assertEquals(List.of("unit", "atom", "top"), resolved.entries().get("my_type").supertypes());
+        assertEquals(List.of("atom", "top"), resolved.entries().get("my_type").supertypes());
         // Imported entries are visible during resolution but never part of the result itself.
         assertEquals(Set.of("my_type"), resolved.entries().keySet());
     }
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
             {
               void => !unit {}
             }
@@ -336,9 +342,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/34/m/meta.tn"
-            !!import:"https://tson.io/2026/34/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/34/m/meta.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/35/m/meta.tn"
             {
               placeholder => unit
             }
@@ -381,7 +387,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         // synthesizes 9 extra entries for argument-bearing type-refs, e.g. enum's own "members:
         // set<token>" -- runs before compiling. Never cached (see the next test) -- only the
         // *quality* of the one-off result changed, not its lifetime.
-        assertEquals(57, compiled.schema().entries().size());
+        assertEquals(58, compiled.schema().entries().size());
         // Genuinely usable: a concrete entry reads cleanly (the marker root `top` deliberately can't be
         // read without an explicit type-ref, so it isn't the check here).
         assertNotNull(compiled.compiledSchema().get("integer_size")
@@ -410,7 +416,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = registry;
 
         TsonSchemaFetchException thrown = assertThrows(TsonSchemaFetchException.class,
-                () -> loader.loadMeta("https://tson.io/2026/34/m/meta.tn"));
+                () -> loader.loadMeta("https://tson.io/2026/35/m/meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
 
@@ -444,7 +450,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         TsonCompiledMetaSchema compiled = loader.loadMeta(TsonBundledSchemas.META_ID);
 
-        assertEquals("BASE64", compiled.compiledSchema().get("binary_encoding")
+        assertEquals("BASE64", compiled.compiledSchema().get("bytes_encoding")
                 .read(TestDocuments.document("BASE64")));
         // Still there, from the explicit pre-registration step above -- meta.tn's own resolution
         // didn't need to (and doesn't) re-register it.

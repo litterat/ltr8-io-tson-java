@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -72,6 +73,10 @@ final class WireForm {
     /** The constructor a held record body carries. */
     static final String RECORD = "record";
 
+    static final String REFERENCE = "reference";
+
+    static final String TARGET = "target";
+
     static final String FIELDS = "fields";
     static final String GROUPS = "groups";
     static final String MEMBERS = "members";
@@ -108,6 +113,21 @@ final class WireForm {
     }
 
     // ── Writing: a resolved value as the wire form it was written in ───────────────────────────
+
+    /**
+     * The held body of an <b>open alias</b> -- {@code <B> !reference { target: pair<uuid, B> }}, the form
+     * [TSON-SCHEMA] §8.1 says a partial application denotes. Spellable because {@code reference.target} is a
+     * {@code type_ref}, so an alias that still binds arguments states them in its own body and {@code source}
+     * is never asked to hold them (§8.1).
+     *
+     * <p>The target goes through {@link #refValue} like every other reference this package writes, so a
+     * no-argument target is a bare token and only an application carries {@code arguments} -- the one
+     * spelling §5.10 requires, however many phases produce it.
+     */
+    static DataValue heldReference(TypeRef target) {
+        return new DataValue(List.of(), Optional.of(REFERENCE), new RecordValue(List.of(
+                new RecordValue.Field(TARGET, scoped(refValue(target))))));
+    }
 
     /**
      * The held body an <b>error placeholder</b> carries -- {@code !record { fields: [] }}, the zero-field
@@ -302,8 +322,23 @@ final class WireForm {
                             bindings))).toList());
             case RecordValue record -> new RecordValue(record.fields().stream()
                     .map(field -> substituteField(field, head, parameters, bindings)).toList());
+            // Both halves of an entry, because a parameter reaches either: core's `extern_of => <S> !scoped
+            // { scope: [EXTERN]  schemas: { S => _ } }` puts one in a key, and `extern_type`'s `T` inside the
+            // array its value names. A key is a data-value and a value a scoped-value ([TSON-DATA] §2.6), so
+            // the two are rebuilt through their own carriers rather than one.
+            case MapValue map -> new MapValue(map.entries().stream()
+                    .map(entry -> new MapValue.MapEntry(
+                            retyped(entry.key(), substitute(entry.key().coreValue(), head, parameters, bindings)),
+                            rescope(entry.value(), substitute(entry.value().value().coreValue(), head, parameters,
+                                    bindings))))
+                    .toList());
             default -> value;
         };
+    }
+
+    /** {@link #rescope}'s counterpart for a map key, which is a bare {@code data-value} and carries no scope. */
+    static DataValue retyped(DataValue original, CoreValue rewritten) {
+        return new DataValue(original.annotations(), original.typeRef(), rewritten);
     }
 
     /**

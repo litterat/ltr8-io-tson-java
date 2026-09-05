@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -11,7 +12,7 @@ import io.ltr8.tson.compiler.lexer.ConfusableNames;
 import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
@@ -20,10 +21,10 @@ import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.Data;
-import io.ltr8.tson.schema.meta.Extern;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.FloatType;
@@ -37,6 +38,7 @@ import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
@@ -50,11 +52,13 @@ import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
-import io.ltr8.tson.schema.meta.UnknownType;
+import io.ltr8.tson.schema.meta.Scoped;
+import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
 import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -114,6 +118,9 @@ public final class TsonSchemaLinker {
 
     /** meta.tn's {@code void}-targeted marker (§5.4), written bare -- presence is the assertion. */
     private static final String DISJOINT = "disjoint";
+
+    /** [TSON-SCHEMA] §4.1's structural root -- what an entry IS-A when it is a constructor. */
+    private static final String TOP = "top";
 
     private TsonSchemaLinker() {
     }
@@ -240,7 +247,7 @@ public final class TsonSchemaLinker {
             checkScope(receiver, schema, name, definition, names, noun, identifiers);
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
-            // them as one anyway -- SPEC-FEEDBACK.md #5. A parameter is a name, §11.4's own reasoning for
+            // them as one anyway -- §11.4 declines the scope. A parameter is a name, §11.4's own reasoning for
             // enum members applies to it unchanged, and `<T, Т>` otherwise declares two parameters that read
             // identically: a body referencing `T` binds one of them and a reviewer cannot see which, which
             // is the substitution hazard §8.2 exists to refuse.
@@ -432,7 +439,7 @@ public final class TsonSchemaLinker {
         for (Map.Entry<String, TypeDefinition> candidate : entries.entrySet()) {
             TypeDefinition definition = candidate.getValue();
             if (definition.position().isPresent() && definition.body() instanceof TemplateBody held
-                    && held.names().contains(name)) {
+                    && HeldBody.of(held).names().contains(name)) {
                 return candidate.getKey();
             }
         }
@@ -508,16 +515,29 @@ public final class TsonSchemaLinker {
         Boolean constructorsAllowed = null;
         for (Map.Entry<String, TypeDefinition> entry : schema.entries().entrySet()) {
             if (merged.containsKey(entry.getKey())) {
-                // The local entry is dropped, not the import's: an import is already-linked, separately
-                // registered material, so keeping it is the choice that leaves the rest of this schema
-                // checkable against something real.
+                // Two entries of one name that are the same entry unify rather than collide. §8.2 names a
+                // materialised instantiation by a function of its resolved form alone, precisely so that
+                // "two `box<text>` anywhere share one entry" -- so an application this schema closed and an
+                // identical one an import already closed agree by construction, and refusing them would make
+                // a template unusable by any schema that imports the one exporting it. Compared by value, not
+                // by origin: it is sameness that makes them one entry, and a derived name that is a function
+                // of the form is what makes sameness decidable here.
+                if (merged.get(entry.getKey()).equals(entry.getValue())) {
+                    continue;
+                }
+                // Otherwise the local entry is dropped, not the import's: an import is already-linked,
+                // separately registered material, so keeping it is the choice that leaves the rest of this
+                // schema checkable against something real.
                 if (!report(receiver, schema, entry.getKey(), entry.getValue(), "'" + entry.getKey()
                         + "' collides with an entry of the same name brought in by !!import")) {
                     continue;
                 }
             }
             TypeDefinition def = entry.getValue();
-            if (def.constructor()) {
+            // §2.2.2's meta-programming case, asked of the type system rather than of a marker: a constructor
+            // is an entry that IS-A `top` (§4.1), which is to say one composing, transitively, with a base
+            // kind. Only a schema chaining directly to the meta-kernel may declare one.
+            if (def.supertypes().contains(TOP)) {
                 if (constructorsAllowed == null) {
                     constructorsAllowed = isMetaKernelGoverned(schema);
                 }
@@ -526,8 +546,8 @@ public final class TsonSchemaLinker {
                     // here, so keeping it lets every reference to it check normally instead of turning one
                     // eligibility error into an unresolved reference at every use site.
                     report(receiver, schema, entry.getKey(), def, "'" + entry.getKey()
-                            + "' declares a type constructor "
-                            + "(the '~' marker), but '" + schema.id() + "' is not governed directly by the "
+                            + "' declares a type constructor -- it composes with a base kind, so it IS-A 'top' "
+                            + "(§4.1) -- but '" + schema.id() + "' is not governed directly by the "
                             + "meta-kernel (its own !!meta is '" + schema.meta() + "') -- only a schema chaining "
                             + "to meta-kernel.tn directly may declare new constructors (§2.2.2's "
                             + "meta-programming case); an ordinary type library or application schema may only "
@@ -830,27 +850,27 @@ public final class TsonSchemaLinker {
     private static TypeDefinition withAddedSubtypes(TypeDefinition def, Set<String> newSubtypes) {
         Set<String> combined = new LinkedHashSet<>(def.subtypes());
         combined.addAll(newSubtypes);
-        return new TypeDefinition(def.source(), def.kind(), def.parameters(), def.constructor(),
-                def.supertypes(), List.copyOf(combined), def.disjoint(), def.body(), def.position(),
+        return new TypeDefinition(def.source(), def.kind(),
+                def.supertypes(), List.copyOf(combined), def.body(), def.position(),
                 def.annotations());
     }
 
     /**
-     * Derives {@link TypeDefinition#disjoint} for every choice entry (§5.4), over the fully-merged
-     * namespace -- a namespace-wide pass, like {@link #computeSubtypes}, since a variant's discrimination
-     * class is only knowable with every entry resolved. The derivation ({@link ChoiceDisjointness}) is
-     * total and two-valued, so a linked choice always carries the fact; only non-choice entries leave it
-     * absent.
+     * Derives {@code choice.disjoint} for every choice entry (§5.4), over the fully-merged namespace -- a
+     * namespace-wide pass, like {@link #computeSubtypes}, since a variant's discrimination class is only
+     * knowable with every entry resolved. The derivation ({@link ChoiceDisjointness}) is total and
+     * two-valued, so a linked choice always carries the fact.
+     *
+     * <p><b>It is written on the body, which is the only thing that has variants to be disjoint over.</b>
+     * An entry with no {@code !choice} body has nowhere to put the fact, so "absent on every other
+     * definition" stops being a rule anyone can break.
      */
     private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged) {
         Map<String, TypeDefinition> result = new LinkedHashMap<>(merged);
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             if (entry.getValue().body() instanceof ChoiceBody choice) {
-                TypeDefinition def = entry.getValue();
-                result.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
-                        def.constructor(), def.supertypes(), def.subtypes(),
-                        Optional.of(ChoiceDisjointness.derive(choice, merged)), def.body(), def.position(),
-                        def.annotations()));
+                result.put(entry.getKey(), entry.getValue().withBody(new ChoiceBody(choice.variants(),
+                        Optional.of(ChoiceDisjointness.derive(choice, merged)))));
             }
         }
         return result;
@@ -871,7 +891,7 @@ public final class TsonSchemaLinker {
      * of entries, so re-arrival is unification, not conflict. Two *different* schemas declaring one name is
      * the real collision, and it is still an error: distinct types cannot share a name in a flat namespace.
      * That is also what makes a revision mismatch (one route reaching {@code /2026/32/m/core.tn}, another
-     * {@code /2026/34/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
+     * {@code /2026/35/m/core.tn}) a hard error at namespace-construction time rather than a confusing field
      * conflict between two identically-spelled types much later.
      *
      * <p>Identity is the canonical one ([TSON-DATA] §2.2.1), so a pinned and an unpinned reference to one
@@ -955,7 +975,11 @@ public final class TsonSchemaLinker {
             Map<String, TypeDefinition> sourceLookup =
                     structureNamespace.isEmpty() || !source.arguments().isEmpty() ? namespace
                             : mergeWithFallback(namespace, structureNamespace);
-            validateTypeRef(source, sourceLookup, def.parameters(), name, " source");
+            // `source` never names a parameter: an open entry records the constructor its held body applies,
+            // and a partial application states its own arguments in `reference.target` rather than here
+            // ([TSON-SCHEMA] §8.1's alias paragraph). So a parameter reaching this
+            // position is an unresolved reference, which is the verdict every other reference form gives it.
+            validateTypeRef(source, sourceLookup, List.of(), name, " source");
         }
         // A supertype gets the same structure-namespace fallback as `source`, and for the same reason: it is
         // not an author-written reference but the residue of one, and §3.3.2 confines only author-written
@@ -1064,7 +1088,7 @@ public final class TsonSchemaLinker {
             }
             case UuidType ignored -> {
             }
-            case BinaryType ignored -> {
+            case BytesType ignored -> {
             }
             case DateType ignored -> {
             }
@@ -1073,6 +1097,8 @@ public final class TsonSchemaLinker {
             case DateTimeType ignored -> {
             }
             case DurationType ignored -> {
+            }
+            case PeriodType ignored -> {
             }
             case Cidr4Type ignored -> {
             }
@@ -1088,9 +1114,7 @@ public final class TsonSchemaLinker {
             }
             case ComplexType ignored -> {
             }
-            case UnknownType ignored -> {
-            }
-            case Extern ignored -> {
+            case Scoped ignored -> {
             }
             case Data data -> {
                 // A body describing something other than a data value. Its shape is the consumer's own Java
@@ -1120,7 +1144,8 @@ public final class TsonSchemaLinker {
     /**
      * §5.4: "The resolver validates that each variant resolves to a distinct type."
      *
-     * <p><b>Judged after flattening, which is the whole point of the rule.</b> §8.3 makes an alias and its
+     * <p><b>Judged at the end of each variant's reference chain, which is the whole point of the rule.</b>
+     * §8.3 makes an alias and its
      * target one type, so {@code (text | my_text)} with {@code my_text => text} is the same duplicate {@code
      * (text | text)} is -- spelled so that an author cannot see it. Comparing the written names would catch
      * only the spelling an author would have caught themselves. A duplicate variant is never merely
@@ -1141,7 +1166,7 @@ public final class TsonSchemaLinker {
                                                   Map<String, TypeDefinition> namespace) {
         Map<TypeRef, String> seen = new LinkedHashMap<>();
         for (TypeRef variant : choice.variants()) {
-            TypeRef flattened = new TypeRef(terminalName(variant.name(), namespace), variant.arguments());
+            TypeRef flattened = new TypeRef(ReferenceChain.terminal(variant.name(), namespace), variant.arguments());
             String first = seen.putIfAbsent(flattened, variant.name());
             if (first == null) {
                 continue;
@@ -1157,13 +1182,13 @@ public final class TsonSchemaLinker {
     /**
      * A variant must not resolve to {@code void} (§5.4): {@code (T | void)} spells
      * optionality as a choice, and optionality belongs to the position -- a field's {@code ?} state, the
-     * {@code _} sentinel -- never to the type occupying it. Judged after §8.3 flattening, like
+     * {@code _} sentinel -- never to the type occupying it. Judged at the end of the chain, like
      * distinctness, so an alias of {@code void} is caught under whatever name the author wrote.
      */
     private static void checkVariantsAreNotVoid(String entryName, ChoiceBody choice,
                                                  Map<String, TypeDefinition> namespace) {
         for (TypeRef variant : choice.variants()) {
-            if (terminalName(variant.name(), namespace).equals("void")) {
+            if (ReferenceChain.terminal(variant.name(), namespace).equals("void")) {
                 throw new TsonSchemaValidationException("'" + entryName + "' has a variant"
                         + (variant.name().equals("void") ? "" : " '" + variant.name() + "'")
                         + " resolving to 'void' -- optionality is not choice (§5.4): a value's absence is the "
@@ -1171,29 +1196,6 @@ public final class TsonSchemaLinker {
                         + "type with void");
             }
         }
-    }
-
-    /**
-     * The name a reference chain ends at (§8.3): the first entry whose body is not a {@code Reference}. A
-     * name this schema does not declare is returned unchanged -- it is a type parameter, already accepted by
-     * {@link #validateTypeRef}.
-     *
-     * <p>A reference cycle stops the walk rather than hanging. Detecting and diagnosing one is a separate
-     * unimplemented concern ({@code BACKLOG.md}); stopping at the repeat is enough here, because the name it
-     * stops at depends on where the walk started, so a cycle yields no false duplicate.
-     */
-    private static String terminalName(String name, Map<String, TypeDefinition> namespace) {
-        Set<String> walked = new LinkedHashSet<>();
-        String current = name;
-        while (walked.add(current)) {
-            TypeDefinition def = namespace.get(current);
-            if (def == null || !(def.body() instanceof Reference reference)
-                    || !reference.target().arguments().isEmpty()) {
-                return current; // an argument-bearing target is an application, not a hop to another entry
-            }
-            current = reference.target().name();
-        }
-        return current;
     }
 
     /** {@code fallback} entries, overridden by {@code primary} on collision -- {@code primary} isn't mutated. */
@@ -1260,7 +1262,7 @@ public final class TsonSchemaLinker {
             // The one question a held body answers without being resolved, and it answers it about tokens
             // rather than about references -- which is the same rule substitution follows when it decides
             // what to rewrite.
-            case TemplateBody held -> into.addAll(held.names());
+            case TemplateBody held -> into.addAll(HeldBody.of(held).names());
             default -> { } // an atom body names no type
         }
     }
@@ -1298,6 +1300,7 @@ public final class TsonSchemaLinker {
         List<String> violations = switch (body) {
             case Atom atom -> atom.coherenceCheck();
             case Product product -> product.coherenceCheck();
+            case Sum sum -> sum.coherenceCheck();
             default -> List.of();
         };
         if (!violations.isEmpty()) {
@@ -1337,17 +1340,21 @@ public final class TsonSchemaLinker {
         if (field.value().isEmpty() || ownParameters.contains(field.type().name())) {
             return;
         }
-        TypeDefinition target = namespace.get(field.type().name());
+        // The chain end is what has to be checked, not the hop: a field typed by an alias
+        // (`a => text`, `f: a = hello`) states a value of whatever the alias names. Resolved output states
+        // the chain rather than rewriting the use site past it, so the walk happens here.
+        String terminal = ReferenceChain.terminal(field.type().name(), namespace);
+        TypeDefinition target = namespace.get(terminal);
         // An unresolved reference is already reported by validateTypeRef; a target that is still open (or an
-        // application of one) has no single body to check against until materialisation closes it. A
-        // REFERENCE target should not occur -- §8.3 flattens a type position past one -- and skipping is the
-        // right answer if it ever does: the chain end is what would have to be checked, not the hop.
+        // application of one) has no single body to check against until materialisation closes it. A body
+        // still a Reference means the walk stopped on a cycle or an argument-bearing target, neither of
+        // which has one either.
         if (target == null || !target.parameters().isEmpty() || !field.type().arguments().isEmpty()
                 || target.body() instanceof Reference) {
             return;
         }
         Token value = field.value().get();
-        Optional<AtomType<?>> parser = AtomParsers.forType(field.type().name(), target.body());
+        Optional<AtomType<?>> parser = AtomParsers.forType(terminal, target.body());
         if (parser.isEmpty()) {
             throw notAScalarType(entryName, field, value, target.body());
         }
@@ -1401,8 +1408,7 @@ public final class TsonSchemaLinker {
             case RecordBody ignored -> "a record";
             case ChoiceBody ignored -> "a choice";
             case Unit ignored -> "the void type";
-            case Extern ignored -> "an external type";
-            case UnknownType ignored -> "the unknown type, which is every type rather than a token shape";
+            case Scoped ignored -> "a scoped type, whose values name their own type rather than being a token shape";
             default -> "not a scalar type";
         };
     }
@@ -1465,7 +1471,7 @@ public final class TsonSchemaLinker {
      */
     private static void checkHeldArity(String entryName, TemplateBody held,
             Map<String, TypeDefinition> namespace, List<String> ownParameters) {
-        for (TypeRef application : held.applications()) {
+        for (TypeRef application : HeldBody.of(held).applications()) {
             checkArity(application, namespace, ownParameters, "'" + entryName + "'");
             for (TypeArgument argument : application.arguments()) {
                 if (argument instanceof TypeArgument.Ref nested) {

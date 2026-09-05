@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.TsonReadException;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -14,6 +15,11 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.Product;
+import io.ltr8.tson.schema.meta.Sum;
+import io.ltr8.tson.schema.meta.Data;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -132,6 +138,12 @@ final class TemplateMaterialiser {
      * {@code chain<text>} again and finds it in {@link #closing}. This stays because the alternative
      * failure, if that check ever has a hole, is a {@link StackOverflowError} -- not a diagnosis, and not
      * something the exception policy can classify. One comparison for that is worth paying.
+     *
+     * <p><b>It is a bare constant rather than a stated policy</b>, and it is [TSON-SCHEMA] §11.5's
+     * materialisation-depth limit at that section's own default. §11.5 states the schema-side limits as part
+     * of [TSON-DATA] §9.1's one limits policy, reported through the same surfaces, so this belongs on {@code
+     * TsonLimitsPolicy} beside {@code maxDepth}; nothing yet bounds the other four §11.5 names -- an import
+     * closure, a schema's entry count, a reference chain, or a supertype chain.
      *
      * <p>Distinct from §5.10.1's productivity rule, which is about a type with no finite <em>data</em>
      * model; the regularity rule is about one with no finite <em>type</em> model.
@@ -279,11 +291,44 @@ final class TemplateMaterialiser {
         List<TypeArgument> arguments = new ArrayList<>();
         for (TypeArgument argument : ref.arguments()) {
             arguments.add(argument instanceof TypeArgument.Ref nested
-                    ? new TypeArgument.Ref(close(nested.ref()))
+                    ? new TypeArgument.Ref(dereferenced(close(nested.ref())))
                     : argument);
         }
         String entry = instantiate(ref.name(), arguments);
         return entry == null ? new TypeRef(ref.name(), arguments, ref.annotations()) : TypeRef.of(entry);
+    }
+
+    /**
+     * A type argument named by its own type rather than by a name for it: a bare reference is replaced with
+     * the entry at the end of its chain.
+     *
+     * <p><b>Because a reference is a pure rename, and an application of one denotes the same type.</b>
+     * {@code user_id => uuid} makes {@code user_id} and {@code uuid} interchangeable at every position (§7.2
+     * compares "after reference flattening of both"), so {@code box<user_id>} and {@code box<uuid>} are one
+     * type and must be one entry. Without this they were two, which left the model saying the arguments were
+     * the same type while the applications were not -- interchangeable at a scalar position and refused one
+     * layer of application up.
+     *
+     * <p><b>An author who wants two boxes told apart has two spellings that say so</b>, and this is what
+     * makes them mean something: {@code user_id => !uuid ^ {}} is a refinement, IS-A {@code uuid} and not its
+     * siblings, and {@code user_id => !uuid_type {}} is a fresh type related to neither. Both are ordinary
+     * entries rather than references, so neither is dereferenced here.
+     *
+     * <p><b>What this normalises is identity, not provenance.</b> The minted entry's {@code source} becomes
+     * the canonical application, and the name the author wrote survives where they wrote it -- at the use
+     * site, which states it as written. The two facts have one home each.
+     *
+     * <p><b>Dereferencing loses nothing, and that is a property of the type system rather than luck.</b>
+     * Everything that decides how a value at a position is read belongs to the type at the end of the
+     * chain, the alphabet a {@code bytes} value is spelled in included: it is a facet of {@code bytes_type}
+     * ([TSON-SCHEMA] §5.5), so it travels with the type and a reference cannot carry one of its own.
+     */
+    private TypeRef dereferenced(TypeRef ref) {
+        if (!ref.arguments().isEmpty()) {
+            return ref; // an application, already closed above to the entry it denotes
+        }
+        String terminal = ReferenceChain.terminal(ref.name(), namespace::getTypeDefinition);
+        return terminal.equals(ref.name()) ? ref : new TypeRef(terminal, ref.arguments(), ref.annotations());
     }
 
     /**
@@ -343,22 +388,24 @@ final class TemplateMaterialiser {
             // whatever that denotes -- `uuid_pair<int32>` is the entry `pair<text, int32>` already produced.
             // "No intermediate entry per alias hop" is the rule, which is why this returns a name rather
             // than making one, and why it is the head that tells the three cases apart rather than the body.
-            if (template.body() instanceof HeldBody open
-                    && REFERENCE.equals(open.application().typeRef().orElseThrow())) {
-                aliasClosing.add(name);
-                return closeHeldAlias(head, template, open, bind(parameters, arguments));
-            }
-            // A record template's closure is the instantiation itself, where every other held form closes to
-            // a synthetic the instantiation then references -- see closeHeldRecord.
-            if (template.body() instanceof HeldBody open
-                    && RECORD.equals(open.application().typeRef().orElseThrow())) {
-                TypeDefinition instantiation =
-                        closeHeldRecord(head, template, open, arguments, bind(parameters, arguments));
-                materialised.put(name, instantiation);
-                publish.accept(name, instantiation);
-                return name;
-            }
-            if (template.body() instanceof HeldBody open) {
+            // The held body is parsed once here and reused by all three branches: this is the only place a
+            // closure needs the tree, and the parse is thrown away with it.
+            if (template.body() instanceof TemplateBody body) {
+                HeldBody open = HeldBody.of(body);
+                String constructor = open.application().typeRef().orElseThrow();
+                if (REFERENCE.equals(constructor)) {
+                    aliasClosing.add(name);
+                    return closeHeldAlias(head, template, open, bind(parameters, arguments));
+                }
+                // A record template's closure is the instantiation itself, where every other held form closes
+                // to a synthetic the instantiation then references -- see closeHeldRecord.
+                if (RECORD.equals(constructor)) {
+                    TypeDefinition instantiation = closeHeldRecord(head, template, open, arguments,
+                            bind(parameters, arguments));
+                    materialised.put(name, instantiation);
+                    publish.accept(name, instantiation);
+                    return name;
+                }
                 String formName = closeHeldTemplate(head, template, open, bind(parameters, arguments));
                 if (generated.contains(head)) {
                     // A generated head closing its own intermediate form: the form entry *is* the answer, and
@@ -436,8 +483,8 @@ final class TemplateMaterialiser {
         if (namespace.getTypeDefinition(formName) != null) {
             return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
         }
-        TypeDefinition definition = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(),
-                List.of(), false, List.of(), List.of(), Optional.empty(), closed.body());
+        TypeDefinition definition = new TypeDefinition(Optional.of(TypeRef.of(target)), kindOfClosed(closed.body()),
+                List.of(), List.of(), closed.body());
         materialised.put(formName, definition);
         synthetics.add(formName);
         publish.accept(formName, definition);
@@ -487,9 +534,36 @@ final class TemplateMaterialiser {
     private TypeDefinition closeHeldRecord(String head, TypeDefinition template, HeldBody open,
             List<TypeArgument> arguments, Map<String, TypeArgument> bindings) {
         Closed closed = closeHeld(head, template, open, bindings);
-        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), template.kind(), List.of(),
-                template.constructor(), template.supertypes(), template.subtypes(), Optional.empty(),
+        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)),
+                kindOfClosed(closed.body()),
+                template.supertypes(), template.subtypes(),
                 fixRoutedValues(closed.body()));
+    }
+
+    /**
+     * The kind a closed entry takes, read off the body substitution produced -- §4.1's "construction
+     * transfers kind", asked of the construction itself.
+     *
+     * <p><b>The template's own kind cannot answer it.</b> An open entry is {@code kind: TEMPLATE}: a template
+     * is not a type and says nothing about what applying it produces.
+     *
+     * <p><b>Nor can the constructor's name.</b> A held body's head is structure-namespace vocabulary
+     * ({@code record}, {@code set_type}, {@code scoped}) declared by the <em>governing meta</em>, which this
+     * pass does not hold -- {@code namespace} is the schema's own type-name namespace (§3.3.1 keeps the two
+     * apart). The closed body is in hand and says the same thing: an entry materialisation mints is never a
+     * constructor, so it does not compose with {@code top}, and for everything that does not, kind is the
+     * branch of {@link Top} its body occupies.
+     */
+    private static TypeKind kindOfClosed(Top body) {
+        return switch (body) {
+            case Atom ignored -> TypeKind.ATOM;
+            case Product ignored -> TypeKind.PRODUCT;
+            case Sum ignored -> TypeKind.SUM;
+            case Reference ignored -> TypeKind.REFERENCE;
+            case Data ignored -> TypeKind.DATA;
+            case TemplateBody ignored -> throw new IllegalStateException(
+                    "a closed entry's body is held -- substitution left a parameter behind");
+        };
     }
 
     /** A held body substituted, its inner applications closed, and read back through its constructor. */
@@ -575,6 +649,14 @@ final class TemplateMaterialiser {
                     .toList());
             case ArrayValue array -> new ArrayValue(array.elements().stream()
                     .map(element -> WireForm.rescope(element, closeApplications(element.value().coreValue()))).toList());
+            // A map slot holds applications like any other: `{ S => [box<text>] }` writes one in the array
+            // its value names, and a key type could take one too. Both halves descend, as they do in
+            // WireForm.substitute, which walks the same shape one step earlier.
+            case MapValue map -> new MapValue(map.entries().stream()
+                    .map(entry -> new MapValue.MapEntry(
+                            WireForm.retyped(entry.key(), closeApplications(entry.key().coreValue())),
+                            WireForm.rescope(entry.value(), closeApplications(entry.value().value().coreValue()))))
+                    .toList());
             default -> value;
         };
     }
@@ -587,8 +669,8 @@ final class TemplateMaterialiser {
      * record one.
      */
     private static TypeDefinition instantiationOf(String head, List<TypeArgument> arguments, String formName) {
-        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE, List.of(),
-                false, List.of(), List.of(), Optional.empty(), new Reference(TypeRef.of(formName)));
+        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE,
+                List.of(), List.of(), new Reference(TypeRef.of(formName)));
     }
 
     /**

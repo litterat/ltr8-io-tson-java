@@ -91,9 +91,10 @@ class TsonDataEmitterTest {
     }
 
     @Test
-    void nullAndAbsentAreDistinctTokens() {
-        assertEquals("null", new TsonDataEmitter().nullValue().toString());
+    void absentIsTheOnlyNoValueToken() {
         assertEquals("_", new TsonDataEmitter().absentValue().toString());
+        // `null` has no emitter of its own: it is an ordinary unquoted string token.
+        assertEquals("null", new TsonDataEmitter().unquotedToken("null").toString());
     }
 
     @Test

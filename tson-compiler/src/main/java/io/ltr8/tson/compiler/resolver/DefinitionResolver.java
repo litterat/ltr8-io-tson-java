@@ -40,9 +40,11 @@ import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.Product;
+import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -235,6 +237,9 @@ final class DefinitionResolver {
      * the constructor's own kind.
      */
     private static final String REFERENCE = "reference";
+
+    /** [TSON-SCHEMA] §4.1's structural root -- the name {@link #requireApplicable} tests IS-A against. */
+    private static final String TOP = "top";
 
     /**
      * Re-serializes an atom refinement's source back to wire form for {@link #mergeWithSource} -- see
@@ -438,21 +443,20 @@ final class DefinitionResolver {
     private TypeDefinition resolveTypeDef(String name, TypeDef typeDef) {
         if (typeDef instanceof StructuralTypeDef structural) {
             List<String> parameters = structural.typeParams();
-            boolean constructor = structural.constructor();
             if (structural.body() instanceof RecordDef recordDef) {
                 RecordBody body = resolveRecordBody(recordDef.entries(), parameters);
                 // Only an error placeholder is both parameterised and still a bare RecordDef here -- the
                 // desugar phase rewrote every real record template into the `!record { ... }` §5.2 says it
                 // denotes. Holding it anyway is what leaves no parameterised RecordBody anywhere, so
                 // materialisation needs only the one substitution path. See WireForm.heldEmptyRecord.
-                return holdIfOpen(name, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters,
-                        constructor, List.of(), List.of(), Optional.empty(), body));
+                return holdIfOpen(name, parameters, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT,
+                        List.of(), List.of(), body));
             }
             if (structural.body() instanceof ConstructionDef construction) {
-                return holdIfOpen(name, resolveComposition(name, construction, constructor, parameters));
+                return holdIfOpen(name, parameters, resolveComposition(name, construction, parameters));
             }
             if (structural.body() instanceof RefinedDef refined) {
-                return holdIfOpen(name, resolveRefinement(name, refined, constructor, parameters));
+                return holdIfOpen(name, parameters, resolveRefinement(name, refined, parameters));
             }
         }
         if (typeDef instanceof ReferenceTypeDef referenceTypeDef) {
@@ -462,7 +466,7 @@ final class DefinitionResolver {
             // materialisation's job, and until then the open form is what the entry records.
             List<String> parameters = referenceTypeDef.typeParams();
             if (referenceTypeDef.ref() instanceof SimpleRef simple) {
-                return TypeDefinition.reference(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
+                return openAliasOr(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
             }
             if (referenceTypeDef.ref() instanceof GenericRef generic) {
                 return resolveTemplateApplication(name, generic, parameters);
@@ -503,14 +507,27 @@ final class DefinitionResolver {
      * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom
      * body has no parameters to hold open.
      */
-    private TypeDefinition holdIfOpen(String name, TypeDefinition resolved) {
-        if (resolved.parameters().isEmpty() || !(resolved.body() instanceof RecordBody record)) {
+    /**
+     * {@code resolved} with its body held and its kind set to TEMPLATE -- what an entry becomes once it is
+     * known to be open.
+     *
+     * <p>The kind it had was the one its <em>body</em> would have produced, which is the kind of the entry
+     * materialisation mints and not of the template itself: a template is not a type ([TSON-SCHEMA] §5.10),
+     * so it takes {@code TEMPLATE} and an application of it takes the constructor's.
+     */
+    private static TypeDefinition openWith(TypeDefinition resolved, io.ltr8.tson.schema.meta.TemplateBody held) {
+        return new TypeDefinition(resolved.source(), TypeKind.TEMPLATE, resolved.supertypes(),
+                resolved.subtypes(), held, resolved.position(), resolved.annotations());
+    }
+
+    private TypeDefinition holdIfOpen(String name, List<String> parameters, TypeDefinition resolved) {
+        if (parameters.isEmpty() || !(resolved.body() instanceof RecordBody record)) {
             return resolved;
         }
         if (record.fields().isEmpty() && record.groups().isEmpty() && record.supertypes().isEmpty()) {
-            return resolved.withBody(new HeldBody(WireForm.heldEmptyRecord()));
+            return openWith(resolved, HeldBody.held(parameters, WireForm.heldEmptyRecord()));
         }
-        return resolved.withBody(new HeldBody(WireForm.heldRecord(record,
+        return openWith(resolved, HeldBody.held(parameters, WireForm.heldRecord(record,
                 value -> annotationWireValue(name, value))));
     }
 
@@ -531,46 +548,95 @@ final class DefinitionResolver {
     // ── Constructor application (§5.5, §5.6) ────────────────────────────────
 
     /**
+     * Whether {@code !C { ... }} may apply {@code C} at all: <b>{@code C} IS-A {@code top}</b>
+     * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain.
+     *
+     * <p><b>This replaces asking whether {@code C} is a constructor, and it is a wider and more exact
+     * question.</b> §4.1 makes every base kind IS-A {@code top} and every constructor transitively so, while
+     * IS-A stops at construction -- an instance or a fresh record carries an empty chain. So the predicate
+     * admits every constructor, and beyond them exactly the entries that describe <em>a type</em> rather than
+     * a part of one.
+     *
+     * <p>What it lets in that {@code constructor} did not:
+     * <ul>
+     *   <li>{@code reference}, which the kernel deliberately leaves unmarked because it describes no value,
+     *   and which the language nonetheless needs applicable. It used to take a by-name exception in {@link
+     *   #resolveTemplateInstance} and none here, so {@code <T> !reference { target: T }} resolved while
+     *   {@code !reference { target: int32 }} did not -- one construction legal open and illegal closed.</li>
+     *   <li>the four base kinds, which cost nothing: each is an abstract union whose own reader refuses a
+     *   direct application by naming the subtypes that would satisfy it.</li>
+     * </ul>
+     *
+     * <p>What it keeps out is the set that matters -- {@code record_field}, {@code type_ref}, {@code
+     * type_argument}, {@code tuple_element}, {@code field_group}, {@code integer_size}, {@code
+     * atom_specification}, {@code type_definition}: record-bodied entries with empty chains, every one a
+     * component of a type rather than a type. Without a check they fail anyway, on {@code Top} being sealed,
+     * but as a {@code ClassCastException} reported {@code NOT_IMPLEMENTED} -- a non-verdict, for an author
+     * error.
+     */
+    private static void requireApplicable(String name, String target, TypeDefinition applied) {
+        if (applied.supertypes().contains(TOP)) {
+            return;
+        }
+        throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' is not applicable -- it is "
+                + "not IS-A 'top' (§4.1), so it describes a part of a type rather than a type, and there is "
+                + "nothing for '!" + target + " { ... }' to build. Did you mean atom refinement ('!" + target
+                + " ^ { ... }')?");
+    }
+
+    /**
      * {@code !C value} (constructor application, no {@code ^}) -- produces a fresh instance filled
-     * with {@code value}. {@code C} resolves against the structure namespace only (see {@link
-     * #resolveConstructorTarget}); the found entry MUST be a constructor ({@code constructor: true})
-     * or this is a resolver error (the spec's own suggested diagnostic: "did you mean atom
-     * refinement?"). {@code value} is bound via {@link #bindAtomInstance} directly --
-     * {@code instance.value().typeRef()} already names {@code C} (per {@code Instance}'s own
-     * reshape, matching §12.1's {@code instance = "!" type-name ws core-value}); positional form (§5.6) and
-     * schema-composed defaults
-     * (§5.2/§5.7) are handled uniformly by the compiled {@code Record*Reader} itself (see {@code
-     * RecordAbstractReader}'s own Javadoc), not by a separate normalization step here -- {@code C}'s
-     * own body is always record-shaped (checked below), so every real call reaches one. Construction
-     * transfers only {@code C}'s {@code kind} (§5.5): no supertypes, no parameters, {@code
-     * constructor: false} on the result.
+     * with {@code value}.
+     *
+     * <p>{@code C} resolves against the structure namespace only (see {@link #resolveConstructorTarget}),
+     * and faces two questions. It MUST be <b>applicable</b> -- IS-A {@code top} (§4.1), see {@link
+     * #requireApplicable} -- and it MUST be <b>closed</b>: a template ({@code C} declaring type parameters)
+     * closes by application, {@code C<...>}, never by construction, so naming one here is a resolver error
+     * whether or not it also carries {@code ~}.
+     *
+     * <p>{@code value} is bound via {@link #bindAtomInstance} directly -- {@code instance.value().typeRef()}
+     * already names {@code C} (per {@code Instance}'s own reshape, matching §12.1's {@code instance = "!"
+     * type-name ws core-value}); positional form (§5.6) and schema-composed defaults (§5.2/§5.7) are handled
+     * uniformly by the compiled {@code Record*Reader} itself (see {@code RecordAbstractReader}'s own
+     * Javadoc), not by a separate normalization step here. Construction transfers only {@code C}'s {@code
+     * kind} (§5.5): no supertypes, no parameters, {@code constructor: false} on the result -- except for an
+     * alias, where the result is the entry {@code name => X} denotes, since {@code !reference { target: X }}
+     * is that alias written out (§8.3).
      *
      * <p>Binds against {@link Top}, not the narrower {@code Atom} -- some constructors (e.g. {@code
-     * unknown_type => ~sum & {}}) compose with {@code sum}, not {@code atom}. {@code C}'s own body
-     * must also already be a {@link RecordBody} -- true for every real constructor (a constructor's
-     * own declared vocabulary is always record-shaped, whatever the resulting instance's bound Java
-     * class looks like, atom-family or not).
+     * unknown_type => ~sum & {}}) compose with {@code sum}, not {@code atom}. {@code C}'s own body is
+     * always a {@link RecordBody} by the time it is read, which the two questions above establish rather
+     * than check: see the note at the binding site.
      */
     private TypeDefinition resolveInstance(String name, Instance instance) {
         String target = instance.target();
-        TypeDefinition constructor = resolveConstructorTarget(name, target);
-        if (!constructor.constructor()) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' does not resolve to a "
-                    + "constructor (§3.3.1) -- did you mean atom refinement ('!" + target + " ^ { ... }')?");
+        ConstructorHead head = resolveConstructorTarget(name, target);
+        TypeDefinition constructor = head.definition();
+        if (!constructor.parameters().isEmpty()) {
+            int declared = constructor.parameters().size();
+            throw new TsonSchemaValidationException("'" + name + "': '" + target + "' is a template taking "
+                    + declared + " type argument" + (declared == 1 ? "" : "s") + " " + constructor.parameters()
+                    + ", and a template closes by application, not by construction -- write '" + target
+                    + "<...>' with its arguments (§5.10). '!" + target + " { ... }' fills a constructor's own "
+                    + "vocabulary (§4.2), which is a different operation and needs a closed constructor");
         }
-        if (!(constructor.body() instanceof RecordBody _)) {
-            // Unreachable from anything this parser produces: §12.1 attaches `~` to a structural-def only
-            // (refined-def / construction-def / record-def), each of which resolves to a record body, and §7.2
-            // says a constructor *is* a record-shaped type. So a constructor with any other body means a
-            // malformed TypeDefinition reached the structure namespace by some route other than parsing --
-            // an invariant violation, not a schema this resolver should be explaining to an author.
-            throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
-                    + constructor.body().getClass().getSimpleName() + " body; a constructor is record-shaped "
-                    + "(§7.2) and cannot be declared otherwise");
+        requireApplicable(name, target, constructor);
+        // No check that the head's own body is a record: the two above leave nothing else. `supertypes` is
+        // populated only by composition and refinement, both of which build a `RecordBody` -- except where
+        // `holdIfOpen` wraps one for an open declaration, and a declaration with parameters is refused as a
+        // template above. Every other body shape (a construction's bound value, an alias's `Reference`)
+        // comes with an empty chain, since IS-A stops at construction (§4.1), so `requireApplicable` refuses
+        // it. Parameters empty and IS-A `top` therefore imply a record body.
+        Top body = bindAtomInstance(name, readAs(instance.value(), head.name()));
+        if (body instanceof io.ltr8.tson.schema.meta.Reference reference) {
+            // `!reference { target: X }` is the explicit spelling of the alias `name => X` (§8.3), so it
+            // denotes the same entry: `kind: REFERENCE` (§4.1 -- a type_kind, not one the supertype chain
+            // could give) with `X` as both source and body. Dispatched on the *body* rather than on the head's
+            // name because this path has already read it; `resolveInstanceTemplate` holds its body unread and
+            // so has only the name to go on, which is what its own `alias` flag is for.
+            return TypeDefinition.reference(reference.target());
         }
-        Top body = bindAtomInstance(name, instance.value());
-        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
-                List.of(), false, List.of(), List.of(), Optional.empty(), body);
+        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(), List.of(), List.of(), body);
     }
 
     /**
@@ -598,17 +664,13 @@ final class DefinitionResolver {
      */
     private TypeDefinition resolveInstanceTemplate(String name, Instance template) {
         String target = template.target();
-        TypeDefinition constructor = resolveConstructorTarget(name, target);
-        // `reference` is the one head whose kind cannot come from its supertype chain and whose eligibility
-        // cannot come from a `~`: §4.1 gives an alias `kind: REFERENCE`, which is a type_kind and not a base
-        // kind, and the kernel deliberately leaves `reference` unmarked because it describes no value. Both
-        // facts are the kernel's own, so the head is dispatched here rather than judged by the generic rule.
-        // The binding check below still runs -- `reference`'s vocabulary is a record like any other.
-        boolean alias = REFERENCE.equals(target);
-        if (!alias && !constructor.constructor()) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' does not resolve to a "
-                    + "constructor (§3.3.1), so there is nothing for '<...> !" + target + " { ... }' to build");
-        }
+        ConstructorHead head = resolveConstructorTarget(name, target);
+        TypeDefinition constructor = head.definition();
+        // `reference` needs no exception here: it IS-A `top`, so the generic rule admits it, which is what
+        // makes the open and closed spellings of one construction agree. Nor does its kind need one any
+        // more -- every open entry is TEMPLATE whatever constructor its held body applies, so the alias form
+        // stopped being the one shape whose kind had to be read off the head.
+        requireApplicable(name, target, constructor);
         if (!(constructor.body() instanceof RecordBody vocabulary)) {
             throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
                     + constructor.body().getClass().getSimpleName() + " body; a constructor is record-shaped "
@@ -617,10 +679,13 @@ final class DefinitionResolver {
         if (template.value().coreValue() instanceof RecordValue bindings) {
             checkTemplateBindings(name, target, vocabulary, bindings);
         }
+        // §5.10: an open entry is a template, not a type. Its kind says that and nothing about what an
+        // application of it produces -- that is the constructor's, read off the closed body at
+        // materialisation. The alias form is no exception: `<B> pair<uuid, B>` is a template whose closure
+        // is a reference, not a reference that happens to have parameters.
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)),
-                alias ? TypeKind.REFERENCE : constructor.kind(),
-                template.typeParams(), false, List.of(), List.of(), Optional.empty(),
-                new HeldBody(template.value()));
+                TypeKind.TEMPLATE, List.of(), List.of(),
+                HeldBody.held(template.typeParams(), template.value()));
     }
 
     /** §5.10's two declaration-time questions about a held binding record -- see {@link #resolveInstanceTemplate}. */
@@ -689,14 +754,22 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
                     + "' does not resolve against the type-name namespace (§3.3.1)");
         }
-        if (source.constructor()) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' refines a "
-                    + "constructor, not an instance (§3.3.1) -- did you mean constructor application ('!"
-                    + sourceName + " { ... }')?");
-        }
-        if (source.kind() != TypeKind.ATOM) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
-                    + "' is not an atom-family instance (§5.5), kind=" + source.kind());
+        // §5.5's question, asked of the body: is this an atom *instance*? An instance's body IS an atom
+        // (`integer` carries an `!integer_type {}`), where its constructor's body is the vocabulary record
+        // describing one (`integer_type` carries a `!record { ... }`). So one test separates the pair and
+        // establishes atom-ness at once, where neither half does alone -- a plain record has no supertypes
+        // either, and `integer_type` is ATOM-kinded exactly like its instances. It is also how the reader
+        // stack decides everything of this shape (`Subsumption`), rather than trusting a stated kind.
+        if (!(source.body() instanceof io.ltr8.tson.schema.meta.Atom)) {
+            // The construction hint is offered only where construction would actually work, which is the
+            // same applicability question (§4.1) -- so `top`, not applicable, gets the plain answer rather
+            // than advice that would fail in turn.
+            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an "
+                    + "atom-family instance to narrow (§5.5), and '" + sourceName + "' is "
+                    + (source.supertypes().contains(TOP)
+                            ? "a constraint vocabulary -- '^' narrows one of its instances. Did you mean "
+                                    + "constructor application ('!" + sourceName + " { ... }')?"
+                            : "kind=" + source.kind() + ", which has no atom constraints to tighten"));
         }
         // Not an author error, unlike the three checks above: an atom-family instance always records the
         // constructor it came from, so one that doesn't is a malformed TypeDefinition, not a schema anyone
@@ -710,8 +783,8 @@ final class DefinitionResolver {
         Top body = bindAtomInstance(name, merged);
         checkNarrows(name, sourceName, source.body(), body);
 
-        return new TypeDefinition(Optional.of(constructorRef), source.kind(), List.of(), false,
-                List.of(sourceName), List.of(), Optional.empty(), body);
+        return new TypeDefinition(Optional.of(constructorRef), source.kind(),
+                List.of(sourceName), List.of(), body);
     }
 
     /**
@@ -739,8 +812,8 @@ final class DefinitionResolver {
         }
         List<String> violations = sourceAtom.constraintsCheck(refinedAtom);
         if (!violations.isEmpty()) {
-            throw new TsonSchemaValidationException("'" + name + "': refinement of '!" + sourceName
-                    + "' widens rather than tightens it (§5.7): " + String.join("; ", violations));
+            throw new TsonSchemaValidationException("'" + name + "': not a valid refinement of '!" + sourceName
+                    + "' (§5.7): " + String.join("; ", violations));
         }
     }
 
@@ -798,21 +871,50 @@ final class DefinitionResolver {
     }
 
     /**
-     * A constructor-application target ({@code !C value}) resolves against {@code metaDefinitions}
-     * (the structure namespace) only -- never {@code namespaceDefinitions} (the type-name namespace).
-     * A constructor is always meta-schema vocabulary (a {@code type_definition} with {@code
-     * constructor: true}, e.g. {@code integer_type}/{@code enum}), never something a schema
-     * legitimately defines about itself and, in the same pass, instantiates -- the target is always
-     * declared in the *governing* meta-schema, one hop via {@code !!meta}, so the structure namespace
-     * alone is enough.
+     * The constructor a {@code !C ...} head names, and the name to read its payload against -- <b>after
+     * following {@code C}'s reference chain</b> ([TSON-SCHEMA] §8.3).
+     *
+     * <p>A reference is a hop, not a rewrite: resolved output states the chain the author wrote, and a
+     * processor collapses it when it needs the type. So {@code alias_array => array} makes
+     * {@code !alias_array { ... }} an application of {@code array}, and everything this resolver then asks of
+     * the head -- is it a template, is it applicable, what kind does construction transfer, whose vocabulary
+     * reads the payload -- is a question about the entry at the end. Asking the alias instead answered every
+     * one of them from an empty supertype chain and a {@code REFERENCE} kind, which is what a hop looks like
+     * rather than what it points at.
+     *
+     * <p>The author's own spelling survives where it is visible: {@link #resolveInstance} records {@code C} in
+     * {@code source}, not the terminal, so the chain stays walkable from resolved output.
      */
-    private TypeDefinition resolveConstructorTarget(String name, String target) {
-        TypeDefinition structural = metaDefinitions.getTypeDefinition(target);
-        if (structural != null) {
-            return structural;
+    private ConstructorHead resolveConstructorTarget(String name, String target) {
+        if (metaDefinitions.getTypeDefinition(target) == null) {
+            throw new TsonSchemaValidationException("'" + name + "': '!" + target
+                    + "' does not resolve against the structure namespace (§3.3.1)");
         }
-        throw new TsonSchemaValidationException("'" + name + "': '!" + target
-                + "' does not resolve against the structure namespace (§3.3.1)");
+        String terminal = ReferenceChain.terminal(target, metaDefinitions::getTypeDefinition);
+        TypeDefinition atEnd = metaDefinitions.getTypeDefinition(terminal);
+        if (atEnd == null) {
+            // The walk stopped at a name the structure namespace does not declare -- a broken hop, which is
+            // the alias's own problem and not this declaration's, but this is where it becomes visible.
+            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' is an alias whose chain "
+                    + "ends at '" + terminal + "', which the structure namespace does not declare (§8.3)");
+        }
+        return new ConstructorHead(terminal, atEnd);
+    }
+
+    /**
+     * {@code value} re-typed to the name its payload is read against -- the terminal of the head's chain
+     * (§8.3), where the author may have written an alias. A no-op for the ordinary case, where they are the
+     * same name; the meta-schema's reader table is keyed by the constructor's own name, so an alias reaches
+     * one only by asking under it.
+     */
+    private static DataValue readAs(DataValue value, String constructorName) {
+        return value.typeRef().filter(constructorName::equals).isPresent()
+                ? value
+                : new DataValue(value.annotations(), Optional.of(constructorName), value.coreValue());
+    }
+
+    /** A construction head resolved through §8.3's chain: the name to read against, and the entry it names. */
+    private record ConstructorHead(String name, TypeDefinition definition) {
     }
 
     /**
@@ -841,6 +943,13 @@ final class DefinitionResolver {
             String where = "'" + name + "': " + e.getMessage();
             throw e instanceof TsonMissingBindingException ? new TsonMissingBindingException(where)
                     : new TsonBindMismatchException(where);
+        } catch (TsonSchemaValidationException e) {
+            // A constructor's own record refusing the values it was handed. `decimal_type`'s member set is the
+            // case: `members` is typed `set<value>`, so the wire admits anything and the family itself is what
+            // says a member must be a number the atom reads. The author's error either way -- the verdict on
+            // `members: ["abc"]` does not change when this library improves -- so it keeps its classification
+            // rather than being relabelled a gap by the catch-all below.
+            throw new TsonSchemaValidationException("'" + name + "': " + e.getMessage(), e);
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to bind '" + constructorName + "' via the compiled meta-schema reader: "
@@ -877,6 +986,7 @@ final class DefinitionResolver {
         List<String> violations = switch (body) {
             case Atom atom -> atom.coherenceCheck();
             case Product product -> product.coherenceCheck();
+            case Sum sum -> sum.coherenceCheck();
             default -> List.of();
         };
         if (!violations.isEmpty()) {
@@ -929,8 +1039,20 @@ final class DefinitionResolver {
                 throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
             }
         }
-        return TypeDefinition.reference(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments),
-                parameters);
+        return openAliasOr(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments), parameters);
+    }
+
+    /**
+     * An alias entry: closed, with a {@code Reference} body naming its target, or -- §5.10's partial
+     * application -- <b>open</b>, with that same {@code !reference { target: ... }} held as its body.
+     *
+     * <p>An open entry's body is held whatever shape it takes, with no exception for the alias form: that is
+     * what lets materialisation dispatch on the constructor head, and what makes "declares parameters" and
+     * "holds its body" one question. {@code source} records the same reference either way, as provenance.
+     */
+    private static TypeDefinition openAliasOr(io.ltr8.tson.schema.meta.TypeRef target, List<String> parameters) {
+        return parameters.isEmpty() ? TypeDefinition.reference(target)
+                : new TypeDefinition(Optional.of(target), TypeKind.TEMPLATE, List.of(), List.of(), HeldBody.held(parameters, WireForm.heldReference(target)));
     }
 
     /**
@@ -956,6 +1078,7 @@ final class DefinitionResolver {
 
     // ── Composition (§5.8) and subtraction (§5.9) ─────────────────────────
 
+
     /**
      * {@code A & B & { ... }}: each supertype's fields and groups are copied into the result, left
      * to right (§5.8's field-ordering rule, §5.11's "supertypes contribute their groups whole"),
@@ -975,7 +1098,7 @@ final class DefinitionResolver {
      * ({@code array => <T> ~product & { ... } }) -- with no substitution or validation that a field
      * actually uses each parameter.
      */
-    private TypeDefinition resolveComposition(String name, ConstructionDef construction, boolean constructor,
+    private TypeDefinition resolveComposition(String name, ConstructionDef construction,
                                                List<String> parameters) {
         List<String> directSupertypes = new ArrayList<>();
         List<String> transitiveSupertypes = new ArrayList<>();
@@ -1064,8 +1187,7 @@ final class DefinitionResolver {
         // reason §5.9 gives: the clause is head-level, so its effect must be readable without scanning the
         // parents' field sets. An author wanting partial IS-A subtracts first and composes second.
         List<String> contract = construction.removal().isPresent() ? List.of() : transitiveSupertypes;
-        return new TypeDefinition(Optional.empty(), kind, parameters, constructor, contract, List.of(),
-                Optional.empty(), body);
+        return new TypeDefinition(Optional.empty(), kind, contract, List.of(), body);
     }
 
     /**
@@ -1213,14 +1335,14 @@ final class DefinitionResolver {
      * determined the same way composition determines it (the transitive chain's literal
      * atom/product/sum name, not the source's own resolved kind).
      */
-    private TypeDefinition resolveRefinement(String name, RefinedDef refined, boolean constructor,
+    private TypeDefinition resolveRefinement(String name, RefinedDef refined,
                                               List<String> parameters) {
         if (refined.target() instanceof GenericRef generic && namesOwnParameter(generic, parameters)) {
             // §5.7 against an open source: the same absorption composition does, and the same two omissions.
             // The source names no entry, so it is neither `source` nor a supertype -- but its own ancestors
             // are types and its whole field set arrives, which is what `^` re-emits and then tightens.
             OpenOperand operand = openOperand(name, generic, parameters, "refinement source");
-            return refineOnto(name, refined, constructor, parameters, Optional.empty(),
+            return refineOnto(name, refined, parameters, Optional.empty(),
                     new ArrayList<>(operand.ancestors()), operand.body());
         }
         io.ltr8.tson.schema.meta.TypeRef sourceRef = resolveRefinementSource(name, refined.target(), parameters);
@@ -1248,7 +1370,7 @@ final class DefinitionResolver {
         for (String ancestor : sourceDef.supertypes()) {
             addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
         }
-        return refineOnto(name, refined, constructor, parameters, Optional.of(sourceRef), transitiveSupertypes,
+        return refineOnto(name, refined, parameters, Optional.of(sourceRef), transitiveSupertypes,
                 sourceBody);
     }
 
@@ -1259,7 +1381,7 @@ final class DefinitionResolver {
      * own ancestors survive. Everything after that -- restating groups, tightening fields, the presence check,
      * the kind -- is one rule and lives here once.
      */
-    private TypeDefinition refineOnto(String name, RefinedDef refined, boolean constructor,
+    private TypeDefinition refineOnto(String name, RefinedDef refined,
             List<String> parameters, Optional<io.ltr8.tson.schema.meta.TypeRef> source,
             List<String> transitiveSupertypes, RecordBody sourceBody) {
         List<RecordField> fields = new ArrayList<>(sourceBody.fields());
@@ -1292,8 +1414,8 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups);
-        return new TypeDefinition(source, kind, parameters, constructor, transitiveSupertypes,
-                List.of(), Optional.empty(), body);
+        return new TypeDefinition(source, kind, transitiveSupertypes,
+                List.of(), body);
     }
 
     /**
@@ -1384,7 +1506,7 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' names no type this schema declares or imports");
         }
-        if (!(template.body() instanceof HeldBody held)) {
+        if (!(template.body() instanceof TemplateBody open)) {
             // Applied to this declaration's own parameter, so the author wrote arguments; the head takes none.
             throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' declares no type parameters, so it cannot be applied to '"
@@ -1402,7 +1524,7 @@ final class DefinitionResolver {
             // `inner<T>` whole and the absorbing declaration's own materialisation closes it.
             bindings.put(template.parameters().get(i), typeArgument(application.args().get(i)));
         }
-        DataValue body = held.application();
+        DataValue body = HeldBody.of(open).application();
         CoreValue substituted = WireForm.substitute(body.coreValue(), head,
                 template.parameters(), bindings);
         Top absorbed = bindAtomInstance(name, new DataValue(body.annotations(), body.typeRef(), substituted));
@@ -1615,10 +1737,49 @@ final class DefinitionResolver {
      * requires the resolver to reject a modifier-only entry both in a fresh record (no source to elide
      * toward) and in a composition body naming no inherited field, so it raises {@link
      * io.ltr8.tson.schema.TsonSchemaValidationException}.
+     *
+     * <p><b>A restatement's annotations merge over the inherited ones</b> ({@link #merged}), rather than
+     * replacing them: a tightening entry states what it tightens, and §5.7's modifier-only spelling ({@code
+     * extra: ?}) has no annotation position at all, so an entry that mentions nothing must not be able to
+     * erase what it does not mention.
      */
     private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
+        Annotations own = annotationsOf(field.name(), field.annotations());
         return resolveFieldEntry(field, parameters, inherited)
-                .withAnnotations(annotationsOf(field.name(), field.annotations()));
+                .withAnnotations(inherited.map(source -> merged(own, source.annotations())).orElse(own));
+    }
+
+    /**
+     * A restated field's annotations: the restatement's own first, in source order, then the inherited
+     * field's, in source order. One rule, and every part of it is load-bearing.
+     *
+     * <p><b>Concatenation, not replacement by name.</b> [TSON-DATA] §3.1 makes an annotation name repeatable
+     * on one value -- "an annotation name MAY appear any number of times on a single value; all occurrences
+     * are preserved in source order" -- so annotations are a list and not a map. Replacing "the inherited
+     * {@code @doc}" would need an identity the model does not give them, and has no defined answer where the
+     * source carries two. A restated field carrying two {@code @doc}s is the same shape as a field an author
+     * wrote two on directly.
+     *
+     * <p><b>Nearer first, because order is the precedence mechanism already.</b> {@link Annotations#get} and
+     * {@link Annotations#value} take the first occurrence, so leading with the restatement is what makes the
+     * nearer declaration win at every such site without one of them having to know about composition. §5.8
+     * states the rule this implements: the restatement's own annotations in source order, then the inherited
+     * field's, adding and never removing.
+     *
+     * <p>The cost is that a subtype rewriting an inherited {@code @doc} leaves the field carrying both, which
+     * is what "annotations are not removable" buys and what §3.1 already accepts anywhere else.
+     */
+    private static Annotations merged(Annotations restatement, Annotations inherited) {
+        if (inherited.isEmpty()) {
+            return restatement;
+        }
+        if (restatement.isEmpty()) {
+            return inherited;
+        }
+        Annotations.Builder merged = new Annotations.Builder();
+        restatement.values().forEach(merged::add);
+        inherited.values().forEach(merged::add);
+        return merged.build();
     }
 
     /**

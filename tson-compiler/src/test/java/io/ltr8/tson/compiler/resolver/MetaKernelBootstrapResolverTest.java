@@ -87,7 +87,7 @@ class MetaKernelBootstrapResolverTest {
 
     @Test
     void booleanResolvesEvenThoughEnumItselfIsDeclaredLaterInTheFile() {
-        // boolean => !enum [true false] appears near the top of the file; enum => ~atom & {...}
+        // boolean => !enum [true false] appears near the top of the file; enum => atom & {...}
         // isn't declared until much later -- the two-pass design exists precisely for this.
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
@@ -102,7 +102,7 @@ class MetaKernelBootstrapResolverTest {
 
         assertEquals(new EnumBody(List.of("INDEX", "NAMED")), schema.entries().get("product_access_type").body());
         assertEquals(new EnumBody(List.of("FIXED", "VARIABLE")), schema.entries().get("product_size_type").body());
-        for (String name : List.of("field_state", "element_state", "type_kind")) {
+        for (String name : List.of("field_state", "element_state")) {
             assertInstanceOf(EnumBody.class, schema.entries().get(name).body());
         }
     }
@@ -135,10 +135,10 @@ class MetaKernelBootstrapResolverTest {
      * form stays prohibited at a field position (§5.2).
      */
     @Test
-    void theFortyNineFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
+    void theFiftyFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(57, schema.entries().size());
+        assertEquals(58, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_param_name", "array_field_group",
                 "array_record_field")) {

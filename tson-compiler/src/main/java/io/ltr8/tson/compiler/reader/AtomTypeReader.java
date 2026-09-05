@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
-import io.ltr8.tson.compiler.atom.BinaryParser;
+import io.ltr8.tson.compiler.atom.BytesParser;
 import io.ltr8.tson.compiler.atom.Cidr4Parser;
 import io.ltr8.tson.compiler.atom.Cidr6Parser;
 import io.ltr8.tson.compiler.atom.ComplexParser;
@@ -15,6 +15,7 @@ import io.ltr8.tson.compiler.atom.DateParser;
 import io.ltr8.tson.compiler.atom.DateTimeParser;
 import io.ltr8.tson.compiler.atom.DecimalParser;
 import io.ltr8.tson.compiler.atom.DurationParser;
+import io.ltr8.tson.compiler.atom.PeriodParser;
 import io.ltr8.tson.compiler.atom.EmailParser;
 import io.ltr8.tson.compiler.atom.EnumParser;
 import io.ltr8.tson.compiler.atom.FloatParser;
@@ -32,7 +33,9 @@ import io.ltr8.tson.compiler.atom.UuidParser;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.meta.BinaryType;
+import io.ltr8.tson.schema.meta.Ipv6Type;
+import io.ltr8.tson.schema.meta.Ipv4Type;
+import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 import io.ltr8.tson.schema.meta.Cidr6Type;
 import io.ltr8.tson.schema.meta.DateTimeType;
@@ -40,6 +43,7 @@ import io.ltr8.tson.schema.meta.DateType;
 import io.ltr8.tson.schema.meta.DecimalType;
 import io.ltr8.tson.schema.meta.EmailType;
 import io.ltr8.tson.schema.meta.DurationType;
+import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.FloatType;
 import io.ltr8.tson.schema.meta.IntegerType;
@@ -83,9 +87,9 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition));
     static final ValueReaderFactory UUID_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new UuidParser((UuidType) definition.body()), context.locationOf(name, definition));
-    /** Registered under {@code "binary"}, not {@code "binary_type"} -- {@link BinaryType}'s own {@code @Typename} matches the real spec constructor name. */
-    static final ValueReaderFactory BINARY = (name, definition, context) ->
-            new AtomTypeReader<>(name, new BinaryParser((BinaryType) definition.body()),
+    // The alphabet is the type's own `encoding` selector, so the body is the whole of what this needs.
+    static final ValueReaderFactory BYTES_TYPE = (name, definition, context) ->
+            new AtomTypeReader<>(name, new BytesParser((BytesType) definition.body()),
                     context.locationOf(name, definition));
     static final ValueReaderFactory DATE_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new DateParser((DateType) definition.body()), context.locationOf(name, definition));
@@ -96,6 +100,9 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition));
     static final ValueReaderFactory DURATION_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new DurationParser((DurationType) definition.body()),
+                    context.locationOf(name, definition));
+    static final ValueReaderFactory PERIOD_TYPE = (name, definition, context) ->
+            new AtomTypeReader<>(name, new PeriodParser((PeriodType) definition.body()),
                     context.locationOf(name, definition));
     static final ValueReaderFactory URI_TYPE = (name, definition, context) ->
             new AtomTypeReader<>(name, new UriParser((UriType) definition.body()), context.locationOf(name, definition));
@@ -129,10 +136,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * definition}'s own body.
      */
     static final ValueReaderFactory IPV4_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, Ipv4Parser.UNCONSTRAINED, context.locationOf(name, definition));
+            new AtomTypeReader<>(name, Ipv4Parser.of((Ipv4Type) definition.body()),
+                    context.locationOf(name, definition));
     /** Same reasoning as {@link #IPV4_TYPE}, for {@link Ipv6Parser}. */
     static final ValueReaderFactory IPV6_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, Ipv6Parser.UNCONSTRAINED, context.locationOf(name, definition));
+            new AtomTypeReader<>(name, Ipv6Parser.of((Ipv6Type) definition.body()),
+                    context.locationOf(name, definition));
     /**
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean}
      * ({@link BooleanReader}), every other enum instance its member text ({@link EnumParser}). Dispatch is
@@ -191,6 +200,26 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     @Override
     public TsonTypeReader<?> renamed(String displayName) {
         return new AtomTypeReader<>(displayName, delegate, schemaLocation);
+    }
+
+    /**
+     * Whether this reads the uninterpreted {@code value} atom -- the one slot {@code RecordBindReader} may
+     * specialise to the host type its component holds. False once something already has: {@code tokenAware}
+     * claims a {@code Token}-bound slot before the field loop runs, and that is a specialisation of the same
+     * kind rather than a case to redo.
+     */
+    boolean readsUninterpretedValue() {
+        return delegate == ValueParser.INSTANCE;
+    }
+
+    /**
+     * The same position, read by a different atom and under a different name -- the location is all that
+     * survives. {@code RecordBindReader} uses it for a {@code value}-typed slot, whose atom depends on what
+     * the bound component holds and so cannot be known when the factory runs. The name goes with it because
+     * the entry's own is {@code value}, which names the escape hatch rather than anything the author wrote.
+     */
+    TsonTypeReader<?> overAtom(String displayName, AtomType<?> replacement) {
+        return new AtomTypeReader<>(displayName, replacement, schemaLocation);
     }
 
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {

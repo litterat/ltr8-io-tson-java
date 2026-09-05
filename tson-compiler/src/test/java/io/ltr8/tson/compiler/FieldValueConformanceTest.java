@@ -34,8 +34,8 @@ class FieldValueConformanceTest {
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/field-value.tn"
-                !!meta:"https://tson.io/2026/34/m/meta.tn"
-                !!import:"https://tson.io/2026/34/m/core.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
                 {
                 %s
                 }
@@ -67,6 +67,34 @@ class FieldValueConformanceTest {
         assertTrue(thrown.getMessage().contains("field 'first'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("declared 'int32'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("§5.2"), thrown.getMessage());
+    }
+
+    /**
+     * <b>Through a reference chain, which is the walk this check has to do itself.</b> Resolved output
+     * states the chain the author wrote rather than rewriting the use site past it, so a field typed by an
+     * alias arrives here naming the alias. The value is still a value of whatever the chain ends at, and
+     * skipping the hop would let every aliased field's default go unchecked.
+     */
+    @Test
+    void aDefaultIsCheckedThroughAReferenceChain() {
+        TsonSchemaValidationException thrown = refused("""
+                  small => !integer ^ { max: 100 }
+                  hop   => small
+                  alias => hop
+                  rec   => { n: alias ~ 500 }""");
+
+        assertTrue(thrown.getMessage().contains("field 'n'"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("100"), thrown.getMessage());
+    }
+
+    /** And one that conforms still passes through the same walk. */
+    @Test
+    void aConformingDefaultThroughAChainIsAccepted() {
+        compile("""
+                  small => !integer ^ { max: 100 }
+                  hop   => small
+                  alias => hop
+                  rec   => { n: alias ~ 50 }""");
     }
 
     /** A fixed value is the same rule, and says "fixed value" rather than "default" so the author's own spelling is echoed. */
@@ -218,8 +246,8 @@ class FieldValueConformanceTest {
         TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
         String schema = """
                 !!id:"https://example.test/field-value.tn"
-                !!meta:"https://tson.io/2026/34/m/meta.tn"
-                !!import:"https://tson.io/2026/34/m/core.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
                 {
                   a => { n: int32 ~ "nope" }
                   b => { m: int32 = "also nope" }

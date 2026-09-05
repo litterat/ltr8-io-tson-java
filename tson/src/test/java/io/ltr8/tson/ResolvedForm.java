@@ -2,9 +2,21 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.ast.ArrayValue;
+import io.ltr8.tson.compiler.ast.CoreValue;
+import io.ltr8.tson.compiler.ast.DataValue;
+import io.ltr8.tson.compiler.ast.MapValue;
+import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -36,8 +48,12 @@ final class ResolvedForm {
 
     private static final Pattern SOURCE_POSITION = Pattern.compile("position=Optional\\[Position\\[[^\\]]*\\]\\]");
 
+    /** {@code kind} is {@code @Unbound}: derived at resolution, absent from §8's output, so never compared. */
+    private static final Pattern KIND = Pattern.compile("kind=[A-Z_]+|kind=null");
+
     /** The placeholder both sides reduce a synthetic's content hash to. */
     static final String HASH_PLACEHOLDER = "_xxhash";
+
 
     private ResolvedForm() {
     }
@@ -52,11 +68,19 @@ final class ResolvedForm {
      * resolver-managed</b>: they are sets the representation happens to write as lists, so one side's
      * alphabetical order and another's resolution order say the same thing. Nothing else is normalised; a
      * difference anywhere else is a real one.
+     *
+     * <p><b>Including every set-typed field</b>, which [TSON-SCHEMA] §7.5's comparison MUST reaches:
+     * "implementations comparing resolver outputs MUST compare set-typed fields as sets, not ordered lists".
+     * The fields are {@code enum.members}, {@code integer_type.members}, {@code decimal_type.members} and
+     * {@code scoped.scope}. This compares each as an ordered list, which is a <b>deliberate divergence</b>
+     * recorded in {@code SPEC-FEEDBACK.md} #4 -- source order is what every producer emits, §7.4 gives a
+     * reader a reason to care about it, and the freedom the MUST compensates for is one nobody exercises.
+     * Honouring the MUST instead is one sort, here, reaching both callers.
      */
     static TypeDefinition canonical(TypeDefinition definition) {
-        return new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
-                definition.constructor(), definition.supertypes().stream().sorted().toList(),
-                definition.subtypes().stream().sorted().toList(), definition.disjoint(), definition.body(),
+        return new TypeDefinition(definition.source(), definition.kind(),
+                definition.supertypes().stream().sorted().toList(),
+                definition.subtypes().stream().sorted().toList(), definition.body(),
                 definition.position(), definition.annotations());
     }
 
@@ -67,12 +91,22 @@ final class ResolvedForm {
      * it in place would mean rebuilding every body shape here.
      */
     static String rendered(TypeDefinition definition) {
-        String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(definition)))
+        // An open entry's body is text, and [TSON-SCHEMA] §5.10 compares the *parsed* form: one spelling is
+        // required of the application, not of the whitespace around it. Both sides are reduced to their
+        // parsed application here, so a held body compares like every other body and needs no side channel.
+        TypeDefinition compared = definition.body() instanceof TemplateBody held
+                ? new TypeDefinition(definition.source(), definition.kind(),
+                        definition.supertypes(), definition.subtypes(),
+                        parsedForComparison(held), definition.position(), definition.annotations())
+                : definition;
+        String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(compared)))
                 .replaceAll(HASH_PLACEHOLDER);
-        // `position` is this model's own: an @Unbound component recording where a declaration was written,
-        // which §8's resolved form has no field for and nothing external carries. Normalised away rather
-        // than compared, exactly as TypeDefinition's own equals leaves it out.
-        return SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty");
+        // `position` and `kind` are this model's own: @Unbound components §8's resolved form has no field
+        // for. `position` records where a declaration was written; `kind` is derived at resolution and kept
+        // for the resolver's own use, so a definition read back from a fixture carries none. Normalised away
+        // rather than compared, exactly as TypeDefinition's own equals leaves them out.
+        return KIND.matcher(SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty"))
+                .replaceAll("kind=DERIVED");
     }
 
     /**
@@ -89,6 +123,20 @@ final class ResolvedForm {
             }
         });
         return own;
+    }
+
+    /**
+     * A held body with its text replaced by the structure that text denotes.
+     *
+     * <p>[TSON-SCHEMA] §5.10's one-spelling rule is about the application, not about the whitespace around
+     * it: an open synthetic's identity is derived from its held binding record, so what must agree between
+     * two resolvers is the parsed form. Reducing both sides here is that rule applied once, and it is what
+     * lets an open entry be compared by {@link #rendered} like every other entry rather than through a
+     * second channel of its own.
+     */
+    private static Top parsedForComparison(TemplateBody held) {
+        return new TemplateBody(held.parameters(),
+                String.valueOf(new TsonDataParser(held.template()).parseDocument().root()));
     }
 
     /**
