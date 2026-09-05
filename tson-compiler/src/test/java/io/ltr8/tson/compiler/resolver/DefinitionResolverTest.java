@@ -536,7 +536,7 @@ class DefinitionResolverTest {
         TypeDefinition pair = resolveSnippet("pair => <A, B> { first: A  second: B }");
 
         assertEquals(List.of("A", "B"), pair.parameters());
-        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" "
+        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"TEMPLATE\" "
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"A\" \"B\" ] "
                         + "template: \"!record { fields: [ "
@@ -577,7 +577,7 @@ class DefinitionResolverTest {
 
         assertEquals(List.of("T"), box.parameters());
         assertEquals(List.of("base"), box.supertypes());
-        assertEquals("{ kind: \"PRODUCT\" supertypes: [ \"base\" ] "
+        assertEquals("{ kind: \"TEMPLATE\" supertypes: [ \"base\" ] "
                         + "subtypes: [] body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { supertypes: [ base ] "
                         + "fields: [ { name: value type: T } ] }\" } }",
@@ -598,7 +598,7 @@ class DefinitionResolverTest {
                 box  => <T> base & { value: T }
                 """);
 
-        assertEquals("{ kind: \"PRODUCT\" supertypes: [ \"base\" ] "
+        assertEquals("{ kind: \"TEMPLATE\" supertypes: [ \"base\" ] "
                         + "subtypes: [] body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { supertypes: [ base ] "
                         + "fields: [ { name: id type: text } { name: value type: T } ] }\" } }",
@@ -673,7 +673,7 @@ class DefinitionResolverTest {
         TypeDefinition sized = resolveSnippet("sized => <T> { value: type_ref = T }");
 
         assertEquals(List.of("T"), sized.parameters());
-        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" "
+        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"TEMPLATE\" "
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { fields: [ "
@@ -689,7 +689,7 @@ class DefinitionResolverTest {
     void aParametricDefaultValueIsPromotedToRequiredDefault() throws DataBindException {
         TypeDefinition retry = resolveSnippet("retry_policy => <N> { attempts: integer ~ N }");
 
-        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" "
+        assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"TEMPLATE\" "
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"N\" ] "
                         + "template: \"!record { fields: [ "

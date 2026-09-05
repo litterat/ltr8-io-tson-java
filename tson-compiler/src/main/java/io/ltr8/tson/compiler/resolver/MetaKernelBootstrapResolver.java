@@ -23,6 +23,7 @@ import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UriType;
@@ -166,7 +167,7 @@ public final class MetaKernelBootstrapResolver {
             // meta-kernel governs itself, so its own templates are applied by the layer below it.
             if (!instance.typeParams().isEmpty()) {
                 entries.put(declaration.name(), new TypeDefinition(Optional.of(TypeRef.of(instance.target())),
-                        target.kind(), List.of(), List.of(), Optional.empty(),
+                        TypeKind.TEMPLATE, List.of(), List.of(), Optional.empty(),
                         HeldBody.held(instance.typeParams(), instance.value())));
                 continue;
             }

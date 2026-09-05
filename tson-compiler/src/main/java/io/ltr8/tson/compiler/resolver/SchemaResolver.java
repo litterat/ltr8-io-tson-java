@@ -607,7 +607,8 @@ public final class SchemaResolver {
         // a second substitution path for the one shape that did not -- see WireForm.heldEmptyRecord.
         Top body = parameters.isEmpty() ? RecordBody.of(List.of())
                 : HeldBody.held(parameters, WireForm.heldEmptyRecord());
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(),
+        return new TypeDefinition(Optional.empty(),
+                parameters.isEmpty() ? TypeKind.PRODUCT : TypeKind.TEMPLATE, List.of(), List.of(),
                 Optional.empty(), body, position, Annotations.empty());
     }
 

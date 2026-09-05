@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.compiler.reader.Subsumption;
 import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -229,9 +230,10 @@ public final class TsonSchemaCompiler {
         }
 
         private TsonTypeReader<?> build(String name, TypeDefinition definition) {
-            if (!definition.parameters().isEmpty()) {
-                // An open entry is a template, not a type, whatever its body says -- see OpenTemplateReader
-                // for why the refusal is the entry's own reader rather than a check at the root.
+            if (definition.kind() == TypeKind.TEMPLATE) {
+                // A template is not a type ([TSON-SCHEMA] §5.10), and its kind says so -- the same field
+                // every other entry is dispatched on. See OpenTemplateReader for why the refusal is the
+                // entry's own reader rather than a check at the root.
                 return new OpenTemplateReader(name, definition.parameters(),
                         new ValueReaderContext(linked, readers, foreign).locationOf(name, definition));
             }

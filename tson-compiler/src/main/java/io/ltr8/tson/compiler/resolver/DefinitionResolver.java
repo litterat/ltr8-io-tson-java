@@ -507,14 +507,27 @@ final class DefinitionResolver {
      * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom
      * body has no parameters to hold open.
      */
+    /**
+     * {@code resolved} with its body held and its kind set to TEMPLATE -- what an entry becomes once it is
+     * known to be open.
+     *
+     * <p>The kind it had was the one its <em>body</em> would have produced, which is the kind of the entry
+     * materialisation mints and not of the template itself: a template is not a type ([TSON-SCHEMA] §5.10),
+     * so it takes {@code TEMPLATE} and an application of it takes the constructor's.
+     */
+    private static TypeDefinition openWith(TypeDefinition resolved, io.ltr8.tson.schema.meta.TemplateBody held) {
+        return new TypeDefinition(resolved.source(), TypeKind.TEMPLATE, resolved.supertypes(),
+                resolved.subtypes(), resolved.disjoint(), held, resolved.position(), resolved.annotations());
+    }
+
     private TypeDefinition holdIfOpen(String name, List<String> parameters, TypeDefinition resolved) {
         if (parameters.isEmpty() || !(resolved.body() instanceof RecordBody record)) {
             return resolved;
         }
         if (record.fields().isEmpty() && record.groups().isEmpty() && record.supertypes().isEmpty()) {
-            return resolved.withBody(HeldBody.held(parameters, WireForm.heldEmptyRecord()));
+            return openWith(resolved, HeldBody.held(parameters, WireForm.heldEmptyRecord()));
         }
-        return resolved.withBody(HeldBody.held(parameters, WireForm.heldRecord(record,
+        return openWith(resolved, HeldBody.held(parameters, WireForm.heldRecord(record,
                 value -> annotationWireValue(name, value))));
     }
 
@@ -653,11 +666,10 @@ final class DefinitionResolver {
         String target = template.target();
         ConstructorHead head = resolveConstructorTarget(name, target);
         TypeDefinition constructor = head.definition();
-        // `reference` needs no exception here any more: it IS-A `top`, so the generic rule admits it, which
-        // is what makes the open and closed spellings of one construction agree. Its `kind` still cannot come
-        // from its supertype chain -- §4.1 gives an alias `kind: REFERENCE`, a type_kind and not a base kind
-        // -- so that fact alone stays the kernel's own, below.
-        boolean alias = REFERENCE.equals(head.name());
+        // `reference` needs no exception here: it IS-A `top`, so the generic rule admits it, which is what
+        // makes the open and closed spellings of one construction agree. Nor does its kind need one any
+        // more -- every open entry is TEMPLATE whatever constructor its held body applies, so the alias form
+        // stopped being the one shape whose kind had to be read off the head.
         requireApplicable(name, target, constructor);
         if (!(constructor.body() instanceof RecordBody vocabulary)) {
             throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
@@ -667,8 +679,12 @@ final class DefinitionResolver {
         if (template.value().coreValue() instanceof RecordValue bindings) {
             checkTemplateBindings(name, target, vocabulary, bindings);
         }
+        // §5.10: an open entry is a template, not a type. Its kind says that and nothing about what an
+        // application of it produces -- that is the constructor's, read off the closed body at
+        // materialisation. The alias form is no exception: `<B> pair<uuid, B>` is a template whose closure
+        // is a reference, not a reference that happens to have parameters.
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)),
-                alias ? TypeKind.REFERENCE : constructor.kind(), List.of(), List.of(), Optional.empty(),
+                TypeKind.TEMPLATE, List.of(), List.of(), Optional.empty(),
                 HeldBody.held(template.typeParams(), template.value()));
     }
 
@@ -1038,7 +1054,7 @@ final class DefinitionResolver {
      */
     private static TypeDefinition openAliasOr(io.ltr8.tson.schema.meta.TypeRef target, List<String> parameters) {
         return parameters.isEmpty() ? TypeDefinition.reference(target)
-                : new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, List.of(), List.of(),
+                : new TypeDefinition(Optional.of(target), TypeKind.TEMPLATE, List.of(), List.of(),
                         Optional.empty(), HeldBody.held(parameters, WireForm.heldReference(target)));
     }
 

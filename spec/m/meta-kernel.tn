@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=1702a83160d4b755d205e6b67f32c9853d3c8c4dec871bd684fbf429e6c56230"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=63167ce964cbc90cdf5b44a33bbaa5207768ef801a087ba0437924c185063275"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -375,7 +375,7 @@
   field_state         => !enum [REQUIRED REQUIRED_DEFAULT REQUIRED_FIXED
                                        OPTIONAL OPTIONAL_FIXED]
   element_state       => !enum [REQUIRED OPTIONAL]
-  type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA]
+  type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA TEMPLATE]
 
   @doc:"""
     Annotation type markers. `synthetic` is resolver-attached and derived:

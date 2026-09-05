@@ -251,8 +251,11 @@ class OpenEntryResolvedFormTest {
      * is {@code !integer_type {}} and {@code integer_type} is meta.tn's. A consumer holding one schema's
      * resolved output cannot derive what this field states.
      *
-     * <p><b>When #5 and #6 land, branch 1 becomes {@code TypeKind.TEMPLATE}</b> rather than a skip, and
-     * {@link #derive} is the rule §8.1's Ingest paragraph should carry.
+     * <p><b>The rule is total.</b> An open entry is {@code TEMPLATE}, which is the branch that used to have
+     * no answer from the entry alone -- its kind was inherited from the constructor its held body applies,
+     * which is a fact about an application of it rather than about the template. {@link #derive} is
+     * therefore the whole rule, and the one §8.1's Ingest paragraph should carry ({@code SPEC-FEEDBACK.md}
+     * #6).
      */
     @Test
     void kindAgreesWithWhatTheEntryAlreadyStates() {
@@ -289,18 +292,17 @@ class OpenEntryResolvedFormTest {
 
         List<String> mismatches = new ArrayList<>();
         int closed = 0;
+        int open = 0;
         int neededTheGoverningMeta = 0;
         for (String id : ids) {
             for (Map.Entry<String, TypeDefinition> entry : perSchema.get(id).entrySet()) {
                 TypeDefinition definition = entry.getValue();
                 if (definition.body() instanceof TemplateBody) {
-                    // Branch 1: an open entry's kind is the one case the rule cannot answer from the entry
-                    // alone -- it is inherited from the constructor the held body applies. #5's `kind:
-                    // TEMPLATE` is what closes it.
-                    continue;
+                    open++;
                 }
                 closed++;
                 if (!definition.supertypes().contains("top") && !(definition.body() instanceof Reference)
+                        && !(definition.body() instanceof TemplateBody)
                         && !perSchema.get(id).containsKey(headOf(definition.body()))) {
                     neededTheGoverningMeta++;
                 }
@@ -313,15 +315,22 @@ class OpenEntryResolvedFormTest {
         }
 
         int closedEntries = closed;
+        int openEntries = open;
         int outsideOwnSchema = neededTheGoverningMeta;
         assertEquals(List.of(), mismatches, "kind restates what supertypes and body already determine");
         assertTrue(closedEntries > 200, () -> "not enough entries for this to mean anything: " + closedEntries);
+        assertTrue(openEntries > 0, () -> "no open entry exercised the TEMPLATE branch: " + openEntries);
         assertTrue(outsideOwnSchema > 50, () -> "the lookup should reach outside the entry's own schema for "
                 + "most of core.tn -- that is why the field stays: " + outsideOwnSchema + " of " + closedEntries);
     }
 
     /** §4.1's rule, read off what the entry already states. Four branches; see the test's own note. */
     private static TypeKind derive(TypeDefinition definition, Map<String, TypeDefinition> universe) {
+        if (definition.body() instanceof TemplateBody) {
+            // A template is not a type (§5.10), so its kind says that and nothing about what applying it
+            // produces -- that is the kind of the entry materialisation mints, from its own closed body.
+            return TypeKind.TEMPLATE;
+        }
         if (definition.body() instanceof Reference) {
             // §4.1 gives an alias REFERENCE, a type_kind and not a base kind -- and the kernel's `reference`
             // constructor is itself PRODUCT, so branch 4 would give the wrong answer here.

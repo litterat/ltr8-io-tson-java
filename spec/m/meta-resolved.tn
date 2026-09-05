@@ -45,7 +45,7 @@
 
   @doc:"The set spelling an author writes: a template over the parameterless set_type constructor."
   set => !type_definition {
-    kind: PRODUCT
+    kind: TEMPLATE
     source: set_type
     body: !template { parameters: [T]  template: "!set_type { element_type: T }" }
   }
