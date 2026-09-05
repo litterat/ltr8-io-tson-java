@@ -35,24 +35,23 @@ doubt, **re-fetch the current URL** and check the revision number at the top rat
 copy. `spec/` holds local snapshots of the current revision for quick reference: `spec/tson-part1-data.md`,
 `spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core}.tn` (the spec's own bundled schema
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
-on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not
-a source of truth — with one standing exception: the three `.tn` schemas are **packaged from here at build
+on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not a
+source of truth — with one standing exception: the three `.tn` schemas are **packaged from here at build
 time**, so they are the live copies rather than a snapshot. They carry **Revision 35 identities** —
-`https://tson.io/2026/35/m/*.tn` — ahead of that revision's publication, this branch being where the
-proposed artifacts are built (below); `main` carries the published Revision 34 ones. `spec/` now holds the
-**candidate Revision 35** of both parts, whose §13.2 table names those same identities and is stamped from
-these bytes — so the table is neither a revision behind nor stale, and **§13.2 is now a fourth pin to move**
-whenever the artifacts change. `scripts/restamp-bundled-schemas.sh` does not know about it: the script covers
-the repo's own pins, and the spec document is a cache it does not write, so §13.2 is the one that has to be
-re-stamped by hand and is therefore the one that silently drifts. `tson hash spec/m/<name>.tn` is the check.
-The divergences earlier revisions carried are all in the spec now — `reference.target` typed `type_ref`, no
+`https://tson.io/2026/35/m/*.tn`, the published revision's own. `spec/` holds Revision 35 of both parts, whose
+§13.2 table names those same identities and is stamped from these bytes — so the table is neither a revision
+behind nor stale, and **§13.2 is a fourth pin to move** whenever the artifacts change.
+`scripts/restamp-bundled-schemas.sh` does not know about it: the script covers the repo's own pins, and the
+spec document is a cache it does not write, so §13.2 is the one that has to be re-stamped by hand and is
+therefore the one that silently drifts. `tson hash spec/m/<name>.tn` is the check. The divergences earlier
+revisions carried are all in the spec now — `reference.target` typed `type_ref`, no
 `instance_template`/`template_argument`/`value_param` (§5.10's held bodies replaced the quoted open-body
 vocabulary), and `map`'s `state` field behind `{K => V?}` (§5.3). The open-entry shape is the spec's now too:
-an open entry's body is an instance of the kernel's `template` constructor — the parameter names and the application as text (§8.1) — so
-`type_definition` has lost `parameters` to that body, `disjoint` to the choice body it is derived over
-(§5.4), and `kind` altogether, the kernel losing `type_kind` with it because a kind is derived from an
-entry's own supertypes and body (§4.1, §8.1's four-branch rule). `TypeDefinition.kind` survives as an
-`@Unbound` component: computed at resolution for this resolver's own use, never written.
+an open entry's body is an instance of the kernel's `template` constructor — the parameter names and the
+application as text (§8.1) — so `type_definition` has lost `parameters` to that body, `disjoint` to the choice
+body it is derived over (§5.4), and `kind` altogether, the kernel losing `type_kind` with it because a kind is
+derived from an entry's own supertypes and body (§4.1, §8.1's four-branch rule). `TypeDefinition.kind`
+survives as an `@Unbound` component: computed at resolution for this resolver's own use, never written.
 **Changing them means re-stamping all three digests bottom-up**, moving the matching `*-resolved.tn`
 entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the published
 values. `scripts/restamp-bundled-schemas.sh` does the digest half — every pin in the repo, in dependency
@@ -69,19 +68,17 @@ differ is pinned per schema. They are the only external statement of what a conf
 so a change that moves those counts wants looking at rather than renumbering. Keep them in step with the
 `.tn` beside them; both have drifted before.
 
-**This branch is `r2026-35-proposal`, and it diverges from published Revision 34 deliberately.** It builds
-what the candidate Revision 35 in `spec/` carries, ahead of that revision's publication, so the register's
-entries stated what was *running* rather than what was *proposed* — the branch was the argument, and the
-candidate has since adopted thirty-two of the thirty-six. It merges to `main` when the spec lands and not
-before: `main` is the reference implementation of the published
-revision, and merging a divergence early costs it the one signal it exists to give. The sibling corpus has a
-branch of the same name and moves with this one, `SUITE_PIN` following it. The three bundled schemas already
-carry the revision's own identities (`/2026/35/m/`), so a content change lands on artifacts named for the
-revision proposing it rather than being re-identified at the end. Landed here so far: **#7, `null`
-removed from the notation**, **#8, the JSON-superset claim and the rules that existed only for it**,
-**#9, a field name is an identifier at every layer**, and **#10, the trailing-comma ban**.
-§1.3's Part 1 freeze is a claim about the published revision, which `main` keeps; it does not hold on this
-branch, and #8's escape-table change is the first thing to rely on that.
+**`main` is the reference implementation of the published revision, which is Revision 35.** Each published
+revision's implementation stays reachable at the point it was the whole of `main`: `r2026-32`, `r2026-34`.
+The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling corpus branch of
+the same name and `SUITE_PIN` following it — where the register's entries state what is *running* rather
+than what is *proposed*, the branch being the argument. It merges when the spec lands and not before, since
+merging a divergence early costs `main` the one signal it exists to give. The bundled schemas carry the
+revision's own identities from the start, so a content change lands on artifacts named for the revision
+proposing it rather than being re-identified at the end.
+
+§1.3's Part 1 freeze is a claim the published revision makes; Revision 35 reopened the lexer for #8's
+escape-table change, which is the first thing to rely on that.
 
 **Status:** Part 2's grammar, resolution, linking, and Class 2 compilation
 all work: the three bundled schemas resolve/register/compile in full, user schemas governed by them
