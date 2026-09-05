@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=6991f932be2f61e8e6e59d7f45287e9c50f6c559c4c437163b6eeb1a01d1155f"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0185d18d3f3e3d3d3aeb62adcf0d1f4ee496cbe8372da71c8ca7bef78c2e3886"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -27,7 +27,7 @@
   sum       => top & {}
 
   @doc:"""
-    The body of an entry that describes something other than a atom,
+    The body of an entry that describes something other than an atom,
     product, or sum type — vocabulary a meta-schema introduces
     beyond the kernel's own, whose instances ride along in a schema
     map without being types. No data value ever has such an entry as

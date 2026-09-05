@@ -1,5 +1,5 @@
-!!id:"https://tson.io/2026/35/m/core.tn?sha256=653698705ba6cac7716a00d4717ec5b1cfde68743bbe2e4fc13a18ac1ad20a39"
-!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=bae2658bbefd1e4ab9b996835d68f5bc8aaaca808c7a253d00398348937f0208"
+!!id:"https://tson.io/2026/35/m/core.tn?sha256=9ecade0ae03e734439d3bd88694407d68cb21fb4d0dfd3e50575ba0b43bc5034"
+!!meta:"https://tson.io/2026/35/m/meta.tn?sha256=74a15934c18e91486742735b50a0befa27d7b82b8204efc1e5ffcab538a83315"
 @doc:"""
   TSON Core Type Library — canonical types for data interchange
   (2026 Revision 35 draft).
@@ -388,11 +388,11 @@
   @doc:"""
     The set spelling an author writes: `set<text>` where the bare
     construction is `!set_type { element_type: text }`. A §5.10
-    template, not a constructor — it carries no `~`, so §4.2's
-    value-route-only rule does not reach its parameter, and
-    `set_type` stays parameterless as §4.2 requires of every
-    container constructor. The element type arrives by application
-    rather than by a parameter on the constructor itself.
+    template, not a constructor: it composes with nothing and so is
+    not IS-A `top`, and `set_type` stays parameterless as §4.2
+    requires of every container constructor. The element type
+    arrives by application rather than by a parameter on the
+    constructor itself.
 
     A sibling of meta's declaration under the same name, as `void`
     is of the kernel's: user schemas reach it through their core

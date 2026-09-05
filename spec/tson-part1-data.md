@@ -12,9 +12,9 @@ description: >
 
 # TSON Part 1: Text Data Format
 
-## 2026 Revision 34
+## 2026 Revision 35
 
-**Status:** Working revision. The 2026 revision series is subject to change without compatibility guarantees. When finalised, this specification will be published as **TSON version 1** and frozen (§1.2, principle 7); until then, revisions are released under the 2026 series. This revision introduces the identifier layer: names have their own grammar (§7.7), distinct from the unquoted-token profile that also carries values, and a name-hygiene policy layer (§8.2) that is enforced by default and never decides validity. It also corrects the treatment of the bidirectional marks in `Pattern_White_Space` (§7.2) and of the joining controls (§7.1), and assigns the duplicate-field and duplicate-key rules their error category (§2.5, §2.6).
+**Status:** Working revision. The 2026 revision series is subject to change without compatibility guarantees. When finalised, this specification will be published as **TSON version 1** and frozen (§1.2, principle 6); until then, revisions are released under the 2026 series. This revision removes the claim that TSON is a JSON superset, and with it the rules that existed only for that claim: `null` is no longer a base value (§4), the `\/` escape and the surrogate-pair rules are gone and a braced `\u{…}` escape is added (§7.2.2), a field name is an identifier at every layer (§2.5, §7.7), and a comma may follow a value (§2.4). It restates base type resolution as applying only in schemaless documents (§4.1), replaces the four spelled binary annotations with one `!bytes` (§5.3), splits the temporal `!duration` into `!duration` and `!period` (§5.4), makes the name-hygiene policy and the resource limits reportable properties of a processor rather than of a refusal (§8.1, §8.2, §9.1), and says why the content-hash pin rides in the URI query (§2.2.1). This is the first revision to change the lexer since the Class 1 freeze was declared (§1.3); it does so under principle 6, and the freeze holds from this revision.
 
 **Series:** TSON Specification, Part 1 of 2
 
@@ -29,9 +29,9 @@ description: >
 
 TSON is a schema system with its own notation. At its centre is a type system ([TSON-SCHEMA]): immutable, hash-pinned schemas whose definitions are themselves data, resolving down a verified chain — document → schema → meta-schema → kernel — so that one hash authenticates a document together with its entire contract. The TSON text format is that system's notation and its reference encoding. Schemas are the point; the text format is how they are written down, and the first of the encodings that carry them.
 
-TSON (Typed Schema Object Notation) is a Unicode text-based data interchange format that extends the concepts of JSON with richer structural types; optional annotations, type annotations, and directives; and a layered resolution model that separates structural parsing from semantic interpretation.
+TSON (Typed Schema Object Notation) is a Unicode text-based data interchange format in the JSON family: braces, brackets, quoted strings and `name: value` fields, extended with richer structural types; optional annotations, type annotations, and directives; and a layered resolution model that separates structural parsing from semantic interpretation. It is JSON-*like* by design and not a JSON superset: a JSON document is read through a JSON reader, which is one encoding of the same model (§6).
 
-This document defines the TSON **text data format**: the lexer, the structural grammar, the absent sentinel, augmentation syntax, base type resolution, and the built-in type vocabulary. It stands alone: a processor implementing this document — and nothing else — can losslessly read and write any schemaless TSON data document, typed or untyped, and every valid JSON document outside two character-level exceptions is already valid TSON (§6). [TSON-SCHEMA] defines the type system this notation carries; nothing in this document depends on it.
+This document defines the TSON **text data format**: the lexer, the structural grammar, the absent sentinel, augmentation syntax, base type resolution, and the built-in type vocabulary. It stands alone: a processor implementing this document — and nothing else — can losslessly read and write any schemaless TSON data document, typed or untyped. [TSON-SCHEMA] defines the type system this notation carries; nothing in this document depends on it.
 
 
 ### 1.2 Design Principles
@@ -43,13 +43,11 @@ This document defines the TSON **text data format**: the lexer, the structural g
 
 3. **Unicode foundation** — Character classification, identifier rules, and normalization are defined in terms of Unicode character properties (UAX #31, UAX #15). Field names and values work in all scripts without quoting. All structural operators use ASCII characters.
 
-4. **Minimal required syntax** — Commas and double quotes are optional where the structure is unambiguous.
+4. **Minimal required syntax** — Whitespace separates values; a comma may follow a value (§2.4). Double quotes are needed only where content demands them (§7.1).
 
-5. **JSON compatibility** — Valid JSON is a subset of valid TSON at the structural level, apart from two character-level string exceptions (§6). TSON parsers SHOULD accept JSON documents outside those exceptions.
+5. **Locality** — A TSON data value is fully local. The format provides no data-level reuse mechanisms (no anchors, references, or merge operators): what appears at a position is the complete value.
 
-6. **Locality** — A TSON data value is fully local. The format provides no data-level reuse mechanisms (no anchors, references, or merge operators): what appears at a position is the complete value.
-
-7. **Permanent stability** — TSON version 1 is a permanent specification. The grammar and resolution rules are frozen at the version 1 release. There is no TSON 1.1 or TSON 2. New types are added through the type system, not through changes to this document. Errata may clarify ambiguities but MUST NOT change the grammar or the behaviour of conforming implementations. The permanence guarantee attaches to the version 1 release: 2026-series revisions of this document, including this one, may change anything.
+6. **Permanent stability** — TSON version 1 is a permanent specification. The grammar and resolution rules are frozen at the version 1 release. There is no TSON 1.1 or TSON 2. New types are added through the type system, not through changes to this document. Errata may clarify ambiguities but MUST NOT change the grammar or the behaviour of conforming implementations. The permanence guarantee attaches to the version 1 release: 2026-series revisions of this document, including this one, may change anything.
 
 
 ### 1.3 The TSON Specification Series
@@ -74,7 +72,7 @@ data document ──!!schema──▶ user schema ──!!meta──▶ meta-sch
   that carries the type system's values                    [this document]
 ```
 
-Reading order runs the other way: this document stands alone, and a Class 1 processor (§1.5) needs nothing from [TSON-SCHEMA]. Each part adds capability without modifying the parts below it. The lexer defined in this document is complete: higher parts introduce no new tokens, no new lexer modes, and no changes to character classification.
+Reading order runs the other way: this document stands alone, and a Class 1 processor (§1.5) needs nothing from [TSON-SCHEMA]. Each part adds capability without modifying the parts below it. The lexer defined in this document is complete: higher parts introduce no new tokens, no new lexer modes, and no changes to character classification. Within the 2026 series the lexer is frozen from this revision — Revision 35 changed the escape production (§7.2.2) under principle 6, and nothing was published against the earlier form; a later revision that touched it again would say so here.
 
 [TSON-SCHEMA] defines a second document kind, the **schema document**, recognised by the header dispatch of §2.2. A schema document is parsed by a sibling grammar — the schema grammar — that shares this document's lexer and core value rules: its declaration grammar gives the reserved special tokens (§7.2.5) their meaning, and [TSON-SCHEMA] defines the operations of the directives (§3.3). None of that syntax appears in data documents: in the data grammar, a reserved special token is a parse error, and a `!!` token whose name is not followed by an adjacent `:` is a parse error.
 
@@ -100,8 +98,10 @@ A **Class 1 processor** (data-format processor) implements the lexer (§7.2), th
 - MUST recognise every type-annotation name in the built-in vocabulary and resolve annotated tokens per the named atom's contract (§5) — the vocabulary is implemented as a unit, so two conforming processors never disagree on whether a built-in name is meaningful;
 - MUST preserve annotations, type annotations outside the vocabulary, and `schema` directives it does not act on (§3);
 - MUST treat a directive token (`!!`) whose name is not followed by an adjacent `:` as a parse error (§1.3), and a directive name outside the closed positional set — or inside it but outside its position — as a parse error (§3.3);
-- MUST match every annotation name and type-annotation name against the identifier grammar (§7.7) and reject a name that fails it as a parse error;
-- MUST implement the name-hygiene checks of §8.2 over each record's own field names, enforce them by default, and report their refusals distinguishably from the error categories of §8.1;
+- MUST match every name — field names, annotation names, and type-annotation names — against the identifier grammar (§7.7), after NFC normalisation, and reject a name that fails it as a parse error;
+- MUST implement the name-hygiene checks of §8.2 over every named scope at this layer (each record's own field names), enforce them by default, and report a refusal as §8.1's fifth outcome — in the same report as the four categories, distinguishable from them, and never as a verdict on the document;
+- MUST enforce the resource limits of §9.1 at their defaults or at a configured or documented value, reporting a limit refusal on the same terms;
+- MUST be able to state, with any report that carries a refusal and SHOULD be able to state with no document in hand, the identifier policy, token policy, limits policy and UCD version under which it judges (§8.2, §9.1);
 - MUST reject a schema document — a document whose header contains `!!meta` (§2.2) — reporting it as a schema document per §8.1, not as a malformed data document;
 - is NOT REQUIRED to implement the schema layer of [TSON-SCHEMA].
 
@@ -189,7 +189,9 @@ When the identifying URI carries a content hash (the convention is defined below
 
 **The hash-parameter URI convention.** A content hash rides on the identifying URI as a query parameter named for its algorithm: `?sha256=<hash>`, with the value in lowercase hexadecimal at full length — a truncated hash is an error. `sha256` is the algorithm of this revision; future algorithms use their own parameter names. The hash parameter is **verification metadata, not identity** (canonical identity is defined below); a query component, when present, MUST consist solely of hash parameters, and a query parameter whose name is not a recognized hash algorithm is an error — never silently retained, so identity never depends on which algorithms a given reader happens to recognize.
 
-**Canonical identity.** A reference's **canonical identity** is a documented profile of RFC 3986 §6.2.1 (simple string comparison), reached by two reductions: (1) remove the scheme and its `://` delimiter, and (2) remove the query component. What remains — **lowercase host plus path** — is the identity; two references name the same document if and only if their canonical identities are byte-for-byte identical. The scheme is a *transport hint*, not part of the name: `http://tson.io/2026/34/m/core.tn` and `https://tson.io/2026/34/m/core.tn` are the same document, and a consumer MAY fetch by whichever scheme its policy allows. The host is part of the identity — two hosts serving a like-named path are different documents — so a fetch-endpoint substitution can never silently redirect a name. A reference with no authority component (a local `file:`-style or path-only reference) has an empty host; its canonical identity is the path alone, and such references are resolved only against an application-supplied library entry ([TSON-SCHEMA] §10.1), never fetched.
+The pin rides in the query, rather than in a fragment or a structured directive value, so that it *reaches the origin and the cache*: a query is sent with the request, and an origin that stores revisions content-addressably can answer a pinned reference with the exact bytes it names long after the unpinned URL has moved on, while a cache can treat a pinned URL as immutable and keep it forever. A fragment is never sent, and a structured `{ url, hash }` value separates locator from integrity so cleanly that the integrity cannot reach the party able to satisfy it — either leaves the origin holding the bare locator, able to detect drift and never to repair it. Canonical identity strips the pin because the two answer different questions: the pin identifies a byte sequence where the rest of the URI identifies a resource (RFC 3986 §3.4's query is "non-hierarchical data that … serves to identify a resource", and *these exact bytes* is an identification). The **fragment is reserved**: it is no part of a schema identity, an identifying URI MUST NOT carry one (below), and a later revision may spell an intra-document reference there without a compatibility question.
+
+**Canonical identity.** A reference's **canonical identity** is a documented profile of RFC 3986 §6.2.1 (simple string comparison), reached by two reductions: (1) remove the scheme and its `://` delimiter, and (2) remove the query component. What remains — **lowercase host plus path** — is the identity; two references name the same document if and only if their canonical identities are byte-for-byte identical. The scheme is a *transport hint*, not part of the name: `http://tson.io/2026/35/m/core.tn` and `https://tson.io/2026/35/m/core.tn` are the same document, and a consumer MAY fetch by whichever scheme its policy allows. The host is part of the identity — two hosts serving a like-named path are different documents — so a fetch-endpoint substitution can never silently redirect a name. A reference with no authority component (a local `file:`-style or path-only reference) has an empty host; its canonical identity is the path alone, and such references are resolved only against an application-supplied library entry ([TSON-SCHEMA] §10.1), never fetched.
 
 Canonical identity stays at RFC 3986's cheapest rung by *restricting the input* rather than normalizing it, in the manner of the unquoted-token profile (§7.1): an identifying URI MUST already be in canonical form apart from scheme and hash query — lowercase host, no userinfo, no port (default or otherwise), no percent-encoding of unreserved characters, no dot-segments (`.`/`..`), and no fragment. An identifier that is not in this form is an error, not a candidate for normalization; no case folding, path resolution, or percent-decoding is ever performed at comparison time (rationale in [TSON-GUIDE]).
 
@@ -243,7 +245,7 @@ The two quoted forms are distinct token kinds in the stream (§7.4): the grammar
 
 **Form is not meaning.** Throughout this series, a token's form is consulted exactly once: by base type resolution (§4), where quoting is the author's way to say "the string `42`, not the number". Everywhere else only the text matters. Type contracts operate on text — `!number 10.2`, `!number "10.2"`, and `!number """10.2"""` are the same value (§5.2) — and identity is form-blind: `name` and `"name"` are the same field name (§2.5), and `Alice` and `"Alice"` are duplicate map keys (§2.6). Quoting is a lexical necessity, not a semantic signal: content containing characters outside the profile — spaces, colons (times, datetimes, URLs with a scheme), `@` (email addresses), `/` (paths, networks, rationals), `%` and currency symbols — MUST be quoted; content inside it may be written in any form. §7.1 lists the content kinds whose quoting rule is *always*.
 
-**Separators.** Within structural types, adjacent values MUST be separated by at least one whitespace character, a comma, or both: `[1 2 3]`, `[1,2,3]`, and `[1, 2, 3]` are equivalent. Zero-width separation is a parse error. Trailing separators are not permitted — `[1, 2, 3,]` and `{ x: 1, }` are parse errors — and the rule applies throughout the series. Structural delimiters inherently create token boundaries, so no separator is required between a delimiter and adjacent content: `{name:Alice}` is valid. Any non-zero amount of whitespace (including line breaks) between tokens is equivalent to any other; indentation is not significant. Within quoted tokens, whitespace is content, subject to each form's character rules (§7.2.2, §7.2.3).
+**Separators.** Within structural types, adjacent values MUST be separated by at least one whitespace character, a comma, or both, and **a comma may follow a value**: `[1 2 3]`, `[1,2,3]`, `[1, 2, 3]` and `[1, 2, 3,]` are equivalent, as are `{ x: 1 }` and `{ x: 1, }`. Zero-width separation is a parse error. A comma that follows nothing — `[, 1]` — or follows a comma — `[1, , 2]` — is a parse error, and needs no rule of its own: a comma is not a value, so each fails as a missing one. One clause therefore decides every case, and the rule applies throughout the series, so a trailing comma is equally legal in the element and argument lists of [TSON-SCHEMA] §12.1. A trailing comma is safe here where it is not in JSON because TSON has no elision: absence is spellable and occupies a slot — `[1, 2,]` is two elements and `[1 2 _]` is three — so there is nothing for a stray comma to be confused with, where a grammar with holes (`[1, , 2]` as three elements in JavaScript) cannot tell two elements from three. A doubled comma is far more likely a lost element than deliberate noise, and in a format whose purpose is validating generated output, reading it as two elements is exactly the silent failure the format exists to catch. Note that only the *comma* is constrained: a whitespace-only separator before a closing delimiter — `[1 2 ]` — has always been legal. Structural delimiters inherently create token boundaries, so no separator is required between a delimiter and adjacent content: `{name:Alice}` is valid. Any non-zero amount of whitespace (including line breaks) between tokens is equivalent to any other; indentation is not significant. Within quoted tokens, whitespace is content, subject to each form's character rules (§7.2.2, §7.2.3).
 
 TSON does not define a comment syntax. Metadata is expressed through annotations (`@`), which are preserved by the parser and available to consuming applications.
 
@@ -251,10 +253,10 @@ TSON does not define a comment syntax. Metadata is expressed through annotations
 ### 2.5 Record
 
 
-A record is an ordered collection of named fields enclosed in curly braces. Field names are separated from values by a colon. Fields are separated by whitespace or an optional comma.
+A record is an ordered collection of named fields enclosed in curly braces. Field names are separated from values by a colon. Fields are separated by whitespace or an optional comma, and a comma may follow the last (§2.4).
 
 ```
-record     = "{" ws field *( separator field ) ws "}"
+record     = "{" ws field *( separator field ) [ ws "," ] ws "}"
 field      = field-name ws ":" ws scoped-value
 field-name = unquoted-token / single-line-token
 ```
@@ -267,26 +269,26 @@ A field's value is a scoped value, so a `schema` directive may prefix it, paired
 
 Field names are bare tokens — unquoted or single-line quoted; the multi-line form is not admitted in name position — and directives, annotations, and type annotations MUST NOT precede a field name. Metadata concerning a field is expressed as annotations on the field's value — `{ name: @deprecated Alice }` — which attach to the value per §3.1.
 
-A field name at this layer is **lexical**: any token the production admits names a field, and `{ "first name": 1 }` is an ordinary record. The identifier grammar (§7.7) constrains names that are *declared* — in a schema ([TSON-SCHEMA] §12.1) — and a data field name conforms to it under a schema by construction, since a field name that is not an identifier can match no declared field. Schemaless field names therefore remain unconstrained, which is what keeps JSON's quoted keys valid (§6); what protects them is the record-scope check of §8.2.
+A field name is an **identifier** (§7.7) at every layer, schemaless or governed. The production admits two spellings — unquoted, or single-line quoted — and they are two spellings of one set of names: what quoting buys is relief from the lexical accidents of the unquoted form (a name that would otherwise resolve as a number, `{ "007": x }`), never a different set of names. The decoded text of a field name is NFC-normalised (§7.2.1) and then matched in full against the identifier grammar, exactly as an annotation name's is; a token in name position whose decoded text is not an identifier is a parse error. So `{ "first name": 1 }`, `{ _id: 1 }` and `{ 42x: 2 }` are parse errors, and the remedy is the one the format already has: a record's fields are the named members of a shape, which is what makes them declarable, and *a key that is not a name belongs in a map* — `{ "Content-Type" => "text/plain" }` is the honest spelling of that data. A diagnostic SHOULD say so. Under a schema a field name matches a declared one or the value is invalid ([TSON-SCHEMA] §7.7), and a declared field name is an identifier by the schema grammar, so nothing further is asked of a governed document.
 
 A record MUST contain at least one field. An empty `{}` is parsed as an `empty-brace` (§2.8).
 
-Field names within a record MUST be unique. A record containing the same field name more than once is a resolver error (§8.1), with the diagnostic at the repeated occurrence's position. Two field names are identical if they produce the same NFC-normalized string after escape processing — `name` and `"name"` are the same field name. Name identity is case-sensitive.
+Field names within a record MUST be unique. A record containing the same field name more than once is a resolver error (§8.1), with the diagnostic at the repeated occurrence's position. Two field names are identical if they produce the same NFC-normalized string after escape processing — `name` and `"name"` are the same field name, and a decomposed spelling of a name is the *same* name as its precomposed spelling rather than a malformed one: normalisation runs before the identifier match, so the pair is a duplicate-field error, never a parse error. Name identity is case-sensitive.
 
 
 ### 2.6 Map
 
 
-A map is a collection of key-value associations enclosed in curly braces. Keys are separated from values by the arrow operator `=>`. Entries are separated by whitespace or an optional comma.
+A map is a collection of key-value associations enclosed in curly braces. Keys are separated from values by the arrow operator `=>`. Entries are separated by whitespace or an optional comma, and a comma may follow the last (§2.4).
 
 ```
-map       = "{" ws map-entry *( separator map-entry ) ws "}"
+map       = "{" ws map-entry *( separator map-entry ) [ ws "," ] ws "}"
 map-entry = data-value ws "=>" ws scoped-value
 ```
 
-Map keys are data values — they may carry annotations and a type reference but not directives. Keys are not restricted to strings.
+Map keys are data values — they may carry annotations and a type reference but not directives. Keys are not restricted to strings, and a key is not a name: a map is where a key that is not an identifier lives (§2.5).
 
-Duplicate keys MUST NOT be present: a map containing two identical keys is a resolver error (§8.1), with the diagnostic at the repeated occurrence's position — one category for the rule at this layer, whether the textual or the decoded-value identity below detects a given pair. Key identity is layered, and each layer detects at least what the one below it does. **Textual identity** is the parser's minimum: scalar keys are identical if they produce the same NFC-normalized string after escape processing (`Alice` and `"Alice"` are duplicates); compound keys are identical if they have the same structure with textually identical elements at every position. **A processor that decodes values compares decoded values**: from base type resolution (§4) onward, different spellings of one value are one key (`0xFF` and `255`, `1_000` and `1000`), so a reader producing decoded output rejects keys the parser's textual rule could not relate. A declared key type may make *more* keys equal — `1` and `1.0` are two keys with no schema and one under an `integer`-keyed schema — and a type-aware duplicate under a schema is a Class 2 validation error ([TSON-SCHEMA] §7.7); a declared type never makes fewer keys equal. A key's annotations and type annotation do not participate in identity at any layer: `!text a` and `a` are the same key.
+Duplicate keys MUST NOT be present: a map containing two identical keys is a resolver error (§8.1), with the diagnostic at the repeated occurrence's position — one category for the rule at this layer, whether the textual or the decoded-value identity below detects a given pair. Key identity is layered, and each layer detects at least what the one below it does. **Textual identity** is the parser's minimum: scalar keys are identical if they produce the same NFC-normalized string after escape processing (`Alice` and `"Alice"` are duplicates); compound keys are identical if they have the same structure with textually identical elements at every position. **A processor that decodes values compares decoded values**: from base type resolution (§4) onward, different spellings of one value are one key (`0xFF` and `255`, `1_000` and `1000`), so a reader producing decoded output rejects keys the parser's textual rule could not relate. A declared key type may make *more* keys equal — `1` and `1.0` are two keys with no schema and one under a `number`-keyed schema, and two spellings of one octet string are one key under a `bytes`-keyed one — because under a schema identity is over the key type's *value space*, never its lexical space ([TSON-SCHEMA] §5.5); a type-aware duplicate under a schema is a Class 2 validation error ([TSON-SCHEMA] §7.7), and a declared type never makes fewer keys equal. A key's annotations and type annotation do not participate in identity at any layer: `!text a` and `a` are the same key.
 
 A map MUST contain at least one entry. An empty `{}` is parsed as an `empty-brace` (§2.8).
 
@@ -294,10 +296,10 @@ A map MUST contain at least one entry. An empty `{}` is parsed as an `empty-brac
 ### 2.7 Array
 
 
-An array is an ordered, variable-length collection of values enclosed in square brackets. Values are separated by whitespace or an optional comma. Array elements are scoped values (§2.3): a `schema` directive may prefix an individual element and scopes to that element alone (§3.3, [TSON-SCHEMA] §7.8).
+An array is an ordered, variable-length collection of values enclosed in square brackets. Values are separated by whitespace or an optional comma, and a comma may follow the last (§2.4). Array elements are scoped values (§2.3): a `schema` directive may prefix an individual element and scopes to that element alone (§3.3, [TSON-SCHEMA] §7.8).
 
 ```
-array = "[" ws [ scoped-value *( separator scoped-value ) ] ws "]"
+array = "[" ws [ scoped-value *( separator scoped-value ) [ ws "," ] ] ws "]"
 ```
 
 In a whitespace-separated array a directive binds unambiguously to the element it prefixes, but for readability encoders SHOULD place each directive-carrying element on its own line or separate elements with commas.
@@ -310,11 +312,13 @@ The parser determines what a curly-brace structure is by its content:
 
 1. If the opening brace is followed by `}` (with only whitespace between), the structure is an **empty-brace**.
 2. Otherwise, the parser consumes one data-value and inspects the next token:
-   - `:` → the structure is a **record**. The consumed data-value MUST be a bare token — carrying no annotations and no type reference, with a core value that is a token — and becomes the first field's name. Anything else is a parse error: field names are bare tokens (§2.5).
+   - `:` → the structure is a **record**. The consumed data-value MUST be a bare token — carrying no annotations and no type reference, with a core value that is an unquoted or single-line token whose decoded text is an identifier (§2.5, §7.7) — and becomes the first field's name. Anything else is a parse error: field names are identifiers.
    - `=>` → the structure is a **map**. The consumed data-value becomes the first entry's key.
    - anything else → parse error. A value inside curly braces MUST be followed by `:` (record) or `=>` (map).
 
-The bare-token check applies only to the first field name; once the structure is known to be a record, subsequent fields are parsed by the `field` production, which admits only a token in name position.
+The bare-token check applies only to the first field name; once the structure is known to be a record, subsequent fields are parsed by the `field` production, which admits only a token in name position and matches it the same way. The lookahead budget is one consumed value plus one token; what the dispatch does with the token it already holds is an identifier match, and nothing more.
+
+Records and maps share the brace form deliberately, and the sharing stands on its own merits rather than on where it came from: `{ k => v }` reads well beside `{ k: v }`, the dispatch is one token deep and stated as such, and an empty brace resolving by expected type is exactly right under a schema, which is the mode the format is for. A second bracket pair for maps would cost every map in every document and schema to save a parser one token.
 
 **Empty braces** are deferred to the resolver. In the absence of declared type information, an empty-brace resolves to an empty record. When a higher part supplies an expected type ([TSON-SCHEMA] §7.7), it resolves to the empty record or the empty map according to that type — the two containers that share the brace form and cannot be told apart when empty. An array or tuple has its own empty spelling (`[]`), and an empty brace at such a position is not an empty container of that type but a value of the wrong form ([TSON-SCHEMA] §7.7).
 
@@ -326,13 +330,13 @@ empty-brace = "{" ws "}"
 ### 2.9 The Absent Sentinel
 
 
-The underscore token `_` represents an explicitly absent value, distinct from any typed value including the base type null (§4.1).
+The underscore token `_` represents an explicitly absent value, distinct from any typed value. It is the format's one spelling of absence: there is no `null` value, and a JSON reader maps JSON `null` to absence in the model (§6).
 
 ```
 absent = "_"
 ```
 
-The absent sentinel is a structural concept, not a type. The interpretation of absence (null, unset, default, removal) is determined by the consuming application or by higher parts of this series.
+The absent sentinel is a structural concept, not a type. The interpretation of absence (a host null, unset, default, removal) is determined by the consuming application or by higher parts of this series.
 
 Because `absent` is a core-value alternative, `_` may occupy any data-value position: record field values, map entry values, array elements, and the document's top-level value. The single restriction is that the absent sentinel MUST NOT appear as a map key — a resolver-layer constraint, not a grammar constraint: the `map-entry` production accepts any value in key position, and the resolver rejects absent keys.
 
@@ -425,19 +429,23 @@ Any other directive name, and any of these names outside its placement, is a par
 ## 4. Base Type Resolution
 
 
-Base type resolution applies **only when no declared type information is in scope** and the token carries no built-in type annotation — a built-in annotation overrides base resolution for its token (§5). When a higher part supplies declared type information ([TSON-SCHEMA]), base type resolution does NOT apply at typed positions; each declared atom type owns its own parsing contract. The tokens `true`, `false`, and `null` have special status only under base type resolution. Resolution applies to **data values only**: field names and map keys are text, never resolved — in `{ 007: 007 }` the key is the name `007` by definition, while the value is a string by fallthrough (leading zeros fail the `integer` production, §4.3), and `07` and `7` are distinct keys because key identity is textual (§2.4).
+Base type resolution is the Class 1 reading of an untyped token: it assigns one of three host base types — boolean, number, string — to an unquoted token by its shape, and the string type to every quoted one. It is total: every token resolves to something, and a resolver never refuses (§4.4).
 
 
-### 4.1 Null
+### 4.1 Applicability
 
 
-The token `null` (case-sensitive, lowercase only) resolves to the null value. `null` is distinct from the absent sentinel `_`: null is a value that can be stored and transmitted; `_` indicates that no value occupies a position.
+Base type resolution applies **only in schemaless documents** — a document whose header carries no `!!schema` (§2.2) — and only to a token that carries no built-in type annotation, since a built-in annotation overrides base resolution for its token (§5). Under a schema it does not apply at all: every value is typed by its position or by its tag, each declared atom type owns its own parsing contract, and there is no third way to read a token ([TSON-SCHEMA] §4.2, §7.1). The tokens `true` and `false` have special status only under base type resolution (§4.2). Resolution applies to **data values only**: field names are names (§2.5), and map keys are text, never resolved — in `{ "007": 007 }` the key is the name `007` and the value is a string by fallthrough (leading zeros fail the `integer` production, §4.3), and `07` and `7` are distinct map keys because key identity is textual at this layer (§2.6).
+
+A Class 1 value is one of three things — an untyped token, a token carrying a built-in annotation from §5's vocabulary, or a container — and this section governs only the first. The vocabulary is the schemaless way to say what a token *means*: `!date 2025-03-13`, `!uuid 9f1c…`, `!int32 007` are typed and checked with no schema in scope. Base resolution is what a token gets when its author chose not to say.
 
 
 ### 4.2 Boolean
 
 
 The tokens `true` and `false` (case-sensitive, lowercase only) resolve to boolean values. No other representations (yes, no, on, off, True, FALSE) are recognised as boolean.
+
+These two are the notation's only keyword-like tokens, and they are kept for a reason that is not JSON's. [TSON-SCHEMA] §5.4 derives a choice's `disjoint` fact from the classes this section assigns, and BOOLEAN is a discrimination class *only because* the two tokens are matched ahead of the number grammar (§4.5): without that match the kernel's `boolean` — the enum `[true false]` — would be string-class, `( boolean | text )` would derive `disjoint: false`, and every boolean in an untagged choice would need a `!boolean` tag. So a Part 1 edit here would change a derived fact in Part 2, which is why the order is normative rather than a convenience. Secondarily, a boolean is a value a schemaless read produces and a consumer stores, and `true` against `"true"` is the same distinction `42` and `"42"` draw (§2.4). Under a schema neither token is special: `boolean` reads its member names as any enum does, and `true` is an identifier like any other (§7.7).
 
 
 ### 4.3 Numbers
@@ -447,10 +455,10 @@ An unquoted token resolves to a numeric value if and only if its complete text m
 
 - **Special values** — `.nan` and `.inf`/`.infinity` (infinity with optional sign). Lowercase only.
 - **Floats** — signed decimal with fraction and/or exponent (`1.5`, `.5`, `6.02e23`, `-2e-3`). Digits MUST follow a decimal point; the integer part MAY be omitted. `5.` is not a number. The signed zeros `+0.0` and `-0.0` are floats whose sign MUST be preserved.
-- **Integers** — signed decimal integers. Leading zeros MUST NOT be used except for the single digit zero.
+- **Integers** — signed decimal integers. Leading zeros MUST NOT be used except for the single digit zero. The rule is the format's own and not an inherited one: it is not octal ambiguity that excludes `007` — `0o377` spells octal explicitly — but the fact that a zero-padded token is data whose leading zeros are *significant*, a postcode, an identifier, a code. Reading `007` as `7` destroys information irrecoverably; reading it as the string `007` preserves exactly what was written. `007` is a string because it is one (§4.4).
 - **Based integers** — hexadecimal, octal, and binary integers via the lowercase prefixes `0x`, `0o`, `0b` (`0xFF`, `0o755`, `0b1010`), with optional sign; hex digits may be either case.
 
-These are JSON's numeric forms extended by an optional leading `+`, leading-dot fractions (`.5`), underscore digit separators (`1_000_000` — permitted only between digits, enforced by the digit-sequence productions), arbitrary precision, based integers, and the special values. Richer numeric forms — rationals (`2/3`), complex numbers (`3+4i`), and hexadecimal floats — are **not** recognised by base type resolution; the built-in type vocabulary provides typed access to them under explicit annotation (§5.6). Complex and hex-float tokens are expressible unquoted and resolve as strings; rational content contains `/`, which is outside the unquoted profile (§7.1), so rational values are always quoted. A consequence of based-integer recognition: hex-shaped identifier data (a blockchain address such as `0x71C7656EC7ab88b098defB751B7401B5f6d8976F`) resolves as a number; authors who intend such a token as a string MUST quote it.
+These are the familiar decimal integer and float forms, with an optional leading `+`, leading-dot fractions (`.5`), underscore digit separators (`1_000_000` — permitted only between digits, enforced by the digit-sequence productions), arbitrary precision, based integers, and the special values. The two rules that read as restrictions — no leading zeros, and digits required after a decimal point (`5.` is not a number) — are both there so that a token which is not a number falls through as the string it is rather than being read as a number it is not. Richer numeric forms — rationals (`2/3`), complex numbers (`3+4i`), and hexadecimal floats — are **not** recognised by base type resolution; the built-in type vocabulary provides typed access to them under explicit annotation (§5.6). Complex and hex-float tokens are expressible unquoted and resolve as strings; rational content contains `/`, which is outside the unquoted profile (§7.1), so rational values are always quoted. A consequence of based-integer recognition: hex-shaped identifier data (a blockchain address such as `0x71C7656EC7ab88b098defB751B7401B5f6d8976F`) resolves as a number; authors who intend such a token as a string MUST quote it.
 
 Numeric values are arbitrary precision; how values map to host-language numeric types is an implementation concern (see §9.1 for literal-length limits). Non-ASCII digit sequences do not match the number grammar and fall through to string.
 
@@ -460,20 +468,23 @@ Numeric values are arbitrary precision; how values map to host-language numeric 
 ### 4.4 String
 
 
-Any quoted token resolves to a string value. Any unquoted token that does not match null, boolean, or the `number` production resolves to a string value — including near-miss numeric forms such as `007` and `1.2.3` (leading zeros and second dots fail the number grammar) and the complex form `3+4i` (§4.3). There are no exceptions: every string-resolving token is one whose complete text failed the null, boolean, and number rules. The bare tokens `-`, `+`, and `.` do not exist (§7.2.4); write the single-character strings quoted.
+Any quoted token resolves to a string value. Any unquoted token that does not match boolean or the `number` production resolves to a string value — including near-miss numeric forms such as `007`, `1.2.3`, `5.` and `1__0` (leading zeros, second dots, a trailing point and a doubled separator all fail the number grammar), the complex form `3+4i` (§4.3), and the token `null`, which is an ordinary string. There are no exceptions: every string-resolving token is one whose complete text failed the boolean and number rules. The bare tokens `-`, `+`, and `.` do not exist (§7.2.4); write the single-character strings quoted.
+
+The fall-through is deliberate, and it is total on purpose. A rule sharp enough to refuse `007` as a near-miss would have to say why `2025-03-13`, a bare UUID, `192.168.0.1`, `2h30m` and `1.2.3` are not near-misses — every one of them begins with a digit and every one of them is a string a configuration file writes unquoted — and the only such rule is an enumeration of shapes, which is §5's vocabulary restated inside this section as exceptions. Refusing an untyped token also adds no information: the format already has two mechanisms that do know what a token means, a `!`-annotation from §5's vocabulary in a schemaless document (`!int32 007` is refused, `!date 2025-03-13` is checked) and a declared type under a schema ([TSON-SCHEMA]), and a token an author chose not to type is, by that choice, a string. The hazard worth naming is the reflex `null` or the mistyped `5.` landing silently as text at a position that wanted something else; the remedy is the annotation, or the schema, not a keyword.
 
 
 ### 4.5 Resolution Order
 
 
-When no declared type information is in scope, the parser MUST attempt resolution in this order:
+In a schemaless document (§4.1), the parser MUST attempt resolution in this order:
 
-1. null — exact keyword match
-2. boolean — exact keyword match (`true`, `false`)
-3. number — full-token match against the number grammar (§7.6)
-4. string — fallback for everything else
+1. boolean — exact keyword match (`true`, `false`)
+2. number — full-token match against the number grammar (§7.6)
+3. string — fallback for everything else
 
-To represent the string `"null"` in schemaless TSON, use quotes.
+To represent the strings `"true"`, `"false"` or `"42"` in schemaless TSON, use quotes (§7.1).
+
+**Why three classes, and no more.** This section classifies *host base types*: what a schemaless read hands back with no library type and no ordered vocabulary behind it — a boolean, a number, a string. It does not classify *semantic* types. A date, a UUID, an address, or a duration is lexically recognisable and starts with a digit, and the number scanner has already inspected it and failed; recognising it here would cost nothing mechanically and would cost the format a great deal: [TSON-SCHEMA] §5.4 couples this order to derived disjointness, so a DATE class would narrow what a `text` variant admits untagged in every schema that never mentions a date, and would make §5's vocabulary non-additive — each new atom changing derived facts on choices that do not name it — until "string" meant "matched none of twenty ordered rules". A Class 1 document reaches a semantic type deliberately, through an annotation (§5), and a Class 2 document through a declaration; a choice over two text-form types is written as a labelled group ([TSON-SCHEMA] §5.11), which discriminates by label and needs no tag. That answers the same question for `uuid`, `uri` and every future addition without re-arguing each.
 
 
 ## 5. Built-in Type Vocabulary
@@ -485,9 +496,9 @@ The built-in type vocabulary is a fixed set of type annotations that extend base
 ### 5.1 Applicability
 
 
-The vocabulary applies **only in schemaless processing** — when no declared schema scope is active for the value being resolved. A built-in annotation overrides base type resolution for the annotated token: the token is parsed by the named atom's contract (§5.2) instead of the §4 resolution order. Type annotations whose names are not in the vocabulary are preserved as uninterpreted markers (§3.2).
+The vocabulary applies **only in schemaless documents** — the same condition as base type resolution (§4.1): a document whose header carries no `!!schema`. A built-in annotation overrides base type resolution for the annotated token: the token is parsed by the named atom's contract (§5.2) instead of the §4 resolution order. Type annotations whose names are not in the vocabulary are preserved as uninterpreted markers (§3.2).
 
-When a schema is in scope ([TSON-SCHEMA]), the vocabulary does not apply: all type annotations resolve through the schema's type-name namespace, and schemas wanting these names import the core type library, whose entries denote the same parsing contracts defined here.
+Under a schema ([TSON-SCHEMA]) the vocabulary does not apply: all type annotations resolve through the schema's type-name namespace, and schemas wanting these names import the core type library, whose entries denote the same parsing contracts and the same value spaces defined here ([TSON-SCHEMA] §5.5, §9).
 
 **Annotation names are case-sensitive.** Only the exact names listed below are recognised; `!UUID` is not a built-in annotation.
 
@@ -507,14 +518,13 @@ Host-value entries in the tables are informative; the precise representation is 
 ### 5.3 Binary Types
 
 
-| Annotation   | Format                          | Host value |
-|--------------|---------------------------------|------------|
-| `!base64`    | Base64 (RFC 4648 §4)            | byte array |
-| `!base64url` | URL-safe base64 (RFC 4648 §5)   | byte array |
-| `!base32`    | Base32 (RFC 4648 §6)            | byte array |
-| `!hex`       | Base16 / hex (RFC 4648 §8)      | byte array |
+| Annotation | Format                | Host value     |
+|------------|-----------------------|----------------|
+| `!bytes`   | Base64 (RFC 4648 §4)  | octet sequence |
 
-Each encoding is a distinct type; there is no generic `!binary` annotation. The host value is the decoded byte sequence; a token that is not a valid encoding under the named scheme is a resolver error. Padding is REQUIRED for the padded encodings: a `!base64`, `!base64url`, or `!base32` token MUST include the `=` pad characters RFC 4648 §3.2 requires, and a token whose length is not a multiple of the scheme's quantum is a resolver error — implementations MUST NOT accept unpadded input merely because a host library tolerates it. Rejecting non-canonical padding *bits* (RFC 4648 §3.5) remains a MAY. Binary values SHOULD always be quoted.
+`!bytes` is the only binary annotation, and its spelling in this notation is base64. The value is the octets: an alphabet is a *spelling* of an octet sequence, not a kind of value, and a schemaless document has no schema to carry a selector, so there is nothing for a reader to consult and one alphabet is fixed for the whole class of text encodings. Under a schema the same type, `bytes`, carries an `encoding` selector that a schema sets to another RFC 4648 alphabet by declaring another type ([TSON-SCHEMA] §5.5, §9); `!bytes` names one type in both conformance classes rather than one in Part 2 and several in Part 1. Equality, identity and content addressing are over the octets and never over a spelling ([TSON-SCHEMA] §5.5).
+
+A token that is not valid base64 is a resolver error. Padding is REQUIRED: a `!bytes` token MUST include the `=` pad characters RFC 4648 §3.2 requires, and a token whose length is not a multiple of four is a resolver error — implementations MUST NOT accept unpadded input merely because a host library tolerates it. Rejecting non-canonical padding *bits* (RFC 4648 §3.5) remains a MAY. Binary values SHOULD always be quoted.
 
 
 ### 5.4 Temporal Types
@@ -523,11 +533,22 @@ Each encoding is a distinct type; there is no generic `!binary` annotation. The 
 | Annotation  | Format               | Host value |
 |-------------|----------------------|------------|
 | `!date`     | RFC 3339 `full-date` | date       |
-| `!datetime` | RFC 3339 `date-time` | datetime   |
-| `!time`     | RFC 3339 `full-time` | time       |
-| `!duration` | ISO 8601 duration (`PnYnMnDTnHnMnS`) | duration |
+| `!datetime` | RFC 3339 `date-time` | instant    |
+| `!time`     | RFC 3339 `full-time` | time of day (UTC) |
+| `!duration` | RFC 3339 Appendix A `dur-date` / `dur-time` / `dur-week`, with no `Y` or month-`M` component; an optional leading `-`; a fraction on the seconds component only | duration (seconds) |
+| `!period`   | `P` with a `Y` component, an `M` component, or both, and nothing else; an optional leading `-` | period (months) |
 
-A token that does not match the named format is a resolver error. `date-time` and `full-time` values contain colons and MUST be quoted (§2.4); `full-date` values are valid unquoted.
+A token that does not match the named format is a resolver error. `date-time` and `full-time` values contain colons and MUST be quoted (§2.4); `full-date`, `duration` and `period` values are valid unquoted.
+
+**One ISO 8601 duration, two atoms.** `!duration` is elapsed time — a signed exact decimal number of seconds — and `!period` is a calendar span — a signed integer number of months. The split is what makes each totally ordered: a month has no fixed length beside a second that has one, so the two are two value spaces rather than one partially ordered one, and `P1Y2M3DT4H5M6S` is an error under both. A span that is genuinely both is a record with a field of each. Three rules the grammar does not carry on its face:
+
+- **The week form stands alone.** RFC 3339 Appendix A's `duration` is an alternation, `"P" (dur-date / dur-time / dur-week)`, so `P1W2D` is not a duration and neither is `P1WT1H` — a week with a time part has no production. (ISO 8601-2's relaxation admitting `P1W2D` is not adopted.)
+- **A week is exactly 7 days and a day exactly 86400 s**, so `P2W`, `P14D` and `PT336H` are one value, and the week form belongs to `!duration` and not to `!period` for that reason: it has a fixed length. (`java.time` puts weeks on the calendar side; this format does not, because seven days is 604800 s only if every day is 86400 s, which is true of a duration and is not the claim a period makes.)
+- **A text encoding emits `PTnHnMnS` and nothing else.** The value is a number of seconds, so a writer cannot recover that its input was written in weeks or in days: `P3W` round-trips as `PT504H` and `P9DT1H` as `PT217H`. `PnW` and `PnD` are reading conveniences, as `0x50` is for an integer — admitted on the way in, gone on the way out, and never a claim about how a value was spelled — and the round trip is not a defect.
+
+**Fractional seconds and range.** The fraction on a seconds component — RFC 3339's `time-secfrac`, in `full-time`, `date-time` and `dur-time` alike — is at most **nine digits**: `"." 1*9DIGIT`, so `PT0.0000000001S` is not a token. No host runtime represents a duration or a timestamp finer than a nanosecond and several are coarser, so a value below that floor is not exactness anyone can use; a schema that needs finer writes `number` seconds, or its own atom, with the unit under its own control. A `!duration`'s magnitude does not exceed 2⁶³ − 1 nanoseconds (about 292 years), stated as a magnitude so that negating an admitted duration yields an admitted one: a processor MUST be able to represent every value in that range and MUST reject one outside it whether or not its own representation could hold it — a range that depends on which implementation read the document is not a range. A span longer than that is a calendar span and is a `!period`, or a physical quantity and is a `!number` in the unit the schema names. The ceiling is a value rule and the floor a lexical one, deliberately: a seconds count is summed from the `D`, `H`, `M` and `S` components, so `P400000D` overflows with no single component long enough to catch, where a fraction reaches the value through one component and is capped at the token ([TSON-SCHEMA] §5.5).
+
+**Instants.** A `!datetime` is the instant on the UTC timeline, and a `!time` is the time of day in UTC on `[00:00:00, 24:00:00)`: the offset RFC 3339 makes mandatory is a *spelling*, so `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are one value, `-00:00` (offset unknown, RFC 3339 §4.3) is the same instant as `Z`, and `23:30:00-02:00` is `01:30:00Z` — the price of a time with no date. This notation preserves the offset as written; equality, ordering and bounds compare the instant ([TSON-SCHEMA] §5.5). A wall clock with no offset, and an appointment for which the zone is data, are other value spaces and not these types.
 
 
 ### 5.5 Text, Identifier, and Network Types
@@ -547,6 +568,8 @@ A token that does not match the named format is a resolver error. `date-time` an
 
 `!text` is the unconstrained text atom: it accepts every token and its host value is the token's text. It adds nothing beyond what an unannotated token's base resolution to a string already provides (§4.4) — it exists so the string case can be asserted explicitly (a quoted numeric token under `!text` is unambiguously the string) and because it anchors the constraint family (`text_type`) on which the library's `uri`, `regex`, and `email` types build.
 
+Every atom in this table is **string-class** under base type resolution (§4.5), as are `!bytes` and the temporal atoms: a schemaless read of the bare token yields a string, and only the annotation says which of them it is. Under a schema the same fact governs untagged choices — `( date | text )` and `( uuid | email )` are not disjoint, so every value in one carries its tag ([TSON-SCHEMA] §5.4) — and the shape that wants no tag is the labelled group, `{ ( on: date | note: text ) }`, which discriminates by label ([TSON-SCHEMA] §5.11).
+
 `!email` is deliberately narrower than full RFC 5322 `addr-spec`: only the `dot-atom "@" dot-atom` core is accepted. Quoted local parts (`"a b"@example.com`), domain literals (`user@[192.0.2.1]`), and comments — all admitted by the full grammar — are rejected: they do not belong in an interchange scalar, and naming the RFC without scoping it would leave each implementation to pick its own subset. Email addresses contain `@` and MUST be quoted (§2.4).
 
 A token that does not match the named format is a resolver error; a CIDR prefix length outside the address family's range is a validation error, as is an address whose host bits are nonzero under the stated prefix length — the host value is a network, and accept-and-mask would be lossy (§5.2). IPv6 zone identifiers (`fe80::1%eth0`, RFC 4007) are host-local and are not part of the `ipv6` or `cidr6` contracts. URIs with a scheme and IPv6 addresses contain colons, and CIDR values contain `/`; all of these MUST be quoted (§2.4). MAC addresses in the colon-separated form MUST be quoted; the hyphen-separated form is expressible unquoted.
@@ -562,7 +585,7 @@ The numeric atoms are defined against the productions of the number grammar (§7
 | `!int8` `!int16` `!int32` `!int64` `!int128` `!int256` | `integer` / `based-integer` | *n*-bit two's-complement signed range | *n*-bit integer |
 | `!uint8` `!uint16` `!uint32` `!uint64` `!uint128` `!uint256` | `integer` / `based-integer` | *n*-bit unsigned range | *n*-bit unsigned |
 | `!positive_integer` `!non_negative_integer` `!negative_integer` `!non_positive_integer` | `integer` / `based-integer` | sign bound (`> 0`, `>= 0`, `< 0`, `<= 0`); unbounded precision | integer |
-| `!number`  | `integer` / `float` | exact, preserved as written | exact number |
+| `!number`  | `integer` / `float` | exact; scale is not part of the value (`1`, `1.0`, `1.00` are one value) | exact number |
 | `!float32` | `integer` / `float` / `hex-float` / `special-value` | approximate, IEEE 754 binary32 grid | 32-bit float |
 | `!float64` | `integer` / `float` / `hex-float` / `special-value` | approximate, IEEE 754 binary64 grid | 64-bit float |
 | `!rational` | `rational` | exact; denominator nonzero (by grammar) | rational |
@@ -576,21 +599,9 @@ The integer atoms — the full fixed-width ladder and the four bound-only refine
 ## 6. TSON and JSON
 
 
-TSON is a superset of JSON with two deliberate character-level exceptions, both confined to string content. Every valid JSON document outside those exceptions is a valid TSON document, and the extensions are additive — no JSON construct changes meaning under TSON.
+TSON is JSON-*like* by design and is not a JSON superset. A JSON document is not a TSON document: the notation carries no `null` keyword (§4.4), treats field names as identifiers (§2.5), has no surrogate-pair escapes (§7.2.2), and admits forms JSON does not. What the two share — `"`-delimited strings, `[ ]` arrays, `{ name: value }` records, the `\n \r \t \\ \"` escapes, base type resolution as a mechanism, and the rule that an unadorned numeric token names the exact type `number` — is shared because each was a good idea on its own, and none of it rests on a compatibility claim.
 
-**The two exceptions.** Both are corollaries of one principle: TSON strings are well-formed Unicode scalar sequences, and single-line quoted tokens are genuinely single-line.
-
-1. RFC 8259 permits the line terminators NEL (U+0085), LINE SEPARATOR (U+2028), and PARAGRAPH SEPARATOR (U+2029) unescaped inside string literals. TSON excludes all three from single-line tokens; they MUST be written as escapes (`\u0085`, `\u2028`, `\u2029`) (§7.2.2). A single escaping pass converts any affected JSON document into TSON with identical meaning.
-2. RFC 8259 leaves surrogate pairing unenforced, so `"\uD800"` alone is grammatically valid JSON. TSON rejects unpaired surrogate escapes as lexer errors (§7.2.2): a lone surrogate encodes data that no Unicode string can hold.
-
-A TSON parser SHOULD accept any valid JSON document outside the two exceptions above; documents within them are mandatory lexer errors (§7.2.2), not implementation latitude. JSON documents carry no TSON type information, so base type resolution (§4) applies:
-
-- JSON objects are records; JSON arrays are arrays.
-- JSON strings are quoted tokens resolved as strings.
-- JSON numbers are unquoted tokens resolved as integers or floats (§4.3). A JSON number carries no precision or width commitment, so it maps to the exact type `number` when a type is named ([TSON-SCHEMA] §9): a bare JSON number is a TSON `number`, preserved as written. Lossiness enters only if a consumer later narrows to an approximate type (`!float32`/`!float64`).
-- JSON `true`, `false`, and `null` resolve as boolean and null. JSON `null` maps to the TSON null base type, not to the absent sentinel.
-
-The comma separators and quoted keys required by JSON are accepted by the TSON grammar, as is a leading byte order mark (§7.1). TSON deliberately declines two extensions common in JSON supersets: there is no comment syntax (§2.4) and there are no anchors, references, or merge operators (§1.2, principle 6).
+A processor that reads JSON does so through a **JSON reader**, which is a second encoding of the same model rather than a mode of this notation. The reader maps a JSON object to a record where its keys are identifiers and to a map otherwise; a JSON array to an array; a JSON string to a string; a JSON number to `number` ([TSON-SCHEMA] §9); `true` and `false` to booleans; and JSON `null` to **absence**, where the position's state decides whether absence is admitted, exactly as `_` is judged (§2.9). Under a schema the reader validates on the same terms as this notation's Class 2 processing; schemaless, it reads on base type resolution's terms (§4). That is the JSON compatibility this series offers, and it is the reader's, not the notation's — which is what lets a JSON `null` land as absence in the model instead of as the string `null` at a `text` position, the one outcome a keyword in this notation could not have prevented.
 
 
 ## 7. Grammar Reference
@@ -633,7 +644,7 @@ Identifier  Start    = XID_Start
 
 The identifier profile is the token profile minus the extensions the number grammar requires: `Nd`, `-`, `+` and `.` at Start exist so that a *number* can be an unquoted token, and reach names only because names and values share one lexical class; an identifier therefore never begins with a digit, a sign, or a dot. `+` is dropped from Continue as an exponent-only character; `.` is dropped from Continue and reserved as a future identifier separator. Every part of the identifier profile lies inside the token profile, so **every identifier is a well-formed unquoted token** and no name ever needs quoting to be written — which is what lets the annotation and type-annotation positions, which admit no quoted form, cost nothing. That invariant is the one to preserve if the profile is ever widened.
 
-The three extension characters are all `Pattern_Syntax` and therefore immutable, so both profiles are frozen in their non-property parts. The property-based components grow with the Unicode version: new scripts enter `XID_Start`/`XID_Continue` and new digits enter `Nd` as they are encoded. Growth is monotone — characters that were lexer errors become token characters, and valid documents remain valid under later versions. Underscore (U+005F) is in `XID_Continue` but not `XID_Start`: it may appear within or at the end of a token (`my_type`) but cannot start one. Token-initial underscore is reserved to the format and occupied by the absent sentinel `_` (§2.9). The identifier profile deliberately does not add `_` to Start either — `_id` is a legal *spelling* only in quoted form (`{ "_id": 1 }`), and the reservation is a statement about spelling: `{ "_": 1 }` is a record with a field named `_`, while `{ _: 1 }` is not a record at all.
+The three extension characters are all `Pattern_Syntax` and therefore immutable, so both profiles are frozen in their non-property parts. The property-based components grow with the Unicode version: new scripts enter `XID_Start`/`XID_Continue` and new digits enter `Nd` as they are encoded. Growth is monotone — characters that were lexer errors become token characters, and valid documents remain valid under later versions. Underscore (U+005F) is in `XID_Continue` but not `XID_Start`: it may appear within or at the end of a token (`my_type`) but cannot start one. Token-initial underscore is reserved to the format and occupied by the absent sentinel `_` (§2.9). The identifier profile deliberately does not add `_` to Start either, so `_id` and `_` are not names at any layer: `{ "_id": 1 }` is a parse error like `{ _id: 1 }` (§2.5), and a key spelled that way belongs in a map. Admitting a leading underscore would be a change to the profile for every naming position at once, and not a cheap one — the lexer takes `_` greedily as the sentinel, so it would also cost the invariant that every identifier is a well-formed unquoted token.
 
 **Profile boundaries.** Every extension character is required by a production of the number grammar (§7.6): `Nd` for digits, `-`/`+` for signs and exponent signs, `.` for the decimal point and `.inf`/`.infinity`/`.nan`. The extension characters remain token-profile members, but their bare single-character forms are claimed by the grammar or excluded: `-` alone is the subtraction operator ([TSON-SCHEMA] §5.9), `..` is the range token (§7.2.4), and bare `+` and `.` have no role — the single-character strings are written quoted (`"-"`, `"+"`, `"."`). Content kinds the profile cannot cover totally — paths, URIs with a scheme, monetary amounts, rationals, networks, percentages, ranges, and the temporal kinds that carry a clock time (RFC 3339 `full-time` and `date-time`, and any duration written with the colon forms) — are excluded entirely, so their quoting rule is *always*, never a per-character scan (full derivation in [TSON-GUIDE]). A calendar date (`2025-03-13`) lies wholly inside the profile and is spellable bare; a time never is, the colon being the one character that ends it.
 
@@ -643,7 +654,7 @@ The three extension characters are all `Pattern_Syntax` and therefore immutable,
 
 TSON documents are encoded in Unicode. UTF-8 is RECOMMENDED; UTF-16 and UTF-32 are permitted. Content-addressed documents MUST be UTF-8 (§2.2.1). A byte sequence that is not valid in the document's encoding is a lexer error (§8.1), reported at the byte offset of the offending sequence's first byte; a decoder MUST NOT substitute replacement characters (U+FFFD) and continue. For UTF-8, overlong encodings, encoded surrogate code points, and values above U+10FFFF are not valid sequences and are rejected on the same terms — a platform decoder's tolerance of any of them is not licence to accept them.
 
-**Byte order mark.** A single U+FEFF at the very start of a document is an encoding artifact: decoders MUST accept it and discard it before lexing — it is not whitespace and is not part of any token. U+FEFF anywhere else outside a quoted token is an unrecognised character and a lexer error (§7.2.6) — it is `Cf`, and the format-character rule above already excludes it; within a quoted token it is ordinary content. Encoders using UTF-8 SHOULD NOT emit a byte order mark; for UTF-16 and UTF-32 the byte order mark belongs to the encoding scheme and is consumed by decoding.
+**Byte order mark.** A single U+FEFF at the very start of a document is an encoding artifact: decoders MUST accept it and discard it before lexing — it is not whitespace and is not part of any token. This is an encoding courtesy of this section's own, owed to the editors that still emit one, and rests on no compatibility claim (RFC 8259 §8.1, where the posture comes from, has it as a MAY). U+FEFF anywhere else outside a quoted token is an unrecognised character and a lexer error (§7.2.6) — it is `Cf`, and the format-character rule above already excludes it; within a quoted token it is ordinary content. Encoders using UTF-8 SHOULD NOT emit a byte order mark; for UTF-16 and UTF-32 the byte order mark belongs to the encoding scheme and is consumed by decoding.
 
 TSON documents use the media type `application/tson` (intended for IANA registration). Version information is not encoded in the media type; if disambiguation is needed in HTTP contexts, implementations MAY use `application/tson; version=1`. File extensions carry the same distinction the media-type parameter does. The unversioned extension **`.tn`** makes no stability claim: it is the extension of the 2026 revision series — this document's own bundled schemas use it — and remains appropriate for any document published without a frozen-version guarantee. The extension **`.tn1`** is a positive claim of TSON version 1 stability and is reserved for the version 1 freeze: it MUST NOT be used before that release, and future major versions use correspondingly numbered extensions (`.tn2`, …). Renaming a document from `.tn` to `.tn1` at the freeze changes its identifying URI and therefore its canonical identity (§2.2.1); references pinned during the revision series do not carry over and are re-pinned against the frozen identities. Whether a TSON file is a data document or a schema document is determined by its header (§2.2), not its extension: classification requires at most two directives of lookahead and no value parsing, so streams, previews, and content sniffers can classify a document from its opening bytes.
 
@@ -682,33 +693,34 @@ Every input character falls into exactly one category. The lookahead rules (quot
 
 Unquoted tokens MUST be in Unicode Normalization Form C (NFC) in the source text: an unquoted token that is not NFC-normalized is a lexer error, and encoders MUST emit unquoted tokens in NFC. The lexer never alters token text — a document's bytes are authoritative, so byte identity and semantic identity coincide for unquoted tokens, which content-hash references depend on. Quoted tokens are not subject to this requirement — they preserve their exact Unicode content.
 
-**Identifier positions normalise at the resolver layer.** Quoted tokens that occupy identifier positions — record field names, and any position a higher part designates as an identifier — are NFC-normalised by the resolver before identity comparison. String-typed positions are not normalised. Consequently, `"café"` (decomposed) and `"café"` (precomposed) collide as duplicate field names, while two string *values* with the same difference remain distinct strings.
+**Identifier positions normalise before they match.** Quoted tokens that occupy identifier positions — record field names (§2.5), and any position a higher part designates as an identifier — are NFC-normalised before the decoded text is matched against the identifier grammar (§7.7) and before identity comparison, so the quoted spelling is never stricter than the unquoted one the lexer already normalises. String-typed positions are not normalised. Consequently, `"café"` (decomposed) and `"café"` (precomposed) collide as duplicate field names, while two string *values* with the same difference remain distinct strings.
 
 
 #### 7.2.2 Quoted Tokens and Escape Processing
 
 
-A single-line quoted token is delimited by `"` and may contain any character from U+0020 upward except the quotation mark, the backslash, and the line terminators NEL (U+0085), LINE SEPARATOR (U+2028), and PARAGRAPH SEPARATOR (U+2029); these three MAY be included via their escape sequences. A literal TAB is below U+0020 and MUST be written as `\t`, matching JSON. Multi-line tokens differ: they admit literal tabs (§7.2.3). The single-character escapes are:
+A single-line quoted token is delimited by `"` and may contain any character from U+0020 upward except the quotation mark, the backslash, and the line terminators NEL (U+0085), LINE SEPARATOR (U+2028), and PARAGRAPH SEPARATOR (U+2029); these three MAY be included via their escape sequences. A single-line token is genuinely single-line: every line terminator of §7.2 rule 1 ends it, and the three above are excluded raw for that reason and no other. A literal TAB is below U+0020 and MUST be written as `\t`. Multi-line tokens differ: they admit literal tabs (§7.2.3). The single-character escapes are:
 
 | Escape | Code point | Description           |
 |--------|------------|-----------------------|
 | `\"`   | U+0022     | Quotation mark        |
 | `\\`   | U+005C     | Reverse solidus       |
-| `\/`   | U+002F     | Solidus (JSON compat) |
 | `\b`   | U+0008     | Backspace             |
 | `\f`   | U+000C     | Form feed             |
 | `\n`   | U+000A     | Line feed             |
 | `\r`   | U+000D     | Carriage return       |
 | `\t`   | U+0009     | Character tabulation  |
-| `\s`   | U+0020     | Space (TSON extension; not in JSON) |
+| `\s`   | U+0020     | Space                 |
 
-The `\s` escape is a TSON extension whose primary use is preserving intentional trailing whitespace in multi-line tokens (§7.2.3). The `\uXXXX` form encodes any code point using four hexadecimal digits; supplementary characters above U+FFFF use a surrogate pair, with requirements that RFC 8259 leaves ambiguous:
+A solidus needs no escape and has none: `\/` is an invalid escape. The `\s` escape's primary use is preserving intentional trailing whitespace in multi-line tokens (§7.2.3).
 
-- A high surrogate escape MUST be immediately followed by a low surrogate escape; a high surrogate not followed by a low surrogate is a lexer error.
-- A low surrogate escape MUST be immediately preceded by a high surrogate escape; a lone low surrogate is a lexer error.
-- The resulting code point MUST be a valid Unicode scalar value; surrogate code points (U+D800–U+DFFF) MUST NOT appear in the decoded token.
+**Character escapes.** A character is escaped by its scalar value in one of two spellings — four hexadecimal digits, or one to six hexadecimal digits in braces:
 
-Implementations MUST reject documents containing unpaired surrogate escapes rather than silently producing ill-formed strings.
+```
+"\u" ( 4HEXDIG / "{" 1*6HEXDIG "}" )
+```
+
+with one constraint: **the value denoted MUST be a Unicode scalar value** — in range, and not a surrogate code point (U+D800–U+DFFF). `\u0041` and `\u{41}` are two spellings of one character; `\u{1F600}` names a supplementary character directly, and so does `\u{E0100}`, a variation selector an ASCII-safe generator could otherwise express only by embedding the invisible character. There are no surrogate pairs: an escape names a character or it names nothing, so `\uD83D\uDE00` is two lexer errors rather than one emoji, and a TSON string is a well-formed sequence of scalar values by construction rather than by a rule the lexer enforces. The `{` after `u` decides the spelling at the first character, so the two forms never conflict; a brace form with no digits, more than six, or an unclosed brace is a lexer error.
 
 
 #### 7.2.3 Multi-line Tokens
@@ -795,11 +807,14 @@ ws-indent     = *( SP / HTAB )
 ; ── Single-line character rules ───────────────────────────
 
 char          = unescaped
-              / BSLASH ( DQUOTE / BSLASH / "/"
+              / BSLASH ( DQUOTE / BSLASH
                        / "b" / "f" / "n" / "r" / "t" / "s"
                        / unicode-escape )
 
-unicode-escape = "u" 4HEXDIG
+unicode-escape = "u" ( 4HEXDIG / "{" 1*6HEXDIG "}" )
+                ; the value denoted MUST be a Unicode scalar
+                ; value: in range and not U+D800-U+DFFF (§7.2.2);
+                ; there are no surrogate pairs
 
 unescaped     = ; U+0020 through U+10FFFF, excluding:
                 ;   U+0022 (DQUOTE)
@@ -811,7 +826,7 @@ unescaped     = ; U+0020 through U+10FFFF, excluding:
 ; ── Multi-line character rules ────────────────────────────
 
 ml-char       = ml-unescaped
-              / BSLASH ( DQUOTE / BSLASH / "/"
+              / BSLASH ( DQUOTE / BSLASH
                        / "b" / "f" / "n" / "r" / "t" / "s"
                        / unicode-escape )
 
@@ -949,15 +964,18 @@ type-ref        = "!" identifier
 core-value      = record / map / array
                 / empty-brace / absent / token
 
-record          = "{" ws field *( separator field ) ws "}"
+record          = "{" ws field *( separator field )
+                  [ ws "," ] ws "}"
 field           = field-name ws ":" ws scoped-value
 
 map             = "{" ws map-entry
-                 *( separator map-entry ) ws "}"
+                 *( separator map-entry ) [ ws "," ] ws "}"
 map-entry       = data-value ws "=>" ws scoped-value
 
 array           = "[" ws [ scoped-value
-                 *( separator scoped-value ) ] ws "]"
+                 *( separator scoped-value ) [ ws "," ] ] ws "]"
+                ; a comma may follow a value (§2.4); a comma
+                ; following nothing, or a comma, is a parse error
 
 scoped-value    = [ schema-directive ws ] data-value
 
@@ -967,12 +985,15 @@ annotation      = "@" identifier [ ":" data-value ]
 token           = unquoted-token / single-line-token
                 / multi-line-token
 field-name      = unquoted-token / single-line-token
-                ; lexical, not an identifier (§2.5); the
-                ; multi-line form is not admitted in name position
+                ; an identifier position (§2.5): the decoded,
+                ; NFC-normalised text is matched against §7.7;
+                ; the multi-line form is not admitted
 empty-brace     = "{" ws "}"
 absent          = "_"
 identifier      = ; §7.7 — matched against a token's complete
-                  ; decoded text, as `number` is (§7.6)
+                  ; decoded text, as `number` is (§7.6); at
+                  ; type-ref and annotation the spelling is an
+                  ; unquoted token, at field-name either spelling
 ```
 
 
@@ -1076,9 +1097,9 @@ Three rules apply on top of the production:
 
 1. **NFC.** An identifier's text MUST be in Unicode Normalization Form C. For an unquoted spelling this is already the lexer's rule (§7.2.1); a quoted spelling at a naming position is NFC-normalised by the resolver before identity comparison (§7.2.1), and it is the normalised text that the production is matched against. Identity between identifiers is byte identity of the NFC text, and is case-sensitive.
 2. **Joining controls.** ZWNJ (U+200C) and ZWJ (U+200D) are `XID_Continue` and so are admitted by the production, but only in the contexts UTS #39 §3.1.1.1 defines for joining controls — conditions A1, A2, and B on the `Joining_Type`, `Canonical_Combining_Class`, and `Indic_Syllabic_Category` of the neighbouring characters, under the two global conditions that the identifier be in NFC and be single-script (ignoring Common and Inherited). A joining control outside those contexts makes the text not an identifier. The rule admits the joiners where they have a shaping effect (Persian `کتاب‌ها`, an Indic conjunct) and refuses them where they are invisible — every position in a Latin name — and it is what makes the token profile's admission of the joiners (§7.1) safe. An implementation MUST implement all three conditions; the Arabic condition alone admits Persian and refuses Malayalam, which is the wrong line.
-3. **No reserved words.** The grammar excludes nothing by name: there is no keyword list, and `true`, `false`, and `null` are identifiers like any other (the kernel's `boolean` is the enum `[true false]`, [TSON-SCHEMA] §7.4). The one lexical reservation the format makes — the token-initial underscore, occupied by the absent sentinel (§7.1) — is not a reservation on names at all: `_` is `XID_Continue` only, so no identifier begins with it, and `_` and `_id` are not identifiers. A schemaless record may still carry a field spelled `"_"` or `"_id"`, because Class 1 field names are lexical (§2.5); no declared field can bear either name.
+3. **No reserved words.** The grammar excludes nothing by name: there is no keyword list, and `true` and `false` are identifiers like any other — the two words that have a special reading under base type resolution (§4.2) are, under a schema, the members of the kernel's `boolean` enum `[true false]` ([TSON-SCHEMA] §7.4), and `null` is an ordinary string (§4.4). The one lexical reservation the format makes — the token-initial underscore, occupied by the absent sentinel (§7.1) — is not a reservation on names at all: `_` is `XID_Continue` only, so no identifier begins with it, and `_` and `_id` are not identifiers at any layer (§2.5).
 
-A token at a naming position whose decoded text fails this grammar is a parse error at the positions the data grammar marks `identifier` (§7.4 — annotation names and type-annotation names) and at every naming position of the schema grammar ([TSON-SCHEMA] §12.1). Record field names are lexical at this layer (§2.5) and are not matched against it; under a schema they conform by construction, since a declared field name is an identifier. Map keys are values, not names, and are never matched against it (§2.6).
+A token at a naming position whose decoded text fails this grammar is a parse error at every position the data grammar marks `identifier` (§7.4 — field names, annotation names and type-annotation names) and at every naming position of the schema grammar ([TSON-SCHEMA] §12.1). Map keys are values, not names, and are never matched against it (§2.6).
 
 The grammar is built only on properties the Unicode Standard has frozen (`XID_Start`, `XID_Continue`, NFC, and the properties the joining-control contexts read), so every implementation at every Unicode version returns the same verdict on the same text, and a content-addressed schema's validity (§2.2.1) rests on nothing that a Unicode Character Database refresh can change. The name-hygiene mechanisms of §8.2, which do depend on unstable data, are deliberately kept out of validity for that reason.
 
@@ -1091,14 +1112,14 @@ The grammar is built only on properties the Unicode Standard has frozen (`XID_St
 
 Errors fall into four categories corresponding to the processing layers. The categories are defined here for the whole series; the resolver and validation categories are populated mainly by the higher parts.
 
-- **Lexer errors** — Malformed input below the token layer: byte sequences invalid in the document's encoding (§7.1), unterminated quoted or multi-line tokens, invalid escapes, unpaired surrogate escapes, unrecognised characters, unquoted tokens that are not NFC-normalized.
-- **Parser errors** — Structural mismatches: unclosed brackets, adjacency violations, unexpected tokens, missing separators, `!!` without an adjacent colon form, a directive name outside the closed positional set or outside its placement (§3.3), a token at an annotation-name or type-annotation-name position that is not an identifier (§7.7).
+- **Lexer errors** — Malformed input below the token layer: byte sequences invalid in the document's encoding (§7.1), unterminated quoted or multi-line tokens, invalid escapes, a character escape denoting no scalar value (§7.2.2), unrecognised characters, unquoted tokens that are not NFC-normalized.
+- **Parser errors** — Structural mismatches: unclosed brackets, adjacency violations, unexpected tokens, missing separators, `!!` without an adjacent colon form, a directive name outside the closed positional set or outside its placement (§3.3), a comma that follows nothing or follows a comma (§2.4), a token at a field-name, annotation-name or type-annotation-name position whose decoded text is not an identifier (§2.5, §7.7).
 - **Resolver errors** — Reference and resolution failures. At the data-format layer: an absent sentinel in map key position; a duplicate field name in a record (§2.5) or a duplicate key in a map (§2.6) under the textual and decoded-value layers of key identity — one category for one rule, whichever of those two layers detects a given pair; a duplicate that only a *declared* key type relates is the schema layer's and is a Class 2 validation error ([TSON-SCHEMA] §7.7); a built-in type annotation on a container value (§5.1); a token that a built-in atom's parsing contract rejects (§5.2) — the structural parser has already accepted the document before an atom contract is consulted, so contract failures resolve, they do not parse. [TSON-SCHEMA] adds unresolved type names, schema resolution failures, and schema compilation failures: every error that makes a schema fail to load or ingest — incoherent constraint values, invalid defaults, refuted assertions, failed ingest checks — is a resolver error, however value-like the violated rule, because it is detected while resolving the schema. Validation errors are reserved for data checked against a successfully loaded schema.
 - **Validation errors** — Type and constraint violations. At the data-format layer: range violations by the numeric atoms and CIDR prefix lengths (§5). [TSON-SCHEMA] generalises validation to author-declared constraints.
 
 **Canonical phrasing.** Normative rules throughout this series refer to errors using one of four canonical phrasings, each mapping unambiguously to a category: "is a lexer error", "is a parse error", "is a resolver error", "is a validation error". Where conformance language appears without an explicit category, the layer that detects the violation determines the category. **A conforming TSON processor has one severity**: every diagnostic this series requires is an error in one of these categories, and no rule anywhere in the series asks for a warning. An implementation MAY emit advisory notices of its own, but nothing normative is satisfied, relaxed, or deferred by one.
 
-**Policy refusals are not validity errors.** The name-hygiene checks of §8.2 refuse documents without making them invalid: a refusal is a fifth, distinguishable outcome — the document is *refused by this processor*, under a stated policy and a stated data version — and MUST NOT be reported in any of the four categories above. The distinction is what lets two conforming processors legitimately disagree on a Layer 2 refusal while never disagreeing on validity.
+**Refusals are a fifth outcome, not a verdict.** Two kinds of check refuse a document without making it invalid: the name-hygiene mechanisms of §8.2, and the resource limits of §9.1. A refusal means *this processor declined* — under its stated policy, data version and limits — and never that the document is wrong: the same document may be well-formed, valid, and accepted in full by the next processor along, and a conforming processor may legitimately not refuse at all. A refusal therefore MUST be distinguishable from the four categories above and MUST name the rule or limit that refused, since the three hygiene mechanisms and each limit want different remedies and the rule is what a consumer routes on. It is reported in the *same* report as the four categories: a consumer reads a report to repair a document, and a repair channel split in two is repaired in two passes, so nothing here asks for a refusal to travel apart from the errors it arrives with. What the report carries about the policy is stated in §8.2 and §9.1. The distinction is what lets two conforming processors legitimately disagree on a refusal while never disagreeing on validity.
 
 Implementations MUST include source position (line, column, and byte offset) in all error reports, SHOULD include expected-vs-found information for token and structural mismatches, and SHOULD continue processing after an error to report multiple issues in a single pass.
 
@@ -1110,22 +1131,24 @@ Implementations MUST include source position (line, column, and byte offset) in 
 
 The identifier grammar (§7.7) decides which texts are names; it does not decide whether two names that are both well-formed can be told apart by a reader. Two visually identical names — Latin `admin` and a Cyrillic-`а` `аdmin` — are two identifiers, and NFC does not relate them. This section defines the **name-hygiene** mechanisms that address that surface. They are a second layer with a different character from validity, and the difference is deliberate:
 
-- **They are not validity.** Each depends on Unicode data that the Unicode Consortium declines to freeze — `confusables.txt`, `IdentifierStatus.txt`, and the script-based restriction levels of UTS #39 — so a verdict can change under a routine Unicode Character Database refresh. A content-addressed document (§2.2.1) must mean the same thing forever, so nothing here may decide whether a document is valid. A document that fails a check is **refused by this processor**, reported as §8.1's distinguishable outcome, and a conforming processor MUST name the UTS #39 data version in the refusal — two implementations can legitimately disagree, and the version is the only thing that explains it.
+- **They are not validity.** Each depends on Unicode data that the Unicode Consortium declines to freeze — `confusables.txt`, `IdentifierStatus.txt`, and the script-based restriction levels of UTS #39 — so a verdict can change under a routine Unicode Character Database refresh. A content-addressed document (§2.2.1) must mean the same thing forever, so nothing here may decide whether a document is valid. A document that fails a check is **refused by this processor**, reported as §8.1's fifth outcome.
+- **The policy and the data version are properties of the report, not of the refusal.** The Unicode data version is a property of the processor — the tables compiled into it — and the policy is a property of the deployment; neither belongs to the problem that was found, and twenty refusals in one document cannot carry twenty different versions. A conforming processor MUST make available, with any report that contains a refusal, the **UCD version** of the data files it judged by and the **identifier policy** and **token policy** (below) it judged under, and SHOULD make both available independently of any report, so that a sender can learn what will be accepted *before* writing rather than one round trip after. The version names the tables, which is what explains a disagreement between two processors at different releases; the policy names the level, unit and permitted scripts, which is what explains the far commoner disagreement between two processors at the same release. The version is the UCD's — `confusables.txt` and `IdentifierStatus.txt` are published as part of the Unicode Character Database and carry its version, not UTS #39's own revision number, which identifies the prose describing the mechanisms and is stable across exactly the refreshes this section exists to make visible.
 - **They are implemented everywhere and enforced by default.** A conforming processor MUST implement all three mechanisms below, MUST enforce the first two by default, and SHOULD default the third to the level named below.
 - **Relaxation is a code decision.** A processor MUST allow a deployment to relax any of the three through the implementation's own configuration and MUST NOT allow that relaxation to be silent: a security policy read from the environment is ambient authority, invisible at the call site and absent from review; an opt-out expressed in code is greppable, attributable, and scoped to the processor instance that holds it. An implementation MUST NOT offer a report-but-accept mode for the levels of mechanism 3 — the levels are the severity, and each is a conforming position.
+- **The policy is not a property of a schema, and no schema carries one.** Two reasons, neither of them orthogonality. *Self-certification:* if a schema declared its own strictness, the artifact being checked would choose the check, and a homograph-laden schema would declare the level that admits it — a policy the subject selects is a preference. *Immutability:* a published schema is immutable and hash-pinned ([TSON-SCHEMA] §3.5, §2.2.1) while strictness must move — `confusables.txt` updates, threat models change — and raising a policy would mint a new identity that every document pinning the old one would never see. A third reason is mechanism 1's own: skeleton distinctness does not compose across `!!import` (§8.3), so the policy is a property of the merged namespace at the importing site, which no one schema is in a position to declare. Where a policy lives — a deployment's own configuration, or an artifact of a kind this series does not yet define — it is named at the call site and never resolved by identity.
 - **The specification pins no Unicode version.** Pinning one would freeze the format to a UCD release and make every later script a breaking change.
 
-**Scopes.** The mechanisms operate over **named scopes** — the closed sets of names the series already defines. At this layer there is one: the field names of one record. [TSON-SCHEMA] §11.4 adds the schema-layer scopes (the members of one enum, the declared names of one schema, and the merged namespace at `!!import`). A data document under a schema needs no further scope of its own — a data field name is valid only if it matches a declared one, so it inherits the declaration's verdict — but the record-scope check applies to schemaless data, where no declaration stands behind a field name. Profile extension characters (`-`, §7.1) are not `XID_Continue`, carry no `Identifier_Status`, and do not participate in any mechanism below.
+**Names and scopes.** Mechanisms 2 and 3 are **per-name**: each judges one identifier on its own and needs no scope, so they reach every identifier position — field names, annotation names, type-annotation names, and every naming position of the schema grammar — in one walk. Mechanism 1 is a relation over a set and operates over **named scopes** — the closed sets of names the series already defines. At this layer there is one: the field names of one record. [TSON-SCHEMA] §11.4 adds the schema-layer scopes (the members of one enum, the field names of one record definition, the declared names of one schema, and the merged namespace at `!!import`). A data document under a schema needs no scope of its own — a data field name is valid only if it matches a declared one, so it inherits the declaration's verdict — but the record scope applies to schemaless data, where no declaration stands behind a field name. Because a field name is an identifier at every layer (§2.5), a schemaless record's field names meet all three mechanisms exactly as a declared name does; there is one walk, and no position is policed differently by conformance class. Profile extension characters (`-`, §7.1) are not `XID_Continue`, carry no `Identifier_Status`, and do not participate in any mechanism below.
 
-**Mechanism 1 — skeleton distinctness (default on).** No two names in one scope may have equal UTS #39 `skeleton()` mappings. This is a relation over a set, so it fires only on a colliding pair and never refuses a lone name: whole-script confusables (`aec` / `аес`), the `l`/`I`, `O`/`0` and `rn`/`m` pairs, and every mixed-script homograph are caught, and `id_пользователя` alone is not. The data is `confusables.txt`. It is the mechanism that cannot be validity for a second reason: it does not compose — two independently published schemas, each fine alone, can collide when one imports the other ([TSON-SCHEMA] §11.4) — and it has pure-ASCII false positives (`comer` / `corner` share a skeleton through `m → rn`), which is a sound basis for a default and an unsound one for a rule.
+**Mechanism 1 — skeleton distinctness (default on).** No two names in one scope may have equal UTS #39 `skeleton()` mappings. This is a relation over a set, so it fires only on a colliding pair and never refuses a lone name: whole-script confusables (Latin `pass` beside Cyrillic `раѕѕ`, `aec` / `аес`), the `l`/`I`, `O`/`0` and `rn`/`m` pairs, and every homograph pair are caught, and a lone name, however it is spelled, is not. The data is `confusables.txt`. A pair that isolates this mechanism has to be two names each single-script — a within-word mixed-script homograph such as `аdmin` is refused by mechanism 3 before this one has a pair to compare, so a test written the obvious way passes for the wrong reason. It is the mechanism that cannot be validity for a second reason: it does not compose — two independently published schemas, each fine alone, can collide when one imports the other ([TSON-SCHEMA] §11.4) — and it has pure-ASCII false positives (`comer` / `corner` share a skeleton through `m → rn`), which is a sound basis for a default and an unsound one for a rule.
 
 **Mechanism 2 — `Identifier_Status` (default on).** Every character of a name that is `XID_Continue` MUST be `Identifier_Status=Allowed` (UTS #39 §3.1). This removes obsolete, technical, and limited-use characters from names — a per-character rule with no cross-script judgement in it, so it refuses no ordinary compound. The data is `IdentifierStatus.txt`. It applies to names only: an unquoted *value* in a historic script remains legal.
 
 **Mechanism 3 — restriction level (default Highly Restrictive, whole name).** A name MUST satisfy one of the six restriction levels of UTS #39 §5.2, applied to a **unit** that is either the whole name or each `_`/`-` delimited segment of it. The level is a UTS #39 name, so two implementations agree on it without reading this document; the unit is this series' one refinement. The RECOMMENDED default is Highly Restrictive over the whole name. The relaxation to reach for first is the **unit**, not the level: applied per segment, Highly Restrictive still refuses every within-word homograph (`аdmin`, `id_аdmin`) while admitting the compounds that mix a Latin abbreviation with a name in another script (`id_пользователя`, `url_адрес`, `alpha_α`) — the common case for an author working outside Latin script. A deployment that knows what it is MAY instead name an additional permitted script set (`Latin + Cyrillic`), the mechanism UTS #39 itself uses for its augmented Latin-plus-East-Asian sets. The two loosest levels differ and MUST be offered apart: Minimally Restrictive drops the script rule and keeps the identifier profile; Unrestricted drops the profile too, taking mechanism 2 with it, and is a diagnostic setting rather than a deployment one. One asymmetry is inherited from UTS #39 and worth stating so an author does not infer it from a rejection: the augmented sets admit `日本語id` without a separator, while a Cyrillic or Greek compound needs one (`пользователь_id`) — Han, Kana, and Hangul share no confusables with Latin, and Cyrillic and Greek are full of them.
 
-**Values.** Everything above constrains names. A value is data and may legitimately be anything, so the default for *tokens* is Unrestricted and no scan runs; an implementation SHOULD nevertheless let a deployment that renders or matches untrusted values apply a restriction level to every token off the stream. Because such a check runs before anything knows which tokens are names, a token policy stricter than the name policy subsumes it — a name is a token — and an implementation's documentation SHOULD say so. The per-segment unit belongs to names only: `_` and `-` are word separators by convention in an identifier and ordinary characters in a value.
+**The two policies.** A processor's configuration for this section has two parts, and the series names them so that two implementations reporting them (above) agree on what they are called. The **identifier policy** is mechanisms 1 and 2, and the level and unit of mechanism 3 — with any additional permitted script set — applied at identifier positions (§7.7). The **token policy** is a restriction level applied to every token off the stream. Everything above constrains names; a value is data and may legitimately be anything, so the token policy's default is Unrestricted and no scan runs — an implementation SHOULD nevertheless let a deployment that renders or matches untrusted values set one. Because a token check runs before anything knows which tokens are names, a token policy stricter than the identifier policy subsumes it — a name is a token — and an implementation's documentation SHOULD say so. The per-segment unit belongs to the identifier policy only: `_` and `-` are word separators by convention in an identifier and ordinary characters in a value.
 
-**On detection.** A refused pair is reported at the second occurrence's position, in the manner of §2.6's duplicate-key diagnostic — a confusable pair is that defect in disguise. Every rule in this section is decidable from the document plus a fixed table, so a conformance suite MAY carry vectors for it, labelled with the UTS #39 version they were computed against.
+**On detection.** A refused pair is reported at the second occurrence's position, in the manner of §2.6's duplicate-key diagnostic — a confusable pair is that defect in disguise. Every rule in this section is decidable from the document plus a fixed table, so a conformance suite MAY carry vectors for it, labelled with the UCD version they were computed against; a processor carrying a different version may legitimately skip such a vector.
 
 
 ### 8.3 Conformance Summary of the Two Layers
@@ -1145,11 +1168,32 @@ The identifier grammar (§7.7) decides which texts are names; it does not decide
 ### 9.1 Denial of Service
 
 
-Deeply nested structures and extremely long tokens are potential denial-of-service vectors. Implementations SHOULD enforce configurable limits on nesting depth, token length, and document size.
+A document can ask a processor for more than it should spend: nesting that exhausts a stack, tokens and literals that exhaust memory, containers whose set operations (§2.5's unique field names, §2.6's key identity, [TSON-SCHEMA] §7.5's element uniqueness) are superlinear in their own size, a total that no per-container bound implies, and — specific to this format — scope pushes that make a processor fetch a schema per value ([TSON-SCHEMA] §7.8). A conforming processor bounds all of these under one **limits policy**, on the terms this section states once rather than per limit.
 
-**Numeric literal length.** Base type resolution admits arbitrary-precision numeric literals by grammar. Implementations SHOULD enforce a maximum digit count for unquoted numeric literals (a reasonable default is 4096 digits). The limit MUST be configurable or, where configuration is impractical, the implementation MUST document its enforced limit. Parsers exceeding the limit MUST report a clear error indicating the configured threshold rather than failing with an out-of-memory condition. The limit applies to annotated numeric tokens (`!number`, `!rational`) exactly as to unannotated ones.
+**The terms.** Every limit below has a default. A processor MUST enforce each limit at its default or at a configured value; the limit MUST be configurable or, where configuration is impractical, the implementation MUST document its enforced value. A processor that exceeds a limit MUST report a clear refusal naming the limit and the configured threshold rather than failing with an out-of-memory condition, a stack overflow, or any other host-language fault — and the refusal is counted where the resource is *counted*, not where it is spent: nesting depth is checked as containers open in the token stream, before any reader descends. A limit refusal is §8.1's fifth outcome: the document may be well-formed, valid and accepted in full by the next processor along, so a refusal is not a verdict, MUST be distinguishable from the four categories, and MUST NOT be reported as a validity error — the fallback an unspecified category invites, and the one a sender must not receive about a document that is not wrong. The limits policy is reported beside the identifier and token policies of §8.2, on the same terms: with any report that carries a refusal, and SHOULD be reachable with no document in hand, so that a generator can emit a document that fits. The two policies stay apart — what a processor will *read* and what it will *admit as a name* are different questions, and a deployment that has changed one has said nothing about the other — but one report carries both.
 
-**Decoded binary size.** The binary atoms (§5.3) decode token content into byte arrays. Token-length limits bound the encoded input; implementations SHOULD apply corresponding limits to decoded output rather than assuming the token limit alone bounds allocation.
+**The limits and their defaults.** A default is a portability claim: a document that fits the tightest limit in common use fits every processor above it, where a generous default would make "a conforming document" a property of whoever received it. The defaults are therefore set at the tight end, and a deployment raises them.
+
+| Limit | Applies to | Default |
+|---|---|---|
+| nesting depth | containers open at once | 64 |
+| token length | one token's decoded text, in code points | 1,048,576 |
+| decoded text length | one value's text after escape processing, in code points | 1,048,576 |
+| numeric literal length | digits in one numeric token, annotated or not | 4,096 |
+| decoded binary size | one `!bytes` value's octets (§5.3) | 16,777,216 |
+| document size | the document's bytes | 16,777,216 |
+| elements | one array or set | 1,048,576 |
+| entries | one map | 1,048,576 |
+| fields | one record | 65,536 |
+| annotations | on one value (§3.1 lets a name repeat any number of times) | 64 |
+| total values | all values in one document, containers and scalars alike | 16,777,216 |
+| foreign schemas | distinct schemas a document's scope pushes may load ([TSON-SCHEMA] §7.8) | 16 |
+
+Three of these want stating outright. **The total is not bounded by the parts:** ten thousand arrays of ten thousand elements sits inside every per-container limit and is 10⁸ values, so the aggregate counter is a separate mechanism from the per-position check, and a processor that bounds depth and container size has bounded neither the work nor the allocation. **Decoded sizes are bounded separately from encoded ones:** a token-length limit bounds the input, and the decoded octets or text may be larger or smaller than it; a limit on the input alone does not bound allocation. **The numeric-literal limit applies to annotated numeric tokens (`!number`, `!rational`) exactly as to unannotated ones.**
+
+**Schemas.** This section speaks of documents. A schema is untrusted input too wherever it is accepted over the wire or reached through `!!import`, and its own limits — the import closure, the entries in one schema, reference and supertype chain lengths, template materialisation depth — are stated in [TSON-SCHEMA] §11.5 on the same terms; the document-side counters above apply to a schema document as a document.
+
+**Regular expressions** are not a limit. The `regex` atom is pinned to RFC 9485 I-Regexp ([TSON-SCHEMA] §9), a language chosen so that matching is linear-time by construction; the pattern-complexity vector every other format warns about is closed here by the choice of dialect rather than by a bound.
 
 
 ### 9.2 Absence of Type Guarantees
@@ -1191,15 +1235,15 @@ The bidirectional formatting characters need no rule of their own. The embedding
 | RFC 4291 | IP Version 6 Addressing Architecture | https://www.rfc-editor.org/rfc/rfc4291 |
 | RFC 4632 | Classless Inter-domain Routing (CIDR) | https://www.rfc-editor.org/rfc/rfc4632 |
 | RFC 4648 | The Base16, Base32, and Base64 Data Encodings | https://www.rfc-editor.org/rfc/rfc4648 |
-| RFC 8259 | The JavaScript Object Notation (JSON) Data Interchange Format | https://www.rfc-editor.org/rfc/rfc8259 |
+| RFC 9485 | I-Regexp: An Interoperable Regular Expression Format | https://www.rfc-editor.org/rfc/rfc9485 |
 | RFC 9542 | IANA Considerations and IETF Protocol and Documentation Usage for IEEE 802 Parameters (EUI-48) | https://www.rfc-editor.org/rfc/rfc9542 |
 | RFC 9562 | Universally Unique IDentifiers (UUIDs) | https://www.rfc-editor.org/rfc/rfc9562 |
-| ISO 8601-1:2019 | Date and time — Representations for information interchange | https://www.iso.org/standard/70907.html |
 | IEEE 754-2019 | Standard for Floating-Point Arithmetic | https://ieeexplore.ieee.org/document/8766229 |
 | UAX #15 | Unicode Normalization Forms (NFC) | https://www.unicode.org/reports/tr15/ |
 | UAX #31 | Unicode Identifier and Pattern Syntax | https://www.unicode.org/reports/tr31/ |
 | UTS #39 | Unicode Security Mechanisms (joining-control contexts, §7.7; name hygiene, §8.2) | https://www.unicode.org/reports/tr39/ |
 | UTS #55 | Unicode Source Code Handling | https://www.unicode.org/reports/tr55/ |
+| UCD | Unicode Character Database (`confusables.txt`, `IdentifierStatus.txt`, `Scripts.txt`, `DerivedCoreProperties.txt`; the version a processor reports under §8.2) | https://www.unicode.org/ucd/ |
 
 
 ### 10.2 Series References
@@ -1207,8 +1251,8 @@ The bidirectional formatting characters need no rule of their own. The embedding
 
 | Reference | Title | URL |
 |-----------|-------|-----|
-| TSON-SCHEMA | TSON Part 2: Type System and Schema | https://tson.io/2026/34/tson-part2-schema |
-| TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/34/tson-guide |
+| TSON-SCHEMA | TSON Part 2: Type System and Schema | https://tson.io/2026/35/tson-part2-schema |
+| TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/35/tson-guide |
 
 
 ### 10.3 Informative References
@@ -1216,7 +1260,9 @@ The bidirectional formatting characters need no rule of their own. The embedding
 
 | Reference | Title | URL |
 |-----------|-------|-----|
+| RFC 8259 | The JavaScript Object Notation (JSON) Data Interchange Format (the notation TSON resembles; not a subset relation, §1.1, §4.1) | https://www.rfc-editor.org/rfc/rfc8259 |
 | RFC 8820 | URI Design and Ownership | https://www.rfc-editor.org/rfc/rfc8820 |
+| ISO 8601-1:2019 | Date and time — Representations for information interchange (the informative source behind RFC 3339 Appendix A's duration grammar, §5.4) | https://www.iso.org/standard/70907.html |
 | ISO/IEC 11404:2007 | General-Purpose Datatypes (GPD) | https://www.iso.org/standard/39479.html |
 
 
