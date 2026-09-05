@@ -48,8 +48,9 @@ re-stamped by hand and is therefore the one that silently drifts. `tson hash spe
 The divergences earlier revisions carried are all in the spec now — `reference.target` typed `type_ref`, no
 `instance_template`/`template_argument`/`value_param` (§5.10's held bodies replaced the quoted open-body
 vocabulary), and `map`'s `state` field behind `{K => V?}` (§5.3). **One new divergence is open**: meta-kernel
-declares a `template` constructor the spec text does not yet describe, carrying an open entry's body as text
-(`SPEC-FEEDBACK.md` #5). §8.1's own shape — the held application written as though it were a value of the
+declares a `template` constructor the spec text does not yet describe, carrying an open entry's body as text,
+`type_definition` has lost its `parameters` field to that body, and `type_kind` has gained a `TEMPLATE`
+member (`SPEC-FEEDBACK.md` #5, #6, #7). §8.1's own shape — the held application written as though it were a value of the
 constructor's vocabulary — does not read: §5.10's own `vector` example fails against `non_negative_integer`,
 and the cases that do read bind the parameter as something else. The artifacts run ahead of the prose here as
 they do for the revision's identities.

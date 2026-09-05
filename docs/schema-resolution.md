@@ -503,6 +503,22 @@ recorded open form, and replacing the application with a reference to the entry 
       arity check, which reads the same accessor: materialisation runs first, and by then the parameter is
       gone — leaving either an arity error against a content-derived name nobody typed, or a wire-vocabulary
       mismatch, neither of which names what the author did.
+- **An open entry's `kind` is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes a
+  template not a type, so the entry that cannot validate anything no longer claims the kind an application of
+  it would take: `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than
+  REFERENCE — it is a template whose closure is a reference, not a reference that happens to have parameters.
+  Like `REFERENCE` it is a `type_kind` and not a base kind (§4.1).
+  - **Which is where materialisation reads the closed entry's kind from instead** (`kindOfClosed`): the
+    branch of `Top` the substituted body occupies, §4.1's "construction transfers kind" asked of the
+    construction. Not the constructor's *name* — a held body's head is structure-namespace vocabulary the
+    governing meta declares, and this pass holds only the type-name namespace (§3.3.1 keeps them apart). An
+    entry materialisation mints is never a constructor, so it does not compose with `top`, and for
+    everything that does not, kind is its body's branch.
+  - **And it makes the derivation total.** Every other entry's kind follows from what it already states —
+    the base-kind name in its own `supertypes` for a constructor, its body's branch otherwise — and the open
+    entry was the one case needing a lookup outside itself. `OpenEntryResolvedFormTest` asserts the whole
+    rule over every entry of every schema.
+
 - **A held body is text, and the kernel's `template` constructor is what carries it.** `schema.meta.TemplateBody`
   is a record over `parameters` and `template`, the application as written — so `set` resolves to
   `body: !template { parameters: [T]  template: "!set_type { element_type: T }" }`. It is an ordinary body of

@@ -445,9 +445,10 @@ keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
       as a 501.
   - A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and propagates
     uncaught.
-- **An open entry compiles to `OpenTemplateReader`, before its body is looked at at all.** An entry
-  declaring type parameters is a template, not a type (§5.10), so there is nothing a value could validate
-  against; the reader reports `UNKNOWN_TYPE_REF` against the data and skips the value, like any other reader
+- **An open entry compiles to `OpenTemplateReader`, before its body is looked at at all.** An entry whose
+  `kind` is `TEMPLATE` is a template, not a type (§5.10), so there is nothing a value could validate
+  against; the dispatch is on `kind`, like every other entry's, rather than on a list being non-empty. The
+  reader reports `UNKNOWN_TYPE_REF` against the data and skips the value, like any other reader
   finding data the schema does not admit. Reaching it is **always** a data error: a *schema* naming a
   template without applying it is rejected at link time (`checkArity`'s zero-argument case), so no field,
   element or supertype routes here — only a data type-ref naming the template, `!paged` against `paged =>
