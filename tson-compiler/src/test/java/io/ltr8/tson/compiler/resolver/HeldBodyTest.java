@@ -82,10 +82,9 @@ class HeldBodyTest {
 
     /**
      * <b>And it parses back to the tree it was written from.</b> This is the round trip the whole split rests
-     * on: {@link HeldBody#held} emits and {@link HeldBody#of} parses, and every held body goes through both
-     * doors -- {@code held} deliberately does not seed the parse cache with the tree already in hand, so a
-     * disagreement between the writer and the parser about §5.10's one spelling fails here rather than
-     * showing up later as two entries that ought to be equal and are not.
+     * on: {@link HeldBody#held} emits and {@link HeldBody#of} parses, and {@code held} hands back no tree of
+     * its own, so a disagreement between the writer and the parser about §5.10's one spelling fails here
+     * rather than showing up later as two entries that ought to be equal and are not.
      */
     @Test
     void whatAHeldBodyWritesParsesAgain() {
@@ -96,16 +95,6 @@ class HeldBodyTest {
         TemplateBody held = HeldBody.held(List.of("T"), application);
 
         assertEquals(application, HeldBody.of(held).application());
-    }
-
-    /** The parse is memoised on the value, so the phases that ask repeatedly pay for one. */
-    @Test
-    void theSameHeldBodyParsesOnce() {
-        TemplateBody held = HeldBody.held(List.of("T"), new DataValue(List.of(), Optional.of("record"),
-                new RecordValue(List.of())));
-
-        assertEquals(HeldBody.of(held), HeldBody.of(new TemplateBody(held.parameters(), held.template())),
-                "an equal value is the same parse, so the cache keys on content and not on identity");
     }
 
     private static ScopedValue scoped(CoreValue value) {

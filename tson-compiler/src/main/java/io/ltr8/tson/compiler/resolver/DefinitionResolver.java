@@ -859,15 +859,6 @@ final class DefinitionResolver {
     }
 
     /**
-     * A constructor-application target ({@code !C value}) resolves against {@code metaDefinitions}
-     * (the structure namespace) only -- never {@code namespaceDefinitions} (the type-name namespace).
-     * A constructor is always meta-schema vocabulary (a {@code type_definition} with {@code
-     * constructor: true}, e.g. {@code integer_type}/{@code enum}), never something a schema
-     * legitimately defines about itself and, in the same pass, instantiates -- the target is always
-     * declared in the *governing* meta-schema, one hop via {@code !!meta}, so the structure namespace
-     * alone is enough.
-     */
-    /**
      * The constructor a {@code !C ...} head names, and the name to read its payload against -- <b>after
      * following {@code C}'s reference chain</b> ([TSON-SCHEMA] §8.3).
      *

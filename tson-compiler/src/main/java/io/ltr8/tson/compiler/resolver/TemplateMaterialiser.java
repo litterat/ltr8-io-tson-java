@@ -384,23 +384,24 @@ final class TemplateMaterialiser {
             // whatever that denotes -- `uuid_pair<int32>` is the entry `pair<text, int32>` already produced.
             // "No intermediate entry per alias hop" is the rule, which is why this returns a name rather
             // than making one, and why it is the head that tells the three cases apart rather than the body.
-            if (template.body() instanceof TemplateBody body
-                    && REFERENCE.equals(HeldBody.of(body).application().typeRef().orElseThrow())) {
-                aliasClosing.add(name);
-                return closeHeldAlias(head, template, HeldBody.of(body), bind(parameters, arguments));
-            }
-            // A record template's closure is the instantiation itself, where every other held form closes to
-            // a synthetic the instantiation then references -- see closeHeldRecord.
-            if (template.body() instanceof TemplateBody body
-                    && RECORD.equals(HeldBody.of(body).application().typeRef().orElseThrow())) {
-                TypeDefinition instantiation = closeHeldRecord(head, template, HeldBody.of(body), arguments,
-                        bind(parameters, arguments));
-                materialised.put(name, instantiation);
-                publish.accept(name, instantiation);
-                return name;
-            }
+            // The held body is parsed once here and reused by all three branches: this is the only place a
+            // closure needs the tree, and the parse is thrown away with it.
             if (template.body() instanceof TemplateBody body) {
                 HeldBody open = HeldBody.of(body);
+                String constructor = open.application().typeRef().orElseThrow();
+                if (REFERENCE.equals(constructor)) {
+                    aliasClosing.add(name);
+                    return closeHeldAlias(head, template, open, bind(parameters, arguments));
+                }
+                // A record template's closure is the instantiation itself, where every other held form closes
+                // to a synthetic the instantiation then references -- see closeHeldRecord.
+                if (RECORD.equals(constructor)) {
+                    TypeDefinition instantiation = closeHeldRecord(head, template, open, arguments,
+                            bind(parameters, arguments));
+                    materialised.put(name, instantiation);
+                    publish.accept(name, instantiation);
+                    return name;
+                }
                 String formName = closeHeldTemplate(head, template, open, bind(parameters, arguments));
                 if (generated.contains(head)) {
                     // A generated head closing its own intermediate form: the form entry *is* the answer, and

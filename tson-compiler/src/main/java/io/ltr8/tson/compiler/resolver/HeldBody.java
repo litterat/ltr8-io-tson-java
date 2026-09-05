@@ -15,10 +15,8 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * A {@link TemplateBody}'s text, parsed -- the constructor application an open entry holds, as a working
@@ -49,8 +47,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class HeldBody {
 
-    private static final Map<TemplateBody, HeldBody> PARSED = new ConcurrentHashMap<>();
-
     /** Vocabulary-free, because a held application is written as the tree it is and read against nothing. */
     private static final TsonObjectWriter WRITER = new TsonObjectWriter();
 
@@ -66,10 +62,10 @@ public final class HeldBody {
      * The held body for an application this resolver has built -- the write direction, and the only way a
      * {@link TemplateBody} is minted.
      *
-     * <p><b>Nothing is cached here on the way past.</b> Seeding the parse cache with the tree in hand would
-     * be one parse cheaper and would hide the thing most worth knowing: that a body written out and read
-     * back is the same body. Parsing every held body through the same door as a read one keeps a
-     * round-trip defect a test failure rather than a difference between two entries that should be equal.
+     * <p><b>The tree in hand is not kept.</b> Handing it back from {@link #of} would be one parse cheaper
+     * and would hide the thing most worth knowing: that a body written out and read back is the same body.
+     * Parsing every held body through the same door as a read one keeps a round-trip defect a test failure
+     * rather than a difference between two entries that should be equal.
      */
     public static TemplateBody held(List<String> parameters, DataValue application) {
         return new TemplateBody(parameters, WRITER.toTson(application));
@@ -85,15 +81,13 @@ public final class HeldBody {
      */
     public static HeldBody of(TemplateBody body) {
         Objects.requireNonNull(body, "body");
-        return PARSED.computeIfAbsent(body, held -> {
-            try {
-                return new HeldBody(held, new TsonDataParser(held.template()).parseDocument().root());
-            } catch (RuntimeException e) {
-                throw new IllegalStateException("an open entry's held body did not parse back: "
-                        + held.template() + " -- a held body is written by WireForm and read here, so the "
-                        + "two have disagreed about the one spelling §5.10 requires", e);
-            }
-        });
+        try {
+            return new HeldBody(body, new TsonDataParser(body.template()).parseDocument().root());
+        } catch (RuntimeException e) {
+            throw new IllegalStateException("an open entry's held body did not parse back: "
+                    + body.template() + " -- a held body is written by WireForm and read here, so the "
+                    + "two have disagreed about the one spelling §5.10 requires", e);
+        }
     }
 
     /** The entry's own parameter names, in declaration order. */
