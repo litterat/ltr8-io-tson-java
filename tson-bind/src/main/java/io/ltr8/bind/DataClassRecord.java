@@ -33,7 +33,8 @@ public class DataClassRecord extends DataClass {
 	// Constructor for the data object.
 	private final MethodHandle constructor;
 
-	// All fields in the projected class.
+	// The fields that are on the wire -- every component except those the class marked @Unbound, which
+	// belong to the class and never appear in a document or in written output.
 	private final DataClassField[] fields;
 
 	// The one field (if any) whose declared type is Annotations -- see annotationsCarrier().
@@ -74,6 +75,8 @@ public class DataClassRecord extends DataClass {
 	public DataClassField[] fields() {
 		return fields;
 	}
+
+
 
 	/**
 	 * The field, if any, that receives this value's own TSON wire-format annotations rather than being bound

@@ -17,12 +17,12 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
 
 import java.lang.invoke.MethodHandle;
+import java.lang.reflect.Method;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodHandles.Lookup;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
+import io.ltr8.annotation.Unbound;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.stream.Collectors;
@@ -140,6 +141,16 @@ public class DefaultRecordBinder {
 	}
 
 	/**
+	 * A stand-in for {@link MethodHandles#arrayElementGetter}: {@code (Object[], int) -> null}. An
+	 * {@code @Unbound} component reads from nothing, and giving it a source of the same shape means the rest
+	 * of the pipeline -- bridges, {@code Optional} wrapping, primitive boxing -- applies unchanged.
+	 */
+	private static MethodHandle nullSource() {
+		return MethodHandles.dropArguments(MethodHandles.constant(Object.class, null), 0,
+				Object[].class, int.class);
+	}
+
+	/**
 	 * Performs the main work of collecting the information for the fields for the DataClassRecord
 	 *
 	 * @param context DataBindContext that the DataClassRecord will be added.
@@ -174,19 +185,34 @@ public class DefaultRecordBinder {
 			reorderFields(dataOrder, components);
 		}
 
-		// Prepare the field descriptors.
-		DataClassField[] dataComponents = new DataClassField[components.size()];
+		// A component the class marked @Unbound is not on the wire: nothing fills it from a document and
+		// nothing writes it. So the values array a reader fills holds only the bound components, densely --
+		// `slots` maps a component's position to its place in that array, or -1 for one the class owns,
+		// which the constructor supplies as null. Keeping the array dense is what lets fields().length stay
+		// the only notion of size anyone needs.
+		int[] slots = new int[components.size()];
+		int nextSlot = 0;
+		for (int x = 0; x < components.size(); x++) {
+			slots[x] = components.get(x).isUnbound() ? -1 : nextSlot++;
+		}
+
+		DataClassField[] allComponents = new DataClassField[components.size()];
+		List<DataClassField> boundComponents = new ArrayList<>();
 		DataClassField annotationsCarrier = null;
 		int annotationsCarrierCount = 0;
 		for (int x = 0; x < components.size(); x++) {
 			ComponentInfo info = components.get(x);
 
-			dataComponents[x] = resolveField(context, targetClass, info, x);
+			allComponents[x] = resolveField(context, targetClass, info, slots[x] < 0 ? x : slots[x]);
+			if (slots[x] >= 0) {
+				boundComponents.add(allComponents[x]);
+			}
 			if (info.getType() == Annotations.class) {
-				annotationsCarrier = dataComponents[x];
+				annotationsCarrier = allComponents[x];
 				annotationsCarrierCount++;
 			}
 		}
+		DataClassField[] dataComponents = boundComponents.toArray(new DataClassField[0]);
 		if (annotationsCarrierCount > 1) {
 			throw new CodeAnalysisException("At most one component may have type " + Annotations.class.getName()
 					+ ", the carrier for this value's own wire-format annotations -- found "
@@ -199,7 +225,8 @@ public class DefaultRecordBinder {
 
 		// Build a MethodHandle that creates object and also calls setters with order of
 		// fields as defined in components.
-		MethodHandle constructor = createTupleConstructor(targetClass, components, dataComponents, dataConstructor);
+		MethodHandle constructor = createTupleConstructor(targetClass, components, allComponents, slots,
+				dataConstructor);
 
 		// See if there's an empty constructor available.
 		MethodHandle creator = null;
@@ -870,14 +897,14 @@ public class DefaultRecordBinder {
 	 * present.
 	 */
 	private MethodHandle createTupleConstructor(Class<?> dataClass, List<ComponentInfo> fields,
-			DataClassField[] dataFields, MethodHandle dataConstructor)
+			DataClassField[] dataFields, int[] slots, MethodHandle dataConstructor)
 			throws IllegalAccessException, NoSuchMethodException, CodeAnalysisException {
 
 		// (Object[]):serialClass -> ctor(Object[])
-		MethodHandle create = createEmbedConstructor(dataClass, dataConstructor, fields, dataFields);
+		MethodHandle create = createEmbedConstructor(dataClass, dataConstructor, fields, dataFields, slots);
 
 		// (serialClass, Object[]) -> serialClass.setValues(Object[x]);
-		MethodHandle setters = createEmbedSetters(dataClass, fields, dataFields);
+		MethodHandle setters = createEmbedSetters(dataClass, fields, dataFields, slots);
 
 		// (Object[], Object[]) -> ctor(Object[]).setvalues(Object[])
 		MethodHandle createAndSet = MethodHandles.collectArguments(setters, 0, create);
@@ -894,7 +921,7 @@ public class DefaultRecordBinder {
 	 * Passes relevant fields into the data class constructor.
 	 */
 	private MethodHandle createEmbedConstructor(Class<?> dataClass, MethodHandle dataConstructor,
-			List<ComponentInfo> fields, DataClassField[] dataFields)
+			List<ComponentInfo> fields, DataClassField[] dataFields, int[] slots)
 			throws NoSuchMethodException, IllegalAccessException, CodeAnalysisException {
 		MethodHandle result = dataConstructor;
 
@@ -906,10 +933,14 @@ public class DefaultRecordBinder {
 				int arg = field.getConstructorArgument();
 
                 // (values[],int) -> values[int]
-				MethodHandle arrayGetter = MethodHandles.arrayElementGetter(Object[].class);
+				// (values[],int) -> values[int], or -> null for a component the class owns (@Unbound).
+				// Substituting the source rather than special-casing downstream keeps every conversion
+				// dataArrayToObject applies -- an Optional component still arrives empty rather than null.
+				MethodHandle arrayGetter = slots[x] < 0 ? nullSource()
+						: MethodHandles.arrayElementGetter(Object[].class);
 
 				// () -> inputIndex
-				MethodHandle index = MethodHandles.constant(int.class, x);
+				MethodHandle index = MethodHandles.constant(int.class, Math.max(slots[x], 0));
 
 				// (values[]) -> values[inputIndex] and maybe additional modifications to the value.
 				MethodHandle arrayIndexGetter = dataArrayToObject(field, dataFields[x], arrayGetter, index);
@@ -936,7 +967,7 @@ public class DefaultRecordBinder {
 	 * Creates a MethodHandle that takes an Object[] as input and calls any field setters for mutable objects.
 	 */
 	private MethodHandle createEmbedSetters(Class<?> dataClass, List<ComponentInfo> fields,
-			DataClassField[] dataFields)
+			DataClassField[] dataFields, int[] slots)
 			throws IllegalAccessException, NoSuchMethodException, SecurityException, CodeAnalysisException {
 
 		// (dataClass,Object[]):dataClass -> return object;
@@ -954,11 +985,12 @@ public class DefaultRecordBinder {
 				// (obj, value):void -> obj.setField( value );
 				MethodHandle fieldSetter = field.getWriteMethod();
 
-				// (value[],x):Object -> value[x]
-				MethodHandle arrayGetter = MethodHandles.arrayElementGetter(Object[].class);
+				// (value[],x):Object -> value[x], or -> null for a component the class owns (@Unbound).
+				MethodHandle arrayGetter = slots[x] < 0 ? nullSource()
+						: MethodHandles.arrayElementGetter(Object[].class);
 
 				// ():int -> inputIndex
-				MethodHandle index = MethodHandles.constant(int.class, x);
+				MethodHandle index = MethodHandles.constant(int.class, Math.max(slots[x], 0));
 
 				// (values[]) -> values[inputIndex] and maybe additional modifications to the value.
 				MethodHandle arrayIndexGetter = dataArrayToObject(field, dataFields[x], arrayGetter, index);
