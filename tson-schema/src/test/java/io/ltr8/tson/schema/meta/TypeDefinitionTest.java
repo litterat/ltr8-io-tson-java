@@ -21,7 +21,7 @@ class TypeDefinitionTest {
 
     private static TypeDefinition unit(Optional<SourcePosition> position) {
         return new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), Optional.empty(), new Unit(), position);
+                List.of(), List.of(), new Unit(), position);
     }
 
     @Test
@@ -50,7 +50,7 @@ class TypeDefinitionTest {
     void aGenuineStructuralDifferenceStillCompareUnequal() {
         TypeDefinition unitEntry = unit(Optional.empty());
         TypeDefinition otherKind = new TypeDefinition(Optional.empty(), TypeKind.SUM, 
-                List.of(), List.of(), Optional.empty(), new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()), Optional.empty());
+                List.of(), List.of(), new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()), Optional.empty());
 
         assertNotEquals(unitEntry, otherKind);
     }

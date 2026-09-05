@@ -77,7 +77,7 @@ final class ResolvedForm {
     static TypeDefinition canonical(TypeDefinition definition) {
         return new TypeDefinition(definition.source(), definition.kind(),
                 definition.supertypes().stream().sorted().toList(),
-                definition.subtypes().stream().sorted().toList(), definition.disjoint(), definition.body(),
+                definition.subtypes().stream().sorted().toList(), definition.body(),
                 definition.position(), definition.annotations());
     }
 
@@ -93,7 +93,7 @@ final class ResolvedForm {
         // parsed application here, so a held body compares like every other body and needs no side channel.
         TypeDefinition compared = definition.body() instanceof TemplateBody held
                 ? new TypeDefinition(definition.source(), definition.kind(),
-                        definition.supertypes(), definition.subtypes(), definition.disjoint(),
+                        definition.supertypes(), definition.subtypes(),
                         parsedForComparison(held), definition.position(), definition.annotations())
                 : definition;
         String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(compared)))

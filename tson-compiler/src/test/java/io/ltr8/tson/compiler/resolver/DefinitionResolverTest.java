@@ -236,7 +236,7 @@ class DefinitionResolverTest {
     void writesAUnitBody() throws DataBindException {
         // Structurally: value => !type_definition { kind: ATOM source: unit body: !unit {} }
         TypeDefinition value = new TypeDefinition(Optional.of(TypeRef.of("unit")), TypeKind.ATOM, 
-                List.of(), List.of(), Optional.empty(), new Unit());
+                List.of(), List.of(), new Unit());
 
         assertEquals("{ source: { name: \"unit\" arguments: [] } kind: \"ATOM\" "
                 + "supertypes: [] subtypes: [] body: !unit {} }", write(value));
@@ -246,7 +246,7 @@ class DefinitionResolverTest {
     void writesAnEnumBody() throws DataBindException {
         // Structurally: boolean => !type_definition { kind: ATOM source: enum body: !enum { members: [true false] } }
         TypeDefinition booleanDef = new TypeDefinition(Optional.of(TypeRef.of("enum")), TypeKind.ATOM,
-                 List.of(), List.of(), Optional.empty(), new EnumBody(List.of("true", "false")));
+                 List.of(), List.of(), new EnumBody(List.of("true", "false")));
 
         assertEquals("{ source: { name: \"enum\" arguments: [] } kind: \"ATOM\" "
                         + "supertypes: [] subtypes: [] body: !enum { members: [ \"true\" \"false\" ] } }",

@@ -11,7 +11,7 @@ import java.util.Optional;
 /**
  * The meta-kernel's {@code type_definition} record, resolved (Part 2 §4, §8.1) -- what every
  * schema declaration ultimately resolves to. {@code kind} is REQUIRED with no default and always
- * appears in output; {@code source}/{@code disjoint} are genuinely OPTIONAL ({@code
+ * appears in output; {@code source} is genuinely OPTIONAL ({@code
  * Optional<TypeRef>}/{@code Optional<Boolean>}) and omitted from written output when absent, the
  * same as any other {@code Optional}-wrapped scalar/record field bound through plain {@code
  * TsonObjectWriter.toTson}. {@code supertypes}/{@code subtypes} are conceptually
@@ -44,7 +44,7 @@ import java.util.Optional;
  */
 public record TypeDefinition(Optional<TypeRef> source, TypeKind kind,
                               List<String> supertypes, List<String> subtypes,
-                              Optional<Boolean> disjoint, Top body, @Unbound Optional<SourcePosition> position,
+                              Top body, @Unbound Optional<SourcePosition> position,
                               Annotations annotations) {
 
     @Record
@@ -59,15 +59,28 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind,
 
     /** Same as the canonical constructor with no annotations -- every caller that has none to carry. */
     public TypeDefinition(Optional<TypeRef> source, TypeKind kind,
-                           List<String> supertypes, List<String> subtypes, Optional<Boolean> disjoint, Top body,
+                           List<String> supertypes, List<String> subtypes, Top body,
                            Optional<SourcePosition> position) {
-        this(source, kind, supertypes, subtypes, disjoint, body, position, Annotations.empty());
+        this(source, kind, supertypes, subtypes, body, position, Annotations.empty());
     }
 
     /** Same as the canonical constructor, {@code position} defaulted to absent -- every existing caller that doesn't know its own source position. */
     public TypeDefinition(Optional<TypeRef> source, TypeKind kind,
-                           List<String> supertypes, List<String> subtypes, Optional<Boolean> disjoint, Top body) {
-        this(source, kind, supertypes, subtypes, disjoint, body, Optional.empty());
+                           List<String> supertypes, List<String> subtypes, Top body) {
+        this(source, kind, supertypes, subtypes, body, Optional.empty());
+    }
+
+    /**
+     * Whether this entry's variants occupy distinct discrimination classes -- present on a choice and absent
+     * on everything else ([TSON-SCHEMA] §5.4).
+     *
+     * <p><b>Derived, not stored.</b> The fact is about a choice's variant list, so it lives on the body that
+     * holds one: an entry with no variants has nowhere to put it, and cannot claim a disjointness it has no
+     * variants to be disjoint over. Like {@code subtypes} it is a cache -- fully recomputable, never trusted,
+     * discarded and recomputed on ingest.
+     */
+    public Optional<Boolean> disjoint() {
+        return body instanceof ChoiceBody choice ? choice.disjoint() : Optional.empty();
     }
 
     /**
@@ -84,8 +97,7 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind,
 
 /** A fresh PRODUCT definition with no source, supertypes or parameters -- {@code integer_size}'s own shape. */
     public static TypeDefinition product(Top body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(),
-                Optional.empty(), body);
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(), body);
     }
 
     /**
@@ -106,24 +118,24 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind,
      */
     public static TypeDefinition reference(TypeRef target) {
         return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, List.of(),
-                List.of(), Optional.empty(), new Reference(target));
+                List.of(), new Reference(target));
     }
 
     /** A copy of this definition with {@code body} replaced -- every other component unchanged. */
     public TypeDefinition withBody(Top body) {
-        return new TypeDefinition(source, kind, supertypes, subtypes, disjoint, body,
+        return new TypeDefinition(source, kind, supertypes, subtypes, body,
                 position, annotations);
     }
 
     /** A copy of this definition with {@code position} replaced -- every other component unchanged. */
     public TypeDefinition withPosition(Optional<SourcePosition> position) {
-        return new TypeDefinition(source, kind, supertypes, subtypes, disjoint, body,
+        return new TypeDefinition(source, kind, supertypes, subtypes, body,
                 position, annotations);
     }
 
     /** A copy of this definition with {@code annotations} replaced -- every other component unchanged. */
     public TypeDefinition withAnnotations(Annotations annotations) {
-        return new TypeDefinition(source, kind, supertypes, subtypes, disjoint, body,
+        return new TypeDefinition(source, kind, supertypes, subtypes, body,
                 position, annotations);
     }
 
@@ -135,13 +147,12 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind,
                 && kind == other.kind
                 && Objects.equals(supertypes, other.supertypes)
                 && Objects.equals(subtypes, other.subtypes)
-                && Objects.equals(disjoint, other.disjoint)
                 && Objects.equals(body, other.body);
     }
 
     /** Excludes {@code position} -- see this class's own Javadoc for why. */
     @Override
     public int hashCode() {
-        return Objects.hash(source, kind, supertypes, subtypes, disjoint, body);
+        return Objects.hash(source, kind, supertypes, subtypes, body);
     }
 }

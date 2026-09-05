@@ -851,26 +851,26 @@ public final class TsonSchemaLinker {
         Set<String> combined = new LinkedHashSet<>(def.subtypes());
         combined.addAll(newSubtypes);
         return new TypeDefinition(def.source(), def.kind(),
-                def.supertypes(), List.copyOf(combined), def.disjoint(), def.body(), def.position(),
+                def.supertypes(), List.copyOf(combined), def.body(), def.position(),
                 def.annotations());
     }
 
     /**
-     * Derives {@link TypeDefinition#disjoint} for every choice entry (§5.4), over the fully-merged
-     * namespace -- a namespace-wide pass, like {@link #computeSubtypes}, since a variant's discrimination
-     * class is only knowable with every entry resolved. The derivation ({@link ChoiceDisjointness}) is
-     * total and two-valued, so a linked choice always carries the fact; only non-choice entries leave it
-     * absent.
+     * Derives {@code choice.disjoint} for every choice entry (§5.4), over the fully-merged namespace -- a
+     * namespace-wide pass, like {@link #computeSubtypes}, since a variant's discrimination class is only
+     * knowable with every entry resolved. The derivation ({@link ChoiceDisjointness}) is total and
+     * two-valued, so a linked choice always carries the fact.
+     *
+     * <p><b>It is written on the body, which is the only thing that has variants to be disjoint over.</b>
+     * An entry with no {@code !choice} body has nowhere to put the fact, so "absent on every other
+     * definition" stops being a rule anyone can break.
      */
     private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged) {
         Map<String, TypeDefinition> result = new LinkedHashMap<>(merged);
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             if (entry.getValue().body() instanceof ChoiceBody choice) {
-                TypeDefinition def = entry.getValue();
-                result.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(),
-                        def.supertypes(), def.subtypes(),
-                        Optional.of(ChoiceDisjointness.derive(choice, merged)), def.body(), def.position(),
-                        def.annotations()));
+                result.put(entry.getKey(), entry.getValue().withBody(new ChoiceBody(choice.variants(),
+                        Optional.of(ChoiceDisjointness.derive(choice, merged)))));
             }
         }
         return result;

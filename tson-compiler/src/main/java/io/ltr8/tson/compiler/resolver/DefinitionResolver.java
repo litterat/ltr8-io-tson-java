@@ -450,7 +450,7 @@ final class DefinitionResolver {
                 // denotes. Holding it anyway is what leaves no parameterised RecordBody anywhere, so
                 // materialisation needs only the one substitution path. See WireForm.heldEmptyRecord.
                 return holdIfOpen(name, parameters, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT,
-                        List.of(), List.of(), Optional.empty(), body));
+                        List.of(), List.of(), body));
             }
             if (structural.body() instanceof ConstructionDef construction) {
                 return holdIfOpen(name, parameters, resolveComposition(name, construction, parameters));
@@ -517,7 +517,7 @@ final class DefinitionResolver {
      */
     private static TypeDefinition openWith(TypeDefinition resolved, io.ltr8.tson.schema.meta.TemplateBody held) {
         return new TypeDefinition(resolved.source(), TypeKind.TEMPLATE, resolved.supertypes(),
-                resolved.subtypes(), resolved.disjoint(), held, resolved.position(), resolved.annotations());
+                resolved.subtypes(), held, resolved.position(), resolved.annotations());
     }
 
     private TypeDefinition holdIfOpen(String name, List<String> parameters, TypeDefinition resolved) {
@@ -636,7 +636,7 @@ final class DefinitionResolver {
             // so has only the name to go on, which is what its own `alias` flag is for.
             return TypeDefinition.reference(reference.target());
         }
-        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(), List.of(), List.of(), Optional.empty(), body);
+        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(), List.of(), List.of(), body);
     }
 
     /**
@@ -684,7 +684,7 @@ final class DefinitionResolver {
         // materialisation. The alias form is no exception: `<B> pair<uuid, B>` is a template whose closure
         // is a reference, not a reference that happens to have parameters.
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)),
-                TypeKind.TEMPLATE, List.of(), List.of(), Optional.empty(),
+                TypeKind.TEMPLATE, List.of(), List.of(),
                 HeldBody.held(template.typeParams(), template.value()));
     }
 
@@ -786,7 +786,7 @@ final class DefinitionResolver {
         checkNarrows(name, sourceName, source.body(), body);
 
         return new TypeDefinition(Optional.of(constructorRef), source.kind(),
-                List.of(sourceName), List.of(), Optional.empty(), body);
+                List.of(sourceName), List.of(), body);
     }
 
     /**
@@ -1054,8 +1054,7 @@ final class DefinitionResolver {
      */
     private static TypeDefinition openAliasOr(io.ltr8.tson.schema.meta.TypeRef target, List<String> parameters) {
         return parameters.isEmpty() ? TypeDefinition.reference(target)
-                : new TypeDefinition(Optional.of(target), TypeKind.TEMPLATE, List.of(), List.of(),
-                        Optional.empty(), HeldBody.held(parameters, WireForm.heldReference(target)));
+                : new TypeDefinition(Optional.of(target), TypeKind.TEMPLATE, List.of(), List.of(), HeldBody.held(parameters, WireForm.heldReference(target)));
     }
 
     /**
@@ -1190,8 +1189,7 @@ final class DefinitionResolver {
         // reason §5.9 gives: the clause is head-level, so its effect must be readable without scanning the
         // parents' field sets. An author wanting partial IS-A subtracts first and composes second.
         List<String> contract = construction.removal().isPresent() ? List.of() : transitiveSupertypes;
-        return new TypeDefinition(Optional.empty(), kind, contract, List.of(),
-                Optional.empty(), body);
+        return new TypeDefinition(Optional.empty(), kind, contract, List.of(), body);
     }
 
     /**
@@ -1419,7 +1417,7 @@ final class DefinitionResolver {
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups);
         return new TypeDefinition(source, kind, transitiveSupertypes,
-                List.of(), Optional.empty(), body);
+                List.of(), body);
     }
 
     /**

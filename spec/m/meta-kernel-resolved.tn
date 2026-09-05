@@ -506,6 +506,7 @@
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
       !record_field { name: variants  type: array_type_ref_xxhash }
+      !record_field { name: disjoint  type: boolean  state: OPTIONAL }
     ] }
   }
 
@@ -517,7 +518,6 @@
       !record_field { name: kind         type: type_kind }
       !record_field { name: supertypes   type: array_type_name_xxhash  state: OPTIONAL }
       !record_field { name: subtypes     type: array_type_name_xxhash  state: OPTIONAL }
-      !record_field { name: disjoint     type: boolean  state: OPTIONAL }
       !record_field { name: body         type: top }
     ] }
   }

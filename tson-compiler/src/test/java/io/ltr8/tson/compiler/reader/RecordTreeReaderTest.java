@@ -48,8 +48,7 @@ class RecordTreeReaderTest {
     }
 
     private static TypeDefinition atomEntry(IntegerType body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(), List.of(),
-                Optional.empty(), body);
+        return new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(), List.of(), body);
     }
 
     private static TsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
