@@ -48,10 +48,11 @@ are kept in step deliberately.
   repeatable on one value with every occurrence preserved — annotations are a list, not a map, so "the
   inherited `@doc`" names nothing when the source wrote two. **Restatement first**, because order *is* the
   precedence mechanism: `Annotations.get`/`value` take the first occurrence, so leading with the nearer
-  declaration is what a first-occurrence lookup reads. **The ordering half has no read-side witness any more**
-  — `@bytes_encoding` was the one field annotation with decode force, and the alphabet is a type selector now
-  (`bytes_type.encoding`), so no annotation the meta layer declares changes how a value reads. The rule is
-  unchanged; only its demonstration is now over resolved output. `RestatedFieldAnnotationsTest` covers each
+  declaration is what a first-occurrence lookup reads. **The ordering half has no read-side witness**, because
+  no annotation the meta layer declares changes how a value reads: everything that decides a spelling belongs
+  to the type, the alphabet a `bytes` value is written in included (`bytes_type.encoding`, §5.5). So the
+  ordering is demonstrated over resolved output, and §5.8 gives it read-side force wherever an annotation
+  directs reading. `RestatedFieldAnnotationsTest` covers each
   case, and §5.8 now states the rule: the restatement's own annotations in source order, then the inherited
   field's, adding and never removing.
 - **What resolves:** record construction; composition (`A & B & { ... }`, §5.8, with kind from the literal

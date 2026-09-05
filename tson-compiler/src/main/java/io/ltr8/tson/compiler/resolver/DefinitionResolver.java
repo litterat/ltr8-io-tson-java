@@ -1746,10 +1746,10 @@ final class DefinitionResolver {
      * wrote two on directly.
      *
      * <p><b>Nearer first, because order is the precedence mechanism already.</b> {@link Annotations#get} and
-     * {@link Annotations#value} take the first occurrence, and so does the {@code @bytes_encoding} lookup
-     * that resolves the directive nearest-first. Leading with the restatement is what makes the nearer
-     * declaration win at every such site without one of them having to know about composition. Inherited-first
-     * would hand a field restated under its own {@code @bytes_encoding} the alphabet of the type it tightens.
+     * {@link Annotations#value} take the first occurrence, so leading with the restatement is what makes the
+     * nearer declaration win at every such site without one of them having to know about composition. §5.8
+     * states the rule this implements: the restatement's own annotations in source order, then the inherited
+     * field's, adding and never removing.
      *
      * <p>The cost is that a subtype rewriting an inherited {@code @doc} leaves the field carrying both, which
      * is what "annotations are not removable" buys and what §3.1 already accepts anywhere else.

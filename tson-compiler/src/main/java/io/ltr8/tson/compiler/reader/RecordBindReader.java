@@ -268,7 +268,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             if (target != null && target.type() == io.ltr8.tson.schema.meta.Token.class) {
                 return AtomTypeReader.of(name, RawTokenParser.INSTANCE, location);
             }
-            // A field's own @bytes_encoding needs a reader the type does not share -- see FieldReaders.byType,
+            // Otherwise by the field's declared type, as tree mode does -- see FieldReaders.byType.
             return resolver.resolve(field.type().name());
         };
     }

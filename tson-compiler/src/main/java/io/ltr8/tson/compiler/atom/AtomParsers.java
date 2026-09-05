@@ -78,7 +78,7 @@ public final class AtomParsers {
             case FloatType t -> new FloatParser(t);
             case RationalType t -> new RationalParser(t);
             case UuidType t -> new UuidParser(t);
-            // No @bytes_encoding here: this path has a body and no position, so it takes the default.
+            // The alphabet rides the body's own encoding selector, like every other facet here.
             case BytesType t -> new BytesParser(t);
             case DateType t -> new DateParser(t);
             case TimeType t -> new TimeParser(t);

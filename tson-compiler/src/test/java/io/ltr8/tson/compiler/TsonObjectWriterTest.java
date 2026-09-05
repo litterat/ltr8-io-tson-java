@@ -146,8 +146,8 @@ class TsonObjectWriterTest {
 
     @Test
     void writeBytesEmitsTheOnlyBuiltinTagAndRoundTrips() throws DataBindException {
-        // Nothing to choose: !bytes is the only built-in name and it is base64. The four alphabets are a
-        // schema's to select with @bytes_encoding, and a schemaless document has no schema to carry one.
+        // Nothing to choose: !bytes is the only built-in name and it is base64. An alphabet is a schema's
+        // to select, on the type (bytes_type.encoding), and a schemaless document has no type to carry one.
         BytesHolder original = reader.read("{ value: !bytes \"3q2+7w==\" }", BytesHolder.class);
         String tson = writer.toTson(original);
         assertEquals("{ value: !bytes \"3q2+7w==\" }", tson);

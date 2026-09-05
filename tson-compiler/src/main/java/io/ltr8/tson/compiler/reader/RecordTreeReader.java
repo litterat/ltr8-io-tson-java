@@ -27,13 +27,9 @@ import java.util.Optional;
 final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
 
     public RecordTreeReader(String name, String displayName, RecordBody body, TsonTypeReaderResolver resolver,
-                            ValueReaderContext context, SchemaLocation schemaLocation,
-                            AnnotationTypes annotationTypes) {
-        // By schema type alone: a tree reader has no binding target to consult (see FieldReaders). The
-        // context is only for a field's own @bytes_encoding, which needs a reader the type does not share.
-        super(name, displayName, body, FieldReaders.byType(resolver, context,
-                (reader, leafName) -> new AtomTreeReader(reader, leafName, AnnotationTypes.of(context))),
-                schemaLocation);
+                            SchemaLocation schemaLocation, AnnotationTypes annotationTypes) {
+        // By schema type alone: a tree reader has no binding target to consult (see FieldReaders).
+        super(name, displayName, body, FieldReaders.byType(resolver), schemaLocation);
         this.annotationTypes = annotationTypes;
     }
 
@@ -49,7 +45,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
                 throw new IllegalArgumentException("'" + name + "' is not record-shaped: " + typeDefinition.body());
             }
             RecordTreeReader ownParser = new RecordTreeReader(name, EntryDisplayName.of(name, typeDefinition),
-                    body, resolver, context, context.locationOf(name, typeDefinition),
+                    body, resolver, context.locationOf(name, typeDefinition),
                     AnnotationTypes.of(context));
             if (typeDefinition.subtypes().isEmpty()) {
                 return ownParser;

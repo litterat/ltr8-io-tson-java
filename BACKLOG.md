@@ -159,16 +159,3 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   `ResolvedForm.heldBodies` is the comparison to keep — §8.1 makes wire form what a held body *is* on both
   sides, not a compromise — and what is owed is the vectors, upstream, plus the note in `CONFORMANCE.md` that
   currently explains the absence.
-
-- [ ] **The `@bytes_encoding`-as-directive narrative is stale across a dozen classes.** [TSON-SCHEMA] §5.5
-  makes the alphabet a **selector facet** on `bytes_type` (`encoding`, defaulting to `BASE64`, not refinable —
-  another alphabet is another instance), and the code already implements that: `BytesType` carries an
-  `encoding` component and its nested `Encoding` enum's Javadoc names it a §5.7 selector. What did not move is
-  the prose around it — `BytesType`'s own class-level Javadoc still says "the alphabet is not here, and that is
-  the design ... it is a directive instead", and `RecordAbstractReader`, `RecordTreeReader`, `RecordBindReader`,
-  `Rendered`, `AtomParsers`, `BytesParser`, `BuiltinTypeVocabulary`, `ComplexType`, `DefinitionResolver` and
-  `TemplateMaterialiser` each describe a per-position directive that no longer exists. Two are worse than
-  stale: `FieldReaders.byType` documents an exception ("a field carrying `@bytes_encoding` needs a reader of
-  its own") that its body does not implement, and `TemplateMaterialiser.dereferenced` carries a "known wrong"
-  paragraph for a case §5.5 has made unreachable — a reference cannot carry an alphabet, so dereferencing one
-  loses nothing. Delete the dead case, and state the selector where the directive used to be described.
