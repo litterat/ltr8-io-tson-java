@@ -43,9 +43,9 @@ a kind its own body contradicts (#6). And `source` has three incompatible defini
 §5.10 and §8.1 (#7). They are separable — each can be adopted alone — but #5's shape depends on #7's answer,
 and #6 is what makes #5's new `kind: TEMPLATE` cost nothing. **The evidence in all three is measured output
 from this build.** All four are now running, three of them partly: the bundled `meta-kernel.tn` declares the
-`template` constructor, `type_definition` has lost `parameters` to the held body and `disjoint` to the choice
-body, `type_kind` has gained `TEMPLATE`, and `source` never carries a parameter — so the artifacts are ahead
-of the spec text on all four. What is left of each is the spec edit, plus #6's reclassification of `kind` as
+`template` constructor, `type_definition` has lost `parameters` to the held body, `disjoint` to the choice
+body and `kind` altogether, and `source` never carries a parameter — so the artifacts are ahead of the spec
+text on all four. What is left of each is the spec edit, plus #6's reclassification of `kind` as
 derived, which is the one recommendation with no implementation behind it. Each entry's Status paragraph
 states exactly which half is built and which is not.
 
@@ -466,7 +466,7 @@ set => !type_definition {
 }
 ```
 
-with `type_definition.parameters` deleted and `type_kind` gaining `TEMPLATE` (#6). It composes with `top`
+with `type_definition.parameters` deleted (#6 removes `kind` and `type_kind` outright). It composes with `top`
 directly, like `reference` and `data`: it describes no value's shape, and nothing is ever typed by it. The
 gains are four:
 
@@ -513,12 +513,12 @@ text, and both `*-resolved.tn` fixtures write open entries in the new form. `vec
 `extern_of` reads back as the application it holds, both asserted in `OpenEntryResolvedFormTest` — the same
 two cases that produced the measurements above.
 
+`type_definition.parameters` is gone, so an open entry states its parameters once, in the body that holds
+them; #7's settling of `source` is what made that sound. An open entry's kind is `TEMPLATE` internally, and
+`kind` is no longer written at all (#6).
+
 What is **not** running, and is the remaining ask of the spec rather than of this implementation:
 
-- **`type_definition.parameters` is still written**, alongside the list inside `!template`, so an open entry
-  states its parameters twice. Deleting the outer one waits on #7.
-- **`type_kind` has no `TEMPLATE` member yet** (#6), so an open entry still takes its kind from the
-  constructor its held body applies.
 - **Nothing checks that a held body *re-resolves* as source.** The round trip that is pinned is narrower:
   the text a resolver writes parses back to the tree it was written from (`HeldBodyTest`). §8.1's Ingest rule
   asks for more — that the parsed application resolve against a namespace — and this library has no ingest
@@ -531,112 +531,84 @@ case. And it **removed** roughly sixty lines of comparison machinery that existe
 could not be compared like any other entry.
 
 
-## 6. `type_definition.kind` is derived at resolution and taken as unverified input at ingest
+## 6. `type_definition.kind` is not resolver output
 
 **Section:** [TSON-SCHEMA] §8.1 (the `type_definition` field list; `supertypes`/`subtypes`; `disjoint`;
-Ingest), §4.1 (kinds), §9 (meta-kernel's `type_kind`).
+Ingest), §4.1 (kinds), §9 (meta-kernel's `type_definition` and `type_kind`).
 
-**Problem:** §8.1 sorts `type_definition`'s fields into two classes and puts `kind` in neither.
-`subtypes` is "a cache: fully derivable, always recomputable, never trusted"; `disjoint` is
-resolver-derived and "on ingest ... MUST be discarded and recomputed"; `supertypes` is "taken as input,
-with the transitive closure recomputed and integrity verified", and §8.1 explains at length why it is not
-recomputable for the atom family. `kind` gets one clause — "(ATOM, PRODUCT, SUM, DATA, or REFERENCE —
-§4.1)" — and appears nowhere in the Ingest paragraph's list of what must be discarded, recomputed or
-verified.
+**Problem:** §8.1 sorts `type_definition`'s fields into two classes and puts `kind` in neither. `subtypes` is
+"a cache: fully derivable, always recomputable, never trusted"; `disjoint` is resolver-derived and "on
+ingest ... MUST be discarded and recomputed"; `supertypes` is "taken as input, with the transitive closure
+recomputed and integrity verified", and §8.1 explains at length why it is not recomputable for the atom
+family. `kind` gets one clause — "(ATOM, PRODUCT, SUM, DATA, or REFERENCE — §4.1)" — and appears nowhere in
+the Ingest paragraph's list of what must be discarded, recomputed or verified.
 
 So it is a REQUIRED field, derived by every resolver from §4.1's rules, restating what the entry's own
 `supertypes` and `body` already determine, with nothing anywhere checking that the three agree. A resolved
-document stating `kind: SUM` over a `!record` body is accepted by a conforming ingest. That is the same
-class of defect as #5 — a field saying something the record around it already says, with no rule that they
-must match — and it is the smaller and cheaper of the two to close.
+document stating `kind: SUM` over a `!record` body is accepted by a conforming ingest.
 
-**It is derivable. Measured: 264 closed entries, 0 mismatches.** Over meta-kernel.tn, meta.tn, core.tn and a
-user schema exercising every declaration form (construction, atom refinement, alias, enum, record,
-composition, array/map/choice/tuple sugar, template, partial application, nested instantiation), this rule
-reproduces `kind` exactly:
+**It is derivable. Measured: 264 closed entries, 0 mismatches**, over meta-kernel.tn, meta.tn, core.tn and a
+schema exercising every declaration form (construction, atom refinement, alias, enum, record, composition,
+array/map/choice/tuple sugar, template, partial application, nested instantiation):
 
-1. the body is held (an open entry) → **TEMPLATE** (see below);
+1. the body is held (an open entry) → **TEMPLATE**;
 2. else the body's constructor head is `reference` → **REFERENCE**;
 3. else the entry IS-A `top` — it is a constructor — → the base-kind name among its own `supertypes`
    (`atom`/`sum`/`data`), or PRODUCT if none;
 4. else → the `kind` of the entry the body's constructor head names.
 
-Branch 3 is §4.1 applied to a constructor, whose kind states what its *instances* will be rather than what
-its own body is: `integer_type => atom & { ... }` has a `!record` body and `kind: ATOM`. Branch 2 is the one
-§4.1 already calls out — an alias's REFERENCE is "a type_kind and not a base kind", and the kernel's
-`reference` constructor is itself PRODUCT, so the head lookup would give the wrong answer.
+Branch 3 is §4.1 applied to a constructor, whose kind states what its *instances* are rather than what its
+own body is: `integer_type => atom & { ... }` has a `!record` body and `kind: ATOM`. Branch 2 is the one §4.1
+already calls out — an alias's REFERENCE is "a type_kind and not a base kind", and the kernel's `reference`
+constructor is itself PRODUCT, so the head lookup would give the wrong answer.
 
-**And yet it should stay, for a reason the derivation itself exposes.** Branch 4 is a namespace lookup, and
-**97 of those 264 entries need a head that is not in their own schema's namespace** — it is in the governing
-meta. core.tn's `integer` is `!integer_type {}` and `integer_type` lives in meta.tn; `extern_of` is
-`!scoped { ... }` and `scoped` lives in meta.tn. A consumer holding core.tn's resolved output and nothing
-else cannot derive `kind` for 97 of its entries. `kind` is precisely the field that makes an entry
-classifiable **without the governing meta chain in hand**, which is the position §1.3's closed-entry
-consumer is in. Deleting it would push a four-branch rule with two special cases and a cross-namespace
-lookup onto every consumer, to save one enum-valued field.
+**Recommendation: remove it, and `type_kind` with it.** This is running (below). A kind is a fact about an
+entry that the entry already states twice over; writing it a third time adds nothing a consumer cannot
+compute and one thing it can be lied to about.
 
-**What it is not doing, so the value is not overstated.** It is consumed at exactly two places in this
-implementation's pipeline: an atom-instance eligibility test for `^` (which needs `kind == ATOM` *and*
-`supertypes` not containing `top`, so kind alone does not decide it), and materialisation, which reads a
-template's kind to give the closed instantiation its own. `TsonSchemaLinker` does not consult it at all —
-its §4.1 DATA refusal tests the body (`body instanceof Data`), and its constructor-eligibility test asks
-`supertypes.contains("top")`. Reader compilation ignores it entirely, dispatching on the body. And it does
-not enter identity: §8.2's derived names hash the binding record, never the kind.
+**The implementation had already voted for this before the entry was written.** Nothing in the reader stack
+consults `kind` — the whole compiled-reader family dispatches on the body — and `Subsumption` says why in as
+many words: *"using the body rather than `kind()` is deliberate: a hand-built entry can carry a `ChoiceBody`
+under [another kind]"*. The part that actually validates data distrusts a stated kind and derives from the
+body. Removing the field from output makes that the only reading available to anyone.
 
-**Interpretation chosen:** derived at resolution from §4.1 and threaded through every later phase as data.
-Nothing here re-derives or verifies it after resolution, which is exactly the hole this entry describes —
-this implementation would accept a forged `kind` in an ingested resolved document today.
+**And the one place kind carried information the body did not turned out not to need it.** §5.5's atom
+refinement asks "is this an atom *instance*?", which took both a kind test and a supertype test — an
+instance and its constructor are both ATOM-kinded, and only the constructor IS-A `top`. It is one test on
+the body: an instance's body **is** an atom (`integer` carries `!integer_type {}`) where its constructor's
+body is the vocabulary record *describing* one (`integer_type` carries `!record { ... }`). Neither half of
+the old test did that alone — a plain record has no supertypes either.
 
-**Suggested resolution: reclassify rather than remove.** Move `kind` into the same class as `subtypes` and
-`disjoint` — resolver-derived, **discarded and recomputed on ingest** — and state the derivation rule above
-in §8.1 so an ingest implementation has one. The field stays REQUIRED in output and stays a one-hop read for
-consumers; what changes is that it is no longer trusted from a document, which closes the hole with a
-sentence in the Ingest paragraph rather than a vocabulary change.
+**A correction to this entry's earlier reasoning.** An earlier draft argued for *keeping* the field on the
+grounds that 97 of those 264 entries need a constructor head declared outside their own schema, so a consumer
+holding one schema's resolved output could not derive branch 4. That measurement is real; the conclusion was
+not. §8.1 already resolves a body-annotation head "through the structure namespace", so a consumer able to
+read `body: !set_type { ... }` at all necessarily holds the governing chain. The chain is a precondition of
+reading the document, not an extra cost the field was sparing anyone.
 
-While that paragraph is open, §8.1 currently describes derivation three different ways — `subtypes` as "a
-cache ... never trusted", `disjoint` as "MUST be discarded and recomputed", `supertypes` as "taken as input
-... integrity verified". A single statement of what *derived* means, with `kind` joining it and `supertypes`
-named as the one deliberate exception, is the tidier outcome and costs nothing.
+**What removal does cost, stated plainly.** §2.2.2's extension point is where it bites hardest: a DATA-kinded
+entry is one "declared by its schema but not a type", and that was the kind naming something a consumer could
+not otherwise infer. It is still derivable — the body's constructor head resolves to something composing with
+`data` — but it is a hop rather than a field, and a consumer that only wanted to skip non-type entries now
+walks one. This implementation's linker already worked that way (`body instanceof Data`, never `kind ==
+DATA`), so nothing here regressed; a consumer written against §8.1's field list would.
 
-**Add `TEMPLATE` to `type_kind`.** This is #5's fourth gain and the reason the two entries belong together.
-Under #5's `!template` body, an open entry's kind is the one case branches 2–4 cannot answer locally, and
-`kind: TEMPLATE` answers it — "open" becomes visible in the same field every other classification lives in,
-matching `type_kind`'s existing precedent that not every member is a base kind (`REFERENCE` is not, and
-§4.1 says so). Two consequences worth stating rather than discovering:
+**Status against Revision 35: running.** `type_definition` declares no `kind`, the kernel declares no
+`type_kind`, and `TypeDefinition.kind` is an `@Unbound` component — derived at resolution, carried for the
+resolver's own use, never written.
 
-- **It is not free.** Materialisation currently takes the closed instantiation's kind from the template's
-  own `kind` field. Under TEMPLATE that source is gone and the closed entry's kind must come from its own
-  closed body instead — by branches 2–4, which apply to it like any other closed entry. Contained (both
-  sites already hold the closed body and the constructor head), but real.
-- **"What will `set<text>` be?" stops being answerable from `set`'s entry alone.** It is answerable from the
-  instantiation, which carries `kind: PRODUCT` derived from its own closed `!set_type { element_type: text }`
-  body — so a consumer asking about a *type* loses nothing, and only one asking about a *template* does.
-  Adding a `produces: type_kind` field to `!template` would answer it, and should not be done: it is a
-  channel for a question nobody has asked, and it would be the same unverified restatement this entry is
-  about.
+**It exposed a conformance defect on the way, which is worth its own line.** `@Unbound` was a read-side
+contract only: it suppressed the bind-mismatch report and then evaporated, so an unbound component was still
+*written*. `TypeDefinition` carries two, `kind` and `position`, which means this implementation could not
+emit resolved output that validates against its own meta-kernel — `UNRECOGNIZED_FIELD` on both, against
+§7.2's closed record, where §1.3 makes producing resolved output a MUST. That is fixed here, and verified by
+writing an entry and validating it. It had gone unseen because `position` is the only other `@Unbound`
+component and every test that writes a `TypeDefinition` uses entries with no source position.
 
-**Status against Revision 35: `TEMPLATE` is running; the reclassification is still a proposal.**
-
-`type_kind` carries a sixth member here and every open entry takes it, so the ask of the spec on that half is
-to describe what the artifacts already do. It cost what the entry said it would and paid for itself twice
-over. Materialisation stopped being able to take the closed entry's kind from the template's own field, and
-what replaced it is the derivation this entry states — `kindOfClosed` reads the branch of `Top` the
-substituted body occupies, which is §4.1's "construction transfers kind" asked of the construction rather
-than inherited from an entry that is not a type. Two conflations fell out with it: `DefinitionResolver`
-carried an `alias` flag whose only job was reading an open alias's kind off its head, and a test asserted
-`REFERENCE` for an entry its own comment called "a template until it closes". Both are gone.
-
-**And the derivation is now total**, which is the argument for stating it in §8.1. An open entry was the one
-case that could not be answered from what the entry states — its kind came from the constructor its held body
-applies, which needs the governing meta — and `TEMPLATE` answers it locally.
-`OpenEntryResolvedFormTest.kindAgreesWithWhatTheEntryAlreadyStates` runs the whole four-branch rule over
-every entry of every schema, and is the rule §8.1's Ingest paragraph should carry.
-
-**What is not running is the reclassification**, which is this entry's actual ask: `kind` is still a REQUIRED
-input that nothing verifies, and §8.1's Ingest paragraph still never names it. That needs no artifact change
-— prose in §8.1 plus a `@doc` line — and it has no implementation evidence behind it here for the same reason
-#5's ingest half has none: this library has no ingest path, so the check would have nowhere to live but a
-test.
+**What is not verified**, and is the same gap #5 records: there is no ingest path here, so nothing exercises
+a consumer *reconstructing* entries from §8 output without the field. The derivation above is asserted
+against entries this resolver produced, which is a weaker claim than "an ingesting consumer can recompute
+it".
 
 
 ## 7. `source` has three incompatible definitions for an open entry

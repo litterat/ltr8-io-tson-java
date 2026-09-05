@@ -503,7 +503,18 @@ recorded open form, and replacing the application with a reference to the entry 
       arity check, which reads the same accessor: materialisation runs first, and by then the parameter is
       gone — leaving either an arity error against a content-derived name nobody typed, or a wire-vocabulary
       mismatch, neither of which names what the author did.
-- **An open entry's `kind` is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes a
+- **`kind` is the resolver's own, not resolver output.** It is derived from an entry's `supertypes` and body,
+  so writing it restates what the record already carries; `type_definition` declares no such field and the
+  kernel declares no `type_kind`. `TypeDefinition.kind` is an `@Unbound` component — computed at resolution,
+  carried for the resolver's use, and never written. The reader stack had already worked this way:
+  nothing in `reader/` consults it, and `Subsumption` says why — "using the body rather than `kind()` is
+  deliberate: a hand-built entry can carry a `ChoiceBody` under [another kind]".
+  - **Which is what the atom-refinement test rests on now** (`DefinitionResolver`): an atom *instance's* body
+    IS an atom (`integer` carries `!integer_type {}`), where its constructor's body is the vocabulary record
+    describing one (`integer_type` carries a `!record { ... }`). So `body instanceof Atom` separates the pair
+    and establishes atom-ness at once, where neither the kind nor the supertype chain does alone — a plain
+    record has no supertypes either, and `integer_type` is ATOM-kinded exactly like its instances.
+- **Internally an open entry's `kind` is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes a
   template not a type, so the entry that cannot validate anything no longer claims the kind an application of
   it would take: `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than
   REFERENCE — it is a template whose closure is a reference, not a reference that happens to have parameters.
