@@ -47,6 +47,16 @@ own prose (which had gone stale on it):
   schemas in a known order, not a general algorithm. Cycle detection is available to build on:
   `resolveLinked` holds a per-thread in-flight set reporting §2.2.3's cycle by the path that closes it.
 
+- [ ] **A source declaration may apply `!template` directly, and §8.1 says it must not** — the kernel's
+  `template` constructor is resolver vocabulary: "nothing is ever typed by it, and a source declaration
+  applying it directly is a resolver error — the parameter list `<…>` is the authored spelling of an open
+  entry". This resolver accepts one. `sneaky => !template { parameters: [T]  template: "!array { element_type:
+  T }" }` resolves without complaint, minting an entry whose held body was hand-written rather than derived
+  from a `<T>` declaration, which sidesteps every declaration-time check §5.10 makes about a template (the
+  unreferenced-parameter rule, regularity, arity against the constructor's own vocabulary). The refusal
+  belongs with the other constructor-eligibility checks, where `requireApplicable` already asks what `!C`
+  may be applied to.
+
 ## Checked annotations
 
 [TSON-SCHEMA] §6 defines the category and §5.4's `@disjoint` is the precedent both follow: an annotation with

@@ -150,7 +150,7 @@ class TsonSchemaLinkerTest {
      * <p><b>The argument is a real entry, and it has to be.</b> {@code source} records the constructor an
      * open entry's held body applies, and a partial application states the arguments it binds in its own
      * {@code reference.target}; neither puts a parameter here (§8.1's alias paragraph, {@code
-     * SPEC-FEEDBACK.md} #7). A parameter reaching this position is therefore an unresolved reference, which
+     * §8.1). A parameter reaching this position is therefore an unresolved reference, which
      * the test below pins.
      */
     @Test
@@ -170,12 +170,10 @@ class TsonSchemaLinkerTest {
     }
 
     /**
-     * <b>And a parameter standing in {@code source} is an unresolved reference.</b> §8.1 lists {@code source}
-     * among the positions resolved against the enclosing entry's parameters, while its own alias paragraph
-     * says {@code source} "is never asked to hold them" -- the contradiction {@code SPEC-FEEDBACK.md} #7
-     * records. This implementation takes the alias paragraph: no parameter reference appears outside a held
-     * body, so nothing here consults a parameter list and a name that resolves to nothing gets the ordinary
-     * verdict.
+     * <b>And a parameter standing in {@code source} is an unresolved reference.</b> §8.1 is explicit that an
+     * open entry's {@code source} is the constructor its held body applies and that "a parameter reference
+     * appears nowhere outside the held text", so nothing here consults a parameter list and a name that
+     * resolves to nothing gets the ordinary verdict.
      */
     @Test
     void aParameterStandingInSourceIsUnresolved() {

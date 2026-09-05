@@ -118,7 +118,7 @@ final class WireForm {
      * The held body of an <b>open alias</b> -- {@code <B> !reference { target: pair<uuid, B> }}, the form
      * [TSON-SCHEMA] §8.1 says a partial application denotes. Spellable because {@code reference.target} is a
      * {@code type_ref}, so an alias that still binds arguments states them in its own body and {@code source}
-     * is never asked to hold them (§8.1, SPEC-FEEDBACK #7).
+     * is never asked to hold them (§8.1).
      *
      * <p>The target goes through {@link #refValue} like every other reference this package writes, so a
      * no-argument target is a bare token and only an application carries {@code arguments} -- the one

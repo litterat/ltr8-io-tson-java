@@ -27,21 +27,19 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * What [TSON-SCHEMA] §8.1 claims about an <b>open</b> entry's resolved form, asked of real documents.
+ * What [TSON-SCHEMA] §8.1 says about an <b>open</b> entry's resolved form, asked of real documents.
  *
- * <p>§8.1 says an open entry "is a {@code type_definition} like any other ... typed by the kernel's {@code
- * schema} without a second value shape, since a parameter reference is an {@code identifier} where a type
- * name is". That premise holds only where every parameter stands in a {@code type_ref} slot, and §5.10 does
- * not confine them there. The three tests below pin what actually happens, in the order the register
- * (`SPEC-FEEDBACK.md` #5) states it: the published fixtures validate, a value parameter does not validate at
- * all, and a parameter that happens to typecheck is read as something else entirely.
+ * <p>An open entry's body is an instance of the kernel's {@code template} constructor -- the parameter
+ * names, and the application as <b>text</b> -- because a body carrying a parameter in a value slot
+ * ({@code min_items: N}) is not a value of any constructor's record shape and cannot be typed as one
+ * (§8.1's "Open entries"). The tests below hold that against real documents: the published fixtures
+ * validate, §5.10's own {@code vector} example validates, and a held body reads back as the application it
+ * holds rather than as the constructor it names.
  *
- * <p><b>Two of these assert the defect rather than the fix.</b> They are written as characterisation tests
- * so this stack stays green while the change lands across several commits, and each says at its own head
- * what it becomes when #5 does: {@link #anOpenEntryWithAValueParameterDoesNotValidate} inverts to a clean
- * validation, and {@link #anOpenEntryWhoseParametersTypecheckIsReadAsSomethingElse} loses its second half
- * once nothing reads a held body as values. Deleting either instead of inverting it would leave the fix
- * unguarded.
+ * <p><b>Each was written against the shape that preceded it and inverted when this one landed</b>, which is
+ * what makes them a guard rather than a description: the value-parameter case failed with two
+ * {@code ATOM_CONSTRAINT_VIOLATION}s, and the case that now reads back as text used to bind {@code S} as a
+ * relative URI -- the two failures §8.1 cites as the reason the shape changed.
  */
 class OpenEntryResolvedFormTest {
 
@@ -102,10 +100,9 @@ class OpenEntryResolvedFormTest {
      * {@code template} field is the application as written, so there is no value slot for {@code N} to fail
      * against and the entry is a {@code type_definition} like any other.
      *
-     * <p>This is the assertion {@code SPEC-FEEDBACK.md} #5 exists for. Before the {@code template}
-     * constructor it failed with two {@code ATOM_CONSTRAINT_VIOLATION}s -- {@code N} is not a
-     * {@code non_negative_integer} -- against §8.1's claim that an open entry is "typed by the kernel's
-     * {@code schema} without a second value shape".
+     * <p>Before the {@code template} constructor this failed with two {@code ATOM_CONSTRAINT_VIOLATION}s --
+     * {@code N} is not a {@code non_negative_integer} -- which is the case §8.1 names when it says a body
+     * carrying a parameter in a value slot "is not a value of any constructor's record shape".
      *
      * <p>The document is hand-authored in §8.1's form rather than produced by this library's writer,
      * deliberately: the claim under test is about the <em>spec's</em> prescribed serialization, and routing
@@ -132,7 +129,8 @@ class OpenEntryResolvedFormTest {
      * <b>And a held body is read back as held, not as the constructor it names.</b> Before the
      * {@code template} constructor these two validated clean and bound as something else -- {@code S} as a
      * schema identity literally named {@code S}, {@code M} as a third enum member spelled {@code M} -- which
-     * is the half of {@code SPEC-FEEDBACK.md} #5 that produced no diagnostic anywhere.
+     * is what §8.1 names as {@code extern_of} resolving to "a schema whose {@code S} was a relative URI" --
+     * accepted, and wrong, with no diagnostic anywhere.
      *
      * <p>{@code extern_of} is core.tn's own declaration. What comes back now is the application as text,
      * with nothing having tried to read it.
@@ -233,14 +231,14 @@ class OpenEntryResolvedFormTest {
         assertTrue(openEntries >= 8, () -> "not enough open entries to mean anything: " + openEntries);
     }
 
-    // ── SPEC-FEEDBACK #6: kind restates what the entry already says ──────
+    // ── §8.1: a kind is derived, never recorded ─────────────────────────
 
     /**
      * <b>{@code type_definition.kind} agrees with what the entry's own {@code supertypes} and {@code body}
      * determine</b>, over every entry of the three bundled schemas plus a schema exercising each declaration
      * form. §8.1 derives the field at resolution and never asks anything to verify it -- it appears nowhere
      * in the Ingest paragraph's list of what must be discarded, recomputed or verified -- so nothing but this
-     * test stands between a forged {@code kind} and a schema that reads by it (`SPEC-FEEDBACK.md` #6).
+     * test stands between the derivation and a resolver that quietly stops agreeing with it.
      *
      * <p><b>The rule has four branches and two of them are special cases</b>, which is the argument for
      * keeping the field rather than deleting it as redundant: branch 4 is a namespace lookup, and it reaches
@@ -251,8 +249,7 @@ class OpenEntryResolvedFormTest {
      * <p><b>The rule is total.</b> An open entry is {@code TEMPLATE}, which is the branch that used to have
      * no answer from the entry alone -- its kind was inherited from the constructor its held body applies,
      * which is a fact about an application of it rather than about the template. {@link #derive} is
-     * therefore the whole rule, and the one §8.1's Ingest paragraph should carry ({@code SPEC-FEEDBACK.md}
-     * #6).
+     * therefore the whole rule, and the one §8.1 states under "Kind is derived".
      */
     @Test
     void kindAgreesWithWhatTheEntryAlreadyStates() {

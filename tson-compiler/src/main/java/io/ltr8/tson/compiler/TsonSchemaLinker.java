@@ -977,7 +977,7 @@ public final class TsonSchemaLinker {
                             : mergeWithFallback(namespace, structureNamespace);
             // `source` never names a parameter: an open entry records the constructor its held body applies,
             // and a partial application states its own arguments in `reference.target` rather than here
-            // ([TSON-SCHEMA] §8.1's alias paragraph, SPEC-FEEDBACK #7). So a parameter reaching this
+            // ([TSON-SCHEMA] §8.1's alias paragraph). So a parameter reaching this
             // position is an unresolved reference, which is the verdict every other reference form gives it.
             validateTypeRef(source, sourceLookup, List.of(), name, " source");
         }
