@@ -40,13 +40,12 @@ a source of truth — with one standing exception: the three `.tn` schemas are *
 time**, so they are the live copies rather than a snapshot. They carry **Revision 35 identities** —
 `https://tson.io/2026/35/m/*.tn` — ahead of that revision's publication, this branch being where the
 proposed artifacts are built (below); `main` carries the published Revision 34 ones. `spec/` now holds the
-**candidate Revision 35** of both parts, whose §13.2 table names those same `/2026/35/m/` identities — so the
-table is no longer a revision behind, but **its three digests are stamped from an earlier state of these
-artifacts and are stale against the working copies**. That is expected of an unpublished draft, whose digest
-table is stamped last from the final bytes; it means a digest disagreement between `spec/m/*.tn` and
-`spec/tson-part2-schema.md` §13.2 is a note for the spec author rather than a defect here, and the repo's own
-pins (which the library verifies on every load) follow the artifacts. The divergences earlier revisions
-carried are all in the spec now — `reference.target` typed `type_ref`, no
+**candidate Revision 35** of both parts, whose §13.2 table names those same identities and is stamped from
+these bytes — so the table is neither a revision behind nor stale, and **§13.2 is now a fourth pin to move**
+whenever the artifacts change. `scripts/restamp-bundled-schemas.sh` does not know about it: the script covers
+the repo's own pins, and the spec document is a cache it does not write, so §13.2 is the one that has to be
+re-stamped by hand and is therefore the one that silently drifts. `tson hash spec/m/<name>.tn` is the check.
+The divergences earlier revisions carried are all in the spec now — `reference.target` typed `type_ref`, no
 `instance_template`/`template_argument`/`value_param` (§5.10's held bodies replaced the quoted open-body
 vocabulary), and `map`'s `state` field behind `{K => V?}` (§5.3).
 **Changing them means re-stamping all three digests bottom-up**, moving the matching `*-resolved.tn`

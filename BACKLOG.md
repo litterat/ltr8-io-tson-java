@@ -128,6 +128,16 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   depth was a counter it already had, and the two aggregates (total values, foreign schemas) need their own
   counter since §9.1 is explicit that the total is not bounded by the parts.
 
+- [ ] **`scripts/restamp-bundled-schemas.sh` does not cover the spec's own §13.2 table.** The script moves
+  every pin in the repo bottom-up — the three `spec/m/*.tn` headers, `TsonBundledSchemas`, `InitCommand`,
+  `README.md` and the getting-started example — and `--check` reports staleness across all of them. It does
+  not know about `spec/tson-part2-schema.md` §13.2, which pins the same three digests, so that table is the
+  one pin a schema edit leaves behind and the only one whose drift nothing reports. It drifted once already.
+  Teaching the script to stamp it (or at least to `--check` it, leaving the write to the spec author) is a
+  few lines against the same digest computation, and makes CI able to catch what a hand edit currently must.
+  The wrinkle worth deciding first: `spec/` is a cache this repo otherwise only reads, so writing into it is
+  a small change to what the script is for — `--check` alone may be the honest scope.
+
 - [ ] **`time` and `datetime` compare by offset, where [TSON-SCHEMA] §5.5 makes them instants.** The
   value-space clause settles the equality contract the series used to delegate without defining, and it decides
   this family against what is running: a `datetime` is the instant on the UTC timeline and a `time` is the time
