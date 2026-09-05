@@ -19,14 +19,12 @@
 !schema {
   @doc:"The RFC 4648 base encodings a text encoding may spell a bytes value in. A spelling is not a kind of value."
   bytes_encoding => !type_definition {
-    kind: ATOM
     source: enum
     body: !enum { members: [BASE64 BASE64URL BASE32 HEX] }
   }
 
   @doc:"Octet-sequence constraint vocabulary. Instance is bytes in core. The value is the octets; encoding is a selector picking the text spelling."
   bytes_type => !type_definition {
-    kind: ATOM
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: encoding    type: bytes_encoding  state: REQUIRED_DEFAULT  value: BASE64 }
@@ -38,14 +36,12 @@
 
   @doc:"Constructor for sum types whose members belong to a named external schema."
   scope_kind => !type_definition {
-    kind: ATOM
     source: enum
     body: !enum { members: [LOCAL EXTERN] }
   }
 
   @doc:"The set spelling an author writes: a template over the parameterless set_type constructor."
   set => !type_definition {
-    kind: TEMPLATE
     source: set_type
     body: !template { parameters: [T]  template: "!set_type { element_type: T }" }
   }
@@ -57,7 +53,6 @@
     as on every non-choice sum.
     """
   scoped => !type_definition {
-    kind: SUM
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
       !record_field { name: scope    type: set_scope_kind_xxhash }
@@ -67,14 +62,12 @@
 
   @doc:"IEEE 754-2019 interchange formats, both radices. Selects the representable grid of an approximate (float_type) value."
   ieee_format => !type_definition {
-    kind: ATOM
     source: enum
     body: !enum { members: [BINARY16 BINARY32 BINARY64 BINARY128 BINARY256 DECIMAL32 DECIMAL64 DECIMAL128] }
   }
 
   @doc:"Approximate-numeric constraint vocabulary (SQL approximate tier; ISO/IEC 11404 approximate real). Instances are `float32` and `float64` in core. Pinned to IEEE 754-2019."
   float_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec                 type: uri      state: REQUIRED_FIXED  value: "https://ieeexplore.ieee.org/document/8766229" }
@@ -96,7 +89,6 @@
 
   @doc:"Exact-numeric constraint vocabulary (SQL exact tier; ISO/IEC 11404 scaled, radix 10). Instance is `number` in core."
   decimal_type => !type_definition {
-    kind: ATOM
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: min              type: value    state: OPTIONAL }
@@ -116,7 +108,6 @@
 
   @doc:"Rational constraint vocabulary. Instance is `rational` in core. Exact (ℚ; ISO/IEC 11404 rational)."
   rational_type => !type_definition {
-    kind: ATOM
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: min            type: value  state: OPTIONAL }
@@ -133,14 +124,12 @@
 
   @doc:"Allowed component types for a complex value. Closed vocabulary of numeric types."
   complex_component => !type_definition {
-    kind: ATOM
     source: enum
     body: !enum { members: [INTEGER NUMBER RATIONAL FLOAT32 FLOAT64] }
   }
 
   @doc:"Complex constraint vocabulary. Instance is `complex` in core. `component` selects the parts' type from complex_component, default NUMBER."
   complex_type => !type_definition {
-    kind: ATOM
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: component  type: complex_component  state: REQUIRED_DEFAULT  value: NUMBER }
@@ -149,7 +138,6 @@
 
   @doc:"Date constraint vocabulary. Instance is `date` in core."
   date_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
@@ -166,7 +154,6 @@
 
   @doc:"Time constraint vocabulary. Instance is `time` in core. `precision` bounds fractional-second digits (at most N, on the written token)."
   time_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec              type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
@@ -184,7 +171,6 @@
 
   @doc:"Datetime constraint vocabulary. Instance is `datetime` in core. `precision` as for `time_type`."
   datetime_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec              type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339" }
@@ -202,7 +188,6 @@
 
   @doc:"Duration constraint vocabulary. Instance is `duration` in core."
   duration_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
@@ -226,7 +211,6 @@
     to carry, and the reason the other half can be ordered at all.
     """
   period_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec           type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3339#appendix-A" }
@@ -244,7 +228,6 @@
 
   @doc:"UUID constraint vocabulary. Instance is `uuid` in core."
   uuid_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec     type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9562" }
@@ -254,7 +237,6 @@
 
   @doc:"Email constraint vocabulary. Instance is `email` in core."
   email_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
       !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
@@ -267,7 +249,6 @@
 
   @doc:"IPv4 address constraint vocabulary. Instance is `ipv4` in core."
   ipv4_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec       type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc3986" }
@@ -278,7 +259,6 @@
 
   @doc:"IPv6 address constraint vocabulary. Instance is `ipv6` in core."
   ipv6_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec       type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
@@ -289,7 +269,6 @@
 
   @doc:"IPv4 network constraint vocabulary. Instance is `cidr4` in core."
   cidr4_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4632" }
@@ -302,7 +281,6 @@
 
   @doc:"IPv6 network constraint vocabulary. Instance is `cidr6` in core."
   cidr6_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec        type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc4291" }
@@ -315,7 +293,6 @@
 
   @doc:"MAC address (EUI-48) constraint vocabulary. Instance is `mac` in core."
   mac_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification top]
     body: !record { supertypes: [atom atom_specification]  fields: [
       !record_field { name: spec  type: uri  state: REQUIRED_FIXED  value: "https://www.rfc-editor.org/rfc/rfc9542" }
@@ -324,91 +301,78 @@
 
   @doc:"Ordering classification (ISO/IEC 11404 / XSD fundamental facet)."
   ordered => @annotation !type_definition {
-    kind: ATOM
     source: enum
     body: !enum { members: [NONE PARTIAL TOTAL] }
   }
 
   @doc:"Boundedness annotation."
   bounded => @annotation !type_definition {
-    kind: REFERENCE
     source: boolean
     body: !reference { target: boolean }
   }
 
   @doc:"Exactness classification (ISO/IEC 11404 characterizing property)."
   exact => @annotation !type_definition {
-    kind: REFERENCE
     source: boolean
     body: !reference { target: boolean }
   }
 
   @doc:"Numeric type marker annotation."
   numeric => @annotation !type_definition {
-    kind: REFERENCE
     source: void
     body: !reference { target: void }
   }
 
   @doc:"Author's assertion that a choice's variants are pairwise disjoint as value sets — advisory, checked against derived `type_definition.disjoint` (Part 2 Section 5.4). Void-targeted presence marker; written bare."
   disjoint => @annotation !type_definition {
-    kind: REFERENCE
     source: void
     body: !reference { target: void }
   }
 
   @doc:"Marks a definition or field as deprecated."
   deprecated => @annotation !type_definition {
-    kind: REFERENCE
     source: text
     body: !reference { target: text }
   }
 
   @doc:"Records when a definition or field was introduced."
   since => @annotation !type_definition {
-    kind: REFERENCE
     source: text
     body: !reference { target: text }
   }
 
   @doc:"Marks incomplete work requiring attention."
   todo => @annotation !type_definition {
-    kind: REFERENCE
     source: text
     body: !reference { target: text }
   }
 
   @doc:"BCP 47 language tag (RFC 5646)."
   lang => @annotation !type_definition {
-    kind: REFERENCE
     source: text
     body: !reference { target: text }
   }
 
   @doc:"Short human-readable name for a definition or field."
   title => @annotation !type_definition {
-    kind: REFERENCE
     source: text
     body: !reference { target: text }
   }
 
   @doc:"Example values, carried for documentation only."
   examples => @annotation !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: value }
   }
 
   @doc:"Marks a field an encoding's consumers may read but not write."
   read_only => @annotation !type_definition {
-    kind: REFERENCE
     source: void
     body: !reference { target: void }
   }
 
   @doc:"Marks a field an encoding's consumers may write but not read."
   write_only => @annotation !type_definition {
-    kind: REFERENCE
     source: void
     body: !reference { target: void }
   }
@@ -418,7 +382,6 @@
     variant on. A checked annotation: no decode force, load-time force.
     """
   discriminator => @annotation !type_definition {
-    kind: REFERENCE
     source: field_name
     body: !reference { target: field_name }
   }
@@ -428,7 +391,6 @@
     A checked annotation on the same terms as @discriminator.
     """
   rest => @annotation !type_definition {
-    kind: REFERENCE
     source: void
     body: !reference { target: void }
   }
@@ -442,25 +404,21 @@
     the shape of the entry.
     """
   @synthetic array_value_xxhash => !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: value }
   }
 
   @synthetic array_type_name_1_xxhash => !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: type_name  min_items: 1 }
   }
 
   @synthetic map_uri_array_type_name_1_ef020ac1_OPTIONAL_1_xxhash => !type_definition {
-    kind: PRODUCT
     source: map
     body: !map { key_type: uri  value_type: array_type_name_1_xxhash  state: OPTIONAL  min_items: 1 }
   }
 
   @synthetic set_type_scope_kind_xxhash => !type_definition {
-    kind: PRODUCT
     source: set_type
     body: !set_type { element_type: scope_kind  min_items: 1 }
   }
@@ -471,19 +429,16 @@
     application where a synthetic's is a bare constructor (Section 8.2).
     """
   set_scope_kind_xxhash => !type_definition {
-    kind: REFERENCE
     source: { name: set  arguments: [ { name: scope_kind } ] }
     body: !reference { target: set_type_scope_kind_xxhash }
   }
 
   @synthetic set_type_value_xxhash => !type_definition {
-    kind: PRODUCT
     source: set_type
     body: !set_type { element_type: value  min_items: 1 }
   }
 
   set_value_xxhash => !type_definition {
-    kind: REFERENCE
     source: { name: set  arguments: [ { name: value } ] }
     body: !reference { target: set_type_value_xxhash }
   }

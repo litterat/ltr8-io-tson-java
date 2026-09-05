@@ -118,7 +118,6 @@ class OpenEntryResolvedFormTest {
                 !!schema:"https://tson.io/2026/35/m/meta-kernel.tn"
                 !schema {
                   vector => !type_definition {
-                    kind: PRODUCT
                     source: array
                     body: !template {
                       parameters: [T N]
@@ -145,7 +144,6 @@ class OpenEntryResolvedFormTest {
                 !!schema:"https://tson.io/2026/35/m/meta.tn"
                 !schema {
                   extern_of => !type_definition {
-                    kind: SUM
                     source: scoped
                     body: !template {
                       parameters: [S]
@@ -153,7 +151,6 @@ class OpenEntryResolvedFormTest {
                     }
                   }
                   e => !type_definition {
-                    kind: ATOM
                     source: enum
                     body: !template { parameters: [M]  template: "!enum { members: [a b M] }" }
                   }

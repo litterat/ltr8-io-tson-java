@@ -37,7 +37,7 @@ class TypeRefAnnotationTest {
     @Test
     void anAnnotationOnATypeRefIsKept() {
         TypeRef type = fieldType(read("""
-                !type_definition { kind: PRODUCT  body: !record { fields: [
+                !type_definition { body: !record { fields: [
                   !record_field { name: n  type: @doc:"the token itself" token }
                 ] } }"""));
 
@@ -49,7 +49,7 @@ class TypeRefAnnotationTest {
     @Test
     void anUnannotatedTypeRefCarriesNothing() {
         assertTrue(fieldType(read("""
-                !type_definition { kind: PRODUCT  body: !record { fields: [
+                !type_definition { body: !record { fields: [
                   !record_field { name: n  type: token }
                 ] } }""")).annotations().values().isEmpty());
     }
@@ -58,7 +58,7 @@ class TypeRefAnnotationTest {
     @Test
     void anAnnotatedTypeRefWritesBackAsOne() {
         TypeRef type = fieldType(read("""
-                !type_definition { kind: PRODUCT  body: !record { fields: [
+                !type_definition { body: !record { fields: [
                   !record_field { name: n  type: @doc:"the token itself" token }
                 ] } }"""));
 

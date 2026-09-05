@@ -30,7 +30,7 @@ class AliasedConstructorDispatchTest {
     /** A {@code type_definition} whose body is written with {@code constructor}'s own name. */
     private static TypeDefinition read(String body) {
         return tson().objectReader().withSchema(TsonBundledSchemas.META_ID)
-                .readAs("!type_definition { kind: PRODUCT  body: " + body + " }",
+                .readAs("!type_definition { body: " + body + " }",
                         "type_definition", TypeDefinition.class);
     }
 
@@ -54,7 +54,7 @@ class AliasedConstructorDispatchTest {
     void aNameNothingBindsIsStillRefused() {
         assertEquals(1, tson().validate("""
                 !!schema:"https://tson.io/2026/35/m/meta.tn"
-                !type_definition { kind: PRODUCT  body: !no_such_constructor { element_type: token } }""")
+                !type_definition { body: !no_such_constructor { element_type: token } }""")
                 .size());
     }
 

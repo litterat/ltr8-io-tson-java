@@ -76,20 +76,17 @@
 !schema {
   @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A."
   top => !type_definition {
-    kind: PRODUCT
     subtypes: [array atom choice data enum integer_type map product record reference regex_type set_type sum template text_type tuple unit uri_type]
     body: !record { fields: [] }
   }
 
   atom => !type_definition {
-    kind: PRODUCT
     supertypes: [top]
     subtypes: [enum integer_type regex_type text_type unit uri_type]
     body: !record { supertypes: [top]  fields: [] }
   }
 
   product => !type_definition {
-    kind: PRODUCT
     supertypes: [top]
     subtypes: [array map record set_type tuple]
     body: !record { supertypes: [top]  fields: [
@@ -99,7 +96,6 @@
   }
 
   sum => !type_definition {
-    kind: PRODUCT
     supertypes: [top]
     subtypes: [choice]
     body: !record { supertypes: [top]  fields: [] }
@@ -114,13 +110,11 @@
     kind is DATA is declared by its schema but is not a type.
     """
   data => !type_definition {
-    kind: PRODUCT
     supertypes: [top]
     body: !record { supertypes: [top]  fields: [] }
   }
 
   reference => !type_definition {
-    kind: PRODUCT
     supertypes: [top]
     body: !record { supertypes: [top]  fields: [
       !record_field { name: target  type: type_ref }
@@ -129,7 +123,6 @@
 
   @doc:"Held body of an open entry — the application as written, unread until its parameters are substituted away."
   template => !type_definition {
-    kind: PRODUCT
     supertypes: [top]
     body: !record { supertypes: [top]  fields: [
       !record_field { name: parameters  type: array_param_name_xxhash }
@@ -145,42 +138,36 @@
     not by schema shape.
     """
   unit => !type_definition {
-    kind: ATOM
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [] }
   }
 
   @doc:"Escape hatch primitive: base type resolution's result, uninterpreted. Instance of `unit`."
   value => !type_definition {
-    kind: ATOM
     source: unit
     body: !unit {}
   }
 
   @doc:"Identifier primitive: the type of every naming position; XID_Start-initial, XID_Continue plus '-', in NFC. Instance of `unit`."
   identifier => !type_definition {
-    kind: ATOM
     source: unit
     body: !unit {}
   }
 
   @doc:"Void primitive: admits only the absent sentinel `_`. Instance of `unit`."
   void => !type_definition {
-    kind: ATOM
     source: unit
     body: !unit {}
   }
 
   @doc:"Internal scalar types for constraint fields."
   boolean => !type_definition {
-    kind: ATOM
     source: enum
     body: !enum { members: [true false] }
   }
 
   @doc:"Fixed-width integer representation: bit width paired with two's-complement signedness."
   integer_size => !type_definition {
-    kind: PRODUCT
     body: !record { fields: [
       !record_field { name: bits    type: non_negative_integer }
       !record_field { name: signed  type: boolean }
@@ -189,7 +176,6 @@
 
   @doc:"Integer constraint vocabulary. Its instance `integer` is the kernel's arbitrary-precision integer."
   integer_type => !type_definition {
-    kind: ATOM
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: size           type: integer_size  state: OPTIONAL }
@@ -207,7 +193,6 @@
   }
 
   integer => !type_definition {
-    kind: ATOM
     source: integer_type
     subtypes: [non_negative_integer]
     body: !integer_type {}
@@ -215,7 +200,6 @@
 
   @doc:"Text constraint vocabulary. Its instance `text` is the kernel's Unicode code point sequence type."
   text_type => !type_definition {
-    kind: ATOM
     supertypes: [atom top]
     subtypes: [regex_type uri_type]
     body: !record { supertypes: [atom]  fields: [
@@ -227,14 +211,12 @@
   }
 
   text => !type_definition {
-    kind: ATOM
     source: text_type
     body: !text_type {}
   }
 
   @doc:"Mixin record contributing the `spec` field to specification-bound atoms."
   atom_specification => !type_definition {
-    kind: PRODUCT
     subtypes: [regex_type uri_type]
     body: !record { fields: [
       !record_field { name: spec  type: uri }
@@ -243,7 +225,6 @@
 
   @doc:"URI constraint vocabulary. Composes with `text_type` and the `atom_specification` mixin."
   uri_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
       !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
@@ -256,14 +237,12 @@
   }
 
   uri => !type_definition {
-    kind: ATOM
     source: uri_type
     body: !uri_type {}
   }
 
   @doc:"Regex constraint vocabulary. Same shape pattern as uri_type, pinned to I-Regexp."
   regex_type => !type_definition {
-    kind: ATOM
     supertypes: [atom atom_specification text_type top]
     body: !record { supertypes: [text_type atom_specification]  fields: [
       !record_field { name: min_length  type: non_negative_integer  state: OPTIONAL }
@@ -275,33 +254,28 @@
   }
 
   regex => !type_definition {
-    kind: ATOM
     source: regex_type
     body: !regex_type {}
   }
 
   @doc:"Identifier roles — distinct naming positions referencing the identifier primitive."
   type_name => !type_definition {
-    kind: REFERENCE
     source: identifier
     body: !reference { target: identifier }
   }
 
   field_name => !type_definition {
-    kind: REFERENCE
     source: identifier
     body: !reference { target: identifier }
   }
 
   param_name => !type_definition {
-    kind: REFERENCE
     source: identifier
     body: !reference { target: identifier }
   }
 
   @doc:"Structured type reference (Part 2 Section 8.1). `name` is the only REQUIRED field, so the positional form applies at every type_ref-typed position: bare token when argument-free, explicit record when carrying arguments."
   type_ref => !type_definition {
-    kind: PRODUCT
     body: !record { fields: [
       !record_field { name: name       type: type_name }
       !record_field { name: arguments  type: array_type_argument_xxhash  state: OPTIONAL }
@@ -310,7 +284,6 @@
 
   @doc:"One positional argument of a type application. `name` holds every reference (types, entries, parameters of either kind); `value` holds concrete literals only. Exactly one member is present; no positional form — the braced record is the reference/literal discrimination."
   type_argument => !type_definition {
-    kind: PRODUCT
     body: !record { fields: [
       !record_field { name: name   type: type_ref  state: OPTIONAL }
       !record_field { name: value  type: value  state: OPTIONAL }
@@ -322,63 +295,48 @@
 
   @doc:"Internal enumerations."
   product_access_type => !type_definition {
-    kind: ATOM
     source: enum
     body: !enum { members: [INDEX NAMED] }
   }
 
   product_size_type => !type_definition {
-    kind: ATOM
     source: enum
     body: !enum { members: [FIXED VARIABLE] }
   }
 
   field_state => !type_definition {
-    kind: ATOM
     source: enum
     body: !enum { members: [REQUIRED REQUIRED_DEFAULT REQUIRED_FIXED OPTIONAL OPTIONAL_FIXED] }
   }
 
   element_state => !type_definition {
-    kind: ATOM
     source: enum
     body: !enum { members: [REQUIRED OPTIONAL] }
   }
 
-  type_kind => !type_definition {
-    kind: ATOM
-    source: enum
-    body: !enum { members: [ATOM PRODUCT SUM REFERENCE DATA TEMPLATE] }
-  }
-
   @doc:"Annotation type markers."
   annotation => @annotation !type_definition {
-    kind: REFERENCE
     source: void
     body: !reference { target: void }
   }
 
   documentation => @annotation !type_definition {
-    kind: REFERENCE
     source: text
     body: !reference { target: text }
   }
 
   doc => @annotation !type_definition {
-    kind: REFERENCE
     source: documentation
     body: !reference { target: documentation }
   }
 
   synthetic => @annotation !type_definition {
-    kind: REFERENCE
     source: void
     body: !reference { target: void }
   }
 
   @doc:"Supporting records."
   record_field => !type_definition {
-    kind: PRODUCT
     body: !record { fields: [
       !record_field { name: name         type: field_name }
       !record_field { name: type         type: type_ref }
@@ -388,7 +346,6 @@
   }
 
   tuple_element => !type_definition {
-    kind: PRODUCT
     body: !record { fields: [
       !record_field { name: element_type  type: type_ref }
       !record_field { name: state         type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
@@ -397,7 +354,6 @@
 
   @doc:"Field group — a set of mutually exclusive fields of a record (Part 2 Section 5.11)."
   field_group => !type_definition {
-    kind: PRODUCT
     body: !record { fields: [
       !record_field { name: members  type: array_field_name_xxhash }
       !record_field { name: state    type: element_state  state: REQUIRED_DEFAULT  value: REQUIRED }
@@ -406,7 +362,6 @@
 
   @doc:"Constructors — ~ marks type factories."
   record => !type_definition {
-    kind: PRODUCT
     supertypes: [product top]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: NAMED }
@@ -418,7 +373,6 @@
   }
 
   array => !type_definition {
-    kind: PRODUCT
     supertypes: [product top]
     subtypes: [set_type]
     body: !record { supertypes: [product]  fields: [
@@ -434,7 +388,6 @@
   }
 
   set_type => !type_definition {
-    kind: PRODUCT
     source: array
     supertypes: [array product top]
     body: !record { fields: [
@@ -449,7 +402,6 @@
     ] }
   }
   map => !type_definition {
-    kind: PRODUCT
     supertypes: [product top]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: NAMED }
@@ -463,7 +415,6 @@
   }
 
   tuple => !type_definition {
-    kind: PRODUCT
     supertypes: [product top]
     body: !record { supertypes: [product]  fields: [
       !record_field { name: access_pattern  type: product_access_type  state: REQUIRED_FIXED  value: INDEX }
@@ -474,27 +425,23 @@
 
   @doc:"A named entry rather than an inline form: ! constructor applications remain prohibited at field positions (Part 2 Section 5.2) and set_type has no sugar of its own."
   enum_set => !type_definition {
-    kind: PRODUCT
     source: set_type
     body: !set_type { element_type: identifier  min_items: 1 }
   }
 
   @doc:"A count. Refines integer rather than constructing beside it, so it IS-A integer."
   non_negative_integer => !type_definition {
-    kind: ATOM
     source: integer_type
     supertypes: [integer]
     body: !integer_type { min: 0 }
   }
 
   integer_member_set => !type_definition {
-    kind: PRODUCT
     source: set_type
     body: !set_type { element_type: integer  min_items: 1 }
   }
 
   enum => !type_definition {
-    kind: ATOM
     supertypes: [atom top]
     body: !record { supertypes: [atom]  fields: [
       !record_field { name: members  type: enum_set }
@@ -502,7 +449,6 @@
   }
 
   choice => !type_definition {
-    kind: SUM
     supertypes: [sum top]
     body: !record { supertypes: [sum]  fields: [
       !record_field { name: variants  type: array_type_ref_xxhash }
@@ -512,10 +458,8 @@
 
   @doc:"Resolver output."
   type_definition => !type_definition {
-    kind: PRODUCT
     body: !record { fields: [
       !record_field { name: source       type: type_ref  state: OPTIONAL }
-      !record_field { name: kind         type: type_kind }
       !record_field { name: supertypes   type: array_type_name_xxhash  state: OPTIONAL }
       !record_field { name: subtypes     type: array_type_name_xxhash  state: OPTIONAL }
       !record_field { name: body         type: top }
@@ -523,7 +467,6 @@
   }
 
   schema => !type_definition {
-    kind: PRODUCT
     source: map
     body: !map { key_type: type_name  value_type: type_definition }
   }
@@ -543,49 +486,41 @@
     hash value non-normative.
     """
   @synthetic array_type_name_xxhash => !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: type_name }
   }
 
   @synthetic array_field_name_xxhash => !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: field_name }
   }
 
   @synthetic array_param_name_xxhash => !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: param_name }
   }
 
   @synthetic array_type_ref_xxhash => !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: type_ref }
   }
 
   @synthetic array_type_argument_xxhash => !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: type_argument }
   }
 
   @synthetic array_record_field_xxhash => !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: record_field }
   }
 
   @synthetic array_field_group_xxhash => !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: field_group }
   }
 
   @synthetic array_tuple_element_xxhash => !type_definition {
-    kind: PRODUCT
     source: array
     body: !array { element_type: tuple_element }
   }

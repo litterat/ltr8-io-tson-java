@@ -441,7 +441,10 @@ class MetaLayerDataConstructorTest {
 
         String written = new TsonObjectWriter(consumerContext()).toTson(entry).replaceAll("\\s+", " ");
 
-        assertTrue(written.contains("kind: \"DATA\""), written);
+        // `kind` is not written: it is derived at resolution and §8's output has no field for it. What
+        // identifies a DATA entry in output is its body -- the constructor that built it.
+        assertFalse(written.contains("kind:"), written);
+        assertEquals(TypeKind.DATA, entry.kind(), "still derived, and still the resolver's own");
         assertTrue(written.contains("body: !operation { path: \"/search\" method: \"GET\""), written);
         assertTrue(written.contains("request: { name: \"search_request\" arguments: [] }"), written);
     }

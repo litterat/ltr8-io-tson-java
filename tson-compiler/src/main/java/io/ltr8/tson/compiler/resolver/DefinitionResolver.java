@@ -754,15 +754,13 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
                     + "' does not resolve against the type-name namespace (§3.3.1)");
         }
-        // §5.5's question, in the type system's own terms: is this an atom *instance*? An atom-kinded entry
-        // that is not itself applicable is exactly one -- §4.1's "IS-A does not extend below construction"
-        // is what makes the pair separable, since `!T {}` transfers kind and not supertypes, so `integer`
-        // carries an empty chain where `integer_type => ~atom & { ... }` carries `[atom, top]`.
-        //
-        // Note which way round that runs: IS-A `atom` is true of the *constructor* and false of every
-        // instance, so it is the constructors it selects. Kind alone does not separate them either --
-        // `integer_type` is ATOM-kinded exactly like its instances. It takes both halves.
-        if (source.kind() != TypeKind.ATOM || source.supertypes().contains(TOP)) {
+        // §5.5's question, asked of the body: is this an atom *instance*? An instance's body IS an atom
+        // (`integer` carries an `!integer_type {}`), where its constructor's body is the vocabulary record
+        // describing one (`integer_type` carries a `!record { ... }`). So one test separates the pair and
+        // establishes atom-ness at once, where neither half does alone -- a plain record has no supertypes
+        // either, and `integer_type` is ATOM-kinded exactly like its instances. It is also how the reader
+        // stack decides everything of this shape (`Subsumption`), rather than trusting a stated kind.
+        if (!(source.body() instanceof io.ltr8.tson.schema.meta.Atom)) {
             // The construction hint is offered only where construction would actually work, which is the
             // same applicability question (§4.1) -- so `top`, not applicable, gets the plain answer rather
             // than advice that would fail in turn.
