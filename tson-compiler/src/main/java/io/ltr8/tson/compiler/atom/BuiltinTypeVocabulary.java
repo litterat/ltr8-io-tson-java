@@ -24,10 +24,9 @@ import java.util.Optional;
  * {@code float64}), {@code rational_type} ({@code rational}), and {@code complex_type} ({@code
  * complex}) -- all fully published in §5.6's table as-is, unlike the integer family. And with {@code
  * uuid_type} ({@code uuid}, §5.5) and {@code text_type} ({@code text}, §5's unconstrained text atom).
- * And with {@code bytes} (§5.5), one name over one value space -- a schemaless document has no schema to
- * carry a {@code @bytes_encoding} directive, so Part 1 fixes base64 rather than offering four names,
- * each a distinct {@code binary_encoding} value, not one generic {@code !binary} annotation,
- * matching §5.3's own "there is no generic {@code !binary} annotation." And with the temporal
+ * And with {@code bytes} ([TSON-SCHEMA] §5.5), one name over one value space -- a schemaless document has
+ * no schema, so it has no type to carry the {@code encoding} selector and [TSON-DATA] §5.3 fixes base64
+ * rather than offering a name per alphabet. And with the temporal
  * family (§5.4) -- {@code date_type} ({@code date}), {@code time_type} ({@code time}), {@code
  * datetime_type} ({@code datetime}), {@code duration_type} ({@code duration}). And with {@code
  * uri_type} ({@code uri}, §5.5) -- see {@link UriParser}'s Javadoc for why it's the one atom here that

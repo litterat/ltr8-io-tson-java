@@ -8,20 +8,20 @@ import java.util.HexFormat;
 import java.util.Optional;
 
 /**
- * Parses and validates against meta.tn's {@code binary} constructor (§5.3's four binary atoms,
- * RFC 4648) -- one class, not one per encoding (an earlier version of this file *did* split it
- * into four sibling classes, one per encoding, since each encoding's decode algorithm is genuinely
- * different -- but that's the same shape of branching {@link IntegerParser} already does on {@code
- * size.signed()} and {@link FloatParser} already does on {@code format}, not a reason to fork the
- * class). Holds a {@link BytesType} -- the pure constraint values, unchanged by this split --
- * rather than declaring those fields itself.
+ * Parses and validates against meta.tn's {@code bytes_type} constructor ([TSON-SCHEMA] §5.5, RFC 4648).
+ *
+ * <p>One class, not one per alphabet, though each alphabet's decode algorithm is genuinely different: that
+ * is the same shape of branching {@link IntegerParser} does on {@code size.signed()} and {@link FloatParser}
+ * on {@code format}, and not a reason to fork the class. Which alphabet is in force comes from the type's
+ * own {@code encoding} selector, so this holds a {@link BytesType} -- the pure constraint values -- and
+ * reads the alphabet off it rather than being told separately.
  */
 public record BytesParser(BytesType constraints) implements AtomType<byte[]> {
 
     /**
-     * Part 1's one binary tag, {@code !bytes}, and the alphabet it reads in: base64 (§4, padded). A
-     * schemaless document has no type to carry a selector, so there is nothing for a reader to consult and
-     * no way one spelling could be more right than another.
+     * Part 1's one binary tag, {@code !bytes}, and the alphabet it reads in: base64 ([TSON-DATA] §5.3,
+     * padded). A schemaless document has no type to carry a selector, so there is nothing for a reader to
+     * consult and no way one spelling could be more right than another.
      */
     public static final BytesParser BASE64 = new BytesParser(BytesType.UNCONSTRAINED);
 
@@ -35,11 +35,11 @@ public record BytesParser(BytesType constraints) implements AtomType<byte[]> {
     /**
      * Part 1's built-in annotation name -- {@code !bytes}, and only that.
      *
-     * <p>The four alphabets are not built-in type annotations. A schemaless document has no schema to carry
-     * a {@code @bytes_encoding} directive, so there is nothing for a reader to consult and no way for one
-     * spelling to be more right than another: Part 1 fixes base64 and offers no override. Under a schema
-     * the directive decides, which is where the choice belongs -- and it means {@code !bytes} names one type
-     * in both classes rather than one type in Part 2 and four in Part 1.
+     * <p>The alphabets are not built-in type annotations. A schemaless document has no schema, so it has no
+     * type to carry the selector and no way for one spelling to be more right than another: [TSON-DATA]
+     * §5.3 fixes base64 and offers no override. Under a schema the type decides ({@code bytes_type}'s
+     * {@code encoding} facet), which is where the choice belongs -- and it means {@code !bytes} names one
+     * type in both conformance classes rather than one type in Part 2 and four in Part 1.
      */
     public static final String TYPENAME = "bytes";
 

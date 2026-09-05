@@ -30,11 +30,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * value with all occurrences preserved; restatement first because order is what every first-occurrence
  * lookup reads as precedence.
  *
- * <p><b>The ordering half has no read-side witness here, and that is a gap in the tests rather than in the
- * rule.</b> It used to have one: {@code @bytes_encoding} was a field annotation with decode force, so a
- * restatement that dropped it read the same characters as different octets. The alphabet is a type selector
- * now ({@code bytes_type.encoding}), and no annotation the meta layer declares changes how a value reads --
- * so the ordering can only be asserted over resolved output until one does.
+ * <p><b>The ordering half has no read-side witness, and that is a gap in the tests rather than in the
+ * rule.</b> No annotation the meta layer declares changes how a value reads -- everything that decides a
+ * spelling belongs to the type, the alphabet a {@code bytes} value is written in included ({@code
+ * bytes_type.encoding}, [TSON-SCHEMA] §5.5) -- so ordering can only be asserted over resolved output until
+ * some annotation carries read-side force. §5.8 gives the rule read-side force wherever one does.
  */
 class RestatedFieldAnnotationsTest {
 

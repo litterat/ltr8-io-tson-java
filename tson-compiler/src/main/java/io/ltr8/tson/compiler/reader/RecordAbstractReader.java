@@ -197,14 +197,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         /**
          * By the field's declared schema type, named as the author wrote it here ({@link UseSite}).
          *
-         * <p>With one exception, and it is the reason this takes a context at all: a field carrying
-         * {@code @bytes_encoding} needs a reader of its own. Every other field of a given type shares one
-         * compiled reader, which is what makes compilation cheap; the directive is per-position by design
-         * (`@bytes_encoding:HEX  digest: sha256`), so a field that states one gets its own parser over the
-         * same constraints rather than the shared one.
+         * <p><b>Every field of a given type shares one compiled reader</b>, which is what makes compilation
+         * cheap, and nothing about a field's own declaration can change which reader it wants: a value's
+         * spelling is settled by its type. The alphabet a {@code bytes} value is written in is the clearest
+         * case, and it is a facet of {@code bytes_type} rather than anything per-position ([TSON-SCHEMA]
+         * §5.5) -- so two fields typed {@code hexdigest} and {@code sha256} name two entries and resolve to
+         * two readers by this rule alone.
          */
-        static FieldReaders byType(TsonTypeReaderResolver resolver, ValueReaderContext context,
-                java.util.function.BiFunction<TsonTypeReader<?>, String, TsonTypeReader<?>> leaf) {
+        static FieldReaders byType(TsonTypeReaderResolver resolver) {
             return field -> resolver.resolve(field.type().name());
         }
     }

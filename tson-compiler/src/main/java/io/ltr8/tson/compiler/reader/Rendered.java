@@ -13,9 +13,9 @@ import java.util.HexFormat;
  * prints as its value, {@link TsonAtom} included, whose own {@code toString} renders the value alone for
  * exactly this reason -- and which is unwrapped here because that is the one value it cannot improve.
  *
- * <p>Hex, and not the encoding the position was written in: the value is octets and the encoding is a
- * spelling ({@code @bytes_encoding}), so the one rendering that is a function of the value alone is the one
- * that does not have to be looked up. It is deliberately not a TSON literal -- a diagnostic quotes what it
+ * <p>Hex, and not the alphabet the position was written in: the value is octets and the alphabet is a
+ * spelling the position's type selects ({@code bytes_type.encoding}), so the one rendering that is a
+ * function of the value alone is the one that does not have to be looked up. It is deliberately not a TSON literal -- a diagnostic quotes what it
  * compared, and the document already says how the author spelled it.
  */
 final class Rendered {

@@ -313,10 +313,10 @@ final class TemplateMaterialiser {
      * the canonical application, and the name the author wrote survives where they wrote it -- at the use
      * site, which states it as written. The two facts have one home each.
      *
-     * <p><b>Known wrong for a reference carrying {@code @bytes_encoding}</b> (`SPEC-FEEDBACK.md` #32): such
-     * an alias is not a pure rename -- values at its positions are spelled in another alphabet -- so
-     * dereferencing it loses the directive. It is accepted here rather than special-cased, because the fix
-     * is to decide what a directive on a reference means at all, not to make identity guess.
+     * <p><b>Dereferencing loses nothing, and that is a property of the type system rather than luck.</b>
+     * Everything that decides how a value at a position is read belongs to the type at the end of the
+     * chain, the alphabet a {@code bytes} value is spelled in included: it is a facet of {@code bytes_type}
+     * ([TSON-SCHEMA] §5.5), so it travels with the type and a reference cannot carry one of its own.
      */
     private TypeRef dereferenced(TypeRef ref) {
         if (!ref.arguments().isEmpty()) {

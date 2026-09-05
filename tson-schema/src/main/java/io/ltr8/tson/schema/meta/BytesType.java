@@ -17,16 +17,22 @@ import java.util.Optional;
  * as 64 hex characters, 44 base64 characters or 32 raw bytes -- so a round trip through any encoding
  * preserves the value.
  *
- * <p><b>The alphabet is not here, and that is the design.</b> A spelling is not a kind of value: the same
- * octets are {@code "3q2+7w=="}, {@code "deadbeef"} and {@code "3WV37Q======"}. Carrying the alphabet as a
- * facet made four types over one value space, related by an IS-A that narrowed nothing; carrying it as a
- * type-ref made a lexical fact into a type claim. It is a directive instead -- meta.tn's
- * {@code @bytes_encoding}, resolved nearest-first (the field, then the field's type walking its supertypes,
- * then base64) and read only by encodings whose values are character sequences. This type says nothing
- * about how octets are spelled, as {@link TextType} says nothing about UTF-8.
+ * <p><b>The alphabet is a selector on the type, and one type is what there is.</b> A spelling is not a kind
+ * of value -- the same octets are {@code "3q2+7w=="}, {@code "deadbeef"} and {@code "3WV37Q======"} -- so
+ * there is one {@code bytes} value space and {@link #encoding} picks which of RFC 4648's alphabets a *text*
+ * encoding writes it in. It is a **selector** facet ([TSON-SCHEMA] §5.7): a refinement may neither set nor
+ * change it, since an alphabet narrows nothing and an IS-A carrying no narrowing would claim a subtype at
+ * positions no base64 reader could honour. Another alphabet is another **instance** --
+ * {@code hexdigest => !bytes_type { encoding: HEX  length: 4 }} -- and refining for length inherits the
+ * alphabet. An encoding whose values are octets ignores the selector entirely and writes them raw.
+ *
+ * <p><b>Why the type rather than an annotation</b> ([TSON-SCHEMA] §5.5): a container element has no
+ * annotation position, so {@code [hexdigest]} works only if the element's own type carries the alphabet.
+ * A reader must be told which one is in force because {@code "abcd"} is well-formed hex *and* well-formed
+ * base64 decoding to different octets -- and the type is the only place every position can be told.
  *
  * <p>Pure constraint values, no parsing or validation behaviour: {@code tson-compiler}'s {@code
- * BytesParser} holds one of these, plus the alphabet it was told to read in, and does the work.
+ * BytesParser} holds one of these and does the work, reading the alphabet off it.
  */
 @Typename(name = "bytes_type")
 public record BytesType(Encoding encoding, Optional<Integer> length,
