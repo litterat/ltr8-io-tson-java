@@ -608,8 +608,7 @@ public final class SchemaResolver {
         Top body = parameters.isEmpty() ? RecordBody.of(List.of())
                 : HeldBody.held(parameters, WireForm.heldEmptyRecord());
         return new TypeDefinition(Optional.empty(),
-                parameters.isEmpty() ? TypeKind.PRODUCT : TypeKind.TEMPLATE, List.of(), List.of(),
-                Optional.empty(), body, position, Annotations.empty());
+                parameters.isEmpty() ? TypeKind.PRODUCT : TypeKind.TEMPLATE, List.of(), List.of(), body, position, Annotations.empty());
     }
 
     /** One already-resolved {@code DataValue} replayed through a compiled reader. */

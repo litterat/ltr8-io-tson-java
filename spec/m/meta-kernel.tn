@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=63167ce964cbc90cdf5b44a33bbaa5207768ef801a087ba0437924c185063275"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=b05bc24ed40ef50a85f33ecf965e415c6b7fc6b658736aa1f9e250689d1f0bb9"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -521,26 +521,34 @@
     members: enum_set
   }
 
+  @doc:"""
+    Closed sum. `disjoint` is a resolver-derived index over the
+    variant list, parallel to `subtypes`: true or false by
+    discrimination-class distinctness ([TSON-SCHEMA] §5.4).
+    Declarations never set it; on ingest it MUST be discarded and
+    recomputed. It carries the encoding-independent fact each
+    encoding's discrimination rules consume ([TSON-SCHEMA] §5.4,
+    §7.2).
+
+    It sits here rather than on `type_definition` because it is a
+    fact about a variant list, and this is the only body that has
+    one. An entry with no variants has nowhere to put it, so
+    "recorded on every choice and absent on every other definition"
+    is structural rather than a rule a document could break.
+    """
   choice => sum & {
-    variants: [type_ref]
+    variants:  [type_ref]
+    disjoint:  boolean?
   }
 
   @doc:"""
-    Resolver output. `disjoint` is a resolver-derived index over
-    choice definitions, parallel to `subtypes`: true or false by
-    discrimination-class distinctness ([TSON-SCHEMA] §5.4), recorded
-    on every entry whose body is a `!choice` and absent on every
-    other. Declarations never set it; on ingest it MUST be discarded
-    and recomputed. It carries
-    the encoding-independent fact each encoding's discrimination rules
-    consume ([TSON-SCHEMA] §5.4, §7.2).
+    Resolver output — what every entry of a schema map resolves to.
     """
   type_definition => {
     source:       type_ref?
     kind:         type_kind
     supertypes:   [type_name]?
     subtypes:     [type_name]?
-    disjoint:     boolean?
     body:         top
   }
 

@@ -167,7 +167,7 @@ public final class MetaKernelBootstrapResolver {
             // meta-kernel governs itself, so its own templates are applied by the layer below it.
             if (!instance.typeParams().isEmpty()) {
                 entries.put(declaration.name(), new TypeDefinition(Optional.of(TypeRef.of(instance.target())),
-                        TypeKind.TEMPLATE, List.of(), List.of(), Optional.empty(),
+                        TypeKind.TEMPLATE, List.of(), List.of(),
                         HeldBody.held(instance.typeParams(), instance.value())));
                 continue;
             }
@@ -175,7 +175,7 @@ public final class MetaKernelBootstrapResolver {
             // parameters -- this is construction, not composition or refinement.
             instanceBody(instance).ifPresent(body -> entries.put(declaration.name(),
                     new TypeDefinition(Optional.of(TypeRef.of(instance.target())), target.kind(),
-                            List.of(), List.of(), Optional.empty(), body)));
+                            List.of(), List.of(), body)));
         }
         for (SchemaMap.Declaration declaration : refinements) {
             AtomRefinement refinement = (AtomRefinement) declaration.typeDef();
@@ -185,7 +185,7 @@ public final class MetaKernelBootstrapResolver {
                         + "', which meta-kernel does not declare");
             }
             entries.put(declaration.name(), new TypeDefinition(target.source(), target.kind(),
-                    List.of(refinement.target()), List.of(), Optional.empty(),
+                    List.of(refinement.target()), List.of(),
                     refinedBody(declaration.name(), refinement, target)));
         }
         return entries;

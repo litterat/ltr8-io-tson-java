@@ -34,19 +34,20 @@ policy lives (#1), how a document names its schema when its encoding has no dire
 namespace should be a value (#3), and one under-exercised freedom that costs a rule downstream (#4). None is
 a defect in a rule the spec states.
 
-**#5–#7 are, and they are one defect seen from three sides.** All three are about the entry an open
-declaration resolves to. §8.1 says an open entry's `body` is "typed by the kernel's `schema` without a second
-value shape"; it is not, and §5.10's own `vector` example is the counterexample (#5). `type_definition.kind`
-is derived at resolution but taken as unverified input at ingest, so an entry can state a kind its own body
-contradicts (#6). And `source` has three incompatible definitions for an open entry across §5.10 and §8.1
-(#7). They are separable — each can be adopted alone — but #5's shape depends on #7's answer, and #6 is what
-makes #5's new `kind: TEMPLATE` cost nothing. **The evidence in all three is measured output from this
-build.** All three are now **partly running**: the bundled `meta-kernel.tn` declares the
-`template` constructor, `type_definition` has lost `parameters` to the held body, `type_kind` has gained
-`TEMPLATE`, and `source` never carries a parameter — so the artifacts are ahead of the spec text on every
-one. What is left of each is the spec edit, plus #6's reclassification of `kind` as derived, which is the one
-recommendation with no implementation behind it. Each entry's Status paragraph states exactly which half is
-built and which is not.
+**#5–#8 are, and #5–#7 are one defect seen from three sides.** Those three are about the entry an open
+declaration resolves to; #8 is the same shape of problem one field over — a derived fact recorded where
+nothing can enforce the rule it needs. §8.1 says an open entry's `body` is "typed by the kernel's `schema`
+without a second value shape"; it is not, and §5.10's own `vector` example is the counterexample (#5).
+`type_definition.kind` is derived at resolution but taken as unverified input at ingest, so an entry can state
+a kind its own body contradicts (#6). And `source` has three incompatible definitions for an open entry across
+§5.10 and §8.1 (#7). They are separable — each can be adopted alone — but #5's shape depends on #7's answer,
+and #6 is what makes #5's new `kind: TEMPLATE` cost nothing. **The evidence in all three is measured output
+from this build.** All four are now running, three of them partly: the bundled `meta-kernel.tn` declares the
+`template` constructor, `type_definition` has lost `parameters` to the held body and `disjoint` to the choice
+body, `type_kind` has gained `TEMPLATE`, and `source` never carries a parameter — so the artifacts are ahead
+of the spec text on all four. What is left of each is the spec edit, plus #6's reclassification of `kind` as
+derived, which is the one recommendation with no implementation behind it. Each entry's Status paragraph
+states exactly which half is built and which is not.
 
 ---
 
@@ -741,3 +742,74 @@ work that made `source`'s role obsolete without the other two passages being upd
 running here is (b), and the alias `source` divergence in the table, which is unchosen and should be fixed
 here once the spec says which of the two answers in point 3 is right. #5's proposal to move `parameters`
 into the `!template` body is contingent on this entry resolving to (b).
+
+
+## 8. `disjoint` is a fact about a variant list, recorded where nothing has one
+
+**Section:** [TSON-SCHEMA] §8.1 (the `type_definition` field list; "`disjoint` is a resolver-derived fact
+over choices"; Ingest), §5.4 (choice types, discrimination-class distinctness), §7.2, §9 (meta-kernel's
+`type_definition` and `choice`).
+
+**Problem:** §8.1 puts `disjoint` on `type_definition` and then spends a paragraph saying where it is not:
+
+> For every choice definition — every entry whose body is a `!choice` binding record, declared or synthetic —
+> the resolver records `disjoint: true` or `false` ...; the field is absent on every other definition, the
+> non-choice sums (the `scoped` instances, §7.8) included, since they have no variant list to derive it over.
+
+That last clause is the whole argument. The fact is derived from a **variant list**, and `choice` is the only
+body that has one — so "absent on every other definition" is a rule the model needs only because the field
+sits somewhere that cannot enforce it. It is stated in prose, it must be verified on ingest, and it is
+forgeable: a `type_definition` with an `!enum` body and `disjoint: true` is well-formed against §9's
+`type_definition` and means nothing.
+
+The same paragraph has to name the awkward case explicitly — a `scoped` instance is a SUM with no variants —
+which is the shape of a field in the wrong place: the exceptions are enumerated rather than impossible.
+
+**Recommendation — move it onto `choice`.** This is running (below):
+
+```tson
+choice => sum & {
+  variants:  [type_ref]
+  disjoint:  boolean?
+}
+```
+
+so a choice entry resolves to
+
+```tson
+shape => !type_definition {
+  kind:   SUM
+  source: choice
+  body:   !choice { variants: [circle square]  disjoint: false }
+}
+```
+
+Three things follow, and none needs prose:
+
+1. **"Absent on every other definition" stops being a rule.** An entry with no variants has nowhere to put
+   the fact, so the §7.8 `scoped` carve-out disappears rather than being restated.
+2. **It cannot be forged onto a non-choice.** §7.2's closed-record rule refuses `disjoint` on any other body,
+   which is the same check that already polices every other field.
+3. **The fact sits beside the thing it is derived from.** A consumer reading a `!choice` has the variant
+   list and the verdict over it in one record, where before it had to look up one level for a field whose
+   presence depended on the body it was looking at.
+
+`type_definition` keeps `subtypes`, whose scope really is every entry, so the two derived indexes end up
+distinguished by what they are indexes *over* rather than sitting together because both are derived.
+
+**Status against Revision 35: running.** The kernel declares it on `choice`,
+`TypeDefinition.disjoint()` is a derived read off the body, and `TsonSchemaLinker.computeDisjointness` writes
+the body it derives from. Both consumers — §5.4's `@disjoint` assertion check and `ChoiceReader`'s untagged
+structural recovery — were untouched by the move, which is the measure of how contained it is: the fact
+changed address, not meaning.
+
+**What it cost, for whoever adopts it.** One conformance vector, `class2/schema/valid/choice-of-two-records`,
+which compares a whole resolved document. The `class2/link/` disjointness vectors state the fact as a
+`{name, value}` pair rather than as a document and needed nothing — a small confirmation that the corpus's
+layers are cut where `RUNNER.md` says. `ChoiceBody` gained a second public constructor (the authoring form,
+with the fact absent) and therefore `@Record` on its canonical one.
+
+**Its scope is exactly §5.4's, and no wider.** This says nothing about `subtypes`, which is an index over the
+whole namespace, and nothing about the separate question #6 raises of whether a derived field should be
+verified on ingest at all — `disjoint` is already stated to be discarded and recomputed, and moving it does
+not change that.

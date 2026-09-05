@@ -46,7 +46,7 @@ class DuplicateFieldTest {
     void aMalformedFirstOccurrenceStillReportsEvenThoughTheValidSecondOccurrenceWins() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("int8", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), Optional.empty(), new IntegerType(new IntegerSize(8, true))));
+                List.of(), new IntegerType(new IntegerSize(8, true))));
         entries.put("holder", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("value", TypeRef.of("int8"))))));
         TsonSchema schema = new TsonSchema("https://example.test/dup-field.tn",
@@ -81,7 +81,7 @@ class DuplicateFieldTest {
     void everyRepeatIsReported() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("int8", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), Optional.empty(), new IntegerType(new IntegerSize(8, true))));
+                List.of(), new IntegerType(new IntegerSize(8, true))));
         entries.put("holder", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("value", TypeRef.of("int8"))))));
         TsonCompiledSchema compiled = compile(new TsonLinkedSchema(new TsonSchema(

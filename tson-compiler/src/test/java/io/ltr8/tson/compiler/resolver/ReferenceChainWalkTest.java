@@ -43,7 +43,7 @@ class ReferenceChainWalkTest {
 
     private static TypeDefinition reference(TypeRef target) {
         return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, 
-                List.of(), List.of(), Optional.empty(), new Reference(target));
+                List.of(), List.of(), new Reference(target));
     }
 
     /** The ordinary case, and the one that has to be transitive: two hops reach the type at the end. */

@@ -484,7 +484,7 @@ final class TemplateMaterialiser {
             return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
         }
         TypeDefinition definition = new TypeDefinition(Optional.of(TypeRef.of(target)), kindOfClosed(closed.body()),
-                List.of(), List.of(), Optional.empty(), closed.body());
+                List.of(), List.of(), closed.body());
         materialised.put(formName, definition);
         synthetics.add(formName);
         publish.accept(formName, definition);
@@ -536,7 +536,7 @@ final class TemplateMaterialiser {
         Closed closed = closeHeld(head, template, open, bindings);
         return new TypeDefinition(Optional.of(new TypeRef(head, arguments)),
                 kindOfClosed(closed.body()),
-                template.supertypes(), template.subtypes(), Optional.empty(),
+                template.supertypes(), template.subtypes(),
                 fixRoutedValues(closed.body()));
     }
 
@@ -670,7 +670,7 @@ final class TemplateMaterialiser {
      */
     private static TypeDefinition instantiationOf(String head, List<TypeArgument> arguments, String formName) {
         return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE,
-                List.of(), List.of(), Optional.empty(), new Reference(TypeRef.of(formName)));
+                List.of(), List.of(), new Reference(TypeRef.of(formName)));
     }
 
     /**

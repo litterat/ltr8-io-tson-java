@@ -35,7 +35,7 @@ class ChoiceReaderTest {
     private static TsonCompiledSchema compiled() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
+                List.of(), List.of(), IntegerType.UNCONSTRAINED));
         entries.put("email", TypeDefinition.product(
                 RecordBody.of(List.of(RecordField.required("address", TypeRef.of("integer"))))));
         entries.put("phone", TypeDefinition.product(

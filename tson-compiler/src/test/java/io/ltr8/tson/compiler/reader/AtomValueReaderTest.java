@@ -50,7 +50,7 @@ class AtomValueReaderTest {
 
     private static Object readValue(Top atomBody, String source) {
         TypeDefinition atomEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), Optional.empty(), atomBody);
+                List.of(), List.of(), atomBody);
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("field", atomEntry);
         entries.put("holder", TypeDefinition.product(

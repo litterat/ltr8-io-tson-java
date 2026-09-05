@@ -101,9 +101,9 @@ class RecordBindReaderTest {
         // dispatch itself); this test isolates the narrowing behavior specifically.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
+                List.of(), IntegerType.UNCONSTRAINED));
         entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), Optional.empty(), TextType.UNCONSTRAINED));
+                List.of(), TextType.UNCONSTRAINED));
         io.ltr8.tson.schema.meta.FieldState optional = io.ltr8.tson.schema.meta.FieldState.OPTIONAL;
         entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
                 new RecordField("min_length", TypeRef.of("integer"), optional, Optional.empty()),
@@ -132,9 +132,9 @@ class RecordBindReaderTest {
     void aFixedFieldChecksTheWrittenValueAgainstTheRawSchemaValueNotTheNarrowedOne() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
+                List.of(), IntegerType.UNCONSTRAINED));
         entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), Optional.empty(), TextType.UNCONSTRAINED));
+                List.of(), TextType.UNCONSTRAINED));
         io.ltr8.tson.schema.meta.FieldState optional = io.ltr8.tson.schema.meta.FieldState.OPTIONAL;
         entries.put("text_type", TypeDefinition.product(RecordBody.of(List.of(
                 new RecordField("min_length", TypeRef.of("integer"),
@@ -209,12 +209,12 @@ class RecordBindReaderTest {
         // as a TextType, never dispatching to EmailType at all.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
+                List.of(), IntegerType.UNCONSTRAINED));
         entries.put("text", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
-                List.of(), Optional.empty(), TextType.UNCONSTRAINED));
+                List.of(), TextType.UNCONSTRAINED));
         io.ltr8.tson.schema.meta.FieldState optional = io.ltr8.tson.schema.meta.FieldState.OPTIONAL;
         entries.put("text_type", new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, 
-                List.of(), List.of("email_type"), Optional.empty(),
+                List.of(), List.of("email_type"),
                 RecordBody.of(List.of(
                         new RecordField("min_length", TypeRef.of("integer"), optional, Optional.empty()),
                         new RecordField("max_length", TypeRef.of("integer"), optional, Optional.empty()),
@@ -224,7 +224,7 @@ class RecordBindReaderTest {
         // compile and silently bind null into the components it left out; the binding check refuses it now,
         // which is the same trap CLAUDE.md records against UriType/RegexType, caught at the fixture instead.
         entries.put("email_type", new TypeDefinition(Optional.of(TypeRef.of("text_type")), TypeKind.PRODUCT,
-                 List.of("text_type"), List.of(), Optional.empty(),
+                 List.of("text_type"), List.of(),
                 RecordBody.of(List.of(
                         new RecordField("min_length", TypeRef.of("integer"), optional, Optional.empty()),
                         new RecordField("max_length", TypeRef.of("integer"), optional, Optional.empty()),

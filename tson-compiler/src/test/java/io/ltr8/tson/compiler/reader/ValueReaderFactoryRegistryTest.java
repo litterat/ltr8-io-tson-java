@@ -76,7 +76,7 @@ class ValueReaderFactoryRegistryTest {
     @Test
     void everyRegisteredConstructorBuildsARealReader() {
         TypeDefinition declared = new TypeDefinition(Optional.empty(), TypeKind.SUM, 
-                List.of(), List.of(), Optional.empty(), new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()));
+                List.of(), List.of(), new Scoped(List.of(ScopeKind.LOCAL), Optional.empty()));
 
         for (ValueReaderFactoryRegistry registry : List.of(ValueReaderFactoryRegistry.tree(),
                 ValueReaderFactoryRegistry.bind(SchemaMetaNameBinder.defaultContext()))) {
@@ -88,7 +88,7 @@ class ValueReaderFactoryRegistryTest {
     @Test
     void treeAndBindBothReadBooleanEnumMembersAsRealBooleans() {
         TypeDefinition booleanEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), Optional.empty(), new EnumBody(List.of("true", "false")));
+                List.of(), List.of(), new EnumBody(List.of("true", "false")));
 
         TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("boolean", booleanEntry, CONTEXT);
@@ -103,7 +103,7 @@ class ValueReaderFactoryRegistryTest {
     @Test
     void treeAndBindReadAnOrdinaryEnumMemberAsItsText() {
         TypeDefinition statusEntry = new TypeDefinition(Optional.empty(), TypeKind.ATOM, 
-                List.of(), List.of(), Optional.empty(), new EnumBody(List.of("ACTIVE", "INACTIVE")));
+                List.of(), List.of(), new EnumBody(List.of("ACTIVE", "INACTIVE")));
 
         TsonTypeReader<?> treeReader = ValueReaderFactoryRegistry.tree().resolve("enum")
                 .create("status", statusEntry, CONTEXT);
