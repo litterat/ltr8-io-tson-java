@@ -366,7 +366,7 @@ rebuilt and called a cache.
       arguments: [] }` for a bare `text`, `!ref { … }` for a `type_argument`, every token quoted, `state:
       REQUIRED` written where the default covers it, and the retired `value_param` channel emitted. The
       first two are the
-      two-spellings problem; the third is fatal on its own, since `TemplateBody.names()` and substitution
+      two-spellings problem; the third is fatal on its own, since `HeldBody.names()` and substitution
       both key on a token being *unquoted*, so a fully-quoted body references no parameters at all. Its
       output is canonical-explicit — a different language from the one a held body is written in.
     - **The writer is still used for exactly one leaf**: a resolved annotation carries its value as a *bound

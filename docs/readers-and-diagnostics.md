@@ -849,7 +849,7 @@ error* category, so this is the same layer, not a new one.
       `final` and lives in `tson-schema`, which holds no pipeline machinery.
     - **Both filters are load-bearing.** Only a *derived* entry is retargeted, or a closed declaration's own
       typo would be blamed on any template that happens to name it; and only a `TemplateBody` declaration is
-      a candidate, since a defect no held body deferred is already located correctly. `TemplateBody.names()`
+      a candidate, since a defect no held body deferred is already located correctly. `HeldBody.names()`
       cannot tell a type reference from a field name, which is why it is asked only about a name already
       known to resolve to nothing — a field of that name is the one remaining way to mislead it, and it
       misleads no worse than naming the applier does.

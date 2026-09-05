@@ -114,8 +114,8 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
     parameters the *referenced* entry declares. And nothing ever closes `chain => <T> { tail: chain<T, T>? }`,
     so deferring it would let that template ship with the mistake in it.
     - **Applications only, never bare names**, and the distinction is load-bearing.
-      `TemplateBody.applications()` returns a shape nothing else in the wire tree shares;
-      `TemplateBody.names()` returns *every* token — field names, states, literals and type references alike.
+      `HeldBody.applications()` returns a shape nothing else in the wire tree shares;
+      `HeldBody.names()` returns *every* token — field names, states, literals and type references alike.
       Asking the zero-argument half ("this token names an unapplied template") off `names()` rejects a
       correct schema whose field happens to be called `box` beside a template of that name, which is a worse
       failure than a late verdict. So that half runs on the entry materialisation mints, and an unapplied
