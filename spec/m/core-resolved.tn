@@ -402,25 +402,22 @@
     A processor comparing these compares wire form, not bound values.
     """
   extern_of => !type_definition {
-    kind: SUM
+    kind: TEMPLATE
     source: scoped
-    parameters: [S]
-    body: !scoped { scope: [EXTERN]  schemas: { S => _ } }
+    body: !template { parameters: [S]  template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }" }
   }
 
   extern_type => !type_definition {
-    kind: SUM
+    kind: TEMPLATE
     source: scoped
-    parameters: [S T]
-    body: !scoped { scope: [EXTERN]  schemas: { S => [T] } }
+    body: !template { parameters: [S T]  template: "!scoped { scope: [EXTERN]  schemas: { S => [T] } }" }
   }
 
   @doc:"The set spelling an author writes: a template over meta's parameterless set_type."
   set => !type_definition {
-    kind: PRODUCT
+    kind: TEMPLATE
     source: set_type
-    parameters: [T]
-    body: !set_type { element_type: T }
+    body: !template { parameters: [T]  template: "!set_type { element_type: T }" }
   }
 
   @doc:"Marker annotation."

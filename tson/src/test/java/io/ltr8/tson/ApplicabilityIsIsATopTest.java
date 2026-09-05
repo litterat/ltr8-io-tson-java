@@ -89,8 +89,10 @@ class ApplicabilityIsIsATopTest {
             assertEquals(TypeKind.REFERENCE, definition.kind(), name);
             assertEquals("int32", definition.source().orElseThrow().name(), name);
         }
-        // The open one is a template until it closes, so its own source is the head it holds.
-        assertEquals(TypeKind.REFERENCE, entries.get("open").kind());
+        // The open one is a template until it closes, and its kind says so: a template is not a type
+        // (§5.10), so it is TEMPLATE rather than the REFERENCE its closure produces. `applied` above is
+        // where the REFERENCE appears -- the entry closing it mints.
+        assertEquals(TypeKind.TEMPLATE, entries.get("open").kind());
     }
 
     /**

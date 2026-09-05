@@ -15,6 +15,11 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.Product;
+import io.ltr8.tson.schema.meta.Sum;
+import io.ltr8.tson.schema.meta.Data;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -383,22 +388,24 @@ final class TemplateMaterialiser {
             // whatever that denotes -- `uuid_pair<int32>` is the entry `pair<text, int32>` already produced.
             // "No intermediate entry per alias hop" is the rule, which is why this returns a name rather
             // than making one, and why it is the head that tells the three cases apart rather than the body.
-            if (template.body() instanceof HeldBody open
-                    && REFERENCE.equals(open.application().typeRef().orElseThrow())) {
-                aliasClosing.add(name);
-                return closeHeldAlias(head, template, open, bind(parameters, arguments));
-            }
-            // A record template's closure is the instantiation itself, where every other held form closes to
-            // a synthetic the instantiation then references -- see closeHeldRecord.
-            if (template.body() instanceof HeldBody open
-                    && RECORD.equals(open.application().typeRef().orElseThrow())) {
-                TypeDefinition instantiation =
-                        closeHeldRecord(head, template, open, arguments, bind(parameters, arguments));
-                materialised.put(name, instantiation);
-                publish.accept(name, instantiation);
-                return name;
-            }
-            if (template.body() instanceof HeldBody open) {
+            // The held body is parsed once here and reused by all three branches: this is the only place a
+            // closure needs the tree, and the parse is thrown away with it.
+            if (template.body() instanceof TemplateBody body) {
+                HeldBody open = HeldBody.of(body);
+                String constructor = open.application().typeRef().orElseThrow();
+                if (REFERENCE.equals(constructor)) {
+                    aliasClosing.add(name);
+                    return closeHeldAlias(head, template, open, bind(parameters, arguments));
+                }
+                // A record template's closure is the instantiation itself, where every other held form closes
+                // to a synthetic the instantiation then references -- see closeHeldRecord.
+                if (RECORD.equals(constructor)) {
+                    TypeDefinition instantiation = closeHeldRecord(head, template, open, arguments,
+                            bind(parameters, arguments));
+                    materialised.put(name, instantiation);
+                    publish.accept(name, instantiation);
+                    return name;
+                }
                 String formName = closeHeldTemplate(head, template, open, bind(parameters, arguments));
                 if (generated.contains(head)) {
                     // A generated head closing its own intermediate form: the form entry *is* the answer, and
@@ -476,8 +483,8 @@ final class TemplateMaterialiser {
         if (namespace.getTypeDefinition(formName) != null) {
             return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
         }
-        TypeDefinition definition = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(),
-                List.of(), List.of(), List.of(), Optional.empty(), closed.body());
+        TypeDefinition definition = new TypeDefinition(Optional.of(TypeRef.of(target)), kindOfClosed(closed.body()),
+                List.of(), List.of(), closed.body());
         materialised.put(formName, definition);
         synthetics.add(formName);
         publish.accept(formName, definition);
@@ -527,9 +534,36 @@ final class TemplateMaterialiser {
     private TypeDefinition closeHeldRecord(String head, TypeDefinition template, HeldBody open,
             List<TypeArgument> arguments, Map<String, TypeArgument> bindings) {
         Closed closed = closeHeld(head, template, open, bindings);
-        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), template.kind(), List.of(),
-                template.supertypes(), template.subtypes(), Optional.empty(),
+        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)),
+                kindOfClosed(closed.body()),
+                template.supertypes(), template.subtypes(),
                 fixRoutedValues(closed.body()));
+    }
+
+    /**
+     * The kind a closed entry takes, read off the body substitution produced -- §4.1's "construction
+     * transfers kind", asked of the construction itself.
+     *
+     * <p><b>The template's own kind cannot answer it.</b> An open entry is {@code kind: TEMPLATE}: a template
+     * is not a type and says nothing about what applying it produces.
+     *
+     * <p><b>Nor can the constructor's name.</b> A held body's head is structure-namespace vocabulary
+     * ({@code record}, {@code set_type}, {@code scoped}) declared by the <em>governing meta</em>, which this
+     * pass does not hold -- {@code namespace} is the schema's own type-name namespace (§3.3.1 keeps the two
+     * apart). The closed body is in hand and says the same thing: an entry materialisation mints is never a
+     * constructor, so it does not compose with {@code top}, and for everything that does not, kind is the
+     * branch of {@link Top} its body occupies.
+     */
+    private static TypeKind kindOfClosed(Top body) {
+        return switch (body) {
+            case Atom ignored -> TypeKind.ATOM;
+            case Product ignored -> TypeKind.PRODUCT;
+            case Sum ignored -> TypeKind.SUM;
+            case Reference ignored -> TypeKind.REFERENCE;
+            case Data ignored -> TypeKind.DATA;
+            case TemplateBody ignored -> throw new IllegalStateException(
+                    "a closed entry's body is held -- substitution left a parameter behind");
+        };
     }
 
     /** A held body substituted, its inner applications closed, and read back through its constructor. */
@@ -635,8 +669,8 @@ final class TemplateMaterialiser {
      * record one.
      */
     private static TypeDefinition instantiationOf(String head, List<TypeArgument> arguments, String formName) {
-        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE, List.of(),
-                List.of(), List.of(), Optional.empty(), new Reference(TypeRef.of(formName)));
+        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE,
+                List.of(), List.of(), new Reference(TypeRef.of(formName)));
     }
 
     /**

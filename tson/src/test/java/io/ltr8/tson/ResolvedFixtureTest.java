@@ -149,32 +149,6 @@ class ResolvedFixtureTest {
     }
 
     /**
-     * <b>And an open entry's held body is what this resolver holds.</b> [TSON-SCHEMA] §8.1 makes a token in
-     * an open body a parameter reference rather than a value of the slot's declared type, and no reader
-     * implements that rule -- so an open entry is the one place a bound comparison cannot be the comparison.
-     * Both sides carry the application as wire form and are compared as that: {@link ResolvedForm#heldBodies}
-     * parses the fixture's, {@link ResolvedForm#ourHeldBody} writes this resolver's straight back out.
-     *
-     * <p>{@link #everyEntryResolvesIdentically} still compares everything else the entry states -- kind,
-     * source, parameters, the two indexes -- with the body blanked on both sides, so nothing goes unchecked.
-     */
-    @Test
-    void everyOpenEntrysHeldBodyMatches() throws Exception {
-        for (Comparison comparison : all()) {
-            Map<String, DataValue> fixtureHeld = ResolvedForm.heldBodies(comparison.text());
-            var ourOpen = new TreeSet<String>();
-            comparison.ours().forEach((name, definition) ->
-                    ResolvedForm.ourHeldBody(tson(), definition).ifPresent(body -> {
-                        ourOpen.add(name);
-                        assertEquals(body, fixtureHeld.get(name),
-                                comparison.label() + ": " + name + "'s held body is not what the fixture writes");
-                    }));
-            assertEquals(ourOpen, new TreeSet<>(fixtureHeld.keySet()),
-                    comparison.label() + ": the two do not agree on which entries are open");
-        }
-    }
-
-    /**
      * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
      * {@code @synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
      * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark nine keys

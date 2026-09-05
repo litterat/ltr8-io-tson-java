@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -438,7 +439,7 @@ public final class TsonSchemaLinker {
         for (Map.Entry<String, TypeDefinition> candidate : entries.entrySet()) {
             TypeDefinition definition = candidate.getValue();
             if (definition.position().isPresent() && definition.body() instanceof TemplateBody held
-                    && held.names().contains(name)) {
+                    && HeldBody.of(held).names().contains(name)) {
                 return candidate.getKey();
             }
         }
@@ -849,27 +850,27 @@ public final class TsonSchemaLinker {
     private static TypeDefinition withAddedSubtypes(TypeDefinition def, Set<String> newSubtypes) {
         Set<String> combined = new LinkedHashSet<>(def.subtypes());
         combined.addAll(newSubtypes);
-        return new TypeDefinition(def.source(), def.kind(), def.parameters(),
-                def.supertypes(), List.copyOf(combined), def.disjoint(), def.body(), def.position(),
+        return new TypeDefinition(def.source(), def.kind(),
+                def.supertypes(), List.copyOf(combined), def.body(), def.position(),
                 def.annotations());
     }
 
     /**
-     * Derives {@link TypeDefinition#disjoint} for every choice entry (§5.4), over the fully-merged
-     * namespace -- a namespace-wide pass, like {@link #computeSubtypes}, since a variant's discrimination
-     * class is only knowable with every entry resolved. The derivation ({@link ChoiceDisjointness}) is
-     * total and two-valued, so a linked choice always carries the fact; only non-choice entries leave it
-     * absent.
+     * Derives {@code choice.disjoint} for every choice entry (§5.4), over the fully-merged namespace -- a
+     * namespace-wide pass, like {@link #computeSubtypes}, since a variant's discrimination class is only
+     * knowable with every entry resolved. The derivation ({@link ChoiceDisjointness}) is total and
+     * two-valued, so a linked choice always carries the fact.
+     *
+     * <p><b>It is written on the body, which is the only thing that has variants to be disjoint over.</b>
+     * An entry with no {@code !choice} body has nowhere to put the fact, so "absent on every other
+     * definition" stops being a rule anyone can break.
      */
     private static Map<String, TypeDefinition> computeDisjointness(Map<String, TypeDefinition> merged) {
         Map<String, TypeDefinition> result = new LinkedHashMap<>(merged);
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             if (entry.getValue().body() instanceof ChoiceBody choice) {
-                TypeDefinition def = entry.getValue();
-                result.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
-                        def.supertypes(), def.subtypes(),
-                        Optional.of(ChoiceDisjointness.derive(choice, merged)), def.body(), def.position(),
-                        def.annotations()));
+                result.put(entry.getKey(), entry.getValue().withBody(new ChoiceBody(choice.variants(),
+                        Optional.of(ChoiceDisjointness.derive(choice, merged)))));
             }
         }
         return result;
@@ -974,7 +975,11 @@ public final class TsonSchemaLinker {
             Map<String, TypeDefinition> sourceLookup =
                     structureNamespace.isEmpty() || !source.arguments().isEmpty() ? namespace
                             : mergeWithFallback(namespace, structureNamespace);
-            validateTypeRef(source, sourceLookup, def.parameters(), name, " source");
+            // `source` never names a parameter: an open entry records the constructor its held body applies,
+            // and a partial application states its own arguments in `reference.target` rather than here
+            // ([TSON-SCHEMA] §8.1's alias paragraph, SPEC-FEEDBACK #7). So a parameter reaching this
+            // position is an unresolved reference, which is the verdict every other reference form gives it.
+            validateTypeRef(source, sourceLookup, List.of(), name, " source");
         }
         // A supertype gets the same structure-namespace fallback as `source`, and for the same reason: it is
         // not an author-written reference but the residue of one, and §3.3.2 confines only author-written
@@ -1257,7 +1262,7 @@ public final class TsonSchemaLinker {
             // The one question a held body answers without being resolved, and it answers it about tokens
             // rather than about references -- which is the same rule substitution follows when it decides
             // what to rewrite.
-            case TemplateBody held -> into.addAll(held.names());
+            case TemplateBody held -> into.addAll(HeldBody.of(held).names());
             default -> { } // an atom body names no type
         }
     }
@@ -1466,7 +1471,7 @@ public final class TsonSchemaLinker {
      */
     private static void checkHeldArity(String entryName, TemplateBody held,
             Map<String, TypeDefinition> namespace, List<String> ownParameters) {
-        for (TypeRef application : held.applications()) {
+        for (TypeRef application : HeldBody.of(held).applications()) {
             checkArity(application, namespace, ownParameters, "'" + entryName + "'");
             for (TypeArgument argument : application.arguments()) {
                 if (argument instanceof TypeArgument.Ref nested) {

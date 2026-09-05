@@ -23,8 +23,9 @@ import java.util.Set;
  * that represents a *bound instance* of that same constructor ({@link
  * io.ltr8.tson.schema.meta.RecordBody}, {@link io.ltr8.tson.schema.meta.ArrayBody}, {@link
  * io.ltr8.tson.schema.meta.MapBody}, {@link io.ltr8.tson.schema.meta.TupleBody}, {@link
- * io.ltr8.tson.schema.meta.EnumBody}, {@link io.ltr8.tson.schema.meta.ChoiceBody}) -- but each of
- * those classes' own {@code @Typename} is the *bare* constructor name (matching the instance side,
+ * io.ltr8.tson.schema.meta.EnumBody}, {@link io.ltr8.tson.schema.meta.ChoiceBody}, {@link
+ * io.ltr8.tson.schema.meta.TemplateBody}) -- but each of those classes' own {@code @Typename} is the
+ * *bare* constructor name (matching the instance side,
  * e.g. {@code RecordBody}'s own is {@code "record"}, not {@code "record_body"}), so this forward
  * (schema-name -> Class) direction needs the {@code "_body"} suffix added explicitly; nothing
  * recovers it mechanically from the bare name alone. {@code set} is a constructor that shares {@code
@@ -61,6 +62,7 @@ public final class SchemaMetaNameBinder {
             Map.entry("tuple", "tuple_body"),
             Map.entry("choice", "choice_body"),
             Map.entry("enum", "enum_body"),
+            Map.entry("template", "template_body"),
             Map.entry("set_type", "array_body"),
             Map.entry("datetime_type", "date_time_type"),
             Map.entry("field_name", "identifier"),

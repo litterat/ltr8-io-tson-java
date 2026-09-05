@@ -44,6 +44,7 @@ import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -448,14 +449,14 @@ final class DefinitionResolver {
                 // desugar phase rewrote every real record template into the `!record { ... }` §5.2 says it
                 // denotes. Holding it anyway is what leaves no parameterised RecordBody anywhere, so
                 // materialisation needs only the one substitution path. See WireForm.heldEmptyRecord.
-                return holdIfOpen(name, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters,
-                        List.of(), List.of(), Optional.empty(), body));
+                return holdIfOpen(name, parameters, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT,
+                        List.of(), List.of(), body));
             }
             if (structural.body() instanceof ConstructionDef construction) {
-                return holdIfOpen(name, resolveComposition(name, construction, parameters));
+                return holdIfOpen(name, parameters, resolveComposition(name, construction, parameters));
             }
             if (structural.body() instanceof RefinedDef refined) {
-                return holdIfOpen(name, resolveRefinement(name, refined, parameters));
+                return holdIfOpen(name, parameters, resolveRefinement(name, refined, parameters));
             }
         }
         if (typeDef instanceof ReferenceTypeDef referenceTypeDef) {
@@ -465,7 +466,7 @@ final class DefinitionResolver {
             // materialisation's job, and until then the open form is what the entry records.
             List<String> parameters = referenceTypeDef.typeParams();
             if (referenceTypeDef.ref() instanceof SimpleRef simple) {
-                return TypeDefinition.reference(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
+                return openAliasOr(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
             }
             if (referenceTypeDef.ref() instanceof GenericRef generic) {
                 return resolveTemplateApplication(name, generic, parameters);
@@ -506,14 +507,27 @@ final class DefinitionResolver {
      * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom
      * body has no parameters to hold open.
      */
-    private TypeDefinition holdIfOpen(String name, TypeDefinition resolved) {
-        if (resolved.parameters().isEmpty() || !(resolved.body() instanceof RecordBody record)) {
+    /**
+     * {@code resolved} with its body held and its kind set to TEMPLATE -- what an entry becomes once it is
+     * known to be open.
+     *
+     * <p>The kind it had was the one its <em>body</em> would have produced, which is the kind of the entry
+     * materialisation mints and not of the template itself: a template is not a type ([TSON-SCHEMA] §5.10),
+     * so it takes {@code TEMPLATE} and an application of it takes the constructor's.
+     */
+    private static TypeDefinition openWith(TypeDefinition resolved, io.ltr8.tson.schema.meta.TemplateBody held) {
+        return new TypeDefinition(resolved.source(), TypeKind.TEMPLATE, resolved.supertypes(),
+                resolved.subtypes(), held, resolved.position(), resolved.annotations());
+    }
+
+    private TypeDefinition holdIfOpen(String name, List<String> parameters, TypeDefinition resolved) {
+        if (parameters.isEmpty() || !(resolved.body() instanceof RecordBody record)) {
             return resolved;
         }
         if (record.fields().isEmpty() && record.groups().isEmpty() && record.supertypes().isEmpty()) {
-            return resolved.withBody(new HeldBody(WireForm.heldEmptyRecord()));
+            return openWith(resolved, HeldBody.held(parameters, WireForm.heldEmptyRecord()));
         }
-        return resolved.withBody(new HeldBody(WireForm.heldRecord(record,
+        return openWith(resolved, HeldBody.held(parameters, WireForm.heldRecord(record,
                 value -> annotationWireValue(name, value))));
     }
 
@@ -622,8 +636,7 @@ final class DefinitionResolver {
             // so has only the name to go on, which is what its own `alias` flag is for.
             return TypeDefinition.reference(reference.target());
         }
-        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
-                List.of(), List.of(), List.of(), Optional.empty(), body);
+        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(), List.of(), List.of(), body);
     }
 
     /**
@@ -653,11 +666,10 @@ final class DefinitionResolver {
         String target = template.target();
         ConstructorHead head = resolveConstructorTarget(name, target);
         TypeDefinition constructor = head.definition();
-        // `reference` needs no exception here any more: it IS-A `top`, so the generic rule admits it, which
-        // is what makes the open and closed spellings of one construction agree. Its `kind` still cannot come
-        // from its supertype chain -- §4.1 gives an alias `kind: REFERENCE`, a type_kind and not a base kind
-        // -- so that fact alone stays the kernel's own, below.
-        boolean alias = REFERENCE.equals(head.name());
+        // `reference` needs no exception here: it IS-A `top`, so the generic rule admits it, which is what
+        // makes the open and closed spellings of one construction agree. Nor does its kind need one any
+        // more -- every open entry is TEMPLATE whatever constructor its held body applies, so the alias form
+        // stopped being the one shape whose kind had to be read off the head.
         requireApplicable(name, target, constructor);
         if (!(constructor.body() instanceof RecordBody vocabulary)) {
             throw new IllegalStateException("'" + name + "': constructor '" + target + "' has a "
@@ -667,10 +679,13 @@ final class DefinitionResolver {
         if (template.value().coreValue() instanceof RecordValue bindings) {
             checkTemplateBindings(name, target, vocabulary, bindings);
         }
+        // §5.10: an open entry is a template, not a type. Its kind says that and nothing about what an
+        // application of it produces -- that is the constructor's, read off the closed body at
+        // materialisation. The alias form is no exception: `<B> pair<uuid, B>` is a template whose closure
+        // is a reference, not a reference that happens to have parameters.
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)),
-                alias ? TypeKind.REFERENCE : constructor.kind(),
-                template.typeParams(), List.of(), List.of(), Optional.empty(),
-                new HeldBody(template.value()));
+                TypeKind.TEMPLATE, List.of(), List.of(),
+                HeldBody.held(template.typeParams(), template.value()));
     }
 
     /** §5.10's two declaration-time questions about a held binding record -- see {@link #resolveInstanceTemplate}. */
@@ -770,8 +785,8 @@ final class DefinitionResolver {
         Top body = bindAtomInstance(name, merged);
         checkNarrows(name, sourceName, source.body(), body);
 
-        return new TypeDefinition(Optional.of(constructorRef), source.kind(), List.of(),
-                List.of(sourceName), List.of(), Optional.empty(), body);
+        return new TypeDefinition(Optional.of(constructorRef), source.kind(),
+                List.of(sourceName), List.of(), body);
     }
 
     /**
@@ -857,15 +872,6 @@ final class DefinitionResolver {
         }
     }
 
-    /**
-     * A constructor-application target ({@code !C value}) resolves against {@code metaDefinitions}
-     * (the structure namespace) only -- never {@code namespaceDefinitions} (the type-name namespace).
-     * A constructor is always meta-schema vocabulary (a {@code type_definition} with {@code
-     * constructor: true}, e.g. {@code integer_type}/{@code enum}), never something a schema
-     * legitimately defines about itself and, in the same pass, instantiates -- the target is always
-     * declared in the *governing* meta-schema, one hop via {@code !!meta}, so the structure namespace
-     * alone is enough.
-     */
     /**
      * The constructor a {@code !C ...} head names, and the name to read its payload against -- <b>after
      * following {@code C}'s reference chain</b> ([TSON-SCHEMA] §8.3).
@@ -1035,8 +1041,20 @@ final class DefinitionResolver {
                 throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
             }
         }
-        return TypeDefinition.reference(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments),
-                parameters);
+        return openAliasOr(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments), parameters);
+    }
+
+    /**
+     * An alias entry: closed, with a {@code Reference} body naming its target, or -- §5.10's partial
+     * application -- <b>open</b>, with that same {@code !reference { target: ... }} held as its body.
+     *
+     * <p>An open entry's body is held whatever shape it takes, with no exception for the alias form: that is
+     * what lets materialisation dispatch on the constructor head, and what makes "declares parameters" and
+     * "holds its body" one question. {@code source} records the same reference either way, as provenance.
+     */
+    private static TypeDefinition openAliasOr(io.ltr8.tson.schema.meta.TypeRef target, List<String> parameters) {
+        return parameters.isEmpty() ? TypeDefinition.reference(target)
+                : new TypeDefinition(Optional.of(target), TypeKind.TEMPLATE, List.of(), List.of(), HeldBody.held(parameters, WireForm.heldReference(target)));
     }
 
     /**
@@ -1171,8 +1189,7 @@ final class DefinitionResolver {
         // reason §5.9 gives: the clause is head-level, so its effect must be readable without scanning the
         // parents' field sets. An author wanting partial IS-A subtracts first and composes second.
         List<String> contract = construction.removal().isPresent() ? List.of() : transitiveSupertypes;
-        return new TypeDefinition(Optional.empty(), kind, parameters, contract, List.of(),
-                Optional.empty(), body);
+        return new TypeDefinition(Optional.empty(), kind, contract, List.of(), body);
     }
 
     /**
@@ -1399,8 +1416,8 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups);
-        return new TypeDefinition(source, kind, parameters, transitiveSupertypes,
-                List.of(), Optional.empty(), body);
+        return new TypeDefinition(source, kind, transitiveSupertypes,
+                List.of(), body);
     }
 
     /**
@@ -1491,7 +1508,7 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' names no type this schema declares or imports");
         }
-        if (!(template.body() instanceof HeldBody held)) {
+        if (!(template.body() instanceof TemplateBody open)) {
             // Applied to this declaration's own parameter, so the author wrote arguments; the head takes none.
             throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' declares no type parameters, so it cannot be applied to '"
@@ -1509,7 +1526,7 @@ final class DefinitionResolver {
             // `inner<T>` whole and the absorbing declaration's own materialisation closes it.
             bindings.put(template.parameters().get(i), typeArgument(application.args().get(i)));
         }
-        DataValue body = held.application();
+        DataValue body = HeldBody.of(open).application();
         CoreValue substituted = WireForm.substitute(body.coreValue(), head,
                 template.parameters(), bindings);
         Top absorbed = bindAtomInstance(name, new DataValue(body.annotations(), body.typeRef(), substituted));

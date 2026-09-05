@@ -165,7 +165,7 @@ final class TemplateRegularity {
         // declared question as `names()`, and returning the applications the wire tree holds is what keeps
         // this rule at the declaration now that every open body is held.
         if (template.body() instanceof TemplateBody held) {
-            held.applications().forEach(ref -> collect(ref, found));
+            HeldBody.of(held).applications().forEach(ref -> collect(ref, found));
             return found;
         }
         MetaRefs.mapBodyRefs(template.body(), ref -> {

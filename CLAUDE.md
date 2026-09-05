@@ -47,7 +47,13 @@ the repo's own pins, and the spec document is a cache it does not write, so §13
 re-stamped by hand and is therefore the one that silently drifts. `tson hash spec/m/<name>.tn` is the check.
 The divergences earlier revisions carried are all in the spec now — `reference.target` typed `type_ref`, no
 `instance_template`/`template_argument`/`value_param` (§5.10's held bodies replaced the quoted open-body
-vocabulary), and `map`'s `state` field behind `{K => V?}` (§5.3).
+vocabulary), and `map`'s `state` field behind `{K => V?}` (§5.3). **One new divergence is open**: meta-kernel
+declares a `template` constructor the spec text does not yet describe, carrying an open entry's body as text,
+`type_definition` has lost its `parameters` field to that body and its `disjoint` field to the choice body,
+and `type_kind` has gained a `TEMPLATE` member (`SPEC-FEEDBACK.md` #5, #6, #7, #8). §8.1's own shape — the held application written as though it were a value of the
+constructor's vocabulary — does not read: §5.10's own `vector` example fails against `non_negative_integer`,
+and the cases that do read bind the parameter as something else. The artifacts run ahead of the prose here as
+they do for the revision's identities.
 **Changing them means re-stamping all three digests bottom-up**, moving the matching `*-resolved.tn`
 entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the published
 values. `scripts/restamp-bundled-schemas.sh` does the digest half — every pin in the repo, in dependency
@@ -1040,13 +1046,14 @@ record-shaped code and is still a resolver error. What is checked per diagnostic
 a **verdict** (`Code.verdict()`): a gap, a bind mismatch and the five fetch codes say the vector could not be judged, and
 letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
 
-**No `class2/schema/` subject declares a template yet, and the reason it could not is gone.** §8.1 now makes
-an open entry a `type_definition` like any other — `parameters` non-empty, `body` the held application in wire
-form under §5.10's one-spelling rule — and says a held body is "compared as wire form and never as bound
-values", which is exactly what this resolver holds (`TemplateBody`/`HeldBody`) and what `ResolvedForm.heldBodies`
-compares. The two sides no longer disagree as values, so the layer can take a template like anything else.
-Templates are covered at the `link/` layer meanwhile, over the entries they mint; `BACKLOG.md` carries the
-vectors that are owed.
+**No `class2/schema/` subject declares a template yet, and nothing stops one now.** An open entry's body is
+the kernel's `template` constructor carrying the application as text (`schema.meta.TemplateBody`), so it is a
+`type_definition` like any other and reads back as ordinary data — where §8.1's older shape wrote the
+application as though it were a value of the constructor's own vocabulary, which no reader could apply
+(`SPEC-FEEDBACK.md` #5). `ResolvedForm` compares an open entry's body by its *parsed* form, §5.10's one
+spelling being about the application and not the whitespace, so the layer needs no expectation format of its
+own. Templates are covered at the `link/` layer meanwhile, over the entries they mint; `BACKLOG.md` carries
+the vectors that are owed.
 
 **Add test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge —
 with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, so a Part 1
@@ -1122,8 +1129,9 @@ compatibility).
 - **A container position that is an application, and what a held open body still cannot say.** §5.10
   substitution works for both template shapes: a **record** template (parameters occupying field types and
   values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T
-  min_items: N }`. An open instance's body is **held** rather than quoted — the application as written, unread
-  until materialisation substitutes its parameters away (`TemplateBody`/`HeldBody`, `docs/schema-resolution.md`)
+  min_items: N }`. An open instance's body is **held** as text — the application as written, unread
+  until materialisation substitutes its parameters away (`schema.meta.TemplateBody` carries it, `HeldBody`
+  parses it, `docs/schema-resolution.md`)
   — which is what makes §5.10's "collection-valued slots are parameterizable" work: `result => <T>
   ( T | error )` (the spec's own example), `<T> [T, text]` and `<T> { v: (T | text) }` all resolve. A
   container position holding an

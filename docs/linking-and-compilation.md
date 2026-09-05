@@ -114,8 +114,8 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
     parameters the *referenced* entry declares. And nothing ever closes `chain => <T> { tail: chain<T, T>? }`,
     so deferring it would let that template ship with the mistake in it.
     - **Applications only, never bare names**, and the distinction is load-bearing.
-      `TemplateBody.applications()` returns a shape nothing else in the wire tree shares;
-      `TemplateBody.names()` returns *every* token — field names, states, literals and type references alike.
+      `HeldBody.applications()` returns a shape nothing else in the wire tree shares;
+      `HeldBody.names()` returns *every* token — field names, states, literals and type references alike.
       Asking the zero-argument half ("this token names an unapplied template") off `names()` rejects a
       correct schema whose field happens to be called `box` beside a template of that name, which is a worse
       failure than a late verdict. So that half runs on the entry materialisation mints, and an unapplied
@@ -445,9 +445,10 @@ keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
       as a 501.
   - A referenced-but-absent name is a stricter `TsonSchemaLinker` invariant violation and propagates
     uncaught.
-- **An open entry compiles to `OpenTemplateReader`, before its body is looked at at all.** An entry
-  declaring type parameters is a template, not a type (§5.10), so there is nothing a value could validate
-  against; the reader reports `UNKNOWN_TYPE_REF` against the data and skips the value, like any other reader
+- **An open entry compiles to `OpenTemplateReader`, before its body is looked at at all.** An entry whose
+  `kind` is `TEMPLATE` is a template, not a type (§5.10), so there is nothing a value could validate
+  against; the dispatch is on `kind`, like every other entry's, rather than on a list being non-empty. The
+  reader reports `UNKNOWN_TYPE_REF` against the data and skips the value, like any other reader
   finding data the schema does not admit. Reaching it is **always** a data error: a *schema* naming a
   template without applying it is rejected at link time (`checkArity`'s zero-argument case), so no field,
   element or supertype routes here — only a data type-ref naming the template, `!paged` against `paged =>

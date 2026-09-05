@@ -334,9 +334,12 @@ a held body.
   them wrong. There were three: the writer, the reader, and `ParameterKinds` matching `name`/`arguments`
   against its own string literals — the one that could have drifted silently, since nothing would have
   failed, only a parameter kind quietly not inferred.
-- **`TsonObjectWriter` cannot serve any of it.** Its output is canonical-explicit and fully quoted, a
-  different language from the one a held body is written in: `TemplateBody.names()` and substitution both key
-  on a token being *unquoted*, so a quoted body references no parameters at all.
+- **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
+  gives canonical-explicit, fully quoted output — a different language from the one a held body is written in:
+  `HeldBody.names()` and substitution both key on a token being *unquoted*, so a quoted body references no
+  parameters at all. That is why `heldRecord` builds the wire tree directly. Once built, the tree is an
+  AST, and `TsonObjectWriter` writes an AST as syntax rather than as a description of itself
+  (`AstWriter`) — which is how `HeldBody.held` turns it into `TemplateBody.template`.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the
   materialisation section below.
 - **Every walk over a held body descends into a map slot, and three of them did not.** meta.tn's
@@ -500,17 +503,42 @@ recorded open form, and replacing the application with a reference to the entry 
       arity check, which reads the same accessor: materialisation runs first, and by then the parameter is
       gone — leaving either an arity error against a content-derived name nobody typed, or a wire-vocabulary
       mismatch, neither of which names what the author did.
-- **A held body writes as the application it holds, and names its carrier nowhere.** `HeldBody` is
-  `@Transparent` (`io.ltr8.annotation.Transparent`), so `tson-bind` resolves it to the held `DataValue`'s own
-  descriptor with a bridge and `TsonObjectWriter` writes no type-ref for it at a `Top` position: a template's
-  body renders `!choice { variants: [T error] }`, not a wrapper naming a type nothing declares. Two things
-  make that work and neither is incidental — the writer asks `value instanceof DataValue` *after* unwrapping a
-  bridge, so a transparent wrapper over a parsed value still reaches `AstWriter` instead of being written as a
-  faithful description of the AST; and `writeUnion` treats a transparent member as contributing no tag.
-  - **Which costs the tag a reader would dispatch on**, deliberately. A transparent union member is selectable
-    only where a position declares it, never by tag. Nothing depends on that here: an open entry's resolved
-    form is its declaration round-tripped, no binder reads one back, and `TypeDefinition.parameters` being
-    non-empty already says the body is held.
+- **An open entry's `kind` is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes a
+  template not a type, so the entry that cannot validate anything no longer claims the kind an application of
+  it would take: `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than
+  REFERENCE — it is a template whose closure is a reference, not a reference that happens to have parameters.
+  Like `REFERENCE` it is a `type_kind` and not a base kind (§4.1).
+  - **Which is where materialisation reads the closed entry's kind from instead** (`kindOfClosed`): the
+    branch of `Top` the substituted body occupies, §4.1's "construction transfers kind" asked of the
+    construction. Not the constructor's *name* — a held body's head is structure-namespace vocabulary the
+    governing meta declares, and this pass holds only the type-name namespace (§3.3.1 keeps them apart). An
+    entry materialisation mints is never a constructor, so it does not compose with `top`, and for
+    everything that does not, kind is its body's branch.
+  - **And it makes the derivation total.** Every other entry's kind follows from what it already states —
+    the base-kind name in its own `supertypes` for a constructor, its body's branch otherwise — and the open
+    entry was the one case needing a lookup outside itself. `OpenEntryResolvedFormTest` asserts the whole
+    rule over every entry of every schema.
+
+- **A held body is text, and the kernel's `template` constructor is what carries it.** `schema.meta.TemplateBody`
+  is a record over `parameters` and `template`, the application as written — so `set` resolves to
+  `body: !template { parameters: [T]  template: "!set_type { element_type: T }" }`. It is an ordinary body of
+  the value model: `Top` is sealed over it, the binder finds it by the same `template` → `template_body` alias
+  `record` → `record_body` already uses, and `type_definition.body` is a `top` with no exception.
+  - **Why text and not a value of the constructor's own vocabulary.** A parameter stands wherever a token
+    stands — `element_type: T` in a type slot, `min_items: N` in a value slot, `variants: [T error]` inside a
+    collection — so a body carrying one is typed by no constructor's record shape until it closes. Writing it
+    as though it were leaves the two halves disagreeing, and both failures are measurable: `min_items: N`
+    refuses to read at all against `non_negative_integer`, and core.tn's own `extern_of` reads *cleanly* and
+    binds `S` as a schema identity literally named `S`. `OpenEntryResolvedFormTest` pins both.
+  - **The parsed form is a working value, not part of the entry** (`HeldBody`). `HeldBody.held(parameters, ast)`
+    emits the text through `TsonObjectWriter`; `HeldBody.of(body)` parses it back for the phases that need a
+    tree. Nothing outside `resolver` sees a `DataValue`, and nothing is retained: template closure is the one
+    caller that needs the tree twice, and it parses once into a local and drops it. `held` hands back no tree
+    of its own, so a writer/parser disagreement about §5.10's one spelling fails in `HeldBodyTest` rather than
+    surfacing later as two entries that ought to be equal and are not.
+  - **Which is also why comparison needs no channel of its own.** §5.10's one-spelling rule is about the
+    application, not the whitespace around it, so `ResolvedForm` reduces a held body to its *parsed* form and
+    an open entry compares like every other entry.
 - **A held body closes by one process, whatever wrote it** (`closeHeld`). `<T> [T]` and `<T> { x: T }` are both
   an application with a parameter standing in a slot — `!array { element_type: T }` and
   `!record { fields: [ { name: x  type: T } ] }` — so both substitute by the same walk and are then bound

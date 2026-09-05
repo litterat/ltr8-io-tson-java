@@ -73,8 +73,8 @@ class StreamingLazinessTest {
     @Test
     void aFailFastErrorOnAnEarlyFieldNeverPullsAHugeTrailingFieldOffTheStream() {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
-        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(),  List.of(),
-                List.of(), Optional.empty(), IntegerType.UNCONSTRAINED));
+        entries.put("integer", new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(),
+                List.of(), IntegerType.UNCONSTRAINED));
         entries.put("numbers", TypeDefinition.product(ArrayBody.of(TypeRef.of("integer"))));
         entries.put("big_record", TypeDefinition.product(RecordBody.of(List.of(
                 RecordField.required("a", TypeRef.of("integer")),

@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0185d18d3f3e3d3d3aeb62adcf0d1f4ee496cbe8372da71c8ca7bef78c2e3886"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=b05bc24ed40ef50a85f33ecf965e415c6b7fc6b658736aa1f9e250689d1f0bb9"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -60,6 +60,35 @@
     """
   reference => top & {
     target: type_ref
+  }
+
+  @doc:"""
+    Held body — the body of an entry that declares type parameters
+    ([TSON-SCHEMA] §5.10). `template` is the constructor application
+    as written, unread until materialisation substitutes the
+    parameters away, and `parameters` are the names it binds.
+
+    Text, because that is what "held" means. A held body is not a
+    value of this vocabulary and cannot be one: a parameter stands
+    wherever a token stands — `min_items: N` as readily as
+    `element_type: T` — so a body carrying one is not typed by any
+    constructor's own record shape until it closes. Writing it as
+    though it were leaves the two halves disagreeing, since a value
+    parameter refuses to read at all and a type parameter reads as a
+    reference to a type nobody declared.
+
+    So an open entry's body is this, and `type_definition.body` is a
+    `top` with no exception. What is compared is the parsed form and
+    never the text: an open synthetic's identity is derived from its
+    held binding record, so two spellings of one form must reduce to
+    one entry, and whitespace is free.
+
+    Composes with `top` directly, like `reference` and `data`: it
+    describes no value's shape, and nothing is ever typed by it.
+    """
+  template => top & {
+    parameters:  [param_name]
+    template:    text
   }
 
   @doc:"""
@@ -346,7 +375,7 @@
   field_state         => !enum [REQUIRED REQUIRED_DEFAULT REQUIRED_FIXED
                                        OPTIONAL OPTIONAL_FIXED]
   element_state       => !enum [REQUIRED OPTIONAL]
-  type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA]
+  type_kind           => !enum [ATOM PRODUCT SUM REFERENCE DATA TEMPLATE]
 
   @doc:"""
     Annotation type markers. `synthetic` is resolver-attached and derived:
@@ -492,27 +521,34 @@
     members: enum_set
   }
 
+  @doc:"""
+    Closed sum. `disjoint` is a resolver-derived index over the
+    variant list, parallel to `subtypes`: true or false by
+    discrimination-class distinctness ([TSON-SCHEMA] §5.4).
+    Declarations never set it; on ingest it MUST be discarded and
+    recomputed. It carries the encoding-independent fact each
+    encoding's discrimination rules consume ([TSON-SCHEMA] §5.4,
+    §7.2).
+
+    It sits here rather than on `type_definition` because it is a
+    fact about a variant list, and this is the only body that has
+    one. An entry with no variants has nowhere to put it, so
+    "recorded on every choice and absent on every other definition"
+    is structural rather than a rule a document could break.
+    """
   choice => sum & {
-    variants: [type_ref]
+    variants:  [type_ref]
+    disjoint:  boolean?
   }
 
   @doc:"""
-    Resolver output. `disjoint` is a resolver-derived index over
-    choice definitions, parallel to `subtypes`: true or false by
-    discrimination-class distinctness ([TSON-SCHEMA] §5.4), recorded
-    on every entry whose body is a `!choice` and absent on every
-    other. Declarations never set it; on ingest it MUST be discarded
-    and recomputed. It carries
-    the encoding-independent fact each encoding's discrimination rules
-    consume ([TSON-SCHEMA] §5.4, §7.2).
+    Resolver output — what every entry of a schema map resolves to.
     """
   type_definition => {
     source:       type_ref?
     kind:         type_kind
-    parameters:   [param_name]?
     supertypes:   [type_name]?
     subtypes:     [type_name]?
-    disjoint:     boolean?
     body:         top
   }
 

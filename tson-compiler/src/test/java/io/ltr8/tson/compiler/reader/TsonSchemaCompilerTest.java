@@ -83,8 +83,7 @@ class TsonSchemaCompilerTest {
         // way.
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("used", TypeDefinition.product(RecordBody.of(List.of())));
-        entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.DATA,
-                List.of(),  List.of(), List.of(), Optional.empty(), new EndpointBody("/search")));
+        entries.put("orphan", new TypeDefinition(Optional.empty(), TypeKind.DATA,  List.of(), List.of(), new EndpointBody("/search")));
         TsonSchema schema = new TsonSchema("test-schema", "test-meta", List.of(), entries);
         TsonLinkedSchema linkedSchema = new TsonLinkedSchema(schema);
 
