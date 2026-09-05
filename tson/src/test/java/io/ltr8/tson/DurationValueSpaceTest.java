@@ -19,9 +19,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>The value is a signed <b>exact decimal</b> number of seconds — no non-terminating fraction is writable,
  * the lexical form putting a fraction on the seconds component and nowhere else — with both ends fixed at a
- * signed 64-bit count of nanoseconds. `SPEC-FEEDBACK.md` #31 carries the argument for the two ends; what
- * these pin is that they are the same ends everywhere, rather than whatever {@code java.time.Duration}
- * happens to reach.
+ * signed 64-bit count of nanoseconds ([TSON-SCHEMA] §5.5, [TSON-DATA] §5.4). What these pin is that they are
+ * the same ends everywhere, rather than whatever {@code java.time.Duration} happens to reach.
  */
 class DurationValueSpaceTest {
 

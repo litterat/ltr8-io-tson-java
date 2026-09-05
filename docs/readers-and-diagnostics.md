@@ -197,18 +197,22 @@ is small and parsed once.)
   as `[text, int32]`, a choice as `(text | int32)`, and an instantiation entry as the application its
   `source` records (`paged<order>`). Anything with no sugar spelling falls back to the entry name — honest
   rather than invented.
-- **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). §8.3
-  flattens a type position past a `REFERENCE` entry, so `c: pct` over `pct => small` reaches the reader for
-  `small` — one shared reader, right for a position that names `small` directly and wrong for one that does
-  not. The name the author wrote rides the type-ref as `@alias`, and a composite reader consults it where it
-  **wires its children**, which is compile time: an aliased position gets a copy of the reader differing only
-  in its name, an unaliased one gets the shared reader back unchanged and allocates nothing. Nothing is added
-  to `TsonReadContext` and no per-read allocation changes (`AllocationHarnessTest` is the guard).
-    - **A materialised application takes the other carrier**, because §8.3's walk stops at an instantiation
-      and leaves no alias. That entry's body is a `Reference`, and a `REFERENCE` entry compiles to its
-      target's reader — so `TsonSchemaCompiler` names it for the entry doing the referring, whose `source` is
-      the application (`b<10>`). Without it a violation against `b<10>` reads
-      `'integer_type_10_100_786fbcfb': …`, the one shape that made `EntryDisplayName`'s fallback reachable.
+- **And it names itself as the *position* wrote it, not as the entry it resolved to** (`UseSite`). A field
+  declared `c: pct` over `pct => small` reads with `small`'s reader, that being the type at the end of the
+  chain, and a message from it would otherwise name a declaration the author did write but did not write
+  *here*. §8.3 makes a reference a hop and forbids collapsing it in resolved output, so a position reaches its
+  child by resolving the name it names and nothing more — no carrier on the type-ref, and nothing added to
+  `TsonReadContext`. The renaming happens one level up instead: the `REFERENCE` entry's own compile names its
+  target's reader for the entry doing the referring (`TsonSchemaCompiler`, through `UseSite.named`), which is
+  the collapse §8.3 permits *after linking, when a processor compiles for reading*. It runs where a composite
+  reader **wires its children**, which is compile time: a position naming an alias gets a copy differing only
+  in its name, every other position gets the shared reader back unchanged and allocates nothing
+  (`AllocationHarnessTest` is the guard).
+    - **A materialised application is named the same way**, and it is why the mechanism sits on the entry
+      rather than on the position. That entry's body is a `Reference`, so it compiles to its target's reader —
+      and `TsonSchemaCompiler` names it for the entry doing the referring, whose `source` is the application
+      (`b<10>`). Without it a violation against `b<10>` reads `'integer_type_10_100_786fbcfb': …`, the one
+      shape that made `EntryDisplayName`'s fallback reachable.
     - **A choice keeps naming the variant**, deliberately: it dispatches by name inside `read`
       (`VariantSchemaReader`/`NamedDispatchReader`/`VariantBindReader`), so renaming there would allocate per
       read — and the variant that rejected the value is the informative name anyway.
@@ -318,9 +322,9 @@ it is not. The refusal is reported against the position's own context rather tha
 names the field or the index; `notAdmitted` and `refuse` are split for exactly that reason, so a scoped copy
 of the context is built only where there is something to locate.
 
-**A schemaless document opens no scope at all** (`ScopePush.refuseSchemaless`), a deliberate divergence from
-§7.8's "schemaless outer documents ... always permit nested `!!schema` directives", argued in
-`SPEC-FEEDBACK.md` #30: the typed-position restriction exists because acceptance is authored intent, and a
+**A schemaless document opens no scope at all** (`ScopePush.refuseSchemaless`), which is §7.8's own rule: "a
+nested `!!schema` in a document with no `!!schema` of its own is a validation error naming the directive". The
+typed-position restriction exists because acceptance is authored intent, and a
 Class 1 document states no intent to opt in to anything; honouring the directive there turns a Class 1 read
 into a Class 2 read halfway down a document with nothing on the document saying so. Both refusals report and
 keep reading — the directive is consumed and the value read as it would have been without one — so a stray
@@ -380,9 +384,9 @@ environment is
 invisible at the call site and absent from review. The relaxation to reach for first is the *unit*
 (`perSegment()`), which still refuses `id_pаy` while admitting `url_адрес`. A token policy stricter than the
 identifier policy subsumes it: a name is a token — which §8.2 asks an implementation's documentation to say,
-and this is where it is said. §8.2 calls the identifier surface the "name policy", once and undefined; this
-implementation says *identifier* throughout, §7.7 being where that term is defined
-(`SPEC-FEEDBACK.md` #15).
+and this is where it is said. The two names are §8.2's own: it defines the **identifier policy** and the
+**token policy** as the two parts of a processor's configuration for that section, precisely so that two
+implementations reporting them agree on what they are called, and `TsonConfig` uses those names.
 
 **Field** names see all three, being names at every layer (§2.5, §7.7): the two per-name rules in the read
 context beside a type-ref's and an annotation's, and the look-alike rule in `SchemalessTreeReader`, which is
@@ -500,7 +504,9 @@ document. Every `tson-cli` envelope carries one in its `policy` field.
 (`withIdentifierPolicy`, `withTokenPolicy`) is exactly where the two can differ, and a response quoting the wrong
 one is worse than quoting none. `TsonUnicodePolicy.dataVersion()` remains the version as a static accessor;
 the constant behind it (`Xid.UNICODE_VERSION`) is in the unexported `lexer` package and unreachable
-otherwise. `SPEC-FEEDBACK.md` #14 proposes §8.2 require this shape rather than the per-refusal copy.
+otherwise. §8.2 requires exactly this shape: the policy and the data version are properties of the *report*,
+not of the refusal, and a processor MUST make both available with any report containing one and SHOULD make
+them available with no document in hand.
 
 ## `TsonLimitsPolicy` — §9.1's bounds, on the same terms
 
@@ -511,9 +517,10 @@ inside it** — the two answer different questions, and a deployment that change
 the other. The three arguments above transfer whole: a bound is constant for a run, a sender needs it before
 it writes, and a number a caller can act on beats a refusal after the fact.
 
-**Only nesting depth is bounded.** [TSON-DATA] §9.1 names four more and omits the ones bounding shape rather
-than size; `SPEC-FEEDBACK.md` #33 asks for the set, and `BACKLOG.md` carries what is left. It is a record with
-one component so each lands on it rather than beside it.
+**Only nesting depth is bounded**, at §9.1's own default of 64. §9.1 states the whole set as one table with a
+default each — eleven more on the document side — and [TSON-SCHEMA] §11.5 adds five on the schema side under
+the same policy and the same reporting surfaces; `BACKLOG.md` carries what is left and where each is counted.
+It is a record with one component so each lands on it rather than beside it.
 
 **Counted in the token stream, not in the readers.** `TsonDataStream.advance` already tracked bracket depth
 for the schema parser's error recovery, and that is the one place every token is consumed — so the check is

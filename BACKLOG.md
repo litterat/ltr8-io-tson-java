@@ -49,16 +49,22 @@ own prose (which had gone stale on it):
 
 ## Checked annotations
 
-[TSON-SCHEMA] §5.4's `@disjoint` is the precedent both follow: an annotation with **no** decode force and
-load-time force, checked at schema load, two outcomes and no third — verified silently, or the schema fails to
-load. Each is declared in meta.tn and neither is checked, so both are advisory today where the design says
-they carry force. §6 owes the category itself a description (`SPEC-FEEDBACK.md` #25(a)) and owes which of its
-two declaration positions honours one (#25(b)); this implementation consults both for `@disjoint` and should do
-the same here.
+[TSON-SCHEMA] §6 defines the category and §5.4's `@disjoint` is the precedent both follow: an annotation with
+**no** decode force and load-time force, verified against a fact the resolver derives, two outcomes and no
+third — verified silently, or a resolver error at schema load. §6 also settles what this implementation had to
+guess at: a checked annotation is an assertion in *either* declaration position and a processor MUST consult
+both spellings, which is what `@disjoint` already does. Each of the two below is declared in meta.tn and
+neither is checked, so both are advisory today where §6 says they carry force. Both are also re-checked on
+ingest (§8.1), which is a second call site for whatever the load-time check becomes.
 
-- [ ] **`@rest` is not checked.** Two checks, both ordinary now: the annotated field's type resolves to a
-  text-keyed map, and at most one field per composed chain carries the mark — the chain being countable since a
-  restatement merges annotations rather than dropping them.
+- [ ] **`@discriminator` is not checked.** Three checks at schema load, over the choice the annotation marks
+  (§6): every variant is a record declaring the named field; that field is `REQUIRED_FIXED` in every variant,
+  never `REQUIRED_DEFAULT`; and the fixed values are pairwise distinct. The annotation's own type does the
+  fourth — `field_name` is an `identifier`, so a non-name spelling already fails where the annotation value is
+  read. Nothing about a value's validity moves: a discriminated choice admits exactly the variants it admitted.
+- [ ] **`@rest` is not checked.** Two checks: the annotated field's type resolves to a text-keyed map, and at
+  most one field per composed chain carries the mark — the chain being countable since §5.8's restated-field
+  rule merges annotations rather than dropping them, which this implementation already applies.
 
 ## Write side
 
@@ -70,7 +76,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 - [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
   through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
-  `@alias`/`@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
+  `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
   linking and the import merge. The *document* round trip is what does not: reading a resolved-form
   `{type_name => type_definition}` document back binds the map with no key annotations at all, and nothing
   writes them. `ResolvedFixtureTest` therefore cannot compare the marker the way it compares everything else
@@ -105,16 +111,54 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **The rest of [TSON-DATA] §9.1's resource limits** (`SPEC-FEEDBACK.md` #33). `TsonLimitsPolicy` is the
-  policy value and carries nesting depth; four of §9.1's own limits are unenforced — **token length**,
-  **document size in bytes**, **numeric-literal length** (§9.1's own worked example, with a suggested default
-  of 4096 digits) and **decoded binary size per value** — as are the shape limits §9.1 does not name at all:
-  elements per container, entries per map, fields per record, annotations per value, total values per
-  document, decoded text length after escape processing, and foreign schemas loaded by one document. Each is a
-  component on `TsonLimitsPolicy`, a `CliPolicy.CliLimits` field, and a `--flag`; what needs deciding per
-  limit is the default and where it is counted, since the ones that bound *shape* are per-container state the
-  stream does not currently keep, where depth was a counter it already had. The aggregate ones (total values,
-  total foreign schemas) are the case §33 argues is not implied by the per-container ones and needs its own
-  counter. Schema-side limits are the other half and have no home yet: nothing bounds an import closure, a
-  schema's entry count, a reference chain or a supertype chain, and `TemplateMaterialiser.MAX_CLOSING_DEPTH`
-  is a bare constant that should move onto this policy when there is somewhere for it to go.
+- [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `TsonLimitsPolicy` is
+  the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one
+  table with a default each, so nothing here is a judgement call any more — what is left is eleven document
+  limits and five schema-side ones, each a component on `TsonLimitsPolicy`, a `CliPolicy.CliLimits` field and a
+  `--flag`. Document side: **token length** (1,048,576 code points), **decoded text length** after escape
+  processing (1,048,576), **numeric literal length** (4,096 digits, annotated tokens included), **decoded
+  binary size** per `!bytes` value (16,777,216 octets), **document size** in bytes (16,777,216), **elements**
+  per array or set (1,048,576), **entries** per map (1,048,576), **fields** per record (65,536),
+  **annotations** on one value (64), **total values** in one document (16,777,216), and **foreign schemas** one
+  document's scope pushes may load (16). Schema side (§11.5, same policy and same reporting surfaces):
+  **import closure** (64), **entries** in one schema map (65,536), **reference chain** (64), **supertype
+  chain** (64), and **materialisation depth** (64) — which is where `TemplateMaterialiser.MAX_CLOSING_DEPTH`
+  goes, it being a bare constant with nowhere to live until now. What still needs deciding per limit is only
+  *where it is counted*: the ones that bound shape are per-container state the stream does not keep, where
+  depth was a counter it already had, and the two aggregates (total values, foreign schemas) need their own
+  counter since §9.1 is explicit that the total is not bounded by the parts.
+
+- [ ] **`time` and `datetime` compare by offset, where [TSON-SCHEMA] §5.5 makes them instants.** The
+  value-space clause settles the equality contract the series used to delegate without defining, and it decides
+  this family against what is running: a `datetime` is the instant on the UTC timeline and a `time` is the time
+  of day in UTC, so `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are **one value**, `-00:00` is `Z`,
+  and `23:30:00-02:00` is `01:30:00Z`. `ValueIdentity.of` falls through to Java equality for both, and
+  `OffsetDateTime.equals`/`OffsetTime.equals` compare the offset — so all three rules that delegate to value
+  identity are wrong here at once: a map admits both spellings as two keys (§2.6), a set admits both as two
+  elements (§7.5), and a `REQUIRED_FIXED` field written in another offset is rejected (§5.2). Ordering is
+  already right and needs nothing: both host types' `compareTo` compares the instant. The fix is one case each
+  in `ValueIdentity.of` — normalise to the instant before comparing — and it must not touch what a reader hands
+  back, since §5.5 has TSON text preserve the offset as written.
+
+- [ ] **`class2/schema/` carries no vector declaring a template, and the reason it could not is gone.**
+  [TSON-SCHEMA] §8.1 now says an open entry is a `type_definition` like any other — `parameters` non-empty,
+  `body` the held application in wire form under §5.10's one-spelling rule, typed by the kernel's `schema`
+  without a second value shape — which is exactly the shape this resolver holds (`TemplateBody`/`HeldBody`).
+  The two sides no longer disagree as values, so the layer can compare a template the way it compares
+  everything else and the corpus can state what one resolves to directly rather than indirectly at `link/`.
+  `ResolvedForm.heldBodies` is the comparison to keep — §8.1 makes wire form what a held body *is* on both
+  sides, not a compromise — and what is owed is the vectors, upstream, plus the note in `CONFORMANCE.md` that
+  currently explains the absence.
+
+- [ ] **The `@bytes_encoding`-as-directive narrative is stale across a dozen classes.** [TSON-SCHEMA] §5.5
+  makes the alphabet a **selector facet** on `bytes_type` (`encoding`, defaulting to `BASE64`, not refinable —
+  another alphabet is another instance), and the code already implements that: `BytesType` carries an
+  `encoding` component and its nested `Encoding` enum's Javadoc names it a §5.7 selector. What did not move is
+  the prose around it — `BytesType`'s own class-level Javadoc still says "the alphabet is not here, and that is
+  the design ... it is a directive instead", and `RecordAbstractReader`, `RecordTreeReader`, `RecordBindReader`,
+  `Rendered`, `AtomParsers`, `BytesParser`, `BuiltinTypeVocabulary`, `ComplexType`, `DefinitionResolver` and
+  `TemplateMaterialiser` each describe a per-position directive that no longer exists. Two are worse than
+  stale: `FieldReaders.byType` documents an exception ("a field carrying `@bytes_encoding` needs a reader of
+  its own") that its body does not implement, and `TemplateMaterialiser.dereferenced` carries a "known wrong"
+  paragraph for a case §5.5 has made unreachable — a reference cannot carry an alphabet, so dereferencing one
+  loses nothing. Delete the dead case, and state the selector where the directive used to be described.

@@ -41,13 +41,13 @@ import java.util.Set;
  * nothing binds through it, and a resolved-output consumer never meets one (§1.3), which makes serializing
  * one OPTIONAL and this the option not taken.
  *
- * <p><b>Which makes an open entry the one thing a value comparison cannot state.</b> The same declaration
- * written as §8 text and read back binds an ordinary {@link RecordBody} -- {@code type_ref.name} is typed
- * {@code identifier} and a parameter is one -- so the text agrees and the values do not. It is why the
- * shared corpus's {@code class2/schema/} layer, which compares resolver values, has no template vector and
- * covers templates over the entries they mint instead. §8.1 is self-contradictory about whether a {@code
- * type_definition} may carry a parameter reference at all ({@code SPEC-FEEDBACK.md} #4), so which side
- * should move is not settled.
+ * <p><b>And this is the shape [TSON-SCHEMA] §8.1 requires of an open entry.</b> An open entry is a {@code
+ * type_definition} like any other -- {@code parameters} non-empty, {@code body} the held application in wire
+ * form under §5.10's one-spelling rule -- typed by the kernel's {@code schema} without a second value shape,
+ * since {@code type_ref.name} is typed {@code identifier} and a parameter is one. What sets it apart is the
+ * reading: a held body is compared <em>as wire form</em> and never as bound values, and is read against its
+ * constructor's vocabulary only at materialisation. So a value comparison of two open entries compares their
+ * held bodies as written, which is what they are on both sides.
  *
  * <p><b>What it is opaque to, and what it is not.</b> A held body withholds one thing: what a reference
  * <em>resolves to</em>, which no argument settles until substitution supplies them. So type-kind validation

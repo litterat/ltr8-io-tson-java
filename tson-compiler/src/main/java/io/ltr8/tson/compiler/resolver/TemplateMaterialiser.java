@@ -134,10 +134,11 @@ final class TemplateMaterialiser {
      * failure, if that check ever has a hole, is a {@link StackOverflowError} -- not a diagnosis, and not
      * something the exception policy can classify. One comparison for that is worth paying.
      *
-     * <p><b>It is also the only resource limit this implementation has</b>, and a bare constant rather than a
-     * stated policy: nothing bounds nesting depth, an import closure, a schema's entry count, or a reference
-     * chain. {@code SPEC-FEEDBACK.md} #33 asks [TSON-DATA] §9.1 for one configurable set of limits with
-     * defaults, reported the way §8.2's name policy is; this one belongs on it once there is one.
+     * <p><b>It is a bare constant rather than a stated policy</b>, and it is [TSON-SCHEMA] §11.5's
+     * materialisation-depth limit at that section's own default. §11.5 states the schema-side limits as part
+     * of [TSON-DATA] §9.1's one limits policy, reported through the same surfaces, so this belongs on {@code
+     * TsonLimitsPolicy} beside {@code maxDepth}; nothing yet bounds the other four §11.5 names -- an import
+     * closure, a schema's entry count, a reference chain, or a supertype chain.
      *
      * <p>Distinct from §5.10.1's productivity rule, which is about a type with no finite <em>data</em>
      * model; the regularity rule is about one with no finite <em>type</em> model.

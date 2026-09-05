@@ -19,12 +19,12 @@ package io.ltr8.tson.compiler;
  * {@code Tson.limitsPolicy()}, {@link TsonTreeReader#limitsPolicy()}, {@link
  * TsonObjectReader#limitsPolicy()}, and {@code tson policy} on the command line.
  *
- * <p><b>Only nesting depth is bounded so far.</b> §9.1 names four other limits (token length, document size,
- * numeric-literal length, decoded binary size) and omits the ones that bound <em>shape</em> rather than size
- * -- elements per container, fields per record, annotations per value, values per document, foreign schemas
- * loaded per document. {@code SPEC-FEEDBACK.md} #33 asks §9.1 for the whole set with defaults; this record is
- * where each lands as it is built, which is why it is a record with one component rather than an {@code int}
- * threaded through the readers.
+ * <p><b>Only nesting depth is bounded so far.</b> §9.1 states the whole set as one table with a default
+ * each -- eleven more on the document side (token and decoded-text length, numeric-literal length, decoded
+ * binary size, document size, elements, entries, fields, annotations, total values, foreign schemas) -- and
+ * [TSON-SCHEMA] §11.5 adds five on the schema side under the same policy. This record is where each lands as
+ * it is built, which is why it is a record with one component rather than an {@code int} threaded through the
+ * readers. {@code BACKLOG.md} carries what is left and where each is counted.
  *
  * @param maxDepth the deepest a container may nest before the read is refused -- see {@link #maxDepth()}
  */

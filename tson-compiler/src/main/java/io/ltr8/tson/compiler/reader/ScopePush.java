@@ -21,7 +21,7 @@ import io.ltr8.tson.compiler.stream.SchemaRef;
  *
  * <p><b>A schemaless document opens no scope at all</b> ({@link #refuseSchemaless}), a deliberate divergence
  * from §7.8's "schemaless outer documents ... always permit nested {@code !!schema} directives" recorded in
- * {@code SPEC-FEEDBACK.md} #30. §7.8's own reasoning is the argument for it: the typed-position restriction
+ * [TSON-SCHEMA] §7.8. §7.8's own reasoning is the argument for it: the typed-position restriction
  * exists because "cross-schema acceptance is authored intent, not accident", and a Class 1 document states
  * no intent to opt in to anything. Honouring the directive there would also turn a Class 1 read into a Class
  * 2 read halfway down a document, with nothing on the document saying so.

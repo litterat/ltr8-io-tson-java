@@ -39,12 +39,16 @@ on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Trea
 a source of truth — with one standing exception: the three `.tn` schemas are **packaged from here at build
 time**, so they are the live copies rather than a snapshot. They carry **Revision 35 identities** —
 `https://tson.io/2026/35/m/*.tn` — ahead of that revision's publication, this branch being where the
-proposed artifacts are built (below), so Part 2 §13.2's table lists Revision 34's three identities and
-digests and is one revision behind here by design; `main` carries the published ones, and a diff against
-the published draft is empty *there*. The divergences earlier revisions carried are all in the
-spec now — `reference.target` typed `type_ref`, no `instance_template`/`template_argument`/`value_param`
-(§5.10's held bodies replaced the quoted open-body vocabulary), and `map`'s `state` field behind
-`{K => V?}` (§5.3).
+proposed artifacts are built (below); `main` carries the published Revision 34 ones. `spec/` now holds the
+**candidate Revision 35** of both parts, whose §13.2 table names those same `/2026/35/m/` identities — so the
+table is no longer a revision behind, but **its three digests are stamped from an earlier state of these
+artifacts and are stale against the working copies**. That is expected of an unpublished draft, whose digest
+table is stamped last from the final bytes; it means a digest disagreement between `spec/m/*.tn` and
+`spec/tson-part2-schema.md` §13.2 is a note for the spec author rather than a defect here, and the repo's own
+pins (which the library verifies on every load) follow the artifacts. The divergences earlier revisions
+carried are all in the spec now — `reference.target` typed `type_ref`, no
+`instance_template`/`template_argument`/`value_param` (§5.10's held bodies replaced the quoted open-body
+vocabulary), and `map`'s `state` field behind `{K => V?}` (§5.3).
 **Changing them means re-stamping all three digests bottom-up**, moving the matching `*-resolved.tn`
 entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the published
 values. `scripts/restamp-bundled-schemas.sh` does the digest half — every pin in the repo, in dependency
@@ -62,9 +66,10 @@ so a change that moves those counts wants looking at rather than renumbering. Ke
 `.tn` beside them; both have drifted before.
 
 **This branch is `r2026-35-proposal`, and it diverges from published Revision 34 deliberately.** It builds
-the removals `SPEC-FEEDBACK.md` #7–#13 propose, ahead of the spec revision that would carry them, so that
-those entries state what is *running* rather than what is *proposed* — the branch is the argument. It merges
-to `main` when the spec lands and not before: `main` is the reference implementation of the published
+what the candidate Revision 35 in `spec/` carries, ahead of that revision's publication, so the register's
+entries stated what was *running* rather than what was *proposed* — the branch was the argument, and the
+candidate has since adopted thirty-two of the thirty-six. It merges to `main` when the spec lands and not
+before: `main` is the reference implementation of the published
 revision, and merging a divergence early costs it the one signal it exists to give. The sibling corpus has a
 branch of the same name and moves with this one, `SUITE_PIN` following it. The three bundled schemas already
 carry the revision's own identities (`/2026/35/m/`), so a content change lands on artifacts named for the
@@ -488,8 +493,9 @@ the entry doing the referring). The walk was never avoidable — the compiler, `
 `TypeInhabitance` and the linker each do one, and §8.3 required `reference.target` stay unflattened anyway —
 so rewriting the output as well was a second representation to keep in step, whose `@alias` summary kept only
 the source-site name and dropped the hops that mattered. A directive on an alias is applied where the alias
-compiles (`UseSite.respelledByDeclaration`), nearest-first falling out of the innermost-first recursion.
-`SPEC-FEEDBACK.md` #32 and `docs/schema-resolution.md` have the measurements.
+compiles (`UseSite.named`, applied by the reference entry's own compile). §8.3 states both halves — a
+processor MAY collapse after linking, when it compiles for reading, and MUST NOT collapse in resolved output;
+`docs/schema-resolution.md` has the measurements.
 
 **The `@synthetic` marker** is the one derived marker (§8.1): §8.2 puts the bare marker on the schema-map
 **key** of every entry the resolver materialised from a sugar form, and on no other — an instantiation entry
@@ -630,8 +636,9 @@ having nowhere to carry a URI — the same asymmetry §2.9 already gets. **The c
 where it stands** rather than consuming it, which is how a document used to push a scope its schema never
 opted into and be read as though it had not: `ScopePush.notAdmitted` answers it once per position and refuses
 it where that position's reader is not a scoped one (§7.8's typed-position restriction — "cross-schema
-acceptance is authored intent, not accident"). A **schemaless** document opens no scope at all, a deliberate
-divergence from §7.8's last sentence (`SPEC-FEEDBACK.md` #30).
+acceptance is authored intent, not accident"). A **schemaless** document opens no scope at all, which is
+§7.8's own rule: a nested `!!schema` in a document with no `!!schema` of its own is a validation error naming
+the directive.
 
 ### Diagnostics — `docs/readers-and-diagnostics.md`
 
@@ -698,14 +705,16 @@ component — the fact is constant for a run, so a per-refusal copy is N copies 
 on failure, where what a sender needs is the rule *before* it writes; and a version says what refused you
 where a level says what would be accepted. That last is why the standalone surface matters more than the
 envelope one: a generator that reads the policy first never writes the name that would be refused, which is
-the round trip the format exists to avoid. `SPEC-FEEDBACK.md` #14 proposes §8.2 ask for this shape.
+the round trip the format exists to avoid. §8.2 requires exactly this shape, naming the two policies
+(`identifier policy`, `token policy`) so two implementations reporting them agree on what they are called.
 
 **`TsonLimitsPolicy` is §9.1's half of the same statement, and it sits beside rather than inside.** What this
 processor will *spend* reading a document, where the above is what it will *admit as a name* —
 `Tson.limitsPolicy()`, either facade's, `TsonTreeReader.withLimits`, `tson policy`, and a `limits` record in
 every CLI envelope's `policy` field. Two values because they answer two questions and a deployment changing
 one has said nothing about the other. **Only nesting depth is bounded** (default 64 — the tightest in common
-use, so a document that fits travels; `SPEC-FEEDBACK.md` #33 asks §9.1 for the rest, `BACKLOG.md` carries it).
+use, so a document that fits travels — §9.1's own default). §9.1 states eleven more with a default each and
+§11.5 five on the schema side under the same policy; `BACKLOG.md` carries what is left.
 **Counted in `TsonDataStream.advance`**, the one place every token is consumed, so the refusal lands before
 any reader descends — which matters because the stream is iterative and every reader over it recurses, and
 `EventSkip` recurses through values no reader keeps. The same counter reaches a schema document. A refusal is
@@ -944,9 +953,10 @@ implementation does not carry is `RUNNER.md` rule 5's fourth legitimate skip —
 the vector rather than the conformance class. It has two homes: `class1/reader/refused/` for Part 1's one
 scope, and `class2/schema/refused/` for §11.4's, where the enum-member and group-member-label vectors are
 the ones that catch a processor checking each name where it is *read* rather than where a scope is
-*walked* — the failure this implementation had. Template parameters stay out of the corpus: §11.4 does not
-list them as a scope, so a vector asserting the refusal would fail a conforming implementation
-(`SPEC-FEEDBACK.md` #5), and `ConfusableNameScopesTest` carries those cases instead.
+*walked* — the failure this implementation had. Template parameters stay out of the corpus: §11.4 and §5.10
+both decline to list them as a scope, so a vector asserting the look-alike refusal would fail a conforming
+implementation, and `ConfusableNameScopesTest` carries those cases instead. Only that rule diverges —
+mechanisms 2 and 3 are per-name and reach every identifier position anyway (§8.2).
 
 **The grammar runs where a name is read; the policy runs once per layer, over scopes.** That split is
 §8.2's own — §7.7 is validity, stable across Unicode versions, and a failure is a parse error; §8.2's three
@@ -963,7 +973,7 @@ single-script name is refused with nothing mixed):
 
 | Layer | Walk | Scopes |
 |---|---|---|
-| Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (`SPEC-FEEDBACK.md` #5) |
+| Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (§11.4 declines the scope) |
 | Data | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
 
 **A minted name is judged by the same walk, and is built so it can be.** A derived name splices
@@ -1031,14 +1041,13 @@ record-shaped code and is still a resolver error. What is checked per diagnostic
 a **verdict** (`Code.verdict()`): a gap, a bind mismatch and the five fetch codes say the vector could not be judged, and
 letting one satisfy an error vector is how a corpus comes to pass on the strength of not having been run.
 
-**No `class2/schema/` subject declares a template**, and the reason is where this layer compares rather
-than what §8 admits. The comparison is over the resolver's own value, and an open entry's body is a
-`HeldBody` — the application as written — where the same text read back as a `type_definition` binds an
-ordinary `RecordBody`: the two sides agree as §8 text and differ as values, and nothing here serializes the
-resolver's value to close the gap (§1.3 makes producing output OPTIONAL, and this doesn't). §8.1 is
-self-contradictory about whether a `type_definition` may carry a parameter reference at all
-(`SPEC-FEEDBACK.md` #4), which is why the answer isn't simply to write the vector. Templates are covered at
-the `link/` layer instead, over the entries they mint.
+**No `class2/schema/` subject declares a template yet, and the reason it could not is gone.** §8.1 now makes
+an open entry a `type_definition` like any other — `parameters` non-empty, `body` the held application in wire
+form under §5.10's one-spelling rule — and says a held body is "compared as wire form and never as bound
+values", which is exactly what this resolver holds (`TemplateBody`/`HeldBody`) and what `ResolvedForm.heldBodies`
+compares. The two sides no longer disagree as values, so the layer can take a template like anything else.
+Templates are covered at the `link/` layer meanwhile, over the entries they mint; `BACKLOG.md` carries the
+vectors that are owed.
 
 **Add test-suite vectors in the same session as any lexer/parser/resolver work**, not after a nudge —
 with one standing exception: the corpus's `resolver` layer is Part 1 *base-type* resolution, so a Part 1
@@ -1148,7 +1157,7 @@ compatibility).
   parsers, the CIDR pair reusing the two address grammars and validating §5.5's family-range and
   host-bits-zero rules on top. All four network families apply `within`/`excluding` and judge the pair
   for emptiness at schema load — exactly, prefix-tree cover being counting rather than searching, with a
-  network family's prefix bounds folded in (`SPEC-FEEDBACK.md` #34) — and **`cidr4`/`cidr6`
+  network family's prefix bounds folded in, both halves stated by §5.5 — and **`cidr4`/`cidr6`
   read to `schema.atom.CidrNetwork`** rather than to text — the address grammars and the network value live
   in `tson-schema` so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries
   without the linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its siblings**, and its format check is
@@ -1191,9 +1200,11 @@ compatibility).
   `docs/`, and that guarantee is what decides between one instance and one per request
   (`SharedInstanceConcurrencyTest` pins it at that surface). What is still open is everything *outside* a
   read: registering schemas concurrently, and mutating a `DataBindContext` after use.
-- **§9.1's resource limits** (SHOULD, DoS-hardening) — the policy exists (`TsonLimitsPolicy`, above) and
-  bounds **nesting depth**; token length, document size, numeric-literal length and decoded binary size are
-  unenforced, as are the shape limits §9.1 does not name and the schema-side ones it cannot
-  (`TemplateMaterialiser.MAX_CLOSING_DEPTH` is still a bare constant). `BACKLOG.md` has what each needs.
+- **§9.1's resource limits** — the policy exists (`TsonLimitsPolicy`, above) and bounds **nesting depth** at
+  §9.1's own default of 64. §9.1 now states the whole set as one table with a default each — eleven more on
+  the document side — and [TSON-SCHEMA] §11.5 adds five on the schema side under the same policy and the same
+  reporting surfaces, one of which `TemplateMaterialiser.MAX_CLOSING_DEPTH` already enforces as a bare
+  constant with nowhere to live. So nothing here is a judgement call any more; what is left is the counting.
+  `BACKLOG.md` has each limit, its default, and where it is counted.
 - **JSON** — a future JSON reader is a whole separate stack (its own `JsonEventStream` and its own readers,
   deliberately not reusing the TSON readers). Not started, not backlogged.

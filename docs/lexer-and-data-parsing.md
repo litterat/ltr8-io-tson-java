@@ -318,5 +318,5 @@ fixed, closed name→`AtomType` table (§5).
   magnitude wider. That ceiling is also what makes `DurationType.isMultiple`'s `toNanos` total — the range
   is the range `toNanos` has — and `coherenceCheck` refuses a bound or a `precision` outside it, so a
   `DurationType` built in Java cannot carry one either. Longer spans are `period`, finer or wider quantities
-  are `number` in the unit the schema names. `SPEC-FEEDBACK.md` #31 is the proposal.
+  are `number` in the unit the schema names. [TSON-SCHEMA] §5.5 and §5.4 here state both ends.
 - The full `int8`..`int256` width ladder is seeded, which is what §5.6's table lists.

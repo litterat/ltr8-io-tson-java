@@ -272,9 +272,12 @@ alike, a character outside the identifier profile, and a script combination the 
 admit. The scopes are §11.4's — the
 merged namespace, which is where §2.2.3's own disjointness rule is exact equality and a confusable pair passes
 it by construction; each entry's record field names, its groups' member labels arriving flattened among them;
-and its enum members — plus **a template's parameters, which §11.4 does not list** (`SPEC-FEEDBACK.md` #5:
-`<T, Т>` otherwise declares two parameters that render identically, and a body referencing `T` binds one of
-them with nothing in the source to say which). A **choice's variants are deliberately not checked**: a variant
+and its enum members — plus **a template's parameters, which §11.4 declines to list** (`<T, Т>` otherwise
+declares two parameters that render identically, and a body referencing `T` binds one of them with nothing in
+the source to say which). §11.4 and §5.10 both say why they are left out — one author writes the list whole on
+one line — and this stays stricter deliberately: mechanisms 2 and 3 reach every identifier position anyway
+(§8.2), so only the look-alike rule is a divergence, and a walk with an exemption is the shape that grew the
+holes the walk was built to close. A **choice's variants are deliberately not checked**: a variant
 is a reference to a declared name, so a confusable pair is already two confusable namespace entries and a check
 there could never fire.
 

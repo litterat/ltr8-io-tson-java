@@ -68,13 +68,13 @@ final class ResolvedForm {
      * alphabetical order and another's resolution order say the same thing. Nothing else is normalised; a
      * difference anywhere else is a real one.
      *
-     * <p><b>Including {@code enum.members}, which [TSON-SCHEMA] §7.5 makes a set</b> -- the only {@code !set}
-     * in meta-kernel, meta.tn and core.tn combined, and so the only field reached by that section's comparison
-     * MUST: "implementations comparing resolver outputs MUST compare set-typed fields as sets, not ordered
-     * lists". This compares it as an ordered list, which is a <b>deliberate divergence</b> recorded in
-     * {@code SPEC-FEEDBACK.md} #27 -- source order is what every producer emits, §7.4 gives a reader a reason
-     * to care about it, and the freedom the MUST compensates for is one nobody exercises. Honouring the MUST
-     * instead is one sort, here, reaching both callers.
+     * <p><b>Including every set-typed field</b>, which [TSON-SCHEMA] §7.5's comparison MUST reaches:
+     * "implementations comparing resolver outputs MUST compare set-typed fields as sets, not ordered lists".
+     * The fields are {@code enum.members}, {@code integer_type.members}, {@code decimal_type.members} and
+     * {@code scoped.scope}. This compares each as an ordered list, which is a <b>deliberate divergence</b>
+     * recorded in {@code SPEC-FEEDBACK.md} #4 -- source order is what every producer emits, §7.4 gives a
+     * reader a reason to care about it, and the freedom the MUST compensates for is one nobody exercises.
+     * Honouring the MUST instead is one sort, here, reaching both callers.
      */
     static TypeDefinition canonical(TypeDefinition definition) {
         return new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
@@ -130,12 +130,13 @@ final class ResolvedForm {
      * the slot's own type regardless. Where the parameter's spelling happens to satisfy that type it binds a
      * <em>misreading</em> ({@code extern_of}'s {@code S} binds as a relative URI), and where it does not it
      * fails outright ({@code min_items: N} against {@code integer}). Either way a bound comparison of an open
-     * entry compares the wrong things, and no emitter closes the gap: a template body does not ingest into a
-     * closed-type body ({@code SPEC-FEEDBACK.md} #4).
+     * entry compares the wrong things.
      *
-     * <p>So an open entry's body is compared as wire form on both sides, which is what it is on both sides:
-     * this resolver holds the application unread ({@code HeldBody}), and the fixture writes it verbatim. The
-     * AST is the common ground -- no emitter, no binder, and whitespace already gone.
+     * <p>So an open entry's body is compared as wire form on both sides, which is what §8.1 says it is on
+     * both sides: an open entry is a {@code type_definition} whose body is the held application in wire form,
+     * "compared as wire form and never as bound values". This resolver holds the application unread
+     * ({@code HeldBody}) and the fixture writes it verbatim; the AST is the common ground -- no emitter, no
+     * binder, and whitespace already gone.
      */
     static Map<String, DataValue> heldBodies(String resolvedText) {
         Map<String, DataValue> held = new LinkedHashMap<>();

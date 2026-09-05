@@ -98,16 +98,16 @@
     TsonConfig gives them, so a deployment's configuration and the report it produces are one vocabulary.
 
     unicode_data_version is the UCD release whose tables the rules were computed against, which is the
-    version §8.2's "UTS #39 data version" means (SPEC-FEEDBACK.md #6). It is here rather than on each
+    version §8.2 asks a report to name. It is here rather than on each
     diagnostic because it is constant for the life of the process, and because what a sender needs in
     order not to be refused is this record *before* it writes a document -- which `tson policy` prints
     with no document in hand.
     """
   @doc:"""
     [TSON-DATA] §9.1's resource limits: what this processor will spend reading one document, as against
-    what it will admit as a name. Only nesting depth is bounded so far -- §9.1 names four other limits and
-    omits the ones that bound shape rather than size (SPEC-FEEDBACK.md #33), and each lands here as it is
-    built.
+    what it will admit as a name. Only nesting depth is bounded so far -- §9.1 states eleven more with a
+    default each, and [TSON-SCHEMA] §11.5 five on the schema side under the same policy; each lands here as
+    it is built.
 
     A limit refusal is LIMIT_EXCEEDED and is not a verdict: the document may be well-formed, valid, and
     read in full by the next processor along. It is here for the same reason the Unicode policy is -- the
