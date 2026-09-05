@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.compiler.TsonDataParser;
+import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -7,88 +9,130 @@ import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.annotation.Transparent;
 import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The one implementation of {@link TemplateBody}: a constructor application in wire form, standing as the
- * body of the template that declares it, unread until materialisation substitutes its parameters away.
+ * A {@link TemplateBody}'s text, parsed -- the constructor application an open entry holds, as a working
+ * value of the phases that need one.
  *
- * <p><b>Every held body is an application, so a {@link DataValue} carries all of them.</b> A sugar form
- * already is one, by the desugar table. A bare record body becomes one: it is the
- * {@code !record { fields: [ ... ] }} §5.2 says it denotes, and {@code SchemaDesugarer} rewrites it there,
- * where the body is written, so a record template holds an application like every other open form and one
- * process closes them all.
+ * <p><b>The parsed form is a working value, not part of the entry.</b> {@link TemplateBody} carries the
+ * application as text because that is what §5.10 means by held; this parses it once, on demand, for the four
+ * questions a held body is asked before it closes: which names it mentions (§5.10's unreferenced-parameter
+ * rule), which applications it writes (§5.10.1's regularity rule and §5.10's arity rule), what substitution
+ * rewrites at materialisation, and which constructor heads it applies. Nothing outside this package sees a
+ * {@link DataValue}.
  *
- * <p><b>The rewrite belongs in the desugar phase and nowhere else.</b> The alternative -- resolve the body,
- * then write the resolved form back out -- puts a second producer in front of a wire form that two later
- * phases read, and they do not agree: {@code TsonObjectWriter} states a no-argument {@code type_ref} in the
- * explicit record form where the desugar table states it positionally, which leaves a {@code type_argument}
- * indistinguishable from a {@code type_ref} application to a walk that reads neither against a vocabulary.
- * The entry name is derived from what is written, so a second spelling is also a second entry for one type.
+ * <p><b>Parsing rather than holding is what keeps the value model a value model.</b> The AST is
+ * {@code tson-compiler}'s own grammar type and {@code tson-schema} depends on nothing here, so an entry
+ * could not carry one without inverting that direction. It also makes the text authoritative, which is what
+ * §8.1's ingest rule already assumes: an open entry's held body is re-resolved as source.
  *
- * <p><b>A composition or refinement template is held too, from one phase later.</b> Both absorb fields from a
- * source (§5.8's supertypes, §5.7's refinement source), so the form to hold is the <em>flattened</em> one --
- * a §5.7 tightening entry states a modifier and no type-ref, and is not a {@code record_field} at all until
- * the inherited field supplies one. So {@code DefinitionResolver} resolves the body against the namespace and
- * then writes it back through {@code WireForm.heldRecord}, which is the same spelling by construction.
- * A parameterized <b>atom refinement</b> is not a form at all: §12.1 gives {@code atom-refinement} no
- * parameter list, a refinement of an atom instance having no parameter to take.
+ * <p><b>Memoised, because the questions are asked repeatedly and the answer cannot change.</b> A
+ * {@link TemplateBody} is an immutable value and parsing is a pure function of its text, so one entry is
+ * parsed once however many phases ask. The cache is keyed on the record itself and bounded by the number of
+ * open entries a process loads -- schema-load work, never read-path work.
  *
- * <p><b>Which is why the kernel declares one {@code value} slot and no labelled group.</b> Every open body is
- * held, so a routed parameter rides {@code value} like any other token and {@code record_field.value_param}
- * had nothing left to disambiguate; it is gone, along with {@code instance_template} and
- * {@code template_argument}, the vocabulary that quoted an open body slot by slot.
- *
- * <p><b>An alias holds one too.</b> {@code <B> pair<uuid, B>} is the {@code !reference { target: pair<uuid,
- * B> }} §8.1 says it denotes, which is spellable because {@code reference.target} is a {@code type_ref}. So
- * {@code TypeDefinition.parameters} being non-empty and the body being held now imply each other, with no
- * exception left -- which is what lets materialisation dispatch on the constructor head rather than on what
- * shape the body happened to arrive in.
- *
- * <p><b>Held, so it needs no label for a parameter.</b> A parameter in a value slot is the one thing a typed
- * open vocabulary cannot spell without one -- a bare token there is always a literal, so a
- * {@code param}/{@code value} labelled group is the only way to tell them apart. Nothing here reads the body
- * as constructor vocabulary until materialisation has substituted, so a token is just a token and
- * substitution rewrites the ones that resolve into the entry's {@code parameters} (§8.1's shadowing rule).
- * The cost is the same one shadowing carries everywhere: a literal spelled like a live parameter is
- * unreachable inside that template.
- *
- * <p><b>{@link Transparent}, so it names itself nowhere.</b> The wrapper exists for Java's sake and
- * contributes nothing to a written body: {@code tson-bind} resolves it to the held value's own descriptor
- * with a bridge, and {@code TsonObjectWriter} writes no type-ref for it at a {@code Top} position. So a
- * template's body writes as {@code !choice { variants: [T error] }} -- the application it is -- rather than
- * as a wrapper naming a type nothing declares -- which is what §8.1 requires: no new kernel vocabulary
- * carries an open body, {@code type_definition.body} being declared {@code top} and a held body never read
- * as a {@code type_definition} value at all.
- *
- * <p><b>Which costs the tag a reader would dispatch on, and nothing that depends on it.</b> A transparent
- * member of a union is selectable only where a position declares it, never by tag -- and a written body is
- * read back by no binder: an open entry's resolved form is its declaration round-tripped, and
- * {@link TypeDefinition#parameters} being non-empty already says the body is held.
- *
- * <p><b>A wrapper rather than {@code DataValue} implementing {@link TemplateBody} directly.</b> The AST
- * models surface syntax and the {@code schema.meta} hierarchy models resolved bodies; a value is a body only
- * in this role, and saying so once here keeps the grammar types out of the value model's root hierarchy.
+ * <p><b>The two questions are not interchangeable, and a check must pick the right one.</b>
+ * {@link #applications()} returns a distinguishable shape; {@link #names()} returns every token the body
+ * holds, type references and field names and literals alike. So a rule that must not fire on a field name --
+ * "this token names an unapplied template" -- has no sound form here and belongs downstream, on the entry
+ * materialisation mints.
  */
-@Transparent
-public record HeldBody(DataValue application) implements TemplateBody {
+public final class HeldBody {
 
-    @Override
+    private static final Map<TemplateBody, HeldBody> PARSED = new ConcurrentHashMap<>();
+
+    /** Vocabulary-free, because a held application is written as the tree it is and read against nothing. */
+    private static final TsonObjectWriter WRITER = new TsonObjectWriter();
+
+    private final TemplateBody body;
+    private final DataValue application;
+
+    private HeldBody(TemplateBody body, DataValue application) {
+        this.body = body;
+        this.application = application;
+    }
+
+    /**
+     * The held body for an application this resolver has built -- the write direction, and the only way a
+     * {@link TemplateBody} is minted.
+     *
+     * <p><b>Nothing is cached here on the way past.</b> Seeding the parse cache with the tree in hand would
+     * be one parse cheaper and would hide the thing most worth knowing: that a body written out and read
+     * back is the same body. Parsing every held body through the same door as a read one keeps a
+     * round-trip defect a test failure rather than a difference between two entries that should be equal.
+     */
+    public static TemplateBody held(List<String> parameters, DataValue application) {
+        return new TemplateBody(parameters, WRITER.toTson(application));
+    }
+
+    /**
+     * {@code body}'s text parsed, from the cache when it has been asked before.
+     *
+     * <p>The text is a {@code core-value} rather than a whole document, so it parses through the data
+     * grammar and is complete when the value ends. A failure here is an internal fault and not an author
+     * error: every held body in circulation was written by {@link WireForm} from a tree this resolver built,
+     * so text that will not parse means the writer and the parser disagree.
+     */
+    public static HeldBody of(TemplateBody body) {
+        Objects.requireNonNull(body, "body");
+        return PARSED.computeIfAbsent(body, held -> {
+            try {
+                return new HeldBody(held, new TsonDataParser(held.template()).parseDocument().root());
+            } catch (RuntimeException e) {
+                throw new IllegalStateException("an open entry's held body did not parse back: "
+                        + held.template() + " -- a held body is written by WireForm and read here, so the "
+                        + "two have disagreed about the one spelling §5.10 requires", e);
+            }
+        });
+    }
+
+    /** The entry's own parameter names, in declaration order. */
+    public List<String> parameters() {
+        return body.parameters();
+    }
+
+    /** The held application as a value tree -- what substitution rewrites and what identity is derived from. */
+    public DataValue application() {
+        return application;
+    }
+
+    /**
+     * Every unquoted name this body mentions, at any depth -- the one question §5.10 asks at link time: a
+     * declared parameter the body never references is an author error.
+     *
+     * <p>What it returns is exactly the set of tokens substitution would rewrite -- unquoted ones, a quoted
+     * token in a value slot being a literal and never a name -- or the check and the rewrite disagree about
+     * what a parameter reference is.
+     */
     public Set<String> names() {
         Set<String> names = new LinkedHashSet<>();
         collect(application.coreValue(), names);
         return names;
     }
 
-    @Override
+    /**
+     * Every type application this body writes, at any depth -- the question §5.10.1 asks at the declaration:
+     * a recursive application that does not pass its parameters through unchanged grows its argument at
+     * every level, so no finite set of types closes it.
+     *
+     * <p><b>Why the check cannot simply wait for materialisation.</b> A template nobody applies is never
+     * materialised, so deferring the rule would let an irregular one ship with no verdict at all; and an
+     * application that does reach materialisation hits a depth backstop instead, which reports a chain of
+     * derived names against the line that used the template rather than the line that contains the mistake.
+     *
+     * <p>Nesting is the caller's -- what this returns is every application the tree holds, an application
+     * inside another's argument list included, each as the {@link TypeRef} it spells.
+     */
     public List<TypeRef> applications() {
         List<TypeRef> applications = new ArrayList<>();
         collectApplications(application.coreValue(), applications);
@@ -126,13 +170,6 @@ public record HeldBody(DataValue application) implements TemplateBody {
                 collect(entry.value().value().coreValue(), into);
             });
             default -> { } // a quoted token is a literal, and nothing else carries a name
-        }
-    }
-
-    public HeldBody {
-        if (application == null) {
-            throw new IllegalArgumentException("a template's held body is the application it was written as, "
-                    + "and there is always one");
         }
     }
 }

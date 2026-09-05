@@ -5,10 +5,8 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Data;
-import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.Reference;
-import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
@@ -24,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -91,63 +90,57 @@ class OpenEntryResolvedFormTest {
         }
     }
 
-    // ── What does not, and is the reason SPEC-FEEDBACK #5 is open ────────
+    // ── What §5.10's own example does, now that a held body is text ──────
 
     /**
-     * <b>§5.10's own {@code vector} example does not validate in §8.1's own prescribed form.</b> The
-     * declaration is
+     * <b>§5.10's {@code vector} example validates in §8.1's own prescribed form.</b> The declaration is
      *
      * <pre>{@code vector => <T, N> !array { element_type: T  min_items: N  max_items: N }}</pre>
      *
      * and §5.10 introduces value parameters with precisely this shape -- "a parameter in a value slot
-     * ({@code min_items: N}) ... is a token like any other". §8.1 then says the resolved entry is typed by
-     * the kernel's {@code schema}. It is not: {@code min_items} is {@code non_negative_integer?} and
-     * {@code N} is an identifier, so the body fails to read as the {@code top} the kernel declares.
+     * ({@code min_items: N}) ... is a token like any other". Its resolved body is a {@code !template} whose
+     * {@code template} field is the application as written, so there is no value slot for {@code N} to fail
+     * against and the entry is a {@code type_definition} like any other.
      *
-     * <p>The document below is hand-authored in §8.1's form rather than produced by this library's writer,
+     * <p>This is the assertion {@code SPEC-FEEDBACK.md} #5 exists for. Before the {@code template}
+     * constructor it failed with two {@code ATOM_CONSTRAINT_VIOLATION}s -- {@code N} is not a
+     * {@code non_negative_integer} -- against §8.1's claim that an open entry is "typed by the kernel's
+     * {@code schema} without a second value shape".
+     *
+     * <p>The document is hand-authored in §8.1's form rather than produced by this library's writer,
      * deliberately: the claim under test is about the <em>spec's</em> prescribed serialization, and routing
      * it through a writer would put this implementation's own canonicalisation between the claim and the
      * verdict.
-     *
-     * <p><b>When #5 lands this inverts</b> -- the same declaration resolves to a {@code !template} body whose
-     * {@code template} field is text, the document validates clean, and this asserts {@code List.of()}.
      */
     @Test
-    void anOpenEntryWithAValueParameterDoesNotValidate() {
-        List<Diagnostic> diagnostics = tson().validate("""
+    void anOpenEntryWithAValueParameterValidates() {
+        assertEquals(List.of(), tson().validate("""
                 !!schema:"https://tson.io/2026/35/m/meta-kernel.tn"
                 !schema {
                   vector => !type_definition {
                     kind: PRODUCT
                     source: array
                     parameters: [T N]
-                    body: !array { element_type: T  min_items: N  max_items: N }
+                    body: !template {
+                      parameters: [T N]
+                      template: "!array { element_type: T  min_items: N  max_items: N }"
+                    }
                   }
                 }
-                """);
-
-        List<String> pointers = diagnostics.stream().map(d -> d.path().orElse("?")).toList();
-        assertEquals(List.of("/vector/body/min_items", "/vector/body/max_items"), pointers,
-                "§8.1 says this reads as a type_definition; it does not, and these are the two slots that fail");
-        assertTrue(diagnostics.stream().allMatch(d -> d.code() == Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
-                () -> "each failure is the value slot refusing an identifier: " + diagnostics);
+                """), "a value parameter has no slot to fail against once the body is held as text");
     }
 
     /**
-     * <b>And where the premise happens to hold, it holds by accident and the entry is read as something
-     * else.</b> This is the worse half of #5: the failing case at least fails.
+     * <b>And a held body is read back as held, not as the constructor it names.</b> Before the
+     * {@code template} constructor these two validated clean and bound as something else -- {@code S} as a
+     * schema identity literally named {@code S}, {@code M} as a third enum member spelled {@code M} -- which
+     * is the half of {@code SPEC-FEEDBACK.md} #5 that produced no diagnostic anywhere.
      *
-     * <p>{@code extern_of} is core.tn's own declaration, and its resolved form validates clean -- because
-     * {@code S} in a map-key position is a well-formed relative URI, so the parameter binds as a
-     * <em>schema identity literally named {@code S}</em>. Likewise {@code M} in an enum's member list binds
-     * as a third member spelled {@code M}. A conforming ingest following §8.1 accepts both and builds a
-     * schema that means something the author did not write, with no diagnostic anywhere.
-     *
-     * <p><b>When #5 lands the second half of this goes</b>: with the body held as text there is nothing left
-     * to misread, and what remains is the first half -- that the document is valid data.
+     * <p>{@code extern_of} is core.tn's own declaration. What comes back now is the application as text,
+     * with nothing having tried to read it.
      */
     @Test
-    void anOpenEntryWhoseParametersTypecheckIsReadAsSomethingElse() {
+    void aHeldBodyReadsBackAsTheApplicationItHolds() {
         Tson tson = metaBoundTson();
         String resolved = """
                 !!schema:"https://tson.io/2026/35/m/meta.tn"
@@ -156,30 +149,31 @@ class OpenEntryResolvedFormTest {
                     kind: SUM
                     source: scoped
                     parameters: [S]
-                    body: !scoped { scope: [EXTERN]  schemas: { S => _ } }
+                    body: !template {
+                      parameters: [S]
+                      template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }"
+                    }
                   }
                   e => !type_definition {
                     kind: ATOM
                     source: enum
                     parameters: [M]
-                    body: !enum { members: [a b M] }
+                    body: !template { parameters: [M]  template: "!enum { members: [a b M] }" }
                   }
                 }
                 """;
-        assertEquals(List.of(), tson.validate(resolved), "both open entries are accepted as ordinary data");
+        assertEquals(List.of(), tson.validate(resolved), "both open entries are valid data");
 
         Map<String, TypeDefinition> read = ResolvedForm.readResolved(tson, resolved);
 
-        Top externOf = read.get("extern_of").body();
-        assertTrue(externOf instanceof Scoped, () -> "read back as a scoped body, not as a held one: " + externOf);
-        assertEquals(List.of("S"), ((Scoped) externOf).schemas().orElseThrow().keySet().stream()
-                        .map(java.net.URI::toString).toList(),
-                "the parameter bound as a schema identity -- a URI literally named 'S'");
+        TemplateBody externOf = assertInstanceOf(TemplateBody.class, read.get("extern_of").body());
+        assertEquals(List.of("S"), externOf.parameters());
+        assertEquals("!scoped { scope: [EXTERN]  schemas: { S => _ } }", externOf.template(),
+                "the application as written -- no URI named 'S' anywhere");
 
-        Top enumBody = read.get("e").body();
-        assertTrue(enumBody instanceof EnumBody, () -> "read back as an enum body: " + enumBody);
-        assertEquals(List.of("a", "b", "M"), ((EnumBody) enumBody).members(),
-                "the parameter bound as a third enum member spelled 'M'");
+        TemplateBody e = assertInstanceOf(TemplateBody.class, read.get("e").body());
+        assertEquals("!enum { members: [a b M] }", e.template(),
+                "the application as written -- no third enum member spelled 'M'");
     }
 
     // ── SPEC-FEEDBACK #6: kind restates what the entry already says ──────

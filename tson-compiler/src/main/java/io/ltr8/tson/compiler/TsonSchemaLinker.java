@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
@@ -438,7 +439,7 @@ public final class TsonSchemaLinker {
         for (Map.Entry<String, TypeDefinition> candidate : entries.entrySet()) {
             TypeDefinition definition = candidate.getValue();
             if (definition.position().isPresent() && definition.body() instanceof TemplateBody held
-                    && held.names().contains(name)) {
+                    && HeldBody.of(held).names().contains(name)) {
                 return candidate.getKey();
             }
         }
@@ -1257,7 +1258,7 @@ public final class TsonSchemaLinker {
             // The one question a held body answers without being resolved, and it answers it about tokens
             // rather than about references -- which is the same rule substitution follows when it decides
             // what to rewrite.
-            case TemplateBody held -> into.addAll(held.names());
+            case TemplateBody held -> into.addAll(HeldBody.of(held).names());
             default -> { } // an atom body names no type
         }
     }
@@ -1466,7 +1467,7 @@ public final class TsonSchemaLinker {
      */
     private static void checkHeldArity(String entryName, TemplateBody held,
             Map<String, TypeDefinition> namespace, List<String> ownParameters) {
-        for (TypeRef application : held.applications()) {
+        for (TypeRef application : HeldBody.of(held).applications()) {
             checkArity(application, namespace, ownParameters, "'" + entryName + "'");
             for (TypeArgument argument : application.arguments()) {
                 if (argument instanceof TypeArgument.Ref nested) {

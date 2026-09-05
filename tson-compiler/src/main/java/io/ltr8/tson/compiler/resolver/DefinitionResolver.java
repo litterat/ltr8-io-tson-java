@@ -44,6 +44,7 @@ import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -511,9 +512,9 @@ final class DefinitionResolver {
             return resolved;
         }
         if (record.fields().isEmpty() && record.groups().isEmpty() && record.supertypes().isEmpty()) {
-            return resolved.withBody(new HeldBody(WireForm.heldEmptyRecord()));
+            return resolved.withBody(HeldBody.held(resolved.parameters(), WireForm.heldEmptyRecord()));
         }
-        return resolved.withBody(new HeldBody(WireForm.heldRecord(record,
+        return resolved.withBody(HeldBody.held(resolved.parameters(), WireForm.heldRecord(record,
                 value -> annotationWireValue(name, value))));
     }
 
@@ -670,7 +671,7 @@ final class DefinitionResolver {
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)),
                 alias ? TypeKind.REFERENCE : constructor.kind(),
                 template.typeParams(), List.of(), List.of(), Optional.empty(),
-                new HeldBody(template.value()));
+                HeldBody.held(template.typeParams(), template.value()));
     }
 
     /** §5.10's two declaration-time questions about a held binding record -- see {@link #resolveInstanceTemplate}. */
@@ -1491,7 +1492,7 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' names no type this schema declares or imports");
         }
-        if (!(template.body() instanceof HeldBody held)) {
+        if (!(template.body() instanceof TemplateBody open)) {
             // Applied to this declaration's own parameter, so the author wrote arguments; the head takes none.
             throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' declares no type parameters, so it cannot be applied to '"
@@ -1509,7 +1510,7 @@ final class DefinitionResolver {
             // `inner<T>` whole and the absorbing declaration's own materialisation closes it.
             bindings.put(template.parameters().get(i), typeArgument(application.args().get(i)));
         }
-        DataValue body = held.application();
+        DataValue body = HeldBody.of(open).application();
         CoreValue substituted = WireForm.substitute(body.coreValue(), head,
                 template.parameters(), bindings);
         Top absorbed = bindAtomInstance(name, new DataValue(body.annotations(), body.typeRef(), substituted));

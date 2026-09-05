@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -141,7 +142,8 @@ class ApplicationInContainerPositionTest {
         assertEquals(List.of("p0"), open.parameters(), "renamed positionally, as every open synthetic is");
         // The application is held whole, so the names it mentions are simply the tokens in the body -- its
         // own head and the parameter it still awaits.
-        assertTrue(body.names().containsAll(List.of("tree", "p0")), () -> "held names: " + body.names());
+        assertTrue(HeldBody.of(body).names().containsAll(List.of("tree", "p0")),
+                () -> "held names: " + HeldBody.of(body).names());
     }
 
     /**

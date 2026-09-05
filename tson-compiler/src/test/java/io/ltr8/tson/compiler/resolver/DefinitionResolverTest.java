@@ -538,8 +538,9 @@ class DefinitionResolverTest {
         assertEquals(List.of("A", "B"), pair.parameters());
         assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" "
                         + "parameters: [ \"A\" \"B\" ] supertypes: [] subtypes: [] "
-                        + "body: !record { fields: [ "
-                        + "{ name: first type: A } { name: second type: B } ] } }",
+                        + "body: !template { parameters: [ \"A\" \"B\" ] "
+                        + "template: \"!record { fields: [ "
+                        + "{ name: first type: A } { name: second type: B } ] }\" } }",
                 write(pair));
     }
 
@@ -577,8 +578,9 @@ class DefinitionResolverTest {
         assertEquals(List.of("T"), box.parameters());
         assertEquals(List.of("base"), box.supertypes());
         assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] supertypes: [ \"base\" ] "
-                        + "subtypes: [] body: !record { supertypes: [ base ] "
-                        + "fields: [ { name: value type: T } ] } }",
+                        + "subtypes: [] body: !template { parameters: [ \"T\" ] "
+                        + "template: \"!record { supertypes: [ base ] "
+                        + "fields: [ { name: value type: T } ] }\" } }",
                 write(box));
     }
 
@@ -597,8 +599,9 @@ class DefinitionResolverTest {
                 """);
 
         assertEquals("{ kind: \"PRODUCT\" parameters: [ \"T\" ] supertypes: [ \"base\" ] "
-                        + "subtypes: [] body: !record { supertypes: [ base ] "
-                        + "fields: [ { name: id type: text } { name: value type: T } ] } }",
+                        + "subtypes: [] body: !template { parameters: [ \"T\" ] "
+                        + "template: \"!record { supertypes: [ base ] "
+                        + "fields: [ { name: id type: text } { name: value type: T } ] }\" } }",
                 write(entries.get("box")));
     }
 
@@ -672,8 +675,9 @@ class DefinitionResolverTest {
         assertEquals(List.of("T"), sized.parameters());
         assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" parameters: [ \"T\" ] "
                         + "supertypes: [] subtypes: [] "
-                        + "body: !record { fields: [ "
-                        + "{ name: value type: type_ref value: T } ] } }",
+                        + "body: !template { parameters: [ \"T\" ] "
+                        + "template: \"!record { fields: [ "
+                        + "{ name: value type: type_ref value: T } ] }\" } }",
                 write(sized));
     }
 
@@ -687,8 +691,9 @@ class DefinitionResolverTest {
 
         assertEquals("{ source: { name: \"record\" arguments: [] } kind: \"PRODUCT\" parameters: [ \"N\" ] "
                         + "supertypes: [] subtypes: [] "
-                        + "body: !record { fields: [ "
-                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] } }",
+                        + "body: !template { parameters: [ \"N\" ] "
+                        + "template: \"!record { fields: [ "
+                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] }\" } }",
                 write(retry));
     }
 
@@ -1784,12 +1789,13 @@ class DefinitionResolverTest {
                 """);
 
         TemplateBody held = assertInstanceOf(TemplateBody.class, entries.get("bounded").body());
-        assertTrue(held.names().contains("MIN"), () -> "the parameter is in the body: " + held.names());
-        assertTrue(held.names().contains("integer"), () -> "the type came from the source: " + held.names());
+        Set<String> names = HeldBody.of(held).names();
+        assertTrue(names.contains("MIN"), () -> "the parameter is in the body: " + names);
+        assertTrue(names.contains("integer"), () -> "the type came from the source: " + names);
         // REQUIRED is the constructor's own default and so is not written at all -- which is the assertion:
         // the inherited OPTIONAL did not survive, and no FIXED state was reached either.
-        assertFalse(held.names().contains(FieldState.OPTIONAL.name()), () -> held.names().toString());
-        assertFalse(held.names().contains(FieldState.OPTIONAL_FIXED.name()), () -> held.names().toString());
+        assertFalse(names.contains(FieldState.OPTIONAL.name()), names::toString);
+        assertFalse(names.contains(FieldState.OPTIONAL_FIXED.name()), names::toString);
     }
 
     // ── Group presence under tightening (§5.11) ───────────────────────────

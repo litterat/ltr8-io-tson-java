@@ -167,7 +167,7 @@ public final class MetaKernelBootstrapResolver {
             if (!instance.typeParams().isEmpty()) {
                 entries.put(declaration.name(), new TypeDefinition(Optional.of(TypeRef.of(instance.target())),
                         target.kind(), instance.typeParams(), List.of(), List.of(), Optional.empty(),
-                        new HeldBody(instance.value())));
+                        HeldBody.held(instance.typeParams(), instance.value())));
                 continue;
             }
             // §5.5: constructor application transfers only the target's kind; no supertypes, no
