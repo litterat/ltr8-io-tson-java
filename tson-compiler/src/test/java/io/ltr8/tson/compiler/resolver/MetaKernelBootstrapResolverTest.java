@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and all 13 {@code Instance} declarations the second pass covers (three {@code unit} instances,
  * {@code integer}, {@code text}/{@code uri}/{@code regex}, and six {@code enum} instances,
  * including one -- {@code boolean} -- declared *before* {@code enum} itself in source order)
- * resolve to the expected kind/body -- all 51 of the real fixture's declarations resolve, alongside the
+ * resolve to the expected kind/body -- all 50 of the real fixture's declarations resolve, alongside the
  * nine entries {@link SchemaDesugarer} injects for their argument-bearing applications.
  */
 class MetaKernelBootstrapResolverTest {
@@ -102,7 +102,7 @@ class MetaKernelBootstrapResolverTest {
 
         assertEquals(new EnumBody(List.of("INDEX", "NAMED")), schema.entries().get("product_access_type").body());
         assertEquals(new EnumBody(List.of("FIXED", "VARIABLE")), schema.entries().get("product_size_type").body());
-        for (String name : List.of("field_state", "element_state", "type_kind")) {
+        for (String name : List.of("field_state", "element_state")) {
             assertInstanceOf(EnumBody.class, schema.entries().get(name).body());
         }
     }
@@ -135,10 +135,10 @@ class MetaKernelBootstrapResolverTest {
      * form stays prohibited at a field position (§5.2).
      */
     @Test
-    void theFiftyOneFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
+    void theFiftyFixtureDeclarationsResolveAlongsideEightDesugaredEntries() {
         TsonSchema schema = MetaKernelBootstrapResolver.getMetaKernelSchema();
 
-        assertEquals(59, schema.entries().size());
+        assertEquals(58, schema.entries().size());
         for (String head : List.of("array_tuple_element", "array_field_name", "array_type_ref",
                 "array_type_name", "array_type_argument", "array_param_name", "array_field_group",
                 "array_record_field")) {

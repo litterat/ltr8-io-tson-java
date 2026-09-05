@@ -42,7 +42,7 @@ import java.util.Optional;
  * soon as a second, convenience constructor exists, or {@code tson-bind}'s own constructor-selection
  * fails outright (see {@link IntegerSize}'s own Javadoc for the identical situation).
  */
-public record TypeDefinition(Optional<TypeRef> source, TypeKind kind,
+public record TypeDefinition(Optional<TypeRef> source, @Unbound TypeKind kind,
                               List<String> supertypes, List<String> subtypes,
                               Top body, @Unbound Optional<SourcePosition> position,
                               Annotations annotations) {

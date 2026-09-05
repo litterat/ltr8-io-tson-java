@@ -48,6 +48,9 @@ final class ResolvedForm {
 
     private static final Pattern SOURCE_POSITION = Pattern.compile("position=Optional\\[Position\\[[^\\]]*\\]\\]");
 
+    /** {@code kind} is {@code @Unbound}: derived at resolution, absent from §8's output, so never compared. */
+    private static final Pattern KIND = Pattern.compile("kind=[A-Z_]+|kind=null");
+
     /** The placeholder both sides reduce a synthetic's content hash to. */
     static final String HASH_PLACEHOLDER = "_xxhash";
 
@@ -98,10 +101,12 @@ final class ResolvedForm {
                 : definition;
         String text = SYNTHETIC_HASH_ANYWHERE.matcher(String.valueOf(canonical(compared)))
                 .replaceAll(HASH_PLACEHOLDER);
-        // `position` is this model's own: an @Unbound component recording where a declaration was written,
-        // which §8's resolved form has no field for and nothing external carries. Normalised away rather
-        // than compared, exactly as TypeDefinition's own equals leaves it out.
-        return SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty");
+        // `position` and `kind` are this model's own: @Unbound components §8's resolved form has no field
+        // for. `position` records where a declaration was written; `kind` is derived at resolution and kept
+        // for the resolver's own use, so a definition read back from a fixture carries none. Normalised away
+        // rather than compared, exactly as TypeDefinition's own equals leaves them out.
+        return KIND.matcher(SOURCE_POSITION.matcher(text).replaceAll("position=Optional.empty"))
+                .replaceAll("kind=DERIVED");
     }
 
     /**
