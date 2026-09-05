@@ -41,11 +41,23 @@ public class ComponentInfo {
 
 	private Union union;
 
+	// Marked @Unbound: the component belongs to the class, not the wire. It keeps its constructor slot and
+	// arrives as null, but no schema field fills it and nothing writes it.
+	private boolean unbound;
+
 
 	public ComponentInfo(String name, Class<?> type) {
 		this.name = name;
 		this.type = type;
 		this.constructorArgument = -1;
+	}
+
+	public boolean isUnbound() {
+		return unbound;
+	}
+
+	public void setUnbound(boolean unbound) {
+		this.unbound = unbound;
 	}
 
 	public void setName(String name) {
