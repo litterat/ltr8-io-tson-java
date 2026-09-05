@@ -58,7 +58,7 @@ import java.util.function.Function;
  * {@code groundRemainingAsType}. §5.10 makes such a parameter a resolver error ("grounded only in mutual
  * recursion between templates, with no concrete kind-determining use"); this implementation reads it as
  * having one consistent assignment instead, because being a value parameter <em>means</em> standing in a
- * scalar slot and a slot is what grounds a parameter. {@code SPEC-FEEDBACK.md} #20 carries the divergence.
+ * scalar slot and a slot is what grounds a parameter. [TSON-SCHEMA] §5.10 states the rule.
  */
 final class ParameterKinds {
 

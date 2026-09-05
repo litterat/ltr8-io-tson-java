@@ -360,7 +360,7 @@ public final class SchemaResolver {
         // rewrite: resolved output states the chain the author wrote, every use site keeps the name it
         // names, and a processor collapses the chain when it compiles readers -- after linking, where the
         // whole namespace is present and the walk is done once per entry rather than once per output.
-        // See docs/schema-resolution.md and SPEC-FEEDBACK.md #32.
+        // See docs/schema-resolution.md and [TSON-SCHEMA] §8.3.
 
         // §6: an annotation written before the declared name binds to the *name*, not to the definition,
         // and "the resolver does not hoist annotations from key to value". A resolved schema is a

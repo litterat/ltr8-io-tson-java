@@ -14,7 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * [TSON-DATA] §8.2's three name-hygiene rules over the schema-layer scopes [TSON-SCHEMA] §11.4 names,
- * plus the one this implementation adds -- a template's parameters ({@code SPEC-FEEDBACK.md} #5).
+ * plus the one this implementation adds -- a template's parameters, which §11.4 and §5.10 both decline to
+ * list.
  *
  * <p><b>All three run in one walk</b> ({@code TsonSchemaLinker.checkNames}), which is what makes the scope
  * list the only place a position can be forgotten. The restricted-character rule used to run at the
@@ -88,10 +89,11 @@ class ConfusableNameScopesTest {
     }
 
     /**
-     * <b>A template's parameters, which §11.4 does not list as a scope</b> ({@code SPEC-FEEDBACK.md} #5).
-     * {@code <T, Т>} declares two parameters that read identically; a body referencing {@code T} binds one of
-     * them and a reviewer cannot see which, which is the substitution hazard §8.2 exists to refuse. §11.4's
-     * own reasoning for enum members applies to it unchanged.
+     * <b>A template's parameters, which §11.4 declines to list as a scope</b> -- one author writes the list
+     * whole on one line, so the population is empty. {@code <T, Т>} declares two parameters that read
+     * identically; a body referencing {@code T} binds one of them and a reviewer cannot see which, which is
+     * the substitution hazard §8.2 exists to refuse. Only the look-alike rule is a divergence here:
+     * mechanisms 2 and 3 are per-name and reach every identifier position anyway (§8.2).
      */
     @Test
     void twoTemplateParametersThatReadAlikeAreRefused() {

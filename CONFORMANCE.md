@@ -99,11 +99,10 @@ conforming implementations can disagree about a code point assigned between two 
 
 **`!duration` accepts the `PnW` week form, standing alone.** RFC 3339 Appendix A's production is an
 alternation — `duration = "P" (dur-date / dur-time / dur-week)` — so `P3W` is a duration, `P1W2D` and
-`P1WT1H` are not, and a week is exactly 7 days, making `P2W`, `P14D` and `PT336H` one value. §5.4's table
-shows only `PnYnMnDTnHnMnS`, which since the `duration`/`period` split names two designators `duration`
-refuses and omits the one it admits; [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md) #1 proposes the table follow the
-ABNF. A canonical write emits the `PTnHnMnS` form, so `PnW` and `PnD` are reading conveniences the way
-`0x50` is for an integer — the value is a count of seconds and carries no memory of how it was spelled.
+`P1WT1H` are not, and a week is exactly 7 days, making `P2W`, `P14D` and `PT336H` one value. §5.4 states all
+three rules and gives `!duration` and `!period` a row each. A canonical write emits the `PTnHnMnS` form, so
+`PnW` and `PnD` are reading conveniences the way `0x50` is for an integer — the value is a count of seconds
+and carries no memory of how it was spelled.
 
 **`toTson`'s round trip is intentionally lossy in a few specific, documented ways.** It's a debugging
 tool, not a guaranteed-lossless serializer: a `!typeName` type-ref is only re-emitted where a value

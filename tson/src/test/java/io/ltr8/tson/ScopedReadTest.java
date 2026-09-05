@@ -302,7 +302,7 @@ class ScopedReadTest {
         assertTrue(problems.getFirst().message().contains("not a scoped type"), problems::toString);
     }
 
-    /** And a document with no schema of its own opens no scope at all -- see {@code SPEC-FEEDBACK.md}. */
+    /** And a document with no schema of its own opens no scope at all ([TSON-SCHEMA] §7.8). */
     @Test
     void aSchemalessDocumentOpensNoScope() {
         List<Diagnostic> problems = tson().validate("{ a: !!schema:\"" + CLAIM + "\" !claim { id: a } }");

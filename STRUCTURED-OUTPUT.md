@@ -229,9 +229,9 @@ Concrete items and decisions:
 
 ### JSON compatibility
 
-**This section is now the whole of it.** The notation no longer claims to be a JSON superset — §6 and
-principle 5 go with `SPEC-FEEDBACK.md` #8 — so reading JSON is a reader's job rather than a property of the
-grammar, which is what the items below already assumed. Nothing here weakens; what changes is that a
+**This section is now the whole of it.** The notation no longer claims to be a JSON superset — §6 says so
+outright, and the JSON-compatibility principle is gone from §1.2 — so reading JSON is a reader's job rather
+than a property of the grammar, which is what the items below already assumed. Nothing here weakens; what changes is that a
 `TsonJsonParser` is the only place JSON compatibility lives, and it is free to map JSON's constructs rather
 than having to agree with TSON's by construction.
 

@@ -277,8 +277,8 @@ public final class TsonCli {
      * rule is about which layer detected it, and this code answers what the caller should do now. A refusal
      * was checked and declined and the sender holds the fix, which is what 1 means. What is genuinely
      * portable-sensitive about a refusal -- that another deployment may accept the same document -- is
-     * carried by the diagnostic's own code and by the run's own {@link CliPolicy}.
-     * {@code SPEC-FEEDBACK.md} #14 proposes §8.2 stop asking for the separate channel.
+     * carried by the diagnostic's own code and by the run's own {@link CliPolicy}, which is the shape §8.2
+     * now asks for: the policy and the data version are properties of the report, not of the refusal.
      *
      * <p><b>A [TSON-DATA] §9.1 limit refusal is also 1, and it is the one place an {@link
      * Outcome#NOT_CHECKED} run exits 1.</b> Everywhere else the two agree, because everywhere else a

@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/35/m/meta.tn?sha256=bae2658bbefd1e4ab9b996835d68f5bc8aaaca808c7a253d00398348937f0208"
-!!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=6991f932be2f61e8e6e59d7f45287e9c50f6c559c4c437163b6eeb1a01d1155f"
-!!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=6991f932be2f61e8e6e59d7f45287e9c50f6c559c4c437163b6eeb1a01d1155f"
+!!id:"https://tson.io/2026/35/m/meta.tn?sha256=74a15934c18e91486742735b50a0befa27d7b82b8204efc1e5ffcab538a83315"
+!!meta:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0185d18d3f3e3d3d3aeb62adcf0d1f4ee496cbe8372da71c8ca7bef78c2e3886"
+!!import:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=0185d18d3f3e3d3d3aeb62adcf0d1f4ee496cbe8372da71c8ca7bef78c2e3886"
 @doc:"""
   TSON meta-schema — 2026 Revision 35 draft.
 
@@ -103,11 +103,11 @@
   @doc:"""
     The set spelling an author writes: `set<text>` where the bare
     construction is `!set_type { element_type: text }`. A §5.10
-    template, not a constructor — it carries no `~`, so §4.2's
-    value-route-only rule does not reach its parameter, and
-    `set_type` stays parameterless as §4.2 requires of every
-    container constructor. The element type arrives by application
-    rather than by a parameter on the constructor itself.
+    template, not a constructor: it composes with nothing and so is
+    not IS-A `top`, and `set_type` stays parameterless as §4.2
+    requires of every container constructor. The element type
+    arrives by application rather than by a parameter on the
+    constructor itself.
 
     This copy serves meta's own fields (`scoped.scope`) and meta-layer
     extensions. Core declares a sibling under the same name, as it

@@ -52,7 +52,8 @@ are kept in step deliberately.
   — `@bytes_encoding` was the one field annotation with decode force, and the alphabet is a type selector now
   (`bytes_type.encoding`), so no annotation the meta layer declares changes how a value reads. The rule is
   unchanged; only its demonstration is now over resolved output. `RestatedFieldAnnotationsTest` covers each
-  case; §5.8/§8.1 owe the rule, which is `SPEC-FEEDBACK.md` #25(c).
+  case, and §5.8 now states the rule: the restatement's own annotations in source order, then the inherited
+  field's, adding and never removing.
 - **What resolves:** record construction; composition (`A & B & { ... }`, §5.8, with kind from the literal
   base-kind names in the transitive supertype chain, and tightening in the trailing body per §5.7); the
   `^` refinement operator (§5.7, copies the source's whole field set, admits no new fields); bare
@@ -124,26 +125,23 @@ are kept in step deliberately.
   refuse. What that used to protect for an ordinary schema, eligibility protects better — it refuses the
   declaration outright rather than only the unmarked spelling of it — and in a meta-schema, where extending
   a vocabulary is the point, it is simply allowed. `ApplicabilityIsIsATopTest` and
-  `ConstructorLevelDisciplineTest` pin both halves; `SPEC-FEEDBACK.md` #36 is the spec side.
-- **§4.2's two remaining declaration-time rules.** **Placement** (a constructor declared only in a schema
-  whose own `!!meta` names the meta-kernel) is the eligibility rule above, checked in the linker.
-  **Construction is exempt** and always was — §5.5 transfers kind and no supertypes, so `!C { … }` yields an
+  `ConstructorLevelDisciplineTest` pin both halves; §3.3.1 and §4.2 are the spec side, the `~` marker and
+  `type_definition.constructor` having gone with the rule that needed them.
+- **§4.2's remaining declaration-time rule is placement** — a constructor declared only in a schema whose own
+  `!!meta` names the meta-kernel — which is the eligibility rule above, checked in the linker.
+  **Construction is exempt** and always was: §5.5 transfers kind and no supertypes, so `!C { … }` yields an
   entry with an empty chain, which is why an instance is not itself a constructor.
-- **§4.2's value-route-only rule is enforced where the argument lands, not at the declaration.** A `~`
-  declaration's parameter routed into a *vocabulary slot* typed `type_ref` — `my_set => <T> array ^ {
-  element_type: = T }` — is refused when it closes, by §5.2's rule that a fixed value is available on a
-  field typed by an atom or an enum and nowhere else; the legal value-routed form (`max_items: = N`, an
-  atom-typed slot) closes normally. What is **not** checked is the channel §5.2 never sees, a parameter
-  standing as a *field type* or a *variant*. §4.2 calls that a resolver error at the declaration, and its
-  stated reason — that a type-channel parameter "could close only by rewriting the body — the materialisation
-  constructors never get" — does not hold here: §5.10 materialisation rewrites held bodies and closes exactly
-  this shape, which `DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord` pins. **It
-  closes into a working type, not a tolerated one**: `ctor_box => <T> ~base & { value: T }` with
-  `flagged => ctor_box<boolean>` materialises, compiles, accepts `{ value: true }` and rejects
-  `{ value: banana }` with a `TYPE_MISMATCH` at `/value`; the variant channel behaves the same. That is the
-  evidence `SPEC-FEEDBACK.md` #35 rests on, which proposes §4.2 delete the rule: its other two channels are
-  decided by §5.2 and §5.10 anyway, and its remaining one has no legal spelling once level discipline is
-  enforced beside it.
+- **A constructor's parameters are confined to no channel**, which is §4.2's own rule: "an argument is
+  substituted as a token and read by the position it lands in, so a slot typed `type_ref` takes a type where
+  an atom-typed slot takes a value". Nothing is checked at the declaration, and each channel is decided where
+  the argument lands. A parameter routed into a *vocabulary slot* typed `type_ref` — `my_set => <T> array ^ {
+  element_type: = T }` — is refused when it closes, by §5.2's rule that a fixed value is available on a field
+  typed by an atom or an enum and nowhere else; the legal value-routed form (`max_items: = N`, an atom-typed
+  slot) closes normally. A parameter standing as a *field type* or a *variant* closes into a working type
+  rather than a tolerated one: `ctor_box => <T> base & { value: T }` with `flagged => ctor_box<boolean>`
+  materialises, compiles, accepts `{ value: true }` and rejects `{ value: banana }` with a `TYPE_MISMATCH` at
+  `/value`, and the variant channel behaves the same
+  (`DefinitionResolverTest.resolvesACompositionTemplateAsAHeldFlattenedRecord`).
 - **All six of §5.2's field-state spellings resolve**, including `field: type? = _` — `OPTIONAL_FIXED`
   carrying *no* value, so §8.1 writes a `record_field` without a `value` member and the field must be
   omitted or written `_`. Its three resolver errors are enforced: `~ _` on any field, `= _` on a REQUIRED
@@ -260,8 +258,8 @@ are kept in step deliberately.
     is exact and total, not a partial prover. **A network family folds its prefix bounds in**, because its
     value is a block and a block is refused for *overlapping* an exclusion: `within: ["10.0.0.0/24"]
     excluding: ["10.0.0.5/32"] max_prefix: 24` admits no network while admitting almost every address. That is
-    the same fold `integer` performs with its `size`-derived range. `SPEC-FEEDBACK.md` #34 asks §5.5 to state
-    both halves.
+    the same fold `integer` performs with its `size`-derived range, and §5.5 states both halves: the pair MUST
+    admit a value, and for a network family the prefix bounds participate.
   - **The three temporal families' rules are correct but not yet reachable from schema text**, for a reason
     that predates them and is nothing to do with coherence: `date_type.min`/`max` are declared `value?` in
     meta.tn (the untyped escape hatch), so a bound arrives as a `String` and the bind into `DateType`'s
@@ -401,8 +399,7 @@ recorded open form, and replacing the application with a reference to the entry 
   wrote survives at the use site, which states it as written — a division that only became available once
   flattening stopped rewriting use sites. `AliasedArgumentIdentityTest` pins it. The one case this used to get
   wrong — a reference carrying an alphabet directive, which was not a pure rename — cannot arise now: the
-  alphabet is `bytes_type`'s own `encoding` selector, so it is part of the type and travels with it
-  (`SPEC-FEEDBACK.md` #29).
+  alphabet is `bytes_type`'s own `encoding` selector (§5.5), so it is part of the type and travels with it.
 - **It runs over the resolved form, not the AST**, as a pass in `SchemaResolver` after the driving loop.
   Two reasons. An application arrives here as a `schema.meta.TypeRef` carrying `arguments` — the one thing
   that shape means, since a closed form is always an entry named by a bare reference — so substitution is a

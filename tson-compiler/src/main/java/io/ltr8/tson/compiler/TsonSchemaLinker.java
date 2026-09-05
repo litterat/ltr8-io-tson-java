@@ -246,7 +246,7 @@ public final class TsonSchemaLinker {
             checkScope(receiver, schema, name, definition, names, noun, identifiers);
 
             // [TSON-SCHEMA] §11.4 does not list a template's parameters among its scopes, and this treats
-            // them as one anyway -- SPEC-FEEDBACK.md #5. A parameter is a name, §11.4's own reasoning for
+            // them as one anyway -- §11.4 declines the scope. A parameter is a name, §11.4's own reasoning for
             // enum members applies to it unchanged, and `<T, Т>` otherwise declares two parameters that read
             // identically: a body referencing `T` binds one of them and a reviewer cannot see which, which
             // is the substitution hazard §8.2 exists to refuse.

@@ -26,8 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p><b>A processor collapses the chain when it compiles readers</b> — after linking, once per entry, where
  * the whole namespace is present ({@code TsonSchemaCompiler}). That is an implementation's choice of moment,
  * not a property of resolved output: the walk happened either way, and rewriting the output as well left two
- * representations to keep in step and a summary ({@code @alias}) that dropped the intermediate hops. See
- * {@code SPEC-FEEDBACK.md} #32.
+ * representations to keep in step and a summary ({@code @alias}) that dropped the intermediate hops. §8.3
+ * states both halves: a processor MAY collapse after linking, when it compiles for reading, and MUST NOT
+ * collapse in resolved output.
  */
 class ReferenceChainTest {
 
