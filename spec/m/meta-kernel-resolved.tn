@@ -77,7 +77,7 @@
   @doc:"Base kinds. `top` is the structural root; every constructor transitively IS-A `atom`, `product`, `sum` or `data`, each of which IS-A `top`. Construction transfers kind, not IS-A."
   top => !type_definition {
     kind: PRODUCT
-    subtypes: [array atom choice data enum integer_type map product record reference regex_type set_type sum text_type tuple unit uri_type]
+    subtypes: [array atom choice data enum integer_type map product record reference regex_type set_type sum template text_type tuple unit uri_type]
     body: !record { fields: [] }
   }
 
@@ -124,6 +124,16 @@
     supertypes: [top]
     body: !record { supertypes: [top]  fields: [
       !record_field { name: target  type: type_ref }
+    ] }
+  }
+
+  @doc:"Held body of an open entry — the application as written, unread until its parameters are substituted away."
+  template => !type_definition {
+    kind: PRODUCT
+    supertypes: [top]
+    body: !record { supertypes: [top]  fields: [
+      !record_field { name: parameters  type: array_param_name_xxhash }
+      !record_field { name: template    type: text }
     ] }
   }
 
