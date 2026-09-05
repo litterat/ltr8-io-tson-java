@@ -850,7 +850,7 @@ public final class TsonSchemaLinker {
     private static TypeDefinition withAddedSubtypes(TypeDefinition def, Set<String> newSubtypes) {
         Set<String> combined = new LinkedHashSet<>(def.subtypes());
         combined.addAll(newSubtypes);
-        return new TypeDefinition(def.source(), def.kind(), def.parameters(),
+        return new TypeDefinition(def.source(), def.kind(),
                 def.supertypes(), List.copyOf(combined), def.disjoint(), def.body(), def.position(),
                 def.annotations());
     }
@@ -867,7 +867,7 @@ public final class TsonSchemaLinker {
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             if (entry.getValue().body() instanceof ChoiceBody choice) {
                 TypeDefinition def = entry.getValue();
-                result.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(), def.parameters(),
+                result.put(entry.getKey(), new TypeDefinition(def.source(), def.kind(),
                         def.supertypes(), def.subtypes(),
                         Optional.of(ChoiceDisjointness.derive(choice, merged)), def.body(), def.position(),
                         def.annotations()));
@@ -975,7 +975,11 @@ public final class TsonSchemaLinker {
             Map<String, TypeDefinition> sourceLookup =
                     structureNamespace.isEmpty() || !source.arguments().isEmpty() ? namespace
                             : mergeWithFallback(namespace, structureNamespace);
-            validateTypeRef(source, sourceLookup, def.parameters(), name, " source");
+            // `source` never names a parameter: an open entry records the constructor its held body applies,
+            // and a partial application states its own arguments in `reference.target` rather than here
+            // ([TSON-SCHEMA] §8.1's alias paragraph, SPEC-FEEDBACK #7). So a parameter reaching this
+            // position is an unresolved reference, which is the verdict every other reference form gives it.
+            validateTypeRef(source, sourceLookup, List.of(), name, " source");
         }
         // A supertype gets the same structure-namespace fallback as `source`, and for the same reason: it is
         // not an author-written reference but the residue of one, and §3.3.2 confines only author-written

@@ -404,14 +404,12 @@
   extern_of => !type_definition {
     kind: SUM
     source: scoped
-    parameters: [S]
     body: !template { parameters: [S]  template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }" }
   }
 
   extern_type => !type_definition {
     kind: SUM
     source: scoped
-    parameters: [S T]
     body: !template { parameters: [S T]  template: "!scoped { scope: [EXTERN]  schemas: { S => [T] } }" }
   }
 
@@ -419,7 +417,6 @@
   set => !type_definition {
     kind: PRODUCT
     source: set_type
-    parameters: [T]
     body: !template { parameters: [T]  template: "!set_type { element_type: T }" }
   }
 

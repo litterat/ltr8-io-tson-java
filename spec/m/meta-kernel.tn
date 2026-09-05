@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=3f90e354c83e9ce6642cdd2c18da06c9c07f1dbb7f83edbe8513d7fe11824690"
+!!id:"https://tson.io/2026/35/m/meta-kernel.tn?sha256=1702a83160d4b755d205e6b67f32c9853d3c8c4dec871bd684fbf429e6c56230"
 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -538,7 +538,6 @@
   type_definition => {
     source:       type_ref?
     kind:         type_kind
-    parameters:   [param_name]?
     supertypes:   [type_name]?
     subtypes:     [type_name]?
     disjoint:     boolean?

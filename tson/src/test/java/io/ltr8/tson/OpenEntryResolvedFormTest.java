@@ -120,7 +120,6 @@ class OpenEntryResolvedFormTest {
                   vector => !type_definition {
                     kind: PRODUCT
                     source: array
-                    parameters: [T N]
                     body: !template {
                       parameters: [T N]
                       template: "!array { element_type: T  min_items: N  max_items: N }"
@@ -148,7 +147,6 @@ class OpenEntryResolvedFormTest {
                   extern_of => !type_definition {
                     kind: SUM
                     source: scoped
-                    parameters: [S]
                     body: !template {
                       parameters: [S]
                       template: "!scoped { scope: [EXTERN]  schemas: { S => _ } }"
@@ -157,7 +155,6 @@ class OpenEntryResolvedFormTest {
                   e => !type_definition {
                     kind: ATOM
                     source: enum
-                    parameters: [M]
                     body: !template { parameters: [M]  template: "!enum { members: [a b M] }" }
                   }
                 }
@@ -174,6 +171,69 @@ class OpenEntryResolvedFormTest {
         TemplateBody e = assertInstanceOf(TemplateBody.class, read.get("e").body());
         assertEquals("!enum { members: [a b M] }", e.template(),
                 "the application as written -- no third enum member spelled 'M'");
+    }
+
+    // ── The biconditional `type_definition.parameters` rests on ─────────
+
+    /**
+     * <b>An entry declares parameters exactly when its body is held, and the two lists agree.</b>
+     * [TSON-SCHEMA] §5.10's "Closed entries are parameter-free" is structural now rather than a MUST anyone
+     * can violate: {@code TypeDefinition.parameters()} reads the held body's own list, so a closed entry has
+     * nowhere to put one. This asks it of every entry of every schema -- the three bundled ones and a schema
+     * exercising each template shape -- which is the population the rule is about, and it is what would catch
+     * the derivation silently answering {@code []} for an entry that is genuinely open.
+     *
+     * <p><b>It is a property of a published entry, not of every {@code TypeDefinition} ever built.</b>
+     * Resolution legitimately constructs an un-held intermediate and converts it: {@code holdIfOpen} takes a
+     * resolved record body and replaces it with the held form, and is handed the parameter list separately
+     * for exactly that reason. So the invariant cannot be an assertion in the constructor -- it would fire on
+     * the value about to be converted -- and belongs here, over entries a schema actually holds.
+     */
+    @Test
+    void anEntryDeclaresParametersExactlyWhenItsBodyIsHeld() {
+        Tson tson = tson();
+        tson.resolve("""
+                !!id:"https://example.com/shapes.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
+                {
+                  base           => { id: text }
+                  pair           => <A, B> { first: A  second: B }
+                  uuid_pair      => <B> pair<text, B>
+                  boxes          => <T> [T]
+                  text_keyed_map => <V> {text => V}
+                  vec            => <T, N> !array { element_type: T  min_items: N  max_items: N }
+                  composed       => <T> base & { value: T }
+                  holder         => { p: pair<text, int32>  q: vec<int32, 3> }
+                }
+                """);
+        List<String> ids = List.of(TsonBundledSchemas.META_KERNEL_ID, TsonBundledSchemas.META_ID,
+                TsonBundledSchemas.CORE_ID, "https://example.com/shapes.tn");
+
+        List<String> broken = new ArrayList<>();
+        int open = 0;
+        for (String id : ids) {
+            for (Map.Entry<String, TypeDefinition> entry
+                    : tson.bindRegistry().core().resolveLinked(id).schema().entries().entrySet()) {
+                TypeDefinition definition = entry.getValue();
+                boolean held = definition.body() instanceof TemplateBody;
+                if (held) {
+                    open++;
+                }
+                if (definition.parameters().isEmpty() == held) {
+                    broken.add(id + "#" + entry.getKey() + ": parameters " + definition.parameters()
+                            + " with a " + definition.body().getClass().getSimpleName() + " body");
+                } else if (definition.body() instanceof TemplateBody body
+                        && !body.parameters().equals(definition.parameters())) {
+                    broken.add(id + "#" + entry.getKey() + ": entry states " + definition.parameters()
+                            + " and its held body states " + body.parameters());
+                }
+            }
+        }
+
+        int openEntries = open;
+        assertEquals(List.of(), broken, "§5.10: only template entries are open, and they agree with their body");
+        assertTrue(openEntries >= 8, () -> "not enough open entries to mean anything: " + openEntries);
     }
 
     // ── SPEC-FEEDBACK #6: kind restates what the entry already says ──────

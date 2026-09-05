@@ -47,7 +47,6 @@
   set => !type_definition {
     kind: PRODUCT
     source: set_type
-    parameters: [T]
     body: !template { parameters: [T]  template: "!set_type { element_type: T }" }
   }
 

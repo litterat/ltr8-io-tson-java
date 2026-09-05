@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RecordClosureTest {
 
     private static TypeDefinition atom(io.ltr8.tson.schema.meta.Top body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.ATOM, List.of(),  List.of(), List.of(),
+        return new TypeDefinition(Optional.empty(), TypeKind.ATOM,  List.of(), List.of(),
                 Optional.empty(), body);
     }
 

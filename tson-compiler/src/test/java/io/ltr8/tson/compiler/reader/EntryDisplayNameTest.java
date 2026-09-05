@@ -43,12 +43,12 @@ class EntryDisplayNameTest {
 
     /** An entry the resolver minted: no position, because there is no declaration to have one. */
     private static TypeDefinition synthetic(io.ltr8.tson.schema.meta.Top body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(),  List.of(), List.of(),
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT,  List.of(), List.of(),
                 Optional.empty(), body, Optional.empty());
     }
 
     private static TypeDefinition synthetic(io.ltr8.tson.schema.meta.Top body, TypeRef source) {
-        return new TypeDefinition(Optional.of(source), TypeKind.PRODUCT, List.of(),  List.of(), List.of(),
+        return new TypeDefinition(Optional.of(source), TypeKind.PRODUCT,  List.of(), List.of(),
                 Optional.empty(), body, Optional.empty());
     }
 
@@ -58,7 +58,7 @@ class EntryDisplayNameTest {
 
     @Test
     void aDeclarationKeepsItsOwnNameWhateverItsShape() {
-        TypeDefinition declared = new TypeDefinition(Optional.of(TypeRef.of("array")), TypeKind.PRODUCT, List.of(),
+        TypeDefinition declared = new TypeDefinition(Optional.of(TypeRef.of("array")), TypeKind.PRODUCT,
                  List.of(), List.of(), Optional.empty(),
                 array(Optional.of(BigInteger.ONE), Optional.empty()), Optional.of(SOMEWHERE));
 

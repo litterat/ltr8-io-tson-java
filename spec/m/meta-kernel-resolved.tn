@@ -515,7 +515,6 @@
     body: !record { fields: [
       !record_field { name: source       type: type_ref  state: OPTIONAL }
       !record_field { name: kind         type: type_kind }
-      !record_field { name: parameters   type: array_param_name_xxhash  state: OPTIONAL }
       !record_field { name: supertypes   type: array_type_name_xxhash  state: OPTIONAL }
       !record_field { name: subtypes     type: array_type_name_xxhash  state: OPTIONAL }
       !record_field { name: disjoint     type: boolean  state: OPTIONAL }

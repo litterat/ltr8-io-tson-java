@@ -479,8 +479,7 @@ final class TemplateMaterialiser {
         if (namespace.getTypeDefinition(formName) != null) {
             return formName; // already built, here or by the desugar phase -- one entry per form, schema-wide
         }
-        TypeDefinition definition = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(),
-                List.of(), List.of(), List.of(), Optional.empty(), closed.body());
+        TypeDefinition definition = new TypeDefinition(Optional.of(TypeRef.of(target)), template.kind(), List.of(), List.of(), Optional.empty(), closed.body());
         materialised.put(formName, definition);
         synthetics.add(formName);
         publish.accept(formName, definition);
@@ -530,7 +529,7 @@ final class TemplateMaterialiser {
     private TypeDefinition closeHeldRecord(String head, TypeDefinition template, HeldBody open,
             List<TypeArgument> arguments, Map<String, TypeArgument> bindings) {
         Closed closed = closeHeld(head, template, open, bindings);
-        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), template.kind(), List.of(),
+        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), template.kind(),
                 template.supertypes(), template.subtypes(), Optional.empty(),
                 fixRoutedValues(closed.body()));
     }
@@ -638,7 +637,7 @@ final class TemplateMaterialiser {
      * record one.
      */
     private static TypeDefinition instantiationOf(String head, List<TypeArgument> arguments, String formName) {
-        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE, List.of(),
+        return new TypeDefinition(Optional.of(new TypeRef(head, arguments)), TypeKind.REFERENCE,
                 List.of(), List.of(), Optional.empty(), new Reference(TypeRef.of(formName)));
     }
 

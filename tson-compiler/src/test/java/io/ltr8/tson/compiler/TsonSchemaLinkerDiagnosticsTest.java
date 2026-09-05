@@ -37,7 +37,7 @@ class TsonSchemaLinkerDiagnosticsTest {
     }
 
     private static TypeDefinition record(int line, RecordField... fields) {
-        return new TypeDefinition(Optional.empty(), io.ltr8.tson.schema.meta.TypeKind.PRODUCT, List.of(), 
+        return new TypeDefinition(Optional.empty(), io.ltr8.tson.schema.meta.TypeKind.PRODUCT, 
                 List.of(), List.of(), Optional.empty(), RecordBody.of(List.of(fields)),
                 Optional.of(new Pos(line, 3, line * 10)), io.ltr8.annotation.Annotations.empty());
     }
@@ -97,7 +97,7 @@ class TsonSchemaLinkerDiagnosticsTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("bad_field", record(4, RecordField.required("x", TypeRef.of("no_such_type"))));
         entries.put("bad_supertype", new TypeDefinition(Optional.empty(),
-                io.ltr8.tson.schema.meta.TypeKind.PRODUCT, List.of(),  List.of("no_such_parent"),
+                io.ltr8.tson.schema.meta.TypeKind.PRODUCT,  List.of("no_such_parent"),
                 List.of(), Optional.empty(), RecordBody.of(List.of()), Optional.of(new Pos(5, 3, 50)),
                 io.ltr8.annotation.Annotations.empty()));
         entries.put("fine", record(6));

@@ -14,7 +14,7 @@ import java.util.Optional;
  * appears in output; {@code source}/{@code disjoint} are genuinely OPTIONAL ({@code
  * Optional<TypeRef>}/{@code Optional<Boolean>}) and omitted from written output when absent, the
  * same as any other {@code Optional}-wrapped scalar/record field bound through plain {@code
- * TsonObjectWriter.toTson}. {@code parameters}/{@code supertypes}/{@code subtypes} are conceptually
+ * TsonObjectWriter.toTson}. {@code supertypes}/{@code subtypes} are conceptually
  * OPTIONAL in the kernel too ({@code [type_name]?} etc.), but modeled here as a bare, always-present
  * {@code List} rather than {@code Optional<List<...>>} -- {@code tson-bind} doesn't support an
  * {@code Optional} wrapping a parameterized collection type yet, so there's no way to opt an empty
@@ -42,39 +42,49 @@ import java.util.Optional;
  * soon as a second, convenience constructor exists, or {@code tson-bind}'s own constructor-selection
  * fails outright (see {@link IntegerSize}'s own Javadoc for the identical situation).
  */
-public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters,
+public record TypeDefinition(Optional<TypeRef> source, TypeKind kind,
                               List<String> supertypes, List<String> subtypes,
                               Optional<Boolean> disjoint, Top body, @Unbound Optional<SourcePosition> position,
                               Annotations annotations) {
 
     @Record
     public TypeDefinition {
-        // Absent and empty are the same list here. [TSON-SCHEMA] declares all three OPTIONAL with no
-        // default ([param_name]? / [type_name]?), so a definition bound from a resolved-form document that
-        // omits one arrives with null where one resolved from source arrives with an empty list.
-        parameters = parameters == null ? List.of() : List.copyOf(parameters);
+        // Absent and empty are the same list here. [TSON-SCHEMA] declares both OPTIONAL with no default
+        // ([type_name]?), so a definition bound from a resolved-form document that omits one arrives with
+        // null where one resolved from source arrives with an empty list.
         supertypes = supertypes == null ? List.of() : List.copyOf(supertypes);
         subtypes = subtypes == null ? List.of() : List.copyOf(subtypes);
         annotations = annotations == null ? Annotations.empty() : annotations;
     }
 
     /** Same as the canonical constructor with no annotations -- every caller that has none to carry. */
-    public TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters,
+    public TypeDefinition(Optional<TypeRef> source, TypeKind kind,
                            List<String> supertypes, List<String> subtypes, Optional<Boolean> disjoint, Top body,
                            Optional<SourcePosition> position) {
-        this(source, kind, parameters, supertypes, subtypes, disjoint, body, position,
-                Annotations.empty());
+        this(source, kind, supertypes, subtypes, disjoint, body, position, Annotations.empty());
     }
 
     /** Same as the canonical constructor, {@code position} defaulted to absent -- every existing caller that doesn't know its own source position. */
-    public TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<String> parameters,
+    public TypeDefinition(Optional<TypeRef> source, TypeKind kind,
                            List<String> supertypes, List<String> subtypes, Optional<Boolean> disjoint, Top body) {
-        this(source, kind, parameters, supertypes, subtypes, disjoint, body, Optional.empty());
+        this(source, kind, supertypes, subtypes, disjoint, body, Optional.empty());
+    }
+
+    /**
+     * The type parameters this entry declares -- {@code []} unless its body is held ([TSON-SCHEMA] §5.10).
+     *
+     * <p><b>Derived, not stored.</b> A held body carries the list it binds, so "does this entry declare
+     * parameters?" and "what does its body hold?" are one question with one answer and cannot disagree.
+     * §5.10's "Closed entries are parameter-free" is a MUST over resolver output; here it is structural, and
+     * a closed entry has nowhere to put a parameter list at all.
+     */
+    public List<String> parameters() {
+        return body instanceof TemplateBody held ? held.parameters() : List.of();
     }
 
 /** A fresh PRODUCT definition with no source, supertypes or parameters -- {@code integer_size}'s own shape. */
     public static TypeDefinition product(Top body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(), List.of(),
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(),
                 Optional.empty(), body);
     }
 
@@ -95,39 +105,25 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
      * before resolution.
      */
     public static TypeDefinition reference(TypeRef target) {
-        return reference(target, List.of());
-    }
-
-    /**
-     * A reference definition that is itself a template -- §5.10's partial application, {@code uuid_pair =>
-     * <B> pair<uuid, B>}: {@code parameters} are the open parameters the declaration re-declares, and
-     * {@code target} is the application that leaves them open. Applying it substitutes into {@code target}'s
-     * own argument list and closes what results, so a reference template mints no entry of its own.
-     *
-     * <p>The body carries the application whole, so an applier reads it from there. {@code source} records
-     * the same reference as provenance, which is what §8.2 keys identity on -- one fact in two components
-     * because they answer different questions, not because either is missing the other's.
-     */
-    public static TypeDefinition reference(TypeRef target, List<String> parameters) {
-        return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, parameters, List.of(),
+        return new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, List.of(),
                 List.of(), Optional.empty(), new Reference(target));
     }
 
     /** A copy of this definition with {@code body} replaced -- every other component unchanged. */
     public TypeDefinition withBody(Top body) {
-        return new TypeDefinition(source, kind, parameters, supertypes, subtypes, disjoint, body,
+        return new TypeDefinition(source, kind, supertypes, subtypes, disjoint, body,
                 position, annotations);
     }
 
     /** A copy of this definition with {@code position} replaced -- every other component unchanged. */
     public TypeDefinition withPosition(Optional<SourcePosition> position) {
-        return new TypeDefinition(source, kind, parameters, supertypes, subtypes, disjoint, body,
+        return new TypeDefinition(source, kind, supertypes, subtypes, disjoint, body,
                 position, annotations);
     }
 
     /** A copy of this definition with {@code annotations} replaced -- every other component unchanged. */
     public TypeDefinition withAnnotations(Annotations annotations) {
-        return new TypeDefinition(source, kind, parameters, supertypes, subtypes, disjoint, body,
+        return new TypeDefinition(source, kind, supertypes, subtypes, disjoint, body,
                 position, annotations);
     }
 
@@ -137,7 +133,6 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
         return o instanceof TypeDefinition other
                 && Objects.equals(source, other.source)
                 && kind == other.kind
-                && Objects.equals(parameters, other.parameters)
                 && Objects.equals(supertypes, other.supertypes)
                 && Objects.equals(subtypes, other.subtypes)
                 && Objects.equals(disjoint, other.disjoint)
@@ -147,6 +142,6 @@ public record TypeDefinition(Optional<TypeRef> source, TypeKind kind, List<Strin
     /** Excludes {@code position} -- see this class's own Javadoc for why. */
     @Override
     public int hashCode() {
-        return Objects.hash(source, kind, parameters, supertypes, subtypes, disjoint, body);
+        return Objects.hash(source, kind, supertypes, subtypes, disjoint, body);
     }
 }

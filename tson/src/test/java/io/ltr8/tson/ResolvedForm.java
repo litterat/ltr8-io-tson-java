@@ -75,7 +75,7 @@ final class ResolvedForm {
      * Honouring the MUST instead is one sort, here, reaching both callers.
      */
     static TypeDefinition canonical(TypeDefinition definition) {
-        return new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
+        return new TypeDefinition(definition.source(), definition.kind(),
                 definition.supertypes().stream().sorted().toList(),
                 definition.subtypes().stream().sorted().toList(), definition.disjoint(), definition.body(),
                 definition.position(), definition.annotations());
@@ -92,7 +92,7 @@ final class ResolvedForm {
         // required of the application, not of the whitespace around it. Both sides are reduced to their
         // parsed application here, so a held body compares like every other body and needs no side channel.
         TypeDefinition compared = definition.body() instanceof TemplateBody held
-                ? new TypeDefinition(definition.source(), definition.kind(), definition.parameters(),
+                ? new TypeDefinition(definition.source(), definition.kind(),
                         definition.supertypes(), definition.subtypes(), definition.disjoint(),
                         parsedForComparison(held), definition.position(), definition.annotations())
                 : definition;

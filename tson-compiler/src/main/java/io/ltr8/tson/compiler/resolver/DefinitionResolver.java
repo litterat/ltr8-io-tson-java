@@ -449,14 +449,14 @@ final class DefinitionResolver {
                 // desugar phase rewrote every real record template into the `!record { ... }` §5.2 says it
                 // denotes. Holding it anyway is what leaves no parameterised RecordBody anywhere, so
                 // materialisation needs only the one substitution path. See WireForm.heldEmptyRecord.
-                return holdIfOpen(name, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, parameters,
+                return holdIfOpen(name, parameters, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT,
                         List.of(), List.of(), Optional.empty(), body));
             }
             if (structural.body() instanceof ConstructionDef construction) {
-                return holdIfOpen(name, resolveComposition(name, construction, parameters));
+                return holdIfOpen(name, parameters, resolveComposition(name, construction, parameters));
             }
             if (structural.body() instanceof RefinedDef refined) {
-                return holdIfOpen(name, resolveRefinement(name, refined, parameters));
+                return holdIfOpen(name, parameters, resolveRefinement(name, refined, parameters));
             }
         }
         if (typeDef instanceof ReferenceTypeDef referenceTypeDef) {
@@ -466,7 +466,7 @@ final class DefinitionResolver {
             // materialisation's job, and until then the open form is what the entry records.
             List<String> parameters = referenceTypeDef.typeParams();
             if (referenceTypeDef.ref() instanceof SimpleRef simple) {
-                return TypeDefinition.reference(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
+                return openAliasOr(io.ltr8.tson.schema.meta.TypeRef.of(simple.name()), parameters);
             }
             if (referenceTypeDef.ref() instanceof GenericRef generic) {
                 return resolveTemplateApplication(name, generic, parameters);
@@ -507,14 +507,14 @@ final class DefinitionResolver {
      * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom
      * body has no parameters to hold open.
      */
-    private TypeDefinition holdIfOpen(String name, TypeDefinition resolved) {
-        if (resolved.parameters().isEmpty() || !(resolved.body() instanceof RecordBody record)) {
+    private TypeDefinition holdIfOpen(String name, List<String> parameters, TypeDefinition resolved) {
+        if (parameters.isEmpty() || !(resolved.body() instanceof RecordBody record)) {
             return resolved;
         }
         if (record.fields().isEmpty() && record.groups().isEmpty() && record.supertypes().isEmpty()) {
-            return resolved.withBody(HeldBody.held(resolved.parameters(), WireForm.heldEmptyRecord()));
+            return resolved.withBody(HeldBody.held(parameters, WireForm.heldEmptyRecord()));
         }
-        return resolved.withBody(HeldBody.held(resolved.parameters(), WireForm.heldRecord(record,
+        return resolved.withBody(HeldBody.held(parameters, WireForm.heldRecord(record,
                 value -> annotationWireValue(name, value))));
     }
 
@@ -623,8 +623,7 @@ final class DefinitionResolver {
             // so has only the name to go on, which is what its own `alias` flag is for.
             return TypeDefinition.reference(reference.target());
         }
-        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(),
-                List.of(), List.of(), List.of(), Optional.empty(), body);
+        return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)), constructor.kind(), List.of(), List.of(), Optional.empty(), body);
     }
 
     /**
@@ -669,8 +668,7 @@ final class DefinitionResolver {
             checkTemplateBindings(name, target, vocabulary, bindings);
         }
         return new TypeDefinition(Optional.of(io.ltr8.tson.schema.meta.TypeRef.of(target)),
-                alias ? TypeKind.REFERENCE : constructor.kind(),
-                template.typeParams(), List.of(), List.of(), Optional.empty(),
+                alias ? TypeKind.REFERENCE : constructor.kind(), List.of(), List.of(), Optional.empty(),
                 HeldBody.held(template.typeParams(), template.value()));
     }
 
@@ -771,7 +769,7 @@ final class DefinitionResolver {
         Top body = bindAtomInstance(name, merged);
         checkNarrows(name, sourceName, source.body(), body);
 
-        return new TypeDefinition(Optional.of(constructorRef), source.kind(), List.of(),
+        return new TypeDefinition(Optional.of(constructorRef), source.kind(),
                 List.of(sourceName), List.of(), Optional.empty(), body);
     }
 
@@ -1027,8 +1025,21 @@ final class DefinitionResolver {
                 throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
             }
         }
-        return TypeDefinition.reference(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments),
-                parameters);
+        return openAliasOr(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments), parameters);
+    }
+
+    /**
+     * An alias entry: closed, with a {@code Reference} body naming its target, or -- §5.10's partial
+     * application -- <b>open</b>, with that same {@code !reference { target: ... }} held as its body.
+     *
+     * <p>An open entry's body is held whatever shape it takes, with no exception for the alias form: that is
+     * what lets materialisation dispatch on the constructor head, and what makes "declares parameters" and
+     * "holds its body" one question. {@code source} records the same reference either way, as provenance.
+     */
+    private static TypeDefinition openAliasOr(io.ltr8.tson.schema.meta.TypeRef target, List<String> parameters) {
+        return parameters.isEmpty() ? TypeDefinition.reference(target)
+                : new TypeDefinition(Optional.of(target), TypeKind.REFERENCE, List.of(), List.of(),
+                        Optional.empty(), HeldBody.held(parameters, WireForm.heldReference(target)));
     }
 
     /**
@@ -1163,7 +1174,7 @@ final class DefinitionResolver {
         // reason §5.9 gives: the clause is head-level, so its effect must be readable without scanning the
         // parents' field sets. An author wanting partial IS-A subtracts first and composes second.
         List<String> contract = construction.removal().isPresent() ? List.of() : transitiveSupertypes;
-        return new TypeDefinition(Optional.empty(), kind, parameters, contract, List.of(),
+        return new TypeDefinition(Optional.empty(), kind, contract, List.of(),
                 Optional.empty(), body);
     }
 
@@ -1391,7 +1402,7 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups);
-        return new TypeDefinition(source, kind, parameters, transitiveSupertypes,
+        return new TypeDefinition(source, kind, transitiveSupertypes,
                 List.of(), Optional.empty(), body);
     }
 
