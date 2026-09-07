@@ -101,7 +101,7 @@ component.
 
 ## Strictness: the schema and the class must agree
 
-Checked at **bind-mode compile** — startup, not first read — raising `TsonBindMismatchException`:
+Checked at **bind-mode compile** — startup, not first read — raising `BindMismatchException`:
 
 > `'order' and Wrong do not agree: no component for field 'placed'; no component for field 'total'.
 > Bind the class the schema describes, or read leniently (TsonConfig.lenientBinding) if dropping this
@@ -115,7 +115,7 @@ sends them. A FIXED field is exempt, the schema settling its value.
   cache, anything derived — so binding leaves it alone instead of reporting a mismatch. Without it, a
   component no schema field fills reaches the constructor as `null` however careful the class is.
 - `TsonConfig.lenientBinding()` opts out wholesale, and is silent.
-- `TsonMissingBindingException` (a subclass) covers a schema type with **no** class at all, and is
+- `MissingBindingException` (a subclass) covers a schema type with **no** class at all, and is
   deferred to the first read of that type — a schema legitimately declares types a consumer never binds.
 
 **A bound class guards its own optional lists.** An omitted optional field arrives as `null` and the binder
@@ -147,7 +147,7 @@ A `Tson` is one profile: a server speaking two schema versions builds one instan
 routes a document to the right one. Nothing derives the profile from the schema a document names — that
 mapping is the application's, and it is the one thing the application knows better than this library.
 Pointing a profile at the wrong version does not bind quietly: the constructor it selects is checked
-against that schema's fields, and a disagreement is a `TsonBindMismatchException`.
+against that schema's fields, and a disagreement is a `BindMismatchException`.
 
 ## The annotations (`io.ltr8.annotation`)
 

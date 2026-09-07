@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * A schema type nothing in the bind context resolves to a Java class is a <b>wiring</b> problem, and the
  * schema pipeline says so wherever it meets one.
  *
- * <p><b>Three answers to one condition is what this pins against.</b> {@code TsonMissingBindingException}
+ * <p><b>Three answers to one condition is what this pins against.</b> {@code MissingBindingException}
  * exists to stop a missing binding reading as <i>this library cannot do that</i> -- its Javadoc records a
  * downstream service turning that shape into a 501 -- and a bind read honours it by throwing the exception
  * unwrapped. The schema pipeline used to undo that twice over: {@code bindAnnotationValue}'s catch-all
@@ -74,7 +74,7 @@ class BindMismatchClassificationTest {
 
     /**
      * {@code @data} names the kernel's own {@code data} base kind, which
-     * {@code TsonMissingBindingException}'s Javadoc gives as an example of a type a consumer legitimately
+     * {@code MissingBindingException}'s Javadoc gives as an example of a type a consumer legitimately
      * never binds. §6 puts an annotation written before the name on the <em>name</em> and one after the
      * arrow on the <em>definition</em>, which used to be two different code paths with two different codes.
      */

@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.base.SourcePosition;
 import org.junit.jupiter.api.Test;
@@ -43,7 +43,7 @@ class TsonValidateSchemaTest {
     @Test
     void anUnfetchableImportStatesWhyItCouldNotBeFetched() {
         TsonSchemaSource refusing = uri -> {
-            throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_PERMITTED,
+            throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,
                     "not an allowed host", null);
         };
         List<Diagnostic> problems = Tson.builder().schemaSource(refusing).build().validateSchema("""

@@ -3,7 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.compiler.TsonMissingBindingException;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.consumer.Operation;
@@ -15,7 +15,6 @@ import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.tree.TsonValue;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -151,8 +150,8 @@ class MetaLayerConstructorThroughTsonTest {
     void withoutTheBinderTheSameSchemaHasNoBoundClass() {
         Tson unextended = Tson.builder().schemaSource(SOURCE).build();
 
-        TsonMissingBindingException thrown =
-                assertThrows(TsonMissingBindingException.class, () -> unextended.resolve(API_SCHEMA));
+        MissingBindingException thrown =
+                assertThrows(MissingBindingException.class, () -> unextended.resolve(API_SCHEMA));
 
         assertTrue(thrown.getMessage().contains("no bound Java class for 'operation'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("TsonConfig.bindings"), "it names the way to fix it: "

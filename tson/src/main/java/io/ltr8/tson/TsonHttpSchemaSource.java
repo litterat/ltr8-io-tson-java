@@ -1,6 +1,6 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 
 import java.io.IOException;
@@ -120,7 +120,7 @@ public final class TsonHttpSchemaSource implements TsonSchemaSource, AutoCloseab
      *
      * @param reference the reference as written in a {@code !!schema}/{@code !!import}/{@code !!meta}
      *                  directive, scheme and {@code ?sha256=} pin included
-     * @throws TsonSchemaFetchException if policy refuses it, or the host cannot supply it
+     * @throws SchemaFetchException if policy refuses it, or the host cannot supply it
      */
     @Override
     public String fetch(String reference) {
@@ -150,7 +150,7 @@ public final class TsonHttpSchemaSource implements TsonSchemaSource, AutoCloseab
      * Fetches each reference now, so request-time resolution finds it already cached. Call during startup, on
      * one thread -- this is the path the threading note describes.
      *
-     * @throws TsonSchemaFetchException on the first one that cannot be fetched, so a misconfigured deployment
+     * @throws SchemaFetchException on the first one that cannot be fetched, so a misconfigured deployment
      *                                  fails at startup rather than on its first request
      */
     public void preload(String... references) {
@@ -212,14 +212,14 @@ public final class TsonHttpSchemaSource implements TsonSchemaSource, AutoCloseab
                     // the reference, or the host mapping, at where the document actually is) is obvious.
                     case 3 -> throw transport(reference, "the host redirected (" + response.statusCode()
                             + "), and a redirect leaves the allow-list");
-                    case 4 -> throw new TsonSchemaFetchException(reference,
-                            TsonSchemaFetchException.Reason.NOT_FOUND,
+                    case 4 -> throw new SchemaFetchException(reference,
+                            SchemaFetchException.Reason.NOT_FOUND,
                             "the host answered " + response.statusCode(), null);
                     default -> throw transport(reference, "the host answered " + response.statusCode());
                 };
             }
         } catch (HttpTimeoutException e) {
-            throw new TsonSchemaFetchException(reference, TsonSchemaFetchException.Reason.TIMEOUT,
+            throw new SchemaFetchException(reference, SchemaFetchException.Reason.TIMEOUT,
                     "the host did not answer within " + timeout, e);
         } catch (IOException e) {
             throw transport(reference, "the host could not be reached: " + e, e);
@@ -237,18 +237,18 @@ public final class TsonHttpSchemaSource implements TsonSchemaSource, AutoCloseab
     private byte[] readCapped(String reference, InputStream body) throws IOException {
         byte[] read = body.readNBytes(maxDocumentBytes + 1);
         if (read.length > maxDocumentBytes) {
-            throw new TsonSchemaFetchException(reference, TsonSchemaFetchException.Reason.TOO_LARGE,
+            throw new SchemaFetchException(reference, SchemaFetchException.Reason.TOO_LARGE,
                     "a schema document may be at most " + maxDocumentBytes + " bytes", null);
         }
         return read;
     }
 
-    private static TsonSchemaFetchException transport(String reference, String message) {
+    private static SchemaFetchException transport(String reference, String message) {
         return transport(reference, message, null);
     }
 
-    private static TsonSchemaFetchException transport(String reference, String message, Throwable cause) {
-        return new TsonSchemaFetchException(reference, TsonSchemaFetchException.Reason.TRANSPORT, message, cause);
+    private static SchemaFetchException transport(String reference, String message, Throwable cause) {
+        return new SchemaFetchException(reference, SchemaFetchException.Reason.TRANSPORT, message, cause);
     }
 
     /** Builds a {@link TsonHttpSchemaSource}. Every default is the safe one; nothing is fetched until a host is allowed. */

@@ -1,6 +1,6 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 
 import java.io.IOException;
@@ -92,7 +92,7 @@ public final class TsonFileSchemaSource implements TsonSchemaSource {
      *
      * @param reference the reference as written in a {@code !!schema}/{@code !!import}/{@code !!meta}
      *                  directive, scheme and {@code ?sha256=} pin included
-     * @throws TsonSchemaFetchException if policy refuses it, or no readable file backs it
+     * @throws SchemaFetchException if policy refuses it, or no readable file backs it
      */
     @Override
     public String fetch(String reference) {
@@ -113,7 +113,7 @@ public final class TsonFileSchemaSource implements TsonSchemaSource {
      * Reads each reference now, so request-time resolution finds it already cached. Call during startup, on
      * one thread.
      *
-     * @throws TsonSchemaFetchException on the first one that cannot be read, so a misconfigured deployment
+     * @throws SchemaFetchException on the first one that cannot be read, so a misconfigured deployment
      *                                  fails at startup rather than on its first request
      */
     public void preload(String... references) {
@@ -176,10 +176,10 @@ public final class TsonFileSchemaSource implements TsonSchemaSource {
             root = permitted.directory().toRealPath();
             real = root.resolve(permitted.relative()).toRealPath();
         } catch (NoSuchFileException e) {
-            throw new TsonSchemaFetchException(reference, TsonSchemaFetchException.Reason.NOT_FOUND,
+            throw new SchemaFetchException(reference, SchemaFetchException.Reason.NOT_FOUND,
                     "no file backs it under '" + permitted.directory() + "'", e);
         } catch (IOException e) {
-            throw new TsonSchemaFetchException(reference, TsonSchemaFetchException.Reason.TRANSPORT,
+            throw new SchemaFetchException(reference, SchemaFetchException.Reason.TRANSPORT,
                     "could not be resolved under '" + permitted.directory() + "': " + e, e);
         }
         if (!real.startsWith(root)) {
@@ -197,16 +197,16 @@ public final class TsonFileSchemaSource implements TsonSchemaSource {
         try (InputStream in = Files.newInputStream(file)) {
             byte[] bytes = in.readNBytes(maxDocumentBytes + 1);
             if (bytes.length > maxDocumentBytes) {
-                throw new TsonSchemaFetchException(reference, TsonSchemaFetchException.Reason.TOO_LARGE,
+                throw new SchemaFetchException(reference, SchemaFetchException.Reason.TOO_LARGE,
                         "a schema document may be at most " + maxDocumentBytes + " bytes", null);
             }
             return new String(bytes, StandardCharsets.UTF_8);
         } catch (NoSuchFileException e) {
             // Between the containment check and the open -- rare, and still "not here" rather than a fault.
-            throw new TsonSchemaFetchException(reference, TsonSchemaFetchException.Reason.NOT_FOUND,
+            throw new SchemaFetchException(reference, SchemaFetchException.Reason.NOT_FOUND,
                     "no file backs it at '" + file + "'", e);
         } catch (IOException e) {
-            throw new TsonSchemaFetchException(reference, TsonSchemaFetchException.Reason.TRANSPORT,
+            throw new SchemaFetchException(reference, SchemaFetchException.Reason.TRANSPORT,
                     "could not be read from '" + file + "': " + e, e);
         }
     }

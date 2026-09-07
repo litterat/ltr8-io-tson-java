@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.*;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,7 @@ class SchemaFailureTest {
     @Test
     void aBindMismatchIsTheReadingApplicationsProblem() {
         assertEquals(Diagnostic.Code.BIND_MISMATCH,
-                SchemaFailure.of(new TsonBindMismatchException("no component for field 'currency'")).code());
+                SchemaFailure.of(new BindMismatchException("no component for field 'currency'")).code());
     }
 
     /**
@@ -50,7 +50,7 @@ class SchemaFailureTest {
     @Test
     void aMissingBindingIsTheSameCategoryAsAMismatch() {
         assertEquals(Diagnostic.Code.BIND_MISMATCH,
-                SchemaFailure.of(new TsonMissingBindingException("no bound Java class for 'order'")).code());
+                SchemaFailure.of(new MissingBindingException("no bound Java class for 'order'")).code());
     }
 
     /** This library's, and already spoken for: a construct beyond it could not be checked, not rejected. */
@@ -67,8 +67,8 @@ class SchemaFailureTest {
      */
     @Test
     void anUnfetchableSchemaIsNotAVerdictOnTheSchema() {
-        TsonSchemaFetchException unfetchable = new TsonSchemaFetchException("https://example.test/x.tn",
-                TsonSchemaFetchException.Reason.TIMEOUT, "no answer in 5s", null);
+        SchemaFetchException unfetchable = new SchemaFetchException("https://example.test/x.tn",
+                SchemaFetchException.Reason.TIMEOUT, "no answer in 5s", null);
 
         assertEquals(Diagnostic.Code.SCHEMA_TIMEOUT, SchemaFailure.of(unfetchable).code());
         assertEquals("a schema that can be obtained", SchemaFailure.of(unfetchable).expected());
@@ -83,11 +83,11 @@ class SchemaFailureTest {
      */
     @Test
     void theFetchBranchKeepsWhichReasonItWas() {
-        for (TsonSchemaFetchException.Reason reason : TsonSchemaFetchException.Reason.values()) {
+        for (SchemaFetchException.Reason reason : SchemaFetchException.Reason.values()) {
             SchemaFailure failure = SchemaFailure.of(
-                    new TsonSchemaFetchException("https://example.test/x.tn", reason, "refused", null));
+                    new SchemaFetchException("https://example.test/x.tn", reason, "refused", null));
 
-            assertEquals(TsonDiagnostics.codeFor(reason), failure.code(), reason::name);
+            assertEquals(Diagnostic.Code.of(reason), failure.code(), reason::name);
             assertFalse(failure.code().verdict(), reason::name);
         }
     }
@@ -95,18 +95,18 @@ class SchemaFailureTest {
     /** No two reasons share a code, or the split would be decorative. */
     @Test
     void everyReasonHasItsOwnCode() {
-        assertEquals(TsonSchemaFetchException.Reason.values().length,
-                Arrays.stream(TsonSchemaFetchException.Reason.values())
-                        .map(TsonDiagnostics::codeFor).distinct().count());
+        assertEquals(SchemaFetchException.Reason.values().length,
+                Arrays.stream(SchemaFetchException.Reason.values())
+                        .map(Diagnostic.Code::of).distinct().count());
     }
 
     /** Every other branch states a code of its own, and none of them is a fetch code. */
     @Test
     void noOtherBranchLandsOnAFetchCode() {
-        for (RuntimeException e : List.of(new TsonBindMismatchException("x"), new UnsupportedOperationException("x"),
-                new TsonSchemaValidationException("x"), new TsonContentHashMismatchException("x"))) {
-            assertFalse(Arrays.stream(TsonSchemaFetchException.Reason.values())
-                    .map(TsonDiagnostics::codeFor).toList().contains(SchemaFailure.of(e).code()), e::toString);
+        for (RuntimeException e : List.of(new BindMismatchException("x"), new UnsupportedOperationException("x"),
+                new TsonSchemaValidationException("x"), new ContentHashMismatchException("x"))) {
+            assertFalse(Arrays.stream(SchemaFetchException.Reason.values())
+                    .map(Diagnostic.Code::of).toList().contains(SchemaFailure.of(e).code()), e::toString);
         }
     }
 
@@ -118,7 +118,7 @@ class SchemaFailureTest {
      */
     @Test
     void aPinMismatchIsAVerdictOnTheReference() {
-        SchemaFailure failure = SchemaFailure.of(new TsonContentHashMismatchException("digest differs"));
+        SchemaFailure failure = SchemaFailure.of(new ContentHashMismatchException("digest differs"));
 
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, failure.code());
         assertEquals("a schema matching its ?sha256= pin", failure.expected());
@@ -127,7 +127,7 @@ class SchemaFailureTest {
     /**
      * <b>Anything else is a fault, and propagates as itself</b> -- the rule {@link
      * Diagnostic#ofBaseSyntaxError} states and this now shares. What makes it applicable is {@link
-     * TsonSchemaSource#fetch} naming {@link TsonSchemaFetchException} as the way a source says "cannot
+     * TsonSchemaSource#fetch} naming {@link SchemaFetchException} as the way a source says "cannot
      * supply this": with no mandated type, an {@code IllegalStateException} here could equally be a source's
      * miss or a broken invariant, and every classification of it is wrong half the time.
      */
@@ -142,7 +142,7 @@ class SchemaFailureTest {
     @Test
     void theExpectedHalfFollowsTheCode() {
         assertEquals("a schema whose types the bound classes match",
-                SchemaFailure.of(new TsonBindMismatchException("x")).expected());
+                SchemaFailure.of(new BindMismatchException("x")).expected());
         assertEquals("a schema this library can compile",
                 SchemaFailure.of(new UnsupportedOperationException("x")).expected());
         assertEquals("a resolvable schema", SchemaFailure.of(new TsonSchemaValidationException("x")).expected());

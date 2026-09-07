@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
@@ -74,7 +74,7 @@ class ScopedReadTest {
                 return document.getValue();
             }
         }
-        throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND, "not one of these", null);
+        throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND, "not one of these", null);
     };
 
     private static Tson tson() {

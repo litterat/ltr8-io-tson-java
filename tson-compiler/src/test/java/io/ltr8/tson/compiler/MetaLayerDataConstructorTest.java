@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.consumer.Operation;
 import io.ltr8.tson.compiler.consumer.Webhook;
@@ -277,7 +278,7 @@ class MetaLayerDataConstructorTest {
      */
     @Test
     void aDataBodyReturningNullReferencesNamesTheClassThatDidIt() {
-        TsonBindMismatchException thrown = assertThrows(TsonBindMismatchException.class,
+        BindMismatchException thrown = assertThrows(BindMismatchException.class,
                 () -> linked("nullrefs", """
                         hook => !webhook { path: "/hook" }"""));
 

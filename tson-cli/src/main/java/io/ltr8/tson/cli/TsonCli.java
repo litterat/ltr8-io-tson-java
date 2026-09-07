@@ -1,6 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.MissingBindingException;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -291,7 +292,7 @@ public final class TsonCli {
      * <p><b>78 rather than 70 for a bind mismatch</b>, because {@code EX_CONFIG} is "found in an
      * unconfigured or misconfigured state" and unconfigured is what this is: no class is registered for a
      * type the schema needs. 70 would say this library cannot do it, which is the reading {@link
-     * io.ltr8.tson.compiler.TsonMissingBindingException} exists to prevent.
+     * MissingBindingException} exists to prevent.
      *
      * <p>Each note goes to stderr so the report on stdout stays exactly what {@code --output json|tson}
      * promises.

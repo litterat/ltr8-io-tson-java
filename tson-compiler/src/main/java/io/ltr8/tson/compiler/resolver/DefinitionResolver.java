@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.base.BindMismatchException;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.compiler.TsonBindMismatchException;
-import io.ltr8.tson.compiler.TsonMissingBindingException;
 import io.ltr8.tson.compiler.TsonWriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -424,15 +424,15 @@ final class DefinitionResolver {
             throw new TsonSchemaValidationException("'" + declaration + "': the value of annotation '@"
                     + annotationName + "' is not valid data for the type '" + annotationName + "' names -- "
                     + e.getMessage(), e);
-        } catch (TsonBindMismatchException e) {
+        } catch (BindMismatchException e) {
             // The same arm {@link #bindAtomInstance} carries, for the same reason and it is not a stylistic
             // echo: an annotation naming a type the consumer never bound -- the kernel's own `data` among
-            // them -- is their configuration, and `TsonMissingBindingException` exists precisely so that a
+            // them -- is their configuration, and `MissingBindingException` exists precisely so that a
             // missing line of wiring does not read as "this library cannot do that". Letting the catch-all
             // below have it rebuilds the shape that type was introduced to retire.
             String where = "'" + declaration + "': " + e.getMessage();
-            throw e instanceof TsonMissingBindingException ? new TsonMissingBindingException(where)
-                    : new TsonBindMismatchException(where);
+            throw e instanceof MissingBindingException ? new MissingBindingException(where)
+                    : new BindMismatchException(where);
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException("'" + declaration + "': failed to bind the value of "
                     + "annotation '@" + annotationName + "' via the compiled meta-schema reader: "
@@ -933,7 +933,7 @@ final class DefinitionResolver {
             body = definitionMetaReader.read(constructorName, value);
         } catch (ReadException e) {
             throw bodyIsNotValidData(name, constructorName, e);
-        } catch (TsonBindMismatchException e) {
+        } catch (BindMismatchException e) {
             // The constructor is a meta layer's own and the consumer never registered a class for it, or
             // registered one that disagrees. Either way it is their configuration, and it already says so --
             // wrapping it as an UnsupportedOperationException would relabel it a library gap, which is the
@@ -941,8 +941,8 @@ final class DefinitionResolver {
             // keeping which of the two it is -- a type with no class at all reads differently from one whose
             // class disagrees, and the caller's next move differs with it.
             String where = "'" + name + "': " + e.getMessage();
-            throw e instanceof TsonMissingBindingException ? new TsonMissingBindingException(where)
-                    : new TsonBindMismatchException(where);
+            throw e instanceof MissingBindingException ? new MissingBindingException(where)
+                    : new BindMismatchException(where);
         } catch (TsonSchemaValidationException e) {
             // A constructor's own record refusing the values it was handed. `decimal_type`'s member set is the
             // case: `members` is typed `set<value>`, so the wire admits anything and the family itself is what

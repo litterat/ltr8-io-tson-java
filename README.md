@@ -239,12 +239,12 @@ try (var in = Files.newInputStream(Path.of("server.tn"))) {
 }
 ```
 
-On a mismatch it throws `TsonReadException` (fail-fast). To collect *every* problem in one pass instead
-of stopping at the first, derive a reader with a collecting `TsonDiagnosticsReceiver` — you get the
+On a mismatch it throws `ReadException` (fail-fast). To collect *every* problem in one pass instead
+of stopping at the first, derive a reader with a collecting `DiagnosticsReceiver` — you get the
 (possibly partial) value back *alongside* the full list, rather than one or the other:
 
 ```java
-var problems = TsonDiagnosticsReceiver.collecting();
+var problems = DiagnosticsReceiver.collecting();
 
 Server server = new TsonObjectReader()
         .withDiagnostics(problems)
@@ -258,18 +258,18 @@ for (Diagnostic d : problems.diagnostics()) {
 A receiver sees **every** problem with the document — a value the schema rejects, an unresolvable
 `!!schema`, and a document that will not lex or parse — so a collecting read never throws for a bad
 document. Only a fault in the library throws past it. (Fail-fast reads still throw at the first problem;
-for a base-syntax failure that is a `TsonReadException` carrying the diagnostic, position included.)
+for a base-syntax failure that is a `ReadException` carrying the diagnostic, position included.)
 
 `withDiagnostics` returns a *new* reader and leaves the original fail-fast; it works the same on
 `TsonTreeReader` and on the schema-aware readers from `tson.treeReader()`/`objectReader()`.
 
-The two built-ins are not the interesting part. `TsonDiagnosticsReceiver` is a plain `void
+The two built-ins are not the interesting part. `DiagnosticsReceiver` is a plain `void
 report(Diagnostic)` sink — one method — so a caller wanting neither behaviour implements it directly. It is
 called as problems are found, not at the end, which is what makes streaming and capping possible at all:
 
 ```java
 // Report as they arrive, and stop keeping them after twenty.
-final class Capped implements TsonDiagnosticsReceiver {
+final class Capped implements DiagnosticsReceiver {
     private final List<Diagnostic> kept = new ArrayList<>();
 
     @Override
@@ -293,7 +293,7 @@ needs to render, group or route without holding on to the document.
 It composes with `withSchema(…)` too, so an out-of-band read (§4 below) collects the same way:
 
 ```java
-var problems = TsonDiagnosticsReceiver.collecting();
+var problems = DiagnosticsReceiver.collecting();
 var value = tson.treeReader().withSchema(SERVER_ID).withDiagnostics(problems).readAs(source, "server");
 ```
 
@@ -443,7 +443,7 @@ Only the read-ahead is buffered (one decoder chunk), never the document — a 50
 `TsonObjectWriter` is the inverse of `TsonObjectReader`: a Java object to TSON text. Mainly a debugging
 aid, not a guaranteed-lossless serializer (see [CONFORMANCE.md](CONFORMANCE.md) for exactly where it's
 lossy). It throws unchecked `TsonWriteException` on failure, symmetric to the reader's
-`TsonReadException` — no checked exceptions on either side of the object-binding pair:
+`ReadException` — no checked exceptions on either side of the object-binding pair:
 
 ```java
 String text = new TsonObjectWriter().toTson(server);

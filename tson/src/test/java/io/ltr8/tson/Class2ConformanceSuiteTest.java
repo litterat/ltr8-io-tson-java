@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentHeader;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -105,7 +105,7 @@ class Class2ConformanceSuiteTest {
             try {
                 return Files.readString(file, StandardCharsets.UTF_8);
             } catch (IOException e) {
-                throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+                throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
                         "no such corpus schema: " + file, e);
             }
         }

@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaFetchException;
+
 /**
  * How a read reaches a schema the document names <em>inside</em> itself -- [TSON-SCHEMA] §7.8's scope push,
  * where a value at a {@code scoped} position carries its own {@code !!schema} and the type it names has to
@@ -22,7 +24,7 @@ public interface ForeignSchemas {
     /**
      * The compiled schema at {@code uri}, in the compiling registry's own read mode.
      *
-     * @throws TsonSchemaFetchException      if no source would supply it
+     * @throws SchemaFetchException      if no source would supply it
      * @throws RuntimeException              if it was supplied and could not be resolved, linked or compiled
      */
     TsonCompiledSchema get(String uri);
@@ -49,7 +51,7 @@ public interface ForeignSchemas {
     /** A lookup for a compile with no registry behind it -- see this interface's own note. */
     static ForeignSchemas none() {
         return uri -> {
-            throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_PERMITTED,
+            throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,
                     "this read has no schema source behind it, so the scope it names cannot be loaded -- read "
                             + "through a Tson facade, whose registry supplies one", null);
         };

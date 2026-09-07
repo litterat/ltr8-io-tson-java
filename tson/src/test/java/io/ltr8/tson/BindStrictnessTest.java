@@ -3,9 +3,9 @@ package io.ltr8.tson;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.compiler.TsonBindMismatchException;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -89,7 +89,7 @@ class BindStrictnessTest {
     void aRequiredFieldTheClassCannotHoldFailsAtCompile() {
         Tson tson = tson(SCHEMA, OrderV1.class, false);
 
-        TsonBindMismatchException thrown = assertThrows(TsonBindMismatchException.class,
+        BindMismatchException thrown = assertThrows(BindMismatchException.class,
                 () -> tson.bindRegistry().get(ID));
 
         assertTrue(thrown.getMessage().contains("no component for field 'currency'"), thrown.getMessage());
@@ -101,7 +101,7 @@ class BindStrictnessTest {
     void aComponentNoFieldFillsFailsAtCompileToo() {
         Tson tson = tson(SCHEMA, OrderV3.class, false);
 
-        TsonBindMismatchException thrown = assertThrows(TsonBindMismatchException.class,
+        BindMismatchException thrown = assertThrows(BindMismatchException.class,
                 () -> tson.bindRegistry().get(ID));
 
         assertTrue(thrown.getMessage().contains("component 'region'"), thrown.getMessage());
@@ -161,7 +161,7 @@ class BindStrictnessTest {
     void anOptionalFieldTheClassCannotHoldFailsAtCompileToo() {
         Tson tson = tson(OPTIONAL_SCHEMA, OrderV1.class, false);
 
-        TsonBindMismatchException thrown = assertThrows(TsonBindMismatchException.class,
+        BindMismatchException thrown = assertThrows(BindMismatchException.class,
                 () -> tson.bindRegistry().get(ID));
 
         assertTrue(thrown.getMessage().contains("no component for field 'currency'"), thrown.getMessage());

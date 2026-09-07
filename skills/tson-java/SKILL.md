@@ -1,6 +1,6 @@
 ---
 name: tson-java
-description: Read, validate, write and bind TSON (`.tn`) documents with the `io.ltr8:tson` Java library, and run its `tson` command line. Use this skill whenever Java code imports `io.ltr8.tson`, `io.ltr8.tson.compiler`, `io.ltr8.tson.tree` or `io.ltr8.bind`; whenever names like `Tson`, `TsonConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`, `TsonReadException`, `TsonSchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the `ltr8-io-tson-java` repository; and whenever someone wants to check, compile or hash `.tn` files from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit hook, a lint step — whatever language the surrounding project is written in. For authoring TSON *data* documents use the tson-data skill; for *schema* documents use tson-schema. This skill is the Java implementation and its CLI, not the notation.
+description: Read, validate, write and bind TSON (`.tn`) documents with the `io.ltr8:tson` Java library, and run its `tson` command line. Use this skill whenever Java code imports `io.ltr8.tson`, `io.ltr8.tson.compiler`, `io.ltr8.tson.tree` or `io.ltr8.bind`; whenever names like `Tson`, `TsonConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`, `ReadException`, `TsonSchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the `ltr8-io-tson-java` repository; and whenever someone wants to check, compile or hash `.tn` files from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit hook, a lint step — whatever language the surrounding project is written in. For authoring TSON *data* documents use the tson-data skill; for *schema* documents use tson-schema. This skill is the Java implementation and its CLI, not the notation.
 ---
 
 # `io.ltr8:tson` — the Java implementation
@@ -50,7 +50,7 @@ must match the library's own revision.
    a bound Java object).
 3. **Build one `Tson` at startup and keep it.** A schema compiles once per instance, and concurrent
    *reads* through one instance are safe. Registering schemas concurrently is not.
-4. **Choose fail-fast or collecting.** A reader throws `TsonReadException` at the first problem;
+4. **Choose fail-fast or collecting.** A reader throws `ReadException` at the first problem;
    `.withDiagnostics(collector)` returns the value *and* every problem, and `tson.validate(...)`
    returns the problems alone. Use a collecting read for anything that reports to a person.
 5. **Switch on `Diagnostic.Code`** — a closed enum — rather than matching `message` text.
@@ -191,7 +191,7 @@ reflectively from another module. Under a schema, name the class for a schema ty
 
 **A schema and its bound class must agree**, checked at bind-mode compile — startup, not first read.
 Any non-FIXED field with no component, or a component no field fills, raises
-`TsonBindMismatchException`; optional fields are *not* exempt, since those are the ones that work in
+`BindMismatchException`; optional fields are *not* exempt, since those are the ones that work in
 development and fail on the first caller who sends them. `@Unbound` marks a component as the class's
 own; `TsonConfig.lenientBinding()` opts out wholesale and is silent. The full annotation set and the
 atom→Java type table are in `references/bindings.md`.
@@ -272,19 +272,19 @@ checks containment *after* `toRealPath` so `..` and symlink escape fall together
 `?sha256=` pin or the fetched `!!id` — the loader does both.
 
 `TsonSchemaSource` is a one-method interface (`String fetch(String uri)`) and **names its own failure
-exception**: a source says "cannot supply this" with `TsonSchemaFetchException` and nothing else, whose
+exception**: a source says "cannot supply this" with `SchemaFetchException` and nothing else, whose
 `Reason` is `NOT_PERMITTED` / `NOT_FOUND` / `TRANSPORT` / `TIMEOUT` / `TOO_LARGE`. Use
 `TsonSchemaSource.ofMap(map)` rather than `schemas::get` — a `null` carries no `Reason` and is refused
 as a fault.
 
 ## Diagnostics and errors
 
-**The read stack holds no error policy.** Readers report to a `TsonDiagnosticsReceiver` — one method,
+**The read stack holds no error policy.** Readers report to a `DiagnosticsReceiver` — one method,
 `void report(Diagnostic)` — and the receiver decides whether that is fatal. Fail-fast and collecting
 are the same read with different receivers.
 
 ```java
-var problems = TsonDiagnosticsReceiver.collecting();
+var problems = DiagnosticsReceiver.collecting();
 
 Server server = new TsonObjectReader()
         .withDiagnostics(problems)
@@ -297,7 +297,7 @@ for (Diagnostic d : problems.diagnostics()) {
 
 `withDiagnostics` returns a *new* reader and leaves the original fail-fast. A receiver sees **every**
 problem with the document — base syntax included — so a collecting read never throws for a bad
-document; only a fault in the library throws past it. A fail-fast read throws `TsonReadException`,
+document; only a fault in the library throws past it. A fail-fast read throws `ReadException`,
 which carries the `Diagnostic` on `.diagnostic()`.
 
 A `Diagnostic` locates itself at both ends, and **every component is a location** — the one fact that is
@@ -327,7 +327,7 @@ on the document, and `Code.verdict()` is the one place that says so rather than 
 own copy of the set: `NOT_IMPLEMENTED` (a library gap), `BIND_MISMATCH` (your class and the schema
 disagree), and the five `SCHEMA_*` fetch codes (nothing was checked — the schema was never obtained).
 Those five are `SCHEMA_NOT_PERMITTED`, `SCHEMA_NOT_FOUND`, `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT` and
-`SCHEMA_TOO_LARGE`, one per `TsonSchemaFetchException.Reason` and mapped by `Code.of(reason)` — a code
+`SCHEMA_TOO_LARGE`, one per `SchemaFetchException.Reason` and mapped by `Code.of(reason)` — a code
 rather than a reason field beside one code, because which one it is is a *routing* question and the code
 is what a consumer routes on. Full list, the exception hierarchy and the exit codes:
 `references/diagnostics.md`.
@@ -341,7 +341,7 @@ reported in any of §8.1's four error categories. In this implementation a refus
 `Diagnostic` carrying `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT` — **one code per
 rule, which is what a consumer routes on** — and nothing else.
 
-**What judged it is stated once, not per refusal**: `TsonProcessorPolicy` — `identifierPolicy` and
+**What judged it is stated once, not per refusal**: `ProcessorPolicy` — `identifierPolicy` and
 `tokenPolicy` (each a level, a unit, any `permitting` relaxations), under the same names that configured
 them, plus the Unicode data version — from `tson.processorPolicy()`, from `processorPolicy()` on the
 reader that judged, or from `tson policy` on the command line. Two deployments
@@ -352,8 +352,8 @@ Two policies, defaulting opposite ways for the same reason in each case:
 
 ```java
 Tson tson = Tson.builder()
-        .identifierPolicy(TsonUnicodePolicy.highlyRestrictive().perSegment())  // names
-        .tokenPolicy(TsonUnicodePolicy.unrestricted())                         // values
+        .identifierPolicy(UnicodePolicy.highlyRestrictive().perSegment())  // names
+        .tokenPolicy(UnicodePolicy.unrestricted())                         // values
         .build();
 ```
 
@@ -420,7 +420,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | `new TsonObjectReader().read(…, Server.class)` with a non-`public` record | binding is reflective across a module boundary            | make the target class `public`                              |
 | a `Tson` built per request                                       | it re-bootstraps and recompiles every schema                        | build one at startup and keep it                            |
 | registering schemas from several threads                        | only *reads* through one `Tson` are safe                            | resolve every schema at startup, then read                  |
-| catching `TsonParseException` around a facade read              | a facade routes base syntax through the receiver                    | catch `TsonReadException`, or read `.diagnostic()`          |
+| catching `TsonParseException` around a facade read              | a facade routes base syntax through the receiver                    | catch `ReadException`, or read `.diagnostic()`          |
 | expecting a collecting read to throw on a syntax error          | it collects; an empty list is the only "valid"                      | check `problems.diagnostics().isEmpty()`                    |
 | matching diagnostic `message` text                              | messages are not API                                                | switch on `Diagnostic.Code`                                 |
 | `!type` on a schemaless read                                    | schemaless reads resolve built-ins only, and report the rest        | `.withSchema(uri)`, or `preservingUnknownTypeRefs()`        |

@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.annotation.Profile;
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.compiler.TsonMissingBindingException;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 
@@ -79,7 +79,7 @@ class BindingsConfigTest {
         Tson tson = Tson.builder().schemaSource(uri -> SHORT_SCHEMA.replace("order =>", "invoice =>"))
                 .bindings(Map.of("order", Order.class)).build();
 
-        TsonMissingBindingException thrown = assertThrows(TsonMissingBindingException.class,
+        MissingBindingException thrown = assertThrows(MissingBindingException.class,
                 () -> tson.objectReader().read("""
                         !!schema:"https://example.test/orders.tn"
                         !invoice { sku: "A"  quantity: 1 }""", Order.class));
@@ -130,7 +130,7 @@ class BindingsConfigTest {
     void aMissingBindingIsAMisconfigurationNotAGap() {
         Tson tson = Tson.builder().schemaSource(uri -> SHORT_SCHEMA).bindings(Map.of()).build();
 
-        TsonMissingBindingException thrown = assertThrows(TsonMissingBindingException.class,
+        MissingBindingException thrown = assertThrows(MissingBindingException.class,
                 () -> tson.objectReader().read("""
                         !!schema:"https://example.test/orders.tn"
                         !order { sku: "A"  quantity: 1 }""", Order.class));

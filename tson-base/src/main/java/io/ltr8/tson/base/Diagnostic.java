@@ -193,11 +193,11 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      *       can ride in the same single-pass list as the ordinary problems rather than throwing and taking
      *       their verdicts with it.</li>
      *   <li>{@code BIND_MISMATCH} -- the reading application. A schema and the Java classes bound to it
-     *       disagree ({@code TsonBindMismatchException}, {@code TsonMissingBindingException}): a wiring
+     *       disagree ({@code BindMismatchException}, {@code MissingBindingException}): a wiring
      *       mistake, where the document may be perfectly valid and the message names one of that
      *       application's own classes.</li>
      *   <li>the five {@code SCHEMA_*} codes -- everyone else. No configured {@code TsonSchemaSource} would
-     *       supply the schema the document names ({@code TsonSchemaFetchException}). Nothing is wrong with
+     *       supply the schema the document names ({@code SchemaFetchException}). Nothing is wrong with
      *       the document, and nothing may be wrong with the schema either -- it was never obtained, so it
      *       was never read. Kept apart from {@code SCHEMA_ERROR} because that one is a verdict: the schema
      *       <em>was</em> obtained and it does not resolve. <b>"Everyone else" is several people</b>, and
@@ -244,7 +244,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         //
         // One per reason rather than a permanent/transient pair, because consumers partition them
         // differently: a command line by whether a rerun could help, an HTTP surface by whose doing it was.
-        // A code encoding one partition strands the other. `TsonSchemaFetchException.Reason` is the throwing
+        // A code encoding one partition strands the other. `SchemaFetchException.Reason` is the throwing
         // channel's own vocabulary and the single input to `Code.of`, so the two channels cannot disagree.
 
         /** Policy refused it: not an allowed host, not a legal identity, or no pin where one is required. */
@@ -262,6 +262,27 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         /** The location answered with more bytes than a schema document is allowed to be. */
         SCHEMA_TOO_LARGE;
 
+
+        /**
+         * The code a fetch failure reports, one per {@link SchemaFetchException.Reason}.
+         *
+         * <p><b>Back on {@code Code} because its input is.</b> It sat in {@code TsonDiagnostics} for as
+         * long as {@code SchemaFetchException} did, on the argument that a diagnostic names no exception
+         * type -- which was a fact about where the exception lived, not about this mapping. It classifies
+         * nothing: a fetch failure arrives already carrying its own {@code Reason}, and this only says
+         * which code a consumer routes on. A schema is obtained the same way whichever encoding names it,
+         * so the answer is the same for all of them, and {@code ofLimitExceeded} sits here for the same
+         * reason.
+         */
+        public static Code of(SchemaFetchException.Reason reason) {
+            return switch (reason) {
+                case NOT_PERMITTED -> SCHEMA_NOT_PERMITTED;
+                case NOT_FOUND -> SCHEMA_NOT_FOUND;
+                case TRANSPORT -> SCHEMA_UNREACHABLE;
+                case TIMEOUT -> SCHEMA_TIMEOUT;
+                case TOO_LARGE -> SCHEMA_TOO_LARGE;
+            };
+        }
 
         /**
          * Whether this code is a verdict on the document -- <b>the document was checked, and this is what

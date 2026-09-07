@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
 /**
  * A schema and a Java class bound to it cannot work together -- the two disagree about a type's fields in a
@@ -28,15 +28,15 @@ package io.ltr8.tson.compiler;
  * A FIXED field is neither: its value is settled by the schema, so a component for it would hold a constant.
  *
  * <p><b>The third shape is a broken contract rather than a mismatch</b>, and reaches this at link time: a
- * {@link io.ltr8.tson.schema.meta.Data} implementation returning {@code null} from {@code references()},
+ * {@code schema.meta.Data} implementation returning {@code null} from {@code references()},
  * which the linker iterates. It is here for the reason the other two are -- the schema is fine, the class is
  * nearly fine, and the failure is the reading application's to fix -- and it is here rather than left as the
  * {@code NullPointerException} it would otherwise be because every channel above reads a bare runtime
  * exception out of the schema pipeline as a fault in this library, and asks for a bug report against it.
  */
-public class TsonBindMismatchException extends RuntimeException {
+public class BindMismatchException extends RuntimeException {
 
-    public TsonBindMismatchException(String message) {
+    public BindMismatchException(String message) {
         super(message);
     }
 }

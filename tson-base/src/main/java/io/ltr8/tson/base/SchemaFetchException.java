@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
 /**
  * A schema reference that could not be turned into schema text, and why.
@@ -9,7 +9,7 @@ package io.ltr8.tson.compiler;
  * host that is down is none of the three: nobody's document is wrong, nothing is unimplemented, and no
  * invariant broke. Fetching brings its own failure modes, so it brings its own exception.
  *
- * <p><b>This is the type {@link TsonSchemaSource#fetch} names</b>, and the only one it permits for "cannot
+ * <p><b>This is the type {@code TsonSchemaSource.fetch} names</b>, and the only one it permits for "cannot
  * supply this". That is what lets {@code SchemaFailure} classify a fetch failure positively and rethrow
  * everything it does not recognise as the fault it is -- with no mandated type, an unfetchable schema and a
  * broken invariant are indistinguishable where a read catches them, and every fault reads to a consumer as a
@@ -25,7 +25,7 @@ package io.ltr8.tson.compiler;
  * reference was acceptable and the world was not. A server mapping schema failures onto status codes needs
  * that split, and cannot recover it from a flattened message.
  */
-public final class TsonSchemaFetchException extends RuntimeException {
+public final class SchemaFetchException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
@@ -51,7 +51,7 @@ public final class TsonSchemaFetchException extends RuntimeException {
     private final String uri;
     private final Reason reason;
 
-    public TsonSchemaFetchException(String uri, Reason reason, String message, Throwable cause) {
+    public SchemaFetchException(String uri, Reason reason, String message, Throwable cause) {
         super("cannot fetch schema '" + uri + "': " + message, cause);
         this.uri = uri;
         this.reason = reason;

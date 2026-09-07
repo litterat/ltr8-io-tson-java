@@ -17,9 +17,9 @@ is small and parsed once.)
   `report(code, message, expected, actual)`, `reported()`. One factory, `of(events, receiver)` (plus
   `throwing(events)` sugar), over one
   implementation. **The context holds no error policy**: `report` builds the `Diagnostic` from the path and
-  positions it tracks and hands it to the read's **`TsonDiagnosticsReceiver`**, which decides its fate —
-  `throwing()` raises `TsonReadException` at the first problem, `collecting()` accumulates into a
-  `TsonDiagnosticsCollector`, and a caller's own `void report(Diagnostic)` can stream them anywhere. No
+  positions it tracks and hands it to the read's **`DiagnosticsReceiver`**, which decides its fate —
+  `throwing()` raises `ReadException` at the first problem, `collecting()` accumulates into a
+  `DiagnosticsCollector`, and a caller's own `void report(Diagnostic)` can stream them anywhere. No
   reader branches on which. A reader needing to know whether its children complained asks `reported()` — a
   count, so it works for a receiver that keeps no list (the `int before = ctx.reported()` checkpoint idiom
   in `RecordBindReader`/`TupleBindReader`/`SchemalessObjectReader`/`AnnotationCapture`).
@@ -410,7 +410,7 @@ profile too", taking that rule with it, so `appliesIdentifierProfile()` guards t
 call at both walks — the read context's and the linker's. Every other level keeps the profile, the
 restricted-script rule gating itself inside `violation()`.
 
-**And the run names the policy and the data version it judged under** (`TsonProcessorPolicy`, below). §8.2
+**And the run names the policy and the data version it judged under** (`ProcessorPolicy`, below). §8.2
 reports a refusal under a *stated policy and a stated data version* and makes naming the version a MUST,
 because §8.3 marks all three rules unstable across Unicode releases. Both are stated once, off the reader
 that judged, rather than on each refusal.
@@ -419,13 +419,13 @@ that judged, rather than on each refusal.
 ## Diagnostics
 
 **`Diagnostic` lives in `tson-base`, and its classifiers do not.** The record, its `Code` enum, the three
-receivers and `TsonReadException` are a module of their own, because [TSON-JSON] §9.4 makes a second
+receivers and `ReadException` are a module of their own, because [TSON-JSON] §9.4 makes a second
 encoding report in the same four categories — one vocabulary by specification, not by convenience. The ten
 `of*` factories that turn a thrown failure into a diagnostic stayed in `tson-compiler` as `TsonDiagnostics`,
 because every one of them switches on an exception type this engine declares. What is shared is the shape of
 an answer; classifying a failure is reading a document, and that is each encoding's own. (`Diagnostic`, root package)
 
-`Diagnostic` is the structured value every `TsonDiagnosticsReceiver` receives, identical shape whichever
+`Diagnostic` is the structured value every `DiagnosticsReceiver` receives, identical shape whichever
 one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`FIELD_FIXED`/`TYPE_MISMATCH`/`WRONG_ARITY`/
 `UNKNOWN_TYPE_REF`/`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY`/`DUPLICATE_FIELD`
 from readers;
@@ -456,10 +456,10 @@ in `diagnostics.tn`.
 
 **Five rather than two** (a "permanent" and a "transient" code) because consumers cut the same five
 differently: a command line by whether a rerun could help, an HTTP surface by whose doing it was. One code
-per reason keeps every partition derivable and privileges none. `TsonSchemaFetchException.Reason` remains the
+per reason keeps every partition derivable and privileges none. `SchemaFetchException.Reason` remains the
 throwing channel's own vocabulary and the single input to `Diagnostic.Code.of`, so the two channels one fetch
 failure travels on cannot disagree.
-A consumer that resolves its schemas at startup sees `TsonSchemaFetchException` thrown and reads
+A consumer that resolves its schemas at startup sees `SchemaFetchException` thrown and reads
 `reason()`; one that reads through a collecting receiver — the common path for a server validating request
 bodies — sees a `Diagnostic` and never sees the exception at all. With the reason on the classification
 only, the same refused reference was the sender's mistake read one way and an operator's read the other.
@@ -470,7 +470,7 @@ rather than its message so the schema-document channel states it too.
 
 **A §8.2 refusal carries no component of its own**, by the same rule that puts a fetch failure's cause in
 the code. §8.2 requires a refusal to name the Unicode data version it was computed against, which is
-a fact about *this processor* rather than about the problem — see `TsonProcessorPolicy` below, which is
+a fact about *this processor* rather than about the problem — see `ProcessorPolicy` below, which is
 where it and the policy are stated, once.
 
 **Which rule refused is the code, and nothing beside it.** One code per §8.2 rule —
@@ -490,11 +490,11 @@ differ on purpose.
 `RESTRICTED_SCRIPT` is also the one code a *value* can carry, a token having no identifier profile and no
 scope to be distinct within.
 
-## `TsonProcessorPolicy` — the configuration, stated once
+## `ProcessorPolicy` — the configuration, stated once
 
 **It carries three settings, not two.** The identifier policy, the token policy and the limits, plus the UCD
 version the first two were computed against. The limits sat beside it while it was named
-`TsonUnicodeProcessorPolicy` — correctly, since a nesting bound has no business inside a *Unicode* policy —
+`ProcessorPolicy` — correctly, since a nesting bound has no business inside a *Unicode* policy —
 and the rename is what made the grouping coherent rather than a reversal of that reasoning. A deployment
 states one policy; the three components stay independent, and changing one still says nothing about the
 others.
@@ -522,13 +522,13 @@ document. Every `tson-cli` envelope carries one in its `policy` field.
 
 **Read off the reader that judged**, not rebuilt from a configuration object: a derived reader
 (`withIdentifierPolicy`, `withTokenPolicy`) is exactly where the two can differ, and a response quoting the wrong
-one is worse than quoting none. `TsonUnicodePolicy.dataVersion()` remains the version as a static accessor;
+one is worse than quoting none. `UnicodePolicy.dataVersion()` remains the version as a static accessor;
 the constant behind it (`Xid.UNICODE_VERSION`) is in the unexported `lexer` package and unreachable
 otherwise. §8.2 requires exactly this shape: the policy and the data version are properties of the *report*,
 not of the refusal, and a processor MUST make both available with any report containing one and SHOULD make
 them available with no document in hand.
 
-## `TsonLimitsPolicy` — §9.1's bounds, on the same terms
+## `LimitsPolicy` — §9.1's bounds, on the same terms
 
 What this processor will *spend* reading a document, where the policy above is what it will *admit as a
 name*: `Tson.limitsPolicy()`, either facade's `limitsPolicy()`, `TsonTreeReader.withLimits`, `tson policy`,
@@ -580,8 +580,8 @@ belongs in the `Code`, which is what a consumer already switches over.
 | `DUPLICATE_FIELD`/`DUPLICATE_MAP_KEY` | in the document, at `path` | no |
 | §8.2 refusal: which rule | it is the `Code` | no |
 | why a schema was not obtained | nowhere — it is about the world | no — it is the `Code`, one per reason |
-| §8.2 refusal: the policy and the Unicode tables | nowhere — it is this processor's configuration | no — `TsonProcessorPolicy`, once per run |
-| §9.1 refusal: which bound, and what it is | nowhere — it is this processor's configuration | no — `TsonLimitsPolicy`, once per run; the bound itself rides in `expected`/`actual` |
+| §8.2 refusal: the policy and the Unicode tables | nowhere — it is this processor's configuration | no — `ProcessorPolicy`, once per run |
+| §9.1 refusal: which bound, and what it is | nowhere — it is this processor's configuration | no — `LimitsPolicy`, once per run; the bound itself rides in `expected`/`actual` |
 
 Most diagnostics are about something the consumer is already holding, which is why `expected`/`actual` are
 enough for them: a rendered `<= 100` is a convenience, and the authoritative copy is a file the consumer has.
@@ -743,7 +743,7 @@ the missing overload now makes hard — not a site that writes a sentence a temp
 and `TsonUnsupportedDocumentException` keep the location in `position()` and out of `getMessage()`;
 `toString()` appends it, so a stack trace still says where while the `Diagnostic` built from one carries
 `dataPosition` as the single copy. Repeating it in the message made every renderer print the location twice,
-in two formats, the second without a byte offset. `TsonReadException.toString()` does the same from its own
+in two formats, the second without a byte offset. `ReadException.toString()` does the same from its own
 diagnostic, which is what keeps a stack trace informative now that a base-syntax failure reaches a fail-fast
 caller through *it* rather than as the parse exception itself.
 
@@ -764,7 +764,7 @@ Three reasons this is the receiver's business rather than the caller's:
   classification is required while making every caller ask for it.
 
 **Fail-fast is unchanged in kind, changed in type.** `throwing()` still throws at the first problem, but a
-base-syntax failure now arrives as `TsonReadException` (carrying the diagnostic, position included) rather
+base-syntax failure now arrives as `ReadException` (carrying the diagnostic, position included) rather
 than `TsonParseException`. The exception type is the whole cost of the change, and it buys `Tson.validate`
 being a plain call with no catch at all. Only a fault in *this library* still propagates as itself:
 `ofBaseSyntaxError` rethrows anything that is not one of §8.1's three.
@@ -772,7 +772,7 @@ being a plain call with no catch at all. Only a fault in *this library* still pr
 ## Schema-side diagnostics (`TsonSchemaParser`, `SchemaResolver`, `TsonSchemaLinker`, `Tson.validateSchema`)
 
 A broken *schema* reports every independent problem in one pass, through the same
-`TsonDiagnosticsReceiver` the read path uses. §8.1 asks for both halves of this: implementations MUST carry
+`DiagnosticsReceiver` the read path uses. §8.1 asks for both halves of this: implementations MUST carry
 source position in **all** error reports, and SHOULD "continue processing after an error to report multiple
 issues in a single pass" — and it explicitly puts schema resolution/compilation failures in the *resolver
 error* category, so this is the same layer, not a new one.
@@ -823,7 +823,7 @@ error* category, so this is the same layer, not a new one.
 - **Two reporting overloads, `SchemaResolver.resolveSchema(document, positions, receiver)` and
   `TsonSchemaLinker.link(schema, loader, receiver)`.** The existing overloads are untouched and still throw
   at the first problem. **The fail-fast paths deliberately do not route through
-  `TsonDiagnosticsReceiver.throwing()`** — that raises `TsonReadException`, and a schema that fails to
+  `DiagnosticsReceiver.throwing()`** — that raises `ReadException`, and a schema that fails to
   resolve is not a read failure; the CLI's exit 1 against exit 70 turns on the distinction. They rethrow the
   original untouched.
 - **The resolver catches inside its memoized namespace getter (`SchemaResolver.OnDemand`), not around the
@@ -886,7 +886,7 @@ error* category, so this is the same layer, not a new one.
   that reported anything is never registered.**
 - **A schema and the class bound to it must agree about a type's fields**, and the check is where they meet
   rather than where a document is read — both halves are fixed by the time a reader is built, so a mismatch
-  is a `TsonBindMismatchException` at bind-mode compile, which is startup for anything compiling its schemas
+  is a `BindMismatchException` at bind-mode compile, which is startup for anything compiling its schemas
   once. **One rule: the class must be able to hold what the schema declares**, with a single exemption:
     - **Any non-FIXED field with no component** → refused at compile, optional ones included. Leaving
       OPTIONAL to the read that writes one is the tempting split and the worse trade: an optional field is
@@ -924,11 +924,11 @@ error* category, so this is the same layer, not a new one.
       as well as a channel did — while letting the pass stay single, which is the property the whole
       schema-diagnostics design exists for. `SchemaResolver.Problems` is where the schema pipeline
       classifies, and `TsonCli.exitCodeFor` is what the CLI's exit code rides on.
-    - **It classifies three ways, not two.** A `TsonBindMismatchException` is neither an author error nor a
+    - **It classifies three ways, not two.** A `BindMismatchException` is neither an author error nor a
       gap, and reaches `ofSchemaBindMismatch` — the same answer `SchemaFailure` gives a read, for the same
       reason. Both throw sites keep it clear of their catch-alls (`bindAtomInstance` and
       `bindAnnotationValue`, which carry the same arm): relabelling it `UnsupportedOperationException`
-      rebuilds the shape `TsonMissingBindingException` exists to retire, a missing line of wiring reading as
+      rebuilds the shape `MissingBindingException` exists to retire, a missing line of wiring reading as
       *this library cannot do that*. An annotation naming a type the consumer never bound — the kernel's own
       `data` among them — is the reachable case, and `BindMismatchClassificationTest` pins it in both §6
       positions plus the constructor case beside them.
@@ -937,15 +937,15 @@ error* category, so this is the same layer, not a new one.
 - **A read that cannot get its schema classifies the failure the same way (`SchemaFailure`).** Both facades
   reach their schema through one call that resolves, links *and* compiles, so every way any of those can
   fail arrives at a single `catch` — and coding them all `SCHEMA_ERROR` says "the author's schema is wrong"
-  about two failures that are nothing of the kind. `TsonBindMismatchException` (its
-  `TsonMissingBindingException` subclass included) is `BIND_MISMATCH`: the schema is fine, the class is
+  about two failures that are nothing of the kind. `BindMismatchException` (its
+  `MissingBindingException` subclass included) is `BIND_MISMATCH`: the schema is fine, the class is
   fine, and the reading application pointed them at each other by mistake, so the message names one of
   *its* classes and the document may be perfectly valid. An `UnsupportedOperationException` is
-  `NOT_IMPLEMENTED`, the same code a gap gets everywhere else. A `TsonSchemaFetchException` is one of the
+  `NOT_IMPLEMENTED`, the same code a gap gets everywhere else. A `SchemaFetchException` is one of the
   five `SCHEMA_*` codes, by its own `Reason`: no source would supply the schema, so it was never read, and
   whether it would even have resolved is unknown — `SCHEMA_ERROR` would claim a verdict on a document
   nothing here has seen. A
-  `TsonContentHashMismatchException` *is* `SCHEMA_ERROR`, and the pair marks the line: something arrived,
+  `ContentHashMismatchException` *is* `SCHEMA_ERROR`, and the pair marks the line: something arrived,
   and it is not what the reference named. Each branch carries the `expected` that matches its code ("a
   schema that can be obtained", "a schema matching its `?sha256=` pin", "a resolvable schema"), and the
   fetch branch carries the exception's own `Reason` besides — the classification is the last place that
@@ -957,7 +957,7 @@ error* category, so this is the same layer, not a new one.
       matching on message text is the alternative it should not be pushed to.
     - **Every branch is a positive verdict and the default rethrows**, the same rule `ofBaseSyntaxError`
       ends on: a library fault propagates as itself. What makes that possible is `TsonSchemaSource.fetch`
-      naming `TsonSchemaFetchException` as the one way a source says "cannot supply this" — with no mandated
+      naming `SchemaFetchException` as the one way a source says "cannot supply this" — with no mandated
       type, an `IllegalStateException` arriving here is equally a source's miss or a broken invariant, and
       either every fault reads as a bad schema or every source that spells a miss that way crashes the read.
       A source failing any other way is that source malfunctioning, and surfaces as the exception it threw:

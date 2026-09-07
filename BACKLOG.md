@@ -191,7 +191,7 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
       both facts instead of having the caller name what the library already knows. The explicit form stays
       either way — a caller writing against a schema it did not compile here has nothing to derive from.
 - [ ] **Writers are fail-fast only, no diagnostics.** They throw `TsonWriteException` at the first
-  problem, with nothing symmetric to the read side's `TsonDiagnosticsReceiver`. The `TsonValueWriter`
+  problem, with nothing symmetric to the read side's `DiagnosticsReceiver`. The `TsonValueWriter`
   above especially needs it, to report every schema violation in one pass the way the reader does — and
   the seam already exists and is write-direction-agnostic (`Diagnostic` carries a data path and both
   positions; nothing about `void report(Diagnostic)` assumes reading), so this is a matter of threading a
@@ -204,10 +204,10 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `TsonLimitsPolicy` is
+- [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is
   the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one
   table with a default each, so nothing here is a judgement call any more — what is left is eleven document
-  limits and five schema-side ones, each a component on `TsonLimitsPolicy`, a `CliPolicy.CliLimits` field and a
+  limits and five schema-side ones, each a component on `LimitsPolicy`, a `CliPolicy.CliLimits` field and a
   `--flag`. Document side: **token length** (1,048,576 code points), **decoded text length** after escape
   processing (1,048,576), **numeric literal length** (4,096 digits, annotated tokens included), **decoded
   binary size** per `!bytes` value (16,777,216 octets), **document size** in bytes (16,777,216), **elements**

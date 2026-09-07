@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.ContentHashMismatchException;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -87,7 +88,7 @@ class TsonContentHashTest {
     void verifyPassesAMatchingPinAndRejectsAMismatch() {
         byte[] doc = utf8("!!id:\"x\"\nabc");   // body "abc" hashes to SHA_ABC
         TsonContentHash.verify(doc, "https://x/s.tn?sha256=" + SHA_ABC);   // no throw
-        assertThrows(TsonContentHashMismatchException.class,
+        assertThrows(ContentHashMismatchException.class,
                 () -> TsonContentHash.verify(doc, "https://x/s.tn?sha256=" + "0".repeat(64)));
     }
 

@@ -171,8 +171,8 @@ computes rather than remembers, and one that breaks silently when that other dec
 §5.2's "Which fields may carry a value" states exactly this rule; `void` and the scoped instances fall out of the
 same line.
 
-**A schema and its bound class must agree about a type's fields** (`TsonBindMismatchException`, raised at
-bind-mode compile — startup, not first read; its subclass `TsonMissingBindingException` covers a type with
+**A schema and its bound class must agree about a type's fields** (`BindMismatchException`, raised at
+bind-mode compile — startup, not first read; its subclass `MissingBindingException` covers a type with
 *no* class at all and is deferred to the first read of that type, since a schema legitimately declares types
 a consumer never binds). Any non-FIXED field with no component, or a component no
 field fills, is refused — optional fields included, since those are the ones that work in development and
@@ -213,7 +213,14 @@ implementation of the spec published under the `ltr8.io` banner, not *the* tson.
 module has a real `module-info.java`; module names mirror each module's root exported package.
 
 - **`tson-base`** — `io.ltr8.tson.base`: `Diagnostic` (the record and its closed `Code` enum), the three
-  diagnostics receivers, `TsonReadException`, and `SourcePosition`. A **true pure leaf** — depends on
+  diagnostics receivers, `SourcePosition`, and the exceptions whose fact is the **processor's** rather than
+  any one encoding's — `ReadException`, `LimitExceededException`, `BindMismatchException` and its
+  `MissingBindingException` subclass, `SchemaFetchException` (whose `Reason` is what `Diagnostic.Code.of`
+  maps), `ContentHashMismatchException`. **The prefix is dropped here and only here**: `Tson` earns its keep
+  disambiguating a consumer's own `Schema` from `TsonSchema`, and in this module the competing name is
+  another *encoding's* type in this same library — `ReadException` beside `JsonParseException` reads right
+  where `TsonReadException` beside it implies the first belongs to the text encoding, which is exactly what
+  nothing here does. A **true pure leaf** — depends on
   nothing, and nothing in it knows what a TSON document or a JSON one looks like. It is a module rather
   than a package because [TSON-JSON] §9.4 makes the JSON encoding report in [TSON-DATA] §8.1's four
   categories and add none of its own: the vocabulary is one vocabulary across both encodings *by
@@ -225,14 +232,14 @@ module has a real `module-info.java`; module names mirror each module's root exp
   encoding's syntax failure" gap, since there is no longer one switch responsible for exceptions it cannot
   name. `SourcePosition` moved here from `schema.meta` so the base need not require `tson-schema`; the
   bonus is that any encoding's own position type can implement it and reach a `Diagnostic` with no
-  conversion — `JsonPosition` does. **`TsonLimitsPolicy` and `TsonLimitExceededException` are here on the
+  conversion — `JsonPosition` does. **`LimitsPolicy` and `LimitExceededException` are here on the
   same argument**: [TSON-JSON] §10.1 makes the bound §9.1's policy "in JSON clothing, and the same policy
   applies with the same defaults", so one record and one refusal serve both encodings and a deployment that
   raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and is the one factory that
   stayed on the record — its nine siblings switch on an encoding's own exception type where it classifies
   nothing at all. **The Unicode machinery is here too**, in an exported `io.ltr8.tson.base.unicode`: `Xid`,
   `IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — UCD 16.0 tables and the
-  UTS #39 rules over them, read by two engines and knowing nothing about either format. `TsonUnicodePolicy`
+  UTS #39 rules over them, read by two engines and knowing nothing about either format. `UnicodePolicy`
   sits beside `Diagnostic`. What it leaves behind in `tson-compiler` is `IdentifierParser`, which mixes
   [TSON-DATA] §7.7's *grammar* (`validate`, throwing `LexException`) with §8.2's *policy* (`hygiene`,
   returning) — the one piece whose home is a real question rather than a move, and it is smaller now that
@@ -606,9 +613,9 @@ real Java references, **eager** so a broken entry surfaces at compile time. `Tso
 one method, `T read(TsonReadContext)`; framing and error policy live elsewhere. A `RuntimeException` while
 building one entry becomes an `ErrorReader` (the schema compiles; reading that entry reports
 `NOT_IMPLEMENTED` and skips the value, so a gap costs that value a verdict and nothing else's — the code,
-not the channel, being what keeps it apart from an author error), with two deliberate exceptions: a `TsonBindMismatchException` is
+not the channel, being what keeps it apart from an author error), with two deliberate exceptions: a `BindMismatchException` is
 rethrown so a schema and a class that disagree fail the compile rather than the first read, and its
-`TsonMissingBindingException` subclass rides an `ErrorReader` but is thrown from it **unwrapped**, being a
+`MissingBindingException` subclass rides an `ErrorReader` but is thrown from it **unwrapped**, being a
 misconfiguration rather than a gap. An entry declaring type parameters becomes an
 `OpenTemplateReader` before its body is looked at at all: a template is not a type, so naming one in *data*
 is an ordinary data diagnostic (a schema naming one unapplied was already refused at link time).
@@ -636,11 +643,11 @@ about the deployment, never a verdict.
 
 Every compiled reader pulls `TsonEvent`s through `TsonReadContext` — no reader requires a materialized
 tree. The context holds **no error policy**: `report(...)` hands a `Diagnostic` to the read's
-`TsonDiagnosticsReceiver` (`throwing()` / `collecting()` / caller's own), and readers ask `reported()` (a
+`DiagnosticsReceiver` (`throwing()` / `collecting()` / caller's own), and readers ask `reported()` (a
 count) when they need to know whether children complained. **A receiver sees every problem with the
 document, base syntax included** — both facades catch a document that will not lex or parse and report
 `Diagnostic.ofBaseSyntaxError(e)`, so a collecting read never throws for a bad document (it returns nothing
-and the collector says why) while fail-fast still throws, as `TsonReadException` rather than
+and the collector says why) while fail-fast still throws, as `ReadException` rather than
 `TsonParseException`. A fault in the library propagates as itself. Load-bearing read rules, each detailed in the
 note: a stated FIXED value is checked, not obeyed; an omitted `OPTIONAL_FIXED` field stays absent where
 `REQUIRED_FIXED` injects (§5.2); collecting mode always keeps reading; **bind mode is all-or-nothing
@@ -689,7 +696,7 @@ locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual
 components matching JSON Schema 2020-12 §12's output unit (`path`, `schemaId`+`schemaPointer`, plus
 `dataPosition`/`schemaPosition`) — and nothing else. **Every component is a location**; the one fact that is
 not, why a schema could not be obtained, is the `Code` itself: five members, one per
-`TsonSchemaFetchException.Reason` (`SCHEMA_NOT_PERMITTED`/`SCHEMA_NOT_FOUND`/`SCHEMA_UNREACHABLE`/
+`SchemaFetchException.Reason` (`SCHEMA_NOT_PERMITTED`/`SCHEMA_NOT_FOUND`/`SCHEMA_UNREACHABLE`/
 `SCHEMA_TIMEOUT`/`SCHEMA_TOO_LARGE`, mapped by `Code.of`). Consumers *route* on that question and a code is
 what a consumer routes on, so a field beside it was a second carrier for one fact; five rather than two
 because consumers partition the reasons differently and no partition is privileged. The exception's own
@@ -701,7 +708,7 @@ the code is a verdict on the document at all, which the five, `NOT_IMPLEMENTED`,
 refused is the `Code` — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT`, one each, since the
 three want three different remedies and the code is what a consumer routes on — and the Unicode data
 version §8.2 requires a refusal to name is a fact about the *processor*, so it is stated once beside the
-diagnostics rather than N times inside them (`TsonProcessorPolicy`, below).
+diagnostics rather than N times inside them (`ProcessorPolicy`, below).
 **What earns a component at all is one rule** — *a fact not recoverable from the
 document plus the schema, and not one the consumer routes on* — which is why an atom's
 failed bound (in the schema), a duplicate key (in the document) and the rule that fired (the code) get none;
@@ -736,7 +743,7 @@ reference to a dropped declaration on top of the real error. Namespace-level fai
 `!!import`, ineligible `!!meta`, `!!id` cross-check) still throw even with a receiver. Compilation, and the
 lexer under everything, are still fail-fast.
 
-**`TsonProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2
+**`ProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2
 policies (`identifierPolicy`, `tokenPolicy`, under `TsonConfig`'s own names — level, whole-name or
 per-segment unit, and any `permitting` relaxations) plus
 the UCD version and §9.1's limits, reachable as `Tson.processorPolicy()`, either facade's `processorPolicy()` (read off the
@@ -750,11 +757,11 @@ envelope one: a generator that reads the policy first never writes the name that
 the round trip the format exists to avoid. §8.2 requires exactly this shape, naming the two policies
 (`identifier policy`, `token policy`) so two implementations reporting them agree on what they are called.
 
-**`TsonLimitsPolicy` is §9.1's half of the same statement, and it is a component of it.** What this
+**`LimitsPolicy` is §9.1's half of the same statement, and it is a component of it.** What this
 processor will *spend* reading a document, where the two above are what it will *admit as a name* —
 `Tson.limitsPolicy()` (`processorPolicy().limits()` in one call), either facade's, `TsonTreeReader.withLimits`,
 `tson policy`, and a `limits` record in every CLI envelope's `policy` field. It sat beside rather than inside
-for as long as the container was called `TsonUnicodeProcessorPolicy`, which was right: a nesting bound has no
+for as long as the container was called `ProcessorPolicy`, which was right: a nesting bound has no
 business inside a *Unicode* policy. The container was the problem and not the grouping — a deployment states
 one policy, and the CLI envelope had been nesting `limits` under `policy` all along. What survives the merge
 is the independence, not the separation: the three components answer three questions, and changing one still
@@ -860,7 +867,7 @@ out of a document and in a server that means a request body: the HTTP one guards
 capped against bytes delivered), the file one arbitrary reads (containment checked *after* `toRealPath`, so
 `..` and symlink escape fall together). Neither verifies the `?sha256=` pin or the fetched `!!id` — the loader
 does both; `requireContentHashPin` adds the one thing it cannot, that a pin be present. **`TsonSchemaSource`
-names its own failure exception** — a source says "cannot supply this" with `TsonSchemaFetchException` and
+names its own failure exception** — a source says "cannot supply this" with `SchemaFetchException` and
 nothing else, which is what lets `SchemaFailure` classify every branch positively and rethrow a fault as
 itself; the exception lives in `tson-compiler` beside the interface, since the classification cannot see a
 type declared in `tson`. A schema no source would supply is one of the five `SCHEMA_*` codes, never
@@ -890,8 +897,8 @@ act: `70 > 78 > 69 > 75 > 1`. Every non-verdict rides in the report as a code wi
 on stdout unchanged. 70's halves print differently: a gap that escapes as an exception prints
 `not implemented yet: <message>`, whose text usually names the workaround; a fault gets the please-report-it
 banner and its stack trace. Also `tson compile`, `tson hash` (stamps a
-`?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `TsonProcessorPolicy`
-and §9.1's `TsonLimitsPolicy` with no document in hand, the same record every `validate`/`compile` envelope
+`?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `ProcessorPolicy`
+and §9.1's `LimitsPolicy` with no document in hand, the same record every `validate`/`compile` envelope
 carries in its `policy` field.
 **Those three commands also take the policy flags** (`PolicyOptions`, which consumes them so each subcommand's
 own loop still sees only `--output` and positionals): `--max-depth` takes §9.1's nesting bound (refused below
@@ -1213,7 +1220,7 @@ compatibility).
   the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted local parts, domain literals or
   comments.
 - **Schema-side diagnostics** — **none outstanding**; what follows is the boundary. Parsing, desugaring,
-  resolution and linking all report through a `TsonDiagnosticsReceiver` (see
+  resolution and linking all report through a `DiagnosticsReceiver` (see
   `docs/readers-and-diagnostics.md`), and read- and schema-side diagnostics now populate the same four
   location components. Throw-site classification is done across the whole schema pipeline. The lexer stays
   fail-fast on purpose and is the floor under schema-parse recovery — not a tracked gap;
@@ -1249,7 +1256,7 @@ compatibility).
   `docs/`, and that guarantee is what decides between one instance and one per request
   (`SharedInstanceConcurrencyTest` pins it at that surface). What is still open is everything *outside* a
   read: registering schemas concurrently, and mutating a `DataBindContext` after use.
-- **§9.1's resource limits** — the policy exists (`TsonLimitsPolicy`, above) and bounds **nesting depth** at
+- **§9.1's resource limits** — the policy exists (`LimitsPolicy`, above) and bounds **nesting depth** at
   §9.1's own default of 64. §9.1 now states the whole set as one table with a default each — eleven more on
   the document side — and [TSON-SCHEMA] §11.5 adds five on the schema side under the same policy and the same
   reporting surfaces, one of which `TemplateMaterialiser.MAX_CLOSING_DEPTH` already enforces as a bare

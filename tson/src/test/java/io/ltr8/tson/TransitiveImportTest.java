@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonContentHashMismatchException;
+import io.ltr8.tson.base.ContentHashMismatchException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import org.junit.jupiter.api.Test;
@@ -325,7 +325,7 @@ class TransitiveImportTest {
         tson.resolve(leaf("https://example.test/b-nopin-3.tn", "beta"));
 
         String wrongPin = "0".repeat(64);
-        assertThrows(TsonContentHashMismatchException.class, () -> tson.resolve("""
+        assertThrows(ContentHashMismatchException.class, () -> tson.resolve("""
                 !!id:"https://example.test/c-pin-4.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!import:"https://tson.io/2026/35/m/core.tn?sha256=%s"

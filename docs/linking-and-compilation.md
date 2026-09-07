@@ -256,7 +256,7 @@ forbids — at the price of verdicts an author cannot predict (two default-`allo
 NaN however far apart their ranges sit) and a conformance bar no second implementation should have to
 match.
 
-**And the restriction level is refused per name, in the same pass** (`TsonUnicodePolicy`, UTS #39 §5.2). The two
+**And the restriction level is refused per name, in the same pass** (`UnicodePolicy`, UTS #39 §5.2). The two
 are complementary rather than overlapping: the confusable check is a *relation* and needs the whole set, so
 it can never fire on a lone name; the level is a *property* of one name, so it is what reaches a name nothing
 else in the schema resembles. Configured by `TsonConfig.identifierPolicy` and carried on
@@ -437,9 +437,9 @@ keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
       verdict, which is the same rule the schema pipeline settled on: throwing instead cost the whole read,
       and in a multi-document `tson validate` the whole envelope, for one unreadable field. `SchemaFailure`
       already classified a *compile* gap met during a read this way, so this was the last one travelling by
-      channel. Fail-fast loses nothing — `report` raises `TsonReadException`, which carries the same
+      channel. Fail-fast loses nothing — `report` raises `ReadException`, which carries the same
       `Diagnostic`, so `e.diagnostic().code()` is the question rather than the exception type.
-    - **`TsonMissingBindingException` is the one cause that still throws, unwrapped and in every mode.** It
+    - **`MissingBindingException` is the one cause that still throws, unwrapped and in every mode.** It
       is the reading application's own wiring — neither this library's gap nor a problem with the document —
       so it reaches that application as itself. Wrapping it once sent a service's missing configuration out
       as a 501.

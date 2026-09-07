@@ -76,7 +76,7 @@ work, and the first is the largest single obstacle to the stated goal.
 
 ## The Unicode policies, and which reach JSON
 
-[TSON-DATA] §8.2's two policies are one object (`TsonProcessorPolicy`) and reach this encoding
+[TSON-DATA] §8.2's two policies are one object (`ProcessorPolicy`) and reach this encoding
 differently. §9.4 states the split: the **identifier policy** reaches member names read as field names and
 every `$type`; the **token policy**, when a deployment sets one, reaches map keys and string values.
 
@@ -236,7 +236,7 @@ any consumer descends, which matters because every consumer of this stream recur
 iterates. The bound arrives as an `int` because a stream needs a number rather than a policy, but **the
 number and the refusal are the processor's, not this encoding's**: §10.1 makes it [TSON-DATA] §9.1's policy
 "in JSON clothing, and the same policy applies with the same defaults", so the stream counts against
-`TsonLimitsPolicy.DEFAULT_MAX_DEPTH` and refuses with `TsonLimitExceededException` — the same type the text
+`LimitsPolicy.DEFAULT_MAX_DEPTH` and refuses with `LimitExceededException` — the same type the text
 encoding refuses with, from `tson-base`. A deployment that raises the bound raises it for both encodings at
 once, which is what one policy means.
 

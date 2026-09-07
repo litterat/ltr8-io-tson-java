@@ -1,7 +1,6 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -159,7 +158,7 @@ class SchemaSourceConfigTest {
                 assertThrows(IllegalStateException.class, () -> tson.treeReader().read(UNPUBLISHED));
 
         assertTrue(thrown.getMessage().contains("returned null"), thrown::getMessage);
-        assertTrue(thrown.getMessage().contains("TsonSchemaFetchException"), thrown::getMessage);
+        assertTrue(thrown.getMessage().contains("SchemaFetchException"), thrown::getMessage);
         assertTrue(thrown.getMessage().contains("ofMap"), thrown::getMessage);
     }
 

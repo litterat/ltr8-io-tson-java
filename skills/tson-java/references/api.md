@@ -56,8 +56,8 @@ public final class TsonConfig {
     public TsonConfig profile(String profile);                   // exclusive with dataBindContext
     public TsonConfig metaNameBinder(DataNameBinder binder);     // a consumer's own meta vocabulary
 
-    public TsonConfig identifierPolicy(TsonUnicodePolicy policy);  // declared names
-    public TsonConfig tokenPolicy(TsonUnicodePolicy policy);       // every token a read pulls
+    public TsonConfig identifierPolicy(UnicodePolicy policy);  // declared names
+    public TsonConfig tokenPolicy(UnicodePolicy policy);       // every token a read pulls
     public TsonConfig lenientBinding();
 
     public Tson build();
@@ -71,7 +71,7 @@ public final class TsonConfig {
 
 ```java
 public interface TsonSchemaSource {                 // io.ltr8.tson.compiler
-    String fetch(String uri);                       // throws TsonSchemaFetchException and nothing else
+    String fetch(String uri);                       // throws SchemaFetchException and nothing else
     static TsonSchemaSource registeredOnly();       // the default: refuses everything, NOT_PERMITTED
     static TsonSchemaSource ofMap(Map<String, String> schemas);   // matched by canonical identity
 }
@@ -110,9 +110,9 @@ public final class TsonTreeReader {
     public TsonTreeReader(TsonCompiledSchemaRegistry tree);
 
     public TsonTreeReader withSchema(String schemaUri);
-    public TsonTreeReader withDiagnostics(TsonDiagnosticsReceiver receiver);
-    public TsonTreeReader withTokenPolicy(TsonUnicodePolicy policy);
-    public TsonTreeReader withIdentifierPolicy(TsonUnicodePolicy policy);
+    public TsonTreeReader withDiagnostics(DiagnosticsReceiver receiver);
+    public TsonTreeReader withTokenPolicy(UnicodePolicy policy);
+    public TsonTreeReader withIdentifierPolicy(UnicodePolicy policy);
     public TsonTreeReader preservingUnknownTypeRefs();
 
     public TsonValue    read(String|InputStream source);        // honours the document's own !!schema
@@ -198,25 +198,28 @@ classifies.
 
 ```java
 public record Diagnostic(…) { public enum Code { … } }        // see references/diagnostics.md
-public interface TsonDiagnosticsReceiver { void report(Diagnostic d);
-    static TsonDiagnosticsReceiver throwing();
-    static TsonDiagnosticsCollector collecting(); }
-public final class TsonDiagnosticsCollector implements TsonDiagnosticsReceiver {
+public interface DiagnosticsReceiver { void report(Diagnostic d);
+    static DiagnosticsReceiver throwing();
+    static DiagnosticsCollector collecting(); }
+public final class DiagnosticsCollector implements DiagnosticsReceiver {
     public List<Diagnostic> diagnostics();  public boolean isEmpty(); }
 public record Position(int line, int column, int byteOffset) implements SourcePosition {}
-// Diagnostic, the receivers, TsonReadException, SourcePosition, TsonUnicodePolicy,
-// TsonLimitsPolicy and TsonProcessorPolicy live in `io.ltr8.tson.base` -- one vocabulary
-// across every encoding ([TSON-JSON] §9.4 adds no category of its own).
+// `io.ltr8.tson.base` holds Diagnostic, the receivers, SourcePosition, the three policies,
+// and the exceptions whose fact is the processor's rather than one encoding's: ReadException,
+// LimitExceededException, BindMismatchException, MissingBindingException, SchemaFetchException,
+// ContentHashMismatchException. One vocabulary across every encoding -- [TSON-JSON] §9.4 adds no
+// category of its own -- and the only module where the `Tson` prefix is dropped, since there the
+// name it would disambiguate from is another encoding's type in this same library.
 public record SchemaLocation(…)             // id + pointer + position, accumulated as a read descends
 ```
 
 ```java
-public record TsonProcessorPolicy(TsonUnicodePolicy identifierPolicy,
-                                  TsonUnicodePolicy tokenPolicy,
-                                  TsonLimitsPolicy limits,
+public record ProcessorPolicy(UnicodePolicy identifierPolicy,
+                                  UnicodePolicy tokenPolicy,
+                                  LimitsPolicy limits,
                                   String unicodeDataVersion) {
-    public static TsonProcessorPolicy of(TsonUnicodePolicy identifier, TsonUnicodePolicy token,
-                                         TsonLimitsPolicy limits);
+    public static ProcessorPolicy of(UnicodePolicy identifier, UnicodePolicy token,
+                                         LimitsPolicy limits);
 }
 ```
 
@@ -230,20 +233,20 @@ in order not to be refused is this record *before* it writes. `tson policy` prin
 ### Unicode policy
 
 ```java
-public final class TsonUnicodePolicy {
+public final class UnicodePolicy {
     public enum Level { ASCII_ONLY, SINGLE_SCRIPT, HIGHLY_RESTRICTIVE,
                         MODERATELY_RESTRICTIVE, MINIMALLY_RESTRICTIVE, UNRESTRICTED }
 
-    public static TsonUnicodePolicy of(Level level);
-    public static TsonUnicodePolicy asciiOnly();
-    public static TsonUnicodePolicy singleScript();
-    public static TsonUnicodePolicy highlyRestrictive();       // the identifier default, whole-name
-    public static TsonUnicodePolicy moderatelyRestrictive();
-    public static TsonUnicodePolicy scriptsUnchecked();
-    public static TsonUnicodePolicy unrestricted();            // the token default
+    public static UnicodePolicy of(Level level);
+    public static UnicodePolicy asciiOnly();
+    public static UnicodePolicy singleScript();
+    public static UnicodePolicy highlyRestrictive();       // the identifier default, whole-name
+    public static UnicodePolicy moderatelyRestrictive();
+    public static UnicodePolicy scriptsUnchecked();
+    public static UnicodePolicy unrestricted();            // the token default
 
-    public TsonUnicodePolicy perSegment();                     // identifiers only -- tokenPolicy throws on one
-    public TsonUnicodePolicy permitting(UnicodeScript... scripts);
+    public UnicodePolicy perSegment();                     // identifiers only -- tokenPolicy throws on one
+    public UnicodePolicy permitting(UnicodeScript... scripts);
 
     public static String dataVersion();                        // the Unicode data version, e.g. "16.0"
     public Level level();                                      // the three below are the whole of a policy
@@ -286,7 +289,7 @@ public final class TsonCompiledSchemaRegistry {
     public static TsonCompiledSchemaRegistry tree(TsonCompiledMetaRegistry core);
     public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBindContext ctx);
     public TsonCompiledSchema get(String uri);
-    public TsonCompiledSchema get(String uri, TsonDiagnosticsReceiver receiver);
+    public TsonCompiledSchema get(String uri, DiagnosticsReceiver receiver);
     public TsonCompiledSchema compile(TsonLinkedSchema linked);
     public TsonCompiledMetaRegistry core();
 }
@@ -298,8 +301,8 @@ public interface TsonTypeReader<T> { T read(TsonReadContext ctx); }
 `TsonTypeReader` is **strictly one method** — it reads one value at a cursor and polices nothing around
 it. Framing and error policy live in the facades. Compilation is **eager**, so a broken entry surfaces
 at compile time; an entry that cannot be built becomes an `ErrorReader` reporting `NOT_IMPLEMENTED` at
-read, with two exceptions: a `TsonBindMismatchException` fails the compile, and a
-`TsonMissingBindingException` is thrown unwrapped from its reader.
+read, with two exceptions: a `BindMismatchException` fails the compile, and a
+`MissingBindingException` is thrown unwrapped from its reader.
 
 `TsonCompiledMetaRegistry` is the shared meta/resolution core: it compiles and caches **only**
 meta-layer schemas, resolves/links/registers everything else without compiling it, and owns content-hash

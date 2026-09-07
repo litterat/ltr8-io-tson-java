@@ -289,14 +289,14 @@ public final class Tson {
                 return problems.diagnostics();
             }
             treeRegistry().compile(core.schemaRegistry().register(linked));
-        } catch (TsonSchemaFetchException e) {
+        } catch (SchemaFetchException e) {
             // An !!import or !!meta naming an identity no configured source will serve. The document fails
             // either way, but it was never checked: nothing here saw the imported schema, so "this schema
             // is wrong" is a verdict this call has no grounds for. Same root pointer as the rest -- what
             // differs is the code and the exception's own Reason, which say respectively that no schema was
             // obtained and whose doing that was.
             problems.report(TsonDiagnostics.ofSchemaUnavailable("", "", e, Optional.empty()));
-        } catch (TsonBindMismatchException e) {
+        } catch (BindMismatchException e) {
             // A class bound to this schema's governing meta cannot work with it -- a Data body returning null
             // from references(), say. The schema may be perfectly good and this call cannot say either way,
             // so it reports the wiring mistake rather than letting a bare runtime exception past a caller who

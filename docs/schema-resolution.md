@@ -284,7 +284,7 @@ are kept in step deliberately.
   namespace (the plain typo, §3.3.1), a `!` form aimed at the wrong kind of target — refining a
   constructor, applying a non-constructor, refining a non-atom — each answered with the form the author
   probably meant, and **a body the constructor's own vocabulary rejects** (an unknown member, a wrong-typed
-  one), which arrives from the compiled meta reader as a `TsonReadException` and is restated here rather
+  one), which arrives from the compiled meta reader as a `ReadException` and is restated here rather
   than passed on in the reader's currency — the read `Diagnostic` itself is dropped, since it was produced
   against a `DataValueEvents` replay whose positions are all the `(0,0,0)` placeholder and whose `path`
   points into a synthetic body; the declaration's real position comes from `SchemaResolver`'s catch.

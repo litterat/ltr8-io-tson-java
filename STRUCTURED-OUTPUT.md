@@ -32,9 +32,9 @@ backend.
 
 ### Tier 1 — validate + fast feedback
 
-- [x] **A structured `Diagnostic` value, not an exception** — landed as `io.ltr8.tson.compiler.Diagnostic`
-  plus `TsonDiagnosticsReceiver`, the seam deciding where each one goes — `throwing()` (fail-fast),
-  `collecting()` (a `TsonDiagnosticsCollector`), or a caller's own `void report(Diagnostic)`. Both
+- [x] **A structured `Diagnostic` value, not an exception** — landed as `io.ltr8.tson.base.Diagnostic`
+  plus `DiagnosticsReceiver`, the seam deciding where each one goes — `throwing()` (fail-fast),
+  `collecting()` (a `DiagnosticsCollector`), or a caller's own `void report(Diagnostic)`. Both
   library-level entry points exist: `Tson.validate(...)` returns every problem and never throws for a bad
   document, and `tson.treeReader()/objectReader().withDiagnostics(collector).read(...)` returns the
   (possibly partial) **value alongside** them — the shape a repair loop actually needs, which for a while
@@ -189,7 +189,7 @@ Concrete items and decisions:
 
 - [ ] **Engine-agnostic validating incremental writer + a `DecoderSession` SPI.** The library side
   streams tokens/events through the existing lexer→event→validator pipeline (reuse the streaming
-  readers plus a **custom `TsonDiagnosticsReceiver`** — the push seam this needs already exists, and a
+  readers plus a **custom `DiagnosticsReceiver`** — the push seam this needs already exists, and a
   receiver is handed each `Diagnostic` as the read finds it rather than in a batch at the end, which is
   exactly the incremental delivery this tier is built on), hands back a checkpoint handle at each
   structural boundary, and returns `List<Diagnostic>` on completion. The engine binding is a tiny SPI —

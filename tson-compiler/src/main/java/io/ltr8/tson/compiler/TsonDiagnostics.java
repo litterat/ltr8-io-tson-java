@@ -1,8 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.LimitExceededException;
-import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.base.*;
 
 import java.util.Optional;
 
@@ -12,7 +10,7 @@ import java.util.Optional;
  * <p><b>Why these are not on {@code Diagnostic} itself.</b> Every method here switches on an exception
  * type this engine declares: {@code TsonParseException}, {@code LexException}, {@code
  * TsonUnsupportedDocumentException}, {@code LimitExceededException}, {@code
- * TsonSchemaFetchException}. A {@code Diagnostic} is the shape of an answer and is shared by every
+ * SchemaFetchException}. A {@code Diagnostic} is the shape of an answer and is shared by every
  * encoding ([TSON-JSON] §9.4 reports in the same four categories and adds none); <em>classifying</em> a
  * failure is reading a document, which is each encoding's own. Leaving these on the record would have
  * made {@code tson-base} depend on the TSON engine, or made one switch responsible for exceptions it
@@ -150,12 +148,12 @@ public final class TsonDiagnostics {
 
     /**
      * The schema could not be obtained at all -- {@link #ofSchemaError}'s shape with {@link
-     * #codeFor(TsonSchemaFetchException.Reason) fetch code} in place of {@code SCHEMA_ERROR}, and the whole
+     * Diagnostic.Code#of(SchemaFetchException.Reason) fetch code} in place of {@code SCHEMA_ERROR}, and the whole
      * of the difference between
      * "this schema is wrong" and "nobody would give me this schema".
      *
      * <p><b>It takes the exception rather than its message</b>, because it is built from a {@link
-     * TsonSchemaFetchException} and from nothing else -- which is what makes the distinction cheap: {@link
+     * SchemaFetchException} and from nothing else -- which is what makes the distinction cheap: {@link
      * TsonSchemaSource#fetch} names that type for "cannot supply this", so the two cases never have to be
      * told apart by reading a message. An {@code !!import} or {@code !!meta} naming an identity no source
      * will serve reaches this; one that resolves and then fails to link is a {@code SCHEMA_ERROR} like any
@@ -164,12 +162,12 @@ public final class TsonDiagnostics {
      * <p>Taking the whole exception is also what picks the {@link Diagnostic.Code}, and what fills the {@code
      * expected}/{@code actual} pair: the reference that could not be obtained is {@code actual}, since it is
      * the thing a consumer must look at. The alternative -- passing a flattened message -- is how this
-     * factory came to state {@link TsonSchemaFetchException.Reason}'s distinction nowhere.
+     * factory came to state {@link SchemaFetchException.Reason}'s distinction nowhere.
      */
     public static Diagnostic ofSchemaUnavailable(String schemaId, String declaration,
-                                                 TsonSchemaFetchException e, Optional<SourcePosition> position) {
+                                                 SchemaFetchException e, Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
-                schemaId, codeFor(e.reason()), e.getMessage(), SchemaFailure.UNAVAILABLE_EXPECTED, e.uri(),
+                schemaId, Diagnostic.Code.of(e.reason()), e.getMessage(), SchemaFailure.UNAVAILABLE_EXPECTED, e.uri(),
                 Optional.empty(), position);
     }
 
@@ -221,13 +219,13 @@ public final class TsonDiagnostics {
      * {@link Diagnostic.Code#BIND_MISMATCH} in place of {@code SCHEMA_ERROR}, and the difference between "your schema is
      * wrong" and "this application is wired wrong".
      *
-     * <p>Built from a {@link TsonBindMismatchException} and from nothing else. It exists so a collecting
+     * <p>Built from a {@link BindMismatchException} and from nothing else. It exists so a collecting
      * caller hears about a wiring mistake in the same list as everything else rather than having it thrown
      * past them as though it were a fault in this library: the schema may be perfectly good, and the message
      * names one of the caller's own classes.
      */
     public static Diagnostic ofSchemaBindMismatch(String schemaId, String declaration,
-                                                  TsonBindMismatchException e,
+                                                  BindMismatchException e,
                                                   Optional<SourcePosition> position) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
                 schemaId, Diagnostic.Code.BIND_MISMATCH, e.getMessage(), "", "", Optional.empty(), position);
@@ -252,20 +250,4 @@ public final class TsonDiagnostics {
                 schemaId, Diagnostic.Code.NOT_IMPLEMENTED, message, "", "", Optional.empty(), position);
     }
 
-    /**
-     * The code a fetch failure reports, one per {@link TsonSchemaFetchException.Reason}.
-     *
-     * <p>Here rather than on {@code Code} itself because {@code Diagnostic} names no exception type: a
-     * schema is fetched by this engine, and the mapping from how that failed to what a consumer routes on
-     * is this engine's to make.
-     */
-    public static Diagnostic.Code codeFor(TsonSchemaFetchException.Reason reason) {
-        return switch (reason) {
-            case NOT_PERMITTED -> Diagnostic.Code.SCHEMA_NOT_PERMITTED;
-            case NOT_FOUND -> Diagnostic.Code.SCHEMA_NOT_FOUND;
-            case TRANSPORT -> Diagnostic.Code.SCHEMA_UNREACHABLE;
-            case TIMEOUT -> Diagnostic.Code.SCHEMA_TIMEOUT;
-            case TOO_LARGE -> Diagnostic.Code.SCHEMA_TOO_LARGE;
-        };
-    }
 }

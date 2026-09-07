@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.ContentHashMismatchException;
+
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Optional;
@@ -92,13 +94,13 @@ public final class TsonContentHash {
      * the [TSON-DATA] §2.2.1 rule that a consumer holding a hashed reference MUST verify before use and
      * MUST NOT use mismatched content. A reference with no pin is a no-op (resolves unverified).
      *
-     * @throws TsonContentHashMismatchException if a pin is declared and the content's hash differs from it
+     * @throws ContentHashMismatchException if a pin is declared and the content's hash differs from it
      */
     public static void verify(byte[] content, String referenceUri) {
         declaredSha256(referenceUri).ifPresent(declared -> {
             String actual = sha256(content);
             if (!actual.equals(declared)) {
-                throw new TsonContentHashMismatchException("content hash mismatch for \"" + referenceUri
+                throw new ContentHashMismatchException("content hash mismatch for \"" + referenceUri
                         + "\": the reference declares sha256=" + declared + " but the content hashes to "
                         + actual + " -- refusing to use mismatched content ([TSON-DATA] §2.2.1)");
             }

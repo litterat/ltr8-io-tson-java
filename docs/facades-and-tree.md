@@ -54,7 +54,7 @@ needs no set of already-reported positions. `wrap` returns the source unchanged 
 nothing, which is the default — an ordinary read pays not even a predicate.
 
 **A raised policy is not a per-token allocation either**, which is what makes it advisable to turn on. The
-conforming path through `TsonUnicodePolicy.violation` scans and returns `Optional.empty()`: no split array
+conforming path through `UnicodePolicy.violation` scans and returns `Optional.empty()`: no split array
 (hand-segmented, since `"[_-]"` misses `String.split`'s single-character fast path and compiles a `Pattern`
 per call), no script set (a single-script unit is decided without materialising one — only a genuinely mixed
 token builds the set `covered` and the message need), no stream, and `isPresent`/`get` at the call rather than
@@ -203,7 +203,7 @@ admit UTS #39's own `Toys-Я-Us`.
   `TsonValue` through `TsonTreeWriter`'s own node emission (package-private, both writers share a package).
 - **`SchemalessObjectReader` streams events** (like the compiled readers), walking the descriptor in
   parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
-  `TsonReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /
+  `ReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /
   applying a bridge / invoking a constructor is caught and re-reported through `ctx`, so a caller sees one
   uniform error model regardless of which layer noticed. **No positional form and no schema-composed
   defaults** — both are schema-layer concepts a class-driven bind has no equivalent for (a record must be
@@ -216,11 +216,11 @@ admit UTS #39's own `Toys-Я-Us`.
   document; it has read a different document and cannot tell. The class is the schema on this path, and a
   closed reading is what makes that claim mean anything. `TsonObjectReader.ignoringUnknownFields()` is the
   opt-out, and it is deliberately the derived reader rather than the default — the safe reading should be
-  the one nobody has to know to ask for, which is the same argument `TsonBindMismatchException` makes at
+  the one nobody has to know to ask for, which is the same argument `BindMismatchException` makes at
   compile time about a schema and a class that disagree.
 - **`TsonObjectWriter.toTson` is mainly a debugging tool**, not a guaranteed-lossless serializer (integer
   width, tuple-ness, and captured wire annotations are documented write-side losses). Both throw unchecked
-  (`TsonReadException`/`TsonWriteException`), so the pair is symmetric and a caller writes neither a
+  (`ReadException`/`TsonWriteException`), so the pair is symmetric and a caller writes neither a
   `throws` clause nor a try/catch for the common path.
 - **Both writers take a sink, and `toTson` is that method over a `StringBuilder`.** `write(value,
   OutputStream)` / `write(value, Appendable)` mirror every reader taking an `InputStream`: `TsonDataEmitter`
@@ -437,9 +437,12 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
     `Content-Length`; the file one is an arbitrary-read risk, so containment is checked **after**
     `toRealPath`, which settles `..` and symlink escape together — checking the unresolved path is the usual
     way that control is defeated.
-  - **`TsonSchemaFetchException` is the contract, and it lives in `tson-compiler`** beside the interface it
-    belongs to rather than beside the two sources that throw it — `SchemaFailure`, which has to route on it,
-    is in that module and cannot see a type declared in `tson`. A source signals "cannot supply this" with
+  - **`SchemaFetchException` is the contract, and it lives in `tson-base`** — with the interface that names
+    it (`TsonSchemaSource`) in `tson-compiler` rather than beside the two sources that throw it, since
+    `SchemaFailure` has to route on it and cannot see a type declared in `tson`. The exception itself sits
+    lower still, because a schema is obtained the same way whichever encoding named it: its `Reason` is what
+    `Diagnostic.Code.of` maps to the five `SCHEMA_*` codes, and that mapping is one answer for every
+    encoding. A source signals "cannot supply this" with
     that and nothing else, so a read can tell an unfetchable schema from a broken invariant by type; anything
     else out of a source is that source malfunctioning and propagates as itself. `Reason` is the part worth
     acting on: `NOT_PERMITTED` is policy and no retry helps, where `TIMEOUT`/`TRANSPORT` say the reference
