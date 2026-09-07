@@ -95,29 +95,47 @@ never flattens — so it cannot exercise `@discriminator` or `@rest` at all. A J
   the `TSON-Schema` header as a projection of the directive — is the channel a server would use, and is where this
   answer has to stay consistent.
 
-- [ ] **No JSON front end — `TsonJsonStream`.** RFC 8259 read against a TSON schema, built as a `TsonEventSource`
-  rather than as a second AST producer: the compiled reader stack consumes that contract, so an encoding that emits
-  events reuses resolution, linking and every compiled reader unchanged. What the scanner has to decide is the
-  `TokenForm` on each `TokenEvent`, since [TSON-DATA] §4 resolves a base type by form — a JSON string is quoted and
-  must reach `StringValue`, where `true`/`false` and numbers are unquoted; duplicate object members, which §2.5/§2.6
-  refuse and JEP 540 refuses for JSON on the same reasoning; and JSON `null`, which maps to `AbsentEvent` so the
-  position's own field state decides whether absence is admitted, rather than the four-character string satisfying a
-  `text` contract. An object key that is no identifier needs nothing — §2.5 leaves `field-name` lexical, so such a key
-  is an ordinary `UNRECOGNIZED_FIELD` against a schema, where routing it to a map would report worse.
+**`tson-json` is a stack of its own, not a second front end over `TsonEventSource`.** Reusing the TSON event
+contract would make one encoding's layering decide the other's at the two points where JSON and TSON genuinely
+disagree — the same shape as the compatibility claim Revision 35 withdrew ([TSON-DATA] §1.1, §6). TSON text tells a
+record from a map syntactically (`a: 1` vs `k => v`), so `TsonDataStream` emits `RecordStart`/`FieldName` or
+`MapStart`/`MapArrow` and each reader asserts which it got; JSON's `{"a": 1}` is one syntax for both and §4.1 makes
+the *position* decide, which a pull-only event source has no channel to say. And `null` is a value in a JSON tree and
+the absent sentinel under a schema (§7), so a shared `TsonEvent` forces one meaning on the layer that does not hold
+it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below follow it. The tree model follows
+[JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
+`jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **The read facades take a concrete `TsonDataStream`, so no second encoding can reach them.**
-  `TsonTreeReader`/`TsonObjectReader`'s private `readRoot`/`readRootAs`/`readDocument` are typed to it and use it only
-  as a `TsonEventSource`. Widening those, plus a public entry point taking one, is what makes a second encoding a
-  client of the facades rather than a fork of them; everything it must not reimplement sits behind that seam — schema
-  fetching and `withSchema`/`readAs`, diagnostics wiring, `TsonLimitsPolicy` counting, §7.8's scope push,
-  `requireDocumentEnd`, and `readFailure`'s verdict-vs-fault split.
+- [ ] **No structural layer — `JsonEvent`/`JsonEventSource`.** The lexer lands in `tson-json`; RFC 8259's grammar over
+  it does not. A pull-based event source is what the schema-directed decode of §5–§8 will consume, so the read stays
+  bounded by nesting depth rather than by document size, and it is the JSON counterpart of Tier 2 — grammar only, no
+  dedupe, no interpretation, on the same layering [TSON-DATA] §1.2 draws. Nesting depth is §10.1's limit and is
+  counted here, the one place every token is consumed.
+
+- [ ] **No tree — `JsonValue` and `Json.parse`.** JEP 540's sealed hierarchy (`JsonObject`/`JsonArray`/`JsonString`/
+  `JsonNumber`/`JsonBoolean`/`JsonNull`), reduced off the event source. `JsonNumber` holds the source lexeme, since
+  §5.3 preserves an exact number's digits and scale and §3.1 forbids rounding one silently. §3.1's duplicate-member
+  rule lands here rather than in the event layer: the *category* follows the position's type, which no grammar layer
+  holds, but the refusal itself is what JEP 540 and §3.1 both require of a parse.
+
+- [ ] **No binding — a JSON object reader.** `tson-bind`'s `DataClass` descriptors drive it, the way
+  `SchemalessObjectReader` drives the TSON side: the target class is in effect the schema, so this needs no TSON
+  schema and is the JSON stack's own peer of the Class 1 read. Streams the event source rather than the tree, so
+  memory held is proportional to nesting depth.
+
+- [ ] **No schema-directed decode — §5–§8.** The whole of what Part 3 actually specifies: atoms by their parsing
+  contracts (§5), containers by their constructors (§6), JSON `null` as the absent sentinel (§7), and the
+  discrimination predicate over the derived `disjoint` fact (§8). This is where `tson-json` gains its dependency on
+  `tson-compiler` and where `@discriminator` and `@rest` get their first consumer. The reserved member namespace
+  (`$schema`/`$type`/`$value`, §3.2/§3.3) and the annotation object come with it.
 
 - [ ] **`Diagnostic.ofBaseSyntaxError` cannot classify another encoding's syntax failure.** Its switch covers
   `TsonParseException`/`LexException`/`TsonUnsupportedDocumentException` and rethrows the rest, so a JSON syntax error
   would escape as a fault — the please-report-it banner, exit 70 — where §8.1 makes it a verdict the sender can act on
   and `TsonCli.exitCodeFor` owes it exit 1. `TsonParseException` is `final`, so a front end cannot ride the
-  classification by subclassing it. What is left is choosing between a fourth case and a seam each encoding
-  contributes to, and making the `expected: "well-formed TSON"` default name the encoding that actually refused.
+  classification by subclassing it, and `JsonParseException` is a separate stack's exception that deliberately does
+  not extend it. What is left is choosing between a fourth case and a seam each encoding contributes to, and making
+  the `expected: "well-formed TSON"` default name the encoding that actually refused.
 
 - [ ] **Nothing dispatches a choice on `@discriminator`, and the JSON reader is what settles its shape.** meta.tn
   declares it as naming "the field a member-dispatching encoding selects a choice's variant on", with force in that

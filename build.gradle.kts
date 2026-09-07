@@ -18,7 +18,8 @@ val moduleDescriptions = mapOf(
     "tson-bind" to "TSON binding engine between data values and Java objects",
     "tson-annotation" to "TSON binding annotations and the wire-annotation carrier a bound class declares",
     "tson-regex" to "A native RFC 9485 I-Regexp engine: parse, match, and decide whether two patterns are disjoint",
-    "tson-cli" to "The tson command-line application"
+    "tson-cli" to "The tson command-line application",
+    "tson-json" to "The JSON encoding of TSON: an RFC 8259 stack of its own, aligned with JEP 540's JSON API"
 )
 
 subprojects {

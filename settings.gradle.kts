@@ -16,4 +16,5 @@ include("tson-tree")
 include("tson-regex")
 include("tson-cli")
 include("tson")
+include("tson-json")
 
