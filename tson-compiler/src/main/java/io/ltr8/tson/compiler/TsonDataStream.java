@@ -12,7 +12,8 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomParseException;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.IdentifierParser;
-import io.ltr8.tson.compiler.atom.UriParser;
+import io.ltr8.tson.compiler.atom.AtomType;
+import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.base.unicode.Nfc;
@@ -112,6 +113,13 @@ import java.util.Optional;
  * {@link TsonDataParser}'s token list before this class existed.
  */
 public final class TsonDataStream implements TsonEventSource {
+
+    /**
+     * [TSON-DATA] §2.2.1's rules on what a directive's argument may be, asked of the vocabulary by name
+     * rather than by naming a parser: a directive argument is a URI, and {@code uri} is what says so.
+     */
+    private static final AtomType<?> URI_ATOM = BuiltinTypeVocabulary.lookup("uri")
+            .orElseThrow(() -> new IllegalStateException("the built-in vocabulary has no 'uri'"));
 
     private final Lexer lexer;
 
@@ -634,7 +642,7 @@ public final class TsonDataStream implements TsonEventSource {
         advance();
 
         try {
-            UriParser.UNCONSTRAINED.read(arg.text());
+            URI_ATOM.read(arg.text());
         } catch (AtomParseException e) {
             throw new ParseException(
                     "'!!" + expectedName + "' argument '" + arg.text() + "' is not a valid URI (§3.3)", arg.start());

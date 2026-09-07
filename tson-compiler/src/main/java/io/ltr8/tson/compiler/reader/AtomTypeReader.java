@@ -9,53 +9,10 @@ import io.ltr8.tson.compiler.atom.AtomParsers;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
-import io.ltr8.tson.compiler.atom.BytesParser;
-import io.ltr8.tson.compiler.atom.Cidr4Parser;
-import io.ltr8.tson.compiler.atom.Cidr6Parser;
-import io.ltr8.tson.compiler.atom.ComplexParser;
-import io.ltr8.tson.compiler.atom.DateParser;
-import io.ltr8.tson.compiler.atom.DateTimeParser;
-import io.ltr8.tson.compiler.atom.DecimalParser;
-import io.ltr8.tson.compiler.atom.DurationParser;
-import io.ltr8.tson.compiler.atom.PeriodParser;
-import io.ltr8.tson.compiler.atom.EmailParser;
-import io.ltr8.tson.compiler.atom.EnumParser;
-import io.ltr8.tson.compiler.atom.FloatParser;
-import io.ltr8.tson.compiler.atom.IntegerParser;
-import io.ltr8.tson.compiler.atom.Ipv4Parser;
-import io.ltr8.tson.compiler.atom.Ipv6Parser;
-import io.ltr8.tson.compiler.atom.MacParser;
-import io.ltr8.tson.compiler.atom.RationalParser;
-import io.ltr8.tson.compiler.atom.RegexParser;
-import io.ltr8.tson.compiler.atom.TextParser;
-import io.ltr8.tson.compiler.atom.TimeParser;
-import io.ltr8.tson.compiler.atom.IdentifierParser;
-import io.ltr8.tson.compiler.atom.UriParser;
-import io.ltr8.tson.compiler.atom.UuidParser;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.meta.Ipv6Type;
-import io.ltr8.tson.schema.meta.Ipv4Type;
-import io.ltr8.tson.schema.meta.BytesType;
-import io.ltr8.tson.schema.meta.Cidr4Type;
-import io.ltr8.tson.schema.meta.Cidr6Type;
-import io.ltr8.tson.schema.meta.DateTimeType;
-import io.ltr8.tson.schema.meta.DateType;
-import io.ltr8.tson.schema.meta.DecimalType;
-import io.ltr8.tson.schema.meta.EmailType;
-import io.ltr8.tson.schema.meta.DurationType;
-import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.IntegerType;
-import io.ltr8.tson.schema.meta.MacType;
-import io.ltr8.tson.schema.meta.RationalType;
-import io.ltr8.tson.schema.meta.RegexType;
-import io.ltr8.tson.schema.meta.TextType;
-import io.ltr8.tson.schema.meta.TimeType;
-import io.ltr8.tson.schema.meta.UriType;
-import io.ltr8.tson.schema.meta.UuidType;
 
 
 /**
@@ -95,29 +52,29 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
     /**
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean}
-     * ({@link BooleanReader}), every other enum instance its member text ({@link EnumParser}). Dispatch is
-     * keyed on the declaration's own name, the same mechanism {@link #UNIT} uses for {@code value}/{@code
-     * token}/{@code void}. (Tree mode then wraps the result in a {@code TsonAtom} -- see {@link
-     * ValueReaderFactoryRegistry}.)
+     * ({@link BooleanReader}), every other enum instance its member text. Dispatch is keyed on the
+     * declaration's own name, the same mechanism {@link #UNIT} uses for {@code value}/{@code token}/{@code
+     * void}, and the one case {@link #ATOM} cannot serve -- an enum body maps to one parser, and this name
+     * alone wants a reader that is not an atom at all. (Tree mode then wraps the result in a
+     * {@code TsonAtom} -- see {@link ValueReaderFactoryRegistry}.)
      */
     static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, context) ->
             "boolean".equals(name)
                     ? new BooleanReader(context.locationOf(name, definition))
-                    : new AtomTypeReader<>(name, new EnumParser((EnumBody) definition.body()),
-                            context.locationOf(name, definition));
+                    : ATOM.create(name, definition, context);
     /**
-     * {@code unit}'s three real instances -- {@code value}/{@code token}/{@code void} -- all
-     * resolve to the identical empty body, so, per the kernel's own doc ("distinguished by name and
-     * prose-level parsing contract, not by schema shape"), dispatch here is keyed on the
-     * declaration's own name, not its resolved shape. {@code void} doesn't fit {@link AtomType}'s
-     * {@code read(TokenValue)} shape at all (its contract admits only the absent sentinel {@code _},
-     * not a token), so it bypasses this class entirely via {@link VoidReader}. An unrecognized
-     * {@code unit}-constructed name falls back to {@link IdentifierParser}, which validates the name profile.
+     * {@code unit}'s three real instances -- {@code value}/{@code token}/{@code void} -- all resolve to the
+     * identical empty body, so, per the kernel's own doc ("distinguished by name and prose-level parsing
+     * contract, not by schema shape"), dispatch is keyed on the declaration's own name rather than its
+     * resolved shape. {@code AtomParsers} performs that dispatch and {@link #ATOM} inherits it; what stays
+     * here is {@code void} alone, which is not a scalar -- its contract admits only the absent sentinel
+     * {@code _}, never a token -- so it bypasses {@link AtomType} entirely via {@link VoidReader}.
      */
     static final ValueReaderFactory UNIT = (name, definition, context) -> switch (name) {
         case "void" -> new VoidReader(context.locationOf(name, definition));
-        case "value" -> new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition));
-        default -> new AtomTypeReader<>(name, IdentifierParser.INSTANCE, context.locationOf(name, definition));
+        // `value` and every other unit-constructed name are AtomParsers' to tell apart -- §4.2 makes that
+        // name dispatch normative, and it is stated there rather than restated here.
+        default -> ATOM.create(name, definition, context);
     };
 
     /**

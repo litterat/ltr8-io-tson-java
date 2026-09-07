@@ -61,4 +61,38 @@ public final class NumberForms {
         });
         return new BigDecimal(sb.toString());
     }
+
+    /**
+     * {@code value} as the token text that reads back to it -- [TSON-DATA] §5.3's own spellings for the
+     * three IEEE special values ({@code .nan}, {@code +.inf}, {@code -.inf}), which have no Java
+     * counterpart: {@code Double#toString} prints {@code NaN}/{@code Infinity}/{@code -Infinity}, none of
+     * which is a TSON token.
+     *
+     * <p>A {@code Float} is formatted via {@link Float#toString()} directly rather than widened to
+     * {@code double} first -- widening introduces noise digits {@code Double#toString} would then print
+     * correctly for the widened value and wrongly for the original.
+     *
+     * <p>It is the number grammar's, not any one atom's: the {@code float} family's writer and the
+     * schemaless writer that frames a bare {@code Double} both need the same spelling, and two copies of a
+     * three-case table is how they come to disagree.
+     */
+    public static String floatToken(Number value) {
+        if (value instanceof Float f) {
+            if (Float.isNaN(f)) {
+                return ".nan";
+            }
+            if (Float.isInfinite(f)) {
+                return f > 0 ? "+.inf" : "-.inf";
+            }
+            return Float.toString(f);
+        }
+        double d = value.doubleValue();
+        if (Double.isNaN(d)) {
+            return ".nan";
+        }
+        if (Double.isInfinite(d)) {
+            return d > 0 ? "+.inf" : "-.inf";
+        }
+        return Double.toString(d);
+    }
 }

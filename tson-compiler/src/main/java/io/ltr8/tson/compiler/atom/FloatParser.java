@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.base.NumberForm;
+import io.ltr8.tson.compiler.base.NumberForms;
 import io.ltr8.tson.compiler.base.NumberGrammar;
 import io.ltr8.tson.compiler.base.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FloatType;
@@ -74,23 +75,7 @@ public record FloatParser(FloatType constraints) implements AtomType<Number> {
      */
     @Override
     public String write(Number value) {
-        if (value instanceof Float f) {
-            if (Float.isNaN(f)) {
-                return ".nan";
-            }
-            if (Float.isInfinite(f)) {
-                return f > 0 ? "+.inf" : "-.inf";
-            }
-            return Float.toString(f);
-        }
-        double d = value.doubleValue();
-        if (Double.isNaN(d)) {
-            return ".nan";
-        }
-        if (Double.isInfinite(d)) {
-            return d > 0 ? "+.inf" : "-.inf";
-        }
-        return Double.toString(d);
+        return NumberForms.floatToken(value);
     }
 
     private double parseAtFormatPrecision(String text) {
