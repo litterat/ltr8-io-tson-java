@@ -76,7 +76,7 @@ work, and the first is the largest single obstacle to the stated goal.
 
 ## The Unicode policies, and which reach JSON
 
-[TSON-DATA] §8.2's two policies are one object (`TsonUnicodeProcessorPolicy`) and reach this encoding
+[TSON-DATA] §8.2's two policies are one object (`TsonProcessorPolicy`) and reach this encoding
 differently. §9.4 states the split: the **identifier policy** reaches member names read as field names and
 every `$type`; the **token policy**, when a deployment sets one, reaches map keys and string values.
 

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonProcessorPolicy;
 import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.base.Diagnostic;
@@ -149,7 +150,7 @@ public interface TsonReadContext {
     // own: what distinguishes it is its `code` (CONFUSABLE_NAMES / RESTRICTED_CHARACTER / RESTRICTED_SCRIPT,
     // one per rule), which is what a consumer routes on. The Unicode data version §8.2 requires a refusal to
     // name is a fact about this processor rather than about the problem, so it is stated once per run beside
-    // the diagnostics -- TsonUnicodeProcessorPolicy -- rather than stamped onto each one.
+    // the diagnostics -- TsonProcessorPolicy -- rather than stamped onto each one.
 
     /**
      * How many problems have been reported through this read so far, counting every scoped copy since they

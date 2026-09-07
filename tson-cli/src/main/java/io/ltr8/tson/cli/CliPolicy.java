@@ -2,7 +2,7 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.tson.base.TsonLimitsPolicy;
-import io.ltr8.tson.compiler.TsonUnicodeProcessorPolicy;
+import io.ltr8.tson.base.TsonProcessorPolicy;
 import io.ltr8.tson.base.TsonUnicodePolicy;
 
 import java.lang.Character.UnicodeScript;
@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * This CLI's on-the-wire shape for {@link TsonUnicodeProcessorPolicy} -- what this run's [TSON-DATA] §8.2
+ * This CLI's on-the-wire shape for {@link TsonProcessorPolicy} -- what this run's [TSON-DATA] §8.2
  * name hygiene was judged by, stated once per {@link ValidationRun}/{@link ValidationReport} and printable
  * on its own by {@code tson policy}.
  *
@@ -21,7 +21,7 @@ import java.util.Set;
  * policy} prints this with no document in hand. The refusal itself carries the remedy: which name, and
  * which rule, in its own {@code code}.
  *
- * <p>A separate DTO from {@link TsonUnicodeProcessorPolicy} for {@link CliDiagnostic}'s own reason --
+ * <p>A separate DTO from {@link TsonProcessorPolicy} for {@link CliDiagnostic}'s own reason --
  * {@code diagnostics.tn} declares these fields as {@code text}, and {@link UnicodeScript} is a JDK enum of
  * some 170 members that no wire schema should be restating. The scripts render by name; {@link
  * TsonUnicodePolicy.Level} stays the real enum, since enum narrowing is the proven binding path here.
@@ -38,9 +38,9 @@ public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierP
      * The policy a run that passed no flag is judged under -- what {@link OutputFormat#TEXT} compares against
      * to decide whether a person needs to be told the policy at all.
      */
-    private static final CliPolicy DEFAULTS = from(TsonUnicodeProcessorPolicy.of(
-            PolicyOptions.DEFAULTS.identifierPolicy(), PolicyOptions.DEFAULTS.tokenPolicy()),
-            PolicyOptions.DEFAULTS.limits());
+    private static final CliPolicy DEFAULTS = from(TsonProcessorPolicy.of(
+            PolicyOptions.DEFAULTS.identifierPolicy(), PolicyOptions.DEFAULTS.tokenPolicy(),
+            PolicyOptions.DEFAULTS.limits()));
 
     /**
      * Whether this is what a run configures by saying nothing.
@@ -53,10 +53,15 @@ public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierP
         return equals(DEFAULTS);
     }
 
-    static CliPolicy from(TsonUnicodeProcessorPolicy policy, TsonLimitsPolicy limits) {
+    /**
+     * One argument, because a processor states one policy. This record's own shape -- the two surfaces, the
+     * data version, and a nested {@code limits} -- is what {@code TsonProcessorPolicy} settled on, so the
+     * conversion is now a field-for-field copy rather than a join of two values.
+     */
+    static CliPolicy from(TsonProcessorPolicy policy) {
         return new CliPolicy(CliUnicodePolicy.from(policy.identifierPolicy()),
                 CliUnicodePolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion(),
-                new CliLimits(limits.maxDepth()));
+                new CliLimits(policy.limits().maxDepth()));
     }
 
     /**

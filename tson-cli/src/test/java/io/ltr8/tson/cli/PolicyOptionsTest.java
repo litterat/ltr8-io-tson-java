@@ -49,8 +49,8 @@ class PolicyOptionsTest {
                 PolicyOptions.DEFAULTS.identifierPolicy().isPerSegment());
         assertEquals(applied.tokenPolicy().level(), PolicyOptions.DEFAULTS.tokenPolicy().level());
         assertEquals(tson.limitsPolicy(), PolicyOptions.DEFAULTS.limits());
-        assertTrue(CliPolicy.from(applied, tson.limitsPolicy()).isDefault(),
-                () -> "a run that configures nothing: " + applied + ", " + tson.limitsPolicy());
+        assertTrue(CliPolicy.from(applied).isDefault(),
+                () -> "a run that configures nothing: " + applied);
     }
 
     /**

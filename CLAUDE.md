@@ -701,7 +701,7 @@ the code is a verdict on the document at all, which the five, `NOT_IMPLEMENTED`,
 refused is the `Code` — `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT`, one each, since the
 three want three different remedies and the code is what a consumer routes on — and the Unicode data
 version §8.2 requires a refusal to name is a fact about the *processor*, so it is stated once beside the
-diagnostics rather than N times inside them (`TsonUnicodeProcessorPolicy`, below).
+diagnostics rather than N times inside them (`TsonProcessorPolicy`, below).
 **What earns a component at all is one rule** — *a fact not recoverable from the
 document plus the schema, and not one the consumer routes on* — which is why an atom's
 failed bound (in the schema), a duplicate key (in the document) and the rule that fired (the code) get none;
@@ -736,10 +736,10 @@ reference to a dropped declaration on top of the real error. Namespace-level fai
 `!!import`, ineligible `!!meta`, `!!id` cross-check) still throw even with a receiver. Compilation, and the
 lexer under everything, are still fail-fast.
 
-**`TsonUnicodeProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2
+**`TsonProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2
 policies (`identifierPolicy`, `tokenPolicy`, under `TsonConfig`'s own names — level, whole-name or
 per-segment unit, and any `permitting` relaxations) plus
-the UCD version, reachable as `Tson.processorPolicy()`, either facade's `processorPolicy()` (read off the
+the UCD version and §9.1's limits, reachable as `Tson.processorPolicy()`, either facade's `processorPolicy()` (read off the
 reader that judged, since a derived reader is where the two can differ), and `tson policy` on the command
 line. It is what makes a §8.2 divergence explainable: the same bytes may be refused here and accepted
 elsewhere, and the reason is in neither the document nor the schema. It is deliberately **not** a diagnostic
@@ -750,11 +750,15 @@ envelope one: a generator that reads the policy first never writes the name that
 the round trip the format exists to avoid. §8.2 requires exactly this shape, naming the two policies
 (`identifier policy`, `token policy`) so two implementations reporting them agree on what they are called.
 
-**`TsonLimitsPolicy` is §9.1's half of the same statement, and it sits beside rather than inside.** What this
-processor will *spend* reading a document, where the above is what it will *admit as a name* —
-`Tson.limitsPolicy()`, either facade's, `TsonTreeReader.withLimits`, `tson policy`, and a `limits` record in
-every CLI envelope's `policy` field. Two values because they answer two questions and a deployment changing
-one has said nothing about the other. **Only nesting depth is bounded** (default 64 — the tightest in common
+**`TsonLimitsPolicy` is §9.1's half of the same statement, and it is a component of it.** What this
+processor will *spend* reading a document, where the two above are what it will *admit as a name* —
+`Tson.limitsPolicy()` (`processorPolicy().limits()` in one call), either facade's, `TsonTreeReader.withLimits`,
+`tson policy`, and a `limits` record in every CLI envelope's `policy` field. It sat beside rather than inside
+for as long as the container was called `TsonUnicodeProcessorPolicy`, which was right: a nesting bound has no
+business inside a *Unicode* policy. The container was the problem and not the grouping — a deployment states
+one policy, and the CLI envelope had been nesting `limits` under `policy` all along. What survives the merge
+is the independence, not the separation: the three components answer three questions, and changing one still
+says nothing about the others. **Only nesting depth is bounded** (default 64 — the tightest in common
 use, so a document that fits travels — §9.1's own default). §9.1 states eleven more with a default each and
 §11.5 five on the schema side under the same policy; `BACKLOG.md` carries what is left.
 **Counted in `TsonDataStream.advance`**, the one place every token is consumed, so the refusal lands before
@@ -886,7 +890,7 @@ act: `70 > 78 > 69 > 75 > 1`. Every non-verdict rides in the report as a code wi
 on stdout unchanged. 70's halves print differently: a gap that escapes as an exception prints
 `not implemented yet: <message>`, whose text usually names the workaround; a fault gets the please-report-it
 banner and its stack trace. Also `tson compile`, `tson hash` (stamps a
-`?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `TsonUnicodeProcessorPolicy`
+`?sha256=` pin idempotently), `tson init-example`, and `tson policy` — the §8.2 `TsonProcessorPolicy`
 and §9.1's `TsonLimitsPolicy` with no document in hand, the same record every `validate`/`compile` envelope
 carries in its `policy` field.
 **Those three commands also take the policy flags** (`PolicyOptions`, which consumes them so each subcommand's

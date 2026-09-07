@@ -410,7 +410,7 @@ profile too", taking that rule with it, so `appliesIdentifierProfile()` guards t
 call at both walks — the read context's and the linker's. Every other level keeps the profile, the
 restricted-script rule gating itself inside `violation()`.
 
-**And the run names the policy and the data version it judged under** (`TsonUnicodeProcessorPolicy`, below). §8.2
+**And the run names the policy and the data version it judged under** (`TsonProcessorPolicy`, below). §8.2
 reports a refusal under a *stated policy and a stated data version* and makes naming the version a MUST,
 because §8.3 marks all three rules unstable across Unicode releases. Both are stated once, off the reader
 that judged, rather than on each refusal.
@@ -470,7 +470,7 @@ rather than its message so the schema-document channel states it too.
 
 **A §8.2 refusal carries no component of its own**, by the same rule that puts a fetch failure's cause in
 the code. §8.2 requires a refusal to name the Unicode data version it was computed against, which is
-a fact about *this processor* rather than about the problem — see `TsonUnicodeProcessorPolicy` below, which is
+a fact about *this processor* rather than about the problem — see `TsonProcessorPolicy` below, which is
 where it and the policy are stated, once.
 
 **Which rule refused is the code, and nothing beside it.** One code per §8.2 rule —
@@ -490,7 +490,14 @@ differ on purpose.
 `RESTRICTED_SCRIPT` is also the one code a *value* can carry, a token having no identifier profile and no
 scope to be distinct within.
 
-## `TsonUnicodeProcessorPolicy` — the configuration, stated once
+## `TsonProcessorPolicy` — the configuration, stated once
+
+**It carries three settings, not two.** The identifier policy, the token policy and the limits, plus the UCD
+version the first two were computed against. The limits sat beside it while it was named
+`TsonUnicodeProcessorPolicy` — correctly, since a nesting bound has no business inside a *Unicode* policy —
+and the rename is what made the grouping coherent rather than a reversal of that reasoning. A deployment
+states one policy; the three components stay independent, and changing one still says nothing about the
+others.
 
 The two §8.2 policies (`identifierPolicy` and `tokenPolicy` — `TsonConfig`'s own names for them, so a
 configuration and the report it produces are one vocabulary; each a level, a unit, and any `permitting`
@@ -573,7 +580,7 @@ belongs in the `Code`, which is what a consumer already switches over.
 | `DUPLICATE_FIELD`/`DUPLICATE_MAP_KEY` | in the document, at `path` | no |
 | §8.2 refusal: which rule | it is the `Code` | no |
 | why a schema was not obtained | nowhere — it is about the world | no — it is the `Code`, one per reason |
-| §8.2 refusal: the policy and the Unicode tables | nowhere — it is this processor's configuration | no — `TsonUnicodeProcessorPolicy`, once per run |
+| §8.2 refusal: the policy and the Unicode tables | nowhere — it is this processor's configuration | no — `TsonProcessorPolicy`, once per run |
 | §9.1 refusal: which bound, and what it is | nowhere — it is this processor's configuration | no — `TsonLimitsPolicy`, once per run; the bound itself rides in `expected`/`actual` |
 
 Most diagnostics are about something the consumer is already holding, which is why `expected`/`actual` are

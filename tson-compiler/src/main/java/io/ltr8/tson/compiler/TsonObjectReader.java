@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonProcessorPolicy;
 import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.base.TsonLimitExceededException;
 import io.ltr8.tson.base.TsonLimitsPolicy;
@@ -258,16 +259,16 @@ public final class TsonObjectReader {
     }
 
     /**
-     * The two Unicode policies this reader applies, and the data version behind them -- what a caller states
-     * beside the diagnostics from a read, and what a deployment publishes so a sender never writes a name
-     * that would be refused.
+     * Everything this reader will admit and spend -- the two Unicode policies, the data version behind them,
+     * and the resource limits -- what a caller states beside the diagnostics from a read, and what a
+     * deployment publishes so a sender never writes a document that would be refused.
      *
      * <p>Read off the reader that judged rather than off the configuration a caller believes it set: a
      * derived reader ({@link #withIdentifierPolicy}, {@link #withTokenPolicy}) is exactly where the two can differ,
      * and a response quoting the wrong one is worse than quoting none.
      */
-    public TsonUnicodeProcessorPolicy processorPolicy() {
-        return TsonUnicodeProcessorPolicy.of(identifierPolicy, tokenPolicy);
+    public TsonProcessorPolicy processorPolicy() {
+        return TsonProcessorPolicy.of(identifierPolicy, tokenPolicy, limits);
     }
 
     /**
@@ -282,8 +283,8 @@ public final class TsonObjectReader {
     }
 
     /**
-     * The resource limits this reader applies -- what a caller states beside the diagnostics from a read, and
-     * what a deployment publishes so a sender never writes a document that would be refused for its shape.
+     * The resource limits this reader applies -- {@link #processorPolicy()}'s {@code limits} component, in
+     * one call for a caller who wants only that half.
      *
      * <p>Read off the reader that judged, for {@link #processorPolicy}'s own reason: {@link #withLimits} is
      * where a derived reader and its parent can differ.
