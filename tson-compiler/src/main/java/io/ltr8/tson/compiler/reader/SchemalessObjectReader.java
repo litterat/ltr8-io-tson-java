@@ -380,7 +380,12 @@ public final class SchemalessObjectReader {
 
         if (!empty) {
             while (!(ctx.peek() instanceof RecordEnd)) {
+                // See RecordAbstractReader.readFields: a name §8.2 refused was never read, so it draws no
+                // verdict here either. The delta across this one pull is exactly "this name was refused".
+                int reportedBeforeName = ctx.reported();
                 FieldName fieldName = (FieldName) ctx.next();
+                boolean nameRefused = ctx.reported() > reportedBeforeName;
+
                 if (!statedNames.add(fieldName.name())) {
                     ctx.field(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
                             "duplicate field '" + fieldName.name() + "' for " + dataClass.typeClass()
@@ -390,7 +395,7 @@ public final class SchemalessObjectReader {
                 }
                 Integer idx = indexByName.get(fieldName.name());
                 if (idx == null) {
-                    if (!ignoreUnknownFields) {
+                    if (!ignoreUnknownFields && !nameRefused) {
                         ctx.field(fieldName.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
                                 "unknown field '" + fieldName.name() + "' for " + dataClass.typeClass()
                                         + " -- the class declares (" + declaredNames(fields, carrier) + ")",

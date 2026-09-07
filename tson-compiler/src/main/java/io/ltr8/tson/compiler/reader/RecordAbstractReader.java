@@ -264,13 +264,25 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     final boolean[] readFields(TsonReadContext ctx, FieldSink sink) {
         boolean[] seen = new boolean[fields.size()];
         while (!(ctx.peek() instanceof RecordEnd)) {
+            // A name [TSON-DATA] §8.2 refused was never read, so nothing here can hold a verdict about it:
+            // reporting it unrecognised would be claiming to have looked it up, which this processor
+            // declined to do. Without this a homoglyph draws both the refusal and "unknown field 'x' -- the
+            // type declares (x)", which tells a sender to add a field that is already there when the fix is
+            // one character. The refusal is reported by `ctx.next()` itself (name hygiene runs as the event
+            // is pulled), so the delta across that one pull is exactly "this name was refused" -- nothing
+            // else reports during it.
+            int reportedBeforeName = ctx.reported();
             FieldName fieldName = (FieldName) ctx.next();
+            boolean nameRefused = ctx.reported() > reportedBeforeName;
+
             Integer schemaIndex = fieldIndex.get(fieldName.name());
             if (schemaIndex == null) {
-                ctx.field(fieldName.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
-                        "unknown field '" + fieldName.name() + "' on '" + displayName + "' -- a record is closed "
-                                + "under its type (§7.2), whose fields are (" + declaredFields + ")",
-                        declaredFields, fieldName.name());
+                if (!nameRefused) {
+                    ctx.field(fieldName.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
+                            "unknown field '" + fieldName.name() + "' on '" + displayName + "' -- a record is closed "
+                                    + "under its type (§7.2), whose fields are (" + declaredFields + ")",
+                            declaredFields, fieldName.name());
+                }
                 EventSkip.scopedValue(ctx);
                 continue;
             }
