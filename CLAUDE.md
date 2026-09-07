@@ -19,6 +19,7 @@ to. Trust but verify: the code is the source of truth if a note has drifted.
 | Streaming readers, read context, diagnostics (data- and schema-side) | `docs/readers-and-diagnostics.md` |
 | Read facades, writers, tree model, `Tson` front door | `docs/facades-and-tree.md` |
 | CLI, config package, bundled schemas, content hashing | `docs/cli-config-hashing.md` |
+| The JSON encoding: its own lexer, structural layer, tree and readers | `docs/json-encoding.md` |
 
 ## Project
 
@@ -273,6 +274,17 @@ module has a real `module-info.java`; module names mirror each module's root exp
 - **`tson`** — the small front-door module (`Tson`/`TsonConfig`) over `tson-compiler`, the way Retrofit
   sits on OkHttp. Declares `tson-compiler`/`tson-schema`/`tson-bind`/`tson-tree` as `api` so a caller sees
   the real classes underneath.
+- **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree and readers. A
+  separate stack rather than a front end over `tson-compiler`'s `TsonEventSource` — see "Not yet implemented"
+  for the two disagreements that decide it. The **tree model follows [JEP 540](https://openjdk.org/jeps/540)**
+  (`jdk.incubator.json`, JDK 28, unavailable now): sealed `JsonValue` over `JsonObject`/`JsonArray`/`JsonString`/
+  `JsonNumber`/`JsonBoolean`/`JsonNull`, `Json.parse`, `JsonParseException` — one API to learn across the two,
+  and a bridge that is later a mapping rather than a rewrite. Where it must differ, §3.1 is why: it decodes UTF-8
+  itself from bytes where JEP 540 parses an already-decoded `String`, and carries a byte offset in every position
+  because [TSON-DATA] §8.1 requires one of every error report. **`Json` is the prefix here, on `Tson`'s own
+  terms** — the names a consumer writes are the JDK's, so this module keeps them rather than minting a second
+  vocabulary for one hierarchy. A pure leaf so far; the schema-directed decode of §5–§8 is what brings a
+  dependency on `tson-compiler`.
 - **`tson-cli`** — the `tson` command-line application. Depends on nothing depending on it (exports
   nothing).
 
@@ -1077,6 +1089,7 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.DefinitionResolverTest"
 ./gradlew :tson-cli:installDist   # then tson-cli/build/install/tson/bin/tson validate ...
 ./gradlew :tson:allocationReport  # the allocation harness alone, numbers on stdout
+./gradlew :tson-json:test         # the JSON encoding's own stack
 ```
 
 **Allocation is measured, not assumed** (`AllocationHarnessTest`, `tson/src/test/.../perf/`). Two separate
@@ -1209,5 +1222,10 @@ compatibility).
   reporting surfaces, one of which `TemplateMaterialiser.MAX_CLOSING_DEPTH` already enforces as a bare
   constant with nowhere to live. So nothing here is a judgement call any more; what is left is the counting.
   `BACKLOG.md` has each limit, its default, and where it is counted.
-- **JSON** — a future JSON reader is a whole separate stack (its own `JsonEventStream` and its own readers,
-  deliberately not reusing the TSON readers). Not started, not backlogged.
+- **JSON ([TSON-JSON], `spec/tson-part3-json.md`)** — the lexical layer is built; everything above it is owed, and
+  `BACKLOG.md`'s "JSON encoding" section holds the list. What is settled is the shape: a stack of `tson-json`'s own,
+  not a second front end over `TsonEventSource`. Sharing the TSON event contract would let one encoding's layering
+  decide the other's at the two points where the formats genuinely disagree — TSON text tells a record from a map
+  syntactically where JSON's `{"a": 1}` is one syntax for both and §4.1 makes the *position* decide, and `null` is a
+  value in a JSON tree and the absent sentinel under a schema (§7). Both are the shape of the compatibility claim
+  Revision 35 withdrew, and the cost of that claim is the reason not to repeat it one layer down.
