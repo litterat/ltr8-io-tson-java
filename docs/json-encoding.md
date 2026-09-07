@@ -245,3 +245,53 @@ where "expected STRING" would tell an author what a lexer calls the thing they a
 the JS object-literal habit and the commonest of these mistakes, never reaches the grammar at all — `a` starts
 no JSON token, so the lexer refuses it first and names the character. The grammar cannot improve on that
 without the lexer knowing what position it is at, which is the layering.
+
+## Tree (`io.ltr8.tson.json`)
+
+`JsonValue` is a sealed interface over six records — `JsonObject`, `JsonArray`, `JsonString`,
+`JsonNumber`, `JsonBoolean`, `JsonNull` — with JEP 540's navigation (`get`/`tryGet`/`tryValue`),
+conversions (`asString`/`asInt`/`asLong`/`asDouble`/`asBoolean`/`asMap`/`asList`), `of` factories, and
+`Json.parse`/`Json.toDisplayString`. `Json.parse` reduces a `JsonEventSource` and holds no grammar; both
+`String` and `InputStream` overloads exist, and the `InputStream` one is where §3.1's rules actually bite.
+
+**Three divergences from JEP 540, each with a reason.**
+
+1. **No source position on a node.** JEP 540 reports a navigation failure with "Location: line 13,
+   position 19", which means its nodes know where they came from. These do not, so equality is over
+   content and two parses of one document are equal — the shape `TsonValue` takes, and for the same
+   reason: a value model holds values. It costs less than it looks like. A parse failure and a duplicate
+   member are already reported with a `JsonPosition`, and the schema-directed decode streams events,
+   which carry positions, rather than walking a tree. What is lost is a line number on a
+   `JsonValueException`, which names the step and what is actually there instead.
+2. **`JsonNumber` holds the lexeme, and equality is over it.** `1`, `1.0` and `1e2` are three distinct
+   nodes. That looks wrong and is the honest layering: [TSON-SCHEMA] §5.5 makes equality a property of a
+   *value space*, and a value space comes from a type, which this layer has none of. Under a schema the
+   three are one `number`, and §5.3's own text says so. `toBigDecimal()` is the one call for a caller who
+   means numeric comparison — added beside JEP 540's `new BigDecimal(number.toString())` advice rather
+   than instead of it.
+3. **`Json.parse(InputStream)`**, because §3.1 makes the document UTF-8 and puts a byte offset in every
+   error report, and a decoder handed an already-decoded `String` has lost both.
+
+**What the tree deliberately keeps from JEP 540** is the pair of behaviours a `TsonValue` user will find
+surprising, and they are surprising in the right direction: **`get` throws** where `TsonValue.get` returns
+a `TsonMissing`, and every throwing accessor has a non-throwing peer. One method name must not carry
+opposite semantics on the two sides a consumer moves between, and that is the whole reason to align at all.
+
+**§3.1's duplicate-member rule lands here**, not in the event stream: the stream is grammar and a repeat is
+not a grammar error. §3.1 gives the *category* to the position's type, which a schemaless parse has none
+of — so this refuses unconditionally, where JEP 540 does and for the reason §10.2 gives (two `$type`
+members, one seen by a security filter and the other by the decoder). The schema-directed decode will
+report the same fact with the category its position gives it. Names are compared **decoded**, so
+`"ab"` and `"\u0061b"` are one name.
+
+**`toString()` is compact RFC 8259 and `Json.toDisplayString` is the indented form.** Both parse back to
+the value they came from, which is §9.2's round trip — "the conformance test, not a separate rule set".
+`JsonText` is the only place this module writes a string: it escapes what RFC 8259 requires and nothing
+more, leaving `/` alone and writing every other character as itself, since a UTF-8 document has no reason
+to spell an ordinary character as an escape. A lone surrogate in a *hand-built* value is written as its own
+`\u` escape rather than raw, which keeps the output well-formed UTF-8 — the value is still one §3.1
+refuses on the way back in, and refusing it there is where the spec puts the rule.
+
+**`io.ltr8.tson.json.stream` is exported**, for the reason `tson-compiler` exports its own: `Json.parse`
+takes a `JsonEventSource`, so it is a real contract rather than an internal dispatch type, and JEP 540
+excludes streaming as a non-goal, so a caller who needs it has nowhere else to go.
