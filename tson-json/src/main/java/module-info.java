@@ -9,6 +9,9 @@
  * {@code io.ltr8.tson.json.stream} is the pull-based event layer under both, exported for the same
  * reason {@code tson-compiler} exports its own: it is a real contract a caller may consume directly,
  * and JEP 540 excludes streaming as a non-goal, so there is nowhere else for that need to go.
+ * {@code io.ltr8.tson.json.bind} reads a document straight into a Java object, driven by the target
+ * class's own {@code tson-bind} descriptor -- JEP 540 excludes data binding too, and for a library whose
+ * point is validated typed data that is the one non-goal worth not inheriting.
  *
  * <p>{@code lexer} stays internal, on the same terms as {@code tson-compiler}'s: a consumer names a
  * value or an event, never a token.
@@ -17,4 +20,7 @@ module io.ltr8.tson.json {
     exports io.ltr8.tson.json;
     exports io.ltr8.tson.json.tree;
     exports io.ltr8.tson.json.stream;
+    exports io.ltr8.tson.json.bind;
+
+    requires transitive io.ltr8.bind;
 }

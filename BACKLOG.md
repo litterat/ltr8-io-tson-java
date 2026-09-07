@@ -106,11 +106,6 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **No binding — a JSON object reader.** `tson-bind`'s `DataClass` descriptors drive it, the way
-  `SchemalessObjectReader` drives the TSON side: the target class is in effect the schema, so this needs no TSON
-  schema and is the JSON stack's own peer of the Class 1 read. Streams the event source rather than the tree, so
-  memory held is proportional to nesting depth.
-
 - [ ] **No schema-directed decode — §5–§8.** The whole of what Part 3 actually specifies: atoms by their parsing
   contracts (§5), containers by their constructors (§6), JSON `null` as the absent sentinel (§7), and the
   discrimination predicate over the derived `disjoint` fact (§8). This is where `tson-json` gains its dependency on
