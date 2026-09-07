@@ -105,13 +105,25 @@ class JsonObjectReaderTest {
         }
 
         @Test
-        void a_member_the_class_does_not_declare_is_discarded() {
-            // What SchemalessObjectReader does, and what a JSON-Schema-shaped source expects:
-            // `additionalProperties` defaults to true, so refusing would fail the first document with
-            // anything extra. §6.1.1's closure rule is a schema's, over declared fields and an @rest tail.
-            assertEquals(new Person("Ada", 36),
-                    READER.read("{\"name\": \"Ada\", \"extra\": {\"deep\": [1, {\"x\": null}]}, \"age\": 36}",
-                            Person.class));
+        void a_member_the_class_does_not_declare_refuses_the_document() {
+            // Not tidiness: a member added in a later version can change what the members this class does
+            // read mean -- a currency beside an amount, a unit beside a quantity. A reader that drops it
+            // has not read a subset of the document, it has read a different document and cannot tell.
+            JsonBindException e = refused("{\"name\": \"Ada\", \"currency\": \"AUD\", \"age\": 36}", Person.class);
+            assertTrue(e.getMessage().contains("Person declares no member 'currency'"), e.getMessage());
+            assertTrue(e.getMessage().contains("(name, age)"), e.getMessage());
+            assertEquals(new JsonPosition(1, 17, 16), e.position());
+        }
+
+        @Test
+        void the_derived_reader_discards_one_instead_and_the_default_reader_is_unchanged() {
+            // The opt-out is the derived reader, never the default: the safe reading is the one nobody has
+            // to know to ask for.
+            JsonObjectReader lenient = READER.ignoringUnknownMembers();
+            assertEquals(new Person("Ada", 36), lenient.read(
+                    "{\"name\": \"Ada\", \"extra\": {\"deep\": [1, {\"x\": null}]}, \"age\": 36}", Person.class));
+            assertThrows(JsonBindException.class, () -> READER.read(
+                    "{\"name\": \"Ada\", \"extra\": 1, \"age\": 36}", Person.class));
         }
 
         @Test
@@ -292,10 +304,13 @@ class JsonObjectReaderTest {
         }
 
         @Test
-        void the_nesting_bound_refuses_before_the_reader_descends() {
+        void the_nesting_bound_holds_even_over_a_value_being_discarded() {
+            // Read through the lenient reader on purpose: the deep value is one nothing keeps, which is
+            // exactly where a bound is easiest to lose -- skipValue walks it and must still be counted.
+            JsonObjectReader lenient = READER.ignoringUnknownMembers();
             String deep = "{\"name\": \"a\", \"age\": 1, \"extra\": " + "[".repeat(200) + "]".repeat(200) + "}";
-            assertThrows(JsonLimitExceededException.class, () -> READER.read(deep, Person.class));
-            assertInstanceOf(Person.class, READER.read(deep, Person.class, 256));
+            assertThrows(JsonLimitExceededException.class, () -> lenient.read(deep, Person.class));
+            assertInstanceOf(Person.class, lenient.read(deep, Person.class, 256));
         }
 
         @Test

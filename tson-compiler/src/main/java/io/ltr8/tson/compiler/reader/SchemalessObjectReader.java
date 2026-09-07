@@ -100,17 +100,22 @@ public final class SchemalessObjectReader {
     /** Whether a type-ref that links to nothing is ignored rather than reported -- see {@link #preserving}. */
     private final boolean preserveUnknownTypeRefs;
 
+    /** Whether a field the target class does not declare is discarded rather than reported -- see {@link #ignoringUnknownFields}. */
+    private final boolean ignoreUnknownFields;
+
     public SchemalessObjectReader(DataBindContext context) {
-        this(context, false);
+        this(context, false, false);
     }
 
     public SchemalessObjectReader() {
         this(TsonAtomContext.defaultContext());
     }
 
-    private SchemalessObjectReader(DataBindContext context, boolean preserveUnknownTypeRefs) {
+    private SchemalessObjectReader(DataBindContext context, boolean preserveUnknownTypeRefs,
+                                   boolean ignoreUnknownFields) {
         this.context = context;
         this.preserveUnknownTypeRefs = preserveUnknownTypeRefs;
+        this.ignoreUnknownFields = ignoreUnknownFields;
     }
 
     /**
@@ -118,7 +123,18 @@ public final class SchemalessObjectReader {
      * marker, for a caller who wants forward-compatible passthrough. Built-in names are still checked.
      */
     public static SchemalessObjectReader preserving(DataBindContext context) {
-        return new SchemalessObjectReader(context, true);
+        return new SchemalessObjectReader(context, true, false);
+    }
+
+    /**
+     * This reader, discarding a field the target class does not declare instead of reporting it.
+     *
+     * <p>The opt-out from the default, which is to refuse. See {@link #bindRecord} for why refusing is the
+     * default; this is for a caller who really is reading a document wider than the class they are binding
+     * it to, and has decided that the parts they cannot see do not change the parts they can.
+     */
+    public SchemalessObjectReader ignoringUnknownFields() {
+        return new SchemalessObjectReader(context, preserveUnknownTypeRefs, true);
     }
 
     // ── Entry points ─────────────────────────────────────────────────────
@@ -291,6 +307,17 @@ public final class SchemalessObjectReader {
      * its own carrier ({@link DataClassRecord#annotationsCarrier()}), settled during analysis, so there is
      * nothing to detect or validate here. Field values' own annotations are never captured -- only the
      * record value's, matching the tree-based reader's own deliberate scope limit.
+     *
+     * <p><b>A field the class does not declare is reported</b> ({@code UNRECOGNIZED_FIELD}) and then
+     * discarded unread, which is the same treatment {@code RecordAbstractReader} gives one under a schema.
+     * Discarding it silently is the tempting default and is wrong for a reason that has nothing to do with
+     * tidiness: <b>a field added in a later version can change what the fields this class does read
+     * mean</b> -- a {@code currency} beside an {@code amount}, a {@code unit} beside a {@code quantity}, an
+     * {@code encoding} beside a {@code payload}. A reader that drops it has not read a subset of the
+     * document; it has read a different document and cannot tell. The class is the schema on this path, and
+     * a closed reading is what makes that claim mean anything. {@link #ignoringUnknownFields} is the opt-out
+     * for a caller who has decided otherwise, and it is deliberately the derived reader rather than the
+     * default -- the safe reading should be the one nobody has to know to ask for.
      */
     private Object bindRecord(TsonReadContext ctx, DataClassRecord dataClass) {
         DataClassField[] fields = dataClass.fields();
@@ -360,7 +387,13 @@ public final class SchemalessObjectReader {
                 }
                 Integer idx = indexByName.get(fieldName.name());
                 if (idx == null) {
-                    EventSkip.scopedValue(ctx); // a data field the target class doesn't declare -- discard
+                    if (!ignoreUnknownFields) {
+                        ctx.field(fieldName.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
+                                "unknown field '" + fieldName.name() + "' for " + dataClass.typeClass()
+                                        + " -- the class declares (" + declaredNames(fields, carrier) + ")",
+                                declaredNames(fields, carrier), fieldName.name());
+                    }
+                    EventSkip.scopedValue(ctx); // reported or not, the value is discarded unread
                     continue;
                 }
                 ScopePush.refuseSchemaless(ctx);
@@ -384,6 +417,21 @@ public final class SchemalessObjectReader {
         }
 
         return construct(ctx, dataClass.constructor(), construct, mark, dataClass.typeClass());
+    }
+
+    /** The names this class declares, for a message that has to say what was expected. */
+    private static String declaredNames(DataClassField[] fields, DataClassField carrier) {
+        StringBuilder names = new StringBuilder();
+        for (DataClassField field : fields) {
+            if (field == carrier) {
+                continue;
+            }
+            if (!names.isEmpty()) {
+                names.append(", ");
+            }
+            names.append(field.name());
+        }
+        return names.toString();
     }
 
     /** One record field's value: the absent sentinel {@code _} binds to {@code null} (a required field left {@code _} is a {@code FIELD_REQUIRED} problem), anything else binds recursively. */

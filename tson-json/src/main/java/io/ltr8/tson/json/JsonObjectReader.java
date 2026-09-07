@@ -55,6 +55,21 @@ import java.util.Set;
  * reader would be a list of one shape, and the wrong shape at that: a class that does not match is a
  * misconfiguration in the reading application, not a verdict on the document.
  *
+ * <p><b>A member the class does not declare refuses the document.</b> This is the one place the reader is
+ * stricter than a JSON consumer expects, and the reason is not tidiness: <b>a member added in a later
+ * version can change what the members this class does read mean</b> — a {@code currency} beside an
+ * {@code amount}, a {@code unit} beside a {@code quantity}, an {@code encoding} beside a
+ * {@code payload}. A reader that drops it has not read a subset of the document; it has read a different
+ * document and cannot tell. The class is the schema here, and a closed reading is what makes that claim
+ * mean anything — it is also what [TSON-SCHEMA] §7.2 already says of a record under a real schema, so
+ * the two paths agree. {@link #ignoringUnknownMembers} is the opt-out.
+ *
+ * <p>The cost is real and is worth stating: a converted JSON Schema whose {@code additionalProperties}
+ * defaults to true describes documents this reader refuses. That is §6.2's rest field's job to fix, and
+ * it fixes it properly by <em>keeping</em> the extra members rather than by ignoring them — which is the
+ * difference between a document read wholly and one read partly, and why the schema-directed decode is
+ * where the accommodation belongs rather than here.
+ *
  * <p><b>What this reader is not.</b> It is not validation against a TSON schema, and it is not §1.3
  * principle 1's schema-directed decode: nothing here consults facets, field states, defaults, fixed
  * values, groups or the discrimination predicate, because a Java class declares none of them. It is the
@@ -77,13 +92,17 @@ public final class JsonObjectReader {
 
     private final DataBindContext context;
 
-    private JsonObjectReader(DataBindContext context) {
+    /** Whether a member the target class does not declare is discarded rather than refused -- see {@link #ignoringUnknownMembers}. */
+    private final boolean ignoreUnknownMembers;
+
+    private JsonObjectReader(DataBindContext context, boolean ignoreUnknownMembers) {
         this.context = context;
+        this.ignoreUnknownMembers = ignoreUnknownMembers;
     }
 
     /** Over a caller's own bind context — one per binding profile, descriptors cached inside it. */
     public static JsonObjectReader using(DataBindContext context) {
-        return new JsonObjectReader(context);
+        return new JsonObjectReader(context, false);
     }
 
     /**
@@ -92,7 +111,23 @@ public final class JsonObjectReader {
      * context registering them and uses {@link #using}.
      */
     public static JsonObjectReader standard() {
-        return new JsonObjectReader(DataBindContext.builder().build());
+        return new JsonObjectReader(DataBindContext.builder().build(), false);
+    }
+
+    /**
+     * This reader, discarding a member the target class does not declare instead of refusing the document.
+     *
+     * <p>The opt-out from the default, which is to refuse — see the class Javadoc for why refusing is the
+     * default. For a caller genuinely reading a document wider than the class they bind it to, and content
+     * that what they cannot see does not change what they can. Deliberately the derived reader rather than
+     * the default: the safe reading is the one nobody has to know to ask for.
+     *
+     * <p>It is also, today, the closest thing this module has to §6.2's rest field — with the difference
+     * that a rest field <em>keeps</em> what it collects, where this drops it. A schema is what tells the
+     * two apart, and the schema-directed decode is where the keeping form arrives.
+     */
+    public JsonObjectReader ignoringUnknownMembers() {
+        return new JsonObjectReader(context, true);
     }
 
     // ── Reading ──────────────────────────────────────────────────────────
@@ -229,10 +264,11 @@ public final class JsonObjectReader {
             }
             Integer index = indexByName.get(member.name());
             if (index == null) {
-                // A member the class does not declare. Discarded, which is what SchemalessObjectReader does
-                // and what a JSON-Schema-shaped source expects: `additionalProperties` defaults to true, so
-                // refusing here would fail the first document carrying anything extra. §6.1.1's closure rule
-                // is a *schema's* to apply, over declared fields and an @rest tail, and arrives with §5-§8.
+                if (!ignoreUnknownMembers) {
+                    throw new JsonBindException("%s declares no member '%s'; it declares (%s)"
+                            .formatted(target.typeClass().getSimpleName(), member.name(),
+                                    declaredNames(fields, carrier)), member.position());
+                }
                 skipValue(events, events.next());
                 continue;
             }
@@ -264,6 +300,21 @@ public final class JsonObjectReader {
                     .formatted(field.name()) + "value", value.position());
         }
         return bind(events, value, field.dataClass());
+    }
+
+    /** The names this class declares, for a message that has to say what was expected. */
+    private static String declaredNames(DataClassField[] fields, DataClassField carrier) {
+        StringBuilder names = new StringBuilder();
+        for (DataClassField field : fields) {
+            if (field == carrier) {
+                continue;
+            }
+            if (!names.isEmpty()) {
+                names.append(", ");
+            }
+            names.append(field.name());
+        }
+        return names.toString();
     }
 
     private static int indexOf(DataClassField[] fields, DataClassField wanted) {

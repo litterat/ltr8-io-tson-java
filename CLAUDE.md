@@ -619,7 +619,10 @@ and the collector says why) while fail-fast still throws, as `TsonReadException`
 note: a stated FIXED value is checked, not obeyed; an omitted `OPTIONAL_FIXED` field stays absent where
 `REQUIRED_FIXED` injects (§5.2); collecting mode always keeps reading; **bind mode is all-or-nothing
 (`ConstructionGuard`) while tree mode keeps everything it built** — deliberate asymmetry, not
-inconsistency; records are closed under their type (§7.2, `UNRECOGNIZED_FIELD` — the same line polices
+inconsistency; records are closed under their type (§7.2, `UNRECOGNIZED_FIELD` — **on the schemaless bind
+path too**, where the target class is the schema and a field it does not declare is reported rather than
+dropped, a later version's extra field being able to change what the fields a class does read mean;
+`ignoringUnknownFields()` is the derived opt-out on both encodings' readers — the same line polices
 schema authoring through the meta's compiled reader); repeated fields/map keys are errors (§2.5/§2.6) with
 last-value-wins recovery underneath; map-key identity is the decoded host value, type-ref and annotations
 stripped (§2.6) — and one `ValueIdentity` answers that, §7.5's duplicate rule and §5.2's FIXED check
