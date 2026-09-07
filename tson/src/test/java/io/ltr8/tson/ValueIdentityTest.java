@@ -35,6 +35,13 @@ class ValueIdentityTest {
               stamped => { k: bytes = "SGk=" }
               holder  => { d: digests  t: tags  m: by_hash }
               hexed   => { h: hexes }
+
+              instants => set<datetime>
+              clocks   => set<time>
+              logged   => { datetime => text }
+              dated    => { i: instants  c: clocks  l: logged }
+              due      => { at: datetime = "2026-01-01T09:00:00Z" }
+              alarm    => { at: time = "01:30:00Z" }
             }
             """;
 
@@ -122,5 +129,71 @@ class ValueIdentityTest {
         assertEquals("4869 (hex)", fixed.expected());
         assertEquals("48656c6c6f (hex)", fixed.actual());
         assertTrue(duplicate.message().contains("4869 (hex)"), duplicate.message());
+    }
+
+    // ── §5.5, the offset is a spelling ───────────────────────────────────
+
+    @Test
+    void aSetOfDatetimesComparesTheInstantAndNotTheOffset() {
+        assertEquals(List.of(), read("!dated { i: [ \"2026-01-01T09:00:00Z\" \"2026-01-01T10:00:00Z\" ]  c: [ \"00:00:00Z\" ]  l: {} }"));
+
+        // §5.5: "2026-01-01T10:00:00+01:00 and 2026-01-01T09:00:00Z are one value".
+        List<Diagnostic> refused =
+                read("!dated { i: [ \"2026-01-01T10:00:00+01:00\" \"2026-01-01T09:00:00Z\" ]  c: [ \"00:00:00Z\" ]  l: {} }");
+        assertEquals(1, refused.size(), refused.toString());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refused.getFirst().code());
+        assertEquals("/i/1", refused.getFirst().path().orElseThrow());
+    }
+
+    @Test
+    void anOffsetOfMinusZeroIsTheSameInstantAsZ() {
+        // §5.5, citing RFC 3339 §4.3: -00:00 means the offset is unknown, not that it is a distinct one.
+        // A guard rather than a demonstration: `ZoneOffset.of("-00:00")` is `ZoneOffset.UTC`, so this pair
+        // compared equal even when the offset was the comparison. It is pinned because §5.5 states it.
+        List<Diagnostic> refused =
+                read("!dated { i: [ \"2026-01-01T09:00:00-00:00\" \"2026-01-01T09:00:00Z\" ]  c: [ \"00:00:00Z\" ]  l: {} }");
+        assertEquals(1, refused.size(), refused.toString());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refused.getFirst().code());
+    }
+
+    @Test
+    void aSetOfTimesComparesTheTimeOfDayInUtc() {
+        assertEquals(List.of(), read("!dated { i: [ \"2026-06-01T00:00:00Z\" ]  c: [ \"01:30:00Z\" \"02:30:00Z\" ]  l: {} }"));
+
+        // §5.5: "23:30:00-02:00 is 01:30:00Z" -- the wrap past midnight is the point.
+        List<Diagnostic> refused = read("!dated { i: [ \"2026-06-01T00:00:00Z\" ]  c: [ \"23:30:00-02:00\" \"01:30:00Z\" ]  l: {} }");
+        assertEquals(1, refused.size(), refused.toString());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refused.getFirst().code());
+        assertEquals("/c/1", refused.getFirst().path().orElseThrow());
+    }
+
+    @Test
+    void aMapRefusesOneInstantStatedInTwoOffsets() {
+        assertEquals(List.of(),
+                read("!dated { i: [ \"2026-06-01T00:00:00Z\" ]  c: [ \"00:00:00Z\" ]  l: { \"2026-01-01T09:00:00Z\" => a  \"2026-01-01T10:00:00Z\" => b } }"));
+
+        List<Diagnostic> refused =
+                read("!dated { i: [ \"2026-06-01T00:00:00Z\" ]  c: [ \"00:00:00Z\" ]  l: { \"2026-01-01T10:00:00+01:00\" => a  \"2026-01-01T09:00:00Z\" => b } }");
+        assertEquals(1, refused.size(), refused.toString());
+        assertEquals(Diagnostic.Code.DUPLICATE_MAP_KEY, refused.getFirst().code());
+    }
+
+    @Test
+    void aFixedDatetimeFieldAcceptsAnotherSpellingOfItsOwnInstant() {
+        assertEquals(List.of(), read("!due { at: \"2026-01-01T09:00:00Z\" }"));
+        assertEquals(List.of(), read("!due { at: \"2026-01-01T10:00:00+01:00\" }"));
+    }
+
+    @Test
+    void aFixedTimeFieldAcceptsAnotherSpellingOfItsOwnTimeOfDay() {
+        assertEquals(List.of(), read("!alarm { at: \"01:30:00Z\" }"));
+        assertEquals(List.of(), read("!alarm { at: \"23:30:00-02:00\" }"));
+    }
+
+    @Test
+    void aFixedDatetimeFieldStillRefusesAnotherInstant() {
+        List<Diagnostic> refused = read("!due { at: \"2026-01-01T09:00:01Z\" }");
+        assertEquals(1, refused.size(), refused.toString());
+        assertEquals(Diagnostic.Code.FIELD_FIXED, refused.getFirst().code());
     }
 }
