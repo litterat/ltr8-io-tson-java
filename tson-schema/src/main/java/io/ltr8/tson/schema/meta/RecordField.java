@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Unbound;

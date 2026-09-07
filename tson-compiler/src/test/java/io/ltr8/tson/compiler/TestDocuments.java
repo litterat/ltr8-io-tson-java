@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+
 /**
  * Positions a {@link TsonReadContext} at a whole document's root value, so a unit test can drive one
  * compiled {@link TsonTypeReader} in isolation rather than through {@link TsonTreeReader}/{@link

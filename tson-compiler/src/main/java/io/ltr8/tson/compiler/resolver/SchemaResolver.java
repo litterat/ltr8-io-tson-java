@@ -4,10 +4,11 @@ import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
-import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.compiler.TsonBindMismatchException;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
-import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.SchemaPositions;
@@ -21,7 +22,7 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -431,10 +432,10 @@ public final class SchemaResolver {
             Optional<SourcePosition> position = positions.of(declaration);
             receiver.report(switch (error) {
                 case TsonBindMismatchException mismatch ->
-                        Diagnostic.ofSchemaBindMismatch(schemaId, declaration.name(), mismatch, position);
+                        TsonDiagnostics.ofSchemaBindMismatch(schemaId, declaration.name(), mismatch, position);
                 case UnsupportedOperationException ignored ->
-                        Diagnostic.ofSchemaGap(schemaId, declaration.name(), message, position);
-                default -> Diagnostic.ofSchemaError(schemaId, declaration.name(), message, position);
+                        TsonDiagnostics.ofSchemaGap(schemaId, declaration.name(), message, position);
+                default -> TsonDiagnostics.ofSchemaError(schemaId, declaration.name(), message, position);
             });
         }
     }

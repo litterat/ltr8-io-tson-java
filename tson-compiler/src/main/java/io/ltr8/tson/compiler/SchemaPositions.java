@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
-import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.base.SourcePosition;
 
 import java.util.IdentityHashMap;
 import java.util.Map;

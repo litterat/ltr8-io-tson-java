@@ -1,10 +1,13 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.stream.ListEventSource;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.base.SourcePosition;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

@@ -3,6 +3,7 @@ plugins {
 }
 
 dependencies {
+    api(project(":tson-base"))
     // api, not implementation -- this module now has a module-info.java (requires io.ltr8.annotation,
     // deliberately not `requires transitive`, since no public schema.meta method signature exposes an
     // annotation type directly). JPMS module-path resolution still needs io.ltr8.annotation physically

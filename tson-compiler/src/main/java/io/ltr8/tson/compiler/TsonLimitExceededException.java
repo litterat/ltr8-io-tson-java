@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.Diagnostic;
+
 /**
  * A document asked for more than this processor's {@link TsonLimitsPolicy} will spend -- [TSON-DATA] §9.1.
  *
@@ -7,8 +9,9 @@ package io.ltr8.tson.compiler;
  * document is malformed, which is a verdict every processor reaching the same bytes would repeat; this says
  * only that <em>this</em> deployment declined, and another with a higher limit would read the same document
  * without complaint. Keeping the two apart in the type is what lets a facade route them to different {@link
- * Diagnostic.Code}s ({@link Diagnostic#ofLimitExceeded} against {@link Diagnostic#ofBaseSyntaxError}) rather
- * than reporting a configured bound as a syntax failure.
+ * Diagnostic.Code}s ({@link TsonDiagnostics#ofLimitExceeded} against
+ * {@link TsonDiagnostics#ofBaseSyntaxError}) rather than reporting a configured bound as a syntax
+ * failure.
  *
  * <p><b>{@link #getMessage()} states what went wrong, never where</b> -- the same division {@link
  * TsonParseException} makes, for the same reason: the location is {@link #position()}, and a message

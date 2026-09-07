@@ -9,6 +9,7 @@ gradle.projectsEvaluated {
 }
 
 include("tson-compiler")
+include("tson-base")
 include("tson-annotation")
 include("tson-bind")
 include("tson-schema")

@@ -11,7 +11,7 @@ import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
-import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonBindMismatchException;
 import io.ltr8.tson.compiler.TsonMissingBindingException;
 import io.ltr8.tson.compiler.SchemaLocation;

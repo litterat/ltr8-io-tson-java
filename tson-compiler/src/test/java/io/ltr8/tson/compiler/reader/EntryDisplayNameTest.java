@@ -5,7 +5,7 @@ import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;

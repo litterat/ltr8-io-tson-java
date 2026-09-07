@@ -1,6 +1,6 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;

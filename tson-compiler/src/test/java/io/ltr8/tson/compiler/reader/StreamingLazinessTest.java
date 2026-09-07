@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;

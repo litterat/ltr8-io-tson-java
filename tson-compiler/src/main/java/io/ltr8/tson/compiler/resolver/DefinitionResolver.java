@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonBindMismatchException;
 import io.ltr8.tson.compiler.TsonMissingBindingException;
-import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonWriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -43,7 +43,7 @@ import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
@@ -1003,7 +1003,7 @@ final class DefinitionResolver {
      * UnsupportedOperationException}, which aborts the run under the "this is a bug in tson" banner. Both a
      * wrong-typed member ({@code !integer ^ { min: "abc" }}) and an unknown one ({@code minimum}) arrive here.
      *
-     * <p>The {@link TsonReadException}'s own {@link io.ltr8.tson.compiler.Diagnostic} is deliberately
+     * <p>The {@link TsonReadException}'s own {@link io.ltr8.tson.base.Diagnostic} is deliberately
      * discarded and only its message kept: it was produced against a {@code DataValueEvents} replay of an
      * already-parsed AST, whose positions are all the {@code (0,0,0)} placeholder and whose {@code path} is a
      * data pointer into a synthetic body. Carrying those into a schema diagnostic would furnish a schema-side

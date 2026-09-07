@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -233,7 +234,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     /** Hands one recovered declaration's syntax error to {@link #receiver}, pointed at the declaration it was found in. */
     private void report(TsonParseException e) {
         reported++;
-        receiver.report(Diagnostic.ofSchemaSyntaxError(schemaId, declarationInProgress, e));
+        receiver.report(TsonDiagnostics.ofSchemaSyntaxError(schemaId, declarationInProgress, e));
     }
 
     /**

@@ -2,12 +2,13 @@ package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.compiler.Diagnostic;
-import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
-import io.ltr8.tson.compiler.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonTreeReader;
-import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -119,7 +120,7 @@ class TsonReadTest {
                     !point { x: 3  y: 4 }""");
 
             Diagnostic diagnostic = problems.diagnostics().getFirst();
-            assertEquals(Diagnostic.Code.of(reason), diagnostic.code(), reason::name);
+            assertEquals(TsonDiagnostics.codeFor(reason), diagnostic.code(), reason::name);
             assertFalse(diagnostic.code().verdict(), reason::name);
         }
     }

@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
  * rewrite that knows nothing about schema identity, canonicalization, or the identity-keyed position table --
  * all three live in {@link SchemaResolver}, which already holds them at the call site. Handing back the raw
  * pair keeps the diagnostics vocabulary out of a phase whose whole shape is "AST in, AST out", and keeps the
- * {@code Diagnostic.ofSchemaError} construction in the one place that also builds the resolver's own.
+ * {@code TsonDiagnostics.ofSchemaError} construction in the one place that also builds the resolver's own.
  *
  * <p>{@code declaration} is the failing declaration exactly as the parser built it -- identity matters, since
  * that is what {@code TsonSchemaParser.declarationPositions()} is keyed on, and a rewritten copy would find

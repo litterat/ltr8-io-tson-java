@@ -9,6 +9,7 @@ plugins {
 sourceSets["test"].java.srcDir("../tson-compiler/src/testShared/java")
 
 dependencies {
+    api(project(":tson-base"))
     // api, not implementation -- this module's own public surface (Tson/TsonConfig in particular)
     // hands back tson-compiler/tson-schema types directly (TsonCompiledMetaSchema, TsonLinkedSchema,
     // TsonObjectReader/TsonTreeReader/TsonObjectWriter, ...), so a caller depending on just this

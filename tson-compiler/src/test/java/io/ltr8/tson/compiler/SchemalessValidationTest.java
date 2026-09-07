@@ -1,6 +1,10 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +37,7 @@ class SchemalessValidationTest {
         try {
             READER.withDiagnostics(problems).read(source);
         } catch (RuntimeException e) {
-            return List.of(Diagnostic.ofBaseSyntaxError(e));
+            return List.of(TsonDiagnostics.ofBaseSyntaxError(e));
         }
         return problems.diagnostics();
     }
@@ -211,7 +215,7 @@ class SchemalessValidationTest {
     @Test
     void anExceptionThatIsNotABaseSyntaxFailureIsRethrown() {
         IllegalStateException fault = new IllegalStateException("a bug, not a bad document");
-        assertSame(fault, assertThrows(IllegalStateException.class, () -> Diagnostic.ofBaseSyntaxError(fault)));
+        assertSame(fault, assertThrows(IllegalStateException.class, () -> TsonDiagnostics.ofBaseSyntaxError(fault)));
     }
 
     /** §8.1 wants a schema document handed in where data was expected to be a categorized diagnostic, not "malformed". */

@@ -10,7 +10,7 @@ package io.ltr8.tson.compiler.atom;
  * <p><b>{@link #expected()} is the machine-readable half, and is the point of this type carrying two
  * strings rather than one.</b> {@code getMessage()} is a whole sentence about this rejection; {@code
  * expected()} is the *constraint that was violated*, standing alone, and lands verbatim in a {@link
- * io.ltr8.tson.compiler.Diagnostic}'s own {@code expected}. A consumer that would otherwise have to
+ * io.ltr8.tson.base.Diagnostic}'s own {@code expected}. A consumer that would otherwise have to
  * recover the bound by regexing the sentence reads it directly:
  *
  * <pre>{@code

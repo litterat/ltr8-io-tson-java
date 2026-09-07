@@ -1,10 +1,10 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
-import io.ltr8.tson.compiler.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.TsonDiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;

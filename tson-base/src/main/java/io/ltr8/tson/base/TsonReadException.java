@@ -1,8 +1,8 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
 /**
  * A Class 2 (schema-validated) reading failure -- e.g. a required field missing from a record. Thrown by
- * {@link TsonDiagnosticsReceiver#throwing()} the instant {@link TsonReadContext#report} hands it a problem;
+ * {@link TsonDiagnosticsReceiver#throwing()} the instant {@code TsonReadContext.report} hands it a problem;
  * the identical information is what {@link TsonDiagnosticsCollector} instead accumulates without throwing,
  * so every receiver reports through exactly one shape, {@link Diagnostic}, whichever a caller chose.
  */

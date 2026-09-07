@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -304,7 +306,7 @@ public final class TsonSchemaLinker {
         if (receiver == null) {
             throw new TsonSchemaValidationException(message);
         }
-        receiver.report(Diagnostic.ofSchemaRefusal(TsonCanonicalIdentity.canonicalize(schema.id()), name,
+        receiver.report(TsonDiagnostics.ofSchemaRefusal(TsonCanonicalIdentity.canonicalize(schema.id()), name,
                 code, message, def == null ? Optional.empty() : def.position()));
     }
 
@@ -476,7 +478,7 @@ public final class TsonSchemaLinker {
 
     /** One entry's failure as a {@link Diagnostic}, positioned at that entry's own declaration. */
     private static Diagnostic schemaError(TsonSchema schema, String name, TypeDefinition def, String message) {
-        return Diagnostic.ofSchemaError(TsonCanonicalIdentity.canonicalize(schema.id()), name, message,
+        return TsonDiagnostics.ofSchemaError(TsonCanonicalIdentity.canonicalize(schema.id()), name, message,
                 def == null ? Optional.empty() : def.position());
     }
 

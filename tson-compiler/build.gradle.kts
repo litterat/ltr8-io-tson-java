@@ -5,6 +5,7 @@
 sourceSets["test"].java.srcDir("src/testShared/java")
 
 dependencies {
+    implementation(project(":tson-base"))
     implementation(project(":tson-schema"))
     implementation(project(":tson-annotation"))
     // The immutable TsonValue tree model, a pure leaf module. tson-compiler holds the engine that produces

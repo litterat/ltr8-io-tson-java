@@ -1,5 +1,8 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -434,8 +437,8 @@ public final class TsonObjectReader {
      */
     private <T> T readFailure(RuntimeException e) {
         receiver.report(e instanceof TsonLimitExceededException limit
-                ? Diagnostic.ofLimitExceeded(limit)
-                : Diagnostic.ofBaseSyntaxError(e));
+                ? TsonDiagnostics.ofLimitExceeded(limit)
+                : TsonDiagnostics.ofBaseSyntaxError(e));
         return null;
     }
 

@@ -1,6 +1,6 @@
 package io.ltr8.tson.cli;
 
-import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -78,14 +78,14 @@ class DiagnosticsSchemaTest {
 
     /**
      * Every fetch reason has a code, so the wire never has to say "a schema was not obtained" without
-     * saying which way. The mapping is {@link io.ltr8.tson.compiler.Diagnostic.Code#of}'s; this asserts the
+     * saying which way. The mapping is {@link io.ltr8.tson.base.Diagnostic.Code#of}'s; this asserts the
      * schema copy of the code enum kept up with it.
      */
     @Test
     void everyFetchReasonHasACodeInTheSchemaCopy() {
         for (TsonSchemaFetchException.Reason reason : TsonSchemaFetchException.Reason.values()) {
             assertTrue(declared("diagnostic_code").contains(
-                    io.ltr8.tson.compiler.Diagnostic.Code.of(reason).name()), reason::name);
+                    io.ltr8.tson.compiler.TsonDiagnostics.codeFor(reason).name()), reason::name);
         }
     }
 }

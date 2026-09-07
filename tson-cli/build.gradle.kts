@@ -10,6 +10,7 @@ application {
 }
 
 dependencies {
+    implementation(project(":tson-base"))
     implementation(project(":tson"))
     implementation(project(":tson-compiler"))
     implementation(project(":tson-schema"))

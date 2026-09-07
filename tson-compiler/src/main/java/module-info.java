@@ -6,6 +6,7 @@ module io.ltr8.tson.compiler {
     exports io.ltr8.tson.compiler.stream;
 
     requires io.ltr8.annotation;
+    requires transitive io.ltr8.tson.base;
     requires transitive io.ltr8.bind;
     requires transitive io.ltr8.tson.schema;
     requires transitive io.ltr8.tson.tree;

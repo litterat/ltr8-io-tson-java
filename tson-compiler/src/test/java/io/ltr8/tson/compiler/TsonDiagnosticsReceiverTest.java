@@ -1,5 +1,9 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.TsonReadException;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

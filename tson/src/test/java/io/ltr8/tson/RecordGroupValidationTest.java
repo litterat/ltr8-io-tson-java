@@ -1,6 +1,6 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.compiler.TsonReadException;
+import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import org.junit.jupiter.api.Test;
 

@@ -1,6 +1,6 @@
 package io.ltr8.tson.cli;
 
-import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.base.Diagnostic;
 
 import java.util.List;
 
