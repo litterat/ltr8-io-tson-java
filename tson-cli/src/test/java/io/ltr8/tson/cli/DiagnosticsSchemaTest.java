@@ -1,7 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import org.junit.jupiter.api.Test;
@@ -83,9 +83,9 @@ class DiagnosticsSchemaTest {
      */
     @Test
     void everyFetchReasonHasACodeInTheSchemaCopy() {
-        for (TsonSchemaFetchException.Reason reason : TsonSchemaFetchException.Reason.values()) {
+        for (SchemaFetchException.Reason reason : SchemaFetchException.Reason.values()) {
             assertTrue(declared("diagnostic_code").contains(
-                    io.ltr8.tson.compiler.TsonDiagnostics.codeFor(reason).name()), reason::name);
+                    Diagnostic.Code.of(reason).name()), reason::name);
         }
     }
 }

@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
 /**
  * A schema type nothing in the bind context resolves to a Java class.
@@ -9,16 +9,16 @@ package io.ltr8.tson.compiler;
  * the type. That reading travels: a downstream service mapped it to a 501, so a missing line of
  * configuration presented as "this library cannot do that".
  *
- * <p><b>Deferred, unlike its parent.</b> {@link TsonBindMismatchException} fails the compile because a class
+ * <p><b>Deferred, unlike its parent.</b> {@link BindMismatchException} fails the compile because a class
  * that exists and disagrees would lose data on every document of that type; a type with no class at all is
  * different, because a schema legitimately declares types a given consumer never binds -- core.tn's forty,
  * the kernel's {@code data} base kind, every constructor a meta layer declares. Failing the compile for
  * those would make bind mode unusable, so this rides an {@code ErrorReader} to the first read of that
  * <em>specific</em> type and is thrown there, still saying what it is.
  */
-public class TsonMissingBindingException extends TsonBindMismatchException {
+public class MissingBindingException extends BindMismatchException {
 
-    public TsonMissingBindingException(String message) {
+    public MissingBindingException(String message) {
         super(message);
     }
 }

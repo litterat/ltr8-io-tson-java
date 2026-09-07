@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 
@@ -25,12 +26,12 @@ import java.util.Objects;
  * source is a policy decision, and a library that guesses one has made it for every deployment that
  * did not ask.
  *
- * <p><b>{@link TsonSchemaFetchException} is the contract.</b> A source signals "cannot supply this"
+ * <p><b>{@link SchemaFetchException} is the contract.</b> A source signals "cannot supply this"
  * with that and nothing else, so a read catching a failure to obtain a schema can tell an unfetchable
  * schema from a broken invariant by type. Anything else a source throws is a fault in that source, and
  * is treated as one -- {@code SchemaFailure} rethrows it rather than reporting the document as invalid.
  * <b>Returning {@code null} is not a way to say it either</b>, and is refused where the loader calls a
- * source, naming this rule: a {@code null} carries no {@link TsonSchemaFetchException.Reason}, so a
+ * source, naming this rule: a {@code null} carries no {@link SchemaFetchException.Reason}, so a
  * deployment that refuses a reference and a host that did not answer would arrive indistinguishable.
  *
  * <p><b>{@link #ofMap} exists because a map is the natural first source and spells a miss the wrong
@@ -45,10 +46,10 @@ public interface TsonSchemaSource {
     /**
      * Returns {@code uri}'s own raw schema-document source text.
      *
-     * @throws TsonSchemaFetchException if {@code uri} can't be fetched -- not found, not permitted by
+     * @throws SchemaFetchException if {@code uri} can't be fetched -- not found, not permitted by
      *                                  whatever policy this implementation enforces, unreachable, or
      *                                  anything else that leaves this source without the document.
-     *                                  {@code TsonSchemaFetchException.Reason} carries which, since
+     *                                  {@code SchemaFetchException.Reason} carries which, since
      *                                  a caller's mistake and an operator's want telling apart. This
      *                                  is the only exception the contract permits for that: throwing
      *                                  another type says a fault in this source, not a schema it
@@ -59,13 +60,13 @@ public interface TsonSchemaSource {
     /**
      * Never fetches anything -- every call throws naming {@code uri}.
      *
-     * <p>{@link TsonSchemaFetchException.Reason#NOT_PERMITTED} rather than {@code NOT_FOUND}: nothing
+     * <p>{@link SchemaFetchException.Reason#NOT_PERMITTED} rather than {@code NOT_FOUND}: nothing
      * was looked for. A loader with no fetch capability configured refuses every reference it does not
      * already hold, whether or not anything anywhere could have served it, and no retry changes that.
      */
     static TsonSchemaSource registeredOnly() {
         return uri -> {
-            throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_PERMITTED,
+            throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,
                     "it is not registered, and this loader has no fetch capability configured to load it "
                             + "from anywhere", null);
         };
@@ -82,7 +83,7 @@ public interface TsonSchemaSource {
      * which is the second half of the same trap -- it fails only for the documents that pin, which are the
      * ones a deployment that cares about integrity writes.
      *
-     * <p><b>A miss is {@link TsonSchemaFetchException.Reason#NOT_FOUND}</b>, where {@link #registeredOnly}'s
+     * <p><b>A miss is {@link SchemaFetchException.Reason#NOT_FOUND}</b>, where {@link #registeredOnly}'s
      * is {@code NOT_PERMITTED}: this source has somewhere to look and looked, and the answer is that this
      * deployment does not publish that schema. Neither is retryable, but they are different sentences to put
      * in front of whoever sent the document.
@@ -114,12 +115,12 @@ public interface TsonSchemaSource {
             } catch (TsonSchemaValidationException e) {
                 // Refused rather than reported as a miss: nothing was looked for, because there is no
                 // identity to look for. Wrapped so this source still fails the one way the contract permits.
-                throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_PERMITTED,
+                throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,
                         "it is not a legal schema identity: " + e.getMessage(), e);
             }
             String document = served.get(identity);
             if (document == null) {
-                throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+                throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
                         "this deployment publishes no schema with that identity", null);
             }
             return document;

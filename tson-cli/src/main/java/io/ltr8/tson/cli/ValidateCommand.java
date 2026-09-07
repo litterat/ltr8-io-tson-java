@@ -2,9 +2,9 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentHeader;
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
@@ -66,10 +66,10 @@ final class ValidateCommand {
         TsonSchemaSource source = uri -> {
             String text = schemas.get(TsonCanonicalIdentity.canonicalize(uri));
             if (text == null) {
-                // TsonSchemaFetchException, not an IllegalStateException: this is a source saying it cannot
+                // SchemaFetchException, not an IllegalStateException: this is a source saying it cannot
                 // supply a schema, which is the one thing the fetch contract names a type for. Anything else
                 // thrown from here would be classified as a fault in this command and rethrown as one.
-                throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+                throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
                         "no schema file on the command line declares that !!id" + supplied(declaredIds), null);
             }
             return text;

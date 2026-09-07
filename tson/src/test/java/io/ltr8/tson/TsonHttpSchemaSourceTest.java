@@ -1,8 +1,8 @@
 package io.ltr8.tson;
 
 import com.sun.net.httpserver.HttpServer;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
-import io.ltr8.tson.compiler.TsonSchemaFetchException.Reason;
+import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException.Reason;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -132,15 +132,15 @@ class TsonHttpSchemaSourceTest {
     void refusesAReferenceThatIsNotALegalIdentity() {
         try (TsonHttpSchemaSource source = TsonHttpSchemaSource.builder().allowHost(HOST).build()) {
             // The origin of https://allowed@evil/ is evil -- a reader, and some parsers, get this wrong.
-            TsonSchemaFetchException userinfo = refusal(source, "https://" + HOST + "@evil.example.com/x.tn");
+            SchemaFetchException userinfo = refusal(source, "https://" + HOST + "@evil.example.com/x.tn");
             assertEquals(Reason.NOT_PERMITTED, userinfo.reason());
             assertTrue(userinfo.getMessage().contains("userinfo"), userinfo.getMessage());
 
-            TsonSchemaFetchException port = refusal(source, "https://" + HOST + ":8443/x.tn");
+            SchemaFetchException port = refusal(source, "https://" + HOST + ":8443/x.tn");
             assertEquals(Reason.NOT_PERMITTED, port.reason());
             assertTrue(port.getMessage().contains("port"), port.getMessage());
 
-            TsonSchemaFetchException fragment = refusal(source, "https://" + HOST + "/x.tn#frag");
+            SchemaFetchException fragment = refusal(source, "https://" + HOST + "/x.tn#frag");
             assertEquals(Reason.NOT_PERMITTED, fragment.reason());
             assertTrue(fragment.getMessage().contains("fragment"), fragment.getMessage());
         }
@@ -156,7 +156,7 @@ class TsonHttpSchemaSourceTest {
             exchange.close();
         });
         try (TsonHttpSchemaSource source = allowingThisServer().build()) {
-            TsonSchemaFetchException refused = refusal(source, reference("/moved.tn"));
+            SchemaFetchException refused = refusal(source, reference("/moved.tn"));
             assertEquals(Reason.TRANSPORT, refused.reason());
             assertTrue(refused.getMessage().contains("redirect"), refused.getMessage());
         }
@@ -209,7 +209,7 @@ class TsonHttpSchemaSourceTest {
     void canRequireAContentHashPin() {
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
         try (TsonHttpSchemaSource source = allowingThisServer().requireContentHashPin(true).build()) {
-            TsonSchemaFetchException refused = refusal(source, reference("/order-1.tn"));
+            SchemaFetchException refused = refusal(source, reference("/order-1.tn"));
             assertEquals(Reason.NOT_PERMITTED, refused.reason());
             assertTrue(refused.getMessage().contains("sha256"), refused.getMessage());
             assertEquals(0, requests.get(), "policy must refuse before opening a connection");
@@ -251,7 +251,7 @@ class TsonHttpSchemaSourceTest {
         try (TsonHttpSchemaSource source = allowingThisServer().build()) {
             source.preload(reference("/order-1.tn"));
             assertTrue(source.isCached(reference("/order-1.tn")));
-            assertThrows(TsonSchemaFetchException.class, () -> source.preload(reference("/missing.tn")));
+            assertThrows(SchemaFetchException.class, () -> source.preload(reference("/missing.tn")));
         }
     }
 
@@ -278,8 +278,8 @@ class TsonHttpSchemaSourceTest {
         }
     }
 
-    private static TsonSchemaFetchException refusal(TsonHttpSchemaSource source, String uri) {
-        return assertThrows(TsonSchemaFetchException.class, () -> source.fetch(uri));
+    private static SchemaFetchException refusal(TsonHttpSchemaSource source, String uri) {
+        return assertThrows(SchemaFetchException.class, () -> source.fetch(uri));
     }
 
     private static InputStream body(String document) {

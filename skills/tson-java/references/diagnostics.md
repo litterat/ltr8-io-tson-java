@@ -91,14 +91,14 @@ carried by the `Code` rather than beside it. A fetch failure has five causes, an
 *routing* question: a code is what a consumer routes on, so a field beside the code would be a second
 carrier for the same fact, free to disagree with it. Consumers partition the five differently (a command
 line by whether a rerun could help, an HTTP surface by whose doing it was), so there is one code per
-cause and no partition is privileged. `TsonSchemaFetchException.Reason` remains the *throwing* channel's
+cause and no partition is privileged. `SchemaFetchException.Reason` remains the *throwing* channel's
 vocabulary, and `Diagnostic.Code.of(reason)` is the single mapping between the two.
 
 What earns a component at all is one rule: **a fact not recoverable from the document plus the schema,
 and about the problem rather than about the processor**. Which is why an atom's failed bound (in the
 schema), a duplicate key (in the document) and the rule that fired (the code) get none — and why a §8.2
 refusal's Unicode data version and policy get none either: they are constant for the whole run, so they
-are stated once beside the diagnostics (`TsonProcessorPolicy`, `tson policy`, and the `policy` field on
+are stated once beside the diagnostics (`ProcessorPolicy`, `tson policy`, and the `policy` field on
 every `tson-cli` envelope) rather than N times inside them.
 
 **Two absence conventions, deliberately.** The two pointers are `Optional` because `""` is the *root*,
@@ -119,11 +119,11 @@ whether that is fatal. A fail-fast reader and a collecting one are the same read
 receivers.
 
 ```java
-public interface TsonDiagnosticsReceiver {
+public interface DiagnosticsReceiver {
     void report(Diagnostic diagnostic);
 
-    static TsonDiagnosticsReceiver throwing();     // first problem becomes a TsonReadException
-    static TsonDiagnosticsCollector collecting();  // .diagnostics(), .isEmpty()
+    static DiagnosticsReceiver throwing();     // first problem becomes a ReadException
+    static DiagnosticsCollector collecting();  // .diagnostics(), .isEmpty()
 }
 ```
 
@@ -144,15 +144,15 @@ Every exception this library raises at read time is unchecked. There is no commo
 
 ```
 RuntimeException
-├── TsonReadException              io.ltr8.tson.compiler  — .diagnostic(); what a fail-fast read throws
+├── ReadException              io.ltr8.tson.compiler  — .diagnostic(); what a fail-fast read throws
 ├── TsonParseException             io.ltr8.tson.compiler  — well-formed tokens, invalid document (§7.4)
 ├── TsonUnsupportedDocumentException  a well-formed document of a kind this parser does not implement
-├── TsonWriteException             the write-side peer of TsonReadException
-├── TsonBindMismatchException      a schema type and its bound class disagree
-│   └── TsonMissingBindingException   a schema type with no bound class at all
+├── TsonWriteException             the write-side peer of ReadException
+├── BindMismatchException      a schema type and its bound class disagree
+│   └── MissingBindingException   a schema type with no bound class at all
 ├── TsonSchemaValidationException  io.ltr8.tson.schema — the author's schema is wrong and the spec says so
-├── TsonSchemaFetchException       .uri(), .reason() — the ONLY exception a TsonSchemaSource may throw
-├── TsonContentHashMismatchException  a ?sha256= pin did not match the fetched content
+├── SchemaFetchException       .uri(), .reason() — the ONLY exception a TsonSchemaSource may throw
+├── ContentHashMismatchException  a ?sha256= pin did not match the fetched content
 ├── AtomTypeException              (sealed, internal package) .expected()
 │   ├── AtomParseException         the token is not this atom's grammar
 │   └── AtomValidationException    it parsed, then failed the atom's constraint
@@ -188,14 +188,14 @@ or `TsonDataParser` directly cannot do for themselves. The facade readers call i
 | Call                                                    | Throws                                                                   |
 | ------------------------------------------------------- | -------------------------------------------------------------------------- |
 | `new TsonDataParser(…).parseDocument()`                 | `TsonParseException`, `TsonUnsupportedDocumentException`, `LexException`  |
-| a fail-fast facade read                                 | `TsonReadException` for everything, base syntax included                 |
+| a fail-fast facade read                                 | `ReadException` for everything, base syntax included                 |
 | a collecting facade read                                | nothing, for any bad document — a library fault still throws             |
 | `Tson.validate` / `validateSchema`                      | nothing, for any bad document — a library fault still throws             |
 | `Tson.resolve` on an already-registered `!!id`          | `TsonSchemaValidationException`                                          |
-| `Tson.resolve` naming an unavailable `!!import`/`!!meta`| `TsonSchemaFetchException`                                               |
-| a bind-mode compile whose class disagrees               | `TsonBindMismatchException` — at compile, not at first read              |
-| the first read of a type with no bound class            | `TsonMissingBindingException`, thrown unwrapped from its `ErrorReader`   |
-| a `TsonSchemaSource`                                    | `TsonSchemaFetchException` and nothing else — another type means a fault |
+| `Tson.resolve` naming an unavailable `!!import`/`!!meta`| `SchemaFetchException`                                               |
+| a bind-mode compile whose class disagrees               | `BindMismatchException` — at compile, not at first read              |
+| the first read of a type with no bound class            | `MissingBindingException`, thrown unwrapped from its `ErrorReader`   |
+| a `TsonSchemaSource`                                    | `SchemaFetchException` and nothing else — another type means a fault |
 
 **`!!meta` in a document handed to the data parser** throws `TsonUnsupportedDocumentException`, not
 `TsonParseException`: a schema document is unsupported there, not malformed.

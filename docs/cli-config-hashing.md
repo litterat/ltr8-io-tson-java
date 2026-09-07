@@ -21,7 +21,7 @@ terminator* (the `!!id` line, grammar-required first, is excluded so a document 
 its own id line without circularity; a leading BOM is stripped, never hashed). `TsonContentHash.verify(bytes,
 referenceUri)` parses a reference's `?sha256=` pin (§2.2.1: only hash-algorithm parameters, never silently
 retained — an unrecognized query parameter or malformed hex throws) and checks it, throwing
-`TsonContentHashMismatchException` on mismatch. Both carry the `Tson` prefix as consumer-facing types whose
+`ContentHashMismatchException` on mismatch. Both carry the `Tson` prefix as consumer-facing types whose
 bare names (`ContentHash`, a `hash` mismatch) a consumer plausibly has their own version of — and "content
 hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash".
 
@@ -124,11 +124,11 @@ the throw used to take the second verdict with it.
 
 **78 rather than 70 for a bind mismatch**, because `EX_CONFIG` is "found in an unconfigured or misconfigured
 state" and unconfigured is what this is. 70 would say this library cannot do it, which is the reading
-`TsonMissingBindingException` exists to prevent — and the note printed with 78 deliberately does not repeat
+`MissingBindingException` exists to prevent — and the note printed with 78 deliberately does not repeat
 the diagnostic's own remedy (`TsonConfig.bindings`, a `DataNameBinder`), neither of which has a command-line
 surface.
 
-**69 and 75 are reached two ways each, and all of them are `TsonSchemaFetchException`.** A data document's
+**69 and 75 are reached two ways each, and all of them are `SchemaFetchException`.** A data document's
 `!!schema` that no configured source will serve arrives through `SchemaFailure` as a read diagnostic; a
 schema document's own `!!import`/`!!meta` that will not load arrives through `Tson.validateSchema`'s own
 catch as `Diagnostic.ofSchemaUnavailable`, located at the root pointer. So `tson validate` missing a schema

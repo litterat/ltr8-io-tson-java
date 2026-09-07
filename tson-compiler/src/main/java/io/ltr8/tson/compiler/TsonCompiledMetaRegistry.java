@@ -1,8 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.UnicodePolicy;
-import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.*;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
@@ -376,9 +374,9 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * here: a {@code null} return.
      *
      * <p><b>{@link TsonSchemaSource} permits exactly one way to say "cannot supply this"</b>, a {@link
-     * TsonSchemaFetchException}, and that is what lets {@code SchemaFailure} tell an unavailable schema from
+     * SchemaFetchException}, and that is what lets {@code SchemaFailure} tell an unavailable schema from
      * a fault by type. A {@code null} says it a second way that carries no {@link
-     * TsonSchemaFetchException.Reason} at all, so the deployment refusing a reference and the host that did
+     * SchemaFetchException.Reason} at all, so the deployment refusing a reference and the host that did
      * not answer arrive indistinguishable -- and unguarded it arrives instead as a {@code
      * NullPointerException} several frames further in, nowhere near the source that caused it.
      *
@@ -396,7 +394,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         if (sourceText == null) {
             throw new IllegalStateException("the TsonSchemaSource " + source.getClass().getName()
                     + " returned null for '" + uri + "'. A source signals \"cannot supply this\" by throwing "
-                    + "TsonSchemaFetchException and nothing else, so that an unavailable schema can be told "
+                    + "SchemaFetchException and nothing else, so that an unavailable schema can be told "
                     + "from a fault by type and carries a Reason saying which; null is neither. If this "
                     + "source is a map lookup, TsonSchemaSource.ofMap(Map) is that lookup done to contract");
         }
@@ -577,7 +575,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private static void checkPin(String referenceUri, String contentHash, String identity) {
         TsonContentHash.declaredSha256(referenceUri).ifPresent(declared -> {
             if (!declared.equals(contentHash)) {
-                throw new TsonContentHashMismatchException("content hash mismatch for \"" + referenceUri
+                throw new ContentHashMismatchException("content hash mismatch for \"" + referenceUri
                         + "\": the reference declares sha256=" + declared + " but the content for identity \""
                         + identity + "\" hashes to " + contentHash
                         + " -- refusing to use mismatched content ([TSON-DATA] §2.2.1, [TSON-SCHEMA] §10.2)");

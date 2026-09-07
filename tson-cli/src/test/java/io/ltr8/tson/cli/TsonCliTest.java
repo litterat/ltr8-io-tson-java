@@ -3,6 +3,7 @@ package io.ltr8.tson.cli;
 import io.ltr8.tson.base.Diagnostic;
 
 import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import org.junit.jupiter.api.Test;
@@ -132,9 +133,9 @@ class TsonCliTest {
                 Diagnostic.Code.SCHEMA_UNREACHABLE, Diagnostic.Code.SCHEMA_ERROR)));
 
         // Every fetch code lands in one of the two ranks -- no reason falls through to "checked and rejected".
-        for (io.ltr8.tson.compiler.TsonSchemaFetchException.Reason reason
-                : io.ltr8.tson.compiler.TsonSchemaFetchException.Reason.values()) {
-            int code = TsonCli.exitCodeFor(List.of(TsonDiagnostics.codeFor(reason)));
+        for (SchemaFetchException.Reason reason
+                : SchemaFetchException.Reason.values()) {
+            int code = TsonCli.exitCodeFor(List.of(Diagnostic.Code.of(reason)));
             assertTrue(code == 69 || code == 75, () -> reason + " fell through to " + code);
         }
     }

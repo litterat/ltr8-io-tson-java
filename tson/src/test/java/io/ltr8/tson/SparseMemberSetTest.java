@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -42,7 +42,7 @@ class SparseMemberSetTest {
             if (base.equals(ID)) {
                 return SCHEMA;
             }
-            throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+            throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
                     "this fixture serves only " + ID, null);
         };
         return Tson.builder().schemaSource(source).build();

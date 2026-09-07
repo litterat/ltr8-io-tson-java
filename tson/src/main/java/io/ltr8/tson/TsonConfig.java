@@ -4,6 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.UnicodePolicy;
@@ -195,7 +196,7 @@ public final class TsonConfig {
      * than this library.
      *
      * <p>Pointing a profile at the wrong version does not bind quietly -- the constructor it selects is
-     * checked against that schema's fields, and a disagreement is a {@code TsonBindMismatchException}.
+     * checked against that schema's fields, and a disagreement is a {@code BindMismatchException}.
      *
      * @throws IllegalStateException from {@link #build()} if {@link #dataBindContext} was also supplied --
      *                               a profile is fixed when a context is built, so it cannot apply to one
@@ -328,7 +329,7 @@ public final class TsonConfig {
      * Lets a bound class hold fewer fields than the schema declares, silently -- off by default.
      *
      * <p>By default the two must agree, and a mismatch is a {@link
-     * io.ltr8.tson.compiler.TsonBindMismatchException} when the schema is compiled in bind mode, which is
+     * BindMismatchException} when the schema is compiled in bind mode, which is
      * startup for anything compiling its schemas once. That default is the asymmetry between the two ways of
      * being wrong: a strict reader that is wrong says so at startup, in one message naming both sides, and
      * is fixed in minutes; a lenient one that is wrong drops a value from every document and surfaces much

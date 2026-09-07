@@ -536,7 +536,7 @@ public final class TsonObjectReader {
 
     /**
      * {@link #abandon}, for the one failure that has something to say beyond its code: a schema that could
-     * not be obtained carries {@code TsonSchemaFetchException.Reason}, and dropping it here is dropping it
+     * not be obtained carries {@code SchemaFetchException.Reason}, and dropping it here is dropping it
      * everywhere, since a collecting receiver is how almost every read of a fetched schema now hears about
      * one. The classification and the reason are one value, so they travel as one rather than as a code
      * beside a field a later call site can forget.

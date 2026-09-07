@@ -1,8 +1,8 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonContentHash;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import org.junit.jupiter.api.Test;
 
@@ -35,7 +35,7 @@ class TsonValidateTest {
             if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;
             }
-            throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+            throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
                     "this fixture serves only " + POINT_ID, null);
         };
         return Tson.builder().schemaSource(source).build();

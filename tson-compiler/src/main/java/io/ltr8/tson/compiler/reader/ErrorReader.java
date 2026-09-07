@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonMissingBindingException;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 
@@ -45,7 +45,7 @@ final public class ErrorReader implements TsonTypeReader<Object> {
      * {@inheritDoc}
      *
      * <p><b>A cause that already says what it is passes through unchanged, and still throws.</b> A {@link
-     * TsonMissingBindingException} is a misconfiguration -- a type the caller never mapped -- and neither
+     * MissingBindingException} is a misconfiguration -- a type the caller never mapped -- and neither
      * reporting it as this library's gap nor collecting it as a problem with the document would be true of
      * it. It is the reading application's own wiring, so it reaches that application as itself, in every
      * mode; wrapping it in "no usable compiled reader" is what once sent a downstream service's missing
@@ -53,7 +53,7 @@ final public class ErrorReader implements TsonTypeReader<Object> {
      */
     @Override
     public Object read(TsonReadContext ctx) {
-        if (cause instanceof TsonMissingBindingException missing) {
+        if (cause instanceof MissingBindingException missing) {
             throw missing;
         }
         // Reported before anything is consumed, so the data position names the value that could not be read

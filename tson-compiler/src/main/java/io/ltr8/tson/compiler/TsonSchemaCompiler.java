@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.BindMismatchException;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.reader.*;
 import io.ltr8.tson.compiler.reader.DeferredTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -207,12 +209,12 @@ public final class TsonSchemaCompiler {
                 TsonTypeReader<?> built;
                 try {
                     built = build(name, definition);
-                } catch (TsonMissingBindingException e) {
+                } catch (MissingBindingException e) {
                     // A type with no class at all is deferred, not fatal: a schema legitimately declares
                     // types a given consumer never binds, and failing the compile for those would make bind
                     // mode unusable. It reaches the first read of this specific type still saying what it is.
                     built = new ErrorReader(name, e);
-                } catch (TsonBindMismatchException e) {
+                } catch (BindMismatchException e) {
                     // Deliberately not an ErrorReader. Every other build failure is one entry's problem and
                     // deferring it keeps the rest of the schema usable; this one is a wiring mistake between
                     // the schema and the caller's own classes, and deferring it to the first document that

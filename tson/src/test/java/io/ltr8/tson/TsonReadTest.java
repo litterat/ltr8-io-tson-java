@@ -2,14 +2,11 @@ package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.DiagnosticsCollector;
-import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.ReadException;
+import io.ltr8.tson.base.*;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonTreeReader;
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
@@ -47,7 +44,7 @@ class TsonReadTest {
             if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;
             }
-            throw new TsonSchemaFetchException(uri, TsonSchemaFetchException.Reason.NOT_FOUND,
+            throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
                     "this fixture serves only " + POINT_ID, null);
         };
         return Tson.builder().schemaSource(source).build();
@@ -113,14 +110,14 @@ class TsonReadTest {
      */
     @Test
     void aCollectedFetchFailureStatesWhichReasonItWas() {
-        for (TsonSchemaFetchException.Reason reason : TsonSchemaFetchException.Reason.values()) {
+        for (SchemaFetchException.Reason reason : SchemaFetchException.Reason.values()) {
             DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
             failing(reason).treeReader().withDiagnostics(problems).read("""
                     !!schema:"https://example.test/not-there.tn"
                     !point { x: 3  y: 4 }""");
 
             Diagnostic diagnostic = problems.diagnostics().getFirst();
-            assertEquals(TsonDiagnostics.codeFor(reason), diagnostic.code(), reason::name);
+            assertEquals(Diagnostic.Code.of(reason), diagnostic.code(), reason::name);
             assertFalse(diagnostic.code().verdict(), reason::name);
         }
     }
@@ -136,7 +133,7 @@ class TsonReadTest {
         String document = """
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }""";
-        Tson tson = failing(TsonSchemaFetchException.Reason.NOT_PERMITTED);
+        Tson tson = failing(SchemaFetchException.Reason.NOT_PERMITTED);
 
         ReadException thrown = assertThrows(ReadException.class, () -> tson.treeReader().read(document));
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
@@ -162,13 +159,13 @@ class TsonReadTest {
     }
 
     /** A {@link Tson} whose one source refuses everything for {@code reason}. */
-    private static Tson failing(TsonSchemaFetchException.Reason reason) {
+    private static Tson failing(SchemaFetchException.Reason reason) {
         TsonSchemaSource source = uri -> {
             String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;
             if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;
             }
-            throw new TsonSchemaFetchException(uri, reason, "refused for the test", null);
+            throw new SchemaFetchException(uri, reason, "refused for the test", null);
         };
         return Tson.builder().schemaSource(source).build();
     }

@@ -3,7 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.annotation.Profile;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.compiler.TsonBindMismatchException;
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * both and each supplies its own default for the field its version does not carry.
  *
  * <p><b>The two mechanisms have to hold together here.</b> The profile picks the constructor; the strict
- * binding check ({@code TsonBindMismatchException}) then verifies that constructor against that version's
+ * binding check ({@code BindMismatchException}) then verifies that constructor against that version's
  * schema. Either alone would be unsafe -- selection without checking binds whatever it picked, and checking
  * without selection has only one shape to check.
  */
@@ -139,7 +139,7 @@ class SchemaVersionProfileTest {
     void aProfilePointedAtTheWrongVersionFailsRatherThanBindingTheOtherOnesConstructor() {
         Tson mismatched = tson("api-2", V1_SCHEMA);
 
-        TsonBindMismatchException thrown = assertThrows(TsonBindMismatchException.class,
+        BindMismatchException thrown = assertThrows(BindMismatchException.class,
                 () -> mismatched.bindRegistry().get(V1));
 
         assertTrue(thrown.getMessage().contains("code"), thrown.getMessage());
@@ -155,7 +155,7 @@ class SchemaVersionProfileTest {
     void anUnprofiledContextFallsBackToTheCanonicalConstructorAndIsRefused() {
         Tson unprofiled = tson(null, V2_SCHEMA);
 
-        TsonBindMismatchException thrown = assertThrows(TsonBindMismatchException.class,
+        BindMismatchException thrown = assertThrows(BindMismatchException.class,
                 () -> unprofiled.bindRegistry().get(V2));
 
         assertTrue(thrown.getMessage().contains("code"), "the union field v2 does not declare: " + thrown.getMessage());

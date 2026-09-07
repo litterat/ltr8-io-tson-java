@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
-import io.ltr8.tson.compiler.TsonSchemaFetchException.Reason;
+import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException.Reason;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -44,8 +44,8 @@ class TsonFileSchemaSourceTest {
         return "https://" + HOST + path;
     }
 
-    private static TsonSchemaFetchException refusal(TsonFileSchemaSource source, String uri) {
-        return assertThrows(TsonSchemaFetchException.class, () -> source.fetch(uri));
+    private static SchemaFetchException refusal(TsonFileSchemaSource source, String uri) {
+        return assertThrows(SchemaFetchException.class, () -> source.fetch(uri));
     }
 
     @Test
@@ -84,7 +84,7 @@ class TsonFileSchemaSourceTest {
         Files.writeString(served.resolve("order-1.tn"), schemaAt("/order-1.tn"));
         Files.writeString(dir.resolve("secret.tn"), "!!id:\"https://elsewhere.test/secret.tn\"\n{}\n");
 
-        TsonSchemaFetchException refused = refusal(serving(served), reference("/../secret.tn"));
+        SchemaFetchException refused = refusal(serving(served), reference("/../secret.tn"));
         assertEquals(Reason.NOT_PERMITTED, refused.reason());
         assertTrue(refused.getMessage().contains("outside"), refused.getMessage());
     }
@@ -104,7 +104,7 @@ class TsonFileSchemaSourceTest {
             return; // a filesystem without symlinks has nothing to test here
         }
 
-        TsonSchemaFetchException refused = refusal(serving(served), reference("/order-1.tn"));
+        SchemaFetchException refused = refusal(serving(served), reference("/order-1.tn"));
         assertEquals(Reason.NOT_PERMITTED, refused.reason());
         assertTrue(refused.getMessage().contains("outside"), refused.getMessage());
     }
@@ -191,7 +191,7 @@ class TsonFileSchemaSourceTest {
 
         source.preload(reference("/order-1.tn"));
         assertTrue(source.isCached(reference("/order-1.tn")));
-        assertThrows(TsonSchemaFetchException.class, () -> source.preload(reference("/missing.tn")));
+        assertThrows(SchemaFetchException.class, () -> source.preload(reference("/missing.tn")));
     }
 
     /** A mapping that cannot be satisfied is a startup mistake, and says so at build time. */

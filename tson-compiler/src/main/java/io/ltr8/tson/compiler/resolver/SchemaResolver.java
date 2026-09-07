@@ -1,12 +1,12 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.TsonDiagnostics;
-import io.ltr8.tson.compiler.TsonBindMismatchException;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -346,7 +346,7 @@ public final class SchemaResolver {
             try {
                 nameAnnotations.put(key, resolver.annotationsFor(name, declarations.get(name).nameAnnotations()));
             } catch (TsonSchemaValidationException | UnsupportedOperationException
-                    | TsonBindMismatchException e) {
+                     | BindMismatchException e) {
                 if (!problems.collecting()) {
                     throw e;
                 }
@@ -405,9 +405,9 @@ public final class SchemaResolver {
      * <p><b>The code is chosen by the project's own exception classification</b>, which has three outcomes
      * and not two. A {@code TsonSchemaValidationException} is the author's error and an {@code
      * UnsupportedOperationException} is this library's gap -- one says fix your schema, the other says this
-     * could not be checked. A {@link TsonBindMismatchException} is neither: it says the reading application
+     * could not be checked. A {@link BindMismatchException} is neither: it says the reading application
      * is wired wrong, and it is the one a caller most easily acts on, the message naming one of their own
-     * classes. Collapsing it into either of the others is what {@code TsonMissingBindingException} exists to
+     * classes. Collapsing it into either of the others is what {@code MissingBindingException} exists to
      * prevent -- its Javadoc records a downstream service turning the library-gap shape into a 501 for what
      * was a missing line of configuration.
      *
@@ -429,7 +429,7 @@ public final class SchemaResolver {
         void report(SchemaMap.Declaration declaration, String message, RuntimeException error) {
             Optional<SourcePosition> position = positions.of(declaration);
             receiver.report(switch (error) {
-                case TsonBindMismatchException mismatch ->
+                case BindMismatchException mismatch ->
                         TsonDiagnostics.ofSchemaBindMismatch(schemaId, declaration.name(), mismatch, position);
                 case UnsupportedOperationException ignored ->
                         TsonDiagnostics.ofSchemaGap(schemaId, declaration.name(), message, position);
@@ -535,7 +535,7 @@ public final class SchemaResolver {
                 entries.put(name, resolved);
                 return resolved;
             } catch (TsonSchemaValidationException | UnsupportedOperationException
-                    | TsonBindMismatchException e) {
+                     | BindMismatchException e) {
                 if (!problems.collecting()) {
                     throw e;
                 }

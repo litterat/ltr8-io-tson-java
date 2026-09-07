@@ -19,7 +19,7 @@ import java.util.Map;
 void main() {
     // A tiny schema, handed to the reader by identity. A real app plugs in a disk/HTTP-backed source
     // with its own fetch policy; `ofMap` is the form for schemas you already hold. Note it, rather
-    // than `schemas::get`: a source says "I cannot supply that" by throwing TsonSchemaFetchException,
+    // than `schemas::get`: a source says "I cannot supply that" by throwing SchemaFetchException,
     // and a map returns null instead -- for whichever identity the *document* names.
     String schema = """
             !!id:"https://example.com/2026/35/app/server-1.tn"

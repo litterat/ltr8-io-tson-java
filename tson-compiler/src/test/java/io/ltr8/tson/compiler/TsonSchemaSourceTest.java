@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import org.junit.jupiter.api.Test;
 
@@ -50,17 +51,17 @@ class TsonSchemaSourceTest {
      */
     @Test
     void ofMapReportsAMissAsNotFound() {
-        TsonSchemaFetchException thrown = assertThrows(TsonSchemaFetchException.class,
+        SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
                 () -> TsonSchemaSource.ofMap(Map.of(ID, SCHEMA)).fetch("https://elsewhere.test/other-1.tn"));
 
-        assertEquals(TsonSchemaFetchException.Reason.NOT_FOUND, thrown.reason());
+        assertEquals(SchemaFetchException.Reason.NOT_FOUND, thrown.reason());
         assertEquals("https://elsewhere.test/other-1.tn", thrown.uri());
     }
 
     @Test
     void registeredOnlyRefusesEverythingAsNotPermitted() {
-        assertEquals(TsonSchemaFetchException.Reason.NOT_PERMITTED,
-                assertThrows(TsonSchemaFetchException.class,
+        assertEquals(SchemaFetchException.Reason.NOT_PERMITTED,
+                assertThrows(SchemaFetchException.class,
                         () -> TsonSchemaSource.registeredOnly().fetch(ID)).reason());
     }
 
@@ -70,10 +71,10 @@ class TsonSchemaSourceTest {
      */
     @Test
     void ofMapRefusesAnIllegalIdentityWithoutBreakingTheContract() {
-        TsonSchemaFetchException thrown = assertThrows(TsonSchemaFetchException.class,
+        SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
                 () -> TsonSchemaSource.ofMap(Map.of(ID, SCHEMA)).fetch("not-a-uri"));
 
-        assertEquals(TsonSchemaFetchException.Reason.NOT_PERMITTED, thrown.reason());
+        assertEquals(SchemaFetchException.Reason.NOT_PERMITTED, thrown.reason());
     }
 
     /** A key that is not a legal identity fails where the map is built, not at the read that needed it. */

@@ -46,7 +46,7 @@ public non-sealed interface Data extends Top {
      * <p><b>Never {@code null} -- return {@link List#of()} for a body that names no types.</b> The case to
      * watch is an implementation returning an OPTIONAL bound component directly: the binder hands an omitted
      * field to the constructor as {@code null} and does not normalise it to an empty list, so
-     * {@code references()} inherits that {@code null}. Linking one is a {@code TsonBindMismatchException}
+     * {@code references()} inherits that {@code null}. Linking one is a {@code BindMismatchException}
      * naming the class, since it is the reading application's mistake rather than anything about the schema.
      */
     default List<TypeRef> references() {

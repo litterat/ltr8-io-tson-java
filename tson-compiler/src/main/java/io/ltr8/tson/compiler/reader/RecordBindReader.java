@@ -11,9 +11,9 @@ import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassUnion;
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonBindMismatchException;
-import io.ltr8.tson.compiler.TsonMissingBindingException;
+import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -25,20 +25,16 @@ import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 import java.lang.reflect.RecordComponent;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -80,7 +76,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     /**
      * Whether a schema field with nowhere to go is an error. Fixed when the reader is built, because that is
      * when the question is answerable and when the answer is cheap to act on -- see {@link
-     * TsonBindMismatchException}. The lenient reading still reports what it drops (below); what it does not
+     * BindMismatchException}. The lenient reading still reports what it drops (below); what it does not
      * do is refuse to start.
      */
     private final boolean strict;
@@ -162,7 +158,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 }
             }
             if (!mismatches.isEmpty()) {
-                throw new TsonBindMismatchException("'" + displayName + "' and "
+                throw new BindMismatchException("'" + displayName + "' and "
                         + descriptor.typeClass().getName() + " do not agree: " + String.join("; ", mismatches)
                         + ". Bind the class the schema describes, or read leniently "
                         + "(TsonConfig.lenientBinding) if dropping this is deliberate");
@@ -483,7 +479,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
         private final DataBindContext context;
 
-        /** Whether a schema field with nowhere to go fails the compile -- see {@link TsonBindMismatchException}. */
+        /** Whether a schema field with nowhere to go fails the compile -- see {@link BindMismatchException}. */
         private final boolean strict;
 
         public Factory(DataBindContext context, boolean strict) {
@@ -598,7 +594,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * The class this schema type binds to.
          *
          * <p><b>A missing one is a misconfiguration, not a gap.</b> It is the same disagreement {@link
-         * TsonBindMismatchException} covers from the other side -- a class that exists and does not fit -- so
+         * BindMismatchException} covers from the other side -- a class that exists and does not fit -- so
          * it is raised the same way and at the same moment, when the schema is compiled in bind mode, naming
          * the type nothing resolves. Surfacing it as a library gap instead would tell a caller who simply
          * never mapped the type that this library cannot do the job, and that reading travels: a downstream
@@ -608,7 +604,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             try {
                 return context.getDescriptor(name);
             } catch (DataBindException e) {
-                throw new TsonMissingBindingException("no bound Java class for '" + name + "': nothing in this "
+                throw new MissingBindingException("no bound Java class for '" + name + "': nothing in this "
                         + "bind context resolves that schema type name. Map it (TsonConfig.bindings) or give "
                         + "the context a DataNameBinder that can find it -- " + e.getMessage());
             }

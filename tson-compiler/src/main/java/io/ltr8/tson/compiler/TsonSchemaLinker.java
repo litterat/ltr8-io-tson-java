@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
@@ -1130,7 +1131,7 @@ public final class TsonSchemaLinker {
                 // a fault in this library and reports with a please-report-it banner.
                 List<TypeRef> references = data.references();
                 if (references == null) {
-                    throw new TsonBindMismatchException(data.getClass().getName() + " returned null from "
+                    throw new BindMismatchException(data.getClass().getName() + " returned null from "
                             + "references() for '" + entryName + "' -- return List.of() for a body that names "
                             + "no types. A null usually means an OPTIONAL component: the binder passes an "
                             + "omitted field as null and does not normalise it to an empty list");

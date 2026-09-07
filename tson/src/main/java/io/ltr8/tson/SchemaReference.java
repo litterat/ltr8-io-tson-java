@@ -1,6 +1,6 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.compiler.TsonSchemaFetchException;
+import io.ltr8.tson.base.SchemaFetchException;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -30,7 +30,7 @@ import java.util.Locale;
 record SchemaReference(String canonical, String host, String path) {
 
     /**
-     * {@code reference} as a legal identity, or a {@link TsonSchemaFetchException.Reason#NOT_PERMITTED}
+     * {@code reference} as a legal identity, or a {@link SchemaFetchException.Reason#NOT_PERMITTED}
      * failure.
      *
      * @param requireContentHashPin refuse a reference carrying no {@code ?sha256=} pin
@@ -69,12 +69,12 @@ record SchemaReference(String canonical, String host, String path) {
         return query != null && query.contains("sha256=");
     }
 
-    static TsonSchemaFetchException notPermitted(String reference, String message) {
+    static SchemaFetchException notPermitted(String reference, String message) {
         return notPermitted(reference, message, null);
     }
 
-    static TsonSchemaFetchException notPermitted(String reference, String message, Throwable cause) {
-        return new TsonSchemaFetchException(reference, TsonSchemaFetchException.Reason.NOT_PERMITTED, message,
+    static SchemaFetchException notPermitted(String reference, String message, Throwable cause) {
+        return new SchemaFetchException(reference, SchemaFetchException.Reason.NOT_PERMITTED, message,
                 cause);
     }
 }
