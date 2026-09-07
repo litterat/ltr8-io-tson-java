@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.FileSchemaSource;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -19,9 +20,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonConfig#httpSchemas} and {@link TsonConfig#fileSchemas} -- the short forms of the two sources
- * this library ships, alongside {@link TsonConfig#schemaSource} rather than instead of it -- and {@link
- * SchemaSource#ofMap}, the third form, for schemas a caller already holds.
+ * {@link SchemaAccess#httpSchemas} and {@link SchemaAccess#fileSchemas} -- the short forms of the two
+ * sources this library ships, alongside {@link SchemaAccess#of} rather than instead of it -- and
+ * {@link SchemaSource#ofMap}, the third form, for schemas a caller already holds, reaching the loader
+ * through {@link TsonConfig#schemaAccess}.
  */
 class SchemaSourceConfigTest {
 
@@ -46,7 +48,7 @@ class SchemaSourceConfigTest {
     void fileSchemasServesADocumentEndToEnd(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
 
-        Tson tson = Tson.builder().fileSchemas(HOST, dir).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.fileSchemas(HOST, dir)).build();
         TsonValue order = tson.treeReader().read(DOCUMENT);
 
         assertEquals("ABC-1", order.get("sku").asString().orElseThrow());
@@ -54,14 +56,14 @@ class SchemaSourceConfigTest {
 
     /**
      * The general seam carries the same arc with the source built rather than named -- the short form is a
-     * convenience over {@link TsonConfig#schemaSource}, not a second path into the loader.
+     * convenience over {@link SchemaAccess#of}, not a second path into the loader.
      */
     @Test
     void theGeneralSeamServesTheSameArcAsTheShortForm(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
         FileSchemaSource source = FileSchemaSource.builder().mapHost(HOST, dir).build();
 
-        Tson tson = Tson.builder().schemaSource(source).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
         tson.resolve(source.fetch(SCHEMA_URI));
 
         assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
@@ -70,9 +72,13 @@ class SchemaSourceConfigTest {
                 !order { }""".formatted(SCHEMA_URI)).size(), "both required fields are missing");
     }
 
-    /** Repeatable: each call maps another host into the one source, rather than replacing the last. */
+    /**
+     * Repeatable: each call maps another host into the one source, rather than replacing the last -- and
+     * both reach the loader. The repeatability is {@link SchemaAccess.Builder}'s and pinned there; what this
+     * adds is that an access holding two hosts serves both through a {@link Tson}.
+     */
     @Test
-    void fileSchemasAccumulatesHosts(@TempDir Path dir) throws IOException {
+    void anAccessMappingTwoHostsServesBoth(@TempDir Path dir) throws IOException {
         Path first = Files.createDirectory(dir.resolve("first"));
         Path second = Files.createDirectory(dir.resolve("second"));
         Files.writeString(first.resolve("order-1.tn"), SCHEMA);
@@ -80,8 +86,10 @@ class SchemaSourceConfigTest {
         Files.writeString(second.resolve("thing-1.tn"), SCHEMA.replace(SCHEMA_URI, otherUri));
 
         Tson tson = Tson.builder()
-                .fileSchemas(HOST, first)
-                .fileSchemas("other.example.test", second)
+                .schemaAccess(SchemaAccess.builder()
+                        .fileSchemas(HOST, first)
+                        .fileSchemas("other.example.test", second)
+                        .build())
                 .build();
 
         assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
@@ -92,7 +100,7 @@ class SchemaSourceConfigTest {
     @Test
     void anUnnamedHostIsNotServed(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
-        Tson tson = Tson.builder().fileSchemas("elsewhere.example.test", dir).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.fileSchemas("elsewhere.example.test", dir)).build();
 
         assertTrue(tson.validate(DOCUMENT).stream()
                 .anyMatch(d -> d.message().contains("is not one of")), () -> tson.validate(DOCUMENT).toString());
@@ -101,33 +109,13 @@ class SchemaSourceConfigTest {
     /** `httpSchemas` allows a host without fetching anything, so this needs no server to be worth asserting. */
     @Test
     void httpSchemasAllowsOnlyTheHostsItNames() {
-        Tson tson = Tson.builder().httpSchemas("allowed.example.test").build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.httpSchemas("allowed.example.test")).build();
 
         assertTrue(tson.validate("""
                 !!schema:"https://denied.example.test/order-1.tn"
                 !order { }""").stream().anyMatch(d -> d.message().contains("is not one of")));
     }
 
-    /**
-     * The three ways of naming a source are mutually exclusive, on the precedent {@code bindings} and
-     * {@code dataBindContext} already set: each builds one source, and {@code schemaSource} holds one, so
-     * mixing them would silently drop one rather than compose them.
-     */
-    @Test
-    void theShortFormsAndTheGeneralSeamAreMutuallyExclusive(@TempDir Path dir) {
-        assertTrue(assertThrows(IllegalStateException.class,
-                () -> Tson.builder().httpSchemas("a.example.test").fileSchemas(HOST, dir))
-                .getMessage().contains("not both"));
-        assertTrue(assertThrows(IllegalStateException.class,
-                () -> Tson.builder().fileSchemas(HOST, dir).httpSchemas("a.example.test"))
-                .getMessage().contains("not both"));
-        assertTrue(assertThrows(IllegalStateException.class,
-                () -> Tson.builder().schemaSource(uri -> SCHEMA).httpSchemas("a.example.test"))
-                .getMessage().contains("not both"));
-        assertTrue(assertThrows(IllegalStateException.class,
-                () -> Tson.builder().fileSchemas(HOST, dir).schemaSource(uri -> SCHEMA))
-                .getMessage().contains("not both"));
-    }
     // --- schemas a caller already holds ---
 
     private static final String UNPUBLISHED = """
@@ -137,7 +125,7 @@ class SchemaSourceConfigTest {
     /** The short form for a caller who already has the text: no host, no directory, no fetching. */
     @Test
     void ofMapServesADocumentEndToEnd() {
-        Tson tson = Tson.builder().schemaSource(SchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA))).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA)))).build();
 
         assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
     }
@@ -149,7 +137,7 @@ class SchemaSourceConfigTest {
      */
     @Test
     void ofMapReportsASchemaItDoesNotHoldAsUnavailable() {
-        Tson tson = Tson.builder().schemaSource(SchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA))).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA)))).build();
 
         List<Diagnostic> problems = tson.validate(UNPUBLISHED);
 
@@ -171,7 +159,7 @@ class SchemaSourceConfigTest {
     @Test
     void aSourceReturningNullSaysSoRatherThanFailingDeeperIn() {
         Map<String, String> schemas = Map.of(SCHEMA_URI, SCHEMA);
-        Tson tson = Tson.builder().schemaSource(schemas::get).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(schemas::get)).build();
 
         IllegalStateException thrown =
                 assertThrows(IllegalStateException.class, () -> tson.treeReader().read(UNPUBLISHED));
@@ -189,7 +177,7 @@ class SchemaSourceConfigTest {
     @Test
     void aSourceReturningNullIsAFaultEvenWhenCollecting() {
         Map<String, String> schemas = Map.of(SCHEMA_URI, SCHEMA);
-        Tson tson = Tson.builder().schemaSource(schemas::get).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(schemas::get)).build();
 
         assertThrows(IllegalStateException.class, () -> tson.validate(UNPUBLISHED));
     }

@@ -3,9 +3,9 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.base.source.HttpSchemaSource;
-import io.ltr8.tson.base.source.FileSchemaSource;
+import io.ltr8.tson.base.policy.FetchPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.BindMismatchException;
@@ -20,7 +20,7 @@ import java.util.Objects;
 
 /**
  * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
- * directly. {@link #schemaSource} fetches user schemas beyond the bundled standard library;
+ * directly. {@link #schemaAccess} says where user schemas beyond the bundled standard library come from;
  * {@link #bindings}/{@link #profile} say which Java classes the schema's types bind to and, where a class
  * offers several shapes, which one ({@link #dataBindContext} is the long form of the same thing, and the two
  * are mutually exclusive); {@link #metaNameBinder} binds a governing meta's own constructors;
@@ -38,104 +38,41 @@ import java.util.Objects;
 public final class TsonConfig {
 
     private DataBindContext dataBindContext = TsonAtomContext.defaultContext();
-    private SchemaSource schemaSource = SchemaSource.registeredOnly();
+    private SchemaAccess schemaAccess = SchemaAccess.registeredOnly();
     private DataNameBinder metaNameBinder;
     private ProcessorPolicy policy = ProcessorPolicy.defaults();
     private boolean strictBinding = true;
     private Map<String, Class<?>> bindings;
     private String profile;
     private boolean dataBindContextSupplied;
-    private boolean schemaSourceSupplied;
-    private HttpSchemaSource.Builder httpSchemas;
-    private FileSchemaSource.Builder fileSchemas;
 
     TsonConfig() {
     }
 
     /**
-     * A source for schema documents beyond the bundled standard library -- consulted by the built
-     * {@link Tson}'s loader to fetch a {@code !!schema}/{@code !!import}/{@code !!meta} target it
-     * doesn't already have registered. The bundled meta-kernel/meta.tn/core.tn are always served
-     * first, so this source only needs to know its own URIs; it is a fallback, never an override of
-     * the standard library. Defaults to {@link SchemaSource#registeredOnly()} (nothing extra
-     * fetchable).
+     * Where this deployment may obtain a schema beyond the bundled standard library, and under what
+     * constraints -- the {@link SchemaSource} and the {@link FetchPolicy} governing it, as one value.
+     * Defaults to {@link SchemaAccess#registeredOnly()}: nothing beyond the standard library is fetchable.
      *
-     * <p>{@link #httpSchemas} and {@link #fileSchemas} are the short forms of the two sources this library
-     * ships, and are what most callers want; this is the general seam -- a source of your own, or the two
-     * shipped ones composed, which is the one thing the short forms cannot express.
+     * <p><b>The vocabulary for stating one lives on {@link SchemaAccess} and not here</b>, so there is one
+     * place to learn it and one place it can drift: {@link SchemaAccess#httpSchemas} and
+     * {@link SchemaAccess#fileSchemas} are the one-call forms of the two sources this library ships,
+     * {@link SchemaAccess#of} wraps a source of your own, and {@link SchemaAccess#builder()} is the general
+     * form -- a {@link FetchPolicy}, a mirror, a host mapped elsewhere. A second copy of those four on this
+     * class would be a second surface to keep in step, and the mutual-exclusion rules among them would have
+     * to be stated twice.
+     *
+     * <pre>{@code
+     * Tson.builder().schemaAccess(SchemaAccess.fileSchemas("schemas.example.com", dir)).build();
+     * }</pre>
+     *
+     * <p>It is the schema half of what a deployment constrains, {@link #processorPolicy} being the reading
+     * half. Two values because they are consumed by different subsystems: a reader applies one and fetches
+     * nothing, the loader applies the other and reads no documents.
      */
-    public TsonConfig schemaSource(SchemaSource schemaSource) {
-        if (httpSchemas != null || fileSchemas != null) {
-            throw new IllegalStateException("supply either schemaSource or httpSchemas/fileSchemas, not both "
-                    + "-- the short forms build a source, so passing one as well would silently discard it");
-        }
-        this.schemaSource = schemaSource;
-        this.schemaSourceSupplied = true;
+    public TsonConfig schemaAccess(SchemaAccess schemaAccess) {
+        this.schemaAccess = Objects.requireNonNull(schemaAccess, "schemaAccess");
         return this;
-    }
-
-    /**
-     * Fetches schemas identified by any of {@code hosts} over {@code https} from that same host -- the short
-     * form of {@link HttpSchemaSource}, which is where the policy is documented and which every default
-     * here comes from. Repeatable: each call adds hosts.
-     *
-     * <p><b>Deny by default is the property worth knowing.</b> A host not named here is not fetched, and a
-     * host is matched exactly -- naming {@code example.com} permits nothing on a subdomain. In a server the
-     * reference comes out of a request body, so this list is a security boundary rather than a convenience.
-     *
-     * <p>Reach for {@link HttpSchemaSource#builder()} and {@link #schemaSource} instead when you need a
-     * mirror or a non-default port ({@code mapHost}), different caps, a required {@code ?sha256=} pin, your
-     * own {@link java.net.http.HttpClient} -- or the source itself, since a source built here is owned by the
-     * {@link Tson} and there is no handle to {@code close()} it through.
-     */
-    public TsonConfig httpSchemas(String... hosts) {
-        rejectMixedSchemaSources("httpSchemas");
-        if (httpSchemas == null) {
-            httpSchemas = HttpSchemaSource.builder();
-        }
-        for (String host : hosts) {
-            httpSchemas.allowHost(host);
-        }
-        return this;
-    }
-
-    /**
-     * Serves schemas identified by {@code host} from {@code directory} -- the short form of
-     * {@link FileSchemaSource}, which is where the policy is documented. Repeatable: each call maps
-     * another host.
-     *
-     * <p>Nothing outside {@code directory} is ever read, symlinks included, and no host but the ones named
-     * here is served at all. [TSON-DATA] §2.2.1 is what makes this legitimate rather than a hack: an identity
-     * names a document independently of where it is stored, so {@code https://schemas.example.com/order-1.tn}
-     * may perfectly well live in a directory.
-     *
-     * <p>Reach for {@link FileSchemaSource#builder()} and {@link #schemaSource} instead when you need
-     * different caps or a required {@code ?sha256=} pin.
-     */
-    public TsonConfig fileSchemas(String host, java.nio.file.Path directory) {
-        rejectMixedSchemaSources("fileSchemas");
-        if (fileSchemas == null) {
-            fileSchemas = FileSchemaSource.builder();
-        }
-        fileSchemas.mapHost(host, directory);
-        return this;
-    }
-
-    /**
-     * The two short forms build one source each, and {@code schemaSource} holds one, so mixing them would
-     * mean silently dropping one. A deployment that really needs both writes the composition itself and
-     * passes it to {@link #schemaSource}, where the order it tries them in is its own to state.
-     */
-    private void rejectMixedSchemaSources(String called) {
-        if (schemaSourceSupplied) {
-            throw new IllegalStateException("supply either schemaSource or " + called + ", not both");
-        }
-        if ("httpSchemas".equals(called) ? fileSchemas != null : httpSchemas != null) {
-            throw new IllegalStateException("supply either httpSchemas or fileSchemas, not both -- for a "
-                    + "deployment needing each for different hosts, compose the two sources yourself and "
-                    + "pass the result to schemaSource, so which one is tried first is stated rather than "
-                    + "assumed");
-        }
     }
 
     /**
@@ -161,7 +98,7 @@ public final class TsonConfig {
      * {@link #dataBindContext} says the long way.
      *
      * <pre>{@code
-     * Tson.builder().schemaSource(source).bindings(Map.of("order", Order.class)).build();
+     * Tson.builder().schemaAccess(SchemaAccess.of(source)).bindings(Map.of("order", Order.class)).build();
      * }</pre>
      *
      * <p><b>It exists because the long way has three steps and two of them are invisible.</b> A caller who
@@ -385,7 +322,7 @@ public final class TsonConfig {
             dataBindContext = boundContext();
         }
         // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
-        // bundled meta-kernel/meta/core, and schemaSource is consulted only for other, later URIs. It
+        // bundled meta-kernel/meta/core, and the access's source is consulted only for other URIs. It
         // compiles the standard library in object-binding mode -- the only mode that can (a DOM reader
         // can't resolve the !enum/!integer instances a meta-schema declares), which is why it takes the
         // bind context rather than a resolver that might be the wrong mode. The *mode* is what is fixed
@@ -394,10 +331,7 @@ public final class TsonConfig {
         DataBindContext schemaContext = metaNameBinder == null
                 ? SchemaMetaNameBinder.defaultContext()
                 : SchemaMetaNameBinder.contextExtendedWith(metaNameBinder);
-        // The short forms are built here rather than at the call that named them, so that repeated calls
-        // accumulate hosts into one source instead of each replacing the last.
-        SchemaSource source = httpSchemas != null ? httpSchemas.build()
-                : fileSchemas != null ? fileSchemas.build() : schemaSource;
+        SchemaSource source = schemaAccess.source();
         TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
                 schemaContext, source, policy.identifierPolicy());
         return new Tson(core, dataBindContext, strictBinding, policy);

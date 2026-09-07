@@ -1,5 +1,6 @@
 package io.ltr8.tson.cli;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
@@ -77,7 +78,7 @@ final class ValidateCommand {
         // One Tson for the whole run, so the identifier policy governs the schema files' own declared names
         // at link time and the data documents' names at read time alike -- it is one processor, and a flag
         // that reached only one of the two ends would be a trap.
-        Tson tson = policies.applyTo(Tson.builder().schemaSource(source)).build();
+        Tson tson = policies.applyTo(Tson.builder().schemaAccess(SchemaAccess.of(source))).build();
         CliPolicy policy = CliPolicy.from(tson.processorPolicy());
 
         for (ValidateInput input : inputs) {

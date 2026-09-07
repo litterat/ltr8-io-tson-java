@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
@@ -69,7 +70,7 @@ class AnnotationValidationTest {
         Map<String, Class<?>> names = Map.of("plain", Plain.class, "carrier", Carrier.class,
                 "shape", Shape.class, "circle", Circle.class, "holder", Holder.class);
         DataNameBinder binder = n -> names.containsKey(n) ? names.get(n) : SchemaMetaNameBinder.INSTANCE.resolve(n);
-        return Tson.builder().schemaSource((SchemaSource) uri -> SCHEMA)
+        return Tson.builder().schemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
                 .dataBindContext(TsonAtomContext.registerDefaults(
                         DataBindContext.builder().nameBinder(binder).build()))
                 .build();

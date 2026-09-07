@@ -1,6 +1,6 @@
 ---
 name: tson-java
-description: Read, validate, write and bind TSON (`.tn`) documents with the `io.ltr8:tson` Java library, and run its `tson` command line. Use this skill whenever Java code imports `io.ltr8.tson`, `io.ltr8.tson.compiler`, `io.ltr8.tson.tree` or `io.ltr8.bind`; whenever names like `Tson`, `TsonConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`, `ReadException`, `TsonSchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the `ltr8-io-tson-java` repository; and whenever someone wants to check, compile or hash `.tn` files from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit hook, a lint step — whatever language the surrounding project is written in. For authoring TSON *data* documents use the tson-data skill; for *schema* documents use tson-schema. This skill is the Java implementation and its CLI, not the notation.
+description: Read, validate, write and bind TSON (`.tn`) documents with the `io.ltr8:tson` Java library, and run its `tson` command line. Use this skill whenever Java code imports `io.ltr8.tson`, `io.ltr8.tson.compiler`, `io.ltr8.tson.tree` or `io.ltr8.bind`; whenever names like `Tson`, `TsonConfig`, `TsonTreeReader`, `TsonObjectReader`, `TsonValue`, `Diagnostic`, `ReadException`, `SchemaSource`, `TsonCompiledSchema` or `TsonBundledSchemas` appear; whenever work happens inside the `ltr8-io-tson-java` repository; and whenever someone wants to check, compile or hash `.tn` files from a shell, a script, a Gradle task or a CI job — `tson validate`, a pre-commit hook, a lint step — whatever language the surrounding project is written in. For authoring TSON *data* documents use the tson-data skill; for *schema* documents use tson-schema. This skill is the Java implementation and its CLI, not the notation.
 ---
 
 # `io.ltr8:tson` — the Java implementation
@@ -137,9 +137,14 @@ resolves the schema the document names and picks the type from its own root `!or
 `resolve` and `validateSchema` **both register**, so calling one after the other on the same text
 throws `TsonSchemaValidationException` ("a schema is already registered under …"). Pick one.
 
-`TsonConfig` (what `Tson.builder()` returns) carries: `schemaSource(…)` / `httpSchemas(hosts…)` /
-`fileSchemas(host, dir)`, `bindings(Map<String, Class<?>>)` / `profile(name)` / `dataBindContext(…)`,
-`metaNameBinder(…)`, `identifierPolicy(…)` / `tokenPolicy(…)`, and `lenientBinding()`.
+`TsonConfig` (what `Tson.builder()` returns) carries: `schemaAccess(…)`,
+`bindings(Map<String, Class<?>>)` / `profile(name)` / `dataBindContext(…)`, `metaNameBinder(…)`,
+`processorPolicy(…)` (or its `identifierPolicy(…)` / `tokenPolicy(…)` / `limits(…)` components), and
+`lenientBinding()`.
+
+Where schemas come from is one value, `SchemaAccess` — the source plus the `FetchPolicy` governing it.
+`SchemaAccess.httpSchemas(hosts…)` / `SchemaAccess.fileSchemas(host, dir)` are the one-call forms,
+`SchemaAccess.of(source)` wraps one you built, and `SchemaAccess.builder()` is the general form.
 
 ## Reading into a tree
 
@@ -255,15 +260,19 @@ project shipped exactly that bug.
 
 ## Fetching schemas
 
-Out of the box a `Tson` serves only the three bundled schemas: `TsonSchemaSource.registeredOnly()` is
+Out of the box a `Tson` serves only the three bundled schemas: `SchemaAccess.registeredOnly()` is
 the default, so anything else must be registered first or reachable through a configured source. Two
 fetching sources ship, plus a non-fetching third:
 
-| Source                  | One-call form                    | Configure                                                                                       |
-| ----------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `TsonHttpSchemaSource`  | `.httpSchemas("tson.io", …)`     | `allowHost`, `mapHost`, `maxDocumentBytes`, `timeout`, `maxCachedSchemas`, `requireContentHashPin`, `httpClient` |
-| `TsonFileSchemaSource`  | `.fileSchemas(host, dir)`        | `mapHost(host, dir)`, `maxDocumentBytes`, `maxCachedSchemas`, `requireContentHashPin`           |
-| `TsonSchemaSource.ofMap`| `.schemaSource(ofMap(map))`      | nothing — a lookup over schemas you already hold                                                |
+| Source              | One-call form                                | Configure                                                        |
+| ------------------- | -------------------------------------------- | ---------------------------------------------------------------- |
+| `HttpSchemaSource`  | `SchemaAccess.httpSchemas("tson.io", …)`     | `allowHost`, `mapHost`, `timeout`, `httpClient`                  |
+| `FileSchemaSource`  | `SchemaAccess.fileSchemas(host, dir)`        | `mapHost(host, dir)`                                             |
+| `SchemaSource.ofMap`| `SchemaAccess.of(SchemaSource.ofMap(map))`   | nothing — a lookup over schemas you already hold                 |
+
+The caps and the pin requirement are `FetchPolicy`'s, shared by both fetching sources and stated once:
+`SchemaAccess.builder().fetchPolicy(FetchPolicy.defaults().withRequireContentHashPin(true))…`. A fetch
+`timeout` is `HttpSchemaSource`'s own — a directory has none.
 
 **A schema reference is attacker-controlled** — a data document names its own schema, so on a server
 that string came out of a request body. Both fetching sources **deny by default** and match a host
@@ -271,10 +280,10 @@ exactly: the HTTP one follows no redirects ever and caps against bytes delivered
 checks containment *after* `toRealPath` so `..` and symlink escape fall together. Neither verifies the
 `?sha256=` pin or the fetched `!!id` — the loader does both.
 
-`TsonSchemaSource` is a one-method interface (`String fetch(String uri)`) and **names its own failure
+`SchemaSource` is a one-method interface (`String fetch(String uri)`) and **names its own failure
 exception**: a source says "cannot supply this" with `SchemaFetchException` and nothing else, whose
 `Reason` is `NOT_PERMITTED` / `NOT_FOUND` / `TRANSPORT` / `TIMEOUT` / `TOO_LARGE`. Use
-`TsonSchemaSource.ofMap(map)` rather than `schemas::get` — a `null` carries no `Reason` and is refused
+`SchemaSource.ofMap(map)` rather than `schemas::get` — a `null` carries no `Reason` and is refused
 as a fault.
 
 ## Diagnostics and errors
@@ -426,8 +435,9 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | `!type` on a schemaless read                                    | schemaless reads resolve built-ins only, and report the rest        | `.withSchema(uri)`, or `preservingUnknownTypeRefs()`        |
 | treating `TsonMissing` and `TsonAbsent` as the same             | `TsonAbsent` was written (`_`); `TsonMissing` is a failed lookup    | `isAbsent()` / `isMissing()`, or `missingPath()`            |
 | `asInt()` to assert which host type a read produced             | it converts; `234.56E2` answers too                                 | `as(Integer.class)`                                         |
-| `schemaSource(schemas::get)`                                    | a `null` carries no `Reason`; refused as a fault                    | `TsonSchemaSource.ofMap(schemas)`                           |
-| `httpSchemas()` with no host                                    | deny by default means nothing is permitted                          | name the hosts explicitly                                   |
+| `SchemaAccess.of(schemas::get)`                                 | a `null` carries no `Reason`; refused as a fault                    | `SchemaSource.ofMap(schemas)`                               |
+| `SchemaAccess.httpSchemas()` with no host                       | deny by default means nothing is permitted                          | name the hosts explicitly                                   |
+| a `FetchPolicy` beside `SchemaAccess.of(…)`                     | that source carries its own, set on its own builder; refused        | state it on the builder that makes the source               |
 | a `SCHEMA_*` fetch code read as "invalid document"              | nothing was checked                                                 | route on the code; only `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT` are worth a retry |
 | your own copy of the "not a verdict" code set                   | two consumers drift apart over the same diagnostic                  | ask `Diagnostic.Code.verdict()`                             |
 | `NOT_IMPLEMENTED` read as "invalid document"                    | it is a verdict on this library                                     | treat it as a bug report; the CLI exits 70                  |

@@ -1,5 +1,6 @@
 package io.ltr8.tson.perf;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.TsonDataEmitter;
@@ -89,7 +90,7 @@ class AllocationHarnessTest {
         assumeTrue(AllocationProbe.supported(), "needs HotSpot's per-thread allocation counter");
 
         SchemaSource source = uri -> SCHEMA;
-        tson = Tson.builder().schemaSource(source)
+        tson = Tson.builder().schemaAccess(SchemaAccess.of(source))
                 .bindings(Map.of("order", Order.class, "line", Line.class))
                 .build();
         reader = tson.objectReader();

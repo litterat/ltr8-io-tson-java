@@ -9,7 +9,7 @@ one-paragraph orientation; this file holds the detail.
 The published identities of the three bundled schemas (`META_KERNEL_ID`/`META_ID`/`CORE_ID`) **and** their
 raw source text (`fetch(uri)`), off `tson-schema`'s classpath — the `.tn` resources are copied from
 `spec/m/` at build time (`processResources`), so there's one copy on disk to keep in sync with the spec.
-`fetch` doesn't implement `TsonSchemaSource` (that would need a `tson-compiler` dependency), but a
+`fetch` doesn't implement `SchemaSource` (that would need a `tson-compiler` dependency), but a
 `tson-compiler` caller passes the method reference `TsonBundledSchemas::fetch` directly (it's a functional
 interface of the same shape). Each schema also ships a published content digest
 (`{META_KERNEL,META,CORE}_SHA256`), checked against the packaged resource on load.
@@ -50,7 +50,7 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
 
 `tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each
 as schema or data (`TsonDocumentHeader.peek` — a header carrying `!!meta` is a schema document), exposes the
-schema files through a `TsonSchemaSource`, and validates each data document via `Tson.validate` — the
+schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the
 `!!schema` URI selects the schema, the root type-ref selects the type, no `!!schema` means schemaless.
 **Fully self-describing: no `--type`.**
 

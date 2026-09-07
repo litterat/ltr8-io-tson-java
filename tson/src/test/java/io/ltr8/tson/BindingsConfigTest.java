@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.Profile;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.MissingBindingException;
@@ -64,7 +65,7 @@ class BindingsConfigTest {
     /** The whole configuration, in one call each. The {@code datetime} field also pins that atoms are bound. */
     @Test
     void bindingsIsTheWholeConfiguration() {
-        Tson tson = Tson.builder().schemaSource(SOURCE).bindings(Map.of("order", Order.class)).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SOURCE)).bindings(Map.of("order", Order.class)).build();
 
         Order order = tson.objectReader().read(DOC, Order.class);
 
@@ -76,7 +77,7 @@ class BindingsConfigTest {
     /** A name outside the map is reported against the map, not against whatever was consulted last. */
     @Test
     void anUnmappedNameNamesTheMap() {
-        Tson tson = Tson.builder().schemaSource(uri -> SHORT_SCHEMA.replace("order =>", "invoice =>"))
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> SHORT_SCHEMA.replace("order =>", "invoice =>")))
                 .bindings(Map.of("order", Order.class)).build();
 
         MissingBindingException thrown = assertThrows(MissingBindingException.class,
@@ -92,7 +93,7 @@ class BindingsConfigTest {
     /** {@code profile} reaches the binder, so the shorter constructor is chosen and the schema checked against it. */
     @Test
     void profileReachesTheBinder() {
-        Tson tson = Tson.builder().schemaSource(uri -> SHORT_SCHEMA)
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> SHORT_SCHEMA))
                 .bindings(Map.of("order", Order.class)).profile("orders-1").build();
 
         Order order = tson.objectReader().read("""
@@ -128,7 +129,7 @@ class BindingsConfigTest {
      */
     @Test
     void aMissingBindingIsAMisconfigurationNotAGap() {
-        Tson tson = Tson.builder().schemaSource(uri -> SHORT_SCHEMA).bindings(Map.of()).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> SHORT_SCHEMA)).bindings(Map.of()).build();
 
         MissingBindingException thrown = assertThrows(MissingBindingException.class,
                 () -> tson.objectReader().read("""
@@ -141,7 +142,7 @@ class BindingsConfigTest {
     /** Tree mode binds nothing, so none of this applies to it. */
     @Test
     void treeModeNeedsNoBindingsAtAll() {
-        Tson tson = Tson.builder().schemaSource(SOURCE).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SOURCE)).build();
 
         assertEquals("A", tson.treeReader().read(DOC).get("sku").asString().orElseThrow());
     }

@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -52,7 +53,7 @@ class BrokenSchemaDuringDataValidationTest {
             }
             throw new IllegalStateException("no schema for " + uri);
         };
-        return Tson.builder().schemaSource(source).build();
+        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
     }
 
     /**
@@ -72,7 +73,7 @@ class BrokenSchemaDuringDataValidationTest {
                   second => { q: !int32 ^ { min: 1 } }
                 }
                 """;
-        Tson tson = Tson.builder().schemaSource(uri -> unparseable).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> unparseable)).build();
 
         List<Diagnostic> problems = tson.validate(DATA);
 
@@ -139,10 +140,10 @@ class BrokenSchemaDuringDataValidationTest {
     @Test
     void anUnreachableSchemaIsStillASingleDiagnostic() {
         List<Diagnostic> problems = Tson.builder()
-                .schemaSource(uri -> {
+                .schemaAccess(SchemaAccess.of(uri -> {
                     throw new SchemaFetchException(uri, SchemaFetchException.Reason.TRANSPORT,
                             "nothing here", null);
-                })
+                }))
                 .build()
                 .validate(DATA);
 
@@ -160,9 +161,9 @@ class BrokenSchemaDuringDataValidationTest {
     @Test
     void aSourceFailingAnyOtherWayIsAFaultAndNotAVerdict() {
         IllegalStateException fault = new IllegalStateException("the cache is in an impossible state");
-        Tson tson = Tson.builder().schemaSource(uri -> {
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> {
             throw fault;
-        }).build();
+        })).build();
 
         assertSame(fault, assertThrows(IllegalStateException.class, () -> tson.validate(DATA)));
     }

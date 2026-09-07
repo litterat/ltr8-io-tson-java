@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.TsonObjectDocument;
@@ -45,7 +46,7 @@ class TsonObjectDocumentRoundTripTest {
 
     private static Tson tson() {
         SchemaSource source = uri -> SCHEMA;
-        Tson tson = Tson.builder().schemaSource(source).bindings(Map.of("order", Order.class)).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source)).bindings(Map.of("order", Order.class)).build();
         tson.resolve(SCHEMA);
         return tson;
     }

@@ -11,7 +11,7 @@ consumer read front doors, named for what a consumer holds, matching Jackson's `
 Each is **dual-mode, fixed at construction**: built standalone (`new TsonObjectReader(ctx)` / `new
 TsonTreeReader()`) it's **schemaless** (Class 1 — the target class, or the wire, is the whole contract;
 any `!!schema` the document declares is ignored, Jackson-style); obtained from a `Tson` facade
-(`objectReader()`/`treeReader()`, carrying a configured `TsonSchemaSource`) it's **schema-aware** — a
+(`objectReader()`/`treeReader()`, carrying a configured `SchemaSource`) it's **schema-aware** — a
 self-describing document is validated against its declared `!!schema` as it's read (the schema resolves
 through the source, the root type-ref selects the type), else read schemalessly. `readWithoutSchema(...)`
 forces the schemaless path on a schema-aware reader.
@@ -418,13 +418,16 @@ tson.resolve(schemaText);                      // registers the schema by its ow
 TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
 ```
 
-- **Two schema sources ship, and `TsonConfig` carries the short form of each.** `TsonHttpSchemaSource`
-  fetches over HTTPS under a host allow-list; `TsonFileSchemaSource` reads from a directory. `httpSchemas(…)`
-  and `fileSchemas(host, dir)` are the one-call forms, repeatable and accumulating into one source;
-  `schemaSource(…)` stays the general seam and the three are mutually exclusive, on the precedent
-  `bindings`/`dataBindContext` already set — each builds one source, so mixing them would drop one rather
-  than compose it. A deployment needing both writes the composition itself, where the order it tries them in
-  is stated rather than assumed.
+- **Two schema sources ship, and `SchemaAccess` carries the short form of each.** `HttpSchemaSource`
+  fetches over HTTPS under a host allow-list; `FileSchemaSource` reads from a directory.
+  `SchemaAccess.httpSchemas(…)` and `SchemaAccess.fileSchemas(host, dir)` are the one-call forms, with
+  `SchemaAccess.builder()`'s repeatable counterparts accumulating into one source; `SchemaAccess.of(source)`
+  stays the general seam and the three are mutually exclusive, on the precedent `bindings`/`dataBindContext`
+  already set — each builds one source, so mixing them would drop one rather than compose it. A deployment
+  needing both writes the composition itself, where the order it tries them in is stated rather than
+  assumed. **`TsonConfig` carries none of that vocabulary**: it has one setter, `schemaAccess`, so the four
+  ways of naming a source are learnt once and the exclusion rules among them are stated once — a second copy
+  at the front door would be a second surface to keep in step.
   - **Identity is not location, and that is what makes two sources one design** ([TSON-DATA] §2.2.1). A
     reference's identity is its lowercase host plus path — the scheme "a transport hint, not part of the
     name", no port, no userinfo, no fragment — so `https://schemas.example.com/order-1.tn` may legitimately
@@ -438,8 +441,34 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
     `Content-Length`; the file one is an arbitrary-read risk, so containment is checked **after**
     `toRealPath`, which settles `..` and symlink escape together — checking the unresolved path is the usual
     way that control is defeated.
+  - **And the pair is one value, `SchemaAccess`** (`base.source`): the source plus the `FetchPolicy`
+    governing it, answering "where may this deployment obtain a schema, and under what constraints". The two
+    facts always travel together and are meaningless apart — a source with no policy has unstated bounds, a
+    policy with no source governs nothing — so handing them separately makes every caller reassemble the
+    pair, and one that reassembles it wrongly is a deployment whose bounds silently do not apply.
+    `TsonConfig.schemaAccess` takes one; `schemaSource`/`httpSchemas`/`fileSchemas`/`fetchPolicy` are the
+    short forms that assemble one, and naming both is refused. The mutual-exclusion rules *among* the four
+    live on `SchemaAccess.Builder` rather than on `TsonConfig`, so they are stated where the access is built
+    instead of once per front door — which is what the JSON encoding's schema-directed decode needs, it
+    being the next caller and one that would otherwise grow its own copy of the host list and the caps.
+    **The name is not `SchemaLibrary`**: [TSON-SCHEMA] §10's library is the *store* mapping identities to
+    content, which here is `TsonSchemaRegistry`, and fetching is "a permitted but opt-in way to populate" it
+    — this is that opt-in, not the store.
+  - **What they will admit and spend is one value, `FetchPolicy`** (`base.policy`, beside `ProcessorPolicy`):
+    how large a document may be, how many may be cached, and whether a reference must carry a `?sha256=`
+    pin. The three are the same question whichever source answers it, and holding them as loose fields per
+    source is two places for a default or a bounds check to drift. `fetchPolicy(...)` is the setter to reach
+    for on either builder and on `TsonConfig`, with the three component setters folding into it — the shape
+    `TsonConfig.processorPolicy` takes, so the library has one convention for stating a policy. A `timeout`
+    is deliberately **not** a component: a directory has none, and a component one implementation silently
+    ignores is what makes a shared policy value untrustworthy. Nor is the host map, which is where *this*
+    deployment can reach rather than what any deployment will admit, and is differently typed on each source.
+    It is `ProcessorPolicy`'s **sibling rather than its component** for the same reason it is not the host
+    map's peer: a `ProcessorPolicy` is threaded into every reader and every stream, none of which fetch, so a
+    fetch bound riding the read path would be carried everywhere and used nowhere. Stated in one breath,
+    consumed by two subsystems, so two values.
   - **`SchemaFetchException` is the contract, and it lives in `tson-base`** — with the interface that names
-    it (`TsonSchemaSource`) in `tson-compiler` rather than beside the two sources that throw it, since
+    it (`SchemaSource`) in `tson-compiler` rather than beside the two sources that throw it, since
     `SchemaFailure` has to route on it and cannot see a type declared in `tson`. The exception itself sits
     lower still, because a schema is obtained the same way whichever encoding named it: its `Reason` is what
     `Diagnostic.Code.of` maps to the five `SCHEMA_*` codes, and that mapping is one answer for every
@@ -456,7 +485,7 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
     deployment's bug, not a verdict on the document that happened to name the schema, so `SchemaFailure`'s
     default rethrows it. Treating `null` as a miss instead would make the wrong spelling work and hide every
     later one.
-  - **`TsonSchemaSource.ofMap` is the third shipped source, and exists because the trap above has one
+  - **`SchemaSource.ofMap` is the third shipped source, and exists because the trap above has one
     author.** `schemaSource(schemas::get)` is the natural first implementation — it compiles, serves every
     identity in the map, and returns `null` for the rest, which the document chooses. `ofMap` is that lookup
     done to contract: a miss is `NOT_FOUND` (this source had somewhere to look, where `registeredOnly`'s
@@ -467,7 +496,8 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
     is copied.
   - **Neither verifies the `?sha256=` pin or the fetched document's `!!id`** — the loader does both, after a
     source returns, and a second implementation would only drift from it. What the loader cannot express is
-    *requiring* a pin, since it verifies only one that is present; `requireContentHashPin` is that.
+    *requiring* a pin, since it verifies only one that is present; `FetchPolicy.requireContentHashPin` is
+    that.
   - **Caching is by canonical identity and never re-checked**, which rests on §10's immutability rule rather
     than on the transport: a file edited in place is not seen, and under §10 editing it was the mistake. A
     cached entry survives its file being removed, which is why the file source's policy check touches no

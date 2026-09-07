@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -41,14 +42,14 @@ class IdentifierPolicyConfigTest {
     private static void accepts(UnicodePolicy policy, String schema) {
         SchemaSource source = uri -> schema;
         Tson tson = (policy == null ? Tson.builder() : Tson.builder().identifierPolicy(policy))
-                .schemaSource(source).build();
+                .schemaAccess(SchemaAccess.of(source)).build();
         assertNotNull(tson.resolve(schema));
     }
 
     private static String refuses(UnicodePolicy policy, String schema) {
         SchemaSource source = uri -> schema;
         Tson tson = (policy == null ? Tson.builder() : Tson.builder().identifierPolicy(policy))
-                .schemaSource(source).build();
+                .schemaAccess(SchemaAccess.of(source)).build();
         return assertThrows(SchemaValidationException.class, () -> tson.resolve(schema)).getMessage();
     }
 
