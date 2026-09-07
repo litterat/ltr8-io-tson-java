@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.tree.TsonValue;
@@ -115,7 +115,7 @@ class TsonCompiledSchemaRegistryTest {
         TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core());
         TsonTreeReader reader = new TsonTreeReader(tree);
 
-        assertSame(tree, reader.withDiagnostics(TsonDiagnosticsReceiver.collecting()).compiledSchemas());
+        assertSame(tree, reader.withDiagnostics(DiagnosticsReceiver.collecting()).compiledSchemas());
         assertSame(tree, reader.withSchema(SCHEMA_ID).compiledSchemas());
         assertSame(tree, reader.preservingUnknownTypeRefs().compiledSchemas());
     }

@@ -23,7 +23,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
  * <p><b>This is {@link ErrorReader}'s own neighbour's rule, applied here too.</b> A schema that fails to
  * compile during a read already arrives as a {@code NOT_IMPLEMENTED} diagnostic ({@code SchemaFailure}),
  * so a gap found one layer further in was the only one still travelling by channel. In fail-fast mode
- * nothing is lost: {@code report} raises {@code TsonReadException}, which carries this same {@link
+ * nothing is lost: {@code report} raises {@code ReadException}, which carries this same {@link
  * Diagnostic} and its code, so a caller that needs the distinction asks {@code
  * e.diagnostic().code()} rather than matching on an exception type.
  *

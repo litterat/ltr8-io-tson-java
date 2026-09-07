@@ -1,7 +1,7 @@
 package io.ltr8.tson.json.stream;
 
-import io.ltr8.tson.base.TsonLimitExceededException;
-import io.ltr8.tson.base.TsonLimitsPolicy;
+import io.ltr8.tson.base.LimitExceededException;
+import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.json.JsonParseException;
 import io.ltr8.tson.json.JsonPosition;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -227,14 +227,14 @@ class JsonStreamTest {
             // §10.1 makes JSON's bound [TSON-DATA] §9.1's policy "in JSON clothing, and the same policy
             // applies with the same defaults" -- so this stream counts against the one default, and a
             // deployment that raises it raises it for both encodings at once.
-            assertEquals(64, TsonLimitsPolicy.DEFAULT_MAX_DEPTH);
-            assertEquals(64 * 2 + 2, events(nested(TsonLimitsPolicy.DEFAULT_MAX_DEPTH)).size());
+            assertEquals(64, LimitsPolicy.DEFAULT_MAX_DEPTH);
+            assertEquals(64 * 2 + 2, events(nested(LimitsPolicy.DEFAULT_MAX_DEPTH)).size());
         }
 
         @Test
         void a_document_at_the_bound_reads_and_one_past_it_is_refused() {
             assertEquals(64 * 2 + 2, events(nested(64)).size());
-            TsonLimitExceededException e = assertThrows(TsonLimitExceededException.class,
+            LimitExceededException e = assertThrows(LimitExceededException.class,
                     () -> events(nested(65)));
             assertEquals(64, e.limit());
             assertTrue(e.getMessage().contains("nests deeper than this processor reads"));
@@ -247,7 +247,7 @@ class JsonStreamTest {
             // failure. Written reflectively because javac refuses the `instanceof`: both are final and
             // unrelated, so the separation is proved at compile time and this only pins it against a
             // later edit that makes one extend the other.
-            TsonLimitExceededException e = assertThrows(TsonLimitExceededException.class,
+            LimitExceededException e = assertThrows(LimitExceededException.class,
                     () -> events(nested(65)));
             assertFalse(JsonParseException.class.isAssignableFrom(e.getClass()));
         }
@@ -257,7 +257,7 @@ class JsonStreamTest {
             JsonStream stream = new JsonStream("[[[1]]]", 2);
             assertInstanceOf(JsonEvent.ArrayStart.class, stream.next());
             assertInstanceOf(JsonEvent.ArrayStart.class, stream.next());
-            TsonLimitExceededException e = assertThrows(TsonLimitExceededException.class, stream::next);
+            LimitExceededException e = assertThrows(LimitExceededException.class, stream::next);
             assertEquals(new JsonPosition(1, 3, 2), e.position());
         }
 
@@ -265,7 +265,7 @@ class JsonStreamTest {
         void the_bound_is_configurable_and_objects_count_the_same_as_arrays() {
             assertEquals(List.of("{", "name(a)", "{", "name(b)", "number(1)", "}", "}", "end"),
                     events("{\"a\": {\"b\": 1}}"));
-            assertThrows(TsonLimitExceededException.class,
+            assertThrows(LimitExceededException.class,
                     () -> new JsonStream("{\"a\": {\"b\": 1}}", 1).forEachRemaining(e -> { }));
         }
 

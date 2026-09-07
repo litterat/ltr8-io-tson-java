@@ -1,11 +1,11 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 
 /**
  * A failure while writing to TSON text -- from {@link TsonObjectWriter} (a Java object graph) or {@link
  * TsonTreeWriter} (a {@code TsonValue} tree) -- e.g. a value whose type the writer has no way to emit, or a
- * bridge that fails to unwrap it. The unchecked counterpart to {@link TsonReadException} on the read side, so
+ * bridge that fails to unwrap it. The unchecked counterpart to {@link ReadException} on the read side, so
  * the whole read/write stack throws only unchecked exceptions; the underlying {@code tson-bind} {@code
  * DataBindException} is preserved as the cause.
  */

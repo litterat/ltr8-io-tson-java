@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.tree.TsonValue;
@@ -140,8 +140,8 @@ class AbsenceHasOneSpellingTest {
      */
     @Test
     void underASchemaNullAtAVoidPositionIsAnError() {
-        TsonReadException thrown =
-                assertThrows(TsonReadException.class, () -> readPerson("deleted: null"));
+        ReadException thrown =
+                assertThrows(ReadException.class, () -> readPerson("deleted: null"));
 
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, thrown.diagnostic().code());
     }
@@ -149,7 +149,7 @@ class AbsenceHasOneSpellingTest {
     /** And absence is still absence -- a REQUIRED field written {@code _} fails as it always did. */
     @Test
     void underASchemaTheSentinelAtARequiredPositionStillFails() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tson().treeReader().read("""
+        ReadException thrown = assertThrows(ReadException.class, () -> tson().treeReader().read("""
                 !!schema:"https://example.test/person-1.tn"
                 !person { name: _  nickname: "Countess" }"""));
 

@@ -1,11 +1,7 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.TsonProcessorPolicy;
-import io.ltr8.tson.base.TsonUnicodePolicy;
-import io.ltr8.tson.base.TsonLimitsPolicy;
-import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.*;
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -88,13 +84,13 @@ public final class Tson {
 
     /** UTS #39 §5.2 over every token a read off this instance pulls -- the token-surface half of the
      * two policies, where {@code core.identifierPolicy()} is the declared-name half. */
-    private final TsonUnicodePolicy tokenPolicy;
+    private final UnicodePolicy tokenPolicy;
 
     /** [TSON-DATA] §9.1's bounds every read off this instance applies -- {@link TsonConfig#limits}. */
-    private final TsonLimitsPolicy limits;
+    private final LimitsPolicy limits;
 
     Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext, boolean strictBinding,
-         TsonUnicodePolicy tokenPolicy, TsonLimitsPolicy limits) {
+         UnicodePolicy tokenPolicy, LimitsPolicy limits) {
         this.tokenPolicy = tokenPolicy;
         this.limits = limits;
         this.core = core;
@@ -161,8 +157,8 @@ public final class Tson {
      * than after being refused. A reader derived with {@link TsonTreeReader#withIdentifierPolicy} answers for
      * itself ({@link TsonTreeReader#processorPolicy()}).
      */
-    public TsonProcessorPolicy processorPolicy() {
-        return TsonProcessorPolicy.of(core.identifierPolicy(), tokenPolicy, limits);
+    public ProcessorPolicy processorPolicy() {
+        return ProcessorPolicy.of(core.identifierPolicy(), tokenPolicy, limits);
     }
 
     /**
@@ -175,7 +171,7 @@ public final class Tson {
      * deployment states one policy -- and it stays a component, independent of the two beside it: changing
      * a limit says nothing about what this processor admits as a name.
      */
-    public TsonLimitsPolicy limitsPolicy() {
+    public LimitsPolicy limitsPolicy() {
         return limits;
     }
 
@@ -242,7 +238,7 @@ public final class Tson {
      * stream. {@code data} is read incrementally and is not closed here.
      */
     public List<Diagnostic> validate(InputStream data) {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         // No catch: a collecting read reports a base-syntax failure through the receiver like every other
         // problem, so it arrives in `problems` in the order it was found, after whatever the read had already
         // reported. A fault in this library still throws itself out of here, which is the intended difference.
@@ -273,7 +269,7 @@ public final class Tson {
      * to trip over.
      */
     public List<Diagnostic> validateSchema(String schemaText) {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         try {
             TsonSchemaParser parser = new TsonSchemaParser(schemaText);
             Optional<SchemaDocument> parsed = parser.parseSchemaDocument(problems);

@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -69,9 +69,9 @@ class RecordBindReaderTest {
     void anUntaggedLabelledChoiceStillObeysItsGroupRule() {
         TsonCompiledSchema compiled = compiled();
 
-        assertThrows(TsonReadException.class,
+        assertThrows(ReadException.class,
                 () -> compiled.get("type_argument").read(TestDocuments.document("{}")));
-        assertThrows(TsonReadException.class, () -> compiled.get("type_argument")
+        assertThrows(ReadException.class, () -> compiled.get("type_argument")
                 .read(TestDocuments.document("{ name: text  value: 3 }")));
     }
 
@@ -158,7 +158,7 @@ class RecordBindReaderTest {
                 compiled.get("text_type").read(TestDocuments.document("{}")));
         assertEquals(Optional.of(3), omitted.minLength());
         // and contradicting it is still caught
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> compiled.get("text_type").read(TestDocuments.document("{ min_length: 4 }")));
         assertTrue(thrown.getMessage().contains("cannot be given another value"), thrown.getMessage());
     }
@@ -257,6 +257,6 @@ class RecordBindReaderTest {
         // of its own -- fails, since there's no Java object "just a top" could construct.
         TsonCompiledSchema compiled = compiled();
 
-        assertThrows(TsonReadException.class, () -> compiled.get("top").read(TestDocuments.document("{}")));
+        assertThrows(ReadException.class, () -> compiled.get("top").read(TestDocuments.document("{}")));
     }
 }

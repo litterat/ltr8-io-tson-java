@@ -1,6 +1,7 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.json.reader.DataClassObjectReader;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
@@ -135,7 +136,7 @@ public final class JsonObjectReader {
         return read(new JsonStream(source), type);
     }
 
-    /** {@link #read(InputStream, Class)} under a nesting bound other than {@link io.ltr8.tson.base.TsonLimitsPolicy#DEFAULT_MAX_DEPTH the processor's default}. */
+    /** {@link #read(InputStream, Class)} under a nesting bound other than {@link LimitsPolicy#DEFAULT_MAX_DEPTH the processor's default}. */
     public <T> T read(InputStream source, Class<T> type, int maxDepth) {
         return read(new JsonStream(source, maxDepth), type);
     }

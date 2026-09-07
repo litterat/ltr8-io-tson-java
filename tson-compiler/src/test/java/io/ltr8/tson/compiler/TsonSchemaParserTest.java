@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
@@ -11,7 +11,6 @@ import io.ltr8.tson.compiler.ast.schema.ConstructionDef;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
 import io.ltr8.tson.compiler.ast.schema.GenericRef;
 import io.ltr8.tson.compiler.ast.schema.GroupDef;
-import io.ltr8.tson.compiler.ast.schema.ElementType;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.MapRef;
 import io.ltr8.tson.compiler.ast.schema.RecordDef;
@@ -870,7 +869,7 @@ class TsonSchemaParserTest {
     // ── Declaration-level recovery (#29) ─────────────────────────────────
 
     private static List<Diagnostic> parseCollecting(String source) {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         new TsonSchemaParser(source).parseSchemaDocument(problems);
         return problems.diagnostics();
     }
@@ -893,7 +892,7 @@ class TsonSchemaParserTest {
 
     @Test
     void aParseThatReportedAnythingHandsBackNoDocumentEvenThoughSomeDeclarationsParsed() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         TsonSchemaParser parser = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 {
@@ -907,7 +906,7 @@ class TsonSchemaParserTest {
 
     @Test
     void aCleanParseThroughTheRecoveringEntryPointHandsBackTheDocument() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         TsonSchemaParser parser = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { sound => { y: text } }
@@ -919,7 +918,7 @@ class TsonSchemaParserTest {
 
     @Test
     void everyDeclarationFailingLeavesNoSchemaMapToBuildRatherThanAnEmptyOne() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         TsonSchemaParser parser = new TsonSchemaParser("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 {
@@ -988,7 +987,7 @@ class TsonSchemaParserTest {
 
     @Test
     void aMalformedHeaderStillThrowsBecauseThereIsNothingToResynchroniseOn() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         assertThrows(TsonParseException.class,
                 () -> new TsonSchemaParser("{ a => text }").parseSchemaDocument(problems));
     }

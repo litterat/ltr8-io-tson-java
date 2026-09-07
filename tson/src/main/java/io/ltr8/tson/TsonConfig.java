@@ -3,10 +3,10 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.base.TsonLimitsPolicy;
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 
@@ -34,11 +34,11 @@ public final class TsonConfig {
     private DataBindContext dataBindContext = TsonAtomContext.defaultContext();
     private TsonSchemaSource schemaSource = TsonSchemaSource.registeredOnly();
     private DataNameBinder metaNameBinder;
-    private TsonUnicodePolicy identifierPolicy = TsonUnicodePolicy.highlyRestrictive();
+    private UnicodePolicy identifierPolicy = UnicodePolicy.highlyRestrictive();
 
-    private TsonUnicodePolicy tokenPolicy = TsonUnicodePolicy.unrestricted();
+    private UnicodePolicy tokenPolicy = UnicodePolicy.unrestricted();
 
-    private TsonLimitsPolicy limits = TsonLimitsPolicy.defaults();
+    private LimitsPolicy limits = LimitsPolicy.defaults();
     private boolean strictBinding = true;
     private Map<String, Class<?>> bindings;
     private String profile;
@@ -231,7 +231,7 @@ public final class TsonConfig {
      * names, parameter names and enum members -- [TSON-DATA] §8.2's restricted-script rule, over the schema-layer
      * scopes [TSON-SCHEMA] §11.4 names.
      *
-     * <p>The default is {@link TsonUnicodePolicy#highlyRestrictive()} over a whole name: the strictest of §5.2's
+     * <p>The default is {@link UnicodePolicy#highlyRestrictive()} over a whole name: the strictest of §5.2's
      * practically deployable levels, and one it <em>names</em>, so the default is a position two
      * implementations agree on without reading this project's documents. It refuses a name that mixes
      * scripts, which is how a homograph reads as another name.
@@ -245,8 +245,8 @@ public final class TsonConfig {
      * the relaxation to try first. Narrower still is {@code permitting(LATIN, CYRILLIC)}, for a deployment
      * that knows exactly which combination it means.
      *
-     * <p>The two ways of switching it off are deliberately distinct: {@link TsonUnicodePolicy#scriptsUnchecked()}
-     * drops the script rule and keeps the identifier profile, while {@link TsonUnicodePolicy#unrestricted()}
+     * <p>The two ways of switching it off are deliberately distinct: {@link UnicodePolicy#scriptsUnchecked()}
+     * drops the script rule and keeps the identifier profile, while {@link UnicodePolicy#unrestricted()}
      * drops that too — §5.2's own level 6, which takes {@code Identifier_Status} with it and which §5.2
      * describes as a diagnostic tool.
      *
@@ -256,7 +256,7 @@ public final class TsonConfig {
      * so a library embedding this one could not hold its own. A method call is greppable, diffable and
      * scoped to the instance that holds it.
      */
-    public TsonConfig identifierPolicy(TsonUnicodePolicy policy) {
+    public TsonConfig identifierPolicy(UnicodePolicy policy) {
         this.identifierPolicy = Objects.requireNonNull(policy, "policy");
         return this;
     }
@@ -264,7 +264,7 @@ public final class TsonConfig {
     /**
      * UTS #39 §5.2 over <b>every token a read pulls off the stream</b>, values included
      * ([TSON-DATA] §8.2's "Values") -- {@link #identifierPolicy}'s peer on the other surface.
-     * Defaults to {@link TsonUnicodePolicy#unrestricted()}, which checks nothing.
+     * Defaults to {@link UnicodePolicy#unrestricted()}, which checks nothing.
      *
      * <p><b>The default is the opposite of the identifier default, for the same reason in each case.</b> A
      * declared name is an interface and a homograph in one is an attack, so names default to Highly
@@ -288,14 +288,14 @@ public final class TsonConfig {
      * compared at all. The per-string rule is what remains, which is the same reason it is right for a
      * browser judging a domain name.
      *
-     * <p>{@link TsonUnicodePolicy.Level#MINIMALLY_RESTRICTIVE} and {@link TsonUnicodePolicy.Level#UNRESTRICTED}
+     * <p>{@link UnicodePolicy.Level#MINIMALLY_RESTRICTIVE} and {@link UnicodePolicy.Level#UNRESTRICTED}
      * collapse here: §5.2 says so directly, a token that is not a name having no identifier profile to drop.
      *
      * @throws IllegalArgumentException if {@code policy} is per-segment -- {@code _} and {@code -} are word
      *         separators by convention in a name and ordinary characters in a value, so segmenting one admits
      *         UTS #39's own {@code Toys-Я-Us}, the spoof a strict token policy exists to refuse
      */
-    public TsonConfig tokenPolicy(TsonUnicodePolicy policy) {
+    public TsonConfig tokenPolicy(UnicodePolicy policy) {
         Objects.requireNonNull(policy, "policy");
         if (policy.isPerSegment()) {
             throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
@@ -307,19 +307,19 @@ public final class TsonConfig {
 
     /**
      * The [TSON-DATA] §9.1 resource limits every read off this instance applies -- {@link
-     * TsonLimitsPolicy#defaults()} unless this says otherwise.
+     * LimitsPolicy#defaults()} unless this says otherwise.
      *
      * <p><b>In code, for {@link #identifierPolicy}'s reason.</b> §9.1 requires the bounds be configurable;
      * taking them from the ambient environment instead would let a deployment's behaviour change without any
      * statement of it in the deployment, which is the property that makes a refusal explainable. A caller
      * that raises the depth is choosing to spend more Java stack on one document, and {@link
-     * TsonLimitsPolicy#withMaxDepth} says what the ceiling on that choice actually is.
+     * LimitsPolicy#withMaxDepth} says what the ceiling on that choice actually is.
      *
      * <p>Reported back by {@link Tson#limitsPolicy()} and by each reader ({@link
      * io.ltr8.tson.compiler.TsonTreeReader#limitsPolicy()}), which is where a derived reader's own {@code
      * withLimits} shows.
      */
-    public TsonConfig limits(TsonLimitsPolicy limits) {
+    public TsonConfig limits(LimitsPolicy limits) {
         this.limits = Objects.requireNonNull(limits, "limits");
         return this;
     }

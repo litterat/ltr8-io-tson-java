@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
@@ -62,7 +63,7 @@ public final class Json {
         return parse(new JsonStream(source));
     }
 
-    /** {@link #parse(InputStream)} under a nesting bound other than {@link io.ltr8.tson.base.TsonLimitsPolicy#DEFAULT_MAX_DEPTH the processor's default}. */
+    /** {@link #parse(InputStream)} under a nesting bound other than {@link LimitsPolicy#DEFAULT_MAX_DEPTH the processor's default}. */
     public static JsonValue parse(InputStream source, int maxDepth) {
         return parse(new JsonStream(source, maxDepth));
     }

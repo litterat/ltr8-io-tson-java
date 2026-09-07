@@ -2,7 +2,7 @@ package io.ltr8.tson.base;
 
 
 /**
- * A document asked for more than this processor's {@link TsonLimitsPolicy} will spend -- [TSON-DATA] §9.1.
+ * A document asked for more than this processor's {@link LimitsPolicy} will spend -- [TSON-DATA] §9.1.
  *
  * <p><b>Not a parse error, and deliberately not a subclass of one.</b> {@code TsonParseException} says the
  * document is malformed, which is a verdict every processor reaching the same bytes would repeat; this says
@@ -15,14 +15,14 @@ package io.ltr8.tson.base;
  * <p><b>{@link #getMessage()} states what went wrong, never where</b> -- the same division {@code TsonParseException} makes, for the same reason: the location is {@link #position()}, and a message
  * repeating it makes every renderer print it twice.
  */
-public final class TsonLimitExceededException extends RuntimeException {
+public final class LimitExceededException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
     private final transient SourcePosition position;
     private final int limit;
 
-    public TsonLimitExceededException(String message, int limit, SourcePosition position) {
+    public LimitExceededException(String message, int limit, SourcePosition position) {
         super(message);
         this.limit = limit;
         this.position = position;

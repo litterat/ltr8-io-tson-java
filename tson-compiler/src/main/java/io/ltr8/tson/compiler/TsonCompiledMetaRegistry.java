@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
@@ -98,7 +98,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * this project's own documents. A deployment that finds it too strict reaches for the *unit* before the
      * level: {@code perSegment()} still refuses every within-word homograph.
      */
-    private TsonUnicodePolicy identifierPolicy = TsonUnicodePolicy.highlyRestrictive();
+    private UnicodePolicy identifierPolicy = UnicodePolicy.highlyRestrictive();
 
     /**
      * The identities this thread is part-way through resolving, outermost first -- [TSON-DATA] §2.2.3's
@@ -185,12 +185,12 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * it itself, e.g. a test bootstrapping in isolation).
      */
     public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source) {
-        return withStandardLibrary(context, source, TsonUnicodePolicy.highlyRestrictive());
+        return withStandardLibrary(context, source, UnicodePolicy.highlyRestrictive());
     }
 
     /** The same, with {@link #identifierPolicy} chosen rather than defaulted. */
     public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source,
-                                                               TsonUnicodePolicy identifierPolicy) {
+                                                               UnicodePolicy identifierPolicy) {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
         registry.identifierPolicy = identifierPolicy;
         registry.loadStandardLibrary();
@@ -198,7 +198,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     }
 
     /** The restriction level this registry applies to declared names -- see {@link #identifierPolicy}. */
-    public TsonUnicodePolicy identifierPolicy() {
+    public UnicodePolicy identifierPolicy() {
         return identifierPolicy;
     }
 
@@ -315,12 +315,12 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * the diagnostics that say why. A caller passing {@code null} for {@code receiver} gets the fail-fast
      * behaviour of the other overload, which never returns {@code null}.
      */
-    public TsonLinkedSchema resolveLinked(String uri, TsonDiagnosticsReceiver receiver) {
+    public TsonLinkedSchema resolveLinked(String uri, DiagnosticsReceiver receiver) {
         return resolveLinked(uri, TsonCanonicalIdentity.canonicalize(uri), receiver);
     }
 
     /**
-     * {@link #resolveLinked(String, TsonDiagnosticsReceiver)} for a caller that has already canonicalized
+     * {@link #resolveLinked(String, DiagnosticsReceiver)} for a caller that has already canonicalized
      * {@code uri} -- {@code identity} must be exactly what {@code canonicalize(uri)} returns.
      *
      * <p>Canonicalizing is a {@code new URI(...)} parse, and a read reaches this three times for one
@@ -328,7 +328,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * canonicalization at the top of a read now serves all three. Not a shortcut past anything else: the
      * resolution and the {@code ?sha256=} pin verification below run exactly as they did.
      */
-    public TsonLinkedSchema resolveLinked(String uri, String identity, TsonDiagnosticsReceiver receiver) {
+    public TsonLinkedSchema resolveLinked(String uri, String identity, DiagnosticsReceiver receiver) {
         Optional<TsonLinkedSchema> cached = schemaRegistry.getByCanonicalIdentity(identity);
         if (cached.isPresent()) {
             verifyPin(uri, identity);
@@ -352,7 +352,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * links is the edge to break.
      *
      * <p>An author error, not a library gap: the verdict does not change when this library improves. It
-     * throws even where a {@link TsonDiagnosticsReceiver} is in play, on the same footing as an
+     * throws even where a {@link DiagnosticsReceiver} is in play, on the same footing as an
      * {@code !!import} that will not load or an ineligible {@code !!meta} -- what fails is the namespace
      * itself, and carrying on would report every reference into the unresolvable half as a second problem.
      */
@@ -403,8 +403,8 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
         return sourceText;
     }
 
-    /** {@link #resolveLinked(String, TsonDiagnosticsReceiver)}'s body, with the cycle guard already held. */
-    private TsonLinkedSchema resolveUncached(String uri, String identity, TsonDiagnosticsReceiver receiver) {
+    /** {@link #resolveLinked(String, DiagnosticsReceiver)}'s body, with the cycle guard already held. */
+    private TsonLinkedSchema resolveUncached(String uri, String identity, DiagnosticsReceiver receiver) {
         String sourceText = fetch(uri);
         // Record this identity's content hash (first resolution) and verify this reference's pin against
         // it -- §2.2.1's MUST-verify rule. A transitive pinned !!import/!!meta is verified likewise when
@@ -418,7 +418,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
             return schemaRegistry.registerIfAbsent(
                     TsonSchemaLinker.link(resolved, schemaRegistry, identifierPolicy));
         }
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         Optional<SchemaDocument> parsed = parser.parseSchemaDocument(problems);
         if (parsed.isEmpty()) {
             problems.diagnostics().forEach(receiver::report);

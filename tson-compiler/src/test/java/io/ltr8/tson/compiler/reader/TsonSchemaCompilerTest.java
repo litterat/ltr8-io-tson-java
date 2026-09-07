@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -57,7 +57,7 @@ class TsonSchemaCompilerTest {
 
         // Reached compilation successfully; reading an empty record against a REQUIRED field then
         // fails for the ordinary reason (missing field), not a reader failure.
-        assertThrows(TsonReadException.class, () -> compiled.get("A").read(TestDocuments.document("{}")));
+        assertThrows(ReadException.class, () -> compiled.get("A").read(TestDocuments.document("{}")));
     }
 
     @Test
@@ -70,7 +70,7 @@ class TsonSchemaCompilerTest {
 
         TsonCompiledSchema compiled = compile(linkedSchema);
 
-        assertThrows(TsonReadException.class, () -> compiled.get("Node").read(TestDocuments.document("{}")));
+        assertThrows(ReadException.class, () -> compiled.get("Node").read(TestDocuments.document("{}")));
     }
 
     @Test
@@ -98,8 +98,8 @@ class TsonSchemaCompilerTest {
         // Fail-fast, so the report raises: the gap is in `diagnostic().code()`, never in the exception type,
         // which is the same rule the schema pipeline follows (`Diagnostic.Code.NOT_IMPLEMENTED`).
         TsonTypeReader<?> orphan = compiled.get("orphan");
-        TsonReadException thrown =
-                assertThrows(TsonReadException.class, () -> orphan.read(TestDocuments.document("{}")));
+        ReadException thrown =
+                assertThrows(ReadException.class, () -> orphan.read(TestDocuments.document("{}")));
         assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, thrown.diagnostic().code());
         assertTrue(thrown.getMessage().contains("orphan"), thrown.getMessage());
     }

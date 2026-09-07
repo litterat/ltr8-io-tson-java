@@ -1,14 +1,13 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.compiler.TsonBindMismatchException;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.SchemaPositions;
@@ -27,7 +26,6 @@ import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
 
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -167,7 +165,7 @@ public final class SchemaResolver {
      * contains placeholder entries and must not be linked, registered or compiled -- the caller checks the
      * receiver and stops, which is the phase boundary javac and Swift both draw (javac attributes every entry
      * before {@code shouldStopPolicyIfError} blocks the next phase; Swift never reaches SILGen after a Sema
-     * error). {@link TsonDiagnosticsReceiver#throwing()}, the default the other overloads pass, makes the
+     * error). {@link DiagnosticsReceiver#throwing()}, the default the other overloads pass, makes the
      * first failure an exception again and so keeps that impossible by construction.
      *
      * <p>Only a {@link TsonSchemaValidationException} -- the schema is wrong -- becomes a diagnostic. An
@@ -175,8 +173,8 @@ public final class SchemaResolver {
      * propagating: a gap is not a verdict on the author's schema, and reporting it as one sends them looking
      * for a fix that doesn't exist.
      *
-     * <p><b>The fail-fast overloads do not route through {@link TsonDiagnosticsReceiver#throwing()}</b>, which
-     * would raise {@code TsonReadException} and so quietly change the exception type every existing caller
+     * <p><b>The fail-fast overloads do not route through {@link DiagnosticsReceiver#throwing()}</b>, which
+     * would raise {@code ReadException} and so quietly change the exception type every existing caller
      * sees -- a schema that fails to resolve is not a read failure, and the CLI's own exit codes turn on that
      * distinction. They rethrow the original instead, unwrapped and with its stack intact.
      *
@@ -184,7 +182,7 @@ public final class SchemaResolver {
      */
     public TsonSchema resolveSchema(SchemaDocument document,
                                     SchemaPositions declarationPositions,
-                                    TsonDiagnosticsReceiver receiver) {
+                                    DiagnosticsReceiver receiver) {
         Objects.requireNonNull(receiver, "receiver");
         return resolve(document, declarationPositions, receiver);
     }
@@ -192,7 +190,7 @@ public final class SchemaResolver {
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private TsonSchema resolve(SchemaDocument document,
                                SchemaPositions declarationPositions,
-                               TsonDiagnosticsReceiver receiver) {
+                               DiagnosticsReceiver receiver) {
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
         TsonCanonicalIdentity.validate(id);
@@ -416,7 +414,7 @@ public final class SchemaResolver {
      * <p>All three are reported per declaration and all three leave a placeholder, so one failing
      * declaration does not cost every other declaration its verdict.
      */
-    private record Problems(String schemaId, SchemaPositions positions, TsonDiagnosticsReceiver receiver) {
+    private record Problems(String schemaId, SchemaPositions positions, DiagnosticsReceiver receiver) {
 
         /** {@code false} for the fail-fast overloads, whose callers rethrow rather than collect. */
         boolean collecting() {
@@ -585,7 +583,7 @@ public final class SchemaResolver {
      * <p><b>Producing one means a diagnostic has already been reported</b> (Swift's {@code ErrorType}
      * obligation). It is not a resolution and must never be linked, registered or compiled -- guaranteed
      * structurally rather than by inspection, because the only overload that can produce one ({@link
-     * #resolveSchema(SchemaDocument, SchemaPositions, TsonDiagnosticsReceiver)}) hands the caller a receiver whose report
+     * #resolveSchema(SchemaDocument, SchemaPositions, DiagnosticsReceiver)}) hands the caller a receiver whose report
      * count is the signal to stop at the phase boundary. It carries the failed declaration's own position so
      * anything that does surface it can still point at the source.
      *
@@ -618,7 +616,7 @@ public final class SchemaResolver {
         // Unrestricted deliberately: these events come from a resolved schema value, not from document text.
         // A schema's own names are the identifier policy's surface, applied by TsonSchemaLinker.
         return reader.read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)),
-                TsonUnicodePolicy.unrestricted()));
+                UnicodePolicy.unrestricted()));
     }
 
     /**

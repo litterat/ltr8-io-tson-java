@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -104,10 +104,10 @@ class NestedContainerTest {
     void theInnerContainersBoundsAreEnforcedWhenReading() {
         TsonCompiledSchema compiled = compile("  grid => [[integer; 2], text]");
 
-        assertTrue(assertThrows(TsonReadException.class,
+        assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("grid").read(TestDocuments.document("[ [1 2 3] \"a\" ]")))
                 .getMessage().contains("maximum 2"));
-        assertTrue(assertThrows(TsonReadException.class,
+        assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("grid").read(TestDocuments.document("[ [1] \"a\" ]")))
                 .getMessage().contains("minimum 2"));
     }
@@ -125,7 +125,7 @@ class NestedContainerTest {
 
         assertNotNull((TsonValue) compiled.get("rows")
                 .read(TestDocuments.document("[ [1 2] [3] [] ]")));
-        assertTrue(assertThrows(TsonReadException.class,
+        assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("rows").read(TestDocuments.document("[ [1] [2] ]")))
                 .getMessage().contains("minimum 3"));
     }
@@ -167,14 +167,14 @@ class NestedContainerTest {
 
         assertNotNull((TsonValue) compiled.get("triple").read(TestDocuments.document("[1 _ 3]")));
         assertNotNull((TsonValue) compiled.get("triple").read(TestDocuments.document("[_ _ _]")));
-        assertTrue(assertThrows(TsonReadException.class,
+        assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("triple").read(TestDocuments.document("[1 _]")))
                 .getMessage().contains("minimum 3"), "an absent element occupies a slot, it does not vacate one");
 
         assertEquals(ElementState.REQUIRED,
                 assertInstanceOf(ArrayBody.class, entry(compiled, "strict").body()).state(),
                 "the unmarked form keeps REQUIRED from the vocabulary's own default");
-        assertTrue(assertThrows(TsonReadException.class,
+        assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("strict").read(TestDocuments.document("[1 _ 3]")))
                 .getMessage().contains("elements are required"));
     }

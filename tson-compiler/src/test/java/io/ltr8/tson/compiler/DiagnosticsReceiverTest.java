@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ReadException;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -15,11 +15,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonDiagnosticsReceiver} -- the seam deciding where a read's problems go. The two built-ins are
+ * {@link DiagnosticsReceiver} -- the seam deciding where a read's problems go. The two built-ins are
  * covered here alongside a caller-written one, since the point of the interface is that a third
  * destination (a formatter, a budget, a telemetry sink) needs no support from the reader stack.
  */
-class TsonDiagnosticsReceiverTest {
+class DiagnosticsReceiverTest {
 
     /** Three fields, each an array where a long is wanted -- three independent problems in document order. */
     public record Three(long a, long b, long c) {
@@ -29,7 +29,7 @@ class TsonDiagnosticsReceiverTest {
 
     @Test
     void theThrowingReceiverStopsAtTheFirstProblem() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> new TsonObjectReader().read(THREE_BAD, Three.class));
 
         assertEquals(Optional.of("/a"), thrown.diagnostic().path());
@@ -38,7 +38,7 @@ class TsonDiagnosticsReceiverTest {
 
     @Test
     void aCollectorGathersEveryProblemInDocumentOrder() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         new TsonObjectReader().withDiagnostics(problems).read(THREE_BAD, Three.class);
 
@@ -47,7 +47,7 @@ class TsonDiagnosticsReceiverTest {
 
     @Test
     void aCollectorIsEmptyWhenNothingIsWrong() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         Three value = new TsonObjectReader().withDiagnostics(problems).read("{ a: 1  b: 2  c: 3 }", Three.class);
 
@@ -60,7 +60,7 @@ class TsonDiagnosticsReceiverTest {
         // A budget of two: throwing from report aborts the read, which is only possible if diagnostics
         // arrive during it. If they were batched at the end, all three would already have been found.
         List<String> seen = new ArrayList<>();
-        TsonDiagnosticsReceiver cappedAtTwo = diagnostic -> {
+        DiagnosticsReceiver cappedAtTwo = diagnostic -> {
             seen.add(diagnostic.path().orElseThrow());
             if (seen.size() == 2) {
                 throw new IllegalStateException("enough");
@@ -77,8 +77,8 @@ class TsonDiagnosticsReceiverTest {
     void withDiagnosticsLeavesTheReaderItWasDerivedFromUnchanged() {
         TsonObjectReader reader = new TsonObjectReader();
 
-        reader.withDiagnostics(TsonDiagnosticsReceiver.collecting()).read(THREE_BAD, Three.class);
+        reader.withDiagnostics(DiagnosticsReceiver.collecting()).read(THREE_BAD, Three.class);
 
-        assertThrows(TsonReadException.class, () -> reader.read(THREE_BAD, Three.class));
+        assertThrows(ReadException.class, () -> reader.read(THREE_BAD, Three.class));
     }
 }

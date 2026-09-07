@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -76,6 +76,6 @@ class EnumTreeReaderTest {
     void aNonMemberValueFailsValidation() {
         TsonCompiledSchema compiled = compiled();
 
-        assertThrows(TsonReadException.class, () -> read(compiled, "{ flag: maybe }"));
+        assertThrows(ReadException.class, () -> read(compiled, "{ flag: maybe }"));
     }
 }

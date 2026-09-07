@@ -1,10 +1,12 @@
+import io.ltr8.tson.base.LimitsPolicy;
+
 /**
  * What every encoding and every phase of this library reports through.
  *
  * <p>A pure leaf, depending on nothing. It holds {@link io.ltr8.tson.base.Diagnostic} -- one record for
  * every problem the library states, with the closed {@code Code} enum a consumer routes on -- the
  * receivers that decide a diagnostic's fate, {@link io.ltr8.tson.base.SourcePosition} -- the three
- * coordinates a report points at -- and {@link io.ltr8.tson.base.TsonLimitsPolicy} with the refusal it
+ * coordinates a report points at -- and {@link LimitsPolicy} with the refusal it
  * raises, which [TSON-JSON] §10.1 makes one policy across every encoding "with the same defaults".
  *
  * <p><b>Why a module of its own.</b> [TSON-JSON] §9.4 makes the JSON encoding report in

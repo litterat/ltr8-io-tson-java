@@ -4,9 +4,9 @@ import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonBindMismatchException;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
@@ -77,7 +77,7 @@ class BindStrictnessTest {
         return (lenient ? config.lenientBinding() : config).build();
     }
 
-    private static Object read(Tson tson, Class<?> bound, TsonDiagnosticsReceiver receiver) {
+    private static Object read(Tson tson, Class<?> bound, DiagnosticsReceiver receiver) {
         return tson.objectReader().withDiagnostics(receiver).read(DOC, bound);
     }
 
@@ -116,7 +116,7 @@ class BindStrictnessTest {
     @Test
     void anUnboundComponentIsTheClassesOwnBusiness() {
         Object value = read(tson(SCHEMA, OrderTraced.class, false), OrderTraced.class,
-                TsonDiagnosticsReceiver.throwing());
+                DiagnosticsReceiver.throwing());
 
         assertEquals(new OrderTraced("A", 1, "AUD", Optional.empty()), value);
     }
@@ -148,7 +148,7 @@ class BindStrictnessTest {
         // hole in the array, which is what keeps the read side of `@Unbound` unchanged.
         assertEquals(new OrderTraced("A", 1, "AUD", Optional.empty()),
                 read(tson(SCHEMA, OrderTraced.class, false), OrderTraced.class,
-                        TsonDiagnosticsReceiver.throwing()));
+                        DiagnosticsReceiver.throwing()));
     }
 
     /**
@@ -178,7 +178,7 @@ class BindStrictnessTest {
     @Test
     void lenientBindingDropsTheFieldSilently() {
         Tson tson = tson(SCHEMA, OrderV1.class, true);
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         assertEquals(new OrderV1("A", 1), read(tson, OrderV1.class, problems));
         assertEquals(List.of(), problems.diagnostics());
@@ -194,7 +194,7 @@ class BindStrictnessTest {
     @Test
     void aMismatchMetDuringAReadIsCodedAsOneRatherThanAsABadSchema() {
         Tson tson = tson(SCHEMA, OrderV1.class, false);
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         assertNull(read(tson, OrderV1.class, problems));
 

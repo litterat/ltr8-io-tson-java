@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.atom.IdentifierParser;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
@@ -18,7 +18,7 @@ import java.util.function.Function;
 /**
  * The one backing implementation of {@link TsonReadContext}. It holds no policy of its own -- {@link #report}
  * enriches a problem with the path and positions tracked here and hands it to the read's {@link
- * TsonDiagnosticsReceiver}, which decides what happens next. Package-private: a caller only ever reaches this
+ * DiagnosticsReceiver}, which decides what happens next. Package-private: a caller only ever reaches this
  * through {@link TsonReadContext}'s own static factories, never by name -- see that interface's own Javadoc for
  * why it's an interface at all.
  */
@@ -33,14 +33,14 @@ final class DefaultTsonReadContext implements TsonReadContext {
      */
     private static final class Cursor {
         final TsonEventSource events;
-        final TsonDiagnosticsReceiver receiver;
+        final DiagnosticsReceiver receiver;
 
         /**
          * [TSON-DATA] §8.2's restricted-script rule over the names this document carries, defaulting to Highly
          * Restrictive as §8.2 says it SHOULD. Per read rather than per context, so every derived context
          * checks against the one a caller named.
          */
-        final TsonUnicodePolicy identifierPolicy;
+        final UnicodePolicy identifierPolicy;
 
         /**
          * Where the cursor is: the position of the last event {@link #peek()} or {@link #next()} returned,
@@ -63,7 +63,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
         /** Where {@link #next()} records what it consumes while a lookahead is running, else {@code null}. */
         List<TsonEvent> recording;
 
-        Cursor(TsonEventSource events, TsonDiagnosticsReceiver receiver, TsonUnicodePolicy identifierPolicy) {
+        Cursor(TsonEventSource events, DiagnosticsReceiver receiver, UnicodePolicy identifierPolicy) {
             this.events = events;
             this.receiver = receiver;
             this.identifierPolicy = identifierPolicy;
@@ -119,12 +119,12 @@ final class DefaultTsonReadContext implements TsonReadContext {
         this.positionOverride = positionOverride;
     }
 
-    static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver) {
-        return of(events, receiver, TsonUnicodePolicy.highlyRestrictive());
+    static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver) {
+        return of(events, receiver, UnicodePolicy.highlyRestrictive());
     }
 
-    static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
-                              TsonUnicodePolicy identifierPolicy) {
+    static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
+                              UnicodePolicy identifierPolicy) {
         return new DefaultTsonReadContext(new Cursor(events, receiver, identifierPolicy), null, null, null,
                 Optional.empty(), Optional.empty());
     }

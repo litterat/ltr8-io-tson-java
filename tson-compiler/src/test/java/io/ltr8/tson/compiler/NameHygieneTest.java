@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import org.junit.jupiter.api.Test;
 
@@ -134,7 +134,7 @@ class NameHygieneTest {
     @Test
     void thePolicyRelaxesPerSegmentWithoutAdmittingAWithinWordHomograph() {
         TsonTreeReader perSegment = new TsonTreeReader()
-                .withIdentifierPolicy(TsonUnicodePolicy.highlyRestrictive().perSegment());
+                .withIdentifierPolicy(UnicodePolicy.highlyRestrictive().perSegment());
         List<Diagnostic> admitted = new ArrayList<>();
         perSegment.withDiagnostics(admitted::add).read("@url_адрес:1 2");
         assertEquals(List.of(), admitted, "a Latin abbreviation beside a name in another script");
@@ -148,7 +148,7 @@ class NameHygieneTest {
     @Test
     void thePolicyRelaxesAway() {
         List<Diagnostic> reported = new ArrayList<>();
-        new TsonTreeReader().withIdentifierPolicy(TsonUnicodePolicy.unrestricted())
+        new TsonTreeReader().withIdentifierPolicy(UnicodePolicy.unrestricted())
                 .withDiagnostics(reported::add).read("@pаy:1 2");
         assertEquals(List.of(), reported);
     }
@@ -164,7 +164,7 @@ class NameHygieneTest {
     @Test
     void unrestrictedDropsTheIdentifierProfileToo() {
         List<Diagnostic> reported = new ArrayList<>();
-        new TsonTreeReader().withIdentifierPolicy(TsonUnicodePolicy.unrestricted())
+        new TsonTreeReader().withIdentifierPolicy(UnicodePolicy.unrestricted())
                 .withDiagnostics(reported::add).read("@" + RESTRICTED_NAME + ":1 2");
         assertEquals(List.of(), reported, reported::toString);
     }
@@ -190,7 +190,7 @@ class NameHygieneTest {
                 wholeName.stream().map(Diagnostic::code).toList(), wholeName::toString);
 
         List<Diagnostic> perSegment = new ArrayList<>();
-        new TsonTreeReader().withIdentifierPolicy(TsonUnicodePolicy.highlyRestrictive().perSegment())
+        new TsonTreeReader().withIdentifierPolicy(UnicodePolicy.highlyRestrictive().perSegment())
                 .withDiagnostics(perSegment::add).read("{ id_пользователя: 1 }");
         assertEquals(List.of(), perSegment, perSegment::toString);
     }

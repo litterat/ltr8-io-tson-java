@@ -56,9 +56,9 @@ import java.util.Set;
  * rule for a caller who wants the wire back as authored -- reading the structure of a document whose
  * {@code !!schema} is deliberately being ignored, or round-tripping through {@code TsonTreeWriter}.
  *
- * <p><b>Every problem goes through {@code ctx.report}</b>, so the read's own {@code TsonDiagnosticsReceiver}
+ * <p><b>Every problem goes through {@code ctx.report}</b>, so the read's own {@code DiagnosticsReceiver}
  * decides its fate exactly as it does for the schema-driven readers: fail-fast throws {@code
- * TsonReadException} at the first, a collector gathers them all and still hands back a tree. Reporting never
+ * ReadException} at the first, a collector gathers them all and still hands back a tree. Reporting never
  * abandons the value -- the node is still built and its children are still read, so one pass finds
  * everything; a leaf whose atom rejected the token becomes a {@link TsonAbsent}, the placeholder {@code
  * AtomTreeReader} uses for the same situation.

@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
@@ -433,7 +433,7 @@ class ApplicationInContainerPositionTest {
         assertEquals(Optional.of(BigInteger.valueOf(3)), vector.minItems());
         assertNotNull(compiled.get("holder")
                 .read(TestDocuments.document("{ p: [ [ 1.0 2.0 3.0 ] ] }")));
-        assertThrows(TsonReadException.class, () -> compiled.get("holder")
+        assertThrows(ReadException.class, () -> compiled.get("holder")
                 .read(TestDocuments.document("{ p: [ [ 1.0 2.0 ] ] }")));
     }
 

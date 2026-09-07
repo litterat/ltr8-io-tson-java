@@ -1,8 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.base.TsonLimitsPolicy;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -143,7 +142,7 @@ final class TemplateMaterialiser {
      * <p><b>It is a bare constant rather than a stated policy</b>, and it is [TSON-SCHEMA] §11.5's
      * materialisation-depth limit at that section's own default. §11.5 states the schema-side limits as part
      * of [TSON-DATA] §9.1's one limits policy, reported through the same surfaces, so this belongs on {@code
-     * TsonLimitsPolicy} beside {@code maxDepth}; nothing yet bounds the other four §11.5 names -- an import
+     * LimitsPolicy} beside {@code maxDepth}; nothing yet bounds the other four §11.5 names -- an import
      * closure, a schema's entry count, a reference chain, or a supertype chain.
      *
      * <p>Distinct from §5.10.1's productivity rule, which is about a type with no finite <em>data</em>
@@ -579,7 +578,7 @@ final class TemplateMaterialiser {
         CoreValue wire = closeApplications(substituted);
         try {
             return new Closed(wire, metaReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
-        } catch (TsonReadException e) {
+        } catch (ReadException e) {
             // The bindings a template defers are checked here and nowhere else (§8.2): `<T, N> [T; N]` is a
             // fine declaration, and `vector<text, "two">` is where it stops being one.
             throw new TsonSchemaValidationException("'" + head + "<...>' substitutes into a body that is not "

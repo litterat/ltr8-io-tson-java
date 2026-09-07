@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.tree.TsonAnnotation;
@@ -128,7 +128,7 @@ class SchemaDrivenTreeAnnotationTest {
     void anAnnotationNamingNoTypeIsReported() {
         // §6: an annotation names a type. A name the governing schema doesn't declare is an unresolved
         // reference, not silently-accepted metadata.
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> read("!shape { name: @nosuchthing:\"x\" \"square\"  origin: { x: 1  y: 2 }  tags: [] }"));
 
         assertTrue(thrown.getMessage().contains("@nosuchthing"), thrown.getMessage());
@@ -139,7 +139,7 @@ class SchemaDrivenTreeAnnotationTest {
     void anAnnotationValueOfTheWrongTypeIsReported() {
         // `label` is text-targeted, so a record where its value belongs is caught by text's own reader --
         // the check falls out of using the right reader, not from a separate validation pass.
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> read("!shape { name: @label:{ a: 1 } \"square\"  origin: { x: 1  y: 2 }  tags: [] }"));
 
         assertTrue(thrown.getMessage().toLowerCase().contains("token"), thrown.getMessage());
@@ -149,7 +149,7 @@ class SchemaDrivenTreeAnnotationTest {
     void aBareAnnotationOnANonVoidTypeIsReported() {
         // §6 makes bare `@T` shorthand for `@T:_`, so the type must admit the absent sentinel. `checked` is
         // void-targeted and does (see VALID); `label` is text-targeted and does not.
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> read("!shape { name: @label \"square\"  origin: { x: 1  y: 2 }  tags: [] }"));
 
         assertTrue(thrown.getMessage().contains("@label"), thrown.getMessage());

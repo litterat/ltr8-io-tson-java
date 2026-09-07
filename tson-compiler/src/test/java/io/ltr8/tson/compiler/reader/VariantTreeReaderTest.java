@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -108,7 +108,7 @@ class VariantTreeReaderTest {
 
         // "shape" has subtypes ("triangle") but its own body REQUIRES "sides" -- the fallback reads
         // against that real body, not a free pass, so a missing required field still fails.
-        assertThrows(TsonReadException.class, () -> read(compiled, "shape", "{}"));
+        assertThrows(ReadException.class, () -> read(compiled, "shape", "{}"));
         assertEquals(BigInteger.valueOf(3), read(compiled, "shape", "{ sides: 3 }").get("sides"));
     }
 
@@ -116,7 +116,7 @@ class VariantTreeReaderTest {
     void unknownTypeRefThrowsNamingTheOffendingValue() {
         TsonCompiledSchema compiled = compiled();
 
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> read(compiled, "!partial_response { value: 42 }"));
         assertTrue(thrown.getMessage().contains("partial_response"), thrown.getMessage());
     }

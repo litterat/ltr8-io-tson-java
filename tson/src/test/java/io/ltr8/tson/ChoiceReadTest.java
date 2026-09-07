@@ -1,6 +1,6 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
@@ -79,7 +79,7 @@ class ChoiceReadTest {
     /** Untagged recovery fails closed: no variant matches the boolean class, and the diagnostic names the set. */
     @Test
     void aValueMatchingNoVariantIsRejected() {
-        TsonReadException e = assertThrows(TsonReadException.class,
+        ReadException e = assertThrows(ReadException.class,
                 () -> read(personReader("(text | integer)"), "true"));
 
         assertTrue(e.getMessage().contains("[text, integer]"), e.getMessage());
@@ -91,7 +91,7 @@ class ChoiceReadTest {
      */
     @Test
     void aTagIsRequiredWhereTheVariantsShareABaseTypeClass() {
-        TsonReadException e = assertThrows(TsonReadException.class,
+        ReadException e = assertThrows(ReadException.class,
                 () -> read(personReader("(text | uri)"), "\"https://example.test\""));
 
         assertTrue(e.getMessage().contains("requires an explicit type annotation"), e.getMessage());

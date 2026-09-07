@@ -33,7 +33,7 @@ void main() {
 
     // A bad value surfaces as a diagnostic rather than a wrong result. Deriving a reader with a
     // collecting receiver gathers every problem in one pass instead of stopping at the first:
-    var problems = TsonDiagnosticsReceiver.collecting();
+    var problems = DiagnosticsReceiver.collecting();
     var bad = "{ hostname: \"web-01\"  port: 99999999999999 }";   // port is out of int32 range
     reader.withDiagnostics(problems).readAs(bad, "server");
     for (Diagnostic d : problems.diagnostics()) {

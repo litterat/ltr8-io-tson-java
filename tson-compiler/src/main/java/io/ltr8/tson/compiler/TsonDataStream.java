@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonLimitExceededException;
-import io.ltr8.tson.base.TsonLimitsPolicy;
+import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomParseException;
@@ -129,13 +129,13 @@ public final class TsonDataStream implements TsonEventSource {
     private boolean started;
 
     /** [TSON-DATA] §9.1's bounds -- consulted by {@link #advance()} as containers open. */
-    private final TsonLimitsPolicy limits;
+    private final LimitsPolicy limits;
 
     public TsonDataStream(String source) {
-        this(source, TsonLimitsPolicy.defaults());
+        this(source, LimitsPolicy.defaults());
     }
 
-    public TsonDataStream(String source, TsonLimitsPolicy limits) {
+    public TsonDataStream(String source, LimitsPolicy limits) {
         this(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)), limits);
     }
 
@@ -146,14 +146,14 @@ public final class TsonDataStream implements TsonEventSource {
      * a caller that opened it owns closing it.
      */
     public TsonDataStream(InputStream source) {
-        this(source, TsonLimitsPolicy.defaults());
+        this(source, LimitsPolicy.defaults());
     }
 
     /**
      * As {@link #TsonDataStream(InputStream)}, under a caller's own resource limits rather than the
      * defaults -- what the facades pass when a {@code TsonConfig} states one.
      */
-    public TsonDataStream(InputStream source, TsonLimitsPolicy limits) {
+    public TsonDataStream(InputStream source, LimitsPolicy limits) {
         this.lexer = new Lexer(source);
         this.limits = Objects.requireNonNull(limits, "limits");
     }
@@ -360,7 +360,7 @@ public final class TsonDataStream implements TsonEventSource {
             case LBRACE, LBRACKET, LPAREN -> {
                 nesting++;
                 if (nesting > limits.maxDepth()) {
-                    throw new TsonLimitExceededException("nested deeper than this processor reads ("
+                    throw new LimitExceededException("nested deeper than this processor reads ("
                             + limits.maxDepth() + "); the document is not being judged, and a processor "
                             + "configured for more would read it", limits.maxDepth(),
                             new Position(t.startLine(), t.startColumn(), t.startByteOffset()));

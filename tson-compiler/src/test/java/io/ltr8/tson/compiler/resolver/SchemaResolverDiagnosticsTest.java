@@ -4,7 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -71,7 +71,7 @@ class SchemaResolverDiagnosticsTest {
     private static List<Diagnostic> resolveCollecting(String schemaText) {
         TsonSchemaParser parser = new TsonSchemaParser(schemaText);
         SchemaDocument document = parser.parseSchemaDocument();
-        TsonDiagnosticsCollector collector = new TsonDiagnosticsCollector();
+        DiagnosticsCollector collector = new DiagnosticsCollector();
         TsonSchema resolved = new SchemaResolver(standardLibrary())
                 .resolveSchema(document, parser.schemaPositions(), collector);
         // Even a schema that failed comes back whole -- placeholders stand in for the broken entries, which is
@@ -142,7 +142,7 @@ class SchemaResolverDiagnosticsTest {
     }
 
     /**
-     * A body the constructor's own vocabulary rejects reaches the resolver as a {@code TsonReadException}
+     * A body the constructor's own vocabulary rejects reaches the resolver as a {@code ReadException}
      * from the governing meta's compiled reader, one layer below every other error here. It is collected
      * like the rest only because {@code DefinitionResolver} restates it as a schema error first: while it
      * wore an {@code UnsupportedOperationException}, one such declaration aborted the entire run -- no

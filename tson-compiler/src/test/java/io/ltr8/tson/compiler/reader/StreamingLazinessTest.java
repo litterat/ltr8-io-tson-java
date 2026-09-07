@@ -1,10 +1,10 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -94,9 +94,9 @@ class StreamingLazinessTest {
         TsonDataStream realStream = new TsonDataStream(dataSource);
         realStream.next(); // DocumentStart
         CountingEventSource counting = new CountingEventSource(realStream);
-        TsonReadContext ctx = TsonReadContext.throwing(counting, TsonUnicodePolicy.unrestricted());
+        TsonReadContext ctx = TsonReadContext.throwing(counting, UnicodePolicy.unrestricted());
 
-        assertThrows(TsonReadException.class, () -> compiled.get("big_record").read(ctx));
+        assertThrows(ReadException.class, () -> compiled.get("big_record").read(ctx));
 
         // A handful of events for "{", "a", "1", "b", and "b"'s own malformed "[1 2 3]" value --
         // nowhere close to the ~50,002 events "huge"'s own array alone would need if the reader had

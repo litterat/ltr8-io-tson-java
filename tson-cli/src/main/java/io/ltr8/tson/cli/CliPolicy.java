@@ -1,16 +1,15 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.annotation.Field;
-import io.ltr8.tson.base.TsonLimitsPolicy;
-import io.ltr8.tson.base.TsonProcessorPolicy;
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.ProcessorPolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 
 import java.lang.Character.UnicodeScript;
 import java.util.List;
 import java.util.Set;
 
 /**
- * This CLI's on-the-wire shape for {@link TsonProcessorPolicy} -- what this run's [TSON-DATA] §8.2
+ * This CLI's on-the-wire shape for {@link ProcessorPolicy} -- what this run's [TSON-DATA] §8.2
  * name hygiene was judged by, stated once per {@link ValidationRun}/{@link ValidationReport} and printable
  * on its own by {@code tson policy}.
  *
@@ -21,10 +20,10 @@ import java.util.Set;
  * policy} prints this with no document in hand. The refusal itself carries the remedy: which name, and
  * which rule, in its own {@code code}.
  *
- * <p>A separate DTO from {@link TsonProcessorPolicy} for {@link CliDiagnostic}'s own reason --
+ * <p>A separate DTO from {@link ProcessorPolicy} for {@link CliDiagnostic}'s own reason --
  * {@code diagnostics.tn} declares these fields as {@code text}, and {@link UnicodeScript} is a JDK enum of
  * some 170 members that no wire schema should be restating. The scripts render by name; {@link
- * TsonUnicodePolicy.Level} stays the real enum, since enum narrowing is the proven binding path here.
+ * UnicodePolicy.Level} stays the real enum, since enum narrowing is the proven binding path here.
  *
  * <p>The two surfaces keep {@code TsonConfig}'s own names, here and on the wire, so a deployment's
  * configuration and the report it produces are one vocabulary.
@@ -38,7 +37,7 @@ public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierP
      * The policy a run that passed no flag is judged under -- what {@link OutputFormat#TEXT} compares against
      * to decide whether a person needs to be told the policy at all.
      */
-    private static final CliPolicy DEFAULTS = from(TsonProcessorPolicy.of(
+    private static final CliPolicy DEFAULTS = from(ProcessorPolicy.of(
             PolicyOptions.DEFAULTS.identifierPolicy(), PolicyOptions.DEFAULTS.tokenPolicy(),
             PolicyOptions.DEFAULTS.limits()));
 
@@ -55,10 +54,10 @@ public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierP
 
     /**
      * One argument, because a processor states one policy. This record's own shape -- the two surfaces, the
-     * data version, and a nested {@code limits} -- is what {@code TsonProcessorPolicy} settled on, so the
+     * data version, and a nested {@code limits} -- is what {@code ProcessorPolicy} settled on, so the
      * conversion is now a field-for-field copy rather than a join of two values.
      */
-    static CliPolicy from(TsonProcessorPolicy policy) {
+    static CliPolicy from(ProcessorPolicy policy) {
         return new CliPolicy(CliUnicodePolicy.from(policy.identifierPolicy()),
                 CliUnicodePolicy.from(policy.tokenPolicy()), policy.unicodeDataVersion(),
                 new CliLimits(policy.limits().maxDepth()));
@@ -82,10 +81,10 @@ public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierP
      * the level. The three together are the whole of a policy, which is what lets a reader of a refusal work
      * out which of them another deployment set differently.
      */
-    public record CliUnicodePolicy(TsonUnicodePolicy.Level level, @Field("per_segment") boolean perSegment,
+    public record CliUnicodePolicy(UnicodePolicy.Level level, @Field("per_segment") boolean perSegment,
                                    List<List<String>> permitting) {
 
-        static CliUnicodePolicy from(TsonUnicodePolicy policy) {
+        static CliUnicodePolicy from(UnicodePolicy policy) {
             return new CliUnicodePolicy(policy.level(), policy.isPerSegment(),
                     policy.permittedScripts().stream().map(CliUnicodePolicy::names).toList());
         }

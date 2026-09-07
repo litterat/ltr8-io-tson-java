@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +36,7 @@ class TsonTreeReaderTest {
 
     /** Every problem from a strict schemaless read of {@code source}, rather than the first as an exception. */
     private static List<Diagnostic> problemsIn(String source) {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         STRICT.withDiagnostics(problems).read(source);
         return problems.diagnostics();
     }
@@ -151,17 +151,17 @@ class TsonTreeReaderTest {
         assertTrue(problems.get(0).dataPosition().isPresent());
     }
 
-    /** Fail-fast is the default receiver, so the same problem arrives as a TsonReadException carrying the diagnostic. */
+    /** Fail-fast is the default receiver, so the same problem arrives as a ReadException carrying the diagnostic. */
     @Test
     void aRejectedTokenThrowsUnderTheDefaultReceiver() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> STRICT.read("{ a: !uuid nope }"));
+        ReadException thrown = assertThrows(ReadException.class, () -> STRICT.read("{ a: !uuid nope }"));
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, thrown.diagnostic().code());
     }
 
     /** The failed leaf keeps its place and its wire type-ref; only its value is gone. */
     @Test
     void aRejectedTokenLeavesAnAbsentPlaceholderInTheTree() {
-        TsonValue node = STRICT.withDiagnostics(TsonDiagnosticsReceiver.collecting())
+        TsonValue node = STRICT.withDiagnostics(DiagnosticsReceiver.collecting())
                 .read("{ a: !uuid nope  b: 2 }");
 
         assertTrue(node.at("/a").isAbsent());
@@ -181,7 +181,7 @@ class TsonTreeReaderTest {
     /** Preserving relaxes rule 3 only -- a built-in name is still held to its own contract. */
     @Test
     void preservingStillChecksBuiltInTypeRefs() {
-        assertThrows(TsonReadException.class, () -> READER.read("{ a: !uuid nope }"));
+        assertThrows(ReadException.class, () -> READER.read("{ a: !uuid nope }"));
     }
 
     /** An annotation's value is a data-value (§3.1), so the same rules reach inside it. */
@@ -215,7 +215,7 @@ class TsonTreeReaderTest {
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
                 keyProblems.stream().map(Diagnostic::code).toList(), keyProblems.toString());
 
-        TsonValue node = STRICT.withDiagnostics(TsonDiagnosticsReceiver.collecting()).read("{ a: 1  a: 2 }");
+        TsonValue node = STRICT.withDiagnostics(DiagnosticsReceiver.collecting()).read("{ a: 1  a: 2 }");
         assertEquals(BigInteger.TWO, node.at("/a").asBigInteger().orElseThrow());
     }
 
@@ -238,7 +238,7 @@ class TsonTreeReaderTest {
      */
     @Test
     void aKeysTypeRefAndAnnotationsAreNotPartOfItsIdentity() {
-        TsonDiagnosticsCollector preserved = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector preserved = DiagnosticsReceiver.collecting();
         READER.withDiagnostics(preserved).read("{ !person a => 1  a => 2 }");
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
                 preserved.diagnostics().stream().map(Diagnostic::code).toList());

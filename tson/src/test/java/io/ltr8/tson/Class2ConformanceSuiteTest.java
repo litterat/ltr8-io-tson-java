@@ -1,8 +1,7 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.unicode.Xid;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentHeader;
 import io.ltr8.tson.compiler.ast.RecordValue;
@@ -22,7 +21,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -169,9 +167,9 @@ class Class2ConformanceSuiteTest {
         String stated = fieldText(refusal, "unicode");
         // Through the public accessor, the way a consumer of this library reads it: `Xid` is in the
         // unexported `lexer` package, so nothing outside `tson-compiler` can name the constant by hand.
-        Assumptions.assumeTrue(TsonUnicodePolicy.dataVersion().equals(stated),
+        Assumptions.assumeTrue(UnicodePolicy.dataVersion().equals(stated),
                 "vector computed against UTS #39 data for Unicode " + stated + "; this implementation "
-                        + "carries " + TsonUnicodePolicy.dataVersion());
+                        + "carries " + UnicodePolicy.dataVersion());
 
         assertFalse(problems.isEmpty(), "the schema is refused, but it loaded without a diagnostic");
         assertTrue(problems.stream().anyMatch(diagnostic -> isPolicyRefusal(diagnostic.code())),
@@ -206,7 +204,7 @@ class Class2ConformanceSuiteTest {
      * happened" would pass a processor that refused for the wrong reason.
      *
      * <p><b>The data version §8.2 requires a refusal to name is the processor's, not the diagnostic's</b>
-     * ({@link TsonUnicodePolicy#dataVersion()}, which the caller has already matched against the vector's
+     * ({@link UnicodePolicy#dataVersion()}, which the caller has already matched against the vector's
      * own {@code unicode} field before running it -- a version this implementation does not carry is a
      * legitimate skip). It is constant for every refusal in a run, so it is stated once beside the
      * diagnostics rather than stamped onto each of them.

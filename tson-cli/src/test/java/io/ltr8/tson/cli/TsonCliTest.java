@@ -2,9 +2,9 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.base.Diagnostic;
 
+import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonDiagnostics;
-import io.ltr8.tson.base.TsonLimitsPolicy;
-import io.ltr8.tson.base.TsonUnicodePolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -321,13 +321,13 @@ class TsonCliTest {
         String text = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {"policy"})));
         assertTrue(text.contains("identifier policy: HIGHLY_RESTRICTIVE"), text);
         assertTrue(text.contains("token policy:      UNRESTRICTED"), text);
-        assertTrue(text.contains("unicode data:      " + TsonUnicodePolicy.dataVersion()), text);
-        assertTrue(text.contains("max depth:         " + TsonLimitsPolicy.DEFAULT_MAX_DEPTH), text);
+        assertTrue(text.contains("unicode data:      " + UnicodePolicy.dataVersion()), text);
+        assertTrue(text.contains("max depth:         " + LimitsPolicy.DEFAULT_MAX_DEPTH), text);
 
         String json = captureStdout(() ->
                 assertEquals(0, TsonCli.run(new String[] {"policy", "--output", "json"})));
         assertTrue(json.strip().startsWith("{\"identifier_policy\":{\"level\":\"HIGHLY_RESTRICTIVE\""), json);
-        assertTrue(json.contains("\"unicode_data_version\":\"" + TsonUnicodePolicy.dataVersion() + "\""), json);
+        assertTrue(json.contains("\"unicode_data_version\":\"" + UnicodePolicy.dataVersion() + "\""), json);
     }
 
     /** A stray argument is a usage error, the same as anywhere else -- this command takes only {@code --output}. */
@@ -406,7 +406,7 @@ class TsonCliTest {
 
         // Raised against a document that fits the raised bound, not the 6000-deep one: a bound above what
         // the host stack carries reintroduces the StackOverflowError this exists to replace, which is what
-        // TsonLimitsPolicy.withMaxDepth says and what raising it here to 8000 actually does.
+        // LimitsPolicy.withMaxDepth says and what raising it here to 8000 actually does.
         Path shallower = writeFile(dir, "less-deep.tson", "[".repeat(200) + "1" + "]".repeat(200));
         String raised = captureStdout(() -> assertEquals(0, TsonCli.run(new String[] {
                 "validate", "--max-depth", "300", shallower.toString()})));

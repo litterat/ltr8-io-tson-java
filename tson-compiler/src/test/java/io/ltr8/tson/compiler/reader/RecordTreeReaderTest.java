@@ -1,11 +1,11 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -56,12 +56,12 @@ class RecordTreeReaderTest {
     }
 
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source) {
-        return read(compiled, source, TsonDiagnosticsReceiver.throwing());
+        return read(compiled, source, DiagnosticsReceiver.throwing());
     }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(TsonCompiledSchema compiled, String source,
-                                            TsonDiagnosticsReceiver receiver) {
+                                            DiagnosticsReceiver receiver) {
         return (Map<String, Object>) Dom.of((TsonValue) compiled.get("point")
                 .read(TestDocuments.document(source, receiver)));
     }
@@ -81,7 +81,7 @@ class RecordTreeReaderTest {
                         RecordField.required("value", TypeRef.of("integer"))));
 
         assertEquals((byte) 100, read(compiled, "{ value: 100 }").get("value"));
-        assertThrows(TsonReadException.class, () -> read(compiled, "{ value: 200 }"));
+        assertThrows(ReadException.class, () -> read(compiled, "{ value: 200 }"));
     }
 
     @Test
@@ -89,7 +89,7 @@ class RecordTreeReaderTest {
         TsonCompiledSchema compiled = compile(
                 pointSchema(atomEntry(IntegerType.UNCONSTRAINED), RecordField.required("value", TypeRef.of("integer"))));
 
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{}"));
+        ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{}"));
         assertTrue(thrown.getMessage().contains("value"), thrown.getMessage());
     }
 
@@ -132,7 +132,7 @@ class RecordTreeReaderTest {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
                 fixed(FieldState.REQUIRED_FIXED, "7")));
 
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: 9 }"));
+        ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: 9 }"));
         assertTrue(thrown.getMessage().contains("cannot be given another value"), thrown.getMessage());
     }
 
@@ -145,7 +145,7 @@ class RecordTreeReaderTest {
     void aFixedFieldWhoseStatedTokenIsMalformedReportsOnce() {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(new IntegerType(new IntegerSize(8, true))),
                 fixed(FieldState.REQUIRED_FIXED, "7")));
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         compiled.get("point").read(TestDocuments.document("{ value: 300 }", problems));
 
@@ -162,7 +162,7 @@ class RecordTreeReaderTest {
     void aWellFormedContradictingTokenStillReportsOnce() {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
                 fixed(FieldState.REQUIRED_FIXED, "7")));
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         compiled.get("point").read(TestDocuments.document("{ value: 9 }", problems));
 
@@ -222,7 +222,7 @@ class RecordTreeReaderTest {
     }
 
     private static Diagnostic onlyDiagnostic(TsonCompiledSchema compiled, String document) {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         compiled.get("point").read(TestDocuments.document(document, problems));
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
         return problems.diagnostics().getFirst();
@@ -234,7 +234,7 @@ class RecordTreeReaderTest {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
                 fixed(FieldState.REQUIRED_FIXED, "7")));
 
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: _ }"));
+        ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: _ }"));
         assertTrue(thrown.getMessage().contains("cannot be absent"), thrown.getMessage());
     }
 
@@ -261,7 +261,7 @@ class RecordTreeReaderTest {
         TsonCompiledSchema compiled = compile(pointSchema(atomEntry(IntegerType.UNCONSTRAINED),
                 fixed(FieldState.OPTIONAL_FIXED, "7")));
 
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: 9 }"));
+        ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: 9 }"));
         assertTrue(thrown.getMessage().contains("cannot be given another value"), thrown.getMessage());
     }
 
@@ -278,7 +278,7 @@ class RecordTreeReaderTest {
         assertNull(read(compiled, "{}").get("value"));
         assertNull(read(compiled, "{ value: _ }").get("value"));
 
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: 7 }"));
+        ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: 7 }"));
         assertTrue(thrown.getMessage().contains("fixed to absent"), thrown.getMessage());
     }
 
@@ -306,10 +306,10 @@ class RecordTreeReaderTest {
 
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
 
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> read(compiled, "{ value: _ }"));
+        ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: _ }"));
         assertTrue(thrown.getMessage().contains("cannot be written '_'"), thrown.getMessage());
 
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
         assertEquals(BigInteger.valueOf(7), read(compiled, "{ value: _ }", problems).get("value"));
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
     }

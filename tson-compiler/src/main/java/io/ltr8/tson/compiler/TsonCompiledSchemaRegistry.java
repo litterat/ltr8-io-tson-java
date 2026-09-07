@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
@@ -114,7 +114,7 @@ public final class TsonCompiledSchemaRegistry {
      * first error. Nothing is cached for a schema that reported: only a schema that resolved, linked and
      * compiled cleanly gets an entry.
      */
-    public TsonCompiledSchema get(String uri, TsonDiagnosticsReceiver receiver) {
+    public TsonCompiledSchema get(String uri, DiagnosticsReceiver receiver) {
         String identity = TsonCanonicalIdentity.canonicalize(uri);
         TsonLinkedSchema linked = core.resolveLinked(uri, identity, receiver);
         if (linked == null) {

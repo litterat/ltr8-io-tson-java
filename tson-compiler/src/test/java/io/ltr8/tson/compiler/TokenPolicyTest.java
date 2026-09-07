@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -30,7 +30,7 @@ class TokenPolicyTest {
             new String(new int[] {0x0430, 0x0434, 0x043C, 0x0438, 0x043D}, 0, 5);
 
     private static List<Diagnostic> problems(TsonTreeReader reader, String document) {
-        TsonDiagnosticsCollector collected = new TsonDiagnosticsCollector();
+        DiagnosticsCollector collected = new DiagnosticsCollector();
         reader.withDiagnostics(collected).read(document);
         return collected.diagnostics();
     }
@@ -49,7 +49,7 @@ class TokenPolicyTest {
     @Test
     void aRaisedPolicyRefusesAMixedScriptValue() {
         List<Diagnostic> found = problems(
-                new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
+                new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
                 "{ note: \"" + CYR_A + "dmin\" }");
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -65,7 +65,7 @@ class TokenPolicyTest {
      */
     @Test
     void aQuotedValueIsCheckedLikeAnyOther() {
-        assertEquals(1, problems(new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
+        assertEquals(1, problems(new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
                 "{ note: \"" + CYR_A + "\" }").size());
     }
 
@@ -80,7 +80,7 @@ class TokenPolicyTest {
     @Test
     void aFieldNameIsATokenAndIsChecked() {
         List<Diagnostic> found = problems(
-                new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
+                new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
                 "{ " + CYRILLIC_NAME + ": 1 }");
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -90,7 +90,7 @@ class TokenPolicyTest {
     /** An ASCII document is unaffected at any level -- the rule is about scripts, not about strictness for its own sake. */
     @Test
     void anAsciiDocumentPassesTheStrictestLevel() {
-        assertTrue(problems(new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
+        assertTrue(problems(new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
                 "{ note: hello  count: 3 }").isEmpty());
     }
 
@@ -100,7 +100,7 @@ class TokenPolicyTest {
      */
     @Test
     void aSingleScriptValuePassesWhereAMixedOneFails() {
-        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.highlyRestrictive());
+        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(UnicodePolicy.highlyRestrictive());
         assertTrue(problems(reader, "{ note: \"админ\" }").isEmpty(), "all-Cyrillic");
         assertEquals(1, problems(reader, "{ note: \"" + CYR_A + "dmin\" }").size(), "Latin with one Cyrillic");
     }
@@ -112,15 +112,15 @@ class TokenPolicyTest {
     @Test
     void aPerSegmentPolicyIsRefusedOnThisSurface() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.highlyRestrictive().perSegment()));
+                () -> new TsonTreeReader().withTokenPolicy(UnicodePolicy.highlyRestrictive().perSegment()));
         assertTrue(e.getMessage().contains("per-segment"), e.getMessage());
     }
 
     /** The policy survives derivation, like every other axis on the facade. */
     @Test
     void thePolicySurvivesWithSchemaAndWithDiagnostics() {
-        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly());
-        assertNotNull(reader.withDiagnostics(new TsonDiagnosticsCollector()));
+        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly());
+        assertNotNull(reader.withDiagnostics(new DiagnosticsCollector()));
         assertEquals(1, problems(reader, "{ note: \"" + CYR_A + "\" }").size());
     }
     /**
@@ -133,7 +133,7 @@ class TokenPolicyTest {
     void aReadContextCannotBeBuiltWithoutNamingAPolicy() {
         NullPointerException e = assertThrows(NullPointerException.class, () -> TsonReadContext.of(
                 new io.ltr8.tson.compiler.stream.ListEventSource(List.of()),
-                new TsonDiagnosticsCollector(), null));
+                new DiagnosticsCollector(), null));
         assertTrue(e.getMessage().contains("unrestricted()"), e.getMessage());
     }
 
@@ -143,9 +143,9 @@ class TokenPolicyTest {
      */
     @Test
     void aRawContextHonoursThePolicyItWasBuiltWith() {
-        TsonDiagnosticsCollector collected = new TsonDiagnosticsCollector();
+        DiagnosticsCollector collected = new DiagnosticsCollector();
         TsonReadContext ctx = TsonReadContext.of(new TsonDataStream("{ note: \"" + CYR_A + "\" }"),
-                collected, TsonUnicodePolicy.asciiOnly());
+                collected, UnicodePolicy.asciiOnly());
         try {                                   // the raw context has no end-of-stream predicate; drain it
             while (true) {
                 ctx.next();

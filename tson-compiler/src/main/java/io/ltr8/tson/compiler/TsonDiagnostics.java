@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
-import io.ltr8.tson.base.TsonLimitExceededException;
+import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SourcePosition;
 
@@ -12,7 +11,7 @@ import java.util.Optional;
  *
  * <p><b>Why these are not on {@code Diagnostic} itself.</b> Every method here switches on an exception
  * type this engine declares: {@code TsonParseException}, {@code LexException}, {@code
- * TsonUnsupportedDocumentException}, {@code TsonLimitExceededException}, {@code
+ * TsonUnsupportedDocumentException}, {@code LimitExceededException}, {@code
  * TsonSchemaFetchException}. A {@code Diagnostic} is the shape of an answer and is shared by every
  * encoding ([TSON-JSON] §9.4 reports in the same four categories and adds none); <em>classifying</em> a
  * failure is reading a document, which is each encoding's own. Leaving these on the record would have
@@ -36,7 +35,7 @@ public final class TsonDiagnostics {
      * this parser doesn't implement (§8.1 requires that last distinction be visible rather than folded into
      * "malformed").
      *
-     * <p><b>Anything else is rethrown, deliberately</b> -- including {@link TsonLimitExceededException},
+     * <p><b>Anything else is rethrown, deliberately</b> -- including {@link LimitExceededException},
      * which has its own classifier ({@link Diagnostic#ofLimitExceeded}) and is caught ahead of this. {@code
      * Tson.validate} promises never to throw for a
      * bad input <i>document</i>, which is not the same as never throwing: an exception that isn't one of
@@ -81,7 +80,7 @@ public final class TsonDiagnostics {
 
 
     /**
-     * A token whose scripts the read's {@code TsonUnicodePolicy} does not permit ([TSON-DATA] §8.2's
+     * A token whose scripts the read's {@code UnicodePolicy} does not permit ([TSON-DATA] §8.2's
      * "Values", UTS #39 §5.2).
      *
      * <p><b>Always {@link Diagnostic.Code#RESTRICTED_SCRIPT}.</b> A token is not a name, so it has no identifier profile
@@ -89,7 +88,7 @@ public final class TsonDiagnostics {
      * surface can carry.
      *
      * <p><b>{@code why} names the text it judged, so this does not name it again.</b> {@code
-     * TsonUnicodePolicy.violation} opens with the unit it refused ({@code 'аdmin' mixes the scripts ...}),
+     * UnicodePolicy.violation} opens with the unit it refused ({@code 'аdmin' mixes the scripts ...}),
      * which is what makes {@code "the token " + why} read as one sentence -- the same composition {@code
      * DefaultTsonReadContext.refuse} uses for a name.
      *

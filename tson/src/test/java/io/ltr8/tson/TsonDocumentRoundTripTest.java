@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonSchemaSource;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.tree.TsonDocument;
@@ -133,7 +133,7 @@ class TsonDocumentRoundTripTest {
     @Test
     void anUnparseableDocumentYieldsNothingJustAsReadDoes() {
         Tson tson = tson();
-        assertNull(tson.treeReader().withDiagnostics(TsonDiagnosticsReceiver.collecting())
+        assertNull(tson.treeReader().withDiagnostics(DiagnosticsReceiver.collecting())
                 .readDocument("{ a: 1  b: ] }"));
     }
 

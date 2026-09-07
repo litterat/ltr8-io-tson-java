@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonLimitExceededException;
-import io.ltr8.tson.base.TsonLimitsPolicy;
+import io.ltr8.tson.base.LimitExceededException;
+import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * [TSON-DATA] §9.1's nesting-depth limit -- {@link TsonLimitsPolicy}, the bound, and what a document past it
+ * [TSON-DATA] §9.1's nesting-depth limit -- {@link LimitsPolicy}, the bound, and what a document past it
  * is told.
  *
  * <p><b>What this is really guarding is that the failure is a diagnostic at all.</b> The token stream is
@@ -35,7 +35,7 @@ class LimitsPolicyTest {
     }
 
     private static List<Diagnostic> problems(TsonTreeReader reader, String document) {
-        TsonDiagnosticsCollector collected = new TsonDiagnosticsCollector();
+        DiagnosticsCollector collected = new DiagnosticsCollector();
         reader.withDiagnostics(collected).read(document);
         return collected.diagnostics();
     }
@@ -43,7 +43,7 @@ class LimitsPolicyTest {
     /**
      * The depth that used to reach a {@link StackOverflowError}, from a document of about 10 KB -- small
      * enough to arrive as an ordinary request body, which is what made this reachable rather than exotic.
-     * Well past {@link TsonLimitsPolicy#DEFAULT_MAX_DEPTH}, so it is refused by the default alone.
+     * Well past {@link LimitsPolicy#DEFAULT_MAX_DEPTH}, so it is refused by the default alone.
      */
     private static final int PAST_THE_STACK = 6000;
 
@@ -62,7 +62,7 @@ class LimitsPolicyTest {
      */
     @Test
     void theObjectReaderIsBoundedTheSameWay() {
-        TsonDiagnosticsCollector collected = new TsonDiagnosticsCollector();
+        DiagnosticsCollector collected = new DiagnosticsCollector();
         Object bound = new TsonObjectReader().withDiagnostics(collected)
                 .read(nested(PAST_THE_STACK), Object.class);
 
@@ -78,14 +78,14 @@ class LimitsPolicyTest {
     void aSchemaDocumentIsBoundedTheSameWay() {
         String schema = "!!meta:\"https://tson.io/2026/35/m/meta.tn\"\n{ deep => " + nested(PAST_THE_STACK) + " }";
 
-        assertThrows(TsonLimitExceededException.class,
+        assertThrows(LimitExceededException.class,
                 () -> new TsonSchemaParser(schema).parseSchemaDocument());
     }
 
     /** Exactly at the bound reads; one past it does not. The document either side differs by one bracket. */
     @Test
     void theBoundIsTheDeepestDepthThatStillReads() {
-        TsonTreeReader reader = new TsonTreeReader().withLimits(new TsonLimitsPolicy(8));
+        TsonTreeReader reader = new TsonTreeReader().withLimits(new LimitsPolicy(8));
 
         assertNotNull(reader.read(nested(8)));
         assertEquals(List.of(Diagnostic.Code.LIMIT_EXCEEDED),
@@ -99,7 +99,7 @@ class LimitsPolicyTest {
      */
     @Test
     void aRefusalCarriesTheBoundAndWhereItWasCrossed() {
-        Diagnostic refusal = problems(new TsonTreeReader().withLimits(new TsonLimitsPolicy(4)), nested(5))
+        Diagnostic refusal = problems(new TsonTreeReader().withLimits(new LimitsPolicy(4)), nested(5))
                 .getFirst();
 
         assertEquals("at most 4 levels of nesting", refusal.expected());
@@ -132,9 +132,9 @@ class LimitsPolicyTest {
     @Test
     void withLimitsDerivesRatherThanMutating() {
         TsonTreeReader base = new TsonTreeReader();
-        TsonTreeReader deeper = base.withLimits(new TsonLimitsPolicy(500));
+        TsonTreeReader deeper = base.withLimits(new LimitsPolicy(500));
 
-        assertEquals(TsonLimitsPolicy.DEFAULT_MAX_DEPTH, base.limitsPolicy().maxDepth());
+        assertEquals(LimitsPolicy.DEFAULT_MAX_DEPTH, base.limitsPolicy().maxDepth());
         assertEquals(500, deeper.limitsPolicy().maxDepth());
         assertNotNull(deeper.read(nested(500)));
     }
@@ -145,7 +145,7 @@ class LimitsPolicyTest {
      */
     @Test
     void aDepthBelowOneIsRefusedAtTheConfiguration() {
-        assertThrows(IllegalArgumentException.class, () -> new TsonLimitsPolicy(0));
+        assertThrows(IllegalArgumentException.class, () -> new LimitsPolicy(0));
     }
 
     /** A document nowhere near the bound is unaffected, which is every real document. */

@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -288,10 +288,10 @@ class ContainerSugarEndToEndTest {
                   holder => { tags: tag_list }""");
 
         assertNotNull(compiled.get("holder").read(TestDocuments.document("{ tags: [\"a\" \"b\"] }")));
-        assertTrue(assertThrows(TsonReadException.class,
+        assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("holder")
                         .read(TestDocuments.document("{ tags: [] }"))).getMessage().contains("minimum 1"));
-        assertTrue(assertThrows(TsonReadException.class,
+        assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("holder")
                         .read(TestDocuments.document("{ tags: [\"a\" \"b\" \"c\"] }")))
                 .getMessage().contains("maximum 2"));
@@ -312,11 +312,11 @@ class ContainerSugarEndToEndTest {
 
         assertNotNull(compiled.get("holder")
                 .read(TestDocuments.document("{ entries: { \"a\" => \"one\" } }")));
-        assertTrue(assertThrows(TsonReadException.class,
+        assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("holder")
                         .read(TestDocuments.document("{ entries: {} }"))).getMessage().contains("minimum 1"),
                 "an empty brace at a map position is a map with no entries");
-        assertTrue(assertThrows(TsonReadException.class,
+        assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("holder").read(TestDocuments.document(
                         "{ entries: { \"a\" => \"1\"  \"b\" => \"2\"  \"c\" => \"3\" } }")))
                 .getMessage().contains("maximum 2"));
@@ -352,7 +352,7 @@ class ContainerSugarEndToEndTest {
 
         assertNotNull(compiled.get("holder")
                 .read(TestDocuments.document("{ a: { \"k\" => _ }  b: { \"k\" => \"v\" } }")));
-        assertTrue(assertThrows(TsonReadException.class, () -> compiled.get("holder")
+        assertTrue(assertThrows(ReadException.class, () -> compiled.get("holder")
                 .read(TestDocuments.document("{ a: { \"k\" => _ }  b: { \"k\" => _ } }")))
                 .getMessage().contains("is absent, but values are required"));
     }

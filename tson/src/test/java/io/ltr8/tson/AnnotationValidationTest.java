@@ -5,8 +5,8 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
@@ -76,7 +76,7 @@ class AnnotationValidationTest {
     }
 
     private static List<Diagnostic> binding(String document, Class<?> type) {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         tson().objectReader().withDiagnostics(problems).read(document, type);
         return problems.diagnostics();
     }
@@ -138,7 +138,7 @@ class AnnotationValidationTest {
      */
     @Test
     void aDocumentWithABadAnnotationNoLongerBindsJustBecauseTheClassIgnoresIt() {
-        assertNull(tson().objectReader().withDiagnostics(TsonDiagnosticsReceiver.collecting())
+        assertNull(tson().objectReader().withDiagnostics(DiagnosticsReceiver.collecting())
                 .read(document("@nosuchtype:\"x\"", "plain"), Plain.class));
         assertNotNull(tson().objectReader().read(document("@level:3", "plain"), Plain.class));
     }
@@ -164,7 +164,7 @@ class AnnotationValidationTest {
      */
     @Test
     void aSchemalessReadStillMakesNoClaimAboutAnAnnotationsType() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         Plain value = new TsonObjectReaderFixture().read(problems);
 
         assertEquals(List.of(), problems.diagnostics());
@@ -173,7 +173,7 @@ class AnnotationValidationTest {
 
     /** A standalone (schemaless) object reader over the same document, with no schema in scope at all. */
     private static final class TsonObjectReaderFixture {
-        Plain read(TsonDiagnosticsCollector problems) {
+        Plain read(DiagnosticsCollector problems) {
             return new io.ltr8.tson.compiler.TsonObjectReader()
                     .withDiagnostics(problems)
                     .read("@nosuchtype:\"x\" { id: \"1\" }", Plain.class);

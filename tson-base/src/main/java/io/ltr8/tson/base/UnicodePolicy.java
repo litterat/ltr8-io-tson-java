@@ -31,7 +31,7 @@ import java.util.Set;
  * <p>Instances are immutable; {@link #perSegment()} and {@link #permitting} return modified copies, so a
  * call site reads as one position rather than three settings.
  */
-public final class TsonUnicodePolicy {
+public final class UnicodePolicy {
 
     /** UTS #39 §5.2's levels, loosest last. */
     public enum Level {
@@ -83,39 +83,39 @@ public final class TsonUnicodePolicy {
     private final boolean perSegment;
     private final List<Set<UnicodeScript>> permitted;
 
-    private TsonUnicodePolicy(Level level, boolean perSegment, List<Set<UnicodeScript>> permitted) {
+    private UnicodePolicy(Level level, boolean perSegment, List<Set<UnicodeScript>> permitted) {
         this.level = level;
         this.perSegment = perSegment;
         this.permitted = List.copyOf(permitted);
     }
 
-    public static TsonUnicodePolicy of(Level level) {
-        return new TsonUnicodePolicy(level, false, List.of());
+    public static UnicodePolicy of(Level level) {
+        return new UnicodePolicy(level, false, List.of());
     }
 
-    public static TsonUnicodePolicy asciiOnly() {
+    public static UnicodePolicy asciiOnly() {
         return of(Level.ASCII_ONLY);
     }
 
-    public static TsonUnicodePolicy singleScript() {
+    public static UnicodePolicy singleScript() {
         return of(Level.SINGLE_SCRIPT);
     }
 
-    public static TsonUnicodePolicy highlyRestrictive() {
+    public static UnicodePolicy highlyRestrictive() {
         return of(Level.HIGHLY_RESTRICTIVE);
     }
 
-    public static TsonUnicodePolicy moderatelyRestrictive() {
+    public static UnicodePolicy moderatelyRestrictive() {
         return of(Level.MODERATELY_RESTRICTIVE);
     }
 
     /** §5.2 level 5: no script restriction, the identifier profile kept. */
-    public static TsonUnicodePolicy scriptsUnchecked() {
+    public static UnicodePolicy scriptsUnchecked() {
         return of(Level.MINIMALLY_RESTRICTIVE);
     }
 
     /** §5.2 level 6: no script restriction and no identifier profile. See {@link Level#UNRESTRICTED}. */
-    public static TsonUnicodePolicy unrestricted() {
+    public static UnicodePolicy unrestricted() {
         return of(Level.UNRESTRICTED);
     }
 
@@ -129,8 +129,8 @@ public final class TsonUnicodePolicy {
      * {@code _} and {@code -} are ordinary characters, and UTS #39's own {@code Toys-Я-Us} is what
      * segmenting a value would wrongly admit.
      */
-    public TsonUnicodePolicy perSegment() {
-        return new TsonUnicodePolicy(level, true, permitted);
+    public UnicodePolicy perSegment() {
+        return new UnicodePolicy(level, true, permitted);
     }
 
     /**
@@ -138,10 +138,10 @@ public final class TsonUnicodePolicy {
      * and its siblings. The narrowest relaxation available: a deployment that knows it is Russian says
      * {@code permitting(LATIN, CYRILLIC)} rather than dropping a level and losing the rule everywhere else.
      */
-    public TsonUnicodePolicy permitting(UnicodeScript... scripts) {
+    public UnicodePolicy permitting(UnicodeScript... scripts) {
         List<Set<UnicodeScript>> extended = new java.util.ArrayList<>(permitted);
         extended.add(Set.of(scripts));
-        return new TsonUnicodePolicy(level, perSegment, extended);
+        return new UnicodePolicy(level, perSegment, extended);
     }
 
     /**
@@ -153,7 +153,7 @@ public final class TsonUnicodePolicy {
      * Consortium freezes: two conforming processors may legitimately disagree about one name, and the
      * version is the only thing that explains the disagreement.
      *
-     * <p><b>It is stated once, not once per refusal</b> ({@code TsonProcessorPolicy}, which a run or a
+     * <p><b>It is stated once, not once per refusal</b> ({@code ProcessorPolicy}, which a run or a
      * response carries beside its diagnostics). It is constant for the life of a process, so a copy on each
      * problem is N copies of a string that cannot differ; and what a sender needs in order not to be refused
      * is this fact <em>before</em> it writes a document, which a channel that only opens on failure cannot
@@ -180,7 +180,7 @@ public final class TsonUnicodePolicy {
      * which is what lets a deployment <em>state</em> its configuration rather than only apply it. A document
      * one processor accepts and another refuses differs by exactly these three, and a reader of the refusal
      * has no other way to learn which one moved: the policy that judged is not in the document, not in the
-     * schema, and not in the diagnostic. See {@code TsonProcessorPolicy}, which is the three of them plus
+     * schema, and not in the diagnostic. See {@code ProcessorPolicy}, which is the three of them plus
      * {@link #dataVersion()} as one value a run or a response states once.
      */
     public Level level() {
@@ -340,13 +340,13 @@ public final class TsonUnicodePolicy {
      * Two policies are equal when they would judge every text alike -- the level, the unit, and the admitted
      * combinations in the order {@link #permitting} added them.
      *
-     * <p>A policy is a value, and the types that report one are records ({@code TsonProcessorPolicy})
+     * <p>A policy is a value, and the types that report one are records ({@code ProcessorPolicy})
      * whose own equality is component-wise: without this, two processors configured identically compare
      * unequal, which is the opposite of what a caller comparing two deployments' configurations is asking.
      */
     @Override
     public boolean equals(Object o) {
-        return o instanceof TsonUnicodePolicy other && level == other.level && perSegment == other.perSegment
+        return o instanceof UnicodePolicy other && level == other.level && perSegment == other.perSegment
                 && permitted.equals(other.permitted);
     }
 

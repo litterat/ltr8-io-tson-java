@@ -3,8 +3,8 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -79,7 +79,7 @@ class MapTreeReaderTest {
         MapBody body = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.REQUIRED, Optional.of(BigInteger.ONE),
                 Optional.empty());
         TsonCompiledSchema compiled = compile(body);
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         compiled.get("scores").read(TestDocuments.document("{}", problems));
 
@@ -102,7 +102,7 @@ class MapTreeReaderTest {
     void absentSentinelAsKeyThrows() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
 
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> readMap(compiled, "{ _ => 1 }"));
         assertTrue(thrown.getMessage().contains("absent sentinel"), thrown.getMessage());
     }
@@ -121,7 +121,7 @@ class MapTreeReaderTest {
     @Test
     void anAbsentEntryValueIsPermittedUnderOptional() {
         TsonCompiledSchema compiled = compile(optionalValues());
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         TsonMap result = (TsonMap) compiled.get("scores").read(TestDocuments.document("{ 1 => _  2 => 20 }", problems));
 
@@ -140,7 +140,7 @@ class MapTreeReaderTest {
     @Test
     void anAbsentEntryValueIsRefusedUnderTheDefaultRequired() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         compiled.get("scores").read(TestDocuments.document("{ 1 => _ }", problems));
 
@@ -166,7 +166,7 @@ class MapTreeReaderTest {
 
         MapBody atMostOne = new MapBody(TypeRef.of("integer"), TypeRef.of("integer"), ElementState.OPTIONAL,
                 Optional.empty(), Optional.of(BigInteger.ONE));
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> compile(atMostOne).get("scores").read(TestDocuments.document("{ 1 => _  2 => _ }")));
         assertTrue(thrown.getMessage().contains("has 2 entries, more than the maximum 1"), thrown.getMessage());
     }
@@ -176,7 +176,7 @@ class MapTreeReaderTest {
     void anAbsentKeyIsStillRefusedWhenTheValueIsAbsentToo() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
 
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> readMap(compiled, "{ _ => _ }"));
         assertTrue(thrown.getMessage().contains("absent sentinel"), thrown.getMessage());
     }
@@ -189,7 +189,7 @@ class MapTreeReaderTest {
     void duplicateKeyIsAValidationError() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
 
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> readMap(compiled, "{ 1 => 10  1 => 20 }"));
         assertTrue(thrown.getMessage().contains("duplicate key '1'"), thrown.getMessage());
     }
@@ -202,7 +202,7 @@ class MapTreeReaderTest {
     @Test
     void duplicateKeyIsJudgedOnTheDecodedValueNotTheWrittenText() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         @SuppressWarnings("unchecked")
         Map<Object, Object> result = (Map<Object, Object>) Dom.of((TsonValue) compiled.get("scores")
@@ -221,7 +221,7 @@ class MapTreeReaderTest {
     @Test
     void anUndecodableKeyIsNotCountedAsSeen() {
         TsonCompiledSchema compiled = compile(MapBody.of(TypeRef.of("integer"), TypeRef.of("integer")));
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         compiled.get("scores").read(TestDocuments.document("{ \"a\" => 1  \"b\" => 2 }", problems));
 
@@ -236,7 +236,7 @@ class MapTreeReaderTest {
         TsonCompiledSchema compiled = compile(body);
 
         assertEquals(2, readMap(compiled, "{ 1 => 1 2 => 2 }").size());
-        assertThrows(TsonReadException.class, () -> readMap(compiled, "{ 1 => 1 }"));
+        assertThrows(ReadException.class, () -> readMap(compiled, "{ 1 => 1 }"));
     }
 
     @Test
@@ -245,6 +245,6 @@ class MapTreeReaderTest {
         TsonCompiledSchema compiled = compile(body);
 
         assertEquals(1, readMap(compiled, "{ 1 => 1 }").size());
-        assertThrows(TsonReadException.class, () -> readMap(compiled, "{ 1 => 1 2 => 2 }"));
+        assertThrows(ReadException.class, () -> readMap(compiled, "{ 1 => 1 2 => 2 }"));
     }
 }
