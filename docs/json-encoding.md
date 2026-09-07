@@ -403,12 +403,32 @@ wrapping. `float`/`double` are the exception and are meant to be — rounding on
 approximate families' own contract (§5.4). An enum needs no rule here at all: `tson-bind` bridges every
 plain Java enum through `EnumStringBridge`, so one arrives as a bridged `String` atom.
 
-**Fail-fast, with no collecting mode.** Collecting belongs with the schema-directed decode, where §9.4's
-four categories exist to sort what is collected. A receiver over this reader would carry one shape of
-problem, and the wrong shape at that: a class that does not match the document is a misconfiguration in
-the reading application, not a verdict on the document — the same line `BIND_MISMATCH` draws on the TSON
-side. `JsonBindException` is separate from `JsonParseException` for that reason: "this is not JSON"
-against "this is not my JSON", and a caller routes on which it caught.
+**Every problem goes through a `DiagnosticsReceiver`**, so a read's own receiver decides its fate exactly
+as it does for the TSON readers: `throwing()` — the default — raises `ReadException` at the first, and
+`withDiagnostics(DiagnosticsCollector)` gathers every problem in one pass and still returns. **One pass
+finding everything is the point**: a reader that threw could only report the first disagreement, and a
+sender fixing a document one round trip per mistake is the failure mode diagnostics exist to avoid.
+
+`JsonReadContext` is what carries it — the peer of `TsonReadContext`, holding no error policy of its own.
+It tracks the position and builds the RFC 6901 pointer by *stepping* (`field(name)`/`index(i)` return a
+context one link deeper) rather than concatenating, since concatenating per step is quadratic in depth and
+thrown away by every read that reports nothing. It is simpler than its TSON peer in three ways, each
+because this read has less to say: no schema end (the class is the schema, and a class has no document to
+point into), no lookahead or rewind (the engine pulls a value's opening event and passes it down), and no
+name policy yet.
+
+Codes come from the same closed vocabulary the TSON readers use — §9.4 adds no category of its own — so
+`TYPE_MISMATCH`, `FIELD_REQUIRED`, `UNRECOGNIZED_FIELD`, `DUPLICATE_FIELD`, `DUPLICATE_MAP_KEY`,
+`WRONG_ARITY`, `ATOM_CONSTRAINT_VIOLATION`, `UNKNOWN_TYPE_REF` for a union with no selector, and
+**`BIND_MISMATCH`** for a class this context cannot analyse or cannot receive a JSON object's keys into.
+That last one is deliberately **not a verdict**: nothing about the document is being asserted by it, which
+is what a caller routing on `Code.verdict()` needs to be able to tell.
+
+**Bind mode is all-or-nothing.** A record, array, tuple or map whose contents reported is not constructed:
+a Java record has nowhere to put a hole, so a collecting read hands back `null` rather than an object
+nobody wrote. Tree mode keeps what it built and this cannot — the same deliberate asymmetry
+`ConstructionGuard` draws on the TSON side, reached here by checkpointing `ctx.reported()` across the
+container's own contents.
 
 **What this reader is not** is validation against a TSON schema. Nothing here consults facets, field
 states, defaults, fixed values, groups or the discrimination predicate, because a Java class declares

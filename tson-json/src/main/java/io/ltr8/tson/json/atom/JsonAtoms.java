@@ -1,9 +1,9 @@
 package io.ltr8.tson.json.atom;
 
 import io.ltr8.bind.DataClassAtom;
-import io.ltr8.tson.json.JsonBindException;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.bind.DataClassBridge;
-import io.ltr8.tson.json.JsonPosition;
+import io.ltr8.tson.json.reader.JsonReadContext;
 import io.ltr8.tson.json.stream.JsonEvent;
 
 import java.math.BigDecimal;
@@ -46,9 +46,9 @@ public final class JsonAtoms {
     }
 
     /** {@code leaf} at {@code atom}'s type, bridge applied. {@code null} only where the leaf was JSON null. */
-    public static Object bind(JsonEvent leaf, DataClassAtom atom, JsonPosition at) {
+    public static Object bind(JsonReadContext ctx, JsonEvent leaf, DataClassAtom atom) {
         Class<?> wire = atom.dataClass();
-        Object value = leaf instanceof JsonEvent.NullValue ? null : bindTo(leaf, wire, at);
+        Object value = leaf instanceof JsonEvent.NullValue ? null : bindTo(ctx, leaf, wire);
         DataClassBridge bridge = atom.bridge().orElse(null);
         if (bridge == null || value == null) {
             return value;
@@ -56,40 +56,51 @@ public final class JsonAtoms {
         try {
             return bridge.toObject().invoke(value);
         } catch (Throwable e) {
-            throw new JsonBindException("'%s' is not a %s: %s"
-                    .formatted(text(leaf), atom.typeClass().getSimpleName(), e.getMessage()), at);
+            // The bridge's own rule refusing the content -- an enum constant that is not one, a malformed
+            // UUID. A constraint on the value, which is what ATOM_CONSTRAINT_VIOLATION names.
+            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "'%s' is not a %s: %s"
+                    .formatted(text(leaf), atom.typeClass().getSimpleName(), e.getMessage()),
+                    "a " + atom.typeClass().getSimpleName(), text(leaf));
+            return null;
         }
     }
 
-    private static Object bindTo(JsonEvent leaf, Class<?> target, JsonPosition at) {
+    private static Object bindTo(JsonReadContext ctx, JsonEvent leaf, Class<?> target) {
         return switch (leaf) {
-            case JsonEvent.StringValue string -> fromString(string.value(), target, at);
+            case JsonEvent.StringValue string -> fromString(ctx, string.value(), target);
             case JsonEvent.BooleanValue bool -> {
                 if (target != boolean.class && target != Boolean.class && target != Object.class) {
-                    throw mismatch("a boolean", target, at);
+                    yield mismatch(ctx, "a boolean", target);
                 }
                 yield bool.value();
             }
-            case JsonEvent.NumberValue number -> fromNumber(number.literal(), target, at);
-            default -> throw new JsonBindException(
-                    "a %s cannot be read into %s".formatted(describe(leaf), target.getSimpleName()), at);
+            case JsonEvent.NumberValue number -> fromNumber(ctx, number.literal(), target);
+            default -> {
+                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                        "a %s cannot be read into %s".formatted(describe(leaf), target.getSimpleName()),
+                        target.getSimpleName(), describe(leaf));
+                yield null;
+            }
         };
     }
 
-    private static Object fromString(String value, Class<?> target, JsonPosition at) {
+    private static Object fromString(JsonReadContext ctx, String value, Class<?> target) {
         if (target == String.class || target == CharSequence.class || target == Object.class) {
             return value;
         }
         if (target == char.class || target == Character.class) {
             if (value.length() != 1) {
-                throw new JsonBindException("a char takes a one-character string, not %d".formatted(value.length()), at);
+                ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+                        "a char takes a one-character string, not %d".formatted(value.length()),
+                        "one character", value.length() + " characters");
+                return null;
             }
             return value.charAt(0);
         }
-        throw mismatch("a string", target, at);
+        return mismatch(ctx, "a string", target);
     }
 
-    private static Object fromNumber(String literal, Class<?> target, JsonPosition at) {
+    private static Object fromNumber(JsonReadContext ctx, String literal, Class<?> target) {
         // Every narrowing runs off one BigDecimal, so `2147483648` at an int and `1.5` at an int fail the
         // same way: the digits are what arrived and the target is what cannot hold them (§3.1).
         if (target == double.class || target == Double.class) {
@@ -122,14 +133,19 @@ public final class JsonAtoms {
                 return decimal.toBigIntegerExact();
             }
         } catch (ArithmeticException e) {
-            throw new JsonBindException("%s is not exactly representable as %s"
-                    .formatted(literal, target.getSimpleName()), at);
+            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, "%s is not exactly representable as %s"
+                    .formatted(literal, target.getSimpleName()),
+                    "a value that fits " + target.getSimpleName(), literal);
+            return null;
         }
-        throw mismatch("a number", target, at);
+        return mismatch(ctx, "a number", target);
     }
 
-    private static JsonBindException mismatch(String found, Class<?> target, JsonPosition at) {
-        return new JsonBindException("%s cannot be read into %s".formatted(found, target.getSimpleName()), at);
+    private static Object mismatch(JsonReadContext ctx, String found, Class<?> target) {
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                "%s cannot be read into %s".formatted(found, target.getSimpleName()),
+                target.getSimpleName(), found);
+        return null;
     }
 
     /** How a leaf names itself in a message. */

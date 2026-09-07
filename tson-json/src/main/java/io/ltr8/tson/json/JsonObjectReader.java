@@ -1,6 +1,7 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.json.reader.DataClassObjectReader;
 import io.ltr8.tson.json.stream.JsonEventSource;
@@ -36,11 +37,18 @@ import java.io.InputStream;
  * to document size, and {@link io.ltr8.tson.json.stream.JsonStream}'s §10.1 bound refuses a document before this descends into
  * it.
  *
- * <p><b>Fail-fast.</b> The first disagreement between document and class is a {@link
- * JsonBindException}; there is no collecting mode here. Collecting belongs with the schema-directed
- * decode of §5–§8, where §9.4's four categories exist to sort what is collected — a receiver over this
- * reader would be a list of one shape, and the wrong shape at that: a class that does not match is a
- * misconfiguration in the reading application, not a verdict on the document.
+ * <p><b>Every problem goes through a {@link DiagnosticsReceiver}</b>, so this read's own receiver decides
+ * its fate exactly as it does for the TSON readers: {@link DiagnosticsReceiver#throwing()} -- the default --
+ * raises {@code ReadException} at the first, and {@link #withDiagnostics} with
+ * {@link DiagnosticsReceiver#collecting()} gathers every problem in one pass and still returns. One pass
+ * finding everything is the point: a reader that threw could only ever report the first disagreement, and a
+ * sender fixing a document one round trip per mistake is the failure mode diagnostics exist to avoid.
+ *
+ * <p>Each problem carries a {@link io.ltr8.tson.base.Diagnostic.Code} from the same closed vocabulary the
+ * TSON readers use ([TSON-JSON] §9.4 adds no category of its own), an RFC 6901 pointer to where in the
+ * document it is, and the position. Two of those codes are deliberately not verdicts on the document:
+ * {@code BIND_MISMATCH} for a class this context cannot analyse or cannot receive a JSON object's keys
+ * into, which is a misconfiguration in the reading application rather than anything about the document.
  *
  * <p><b>A member the class does not declare refuses the document.</b> This is the one place the reader is
  * stricter than a JSON consumer expects, and the reason is not tidiness: <b>a member added in a later
@@ -85,15 +93,33 @@ public final class JsonObjectReader {
     /** What actually binds a value. Rebuilt per derived reader, since a derivation is a change to how it binds. */
     private final DataClassObjectReader engine;
 
-    private JsonObjectReader(DataBindContext context, boolean ignoreUnknownMembers) {
+    /** What decides a problem's fate. Fail-fast until a caller names otherwise. */
+    private final DiagnosticsReceiver receiver;
+
+    private JsonObjectReader(DataBindContext context, boolean ignoreUnknownMembers,
+                             DiagnosticsReceiver receiver) {
         this.context = context;
         this.ignoreUnknownMembers = ignoreUnknownMembers;
+        this.receiver = receiver;
         this.engine = new DataClassObjectReader(context, ignoreUnknownMembers);
+    }
+
+    /**
+     * This reader routing its problems to {@code receiver} -- a new reader, leaving this one unchanged.
+     *
+     * <p>The peer of {@code TsonObjectReader.withDiagnostics}, and what makes a one-pass read possible:
+     * {@code DiagnosticsReceiver.collecting()} gathers every problem and lets the read run to the end,
+     * where the default {@code throwing()} raises {@code ReadException} at the first. A collecting read
+     * hands back {@code null} rather than a half-built object -- see {@code DataClassObjectReader} on why
+     * bind mode is all-or-nothing where a tree keeps what it built.
+     */
+    public JsonObjectReader withDiagnostics(DiagnosticsReceiver receiver) {
+        return new JsonObjectReader(context, ignoreUnknownMembers, receiver);
     }
 
     /** Over a caller's own bind context — one per binding profile, descriptors cached inside it. */
     public static JsonObjectReader using(DataBindContext context) {
-        return new JsonObjectReader(context, false);
+        return new JsonObjectReader(context, false, DiagnosticsReceiver.throwing());
     }
 
     /**
@@ -102,7 +128,7 @@ public final class JsonObjectReader {
      * context registering them and uses {@link #using}.
      */
     public static JsonObjectReader standard() {
-        return new JsonObjectReader(DataBindContext.builder().build(), false);
+        return new JsonObjectReader(DataBindContext.builder().build(), false, DiagnosticsReceiver.throwing());
     }
 
     /**
@@ -118,7 +144,7 @@ public final class JsonObjectReader {
      * two apart, and the schema-directed decode is where the keeping form arrives.
      */
     public JsonObjectReader ignoringUnknownMembers() {
-        return new JsonObjectReader(context, true);
+        return new JsonObjectReader(context, true, receiver);
     }
 
     // ── Reading ──────────────────────────────────────────────────────────
@@ -156,7 +182,7 @@ public final class JsonObjectReader {
      * {@link DataClassObjectReader} binds a value and stops, which is what lets it compose.
      */
     private <T> T readDocument(JsonEventSource events, Class<T> type) {
-        T value = engine.read(events, type);
+        T value = engine.read(events, type, receiver);
         events.next();   // EndOfDocument, or the stream refuses what follows the root value
         return value;
     }

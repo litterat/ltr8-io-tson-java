@@ -3,6 +3,9 @@ package io.ltr8.tson.json;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.annotation.Field;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -73,8 +76,16 @@ class JsonObjectReaderTest {
     public record Drawing(Shape shape) {
     }
 
-    private static JsonBindException refused(String source, Class<?> type) {
-        return assertThrows(JsonBindException.class, () -> READER.read(source, type));
+    /** The one problem a fail-fast read raises, as a diagnostic -- what {@code throwing()} wraps. */
+    private static Diagnostic refused(String source, Class<?> type) {
+        return assertThrows(ReadException.class, () -> READER.read(source, type)).diagnostic();
+    }
+
+    /** Every problem a collecting read finds, in one pass. */
+    private static List<Diagnostic> collected(String source, Class<?> type) {
+        DiagnosticsCollector problems = new DiagnosticsCollector();
+        READER.withDiagnostics(problems).read(source, type);
+        return problems.diagnostics();
     }
 
     @Nested
@@ -111,10 +122,10 @@ class JsonObjectReaderTest {
             // Not tidiness: a member added in a later version can change what the members this class does
             // read mean -- a currency beside an amount, a unit beside a quantity. A reader that drops it
             // has not read a subset of the document, it has read a different document and cannot tell.
-            JsonBindException e = refused("{\"name\": \"Ada\", \"currency\": \"AUD\", \"age\": 36}", Person.class);
-            assertTrue(e.getMessage().contains("Person declares no member 'currency'"), e.getMessage());
-            assertTrue(e.getMessage().contains("(name, age)"), e.getMessage());
-            assertEquals(new JsonPosition(1, 17, 16), e.position());
+            Diagnostic e = refused("{\"name\": \"Ada\", \"currency\": \"AUD\", \"age\": 36}", Person.class);
+            assertTrue(e.message().contains("Person declares no member 'currency'"), e.message());
+            assertTrue(e.message().contains("(name, age)"), e.message());
+            assertEquals(new JsonPosition(1, 17, 16), e.dataPosition().orElseThrow());
         }
 
         @Test
@@ -124,7 +135,7 @@ class JsonObjectReaderTest {
             JsonObjectReader lenient = READER.ignoringUnknownMembers();
             assertEquals(new Person("Ada", 36), lenient.read(
                     "{\"name\": \"Ada\", \"extra\": {\"deep\": [1, {\"x\": null}]}, \"age\": 36}", Person.class));
-            assertThrows(JsonBindException.class, () -> READER.read(
+            assertThrows(ReadException.class, () -> READER.read(
                     "{\"name\": \"Ada\", \"extra\": 1, \"age\": 36}", Person.class));
         }
 
@@ -132,23 +143,23 @@ class JsonObjectReaderTest {
         void a_missing_required_member_is_refused_and_a_missing_optional_one_is_not() {
             // A primitive component is required; an object component is not unless the class says so.
             assertEquals(new Person(null, 36), READER.read("{\"age\": 36}", Person.class));
-            assertTrue(refused("{\"name\": \"Ada\"}", Person.class).getMessage()
+            assertTrue(refused("{\"name\": \"Ada\"}", Person.class).message()
                     .contains("requires a member 'age'"));
-            assertTrue(refused("{}", Required.class).getMessage().contains("requires a member 'name'"));
+            assertTrue(refused("{}", Required.class).message().contains("requires a member 'name'"));
         }
 
         @Test
         void a_duplicate_member_name_is_refused_at_the_repeat() {
-            JsonBindException e = refused("{\"name\": \"a\", \"name\": \"b\", \"age\": 1}", Person.class);
-            assertTrue(e.getMessage().contains("'name' is already a member"));
-            assertEquals(new JsonPosition(1, 15, 14), e.position());
+            Diagnostic e = refused("{\"name\": \"a\", \"name\": \"b\", \"age\": 1}", Person.class);
+            assertTrue(e.message().contains("'name' is already a member"));
+            assertEquals(new JsonPosition(1, 15, 14), e.dataPosition().orElseThrow());
         }
 
         @Test
         void a_value_of_the_wrong_shape_names_what_was_due_and_what_arrived() {
-            assertTrue(refused("[1, 2]", Person.class).getMessage()
+            assertTrue(refused("[1, 2]", Person.class).message()
                     .contains("Person takes an object, and this is an array"));
-            assertTrue(refused("{\"name\": \"a\", \"age\": {}}", Person.class).getMessage()
+            assertTrue(refused("{\"name\": \"a\", \"age\": {}}", Person.class).message()
                     .contains("an object cannot be read into int"));
         }
 
@@ -182,9 +193,9 @@ class JsonObjectReaderTest {
         @Test
         void null_at_a_required_member_is_refused_as_the_absent_sentinel_is_in_text() {
             // [TSON-SCHEMA] §7.6: `_` at a REQUIRED field is an error, and §7 makes null its JSON spelling.
-            assertTrue(refused("{\"name\": \"a\", \"age\": null}", Person.class).getMessage()
+            assertTrue(refused("{\"name\": \"a\", \"age\": null}", Person.class).message()
                     .contains("member 'age' is required and is written null"));
-            assertTrue(refused("{\"name\": null}", Required.class).getMessage()
+            assertTrue(refused("{\"name\": null}", Required.class).message()
                     .contains("member 'name' is required and is written null"));
         }
 
@@ -218,9 +229,9 @@ class JsonObjectReaderTest {
         @Test
         void a_narrowing_that_would_lose_is_an_error_rather_than_a_round() {
             // §3.1: "an implementation that cannot represent the digits MUST error, never round silently".
-            assertTrue(refused("{\"name\": \"a\", \"age\": 1.5}", Person.class).getMessage()
+            assertTrue(refused("{\"name\": \"a\", \"age\": 1.5}", Person.class).message()
                     .contains("1.5 is not exactly representable as int"));
-            assertTrue(refused("{\"name\": \"a\", \"age\": 2147483648}", Person.class).getMessage()
+            assertTrue(refused("{\"name\": \"a\", \"age\": 2147483648}", Person.class).message()
                     .contains("not exactly representable as int"));
         }
 
@@ -238,13 +249,13 @@ class JsonObjectReaderTest {
                     Painted.class));
             // The lookup is EnumStringBridge's, not this reader's: tson-bind binds every plain Java enum
             // through it, so an enum component arrives as a bridged String atom.
-            assertTrue(refused("{\"colour\": \"BLUE\", \"filled\": true}", Painted.class).getMessage()
+            assertTrue(refused("{\"colour\": \"BLUE\", \"filled\": true}", Painted.class).message()
                     .contains("'BLUE' is not a Colour"));
         }
 
         @Test
         void a_boolean_target_takes_a_boolean_and_not_its_spelling() {
-            assertTrue(refused("{\"colour\": \"RED\", \"filled\": \"true\"}", Painted.class).getMessage()
+            assertTrue(refused("{\"colour\": \"RED\", \"filled\": \"true\"}", Painted.class).message()
                     .contains("cannot be read into boolean"));
         }
     }
@@ -268,7 +279,7 @@ class JsonObjectReaderTest {
 
         @Test
         void a_repeated_key_is_refused() {
-            assertTrue(refused("{\"byName\": {\"a\": 1, \"a\": 2}}", Scores.class).getMessage()
+            assertTrue(refused("{\"byName\": {\"a\": 1, \"a\": 2}}", Scores.class).message()
                     .contains("'a' is already a key of this map"));
         }
     }
@@ -281,7 +292,7 @@ class JsonObjectReaderTest {
             // §8.2 admits a tag-free choice by exactly two routes -- a declared discriminator, or a derived
             // disjointness fact -- and forbids extending them. A Java union states neither, and trying each
             // member in turn is what §8.2 rules out in as many words.
-            String message = refused("{\"shape\": {\"radius\": 1}}", Drawing.class).getMessage();
+            String message = refused("{\"shape\": {\"radius\": 1}}", Drawing.class).message();
             assertTrue(message.contains("is a union"), message);
             assertTrue(message.contains("no selector"), message);
             assertTrue(message.contains("§8.2"), message);

@@ -363,6 +363,12 @@ belief, over the bind path:
 
 ## Name hygiene on the read path ([TSON-DATA] §8.2)
 
+**An unbindable target class is `BIND_MISMATCH`, not `SCHEMA_ERROR`.** A class `tson-bind` cannot analyse
+is a misconfiguration in the reading application and says nothing about the document — the distinction
+`Code.verdict()` exists to carry, and the same line `TsonBindMismatchException` draws at compile time.
+Reporting it as `SCHEMA_ERROR` told a caller routing on the answer that the document was wrong when nothing
+had looked at it. Both encodings' class-driven readers report it the same way.
+
 **A refused name draws no verdict beside its refusal.** Name hygiene runs inside `ctx.next()`, so a name
 §8.2 refused is reported before the reader has looked it up — and then the reader does not look it up:
 `RecordAbstractReader.readFields` and `SchemalessObjectReader.bindRecord` both checkpoint `ctx.reported()`
