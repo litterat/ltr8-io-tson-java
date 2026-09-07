@@ -1,7 +1,7 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.json.reader.ClassDirectedReader;
+import io.ltr8.tson.json.reader.DataClassObjectReader;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
 import java.io.InputStream;
@@ -25,7 +25,7 @@ import java.io.InputStream;
  * same reason {@code TsonObjectReader} sits beside {@code Tson}: a reader is a front door, not a
  * layer of one.
  *
- * <p><b>A facade over {@link ClassDirectedReader}</b>, which is what actually binds a value. The split is
+ * <p><b>A facade over {@link DataClassObjectReader}</b>, which is what actually binds a value. The split is
  * the one {@code TsonObjectReader} makes over {@code SchemalessObjectReader}, and for the same reason: a
  * front door owns the document -- entry points, framing, and the configuration a read is judged under --
  * where the engine owns one value at one descriptor and stops. It is also where the schema-directed decode
@@ -82,12 +82,12 @@ public final class JsonObjectReader {
     private final boolean ignoreUnknownMembers;
 
     /** What actually binds a value. Rebuilt per derived reader, since a derivation is a change to how it binds. */
-    private final ClassDirectedReader engine;
+    private final DataClassObjectReader engine;
 
     private JsonObjectReader(DataBindContext context, boolean ignoreUnknownMembers) {
         this.context = context;
         this.ignoreUnknownMembers = ignoreUnknownMembers;
-        this.engine = new ClassDirectedReader(context, ignoreUnknownMembers);
+        this.engine = new DataClassObjectReader(context, ignoreUnknownMembers);
     }
 
     /** Over a caller's own bind context — one per binding profile, descriptors cached inside it. */
@@ -152,7 +152,7 @@ public final class JsonObjectReader {
      *
      * <p>The pull past the root value is what rejects trailing content, so a read that stopped at the
      * object's closing brace would accept {@code "{} 2"}. Framing is the facade's because the document is:
-     * {@link ClassDirectedReader} binds a value and stops, which is what lets it compose.
+     * {@link DataClassObjectReader} binds a value and stops, which is what lets it compose.
      */
     private <T> T readDocument(JsonEventSource events, Class<T> type) {
         T value = engine.read(events, type);

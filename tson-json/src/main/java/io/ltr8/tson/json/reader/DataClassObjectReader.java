@@ -31,11 +31,16 @@ import java.util.Set;
  * Binds one JSON value at one {@link DataClass}, driven by the target class's own {@code tson-bind}
  * descriptor -- the engine {@code JsonObjectReader} is a facade over.
  *
- * <p><b>Named for what directs it.</b> [TSON-JSON] §1.3's first principle makes decoding
- * <em>schema</em>-directed; this reads the same way with a Java class standing in for the schema, and the
- * schema-directed decode of §5-§8 will be its sibling under the same facade rather than a second front
- * door. "Schemaless" would name what it lacks, which is the less useful half of the fact -- the TSON side
- * calls its peer {@code SchemalessObjectReader}, and the two are the same shape under different names.
+ * <p><b>Named for what drives it and what it produces</b>, which is the pair every reader in this family
+ * is named for: a {@code DataClass} descriptor drives it, and an object comes out. The eventual tree
+ * reader is a {@code JsonTreeReader} over a tree engine, and the schema-directed decode of §5-§8 is a
+ * third engine under this same facade rather than a second front door -- so the two axes have to stay in
+ * the name or the family stops scaling.
+ *
+ * <p>{@code tson-compiler}'s peer is {@code SchemalessObjectReader}, and this deliberately does not copy
+ * that name: the class <em>is</em> the schema here, as that class's own Javadoc says of its own target
+ * ("in effect the schema the data must satisfy"), so "schemaless" describes the one thing this reader is
+ * not short of. It is accurate of a <em>tree</em> reader, which really is driven by nothing.
  *
  * <p><b>Frame-free.</b> Whole-document framing -- draining the source through
  * {@link JsonEvent.EndOfDocument}, which is what rejects trailing content -- belongs to whoever owns the
@@ -45,14 +50,14 @@ import java.util.Set;
  * <p>Unexported, on the same terms as {@code tson-compiler}'s {@code reader} package: a consumer names the
  * facade, never the engine under it.
  */
-public final class ClassDirectedReader {
+public final class DataClassObjectReader {
 
     private final DataBindContext context;
 
     /** Whether a member the target class does not declare is discarded rather than refused -- see {@code JsonObjectReader.ignoringUnknownMembers}. */
     private final boolean ignoreUnknownMembers;
 
-    public ClassDirectedReader(DataBindContext context, boolean ignoreUnknownMembers) {
+    public DataClassObjectReader(DataBindContext context, boolean ignoreUnknownMembers) {
         this.context = context;
         this.ignoreUnknownMembers = ignoreUnknownMembers;
     }

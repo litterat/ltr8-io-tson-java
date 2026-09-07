@@ -22,13 +22,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * second engine under the same door.
  */
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
-class ClassDirectedReaderTest {
+class DataClassObjectReaderTest {
 
     public record Person(String name, int age) {
     }
 
-    private static final ClassDirectedReader ENGINE =
-            new ClassDirectedReader(DataBindContext.builder().build(), false);
+    private static final DataClassObjectReader ENGINE =
+            new DataClassObjectReader(DataBindContext.builder().build(), false);
 
     @Test
     void it_binds_one_value_and_leaves_the_source_where_that_value_ended() {
