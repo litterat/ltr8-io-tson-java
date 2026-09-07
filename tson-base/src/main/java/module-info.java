@@ -20,4 +20,11 @@
  */
 module io.ltr8.tson.base {
     exports io.ltr8.tson.base;
+
+    /**
+     * The UCD-16.0 tables and the UTS #39 rules over them, exported because two engines read them:
+     * {@code tson-compiler}'s lexer and identifier parser, and whatever a second encoding needs to know
+     * what an identifier is. Pure Unicode -- nothing here knows what a TSON document looks like.
+     */
+    exports io.ltr8.tson.base.unicode;
 }

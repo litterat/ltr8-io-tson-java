@@ -1,7 +1,8 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.unicode.Xid;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonUnicodePolicy;
+import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentHeader;
 import io.ltr8.tson.compiler.ast.RecordValue;

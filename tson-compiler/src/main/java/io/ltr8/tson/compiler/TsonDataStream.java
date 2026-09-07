@@ -10,7 +10,7 @@ import io.ltr8.tson.compiler.atom.IdentifierParser;
 import io.ltr8.tson.compiler.atom.UriParser;
 import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
-import io.ltr8.tson.compiler.lexer.Nfc;
+import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
 import io.ltr8.tson.compiler.stream.AbsentEvent;

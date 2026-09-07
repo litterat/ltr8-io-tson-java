@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler.lexer;
+package io.ltr8.tson.base.unicode;
 
 import java.text.Normalizer;
 import java.util.HashMap;

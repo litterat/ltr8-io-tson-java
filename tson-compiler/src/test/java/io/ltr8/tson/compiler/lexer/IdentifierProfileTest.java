@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.lexer;
 
+import io.ltr8.tson.base.unicode.Xid;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;

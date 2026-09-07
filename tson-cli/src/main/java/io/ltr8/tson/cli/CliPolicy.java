@@ -3,7 +3,7 @@ package io.ltr8.tson.cli;
 import io.ltr8.annotation.Field;
 import io.ltr8.tson.base.TsonLimitsPolicy;
 import io.ltr8.tson.compiler.TsonUnicodeProcessorPolicy;
-import io.ltr8.tson.compiler.TsonUnicodePolicy;
+import io.ltr8.tson.base.TsonUnicodePolicy;
 
 import java.lang.Character.UnicodeScript;
 import java.util.List;

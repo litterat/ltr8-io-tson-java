@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.compiler.lexer.Xid;
+import io.ltr8.tson.base.unicode.Xid;
 
 /**
  * The readable half of a name the resolver mints, built so the whole name is <b>ASCII and a valid {@code

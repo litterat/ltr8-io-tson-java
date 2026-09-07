@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.compiler.lexer.Nfc;
+import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonAtom;
 

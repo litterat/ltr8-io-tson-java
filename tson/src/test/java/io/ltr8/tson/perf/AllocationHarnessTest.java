@@ -1,6 +1,6 @@
 package io.ltr8.tson.perf;
 
-import io.ltr8.tson.compiler.TsonUnicodePolicy;
+import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.compiler.TsonDataStream;
