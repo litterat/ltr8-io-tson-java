@@ -202,3 +202,46 @@ structurally rather than by parsing prose. §9.4 splits what the exception cover
 §8.1's categories — a lexer error for malformed UTF-8 and ill-formed strings, a parse error for grammar
 violations — and that split is the schema-directed layer's to make when it classifies one into a `Diagnostic`.
 Carrying it on the exception as well would be a second opinion about one fact.
+
+## Structural layer (`tson-json/.../stream/`)
+
+`JsonStream` is RFC 8259's grammar over the lexer, as a lazy pull-based `JsonEventSource`. It is the only
+thing above the lexer that walks source text; it holds a frame stack and nothing else, so memory is
+proportional to nesting depth rather than to document size, and the layers above consume events and hold no
+grammar of their own. `JsonEvent` is a sealed hierarchy of ten records — the two container pairs,
+`MemberName`, the four leaves, and `EndOfDocument`.
+
+**No token lookahead at all.** JSON's grammar is LL(1) on already-lexed tokens and never needs a pushback:
+after `{` the next token is either `}` or a member name and consuming it decides which. That is where
+`TsonDataStream` spends two tokens, on the record-versus-map brace idiom — an ambiguity JSON does not have
+because it does not draw the distinction. `peek()` holds back a produced event, not a token.
+
+**There is no document-start event.** `JSON-text` is one value and carries no header, so there is nothing for
+one to hold; the TSON counterpart exists only for `!!id`/`!!schema`. `EndOfDocument` does exist and is not
+merely `hasNext() == false` — **producing it is what pulls past the root value, and so what rejects trailing
+content**. `[1] 2` is refused there and nowhere else, the same trap the TSON facades keep under
+`requireDocumentEnd`.
+
+**`NullValue` is a value here.** §7 makes JSON null the absent sentinel's spelling *at a typed position*, and
+this layer has none. Settling it in the event vocabulary is exactly the mistake a shared `TsonEvent` would
+have forced.
+
+**Grammar only**, on §3.1's own layering, and three things follow: member names are not deduped (§3.1 makes a
+repeat an error whose *category* follows the position's type, which no grammar layer holds — the tree applies
+the rule where JEP 540 does, the schema-directed decode applies it with a category); no value is interpreted;
+and no member name is reserved, §3.2's `$`-namespace being a question about the position's type.
+
+**Nesting depth is bounded here** (§10.1) — the one place every container opens, so a refusal lands before
+any consumer descends, which matters because every consumer of this stream recurses where the stream itself
+iterates. The bound arrives as an `int`, not a policy object: §10.1 makes it [TSON-DATA] §9.1's policy "in
+JSON clothing", one policy across both encodings, so a second policy type here would be a second default to
+drift. `JsonLimitExceededException` *is* a separate type, and has to be — §10.1 makes a refusal §8.1's fifth
+outcome, never a verdict, so it must be distinguishable from `JsonParseException` or a configured bound
+reaches a consumer as a syntax failure. Both are `final` and unrelated, so javac itself proves the split.
+
+**Error messages name the construct the position admits**, not the token class found — "a member name is due"
+where "expected STRING" would tell an author what a lexer calls the thing they already wrote.
+`TsonSchemaParser` makes the same choice. One case escapes it and is pinned rather than papered over: `{a: 1}`,
+the JS object-literal habit and the commonest of these mistakes, never reaches the grammar at all — `a` starts
+no JSON token, so the lexer refuses it first and names the character. The grammar cannot improve on that
+without the lexer knowing what position it is at, which is the layering.
