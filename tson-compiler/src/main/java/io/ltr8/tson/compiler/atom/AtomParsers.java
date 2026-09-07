@@ -15,6 +15,7 @@ import io.ltr8.tson.schema.meta.IntegerType;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import io.ltr8.tson.schema.meta.MacType;
+import io.ltr8.tson.schema.meta.PeriodType;
 import io.ltr8.tson.schema.meta.RationalType;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.TextType;
@@ -84,6 +85,7 @@ public final class AtomParsers {
             case TimeType t -> new TimeParser(t);
             case DateTimeType t -> new DateTimeParser(t);
             case DurationType t -> new DurationParser(t);
+            case PeriodType t -> new PeriodParser(t);
             case UriType t -> new UriParser(t);
             case RegexType t -> new RegexParser(t);
             case MacType t -> new MacParser(t);

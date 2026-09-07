@@ -5,6 +5,7 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.compiler.atom.AtomParsers;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
@@ -73,76 +74,25 @@ import io.ltr8.tson.schema.meta.UuidType;
  */
 final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
-    static final ValueReaderFactory INTEGER_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new IntegerParser((IntegerType) definition.body()),
-                    context.locationOf(name, definition));
-    static final ValueReaderFactory TEXT_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new TextParser((TextType) definition.body()), context.locationOf(name, definition));
-    static final ValueReaderFactory DECIMAL_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new DecimalParser((DecimalType) definition.body()),
-                    context.locationOf(name, definition));
-    static final ValueReaderFactory FLOAT_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new FloatParser((FloatType) definition.body()), context.locationOf(name, definition));
-    static final ValueReaderFactory RATIONAL_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new RationalParser((RationalType) definition.body()),
-                    context.locationOf(name, definition));
-    static final ValueReaderFactory UUID_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new UuidParser((UuidType) definition.body()), context.locationOf(name, definition));
-    // The alphabet is the type's own `encoding` selector, so the body is the whole of what this needs.
-    static final ValueReaderFactory BYTES_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new BytesParser((BytesType) definition.body()),
-                    context.locationOf(name, definition));
-    static final ValueReaderFactory DATE_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new DateParser((DateType) definition.body()), context.locationOf(name, definition));
-    static final ValueReaderFactory TIME_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new TimeParser((TimeType) definition.body()), context.locationOf(name, definition));
-    static final ValueReaderFactory DATETIME_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new DateTimeParser((DateTimeType) definition.body()),
-                    context.locationOf(name, definition));
-    static final ValueReaderFactory DURATION_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new DurationParser((DurationType) definition.body()),
-                    context.locationOf(name, definition));
-    static final ValueReaderFactory PERIOD_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new PeriodParser((PeriodType) definition.body()),
-                    context.locationOf(name, definition));
-    static final ValueReaderFactory URI_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new UriParser((UriType) definition.body()), context.locationOf(name, definition));
-    static final ValueReaderFactory REGEX_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new RegexParser((RegexType) definition.body()), context.locationOf(name, definition));
-    static final ValueReaderFactory MAC_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new MacParser((MacType) definition.body()), context.locationOf(name, definition));
-    static final ValueReaderFactory EMAIL_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new EmailParser((EmailType) definition.body()), context.locationOf(name, definition));
     /**
-     * {@code within}/{@code excluding} aren't modeled by {@link Cidr4Parser} -- see its own Javadoc -- but
-     * {@code min_prefix}/{@code max_prefix} are, so unlike {@link #IPV4_TYPE} this does read {@code
-     * definition}'s own body.
+     * <b>One factory for every atom family</b>, because the mapping from a resolved body to the parser that
+     * reads it is {@link AtomParsers}' and there is no second opinion to have about it. Each family used to
+     * carry its own constant doing {@code new XParser((XType) definition.body())} -- a table restating
+     * {@code AtomParsers.forType} entry for entry, which is how {@code period} came to be missing from one
+     * of them and present in the other, so a period-typed field's {@code ~} default was reported as "not a
+     * scalar type".
+     *
+     * <p>{@link ValueReaderFactoryRegistry} still registers it under each constructor name: what collapses
+     * is the mapping, not the registration, and a name that reaches here with a body no atom parses is a
+     * fault rather than an author error -- the registry only routes here for names that are atoms.
      */
-    static final ValueReaderFactory CIDR4_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new Cidr4Parser((Cidr4Type) definition.body()), context.locationOf(name, definition));
-    /** Same reasoning as {@link #CIDR4_TYPE}, for {@link Cidr6Parser}. */
-    static final ValueReaderFactory CIDR6_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, new Cidr6Parser((Cidr6Type) definition.body()), context.locationOf(name, definition));
+    static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
+            .forType(name, definition.body())
+            .<TsonTypeReader<?>>map(parser ->
+                    new AtomTypeReader<>(name, parser, context.locationOf(name, definition)))
+            .orElseThrow(() -> new IllegalStateException(
+                    "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
 
-    /**
-     * {@code complex_type} has nothing to configure ({@code component} is fixed, not modeled -- see {@link
-     * ComplexParser}'s own Javadoc), so this ignores {@code definition}'s own body entirely (though not its
-     * position) and always wraps the one {@link ComplexParser#UNCONSTRAINED} singleton.
-     */
-    static final ValueReaderFactory COMPLEX_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, ComplexParser.UNCONSTRAINED, context.locationOf(name, definition));
-    /**
-     * {@code within}/{@code excluding} ({@code schema.meta.Ipv4Type}'s own fields) aren't modeled by {@link
-     * Ipv4Parser} -- see its own Javadoc -- so, like {@link #COMPLEX_TYPE}, this ignores {@code
-     * definition}'s own body.
-     */
-    static final ValueReaderFactory IPV4_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, Ipv4Parser.of((Ipv4Type) definition.body()),
-                    context.locationOf(name, definition));
-    /** Same reasoning as {@link #IPV4_TYPE}, for {@link Ipv6Parser}. */
-    static final ValueReaderFactory IPV6_TYPE = (name, definition, context) ->
-            new AtomTypeReader<>(name, Ipv6Parser.of((Ipv6Type) definition.body()),
-                    context.locationOf(name, definition));
     /**
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean}
      * ({@link BooleanReader}), every other enum instance its member text ({@link EnumParser}). Dispatch is

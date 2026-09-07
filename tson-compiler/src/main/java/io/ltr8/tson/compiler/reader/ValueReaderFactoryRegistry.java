@@ -112,10 +112,10 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
 
         // meta-kernel.tn
         factories.put("unit", unitFactory);
-        factories.put("integer_type", leaf.apply(AtomTypeReader.INTEGER_TYPE));
-        factories.put("text_type", leaf.apply(AtomTypeReader.TEXT_TYPE));
-        factories.put("uri_type", leaf.apply(AtomTypeReader.URI_TYPE));
-        factories.put("regex_type", leaf.apply(AtomTypeReader.REGEX_TYPE));
+        factories.put("integer_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("text_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("uri_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("regex_type", leaf.apply(AtomTypeReader.ATOM));
         factories.put("record", record);
         factories.put("array", array);
         factories.put("set_type", array);
@@ -125,23 +125,23 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("choice", choice);
 
         // meta.tn
-        factories.put("bytes_type", leaf.apply(AtomTypeReader.BYTES_TYPE));
-        factories.put("float_type", leaf.apply(AtomTypeReader.FLOAT_TYPE));
-        factories.put("decimal_type", leaf.apply(AtomTypeReader.DECIMAL_TYPE));
-        factories.put("rational_type", leaf.apply(AtomTypeReader.RATIONAL_TYPE));
-        factories.put("date_type", leaf.apply(AtomTypeReader.DATE_TYPE));
-        factories.put("time_type", leaf.apply(AtomTypeReader.TIME_TYPE));
-        factories.put("datetime_type", leaf.apply(AtomTypeReader.DATETIME_TYPE));
-        factories.put("duration_type", leaf.apply(AtomTypeReader.DURATION_TYPE));
-        factories.put("period_type", leaf.apply(AtomTypeReader.PERIOD_TYPE));
-        factories.put("uuid_type", leaf.apply(AtomTypeReader.UUID_TYPE));
-        factories.put("complex_type", leaf.apply(AtomTypeReader.COMPLEX_TYPE));
-        factories.put("mac_type", leaf.apply(AtomTypeReader.MAC_TYPE));
-        factories.put("email_type", leaf.apply(AtomTypeReader.EMAIL_TYPE));
-        factories.put("ipv4_type", leaf.apply(AtomTypeReader.IPV4_TYPE));
-        factories.put("ipv6_type", leaf.apply(AtomTypeReader.IPV6_TYPE));
-        factories.put("cidr4_type", leaf.apply(AtomTypeReader.CIDR4_TYPE));
-        factories.put("cidr6_type", leaf.apply(AtomTypeReader.CIDR6_TYPE));
+        factories.put("bytes_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("float_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("decimal_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("rational_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("date_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("time_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("datetime_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("duration_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("period_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("uuid_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("complex_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("mac_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("email_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("ipv4_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("ipv6_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("cidr4_type", leaf.apply(AtomTypeReader.ATOM));
+        factories.put("cidr6_type", leaf.apply(AtomTypeReader.ATOM));
 
         factories.put("scoped", scoped);
 
