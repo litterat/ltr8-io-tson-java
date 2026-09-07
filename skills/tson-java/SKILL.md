@@ -87,7 +87,8 @@ out.
 
 ```java
 import io.ltr8.tson.Tson;
-import io.ltr8.tson.compiler.*;
+import io.ltr8.tson.base.*;        // Diagnostic, the receivers, the policies
+import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
 
 Tson tson = Tson.builder().build();   // bootstraps meta-kernel, meta.tn and core.tn
@@ -340,7 +341,7 @@ reported in any of §8.1's four error categories. In this implementation a refus
 `Diagnostic` carrying `CONFUSABLE_NAMES`, `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT` — **one code per
 rule, which is what a consumer routes on** — and nothing else.
 
-**What judged it is stated once, not per refusal**: `TsonUnicodeProcessorPolicy` — `identifierPolicy` and
+**What judged it is stated once, not per refusal**: `TsonProcessorPolicy` — `identifierPolicy` and
 `tokenPolicy` (each a level, a unit, any `permitting` relaxations), under the same names that configured
 them, plus the Unicode data version — from `tson.processorPolicy()`, from `processorPolicy()` on the
 reader that judged, or from `tson policy` on the command line. Two deployments
