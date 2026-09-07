@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
-import io.ltr8.tson.compiler.atom.DurationParser;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -27,12 +26,10 @@ import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.UuidType;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
-
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**

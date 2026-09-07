@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.atom.AtomTypeException;
+import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayStart;
 import io.ltr8.tson.compiler.stream.EmptyBraceEvent;

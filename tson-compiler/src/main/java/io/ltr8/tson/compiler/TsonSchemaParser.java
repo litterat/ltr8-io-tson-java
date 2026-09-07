@@ -34,10 +34,9 @@ import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.lexer.TokenType;
-import io.ltr8.tson.compiler.atom.AtomTypeException;
-import io.ltr8.tson.compiler.atom.IdentifierParser;
-import io.ltr8.tson.compiler.base.NumberGrammar;
-
+import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.atom.IdentifierParser;
+import io.ltr8.tson.atom.number.NumberGrammar;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;

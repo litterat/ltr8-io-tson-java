@@ -7,7 +7,6 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
-
 /**
  * Reads meta-kernel's {@code boolean => !enum [true false]} as a genuine Java {@code Boolean} rather than
  * raw member text -- the one real enum instance whose members are meant to stand in for the two boolean

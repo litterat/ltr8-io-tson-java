@@ -1,0 +1,132 @@
+package io.ltr8.tson.atom.parser;
+
+import io.ltr8.tson.atom.AtomParseException;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomValidationException;
+import io.ltr8.tson.atom.number.NumberForm;
+import io.ltr8.tson.atom.number.NumberForms;
+import io.ltr8.tson.atom.number.NumberGrammar;
+import io.ltr8.tson.atom.number.NumberNarrowing;
+import io.ltr8.tson.schema.meta.DecimalType;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+/**
+ * Parses and validates against meta-kernel's {@code decimal_type} constructor (§5.6's {@code
+ * number} atom -- SQL's exact tier, ISO/IEC 11404 {@code scaled}). Accepts only {@code
+ * integer}/{@code float} forms (§7.6) -- unlike {@link IntegerParser}, no {@code based-integer}
+ * either, and unlike {@link FloatParser}, no {@code hex-float} or {@code special-value}: "{@code
+ * !number}, being exact, does not accept the special values" (§5.6). The value is preserved exactly
+ * as written, never rounded -- this is the atom {@code AtomBinder}'s existing untyped-float path
+ * already implements the exactness for (a bare decimal token already binds to {@code BigDecimal}
+ * without loss); this type exists to apply the same exact-preservation contract when the token
+ * additionally carries an explicit {@code !number} annotation, plus {@code decimal_type}'s
+ * constraint vocabulary (bounds, {@code multiple_of}, digit-count limits, a sparse {@code members} set) on
+ * top. Holds a {@link DecimalType} -- the pure constraint values, unchanged by this split -- rather than
+ * declaring those fields itself.
+ */
+public record DecimalParser(DecimalType constraints) implements AtomType<BigDecimal> {
+
+    /** §5.6's built-in annotation name -- {@code !number}. */
+    public static final String TYPENAME = "number";
+
+    /** {@code number => !decimal_type {}} -- the unconstrained exact number, §5.6's {@code !number}. */
+    public static final DecimalParser UNCONSTRAINED = new DecimalParser(DecimalType.UNCONSTRAINED);
+
+    public DecimalParser(Optional<BigDecimal> min, Optional<BigDecimal> exclusiveMin, Optional<BigDecimal> max,
+                          Optional<BigDecimal> exclusiveMax, Optional<BigDecimal> multipleOf,
+                          Optional<Integer> totalDigits, Optional<Integer> fractionDigits) {
+        this(new DecimalType(min, exclusiveMin, max, exclusiveMax, multipleOf, totalDigits, fractionDigits,
+                Optional.empty()));
+    }
+
+    @Override
+    public BigDecimal read(String text) {
+        return (BigDecimal) read(text, BigDecimal.class);
+    }
+
+    @Override
+    public Object read(String text, Class<?> target) {
+        return NumberNarrowing.narrowDecimal(readExact(text), target);
+    }
+
+    @Override
+    public String write(BigDecimal value) {
+        return value.toString();
+    }
+
+    private BigDecimal readExact(String text) {
+        NumberForm form = NumberGrammar.tryParse(text)
+                .filter(f -> f instanceof NumberForm.IntegerForm || f instanceof NumberForm.FloatForm)
+                .orElseThrow(() -> new AtomParseException("'" + text + "' is not a valid exact number -- "
+                        + "only integer and float forms are accepted (§5.6); !number does not accept "
+                        + "based-integer or the special values", "an integer or float form"));
+
+        BigDecimal exact = (form instanceof NumberForm.IntegerForm intForm)
+                ? new BigDecimal(NumberForms.toBigInteger(intForm))
+                : NumberForms.toBigDecimal((NumberForm.FloatForm) form);
+        validate(exact, text);
+        return exact;
+    }
+
+    private void validate(BigDecimal value, String text) {
+        constraints.min().ifPresent(m -> {
+            if (value.compareTo(m) < 0) {
+                throw new AtomValidationException("'" + text + "' is less than the minimum " + m, ">= " + m);
+            }
+        });
+        constraints.exclusiveMin().ifPresent(m -> {
+            if (value.compareTo(m) <= 0) {
+                throw new AtomValidationException("'" + text + "' must be strictly greater than " + m, "> " + m);
+            }
+        });
+        constraints.max().ifPresent(m -> {
+            if (value.compareTo(m) > 0) {
+                throw new AtomValidationException("'" + text + "' is greater than the maximum " + m, "<= " + m);
+            }
+        });
+        constraints.exclusiveMax().ifPresent(m -> {
+            if (value.compareTo(m) >= 0) {
+                throw new AtomValidationException("'" + text + "' must be strictly less than " + m, "< " + m);
+            }
+        });
+        constraints.multipleOf().ifPresent(m -> {
+            if (value.remainder(m).compareTo(BigDecimal.ZERO) != 0) {
+                throw new AtomValidationException("'" + text + "' is not a multiple of " + m, "a multiple of " + m);
+            }
+        });
+        // Both digit-count facets measure the value, never the spelling: meta.tn's own @doc says "scale is
+        // not part of the value -- 1, 1.0 and 1.00 are one value", so 1.230 has three significant digits and
+        // two after the point, and `fraction_digits: 2` admits "any hundredth" whatever the author typed.
+        // The value handed back is still exactly as written; only the measurement strips.
+        BigDecimal measured = value.stripTrailingZeros();
+        constraints.totalDigits().ifPresent(td -> {
+            if (measured.precision() > td) {
+                throw new AtomValidationException(
+                        "'" + text + "' has more than the maximum " + td + " total significant digits",
+                        "at most " + td + " total significant digits");
+            }
+        });
+        constraints.fractionDigits().ifPresent(fd -> {
+            // scale() can be negative (e.g. 1E+2 has scale -2, a whole number with no fraction
+            // digits at all, not -2 of them) -- clamp at 0 before comparing.
+            if (Math.max(measured.scale(), 0) > fd) {
+                throw new AtomValidationException(
+                        "'" + text + "' has more than the maximum " + fd + " digits after the decimal point",
+                        "at most " + fd + " digits after the decimal point");
+            }
+        });
+        // §4.3's identity, and BigDecimal's own is not it: 2.50 and 2.5 are two objects and one number, so
+        // membership is compareTo. `DecimalType` reads every member as a decimal before the set is formed,
+        // which is what lets this compare at all -- the facet is `set<value>` on the wire.
+        constraints.members().ifPresent(members -> {
+            if (members.stream().noneMatch(member -> value.compareTo(member) == 0)) {
+                throw new AtomValidationException(
+                        "'" + text + "' is not a member of this type -- expected one of " + members,
+                        "one of (" + members.stream().map(BigDecimal::toString).collect(Collectors.joining(", ")) + ")");
+            }
+        });
+    }
+}

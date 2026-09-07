@@ -1,10 +1,10 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.atom.AtomTypeException;
-import io.ltr8.tson.compiler.atom.UriParser;
+import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.ast.TokenForm;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayDeque;
@@ -36,6 +36,13 @@ import java.util.Deque;
  * <p>Not thread-safe; single-use, like {@link io.ltr8.tson.compiler.lexer.Lexer}.
  */
 public final class TsonDataEmitter {
+
+    /**
+     * [TSON-DATA] §2.2.1's rules on what a directive's argument may be, asked of the vocabulary by name
+     * rather than by naming a parser: a directive argument is a URI, and {@code uri} is what says so.
+     */
+    private static final AtomType<?> URI_ATOM = BuiltinTypeVocabulary.lookup("uri")
+            .orElseThrow(() -> new IllegalStateException("the built-in vocabulary has no 'uri'"));
 
     private final Appendable out;
 
@@ -187,7 +194,7 @@ public final class TsonDataEmitter {
      */
     private TsonDataEmitter directive(String name, String uri) {
         try {
-            UriParser.UNCONSTRAINED.read(uri);
+            URI_ATOM.read(uri);
         } catch (AtomTypeException e) {
             throw new TsonWriteException("'!!" + name + "' argument \"" + uri + "\" is not a valid URI (§3.3): "
                     + e.getMessage(), e);

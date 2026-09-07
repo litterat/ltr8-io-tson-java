@@ -2,10 +2,9 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.UnicodePolicy;
-import io.ltr8.tson.compiler.atom.IdentifierParser;
+import io.ltr8.tson.atom.IdentifierParser;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;

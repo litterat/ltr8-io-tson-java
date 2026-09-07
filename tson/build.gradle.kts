@@ -16,6 +16,8 @@ dependencies {
     // module still needs them on its own compile classpath.
     api(project(":tson-compiler"))
     api(project(":tson-schema"))
+    // Reachable through tson-compiler, declared here because JPMS resolution needs it present.
+    api(project(":tson-atom"))
     api(project(":tson-bind"))
     api(project(":tson-tree"))
 

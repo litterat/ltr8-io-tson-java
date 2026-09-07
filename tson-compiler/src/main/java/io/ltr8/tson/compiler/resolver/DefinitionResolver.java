@@ -32,8 +32,8 @@ import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonObjectWriter;
-import io.ltr8.tson.compiler.atom.IdentifierParser;
-import io.ltr8.tson.compiler.atom.AtomTypeException;
+import io.ltr8.tson.atom.IdentifierParser;
+import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ElementState;
@@ -52,7 +52,6 @@ import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
