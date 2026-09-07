@@ -27,7 +27,7 @@ class JoiningControlsTest {
     }
 
     private static String parse(String identifier) {
-        return IdentifierParser.INSTANCE.read(new TokenValue(identifier, TokenForm.UNQUOTED));
+        return IdentifierParser.INSTANCE.read(identifier);
     }
 
     private static String refused(String identifier) {

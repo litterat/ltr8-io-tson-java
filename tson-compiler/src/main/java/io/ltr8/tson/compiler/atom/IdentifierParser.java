@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.base.unicode.IdentifierStatus;
 import io.ltr8.tson.base.unicode.JoiningControls;
 import io.ltr8.tson.base.unicode.Xid;
@@ -65,16 +64,15 @@ public final class IdentifierParser implements AtomType<String> {
     }
 
     @Override
-    public String read(TokenValue token) {
-        return validate(token.text());
+    public String read(String text) {
+        return validate(text);
     }
 
     /**
-     * The profile itself, over a name's decoded text. Separate from {@link #read(TokenValue)} because the form a
-     * name was spelled in is no part of the contract -- an identifier is constrained however it was written -- so
-     * a caller that already holds the text (the grammar, at each name position; the resolver, for a field name it
-     * built) states the check directly rather than wrapping a {@link TokenValue} around the string to get at it.
-     * Returns the text, so it composes where a value is wanted.
+     * The profile itself, over a name's decoded text. Separate from {@link #read(String)} because that one
+     * applies this atom's own constraints as well, where a caller checking a name it already holds (the
+     * grammar, at each name position; the resolver, for a field name it built) wants the profile and nothing
+     * else. Returns the text, so it composes where a value is wanted.
      */
     public static String validate(String text) {
         if (text.isEmpty()) {

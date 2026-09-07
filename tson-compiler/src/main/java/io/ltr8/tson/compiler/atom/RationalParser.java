@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.base.NumberForm;
 import io.ltr8.tson.compiler.base.NumberGrammar;
 import io.ltr8.tson.compiler.base.RationalForm;
@@ -14,8 +13,9 @@ import java.util.Optional;
  * Parses and validates against meta-kernel's {@code rational_type} constructor (§5.6's {@code
  * rational} atom). Accepts only the {@code rational} grammar form (§7.6) -- {@code "2/3"}, always
  * quoted in practice since {@code /} is outside the unquoted token profile (§5.6), though {@link
- * #read} doesn't check {@link TokenValue#form()} itself, matching every other atom here (§5.2:
- * "whether quoting is required is a lexical property of the content, not of the atom"). Holds a
+ * #read} never sees which form carried it -- an {@link AtomType} is handed a {@code String} -- matching
+ * every other atom here (§5.2: "whether quoting is required is a lexical property of the content, not of
+ * the atom"). Holds a
  * {@link RationalType} -- the pure constraint values, unchanged by this split -- rather than
  * declaring those fields itself.
  *
@@ -41,8 +41,7 @@ public record RationalParser(RationalType constraints) implements AtomType<Ratio
     }
 
     @Override
-    public Rational read(TokenValue token) {
-        String text = token.text();
+    public Rational read(String text) {
         RationalForm form = NumberGrammar.tryRational(text).orElseThrow(() -> new AtomParseException(
                 "'" + text + "' is not a valid rational -- expected numerator/denominator, e.g. \"2/3\" (§7.6)",
                 "a rational form"));

@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class DecimalParserTest {
 
-    private static TokenValue token(String text) {
-        return new TokenValue(text, TokenForm.UNQUOTED);
+    private static String token(String text) {
+        return text;
     }
 
     private static DecimalParser decimalType(Optional<BigDecimal> min, Optional<BigDecimal> multipleOf,

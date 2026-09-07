@@ -627,13 +627,13 @@ class ConformanceSuiteTest {
         assertEquals(fieldText(sidecar, "type-ref"), typeRef,
                 "the sidecar's type-ref must name the atom the subject's own type-ref does");
         switch (outcomeOf(sidecar)) {
-            case "valid" -> checkValidVocabularyVector(typeRef, atomType, token, outcomePayload(sidecar));
-            case "error" -> assertThrows(errorClassFor(sidecar), () -> atomType.read(token));
+            case "valid" -> checkValidVocabularyVector(typeRef, atomType, token.text(), outcomePayload(sidecar));
+            case "error" -> assertThrows(errorClassFor(sidecar), () -> atomType.read(token.text()));
             default -> fail("unknown vocabulary-layer outcome: " + outcomeOf(sidecar));
         }
     }
 
-    private static void checkValidVocabularyVector(String typeRef, AtomType<?> atomType, TokenValue token, RecordValue valid) {
+    private static void checkValidVocabularyVector(String typeRef, AtomType<?> atomType, String token, RecordValue valid) {
         RecordValue.Field family = soleField((RecordValue) fieldCore(valid, "value"), "vocabulary value");
         CoreValue payload = family.value().value().coreValue();
         switch (typeRef) {

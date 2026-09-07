@@ -22,6 +22,7 @@ import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomType;
+import io.ltr8.tson.compiler.atom.HostAtoms;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
@@ -276,6 +277,14 @@ public final class SchemalessObjectReader {
             }
         }
 
+        // No type-ref to dispatch on, so the target class is the schema -- [TSON-JSON] §4.1's
+        // schema-directed reading with the class standing in for it. Restricted to §5.6's string-content
+        // families: §4.4 makes a quoted token a string, and the numeric families must keep base resolution.
+        Optional<AtomType<?>> byHostType = HostAtoms.forStringContentHostType(dataClass.dataClass());
+        if (byHostType.isPresent()) {
+            return bindBuiltin(ctx, byHostType.get(), tokenValue, dataClass.dataClass());
+        }
+
         return bindBaseValue(ctx, BaseTypeResolver.resolve(tokenValue), dataClass.dataClass());
     }
 
@@ -294,7 +303,7 @@ public final class SchemalessObjectReader {
      */
     private Object bindBuiltin(TsonReadContext ctx, AtomType<?> atomType, TokenValue token, Class<?> target) {
         try {
-            return atomType.read(token, target);
+            return atomType.read(token.text(), target);
         } catch (AtomTypeException e) {
             ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), e.expected(), token.text());
             return null;

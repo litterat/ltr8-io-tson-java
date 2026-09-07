@@ -20,7 +20,7 @@ import io.ltr8.tson.schema.meta.Token;
  * <p>Selected per slot rather than per type, by the bound component's own Java type -- see {@code
  * GroupUnionBindReader}. A {@code value}-typed field bound to anything else keeps {@link ValueParser}.
  */
-public final class RawTokenParser implements AtomType<Token> {
+public final class RawTokenParser implements TokenAtomType<Token> {
 
     public static final RawTokenParser INSTANCE = new RawTokenParser();
 
@@ -34,6 +34,11 @@ public final class RawTokenParser implements AtomType<Token> {
             case SINGLE_LINE_QUOTED -> Token.Form.SINGLE_LINE_QUOTED;
             case MULTI_LINE_QUOTED -> Token.Form.MULTI_LINE_QUOTED;
         });
+    }
+
+    @Override
+    public Object read(TokenValue token, Class<?> target) {
+        return read(token);
     }
 
     @Override

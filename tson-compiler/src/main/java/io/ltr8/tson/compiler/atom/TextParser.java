@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.schema.meta.TextType;
 
@@ -36,8 +35,7 @@ public record TextParser(TextType constraints) implements AtomType<String> {
     }
 
     @Override
-    public String read(TokenValue token) {
-        String text = token.text();
+    public String read(String text) {
         validate(text);
         return text;
     }

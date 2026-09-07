@@ -187,7 +187,7 @@ public final class TsonDataEmitter {
      */
     private TsonDataEmitter directive(String name, String uri) {
         try {
-            UriParser.UNCONSTRAINED.read(new TokenValue(uri, TokenForm.SINGLE_LINE_QUOTED));
+            UriParser.UNCONSTRAINED.read(uri);
         } catch (AtomTypeException e) {
             throw new TsonWriteException("'!!" + name + "' argument \"" + uri + "\" is not a valid URI (§3.3): "
                     + e.getMessage(), e);

@@ -15,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DateTimeParserTest {
 
-    private static TokenValue token(String text) {
-        return new TokenValue(text, TokenForm.UNQUOTED);
+    private static String token(String text) {
+        return text;
     }
 
     @Test

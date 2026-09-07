@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.regex.TsonRegexSyntaxException;
 import io.ltr8.tson.schema.meta.RegexType;
@@ -33,15 +32,15 @@ public record RegexParser(RegexType constraints) implements AtomType<String> {
     public static final RegexParser UNCONSTRAINED = new RegexParser(RegexType.UNCONSTRAINED);
 
     @Override
-    public String read(TokenValue token) {
-        String text = new TextParser(constraints.textConstraints()).read(token);
+    public String read(String text) {
+        String pattern = new TextParser(constraints.textConstraints()).read(text);
         try {
-            TsonRegex.parse(text);
+            TsonRegex.parse(pattern);
         } catch (TsonRegexSyntaxException e) {
             throw new AtomParseException("'" + text + "' is not a valid I-Regexp (RFC 9485): " + e.getMessage(),
                     "an I-Regexp pattern");
         }
-        return text;
+        return pattern;
     }
 
     @Override

@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.schema.meta.UriType;
 
@@ -43,8 +42,7 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
     }
 
     @Override
-    public URI read(TokenValue token) {
-        String text = token.text();
+    public URI read(String text) {
         URI value;
         try {
             value = new URI(text);

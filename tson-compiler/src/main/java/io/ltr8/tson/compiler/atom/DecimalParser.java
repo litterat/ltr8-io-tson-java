@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.base.NumberForm;
 import io.ltr8.tson.compiler.base.NumberForms;
 import io.ltr8.tson.compiler.base.NumberGrammar;
@@ -42,13 +41,13 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
     }
 
     @Override
-    public BigDecimal read(TokenValue token) {
-        return (BigDecimal) read(token, BigDecimal.class);
+    public BigDecimal read(String text) {
+        return (BigDecimal) read(text, BigDecimal.class);
     }
 
     @Override
-    public Object read(TokenValue token, Class<?> target) {
-        return NumberNarrowing.narrowDecimal(readExact(token), target);
+    public Object read(String text, Class<?> target) {
+        return NumberNarrowing.narrowDecimal(readExact(text), target);
     }
 
     @Override
@@ -56,8 +55,7 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
         return value.toString();
     }
 
-    private BigDecimal readExact(TokenValue token) {
-        String text = token.text();
+    private BigDecimal readExact(String text) {
         NumberForm form = NumberGrammar.tryParse(text)
                 .filter(f -> f instanceof NumberForm.IntegerForm || f instanceof NumberForm.FloatForm)
                 .orElseThrow(() -> new AtomParseException("'" + text + "' is not a valid exact number -- "

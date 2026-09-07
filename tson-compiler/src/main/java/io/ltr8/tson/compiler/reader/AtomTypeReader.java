@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomType;
+import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.BytesParser;
 import io.ltr8.tson.compiler.atom.Cidr4Parser;
@@ -242,7 +243,15 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         ctx.next();
         TokenValue tokenValue = new TokenValue(token.text(), token.form());
         try {
-            return delegate.read(tokenValue);
+            // A form-sensitive atom keeps the token: `value` is decoded by §4 base type resolution, whose
+            // §4.4 rule is that a quoted token is a string, and `Token` records the spelling §8's resolved
+            // form carries. Every other family is a function of the text alone (§5.1).
+            if (delegate instanceof TokenAtomType) {
+                @SuppressWarnings("unchecked")
+                TokenAtomType<T> formSensitive = (TokenAtomType<T>) delegate;
+                return formSensitive.read(tokenValue);
+            }
+            return delegate.read(tokenValue.text());
         } catch (AtomTypeException ex) {
             ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
                     "'" + name + "': " + ex.getMessage(), ex.expected(), token.text());

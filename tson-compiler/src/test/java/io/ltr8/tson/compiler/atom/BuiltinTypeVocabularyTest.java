@@ -123,7 +123,7 @@ class BuiltinTypeVocabularyTest {
     void textAcceptsEveryTokenAndYieldsItsTextUnchanged(String content) {
         AtomType<?> text = BuiltinTypeVocabulary.lookup("text").orElseThrow();
 
-        assertEquals(content, text.read(new TokenValue(content, TokenForm.SINGLE_LINE_QUOTED)));
+        assertEquals(content, text.read(content));
     }
 
     /** Form is not meaning (§2.4): the same content quoted or not is the same string. */
@@ -131,8 +131,8 @@ class BuiltinTypeVocabularyTest {
     void textReadsAQuotedNumericAsTheString() {
         AtomType<?> text = BuiltinTypeVocabulary.lookup("text").orElseThrow();
 
-        assertEquals("42", text.read(new TokenValue("42", TokenForm.SINGLE_LINE_QUOTED)));
-        assertEquals("42", text.read(new TokenValue("42", TokenForm.UNQUOTED)));
+        assertEquals("42", text.read("42"));
+        assertEquals("42", text.read("42"));
     }
 
     @org.junit.jupiter.api.Test
@@ -147,8 +147,8 @@ class BuiltinTypeVocabularyTest {
     void registeredEntryActuallyValidatesLikeItsPublishedContract() {
         @SuppressWarnings("unchecked")
         AtomType<Number> int8 = (AtomType<Number>) BuiltinTypeVocabulary.lookup("int8").orElseThrow();
-        assertEquals((byte) 127, int8.read(new TokenValue("127", TokenForm.UNQUOTED)));
+        assertEquals((byte) 127, int8.read("127"));
         org.junit.jupiter.api.Assertions.assertThrows(AtomValidationException.class,
-                () -> int8.read(new TokenValue("128", TokenForm.UNQUOTED)));
+                () -> int8.read("128"));
     }
 }

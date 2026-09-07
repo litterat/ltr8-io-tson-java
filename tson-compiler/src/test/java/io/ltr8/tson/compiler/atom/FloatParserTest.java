@@ -15,8 +15,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FloatParserTest {
 
-    private static TokenValue token(String text) {
-        return new TokenValue(text, TokenForm.UNQUOTED);
+    private static String token(String text) {
+        return text;
     }
 
     // ── §7.6 form acceptance (§5.6: "integer / float / hex-float / special-value") ─────────────

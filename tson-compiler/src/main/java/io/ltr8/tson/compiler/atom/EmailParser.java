@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.schema.meta.EmailType;
 
@@ -48,8 +47,7 @@ public record EmailParser(EmailType constraints) implements AtomType<String> {
             ATEXT + "(?:\\." + ATEXT + ")*@" + ATEXT + "(?:\\." + ATEXT + ")*");
 
     @Override
-    public String read(TokenValue token) {
-        String text = token.text();
+    public String read(String text) {
         if (!ADDR_SPEC.matcher(text).matches()) {
             throw new AtomParseException("'" + text + "' is not a valid email address -- expected RFC 5322's "
                     + "dot-atom form, local@domain (quoted local parts, domain literals and comments are not "

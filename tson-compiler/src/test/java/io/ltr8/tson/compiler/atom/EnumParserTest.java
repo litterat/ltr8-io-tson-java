@@ -11,8 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class EnumParserTest {
 
-    private static TokenValue token(String text, TokenForm form) {
-        return new TokenValue(text, form);
+    // The form is accepted and ignored: this family matches by text alone, which is the point.
+    private static String token(String text, TokenForm form) {
+        return text;
     }
 
     @Test

@@ -12,6 +12,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomParsers;
 import io.ltr8.tson.compiler.atom.AtomType;
+import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.IdentifierParser;
 import io.ltr8.tson.base.unicode.ConfusableNames;
@@ -1364,7 +1365,13 @@ public final class TsonSchemaLinker {
             throw notAScalarType(entryName, field, value, target.body());
         }
         try {
-            parser.get().read(new TokenValue(value.text(), TokenForm.valueOf(value.form().name())));
+            // The token is in hand and one of the two atoms cares which form it was (see TokenAtomType),
+            // so it is passed whole rather than reconstructed.
+            if (parser.get() instanceof TokenAtomType<?> formSensitive) {
+                formSensitive.read(new TokenValue(value.text(), TokenForm.valueOf(value.form().name())));
+            } else {
+                parser.get().read(value.text());
+            }
         } catch (AtomTypeException e) {
             // The field's two halves are what the author has to reconcile, so both are named, in the order
             // they are written, and the value is echoed as the schema spells it -- quoted if it was quoted,
