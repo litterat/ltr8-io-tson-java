@@ -348,10 +348,22 @@ Three rules are §7-shaped, as far as a Java class can express §7:
 - **An `Annotations` carrier is filled empty**, §4.3 giving the JSON wire no annotation channel. Nothing
   is dropped; there was nothing to drop.
 
-**A member the class does not declare is discarded**, as `SchemalessObjectReader` discards one. That is
-also what the on-ramp needs: `additionalProperties` defaults to *true* in JSON Schema, so refusing here
-would fail the first converted document carrying anything extra. §6.1.1's closure rule is a *schema's*,
-over declared fields and an `@rest` tail, and arrives with §5–§8.
+**A member the class does not declare refuses the document**, which is the one place this reader is
+stricter than a JSON consumer expects. The reason is not tidiness: **a member added in a later version can
+change what the members this class does read mean** — a `currency` beside an `amount`, a `unit` beside a
+`quantity`, an `encoding` beside a `payload`. A reader that drops it has not read a subset of the document;
+it has read a different document and cannot tell. The class is the schema here, and a closed reading is
+what makes that claim mean anything — it is also what [TSON-SCHEMA] §7.2 already says of a record under a
+real schema, so the two paths agree, and `SchemalessObjectReader` applies the same rule on the TSON side.
+`ignoringUnknownMembers()` is the opt-out, deliberately the derived reader: the safe reading is the one
+nobody has to know to ask for.
+
+The cost is real and worth stating, because it lands squarely on the on-ramp: a converted JSON Schema whose
+`additionalProperties` defaults to *true* describes documents this reader refuses. That is §6.2's rest
+field's job, and it fixes it properly — by **keeping** the extra members rather than ignoring them, which
+is the difference between a document read wholly and one read partly. The accommodation belongs with the
+schema-directed decode, where a schema can say which members are a tail and which are a mistake, and not
+here, where the only two options are drop and refuse.
 
 **A union target is refused, with the reason.** §8.2 admits a tag-free choice by exactly two routes — a
 declared discriminator, or a derived disjointness fact over class-stable variants — and forbids extending

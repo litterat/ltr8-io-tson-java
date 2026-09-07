@@ -208,6 +208,16 @@ admit UTS #39's own `Toys-Я-Us`.
   uniform error model regardless of which layer noticed. **No positional form and no schema-composed
   defaults** — both are schema-layer concepts a class-driven bind has no equivalent for (a record must be
   braced; an absent required field is `FIELD_REQUIRED`).
+- **A field the target class does not declare is `UNRECOGNIZED_FIELD`**, the same code and the same
+  treatment a schema-driven read gives one — reported, then the value discarded unread, so one collecting
+  pass finds every stray name. The reason is not tidiness: **a field added in a later version can change
+  what the fields this class does read mean** — a `currency` beside an `amount`, a `unit` beside a
+  `quantity`, an `encoding` beside a `payload`. A reader that drops it has not read a subset of the
+  document; it has read a different document and cannot tell. The class is the schema on this path, and a
+  closed reading is what makes that claim mean anything. `TsonObjectReader.ignoringUnknownFields()` is the
+  opt-out, and it is deliberately the derived reader rather than the default — the safe reading should be
+  the one nobody has to know to ask for, which is the same argument `TsonBindMismatchException` makes at
+  compile time about a schema and a class that disagree.
 - **`TsonObjectWriter.toTson` is mainly a debugging tool**, not a guaranteed-lossless serializer (integer
   width, tuple-ness, and captured wire annotations are documented write-side losses). Both throw unchecked
   (`TsonReadException`/`TsonWriteException`), so the pair is symmetric and a caller writes neither a

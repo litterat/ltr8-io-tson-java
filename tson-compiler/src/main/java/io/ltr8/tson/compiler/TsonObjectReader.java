@@ -231,6 +231,27 @@ public final class TsonObjectReader {
     }
 
     /**
+     * This reader, discarding a field the target class does not declare instead of reporting it -- a new
+     * reader, leaving this one unchanged, sharing its compiled-schema registry.
+     *
+     * <p>A schemaless bind refuses such a field by default ({@code UNRECOGNIZED_FIELD}), which is the same
+     * treatment a schema-driven read gives one ([TSON-SCHEMA] §7.2, records closed under their type). The
+     * reason is not tidiness: <b>a field added in a later version can change what the fields this class does
+     * read mean</b> -- a {@code currency} beside an {@code amount}, a {@code unit} beside a
+     * {@code quantity}. A reader that drops it has not read a subset of the document; it has read a
+     * different document and cannot tell.
+     *
+     * <p>This is the opt-out, for a caller genuinely reading a document wider than the class they bind it to
+     * and content that what they cannot see does not change what they can. It is the derived reader rather
+     * than the default on purpose: the safe reading is the one nobody has to know to ask for. Affects the
+     * schemaless path only -- under a schema the rule is the schema's, and there is nothing here to relax.
+     */
+    public TsonObjectReader ignoringUnknownFields() {
+        return new TsonObjectReader(dataBindContext, schemaless.ignoringUnknownFields(),
+                bind, receiver, schemaUri, tokenPolicy, identifierPolicy, limits);
+    }
+
+    /**
      * The two Unicode policies this reader applies, and the data version behind them -- what a caller states
      * beside the diagnostics from a read, and what a deployment publishes so a sender never writes a name
      * that would be refused.

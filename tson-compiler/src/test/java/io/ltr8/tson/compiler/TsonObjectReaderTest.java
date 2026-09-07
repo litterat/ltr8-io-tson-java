@@ -1257,4 +1257,42 @@ class TsonObjectReaderTest {
         assertThrows(TsonReadException.class,
                 () -> mapper.read("{ shape: !triangle { a: 1 } }", ShapeHolder.class));
     }
+
+    // ── Fields the target class does not declare (§7.2's rule, on the schemaless path) ────────────────
+
+    @Test
+    void aFieldTheTargetClassDoesNotDeclareIsReported() {
+        // Not tidiness: a field added in a later version can change what the fields this class does read
+        // mean -- a `currency` beside an `amount`, a `unit` beside a `quantity`. A reader that drops it has
+        // not read a subset of the document, it has read a different document and cannot tell. The same
+        // rule a schema-driven read applies (RecordAbstractReader, UNRECOGNIZED_FIELD).
+        TsonReadException e = assertThrows(TsonReadException.class,
+                () -> mapper.read("{ x: 1  y: 2  z: 3 }", Point.class));
+        assertTrue(e.getMessage().contains("unknown field 'z'"), e.getMessage());
+        assertTrue(e.getMessage().contains("x, y"), e.getMessage());
+    }
+
+    @Test
+    void aCollectingReadGathersEveryUnknownFieldRatherThanOnlyTheFirst() {
+        TsonDiagnosticsCollector collected = new TsonDiagnosticsCollector();
+        mapper.withDiagnostics(collected).read("{ x: 1  y: 2  z: 3  w: 4 }", Point.class);
+        assertEquals(List.of(Diagnostic.Code.UNRECOGNIZED_FIELD, Diagnostic.Code.UNRECOGNIZED_FIELD),
+                collected.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    @Test
+    void theDerivedReaderIgnoresOneInsteadAndTheDefaultReaderIsUnchanged() {
+        // The opt-out is the derived reader, never the default: the safe reading is the one nobody has to
+        // know to ask for.
+        assertEquals(new Point(1, 2), mapper.ignoringUnknownFields().read("{ x: 1  y: 2  z: 3 }", Point.class));
+        assertThrows(TsonReadException.class, () -> mapper.read("{ x: 1  y: 2  z: 3 }", Point.class));
+    }
+
+    @Test
+    void anUnknownFieldsValueIsStillDiscardedWholeSoTheDocumentStillFrames() {
+        // Reported or not, the value is skipped -- a nested one included, or the document-end pull that
+        // follows finds its events still pending.
+        assertEquals(new Point(1, 2), mapper.ignoringUnknownFields()
+                .read("{ x: 1  z: { deep: [1, { a: _ }] }  y: 2 }", Point.class));
+    }
 }
