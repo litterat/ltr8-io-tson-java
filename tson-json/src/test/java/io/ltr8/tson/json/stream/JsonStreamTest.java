@@ -254,7 +254,7 @@ class JsonStreamTest {
 
         @Test
         void the_refusal_lands_at_the_container_that_did_not_fit_before_any_consumer_descends() {
-            JsonStream stream = new JsonStream("[[[1]]]", 2);
+            JsonStream stream = new JsonStream("[[[1]]]", LimitsPolicy.defaults().withMaxDepth(2));
             assertInstanceOf(JsonEvent.ArrayStart.class, stream.next());
             assertInstanceOf(JsonEvent.ArrayStart.class, stream.next());
             LimitExceededException e = assertThrows(LimitExceededException.class, stream::next);
@@ -266,12 +266,12 @@ class JsonStreamTest {
             assertEquals(List.of("{", "name(a)", "{", "name(b)", "number(1)", "}", "}", "end"),
                     events("{\"a\": {\"b\": 1}}"));
             assertThrows(LimitExceededException.class,
-                    () -> new JsonStream("{\"a\": {\"b\": 1}}", 1).forEachRemaining(e -> { }));
+                    () -> new JsonStream("{\"a\": {\"b\": 1}}", LimitsPolicy.defaults().withMaxDepth(1)).forEachRemaining(e -> { }));
         }
 
         @Test
         void a_bound_below_one_is_a_caller_error_rather_than_a_document_one() {
-            assertThrows(IllegalArgumentException.class, () -> new JsonStream("1", 0));
+            assertThrows(IllegalArgumentException.class, () -> new JsonStream("1", LimitsPolicy.defaults().withMaxDepth(0)));
         }
 
         @Test
@@ -279,7 +279,7 @@ class JsonStreamTest {
             // The frame array grows on demand rather than being sized from maxDepth, which a caller may
             // set far above any depth a document reaches.
             List<String> rendered = new ArrayList<>();
-            new JsonStream(nested(200), 256).forEachRemaining(e -> rendered.add(render(e)));
+            new JsonStream(nested(200), LimitsPolicy.defaults().withMaxDepth(256)).forEachRemaining(e -> rendered.add(render(e)));
             assertEquals(200 * 2 + 2, rendered.size());
         }
     }

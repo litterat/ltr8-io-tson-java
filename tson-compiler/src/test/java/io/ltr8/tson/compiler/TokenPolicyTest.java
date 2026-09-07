@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
@@ -149,8 +149,8 @@ class TokenPolicyTest {
     void aRawStreamHonoursThePolicyItWasBuiltWith() {
         DiagnosticsCollector collected = new DiagnosticsCollector();
         TsonReadContext ctx = TsonReadContext.of(
-                new TsonDataStream("{ note: \"" + CYR_A + "\" }", LimitsPolicy.defaults(),
-                        UnicodePolicy.asciiOnly(), collected),
+                new TsonDataStream("{ note: \"" + CYR_A + "\" }",
+                        ProcessorPolicy.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()), collected),
                 collected);
         try {                                   // the raw context has no end-of-stream predicate; drain it
             while (true) {

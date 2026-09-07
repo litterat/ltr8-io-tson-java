@@ -4,6 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.json.reader.DataClassObjectReader;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
@@ -97,15 +98,18 @@ public final class JsonObjectReader {
     /** What decides a problem's fate. Fail-fast until a caller names otherwise. */
     private final DiagnosticsReceiver receiver;
 
-    /** [TSON-DATA] §8.2's token surface, {@code unrestricted()} until a deployment names one. */
-    private final UnicodePolicy tokenPolicy;
+    /**
+     * Everything this reader will admit and spend -- §8.2's token surface and §10.1's bounds. One value
+     * because a deployment states one, and the same value {@code TsonObjectReader} carries.
+     */
+    private final ProcessorPolicy policy;
 
     private JsonObjectReader(DataBindContext context, boolean ignoreUnknownMembers,
-                             DiagnosticsReceiver receiver, UnicodePolicy tokenPolicy) {
+                             DiagnosticsReceiver receiver, ProcessorPolicy policy) {
         this.context = context;
         this.ignoreUnknownMembers = ignoreUnknownMembers;
         this.receiver = receiver;
-        this.tokenPolicy = tokenPolicy;
+        this.policy = policy;
         this.engine = new DataClassObjectReader(context, ignoreUnknownMembers);
     }
 
@@ -119,8 +123,40 @@ public final class JsonObjectReader {
      * the policy rides the <em>stream</em> this reader builds, since that is what produces each token
      * exactly once.
      */
-    public JsonObjectReader withTokenPolicy(UnicodePolicy policy) {
+    public JsonObjectReader withTokenPolicy(UnicodePolicy tokenPolicy) {
+        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy.withTokenPolicy(tokenPolicy));
+    }
+
+    /**
+     * This reader under {@code limits} -- a new reader, leaving this one unchanged.
+     *
+     * <p>[TSON-JSON] §10.1 makes JSON's bounds [TSON-DATA] §9.1's policy "in JSON clothing, and the same
+     * policy applies with the same defaults", and §9.1 requires the bounds be configurable in code rather
+     * than from the ambient environment. The peer of {@code TsonObjectReader.withLimits}, and what replaced
+     * a per-call {@code maxDepth}: a bound is the reader's, not one read's.
+     */
+    public JsonObjectReader withLimits(LimitsPolicy limits) {
+        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy.withLimits(limits));
+    }
+
+    /**
+     * This reader under {@code policy} whole -- what a caller holding a processor's own policy says in one
+     * call, rather than the derivations that each change one component of it. The peer of
+     * {@code TsonObjectReader.withProcessorPolicy}, and how a {@code Tson} front door will hand this reader
+     * the same policy its TSON readers carry.
+     */
+    public JsonObjectReader withProcessorPolicy(ProcessorPolicy policy) {
         return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy);
+    }
+
+    /** Everything this reader will admit and spend, for a caller stating it beside a read's diagnostics. */
+    public ProcessorPolicy processorPolicy() {
+        return policy;
+    }
+
+    /** {@link #processorPolicy()}'s {@code limits} component, in one call. */
+    public LimitsPolicy limitsPolicy() {
+        return policy.limits();
     }
 
     /**
@@ -133,12 +169,12 @@ public final class JsonObjectReader {
      * bind mode is all-or-nothing where a tree keeps what it built.
      */
     public JsonObjectReader withDiagnostics(DiagnosticsReceiver receiver) {
-        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, tokenPolicy);
+        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy);
     }
 
     /** Over a caller's own bind context — one per binding profile, descriptors cached inside it. */
     public static JsonObjectReader using(DataBindContext context) {
-        return new JsonObjectReader(context, false, DiagnosticsReceiver.throwing(), UnicodePolicy.unrestricted());
+        return new JsonObjectReader(context, false, DiagnosticsReceiver.throwing(), ProcessorPolicy.defaults());
     }
 
     /**
@@ -148,7 +184,7 @@ public final class JsonObjectReader {
      */
     public static JsonObjectReader standard() {
         return new JsonObjectReader(DataBindContext.builder().build(), false, DiagnosticsReceiver.throwing(),
-                UnicodePolicy.unrestricted());
+                ProcessorPolicy.defaults());
     }
 
     /**
@@ -164,28 +200,21 @@ public final class JsonObjectReader {
      * two apart, and the schema-directed decode is where the keeping form arrives.
      */
     public JsonObjectReader ignoringUnknownMembers() {
-        return new JsonObjectReader(context, true, receiver, tokenPolicy);
+        return new JsonObjectReader(context, true, receiver, policy);
     }
 
     // ── Reading ──────────────────────────────────────────────────────────
 
     public <T> T read(String source, Class<T> type) {
-        return read(new JsonStream(source, LimitsPolicy.DEFAULT_MAX_DEPTH, tokenPolicy, receiver), type);
+        return read(new JsonStream(source, policy, receiver), type);
     }
 
-    public <T> T read(String source, Class<T> type, int maxDepth) {
-        return read(new JsonStream(source, maxDepth, tokenPolicy, receiver), type);
-    }
 
     /** Off UTF-8 bytes, where §3.1's rules bite. {@code source} is not closed here. */
     public <T> T read(InputStream source, Class<T> type) {
-        return read(new JsonStream(source, LimitsPolicy.DEFAULT_MAX_DEPTH, tokenPolicy, receiver), type);
+        return read(new JsonStream(source, policy, receiver), type);
     }
 
-    /** {@link #read(InputStream, Class)} under a nesting bound other than {@link LimitsPolicy#DEFAULT_MAX_DEPTH the processor's default}. */
-    public <T> T read(InputStream source, Class<T> type, int maxDepth) {
-        return read(new JsonStream(source, maxDepth, tokenPolicy, receiver), type);
-    }
 
     /** Off an event source, which is the seam the two families above come through. */
     public <T> T read(JsonEventSource events, Class<T> type) {

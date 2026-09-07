@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
@@ -107,20 +108,27 @@ public final class JsonStream implements JsonEventSource {
         this(new JsonLexer(source), LimitsPolicy.DEFAULT_MAX_DEPTH);
     }
 
+    /** Under {@code limits} alone, for a caller with no receiver to report a token refusal to. */
+    public JsonStream(InputStream source, LimitsPolicy limits) {
+        this(new JsonLexer(source), limits.maxDepth());
+    }
+
+    /** {@link #JsonStream(InputStream, LimitsPolicy)} over a string. */
+    public JsonStream(String source, LimitsPolicy limits) {
+        this(new JsonLexer(source), limits.maxDepth());
+    }
+
     public JsonStream(String source) {
         this(new JsonLexer(source), LimitsPolicy.DEFAULT_MAX_DEPTH);
     }
 
-    public JsonStream(InputStream source, int maxDepth) {
-        this(new JsonLexer(source), maxDepth);
-    }
-
-    public JsonStream(String source, int maxDepth) {
-        this(new JsonLexer(source), maxDepth);
-    }
-
     /**
-     * A stream applying {@code tokenPolicy} to every token it hands out.
+     * A stream reading under {@code policy}: its limits bound what this will spend (§10.1), and its token
+     * policy is applied to every token it hands out.
+     *
+     * <p><b>One policy rather than a depth and a surface</b>, because a deployment states one -- and because
+     * a bare {@code int} beside a {@code UnicodePolicy} is how a caller comes to pass a bound from one
+     * policy and a token surface from another.
      *
      * <p>[TSON-JSON] §9.4 puts the token policy on "map keys and string values"; this checks every token
      * a JSON document carries -- strings, numbers, and member names -- because at this layer nothing knows
@@ -136,17 +144,16 @@ public final class JsonStream implements JsonEventSource {
      * <p>At {@code unrestricted()} -- the default, and every ordinary read -- it is a field read and a
      * branch.
      */
-    public JsonStream(InputStream source, int maxDepth, UnicodePolicy tokenPolicy,
-                      DiagnosticsReceiver receiver) {
-        this(new JsonLexer(source), maxDepth);
-        this.tokenPolicy = tokenPolicy;
+    public JsonStream(InputStream source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
+        this(new JsonLexer(source), policy.limits().maxDepth());
+        this.tokenPolicy = policy.tokenPolicy();
         this.tokenPolicyReceiver = receiver;
     }
 
-    /** {@link #JsonStream(InputStream, int, UnicodePolicy, DiagnosticsReceiver)} over a string. */
-    public JsonStream(String source, int maxDepth, UnicodePolicy tokenPolicy, DiagnosticsReceiver receiver) {
-        this(new JsonLexer(source), maxDepth);
-        this.tokenPolicy = tokenPolicy;
+    /** {@link #JsonStream(InputStream, ProcessorPolicy, DiagnosticsReceiver)} over a string. */
+    public JsonStream(String source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
+        this(new JsonLexer(source), policy.limits().maxDepth());
+        this.tokenPolicy = policy.tokenPolicy();
         this.tokenPolicyReceiver = receiver;
     }
 

@@ -4,6 +4,7 @@ import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
+import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.json.tree.JsonArray;
 import io.ltr8.tson.json.tree.JsonBoolean;
@@ -52,8 +53,8 @@ public final class Json {
     }
 
     /** @throws ParseException if the document is not JSON within §3.1's profile */
-    public static JsonValue parse(String source, int maxDepth) {
-        return parse(new JsonStream(source, maxDepth));
+    public static JsonValue parse(String source, LimitsPolicy limits) {
+        return parse(new JsonStream(source, limits));
     }
 
     /**
@@ -65,8 +66,8 @@ public final class Json {
     }
 
     /** {@link #parse(InputStream)} under a nesting bound other than {@link LimitsPolicy#DEFAULT_MAX_DEPTH the processor's default}. */
-    public static JsonValue parse(InputStream source, int maxDepth) {
-        return parse(new JsonStream(source, maxDepth));
+    public static JsonValue parse(InputStream source, LimitsPolicy limits) {
+        return parse(new JsonStream(source, limits));
     }
 
     /**

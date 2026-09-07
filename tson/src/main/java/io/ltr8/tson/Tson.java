@@ -116,8 +116,7 @@ public final class Tson {
      * answer for it, which is only true if one answer is what both ends use.
      */
     public TsonObjectReader objectReader() {
-        return new TsonObjectReader(bind, dataBindContext)
-                .withTokenPolicy(tokenPolicy).withIdentifierPolicy(core.identifierPolicy()).withLimits(limits);
+        return new TsonObjectReader(bind, dataBindContext).withProcessorPolicy(processorPolicy());
     }
 
     /**
@@ -130,8 +129,7 @@ public final class Tson {
      * <p>Carries both §8.2 policies from this instance, for the reason {@link #objectReader()} states.
      */
     public TsonTreeReader treeReader() {
-        return new TsonTreeReader(tree)
-                .withTokenPolicy(tokenPolicy).withIdentifierPolicy(core.identifierPolicy()).withLimits(limits);
+        return new TsonTreeReader(tree).withProcessorPolicy(processorPolicy());
     }
 
     /** A fresh, schemaless (Class 1) {@link TsonObjectWriter} bound to {@link #dataBindContext()} -- the inverse of {@link #objectReader()}. */

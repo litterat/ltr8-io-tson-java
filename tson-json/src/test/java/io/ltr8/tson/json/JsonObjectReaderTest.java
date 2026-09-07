@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.annotation.Annotations;
@@ -323,7 +324,7 @@ class JsonObjectReaderTest {
             JsonObjectReader lenient = READER.ignoringUnknownMembers();
             String deep = "{\"name\": \"a\", \"age\": 1, \"extra\": " + "[".repeat(200) + "]".repeat(200) + "}";
             assertThrows(LimitExceededException.class, () -> lenient.read(deep, Person.class));
-            assertInstanceOf(Person.class, lenient.read(deep, Person.class, 256));
+            assertInstanceOf(Person.class, lenient.withLimits(LimitsPolicy.defaults().withMaxDepth(256)).read(deep, Person.class));
         }
 
         @Test

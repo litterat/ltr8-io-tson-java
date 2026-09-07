@@ -84,6 +84,30 @@ public record ProcessorPolicy(UnicodePolicy identifierPolicy, UnicodePolicy toke
         return new ProcessorPolicy(identifierPolicy, tokenPolicy, limits, UnicodePolicy.dataVersion());
     }
 
+    /** {@link #defaults()} is what a processor applies before a deployment says anything. */
+    public static ProcessorPolicy defaults() {
+        return of(UnicodePolicy.highlyRestrictive(), UnicodePolicy.unrestricted(), LimitsPolicy.defaults());
+    }
+
+    /**
+     * This policy with one component replaced -- what a derived reader is built from.
+     *
+     * <p>Three methods rather than a builder because there are three components and a policy is small: a
+     * reader deriving one names the component it is changing, at the call site, in a form a reader of that
+     * call site can see is a change of exactly one thing.
+     */
+    public ProcessorPolicy withIdentifierPolicy(UnicodePolicy policy) {
+        return of(policy, tokenPolicy, limits);
+    }
+
+    public ProcessorPolicy withTokenPolicy(UnicodePolicy policy) {
+        return of(identifierPolicy, policy, limits);
+    }
+
+    public ProcessorPolicy withLimits(LimitsPolicy policy) {
+        return of(identifierPolicy, tokenPolicy, policy);
+    }
+
     @Override
     public String toString() {
         return "identifier policy " + identifierPolicy + ", token policy " + tokenPolicy
