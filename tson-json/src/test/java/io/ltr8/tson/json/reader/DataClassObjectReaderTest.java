@@ -1,5 +1,6 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
@@ -35,7 +36,7 @@ class DataClassObjectReaderTest {
     void it_binds_one_value_and_leaves_the_source_where_that_value_ended() {
         // Positioned mid-document: the engine takes the object and nothing after it, so the caller's own
         // framing still sees the array's remaining events.
-        JsonStream events = new JsonStream("[{\"name\": \"Ada\", \"age\": 36}, 99]");
+        JsonStream events = stream("[{\"name\": \"Ada\", \"age\": 36}, 99]");
         assertInstanceOf(JsonEvent.ArrayStart.class, events.next());
 
         assertEquals(new Person("Ada", 36), ENGINE.read(events, Person.class, DiagnosticsReceiver.throwing()));
@@ -51,7 +52,7 @@ class DataClassObjectReaderTest {
         // business. The refusal is JsonStream's, raised the moment anything pulls past the root value, and
         // the facade's contribution is only to make that pull happen. So the engine composes and the
         // document still cannot end early.
-        JsonStream events = new JsonStream("{\"name\": \"Ada\", \"age\": 36} 99");
+        JsonStream events = stream("{\"name\": \"Ada\", \"age\": 36} 99");
         assertEquals(new Person("Ada", 36), ENGINE.read(events, Person.class, DiagnosticsReceiver.throwing()));
         assertTrue(assertThrows(ParseException.class, events::next)
                 .getMessage().contains("this one is complete"));
@@ -59,7 +60,23 @@ class DataClassObjectReaderTest {
 
     @Test
     void a_failure_inside_the_value_still_reaches_the_caller() {
-        JsonStream events = new JsonStream("{\"name\": ]}");
+        JsonStream events = stream("{\"name\": ]}");
         assertThrows(ParseException.class, () -> ENGINE.read(events, Person.class, DiagnosticsReceiver.throwing()));
+    }
+
+    /**
+     * A stream over {@code source}, under the processor's defaults and raising what it refuses.
+     *
+     * <p>{@code JsonStream} has one constructor and defaults nothing: a stream reads under a policy and
+     * reports through a receiver, both always true. A test with nothing particular to say forms them here,
+     * once, where they can be seen -- which is the arrangement the single constructor is for.
+     */
+    private static JsonStream stream(String source) {
+        return new JsonStream(utf8(source), ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing());
+    }
+
+    /** §3.1 makes the document UTF-8 and the lexer takes bytes; a test holding a string says so here. */
+    private static java.io.InputStream utf8(String source) {
+        return new java.io.ByteArrayInputStream(source.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 }

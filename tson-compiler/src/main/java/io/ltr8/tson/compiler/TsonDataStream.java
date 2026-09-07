@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.ParseException;
@@ -162,7 +163,12 @@ public final class TsonDataStream implements TsonEventSource {
      * defaults -- what the facades pass when a {@code TsonConfig} states one.
      */
     /**
-     * A stream applying {@code tokenPolicy} to every token it hands out ([TSON-DATA] §8.2's "Values").
+     * A stream reading under {@code policy}: its limits bound what this will spend (§9.1), and its token
+     * policy is applied to every token it hands out (§8.2's "Values").
+     *
+     * <p><b>One policy rather than three parameters</b>, because a deployment states one -- and because two
+     * of the three always travelled together here anyway, which is how a caller comes to pass a bound from
+     * one policy beside a token surface from another.
      *
      * <p><b>Here rather than in a decorator around this, and here rather than in the read context.</b> The
      * context rewinds -- an event consumed during lookahead is delivered again, and a probe context can be
@@ -174,18 +180,16 @@ public final class TsonDataStream implements TsonEventSource {
      * <p>At {@code unrestricted()} -- the default, and every ordinary read -- the check is a field read and
      * a branch: {@code checksScripts()} is false and nothing else happens.
      */
-    public TsonDataStream(InputStream source, LimitsPolicy limits, UnicodePolicy tokenPolicy,
-                          DiagnosticsReceiver receiver) {
-        this(source, limits);
-        this.tokenPolicy = tokenPolicy;
+    public TsonDataStream(InputStream source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
+        this(source, policy.limits());
+        this.tokenPolicy = policy.tokenPolicy();
         this.tokenPolicyReceiver = receiver;
     }
 
-    /** {@link #TsonDataStream(InputStream, LimitsPolicy, UnicodePolicy, DiagnosticsReceiver)} over a string. */
-    public TsonDataStream(String source, LimitsPolicy limits, UnicodePolicy tokenPolicy,
-                          DiagnosticsReceiver receiver) {
-        this(source, limits);
-        this.tokenPolicy = tokenPolicy;
+    /** {@link #TsonDataStream(InputStream, ProcessorPolicy, DiagnosticsReceiver)} over a string. */
+    public TsonDataStream(String source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
+        this(source, policy.limits());
+        this.tokenPolicy = policy.tokenPolicy();
         this.tokenPolicyReceiver = receiver;
     }
 

@@ -155,7 +155,11 @@ Three places this must differ, each because §3.1 requires it:
 
 ## Lexer (`tson-json/.../lexer/`)
 
-`JsonLexer` is a single hand-written scanner over UTF-8 bytes read incrementally from an `InputStream`,
+`JsonLexer` is a single hand-written scanner over UTF-8 bytes read incrementally from an `InputStream` --
+**bytes only, with no `String` entry point**, since §3.1 makes the document UTF-8 and a decoder handed
+characters has already lost the malformed-sequence rule and the byte offset §8.1 requires. A caller holding
+a string is one `getBytes(UTF_8)` away, and `Json.parse(String)`/`JsonObjectReader.read(String, …)` do it
+there so one place re-encodes rather than every layer offering to. It is
 code-point addressed, with one code point of lookahead — no JSON token needs more. `nextToken()` returns only
 a `JsonTokenType`, the text and the six position coordinates read off separate accessors, so a token costs no
 `JsonPosition` allocation unless a caller retains one; `tokenize()` materializes `JsonToken` snapshots and is
@@ -230,6 +234,18 @@ have forced.
 repeat an error whose *category* follows the position's type, which no grammar layer holds — the tree applies
 the rule where JEP 540 does, the schema-directed decode applies it with a category); no value is interpreted;
 and no member name is reserved, §3.2's `$`-namespace being a question about the position's type.
+
+**One constructor**, `JsonStream(InputStream, ProcessorPolicy, DiagnosticsReceiver)`. A stream reads under a
+policy and reports through a receiver, and both are always true, so neither is defaulted: a caller with
+nothing particular to say forms `ProcessorPolicy.defaults()` and `DiagnosticsReceiver.throwing()` where they
+can be seen, rather than picking them up from an overload that hides which defaults it chose. The bound comes
+off the policy rather than as a number, so there is no way to hand the stream a depth `LimitsPolicy` would
+have refused — that record refuses a bound below one, once, for every encoding.
+
+**`withProcessorPolicy` is `JsonObjectReader`'s only policy derivation.** `ProcessorPolicy` already carries
+`withIdentifierPolicy`/`withTokenPolicy`/`withLimits`, so a caller changing one component writes
+`r.withProcessorPolicy(r.processorPolicy().withTokenPolicy(p))` — one method on the reader, and the component
+derivations where the components live. The TSON facades carry all four for history; a new surface need not.
 
 **Nesting depth is bounded here** (§10.1) — the one place every container opens, so a refusal lands before
 any consumer descends, which matters because every consumer of this stream recurses where the stream itself

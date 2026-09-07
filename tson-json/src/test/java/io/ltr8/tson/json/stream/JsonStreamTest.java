@@ -1,5 +1,7 @@
 package io.ltr8.tson.json.stream;
 
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.base.ParseException;
@@ -33,7 +35,7 @@ class JsonStreamTest {
     /** Every event of a document, rendered one per entry -- {@code EndOfDocument} included, since pulling it is the point. */
     private static List<String> events(String source) {
         List<String> rendered = new ArrayList<>();
-        JsonStream stream = new JsonStream(source);
+        JsonStream stream = stream(source);
         while (stream.hasNext()) {
             rendered.add(render(stream.next()));
         }
@@ -254,7 +256,9 @@ class JsonStreamTest {
 
         @Test
         void the_refusal_lands_at_the_container_that_did_not_fit_before_any_consumer_descends() {
-            JsonStream stream = new JsonStream("[[[1]]]", 2);
+            JsonStream stream = new JsonStream(utf8("[[[1]]]"),
+                    ProcessorPolicy.defaults().withLimits(LimitsPolicy.defaults().withMaxDepth(2)),
+                    DiagnosticsReceiver.throwing());
             assertInstanceOf(JsonEvent.ArrayStart.class, stream.next());
             assertInstanceOf(JsonEvent.ArrayStart.class, stream.next());
             LimitExceededException e = assertThrows(LimitExceededException.class, stream::next);
@@ -265,13 +269,15 @@ class JsonStreamTest {
         void the_bound_is_configurable_and_objects_count_the_same_as_arrays() {
             assertEquals(List.of("{", "name(a)", "{", "name(b)", "number(1)", "}", "}", "end"),
                     events("{\"a\": {\"b\": 1}}"));
-            assertThrows(LimitExceededException.class,
-                    () -> new JsonStream("{\"a\": {\"b\": 1}}", 1).forEachRemaining(e -> { }));
+            assertThrows(LimitExceededException.class, () -> bounded("{\"a\": {\"b\": 1}}", 1)
+                    .forEachRemaining(e -> { }));
         }
 
         @Test
-        void a_bound_below_one_is_a_caller_error_rather_than_a_document_one() {
-            assertThrows(IllegalArgumentException.class, () -> new JsonStream("1", 0));
+        void a_bound_below_one_is_a_caller_error_and_LimitsPolicy_is_where_it_is_refused() {
+            // The stream takes no bare depth any more, so there is no way to hand it one this record would
+            // not have accepted -- and the record refuses it once, for every encoding.
+            assertThrows(IllegalArgumentException.class, () -> LimitsPolicy.defaults().withMaxDepth(0));
         }
 
         @Test
@@ -279,7 +285,7 @@ class JsonStreamTest {
             // The frame array grows on demand rather than being sized from maxDepth, which a caller may
             // set far above any depth a document reaches.
             List<String> rendered = new ArrayList<>();
-            new JsonStream(nested(200), 256).forEachRemaining(e -> rendered.add(render(e)));
+            bounded(nested(200), 256).forEachRemaining(e -> rendered.add(render(e)));
             assertEquals(200 * 2 + 2, rendered.size());
         }
     }
@@ -289,7 +295,7 @@ class JsonStreamTest {
 
         @Test
         void peek_does_not_consume_and_repeats() {
-            JsonStream stream = new JsonStream("[1]");
+            JsonStream stream = stream("[1]");
             JsonEvent peeked = stream.peek();
             assertSame(peeked, stream.peek());
             assertSame(peeked, stream.next());
@@ -298,7 +304,7 @@ class JsonStreamTest {
 
         @Test
         void has_next_stays_true_through_the_end_event_and_false_after_it() {
-            JsonStream stream = new JsonStream("1");
+            JsonStream stream = stream("1");
             assertTrue(stream.hasNext());
             stream.next();
             assertTrue(stream.hasNext(), "the end event has not been pulled yet");
@@ -308,7 +314,7 @@ class JsonStreamTest {
 
         @Test
         void a_peeked_end_event_still_counts_as_pending() {
-            JsonStream stream = new JsonStream("1");
+            JsonStream stream = stream("1");
             stream.next();
             assertInstanceOf(JsonEvent.EndOfDocument.class, stream.peek());
             assertTrue(stream.hasNext());
@@ -318,7 +324,7 @@ class JsonStreamTest {
 
         @Test
         void pulling_past_the_end_is_a_caller_error() {
-            JsonStream stream = new JsonStream("1");
+            JsonStream stream = stream("1");
             stream.next();
             stream.next();
             assertThrows(NoSuchElementException.class, stream::next);
@@ -328,8 +334,7 @@ class JsonStreamTest {
         void a_document_read_from_bytes_streams_alike() {
             String source = "{\"\u00E9\": [1, true, null]}";
             List<String> fromBytes = new ArrayList<>();
-            new JsonStream(new java.io.ByteArrayInputStream(source.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
-                    .forEachRemaining(e -> fromBytes.add(render(e)));
+            stream(source).forEachRemaining(e -> fromBytes.add(render(e)));
             assertEquals(events(source), fromBytes);
         }
     }
@@ -339,7 +344,7 @@ class JsonStreamTest {
 
         @Test
         void every_event_carries_the_position_of_the_token_that_produced_it() {
-            JsonStream stream = new JsonStream("{\n  \"a\": [1]\n}");
+            JsonStream stream = stream("{\n  \"a\": [1]\n}");
             assertEquals(new JsonPosition(1, 1, 0), stream.next().position());    // {
             assertEquals(new JsonPosition(2, 3, 4), stream.next().position());    // "a"
             assertEquals(new JsonPosition(2, 8, 9), stream.next().position());    // [
@@ -352,10 +357,33 @@ class JsonStreamTest {
         void a_lexical_failure_still_surfaces_through_the_stream() {
             // The stream pulls tokens lazily, so a bad token mid-document reaches a consumer here rather
             // than at construction.
-            JsonStream stream = new JsonStream("[1, +2]");
+            JsonStream stream = stream("[1, +2]");
             stream.next();
             stream.next();
             assertTrue(assertThrows(ParseException.class, stream::next).getMessage().contains("'+'"));
         }
+    }
+
+    /**
+     * A stream over {@code source}, under the processor's defaults and raising what it refuses.
+     *
+     * <p>{@code JsonStream} has one constructor and defaults nothing: a stream reads under a policy and
+     * reports through a receiver, both always true. A test with nothing particular to say forms them here,
+     * once, where they can be seen -- which is the arrangement the single constructor is for.
+     */
+    private static JsonStream stream(String source) {
+        return new JsonStream(utf8(source), ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing());
+    }
+
+    /** A stream over {@code source} bounded at {@code maxDepth}, everything else at the processor's defaults. */
+    private static JsonStream bounded(String source, int maxDepth) {
+        return new JsonStream(utf8(source),
+                ProcessorPolicy.defaults().withLimits(LimitsPolicy.defaults().withMaxDepth(maxDepth)),
+                DiagnosticsReceiver.throwing());
+    }
+
+    /** §3.1 makes the document UTF-8 and the lexer takes bytes; a test holding a string says so here. */
+    private static java.io.InputStream utf8(String source) {
+        return new java.io.ByteArrayInputStream(source.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 }

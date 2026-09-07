@@ -2,6 +2,7 @@ package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.base.UnicodePolicy;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -36,7 +37,9 @@ class JsonTokenPolicyTest {
 
     private static List<Diagnostic> under(UnicodePolicy policy, String source, Class<?> type) {
         DiagnosticsCollector problems = new DiagnosticsCollector();
-        JsonObjectReader.standard().withTokenPolicy(policy).withDiagnostics(problems).read(source, type);
+        JsonObjectReader.standard()
+                .withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(policy))
+                .withDiagnostics(problems).read(source, type);
         return problems.diagnostics();
     }
 
@@ -80,7 +83,8 @@ class JsonTokenPolicyTest {
 
     @Test
     void a_derived_reader_leaves_the_original_alone() {
-        JsonObjectReader strict = JsonObjectReader.standard().withTokenPolicy(UnicodePolicy.asciiOnly());
+        JsonObjectReader strict = JsonObjectReader.standard()
+                .withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()));
         assertEquals(new Note(CYRILLIC_A),
                 JsonObjectReader.standard().read("{\"text\": \"" + CYRILLIC_A + "\"}", Note.class));
         DiagnosticsCollector problems = new DiagnosticsCollector();

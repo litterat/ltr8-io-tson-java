@@ -1,5 +1,7 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.json.tree.JsonArray;
@@ -97,7 +99,7 @@ class JsonTest {
         void the_nesting_bound_reaches_parse_and_refuses_before_the_reducer_descends() {
             String deep = "[".repeat(200) + "1" + "]".repeat(200);
             assertThrows(LimitExceededException.class, () -> Json.parse(deep));
-            assertInstanceOf(JsonArray.class, Json.parse(deep, 256));
+            assertInstanceOf(JsonArray.class, Json.parse(deep, ProcessorPolicy.defaults().withLimits(LimitsPolicy.defaults().withMaxDepth(256))));
         }
     }
 

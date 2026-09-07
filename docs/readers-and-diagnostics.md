@@ -529,6 +529,17 @@ scope to be distinct within.
 
 ## `ProcessorPolicy` — the configuration, stated once
 
+**And threaded as one value.** Every constructor and derivation that used to take a `UnicodePolicy`, a
+second `UnicodePolicy` and a `LimitsPolicy` — or, on the JSON side, a bare `int maxDepth` — takes the policy
+instead: both streams, both TSON facades, and `JsonObjectReader`. Three parameters that always travelled
+together is how a caller comes to pass a bound from one policy beside a token surface from another, and a
+bare `int` beside a `UnicodePolicy` is the same hazard with less to grep for.
+
+`withIdentifierPolicy`/`withTokenPolicy`/`withLimits` stay, each changing exactly one component; `ProcessorPolicy`
+grew the matching three so a reader's derivation is one call rather than a rebuild. `withProcessorPolicy` is
+the whole-value form, and what `Tson.objectReader()`/`treeReader()` now use — they chained all three before,
+which was three chances to state two and forget the third.
+
 **It carries three settings, not two.** The identifier policy, the token policy and the limits, plus the UCD
 version the first two were computed against. The limits sat beside it while it was named
 `ProcessorPolicy` — correctly, since a nesting bound has no business inside a *Unicode* policy —
