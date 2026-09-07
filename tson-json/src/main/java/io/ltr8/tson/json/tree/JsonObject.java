@@ -13,7 +13,8 @@ import java.util.Optional;
  * reads it; keeping it is what lets a document re-emit as it arrived, and what makes a diff of two
  * round-tripped documents about their content.
  *
- * <p>Names are unique: §3.1 makes a repeat an error, and {@link io.ltr8.tson.json.Json#parse Json.parse} refuses one before a
+ * <p>Names are unique: §3.1 makes a repeat an error, and {@link io.ltr8.tson.json.Json#parse Json.parse} refuses one before
+ * a
  * {@code JsonObject} is ever built. Equality is therefore over the member set and not over the order.
  */
 public record JsonObject(Map<String, JsonValue> members) implements JsonValue {

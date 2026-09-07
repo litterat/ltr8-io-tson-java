@@ -34,7 +34,7 @@ import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.compiler.atom.IdentifierParser;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -124,7 +124,7 @@ import java.util.Set;
  *   composition, a refinement copies the source's *entire* field set and admits no new fields --
  *   every body entry MUST tighten an inherited field (reusing {@link #resolveTighteningField}) or
  *   the declaration is a resolver error, reported as such ({@link
- *   io.ltr8.tson.schema.TsonSchemaValidationException}) rather than as a coverage gap. {@code source} is
+ *   io.ltr8.tson.base.SchemaValidationException}) rather than as a coverage gap. {@code source} is
  *   recorded verbatim as the result's own
  *   {@code source} (unlike composition, which never sets it); {@code supertypes} accumulates by the
  *   same induction as composition ({@code [sourceName] + source.supertypes()}); the body's own
@@ -148,7 +148,7 @@ import java.util.Set;
  *
  * <p>{@link UnsupportedOperationException} means "this construct isn't implemented yet"; a genuine
  * schema error a coverage gap can't explain is a {@link
- * io.ltr8.tson.schema.TsonSchemaValidationException} instead. The distinction is not cosmetic: only the
+ * io.ltr8.tson.base.SchemaValidationException} instead. The distinction is not cosmetic: only the
  * validation exception is collected into a {@code Diagnostic} by {@code SchemaResolver}'s reporting
  * overload, so misfiling an author error as a gap both aborts the run and tells the author their correct
  * understanding of the spec is this library's fault. A useful test for which is which: <b>a schema error's
@@ -390,7 +390,7 @@ final class DefinitionResolver {
         try {
             IdentifierParser.validate(name);
         } catch (AtomTypeException e) {
-            throw new TsonSchemaValidationException("invalid " + role + " -- " + e.getMessage());
+            throw new SchemaValidationException("invalid " + role + " -- " + e.getMessage());
         }
     }
 
@@ -399,9 +399,9 @@ final class DefinitionResolver {
      * namespace. Worded from the two ways an author gets here -- a name they declared in this very schema (or
      * imported into it), which is the near miss the rule actually catches, and a name that is simply nowhere.
      */
-    private TsonSchemaValidationException unresolvedAnnotation(String declaration, String annotationName) {
+    private SchemaValidationException unresolvedAnnotation(String declaration, String annotationName) {
         boolean local = namespaceDefinitions.getTypeDefinition(annotationName) != null;
-        return new TsonSchemaValidationException("'" + declaration + "': '@" + annotationName + "' does not name "
+        return new SchemaValidationException("'" + declaration + "': '@" + annotationName + "' does not name "
                 + "a type in the governing meta-schema's namespace, which is the whole annotation namespace of a "
                 + "schema document (one hop through !!meta, §3.3.3)"
                 + (local ? " -- the name is declared by this schema or brought in by !!import, which makes it "
@@ -421,7 +421,7 @@ final class DefinitionResolver {
             // Same split as bindAtomInstance, for the same reason: an annotation value that does not conform
             // to the type its name refers to (§6) is the author's error, and relabelling it a coverage gap
             // aborts the run over a typo.
-            throw new TsonSchemaValidationException("'" + declaration + "': the value of annotation '@"
+            throw new SchemaValidationException("'" + declaration + "': the value of annotation '@"
                     + annotationName + "' is not valid data for the type '" + annotationName + "' names -- "
                     + e.getMessage(), e);
         } catch (BindMismatchException e) {
@@ -578,7 +578,7 @@ final class DefinitionResolver {
         if (applied.supertypes().contains(TOP)) {
             return;
         }
-        throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' is not applicable -- it is "
+        throw new SchemaValidationException("'" + name + "': '!" + target + "' is not applicable -- it is "
                 + "not IS-A 'top' (§4.1), so it describes a part of a type rather than a type, and there is "
                 + "nothing for '!" + target + " { ... }' to build. Did you mean atom refinement ('!" + target
                 + " ^ { ... }')?");
@@ -614,7 +614,7 @@ final class DefinitionResolver {
         TypeDefinition constructor = head.definition();
         if (!constructor.parameters().isEmpty()) {
             int declared = constructor.parameters().size();
-            throw new TsonSchemaValidationException("'" + name + "': '" + target + "' is a template taking "
+            throw new SchemaValidationException("'" + name + "': '" + target + "' is a template taking "
                     + declared + " type argument" + (declared == 1 ? "" : "s") + " " + constructor.parameters()
                     + ", and a template closes by application, not by construction -- write '" + target
                     + "<...>' with its arguments (§5.10). '!" + target + " { ... }' fills a constructor's own "
@@ -694,7 +694,7 @@ final class DefinitionResolver {
         Set<String> bound = new LinkedHashSet<>();
         for (RecordValue.Field binding : bindings.fields()) {
             if (vocabulary.fields().stream().noneMatch(field -> field.name().equals(binding.name()))) {
-                throw new TsonSchemaValidationException("'" + name + "': '" + target + "' has no field '"
+                throw new SchemaValidationException("'" + name + "': '" + target + "' has no field '"
                         + binding.name() + "' to bind (§7.2) -- its fields are "
                         + vocabulary.fields().stream().map(RecordField::name).toList());
             }
@@ -705,7 +705,7 @@ final class DefinitionResolver {
                 // No application of this template could ever produce a valid instance, so the template is
                 // wrong wherever the application is -- exactly the case the declaration is the right place
                 // to report.
-                throw new TsonSchemaValidationException("'" + name + "': '" + target + "' requires a '"
+                throw new SchemaValidationException("'" + name + "': '" + target + "' requires a '"
                         + field.name() + "', and nothing binds it (§7.2), so no application of this template "
                         + "could build one");
             }
@@ -751,7 +751,7 @@ final class DefinitionResolver {
         String sourceName = refinement.target();
         TypeDefinition source = namespaceDefinitions.getTypeDefinition(sourceName);
         if (source == null) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName
+            throw new SchemaValidationException("'" + name + "': '!" + sourceName
                     + "' does not resolve against the type-name namespace (§3.3.1)");
         }
         // §5.5's question, asked of the body: is this an atom *instance*? An instance's body IS an atom
@@ -764,7 +764,7 @@ final class DefinitionResolver {
             // The construction hint is offered only where construction would actually work, which is the
             // same applicability question (§4.1) -- so `top`, not applicable, gets the plain answer rather
             // than advice that would fail in turn.
-            throw new TsonSchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an "
+            throw new SchemaValidationException("'" + name + "': '!" + sourceName + " ^ { ... }' needs an "
                     + "atom-family instance to narrow (§5.5), and '" + sourceName + "' is "
                     + (source.supertypes().contains(TOP)
                             ? "a constraint vocabulary -- '^' narrows one of its instances. Did you mean "
@@ -812,7 +812,7 @@ final class DefinitionResolver {
         }
         List<String> violations = sourceAtom.constraintsCheck(refinedAtom);
         if (!violations.isEmpty()) {
-            throw new TsonSchemaValidationException("'" + name + "': not a valid refinement of '!" + sourceName
+            throw new SchemaValidationException("'" + name + "': not a valid refinement of '!" + sourceName
                     + "' (§5.7): " + String.join("; ", violations));
         }
     }
@@ -854,7 +854,7 @@ final class DefinitionResolver {
             // does not change as this library improves. Unreachable from source -- `TsonSchemaParser` refuses
             // a non-braced body at the `^` -- but the resolver is also driven directly, and coding it
             // NOT_IMPLEMENTED would exit 70 over a construct the grammar itself refuses.
-            throw new TsonSchemaValidationException("'" + name + "': expected a braced record of constraint "
+            throw new SchemaValidationException("'" + name + "': expected a braced record of constraint "
                     + "bindings (§5.5), found " + newBindings.coreValue());
         }
         return new DataValue(newBindings.annotations(), Optional.of(constructorName), new RecordValue(List.copyOf(merged.values())));
@@ -887,7 +887,7 @@ final class DefinitionResolver {
      */
     private ConstructorHead resolveConstructorTarget(String name, String target) {
         if (metaDefinitions.getTypeDefinition(target) == null) {
-            throw new TsonSchemaValidationException("'" + name + "': '!" + target
+            throw new SchemaValidationException("'" + name + "': '!" + target
                     + "' does not resolve against the structure namespace (§3.3.1)");
         }
         String terminal = ReferenceChain.terminal(target, metaDefinitions::getTypeDefinition);
@@ -895,7 +895,7 @@ final class DefinitionResolver {
         if (atEnd == null) {
             // The walk stopped at a name the structure namespace does not declare -- a broken hop, which is
             // the alias's own problem and not this declaration's, but this is where it becomes visible.
-            throw new TsonSchemaValidationException("'" + name + "': '!" + target + "' is an alias whose chain "
+            throw new SchemaValidationException("'" + name + "': '!" + target + "' is an alias whose chain "
                     + "ends at '" + terminal + "', which the structure namespace does not declare (§8.3)");
         }
         return new ConstructorHead(terminal, atEnd);
@@ -943,13 +943,13 @@ final class DefinitionResolver {
             String where = "'" + name + "': " + e.getMessage();
             throw e instanceof MissingBindingException ? new MissingBindingException(where)
                     : new BindMismatchException(where);
-        } catch (TsonSchemaValidationException e) {
+        } catch (SchemaValidationException e) {
             // A constructor's own record refusing the values it was handed. `decimal_type`'s member set is the
             // case: `members` is typed `set<value>`, so the wire admits anything and the family itself is what
             // says a member must be a number the atom reads. The author's error either way -- the verdict on
             // `members: ["abc"]` does not change when this library improves -- so it keeps its classification
             // rather than being relabelled a gap by the catch-all below.
-            throw new TsonSchemaValidationException("'" + name + "': " + e.getMessage(), e);
+            throw new SchemaValidationException("'" + name + "': " + e.getMessage(), e);
         } catch (RuntimeException e) {
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to bind '" + constructorName + "' via the compiled meta-schema reader: "
@@ -973,7 +973,7 @@ final class DefinitionResolver {
      * range -- and asking them here rather than one per kind is what lets a body with both kinds of
      * incoherence report both in one pass.
      *
-     * <p>A violation is the <b>author's</b> error and stays a {@link TsonSchemaValidationException}:
+     * <p>A violation is the <b>author's</b> error and stays a {@link SchemaValidationException}:
      * the verdict on {@code { min_length: 10  max_length: 3 }} does not change when this library
      * improves. It is deliberately not left to the atom parsers, which would surface it as an {@code
      * ErrorReader} -- the library-gap marker -- and so would give exactly the wrong classification.
@@ -990,7 +990,7 @@ final class DefinitionResolver {
             default -> List.of();
         };
         if (!violations.isEmpty()) {
-            throw new TsonSchemaValidationException("'" + name + "': the body's own '" + constructorName
+            throw new SchemaValidationException("'" + name + "': the body's own '" + constructorName
                     + "' constraints contradict each other: " + String.join("; ", violations));
         }
     }
@@ -998,7 +998,7 @@ final class DefinitionResolver {
     /**
      * A body the constructor's own vocabulary rejects is the <b>author's</b> error, not a coverage gap
      * (§7.2: a constructor "is a record-shaped type, so it validates a record against its constraint-field
-     * vocabulary", receiving ordinary record validation) -- so it is a {@link TsonSchemaValidationException},
+     * vocabulary", receiving ordinary record validation) -- so it is a {@link SchemaValidationException},
      * which {@code SchemaResolver} collects into a diagnostic and carries on from, rather than an {@link
      * UnsupportedOperationException}, which aborts the run under the "this is a bug in tson" banner. Both a
      * wrong-typed member ({@code !integer ^ { min: "abc" }}) and an unknown one ({@code minimum}) arrive here.
@@ -1010,9 +1010,9 @@ final class DefinitionResolver {
      * problem with confident-looking data-side locations that name nothing. The declaration's own position and
      * {@code schemaPointer} come from {@code SchemaResolver}'s catch instead, which is where they are real.
      */
-    private static TsonSchemaValidationException bodyIsNotValidData(String name, String constructorName,
+    private static SchemaValidationException bodyIsNotValidData(String name, String constructorName,
                                                                     ReadException cause) {
-        return new TsonSchemaValidationException("'" + name + "': the body is not valid data for '"
+        return new SchemaValidationException("'" + name + "': the body is not valid data for '"
                 + constructorName + "', the constructor's own constraint vocabulary -- " + cause.getMessage(), cause);
     }
 
@@ -1131,7 +1131,7 @@ final class DefinitionResolver {
                 // name -- nothing here could ever denote a record, so there is no field set to compose with
                 // and no implementation to wait for; §12.1's `supertype-ref` narrows the operands to named
                 // references, so this shape is the grammar's own error to refuse.
-                throw new TsonSchemaValidationException("'" + name + "': a "
+                throw new SchemaValidationException("'" + name + "': a "
                         + (supertypeRef instanceof ChoiceRef ? "choice" : "bracketed array/tuple")
                         + " cannot be a supertype -- '&' composes record types, and this form has "
                         + (supertypeRef instanceof ChoiceRef ? "variants" : "elements") + ", not fields (§5.8)");
@@ -1141,13 +1141,13 @@ final class DefinitionResolver {
             if (supertypeDef == null) {
                 // Not a library gap: composition copies the supertype's own fields, so the name has to
                 // resolve here rather than being left to the linker the way an ordinary field type is.
-                throw new TsonSchemaValidationException("'" + name + "': supertype '" + supertypeName
+                throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName
                         + "' names no type this schema declares or imports");
             }
             if (!(supertypeDef.body() instanceof RecordBody supertypeBody)) {
                 // §4.3 generalises §5.7's vocabulary-body requirement to composition, which has the same
                 // need: it copies the parent's fields, and a binding record has none to copy.
-                throw new TsonSchemaValidationException("'" + name + "': supertype '" + supertypeName
+                throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName
                         + "' has no fields to contribute -- its body is a binding record, not a vocabulary, so "
                         + "there is nothing for '&' to compose with (§5.8, and §5.7's vocabulary-body rule "
                         + "read across). Compose with the head it derives from");
@@ -1230,12 +1230,12 @@ final class DefinitionResolver {
         Set<String> removed = new LinkedHashSet<>();
         for (String fieldName : removal.fieldNames()) {
             if (bodyDeclared.contains(fieldName)) {
-                throw new TsonSchemaValidationException("'" + declarationName + "': removal names '" + fieldName
+                throw new SchemaValidationException("'" + declarationName + "': removal names '" + fieldName
                         + "', which this declaration's own body also declares -- a declaration cannot both state "
                         + "a field and remove it (§5.9 rule 4)");
             }
             if (fields.stream().noneMatch(field -> field.name().equals(fieldName))) {
-                throw new TsonSchemaValidationException("'" + declarationName + "': removal names '" + fieldName
+                throw new SchemaValidationException("'" + declarationName + "': removal names '" + fieldName
                         + "', which is not a field of the composed type -- only an inherited field can be "
                         + "removed (§5.9 rule 2)");
             }
@@ -1300,7 +1300,7 @@ final class DefinitionResolver {
             // §4.1's base kinds are disjoint categories, not facets a type can hold several of, so a chain
             // reaching two of them describes nothing. A verdict, not a gap: no improvement to this library
             // makes a type both an atom and a product.
-            throw new TsonSchemaValidationException("'" + name + "' reaches " + baseKindsFound.size()
+            throw new SchemaValidationException("'" + name + "' reaches " + baseKindsFound.size()
                     + " base kinds through its supertypes (" + String.join(", ", baseKindsFound) + ") -- §4.1 "
                     + "gives a type exactly one, so nothing can be both. Compose or refine from sources that "
                     + "agree on their base kind");
@@ -1350,7 +1350,7 @@ final class DefinitionResolver {
         TypeDefinition sourceDef = namespaceDefinitions.getTypeDefinition(sourceName);
         if (sourceDef == null) {
             // As with a supertype: a refinement reads the source's own field set, so this resolves now.
-            throw new TsonSchemaValidationException("'" + name + "': refinement source '" + sourceName
+            throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName
                     + "' names no type this schema declares or imports");
         }
         if (!(sourceDef.body() instanceof RecordBody sourceBody)) {
@@ -1358,7 +1358,7 @@ final class DefinitionResolver {
             // is a !record, and one whose body is a binding record -- a top-level constructor application, a
             // template instantiation, or an alias for either -- is *finished*, its bindings set. The author's
             // error, not a gap: there is no vocabulary here to tighten.
-            throw new TsonSchemaValidationException("'" + name + "': refinement source '" + sourceName
+            throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName
                     + "' has no vocabulary to tighten -- its body is a binding record, so it is finished and "
                     + "'^' on it is a resolver error (§5.7). Refine the head it derives from, or, for an atom "
                     + "instance, use atom refinement ('!" + sourceName + " ^ { ... }', §5.5)");
@@ -1394,7 +1394,7 @@ final class DefinitionResolver {
         for (RecordEntry entry : refined.body().entries()) {
             if (entry instanceof GroupDef groupDef) {
                 if (!restatesInheritedGroup(name, groupDef, fields, groups, inheritedFieldIndex)) {
-                    throw new TsonSchemaValidationException("'" + name + "': the group ("
+                    throw new SchemaValidationException("'" + name + "': the group ("
                             + String.join(" | ", memberNames(groupDef)) + ") names no inherited group -- a "
                             + "refinement copies its source's whole field set and admits no new fields or "
                             + "groups; composition (`&`) is what adds one (§5.7, §5.11)");
@@ -1404,7 +1404,7 @@ final class DefinitionResolver {
             FieldDef fieldDef = (FieldDef) entry;
             Integer index = inheritedFieldIndex.get(fieldDef.name());
             if (index == null) {
-                throw new TsonSchemaValidationException("'" + name + "': refinement body field '" + fieldDef.name()
+                throw new SchemaValidationException("'" + name + "': refinement body field '" + fieldDef.name()
                         + "' names no inherited field -- a refinement copies its source's whole field set and "
                         + "admits no new fields; composition (`&`) is what adds one (§5.7)");
             }
@@ -1503,17 +1503,17 @@ final class DefinitionResolver {
         String head = application.name();
         TypeDefinition template = namespaceDefinitions.getTypeDefinition(head);
         if (template == null) {
-            throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
+            throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' names no type this schema declares or imports");
         }
         if (!(template.body() instanceof TemplateBody open)) {
             // Applied to this declaration's own parameter, so the author wrote arguments; the head takes none.
-            throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
+            throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "' declares no type parameters, so it cannot be applied to '"
                     + String.join(", ", typeParams) + "' (§5.10)");
         }
         if (template.parameters().size() != application.args().size()) {
-            throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head + "' declares "
+            throw new SchemaValidationException("'" + name + "': " + position + " '" + head + "' declares "
                     + template.parameters().size() + " type parameter(s) and is applied to "
                     + application.args().size() + " (§5.10)");
         }
@@ -1531,7 +1531,7 @@ final class DefinitionResolver {
         if (!(absorbed instanceof RecordBody record)) {
             // An open instance rather than a record template -- `<T> [T]` has elements, not fields, so there
             // is nothing for `&` or `^` to take. The same verdict its closed spelling gets, one phase earlier.
-            throw new TsonSchemaValidationException("'" + name + "': " + position + " '" + head
+            throw new SchemaValidationException("'" + name + "': " + position + " '" + head
                     + "<...>' has no fields to contribute -- it is a binding record, not a vocabulary, so "
                     + "there is nothing to compose with (§5.8, and §5.7's vocabulary-body rule read across)");
         }
@@ -1646,7 +1646,7 @@ final class DefinitionResolver {
             // §5.7's table is a rule about schemas, not a coverage boundary: "refinement can only restrict,
             // never expand -- FIXED states are terminal, and loosening a required field to optional is a
             // resolver error".
-            throw new TsonSchemaValidationException("'" + declarationName + "': tightening '" + fieldDef.name()
+            throw new SchemaValidationException("'" + declarationName + "': tightening '" + fieldDef.name()
                     + "' from " + inherited.state() + " to " + tightened.state() + " is not a permitted state "
                     + "transition -- a refinement can only restrict, never expand (§5.7)");
         }
@@ -1702,7 +1702,7 @@ final class DefinitionResolver {
     private static void requireFieldNameNotSeen(String declarationName, String fieldName,
                                                  Set<String> seenFieldNames, FieldOrigin origin) {
         if (seenFieldNames.contains(fieldName)) {
-            throw new TsonSchemaValidationException((declarationName == null ? "" : "'" + declarationName + "': ")
+            throw new SchemaValidationException((declarationName == null ? "" : "'" + declarationName + "': ")
                     + "field '" + fieldName + "' is declared more than once -- " + origin.explanation);
         }
     }
@@ -1736,7 +1736,7 @@ final class DefinitionResolver {
      * and an elided type with nothing to inherit from is the <b>author's</b> error, not a gap -- §5.7
      * requires the resolver to reject a modifier-only entry both in a fresh record (no source to elide
      * toward) and in a composition body naming no inherited field, so it raises {@link
-     * io.ltr8.tson.schema.TsonSchemaValidationException}.
+     * io.ltr8.tson.base.SchemaValidationException}.
      *
      * <p><b>A restatement's annotations merge over the inherited ones</b> ({@link #merged}), rather than
      * replacing them: a tightening entry states what it tightens, and §5.7's modifier-only spelling ({@code
@@ -1802,7 +1802,7 @@ final class DefinitionResolver {
             // ("every field MUST have an explicit type-ref, and the resolver MUST reject modifier-only entries
             // there") or a composition body entry naming no inherited field. Both are the author's error, not
             // a gap in this resolver -- the two positions where elision *is* legal resolve above.
-            throw new TsonSchemaValidationException("field '" + field.name() + "' states only a modifier and no "
+            throw new SchemaValidationException("field '" + field.name() + "' states only a modifier and no "
                     + "type-ref, but names no inherited field to take a type from -- a modifier-only entry is "
                     + "always a tightening, so it is only meaningful in a refinement or composition body, "
                     + "against a field the source declares (§5.7)");
@@ -1868,7 +1868,7 @@ final class DefinitionResolver {
                     .filter(member -> isAlwaysPresent(stateOf(fields, member)))
                     .toList();
             if (alwaysPresent.size() > 1) {
-                throw new TsonSchemaValidationException((declarationName == null ? "" : "'" + declarationName + "': ")
+                throw new SchemaValidationException((declarationName == null ? "" : "'" + declarationName + "': ")
                         + "members " + String.join(" and ", alwaysPresent) + " of the group ("
                         + String.join(" | ", group.members()) + ") are both always present, but at most one "
                         + "member of a group may be (§5.11) -- no value could satisfy this type. Leave all but "
@@ -1917,7 +1917,7 @@ final class DefinitionResolver {
      * separate, already-supported gesture of naming it as an ordinary field.
      *
      * <p>Everything checked here is the author's error under a MUST, so each is a {@link
-     * TsonSchemaValidationException} -- and each says which of the four rules was broken, since a
+     * SchemaValidationException} -- and each says which of the four rules was broken, since a
      * restatement that got the order wrong and one that changed a member's type need different fixes.
      */
     private boolean restatesInheritedGroup(String declarationName, GroupDef groupDef, List<RecordField> fields,
@@ -1930,7 +1930,7 @@ final class DefinitionResolver {
         String prefix = (declarationName == null ? "" : "'" + declarationName + "': ") + "the restated group ("
                 + String.join(" | ", restated) + ") ";
         if (inheritedMembers.size() != restated.size()) {
-            throw new TsonSchemaValidationException(prefix + "adds a member the source does not declare -- "
+            throw new SchemaValidationException(prefix + "adds a member the source does not declare -- "
                     + "changing membership is a resolver error (§5.11)");
         }
 
@@ -1942,12 +1942,12 @@ final class DefinitionResolver {
             }
         }
         if (index < 0) {
-            throw new TsonSchemaValidationException(prefix + "names inherited fields that are not a group -- "
+            throw new SchemaValidationException(prefix + "names inherited fields that are not a group -- "
                     + "a group can only restate one the source declares as a group (§5.11)");
         }
         FieldGroup inherited = groups.get(index);
         if (!inherited.members().equals(restated)) {
-            throw new TsonSchemaValidationException(prefix + "does not match the inherited group ("
+            throw new SchemaValidationException(prefix + "does not match the inherited group ("
                     + String.join(" | ", inherited.members()) + ") -- a restatement MUST have the same member "
                     + "labels in the same order, and changing membership is a resolver error (§5.11)");
         }
@@ -1956,7 +1956,7 @@ final class DefinitionResolver {
             io.ltr8.tson.schema.meta.TypeRef inheritedType =
                     fields.get(inheritedFieldIndex.get(member.name())).type();
             if (!restatedType.equals(inheritedType)) {
-                throw new TsonSchemaValidationException(prefix + "gives member '" + member.name() + "' the type "
+                throw new SchemaValidationException(prefix + "gives member '" + member.name() + "' the type "
                         + "'" + restatedType.name() + "' where the source declares '" + inheritedType.name()
                         + "' -- member type-refs are restated verbatim (§5.11); narrowing a member's type is "
                         + "done by naming it as an ordinary field");
@@ -1965,7 +1965,7 @@ final class DefinitionResolver {
 
         ElementState state = groupDef.optional() ? ElementState.OPTIONAL : ElementState.REQUIRED;
         if (inherited.state() == ElementState.REQUIRED && state == ElementState.OPTIONAL) {
-            throw new TsonSchemaValidationException(prefix + "loosens a REQUIRED group to OPTIONAL -- a "
+            throw new SchemaValidationException(prefix + "loosens a REQUIRED group to OPTIONAL -- a "
                     + "restatement may only tighten OPTIONAL→REQUIRED (§5.11)");
         }
         groups.set(index, new FieldGroup(inherited.members(), state));

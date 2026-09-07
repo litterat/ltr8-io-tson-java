@@ -1,14 +1,15 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.Top;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -59,8 +60,8 @@ class ContainerSugarEndToEndTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -172,7 +173,7 @@ class ContainerSugarEndToEndTest {
      */
     @Test
     void twoApplicationsOfOneTemplateAreOneVariant() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           box => <T> { v: T }
                           u   => ( box<text> | box<text> )"""));
@@ -393,12 +394,12 @@ class ContainerSugarEndToEndTest {
     void enumMembersAreIdentifiersAndAtLeastOneAndUnique() {
         assertNotNull(compile("  e => !enum [OPEN DONE]"));
 
-        assertTrue(assertThrows(TsonSchemaValidationException.class, () -> compile("  e => !enum []"))
+        assertTrue(assertThrows(SchemaValidationException.class, () -> compile("  e => !enum []"))
                 .getMessage().contains("fewer than the minimum 1"));
-        assertTrue(assertThrows(TsonSchemaValidationException.class,
+        assertTrue(assertThrows(SchemaValidationException.class,
                 () -> compile("  e => !enum [\"in progress\" DONE]"))
                 .getMessage().contains("U+0020 at index 2 cannot appear in an identifier"));
-        assertTrue(assertThrows(TsonSchemaValidationException.class, () -> compile("  e => !enum [OPEN OPEN]"))
+        assertTrue(assertThrows(SchemaValidationException.class, () -> compile("  e => !enum [OPEN OPEN]"))
                 .getMessage().contains("requires unique elements"));
     }
 
@@ -412,7 +413,7 @@ class ContainerSugarEndToEndTest {
      */
     @Test
     void aSizedArrayWhoseBoundsCannotBeSatisfiedIsAResolverError() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("  impossible => [text; 5..3]"));
 
         assertTrue(thrown.getMessage().contains("min_items 5 is above max_items 3"), thrown.getMessage());
@@ -540,7 +541,7 @@ class ContainerSugarEndToEndTest {
      */
     @Test
     void aContainerConstructorsNameAtAHeadIsAnUnresolvedReference() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("  holder => { entries: map<text, text> }"));
 
         assertTrue(thrown.getMessage().contains("unresolved reference 'map'"), thrown.getMessage());

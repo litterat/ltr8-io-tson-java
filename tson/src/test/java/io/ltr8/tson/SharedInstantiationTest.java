@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 
 /**
  * [TSON-SCHEMA] §8.2's instantiation identity across an {@code !!import} boundary: two applications of one
@@ -62,7 +62,7 @@ class SharedInstantiationTest {
     /** A name an import already binds to a <em>different</em> type is still an error. */
     @Test
     void aLocalDeclarationShadowingAnImportedNameStillCollides() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.builder().build().resolve("""
                         !!id:"https://example.test/shadowing.tn"
                         !!meta:"%s"

@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import org.junit.jupiter.api.Test;
 
@@ -63,7 +63,7 @@ class ForwardReferenceResolutionTest {
     @Test
     void aCircularCompositionChainIsRejected() {
         // a composes b composes a -- resolution needs each other's resolved form, so neither can complete.
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolve("  a => b & { }\n  b => a & { }"));
 
         assertTrue(thrown.getMessage().contains("circular"), thrown::getMessage);
@@ -73,7 +73,7 @@ class ForwardReferenceResolutionTest {
     void aCircularCompositionChainWithFieldBodiesIsAlsoRejected() {
         // Same cycle, now with tightening-body fields -- the cycle is in the composition (resolved before
         // the fields), so a field body provides no escape and it's caught the same way.
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolve("  a => b & { p: text }\n  b => a & { q: text }"));
 
         assertTrue(thrown.getMessage().contains("circular"), thrown::getMessage);

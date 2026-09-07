@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import org.junit.jupiter.api.Test;
 
@@ -75,10 +75,10 @@ class SyntheticEntryMarkerTest {
 
     private static TsonCompiledMetaRegistry registry() {
         return TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
-            if (TsonCanonicalIdentity.sameIdentity(uri, IMPORTER_ID)) {
+            if (CanonicalIdentity.sameIdentity(uri, IMPORTER_ID)) {
                 return IMPORTER;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -92,7 +92,7 @@ class SyntheticEntryMarkerTest {
     /** This schema's own entries, the merged {@code !!import} closure left out. */
     private static Map<String, TypeDefinition> localEntries() {
         var linked = registry().resolveLinked(ID);
-        String canonical = TsonCanonicalIdentity.canonicalize(ID);
+        String canonical = CanonicalIdentity.canonicalize(ID);
         Map<String, TypeDefinition> local = new LinkedHashMap<>();
         linked.schema().entries().forEach((name, definition) -> {
             if (linked.originOf(name).equals(canonical)) {

@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.*;
 
 import java.util.Optional;
@@ -132,7 +134,7 @@ public final class TsonDiagnostics {
      *
      * <p><b>It takes the exception rather than its message</b>, because it is built from a {@link
      * SchemaFetchException} and from nothing else -- which is what makes the distinction cheap: {@link
-     * TsonSchemaSource#fetch} names that type for "cannot supply this", so the two cases never have to be
+     * SchemaSource#fetch} names that type for "cannot supply this", so the two cases never have to be
      * told apart by reading a message. An {@code !!import} or {@code !!meta} naming an identity no source
      * will serve reaches this; one that resolves and then fails to link is a {@code SCHEMA_ERROR} like any
      * other.

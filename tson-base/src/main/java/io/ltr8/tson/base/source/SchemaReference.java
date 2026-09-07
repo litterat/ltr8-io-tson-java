@@ -1,4 +1,5 @@
-package io.ltr8.tson;
+package io.ltr8.tson.base.source;
+
 
 import io.ltr8.tson.base.SchemaFetchException;
 
@@ -8,7 +9,7 @@ import java.util.Locale;
 
 /**
  * One schema reference checked against [TSON-DATA] §2.2.1's rules on what an identifying URI may be, shared by
- * every fetching {@code TsonSchemaSource}.
+ * every fetching {@code SchemaSource}.
  *
  * <p><b>Identity is not location</b>, and this type is the split. §2.2.1 makes a reference's canonical identity
  * its lowercase host plus path: the scheme is "a transport hint, not part of the name", the {@code ?sha256=}

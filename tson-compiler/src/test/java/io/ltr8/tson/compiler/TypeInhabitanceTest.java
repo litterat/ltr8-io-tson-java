@@ -1,17 +1,18 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,8 +46,8 @@ class TypeInhabitanceTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -62,7 +63,7 @@ class TypeInhabitanceTest {
     }
 
     private static String rejection(String declarations) {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile(declarations), () -> "expected a rejection for: " + declarations);
         assertTrue(thrown.getMessage().contains("can never be satisfied"), thrown.getMessage());
         return thrown.getMessage();
@@ -200,7 +201,7 @@ class TypeInhabitanceTest {
      */
     @Test
     void anUnresolvedReferenceIsNotAlsoCalledUninhabited() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("  holder => { v: nowhere }"));
 
         assertTrue(thrown.getMessage().contains("nowhere"), thrown.getMessage());

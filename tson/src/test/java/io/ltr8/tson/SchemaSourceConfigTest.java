@@ -1,7 +1,8 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.source.FileSchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -20,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * {@link TsonConfig#httpSchemas} and {@link TsonConfig#fileSchemas} -- the short forms of the two sources
  * this library ships, alongside {@link TsonConfig#schemaSource} rather than instead of it -- and {@link
- * TsonSchemaSource#ofMap}, the third form, for schemas a caller already holds.
+ * SchemaSource#ofMap}, the third form, for schemas a caller already holds.
  */
 class SchemaSourceConfigTest {
 
@@ -49,6 +50,24 @@ class SchemaSourceConfigTest {
         TsonValue order = tson.treeReader().read(DOCUMENT);
 
         assertEquals("ABC-1", order.get("sku").asString().orElseThrow());
+    }
+
+    /**
+     * The general seam carries the same arc with the source built rather than named -- the short form is a
+     * convenience over {@link TsonConfig#schemaSource}, not a second path into the loader.
+     */
+    @Test
+    void theGeneralSeamServesTheSameArcAsTheShortForm(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
+        FileSchemaSource source = FileSchemaSource.builder().mapHost(HOST, dir).build();
+
+        Tson tson = Tson.builder().schemaSource(source).build();
+        tson.resolve(source.fetch(SCHEMA_URI));
+
+        assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
+        assertEquals(2, tson.validate("""
+                !!schema:"%s"
+                !order { }""".formatted(SCHEMA_URI)).size(), "both required fields are missing");
     }
 
     /** Repeatable: each call maps another host into the one source, rather than replacing the last. */
@@ -118,7 +137,7 @@ class SchemaSourceConfigTest {
     /** The short form for a caller who already has the text: no host, no directory, no fetching. */
     @Test
     void ofMapServesADocumentEndToEnd() {
-        Tson tson = Tson.builder().schemaSource(TsonSchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA))).build();
+        Tson tson = Tson.builder().schemaSource(SchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA))).build();
 
         assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
     }
@@ -130,7 +149,7 @@ class SchemaSourceConfigTest {
      */
     @Test
     void ofMapReportsASchemaItDoesNotHoldAsUnavailable() {
-        Tson tson = Tson.builder().schemaSource(TsonSchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA))).build();
+        Tson tson = Tson.builder().schemaSource(SchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA))).build();
 
         List<Diagnostic> problems = tson.validate(UNPUBLISHED);
 

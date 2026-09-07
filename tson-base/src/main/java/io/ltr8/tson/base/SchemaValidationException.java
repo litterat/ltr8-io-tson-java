@@ -1,4 +1,4 @@
-package io.ltr8.tson.schema;
+package io.ltr8.tson.base;
 
 /**
  * <b>The author's schema is wrong</b> -- a rule the spec states, broken by the document, at any phase that
@@ -14,11 +14,11 @@ package io.ltr8.tson.schema;
  * and tells the author their correct reading of the spec is this library's fault. The test for which is
  * which: <b>a schema error's verdict does not change when this library improves; a gap's does.</b>
  */
-public final class TsonSchemaValidationException extends RuntimeException {
+public final class SchemaValidationException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
-    public TsonSchemaValidationException(String message) {
+    public SchemaValidationException(String message) {
         super(message);
     }
 
@@ -29,7 +29,7 @@ public final class TsonSchemaValidationException extends RuntimeException {
      * failure to read it is the schema author's problem. {@code cause} is kept for the stack trace alone;
      * the message must already say everything a reader of the diagnostic needs.
      */
-    public TsonSchemaValidationException(String message, Throwable cause) {
+    public SchemaValidationException(String message, Throwable cause) {
         super(message, cause);
     }
 }

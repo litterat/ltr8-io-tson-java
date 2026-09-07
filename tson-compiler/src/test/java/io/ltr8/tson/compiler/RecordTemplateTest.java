@@ -1,12 +1,13 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -54,8 +55,8 @@ class RecordTemplateTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -185,7 +186,7 @@ class RecordTemplateTest {
         assertEquals("10", first.value().orElseThrow().text(), "N stood in the value slot");
         assertEquals(FieldState.REQUIRED_DEFAULT, first.state(), "~ is a default, and stays one");
 
-        TsonSchemaValidationException swapped = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException swapped = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           test1 => <T, N> { first: T ~ N }
                           holder => { d: test1<10, int32> }"""));
@@ -347,7 +348,7 @@ class RecordTemplateTest {
      */
     @Test
     void anArgumentTheSlotCannotTakeIsReportedAtTheApplication() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           tags   => <N> { xs: [text; N] }
                           holder => { t: tags<"two"> }"""));
@@ -456,7 +457,7 @@ class RecordTemplateTest {
      */
     @Test
     void aCycleThroughAnApplicationIsStillCaughtAsACircularComposition() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           a => b<text> & { x: text }
                           b => <T> a & { y: T }"""));
@@ -468,7 +469,7 @@ class RecordTemplateTest {
 
     @Test
     void anArityMismatchIsReportedAgainstTheApplication() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           pair => <A, B> { first: A  second: B }
                           holder => { p: pair<text> }"""));
@@ -487,7 +488,7 @@ class RecordTemplateTest {
      */
     @Test
     void applyingAValueWhereTheBodyUsesAParameterAsATypeIsAnError() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           box => <T> { v: T }
                           holder => { b: box<3> }"""));
@@ -510,7 +511,7 @@ class RecordTemplateTest {
      */
     @Test
     void applyingATypeWhereTheBodyRoutesAValueIsCaughtByValueConformance() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           retry => <N> { attempts: int32 ~ N }
                           holder => { r: retry<text> }"""));
@@ -529,7 +530,7 @@ class RecordTemplateTest {
      */
     @Test
     void nonRegularRecursionIsRejectedBeforeAnythingCloses() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           box   => <T> { v: T }
                           weird => <T> { next: weird<box<T>>? }
@@ -549,7 +550,7 @@ class RecordTemplateTest {
     /** Applying arguments to something that declares none stays the author's error, wherever it is caught. */
     @Test
     void applyingArgumentsToANonTemplateIsAnError() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           plain => { a: text }
                           holder => { b: plain<text> }"""));
@@ -636,7 +637,7 @@ class RecordTemplateTest {
     /** Arity is the <b>alias's</b> own parameter list, not the arity of the application it names. */
     @Test
     void aParameterisedAliasIsAppliedAtItsOwnArity() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class, () -> compile("""
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
                   pair   => <A, B> { first: A  second: B }
                   keyed  => <B> pair<text, B>
                   holder => { p: keyed<int32, text> }"""));
@@ -652,7 +653,7 @@ class RecordTemplateTest {
      */
     @Test
     void aSelfApplyingReferenceTemplateIsASchemaError() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class, () -> compile("""
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> compile("""
                   loop   => <T> loop<T>
                   holder => { p: loop<text> }"""));
 

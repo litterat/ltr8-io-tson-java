@@ -5,9 +5,9 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentHeader;
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,7 +27,7 @@ import java.util.Map;
  *
  * <p><b>A flat list of files, auto-classified.</b> Each file is a TSON schema document (its header
  * carries {@code !!meta}) or a data document. The schema files are made available through a {@link
- * TsonSchemaSource}, and each data document is handed to {@link Tson#validate(InputStream)}, which
+ * SchemaSource}, and each data document is handed to {@link Tson#validate(InputStream)}, which
  * works out on its own whether the data's {@code !!schema} selects a schema or whether it's validated
  * schemalessly (base syntax + built-in atoms). This command only turns the argument list into a
  * source + a list of data documents, then renders the diagnostics.
@@ -63,8 +63,8 @@ final class ValidateCommand {
         // classified because it reads `schemas` only when a document asks for one, and because the run's own
         // policy has to come from the instance that judges -- including on a run that fails classification
         // and judges nothing, whose report carries the same envelope as any other.
-        TsonSchemaSource source = uri -> {
-            String text = schemas.get(TsonCanonicalIdentity.canonicalize(uri));
+        SchemaSource source = uri -> {
+            String text = schemas.get(CanonicalIdentity.canonicalize(uri));
             if (text == null) {
                 // SchemaFetchException, not an IllegalStateException: this is a source saying it cannot
                 // supply a schema, which is the one thing the fetch contract names a type for. Anything else
@@ -106,7 +106,7 @@ final class ValidateCommand {
                     } else {
                         // Key by canonical identity so a data file's plain !!schema resolves against a
                         // schema whose !!id carries a ?sha256= pin (the hash is not identity, §2.2.1).
-                        schemas.put(TsonCanonicalIdentity.canonicalize(id), text);
+                        schemas.put(CanonicalIdentity.canonicalize(id), text);
                         declaredIds.add(id);
                     }
                 } catch (RuntimeException e) {

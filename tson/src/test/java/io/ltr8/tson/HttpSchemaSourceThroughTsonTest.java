@@ -1,7 +1,9 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.HttpSchemaSource;
 import com.sun.net.httpserver.HttpServer;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,7 +24,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class TsonHttpSchemaSourceConcurrencyTest {
+/**
+ * {@link HttpSchemaSource} as a {@code Tson} instance actually uses it: the arc a document naming an
+ * {@code https} schema travels, and what the loader above the source does with it under load. The source's
+ * own contract -- the allow-list, the redirect and size rules, its cache -- is {@code tson-base}'s to test,
+ * this being the half that needs a front door.
+ */
+class HttpSchemaSourceThroughTsonTest {
 
     private static final int THREADS = Math.max(8, Runtime.getRuntime().availableProcessors() * 2);
     private static final String HOST = "schemas.example.com";
@@ -47,8 +55,6 @@ class TsonHttpSchemaSourceConcurrencyTest {
 
     private HttpServer server;
     private String base;
-    private final AtomicInteger requests = new AtomicInteger();
-
     @BeforeEach
     void startServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -66,7 +72,6 @@ class TsonHttpSchemaSourceConcurrencyTest {
 
     private void serve(String path, String document) {
         server.createContext(path, exchange -> {
-            requests.incrementAndGet();
             byte[] bytes = document.getBytes(StandardCharsets.UTF_8);
             exchange.sendResponseHeaders(200, bytes.length);
             try (var out = exchange.getResponseBody()) {
@@ -75,45 +80,30 @@ class TsonHttpSchemaSourceConcurrencyTest {
         });
     }
 
-    private TsonHttpSchemaSource source() {
-        return TsonHttpSchemaSource.builder().mapHost(HOST, base).timeout(Duration.ofSeconds(5)).build();
+    private HttpSchemaSource source() {
+        return HttpSchemaSource.builder().mapHost(HOST, base).timeout(Duration.ofSeconds(5)).build();
     }
 
     /**
-     * Many threads first-fetching one identity at once. The cache is get-then-put rather than
-     * {@code computeIfAbsent}, so a race costs a duplicate fetch and nothing else -- every caller must still get
-     * the right document, and none may hang.
+     * The whole point, end to end: a document naming a schema over HTTP resolves, validates, and reads --
+     * with resolution done at startup, on this thread, which is what the threading note requires.
      */
     @Test
-    @Timeout(120)
-    void concurrentFirstFetchesOfOneIdentityAllSucceed() throws Exception {
-        String reference = "https://" + HOST + "/2026/35/app/order-1.tn";
-        Queue<Throwable> failures = new ConcurrentLinkedQueue<>();
-        CountDownLatch start = new CountDownLatch(1);
-        CountDownLatch done = new CountDownLatch(THREADS);
+    void aDocumentNamingAnHttpSchemaResolvesAndValidates() {
+        String schemaUri = "https://" + HOST + "/2026/35/app/order-1.tn";
+        try (HttpSchemaSource source = source()) {
+            Tson tson = Tson.builder().schemaSource(source).build();
+            tson.resolve(source.fetch(schemaUri));
 
-        try (TsonHttpSchemaSource source = source();
-             ExecutorService pool = Executors.newFixedThreadPool(THREADS)) {
-            for (int i = 0; i < THREADS; i++) {
-                pool.submit(() -> {
-                    try {
-                        start.await();
-                        assertEquals(SCHEMA, source.fetch(reference));
-                    } catch (Throwable t) {
-                        failures.add(t);
-                    } finally {
-                        done.countDown();
-                    }
-                });
-            }
-            start.countDown();
-            assertTrue(done.await(60, TimeUnit.SECONDS), "threads did not finish -- a deadlock, most likely");
-            assertTrue(failures.isEmpty(), "failures: " + failures);
-            assertTrue(source.isCached(reference));
+            TsonValue order = tson.treeReader().read("""
+                    !!schema:"%s"
+                    !order { sku: "ABC-1"  quantity: 3 }""".formatted(schemaUri));
+            assertEquals("ABC-1", order.get("sku").asString().orElseThrow());
+
+            assertEquals(2, tson.validate("""
+                    !!schema:"%s"
+                    !order { }""".formatted(schemaUri)).size(), "both required fields are missing");
         }
-
-        assertTrue(requests.get() <= THREADS,
-                "a duplicate fetch is the accepted cost of not holding a lock across I/O; " + requests.get());
     }
 
     /**
@@ -130,7 +120,7 @@ class TsonHttpSchemaSourceConcurrencyTest {
         AtomicInteger depth = new AtomicInteger();
         AtomicInteger maxDepth = new AtomicInteger();
 
-        TsonSchemaSource counting = uri -> {
+        SchemaSource counting = uri -> {
             int current = depth.incrementAndGet();
             maxDepth.updateAndGet(seen -> Math.max(seen, current));
             try {
@@ -160,7 +150,7 @@ class TsonHttpSchemaSourceConcurrencyTest {
                 pool.submit(() -> {
                     // A Tson of its own per thread: resolution mutates a registry and is not concurrent-safe,
                     // which is the invariant this project states everywhere. What is shared here is the origin.
-                    try (TsonHttpSchemaSource source = source()) {
+                    try (HttpSchemaSource source = source()) {
                         start.await();
                         Tson tson = Tson.builder().schemaSource(source).build();
                         assertEquals(java.util.List.of(), tson.validateSchema(DERIVED));

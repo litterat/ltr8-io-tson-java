@@ -10,7 +10,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -267,7 +267,7 @@ class SchemaResolverDiagnosticsTest {
         SchemaDocument document = parser.parseSchemaDocument();
         SchemaResolver resolver = new SchemaResolver(standardLibrary());
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolver.resolveSchema(document, parser.schemaPositions()));
         assertTrue(thrown.getMessage().contains("pins a floor of zero"), thrown.getMessage());
     }
@@ -279,7 +279,7 @@ class SchemaResolverDiagnosticsTest {
         SchemaDocument document = parser.parseSchemaDocument();
         SchemaResolver resolver = new SchemaResolver(standardLibrary());
 
-        assertThrows(TsonSchemaValidationException.class,
+        assertThrows(SchemaValidationException.class,
                 () -> resolver.resolveSchema(document, parser.schemaPositions()));
     }
 }

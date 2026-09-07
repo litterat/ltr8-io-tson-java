@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.EnumBody;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.Reference;
@@ -44,8 +45,8 @@ class ParameterKindTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -56,7 +57,7 @@ class ParameterKindTest {
     }
 
     private static String rejected(String declarations) {
-        return assertThrows(TsonSchemaValidationException.class, () -> compile(declarations)).getMessage();
+        return assertThrows(SchemaValidationException.class, () -> compile(declarations)).getMessage();
     }
 
     /** An entry's body with every {@code REFERENCE} hop followed. */

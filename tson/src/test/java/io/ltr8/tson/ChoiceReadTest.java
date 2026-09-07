@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -122,7 +122,7 @@ class ChoiceReadTest {
      */
     @Test
     void aChoiceWithADuplicateVariantIsRejected() {
-        TsonSchemaValidationException e = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException e = assertThrows(SchemaValidationException.class,
                 () -> personReader("(text | text)"));
 
         assertTrue(e.getMessage().contains("§5.4"), e.getMessage());

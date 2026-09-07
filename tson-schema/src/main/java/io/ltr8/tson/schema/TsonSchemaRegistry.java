@@ -1,5 +1,7 @@
 package io.ltr8.tson.schema;
 
+import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Optional;
@@ -74,7 +76,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     public TsonLinkedSchema register(TsonLinkedSchema schema) {
         String identity = checkRegistrable(schema);
         if (schemas.putIfAbsent(identity, schema) != null) {
-            throw new TsonSchemaValidationException("a schema is already registered under '" + identity + "'");
+            throw new SchemaValidationException("a schema is already registered under '" + identity + "'");
         }
         return schema;
     }
@@ -106,13 +108,13 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     private static String checkRegistrable(TsonLinkedSchema schema) {
         TsonSchema unwrapped = schema.schema();
         if (selfReferential(unwrapped) && unwrapped.bootstrap()) {
-            throw new TsonSchemaValidationException("'" + unwrapped.id() + "' is self-referential (its own "
+            throw new SchemaValidationException("'" + unwrapped.id() + "' is self-referential (its own "
                     + "!!meta names its own !!id) and bootstrap() == true -- meta-kernel's own identity "
                     + "must be registered via a schema resolved ordinarily (TsonSchemaResolver.resolveSchema,"
                     + " which never sets bootstrap), never the bootstrap-produced form directly, "
                     + "materialized or not");
         }
-        return TsonCanonicalIdentity.canonicalize(unwrapped.id());
+        return CanonicalIdentity.canonicalize(unwrapped.id());
     }
 
     /**
@@ -122,7 +124,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
      * would be circular, §2.2.1), so the two differ as strings but name the same identity.
      */
     private static boolean selfReferential(TsonSchema schema) {
-        return TsonCanonicalIdentity.sameIdentity(schema.id(), schema.meta());
+        return CanonicalIdentity.sameIdentity(schema.id(), schema.meta());
     }
 
     @Override
@@ -131,7 +133,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     }
 
     public Optional<TsonLinkedSchema> get(String uri) {
-        return getByCanonicalIdentity(TsonCanonicalIdentity.canonicalize(uri));
+        return getByCanonicalIdentity(CanonicalIdentity.canonicalize(uri));
     }
 
     /**

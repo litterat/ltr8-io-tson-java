@@ -1,8 +1,8 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaSource;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.source.SchemaSource;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -44,8 +44,8 @@ class ValueParamFixedFieldTest {
             """;
 
     private static Tson tson() {
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -117,7 +117,7 @@ class ValueParamFixedFieldTest {
     @Test
     void aMaterialisedValueParameterDefaultStaysADefault() {
         String schema = SCHEMA.replace("status: int32 = S", "status: int32 ~ S");
-        TsonSchemaSource source = uri -> schema;
+        SchemaSource source = uri -> schema;
         Tson tson = Tson.builder().schemaSource(source).build();
 
         RecordField materialised = statusOf(tson.resolve(schema), "created");
@@ -160,7 +160,7 @@ class ValueParamFixedFieldTest {
                   c => refined<201>
                 }
                 """;
-        TsonSchemaSource source = uri -> schema;
+        SchemaSource source = uri -> schema;
         TsonLinkedSchema linked = Tson.builder().schemaSource(source).build().resolve(schema);
 
         for (String entry : List.of("a", "b", "c")) {
@@ -199,7 +199,7 @@ class ValueParamFixedFieldTest {
                   d => sized<2>
                 }
                 """;
-        TsonSchemaSource source = uri -> schema;
+        SchemaSource source = uri -> schema;
         TsonLinkedSchema linked = Tson.builder().schemaSource(source).build().resolve(schema);
 
         // The kernel field is gone, so the compile-time proof is that this resolves at all; what is worth

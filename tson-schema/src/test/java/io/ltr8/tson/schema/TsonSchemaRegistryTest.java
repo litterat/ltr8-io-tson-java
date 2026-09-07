@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema;
 
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -74,7 +75,7 @@ class TsonSchemaRegistryTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         TsonLinkedSchema first = registry.register(linkedSchema());
 
-        assertThrows(TsonSchemaValidationException.class, () -> registry.register(linkedSchema()));
+        assertThrows(SchemaValidationException.class, () -> registry.register(linkedSchema()));
         assertSame(first, registry.registerIfAbsent(linkedSchema()), "the winner's entry, not the newcomer's");
     }
 
@@ -109,7 +110,7 @@ class TsonSchemaRegistryTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         registry.register(linkedSchema());
 
-        assertThrows(TsonSchemaValidationException.class,
+        assertThrows(SchemaValidationException.class,
                 () -> registry.register(linkedSchema()));
     }
 
@@ -123,7 +124,7 @@ class TsonSchemaRegistryTest {
                 List.of(), Map.of());
         TsonLinkedSchema linked = new TsonLinkedSchema(sameIdentityDifferentScheme);
 
-        assertThrows(TsonSchemaValidationException.class, () -> registry.register(linked));
+        assertThrows(SchemaValidationException.class, () -> registry.register(linked));
     }
 
 }

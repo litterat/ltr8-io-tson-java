@@ -20,7 +20,8 @@ import java.util.Optional;
  * <p><b>Nodes carry no source position</b>, so equality is over content and two structurally equal
  * documents parsed from different sources are equal. It is the same shape {@code TsonValue} takes and
  * for the same reason — a value model holds values — and it costs less than it appears to: a parse
- * failure and a duplicate member are reported by {@link io.ltr8.tson.json.Json#parse Json.parse} with a {@link io.ltr8.tson.json.JsonPosition JsonPosition}
+ * failure and a duplicate member are reported by {@link io.ltr8.tson.json.Json#parse Json.parse} with a
+ * {@link io.ltr8.tson.json.JsonPosition JsonPosition}
  * already, and the schema-directed decode streams events, which carry positions, rather than walking a
  * tree. A {@link JsonValueException} therefore names the step and the value rather than a line.
  *
@@ -92,7 +93,9 @@ public sealed interface JsonValue
         throw notA("a boolean");
     }
 
-    /** This object's members in document order, unmodifiable. @throws JsonValueException unless this is a {@link JsonObject} */
+    /**
+     * This object's members in document order, unmodifiable. @throws JsonValueException unless this is a {@link JsonObject}
+     */
     default Map<String, JsonValue> asMap() {
         throw notA("an object");
     }
@@ -107,7 +110,8 @@ public sealed interface JsonValue
     /**
      * This value as compact RFC 8259 JSON, on one line.
      *
-     * <p>Within [TSON-JSON] §3.1's profile in both directions: what {@link io.ltr8.tson.json.Json#parse Json.parse} accepts, this
+     * <p>Within [TSON-JSON] §3.1's profile in both directions: what {@link io.ltr8.tson.json.Json#parse Json.parse} accepts,
+     * this
      * emits, and what this emits {@link io.ltr8.tson.json.Json#parse Json.parse} accepts — §9.2's round trip, which is the
      * conformance test rather than a separate rule set. A {@link JsonNumber} re-emits its own digits
      * (§5.3), never a value routed through a host type.

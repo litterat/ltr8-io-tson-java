@@ -1,4 +1,4 @@
-package io.ltr8.tson.base;
+package io.ltr8.tson.base.policy;
 
 import io.ltr8.tson.base.unicode.Xid;
 

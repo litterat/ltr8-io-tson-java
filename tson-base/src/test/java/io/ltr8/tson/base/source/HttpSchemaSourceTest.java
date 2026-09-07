@@ -1,12 +1,9 @@
-package io.ltr8.tson;
+package io.ltr8.tson.base.source;
 
 import com.sun.net.httpserver.HttpServer;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.SchemaFetchException.Reason;
-import io.ltr8.tson.tree.TsonValue;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -14,6 +11,12 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * being tested is behaviour of the transport -- a redirect, a slow response, an oversized body -- that a stub
  * would only assert about itself.
  */
-class TsonHttpSchemaSourceTest {
+class HttpSchemaSourceTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
@@ -78,24 +81,24 @@ class TsonHttpSchemaSourceTest {
     }
 
     /** Names are on {@link #HOST}; the bytes come from the test server. That split is the point of mapHost. */
-    private TsonHttpSchemaSource.Builder allowingThisServer() {
-        return TsonHttpSchemaSource.builder().mapHost(HOST, base).timeout(Duration.ofSeconds(2));
+    private HttpSchemaSource.Builder allowingThisServer() {
+        return HttpSchemaSource.builder().mapHost(HOST, base).timeout(Duration.ofSeconds(2));
     }
 
     @Test
     void fetchesAPermittedOrigin() {
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
-        try (TsonHttpSchemaSource source = allowingThisServer().build()) {
+        try (HttpSchemaSource source = allowingThisServer().build()) {
             assertTrue(source.fetch(reference("/order-1.tn")).contains("order =>"));
         }
     }
 
-    /** Deny by default: a source with no allowed origin is exactly as inert as TsonSchemaSource.registeredOnly(). */
+    /** Deny by default: a source with no allowed origin is exactly as inert as SchemaSource.registeredOnly(). */
     @Test
     void fetchesNothingUntilAnOriginIsAllowed() {
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
-        try (TsonHttpSchemaSource source = TsonHttpSchemaSource.builder().build()) {
-            assertEquals(Reason.NOT_PERMITTED, refusal(source, reference("/order-1.tn")).reason());
+        try (HttpSchemaSource source = HttpSchemaSource.builder().build()) {
+            Assertions.assertEquals(Reason.NOT_PERMITTED, refusal(source, reference("/order-1.tn")).reason());
             assertEquals(0, requests.get(), "policy must refuse before opening a connection");
         }
     }
@@ -106,10 +109,10 @@ class TsonHttpSchemaSourceTest {
      */
     @Test
     void aHostIsMatchedExactlyNotBySuffix() {
-        try (TsonHttpSchemaSource source = TsonHttpSchemaSource.builder().allowHost(HOST).build()) {
-            assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://evil-schemas.example.com/x.tn").reason());
-            assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://sub.schemas.example.com/x.tn").reason());
-            assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://example.com/x.tn").reason());
+        try (HttpSchemaSource source = HttpSchemaSource.builder().allowHost(HOST).build()) {
+            Assertions.assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://evil-schemas.example.com/x.tn").reason());
+            Assertions.assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://sub.schemas.example.com/x.tn").reason());
+            Assertions.assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://example.com/x.tn").reason());
         }
     }
 
@@ -120,7 +123,7 @@ class TsonHttpSchemaSourceTest {
     @Test
     void theSchemeIsNotPartOfTheIdentity() {
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
-        try (TsonHttpSchemaSource source = allowingThisServer().build()) {
+        try (HttpSchemaSource source = allowingThisServer().build()) {
             source.fetch("https://" + HOST + "/order-1.tn");
             source.fetch("http://" + HOST + "/order-1.tn");
             assertEquals(1, requests.get(), "one identity however the scheme is written");
@@ -130,7 +133,7 @@ class TsonHttpSchemaSourceTest {
     /** §2.2.1: an identifying URI carries no port, no userinfo and no fragment. Refused with a message that says so. */
     @Test
     void refusesAReferenceThatIsNotALegalIdentity() {
-        try (TsonHttpSchemaSource source = TsonHttpSchemaSource.builder().allowHost(HOST).build()) {
+        try (HttpSchemaSource source = HttpSchemaSource.builder().allowHost(HOST).build()) {
             // The origin of https://allowed@evil/ is evil -- a reader, and some parsers, get this wrong.
             SchemaFetchException userinfo = refusal(source, "https://" + HOST + "@evil.example.com/x.tn");
             assertEquals(Reason.NOT_PERMITTED, userinfo.reason());
@@ -155,7 +158,7 @@ class TsonHttpSchemaSourceTest {
             exchange.sendResponseHeaders(302, -1);
             exchange.close();
         });
-        try (TsonHttpSchemaSource source = allowingThisServer().build()) {
+        try (HttpSchemaSource source = allowingThisServer().build()) {
             SchemaFetchException refused = refusal(source, reference("/moved.tn"));
             assertEquals(Reason.TRANSPORT, refused.reason());
             assertTrue(refused.getMessage().contains("redirect"), refused.getMessage());
@@ -165,7 +168,7 @@ class TsonHttpSchemaSourceTest {
     @Test
     void reportsAMissingSchemaAsNotFound() {
         serve("/gone.tn", 404, "nope");
-        try (TsonHttpSchemaSource source = allowingThisServer().build()) {
+        try (HttpSchemaSource source = allowingThisServer().build()) {
             assertEquals(Reason.NOT_FOUND, refusal(source, reference("/gone.tn")).reason());
         }
     }
@@ -173,7 +176,7 @@ class TsonHttpSchemaSourceTest {
     @Test
     void reportsAFailingOriginAsTransport() {
         serve("/broken.tn", 500, "boom");
-        try (TsonHttpSchemaSource source = allowingThisServer().build()) {
+        try (HttpSchemaSource source = allowingThisServer().build()) {
             assertEquals(Reason.TRANSPORT, refusal(source, reference("/broken.tn")).reason());
         }
     }
@@ -182,7 +185,7 @@ class TsonHttpSchemaSourceTest {
     @Test
     void refusesADocumentLargerThanTheCap() {
         serve("/big.tn", 200, "x".repeat(4096));
-        try (TsonHttpSchemaSource source = allowingThisServer().maxDocumentBytes(1024).build()) {
+        try (HttpSchemaSource source = allowingThisServer().maxDocumentBytes(1024).build()) {
             assertEquals(Reason.TOO_LARGE, refusal(source, reference("/big.tn")).reason());
         }
     }
@@ -199,7 +202,7 @@ class TsonHttpSchemaSourceTest {
             exchange.sendResponseHeaders(200, -1);
             exchange.close();
         });
-        try (TsonHttpSchemaSource source = allowingThisServer().timeout(Duration.ofMillis(300)).build()) {
+        try (HttpSchemaSource source = allowingThisServer().timeout(Duration.ofMillis(300)).build()) {
             assertEquals(Reason.TIMEOUT, refusal(source, reference("/slow.tn")).reason());
         }
     }
@@ -208,7 +211,7 @@ class TsonHttpSchemaSourceTest {
     @Test
     void canRequireAContentHashPin() {
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
-        try (TsonHttpSchemaSource source = allowingThisServer().requireContentHashPin(true).build()) {
+        try (HttpSchemaSource source = allowingThisServer().requireContentHashPin(true).build()) {
             SchemaFetchException refused = refusal(source, reference("/order-1.tn"));
             assertEquals(Reason.NOT_PERMITTED, refused.reason());
             assertTrue(refused.getMessage().contains("sha256"), refused.getMessage());
@@ -224,7 +227,7 @@ class TsonHttpSchemaSourceTest {
     @Test
     void cachesByIdentitySoAQueryStringCannotForceRefetches() {
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
-        try (TsonHttpSchemaSource source = allowingThisServer().build()) {
+        try (HttpSchemaSource source = allowingThisServer().build()) {
             source.fetch(reference("/order-1.tn"));
             source.fetch(reference("/order-1.tn"));
             source.fetch(reference("/order-1.tn") + "?sha256=abc123");
@@ -236,7 +239,7 @@ class TsonHttpSchemaSourceTest {
     @Test
     void aFullCacheStopsCachingRatherThanFailing() {
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
-        try (TsonHttpSchemaSource source = allowingThisServer().maxCachedSchemas(0).build()) {
+        try (HttpSchemaSource source = allowingThisServer().maxCachedSchemas(0).build()) {
             source.fetch(reference("/order-1.tn"));
             source.fetch(reference("/order-1.tn"));
             assertEquals(2, requests.get());
@@ -248,7 +251,7 @@ class TsonHttpSchemaSourceTest {
     @Test
     void preloadFetchesEagerlyAndFailsLoudly() {
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
-        try (TsonHttpSchemaSource source = allowingThisServer().build()) {
+        try (HttpSchemaSource source = allowingThisServer().build()) {
             source.preload(reference("/order-1.tn"));
             assertTrue(source.isCached(reference("/order-1.tn")));
             assertThrows(SchemaFetchException.class, () -> source.preload(reference("/missing.tn")));
@@ -256,29 +259,45 @@ class TsonHttpSchemaSourceTest {
     }
 
     /**
-     * The whole point, end to end: a document naming a schema over HTTP resolves, validates, and reads --
-     * with resolution done at startup, on this thread, which is what the threading note requires.
+     * Many threads first-fetching one identity at once. The cache is get-then-put rather than
+     * {@code computeIfAbsent}, so a race costs a duplicate fetch and nothing else -- every caller must still get
+     * the right document, and none may hang.
      */
     @Test
-    void aDocumentNamingAnHttpSchemaResolvesAndValidates() {
-        String schemaUri = reference("/order-1.tn");
+    @Timeout(120)
+    void concurrentFirstFetchesOfOneIdentityAllSucceed() throws Exception {
+        int threads = Math.max(8, Runtime.getRuntime().availableProcessors() * 2);
+        String reference = reference("/order-1.tn");
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
-        try (TsonHttpSchemaSource source = allowingThisServer().build()) {
-            Tson tson = Tson.builder().schemaSource(source).build();
-            tson.resolve(source.fetch(schemaUri));
+        Queue<Throwable> failures = new ConcurrentLinkedQueue<>();
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threads);
 
-            TsonValue order = tson.treeReader().read("""
-                    !!schema:"%s"
-                    !order { sku: "ABC-1"  quantity: 3 }""".formatted(schemaUri));
-            assertEquals("ABC-1", order.get("sku").asString().orElseThrow());
-
-            assertEquals(2, tson.validate("""
-                    !!schema:"%s"
-                    !order { }""".formatted(schemaUri)).size(), "both required fields are missing");
+        try (HttpSchemaSource source = allowingThisServer().timeout(Duration.ofSeconds(5)).build();
+             ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+            for (int i = 0; i < threads; i++) {
+                pool.submit(() -> {
+                    try {
+                        start.await();
+                        assertEquals(schemaAt("/order-1.tn"), source.fetch(reference));
+                    } catch (Throwable t) {
+                        failures.add(t);
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+            start.countDown();
+            assertTrue(done.await(60, TimeUnit.SECONDS), "threads did not finish -- a deadlock, most likely");
+            assertTrue(failures.isEmpty(), "failures: " + failures);
+            assertTrue(source.isCached(reference));
         }
+
+        assertTrue(requests.get() <= threads,
+                "a duplicate fetch is the accepted cost of not holding a lock across I/O; " + requests.get());
     }
 
-    private static SchemaFetchException refusal(TsonHttpSchemaSource source, String uri) {
+    private static SchemaFetchException refusal(HttpSchemaSource source, String uri) {
         return assertThrows(SchemaFetchException.class, () -> source.fetch(uri));
     }
 

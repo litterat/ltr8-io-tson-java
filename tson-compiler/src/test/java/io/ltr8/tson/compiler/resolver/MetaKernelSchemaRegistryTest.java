@@ -10,7 +10,7 @@ import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -95,7 +95,7 @@ class MetaKernelSchemaRegistryTest {
         TsonSchemaRegistry registry = new TsonSchemaRegistry();
         TsonLinkedSchema unlinked = new TsonLinkedSchema(MetaKernelBootstrapResolver.getMetaKernelSchema());
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> registry.register(unlinked));
         assertTrue(thrown.getMessage().contains("bootstrap"));
     }
@@ -120,8 +120,8 @@ class MetaKernelSchemaRegistryTest {
         assertEquals(58, raw.entries().size());
         assertEquals(58, linked.schema().entries().size());
 
-        assertThrows(TsonSchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
-        assertThrows(TsonSchemaValidationException.class, () -> registry.register(linked));
+        assertThrows(SchemaValidationException.class, () -> registry.register(new TsonLinkedSchema(raw)));
+        assertThrows(SchemaValidationException.class, () -> registry.register(linked));
     }
 
     /**
@@ -149,6 +149,6 @@ class MetaKernelSchemaRegistryTest {
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(resolved, registry));
         assertEquals(58, registered.schema().entries().size());
-        assertThrows(TsonSchemaValidationException.class, () -> registry.register(registered));
+        assertThrows(SchemaValidationException.class, () -> registry.register(registered));
     }
 }

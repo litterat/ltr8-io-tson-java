@@ -1,11 +1,11 @@
 package io.ltr8.tson.perf;
 
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonObjectReader;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -88,7 +88,7 @@ class AllocationHarnessTest {
     static void startUp() {
         assumeTrue(AllocationProbe.supported(), "needs HotSpot's per-thread allocation counter");
 
-        TsonSchemaSource source = uri -> SCHEMA;
+        SchemaSource source = uri -> SCHEMA;
         tson = Tson.builder().schemaSource(source)
                 .bindings(Map.of("order", Order.class, "line", Line.class))
                 .build();

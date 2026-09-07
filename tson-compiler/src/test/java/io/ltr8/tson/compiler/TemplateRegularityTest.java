@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 
 import org.junit.jupiter.api.Test;
 
@@ -33,8 +34,8 @@ class TemplateRegularityTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -45,7 +46,7 @@ class TemplateRegularityTest {
     }
 
     private static String rejected(String declarations) {
-        return assertThrows(TsonSchemaValidationException.class, () -> compile(declarations)).getMessage();
+        return assertThrows(SchemaValidationException.class, () -> compile(declarations)).getMessage();
     }
 
     /** The whole point: rejected at the declaration, with nothing applying it. */

@@ -18,7 +18,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.SourcePosition;
 import org.junit.jupiter.api.Test;
 
@@ -335,7 +335,7 @@ class SchemaDesugarerTest {
      */
     @Test
     void aVacuousZeroFloorIsRejectedRatherThanDesugared() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> desugar("  tags => [text; 0..]"));
         assertTrue(thrown.getMessage().contains("'[text; 0..]'"), "quotes the form: " + thrown.getMessage());
     }
@@ -677,7 +677,7 @@ class SchemaDesugarerTest {
     /** Applying arguments to a local declaration that takes none is the author's error, not a library gap. */
     @Test
     void applyingArgumentsToSomethingThatTakesNoneIsAnAuthorError() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> desugar("""
                           plain => { a: text }
                           holder => { b: plain<text> }"""));

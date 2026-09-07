@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -136,8 +136,8 @@ class SharedInstanceConcurrencyTest {
         Tson tson = Tson.builder().build();
         tson.resolve(SCHEMA);
 
-        TsonSchemaValidationException thrown =
-                assertThrows(TsonSchemaValidationException.class, () -> tson.resolve(SCHEMA));
+        SchemaValidationException thrown =
+                assertThrows(SchemaValidationException.class, () -> tson.resolve(SCHEMA));
 
         assertTrue(thrown.getMessage().contains(CANONICAL_ID), thrown::getMessage);
         assertTrue(thrown.getMessage().contains("already registered"), thrown::getMessage);

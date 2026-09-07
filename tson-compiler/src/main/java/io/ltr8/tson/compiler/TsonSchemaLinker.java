@@ -1,8 +1,10 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;
@@ -83,7 +85,7 @@ import java.util.Set;
  *
  * <p>Public, and meant to be called directly by anything orchestrating the pipeline -- the registries here
  * link a schema before registering it, same as any other caller. Identities are canonicalized through
- * {@link TsonCanonicalIdentity}, which stays in {@code tson-schema} beside the registry that keys on it.
+ * {@link CanonicalIdentity}, which stays in {@code tson-schema} beside the registry that keys on it.
  *
  * <p><b>No materialization.</b> An argument-bearing {@code type_ref} does not become a synthesized entry
  * here -- {@code SchemaDesugarer} has already turned every sugar form and generic application into a real
@@ -150,7 +152,7 @@ public final class TsonSchemaLinker {
      * against up front) can get a usable result straight from the raw bootstrap object, without
      * separately wiring a {@link TsonSchemaLoader} or a registry at all.
      *
-     * @throws TsonSchemaValidationException if {@code bootstrap.bootstrap()} is {@code false} -- this
+     * @throws SchemaValidationException if {@code bootstrap.bootstrap()} is {@code false} -- this
      *                                        method exists specifically for the one self-referential
      *                                        schema, not as a general "link without registering"
      *                                        escape hatch for ordinary schemas (call {@link #link}
@@ -158,7 +160,7 @@ public final class TsonSchemaLinker {
      */
     public static TsonLinkedSchema linkBootstrap(TsonSchema bootstrap) {
         if (!bootstrap.bootstrap()) {
-            throw new TsonSchemaValidationException("'" + bootstrap.id() + "' was not produced by the real "
+            throw new SchemaValidationException("'" + bootstrap.id() + "' was not produced by the real "
                     + "bootstrap reader (MetaKernelBootstrapResolver.getMetaKernelSchema()) -- "
                     + "TsonSchemaLinker.linkBootstrap exists specifically for that case; call "
                     + "link directly for an ordinary schema instead");
@@ -305,9 +307,9 @@ public final class TsonSchemaLinker {
     private static void refuse(DiagnosticsReceiver receiver, TsonSchema schema, String name,
                                TypeDefinition def, Diagnostic.Code code, String message) {
         if (receiver == null) {
-            throw new TsonSchemaValidationException(message);
+            throw new SchemaValidationException(message);
         }
-        receiver.report(TsonDiagnostics.ofSchemaRefusal(TsonCanonicalIdentity.canonicalize(schema.id()), name,
+        receiver.report(TsonDiagnostics.ofSchemaRefusal(CanonicalIdentity.canonicalize(schema.id()), name,
                 code, message, def == null ? Optional.empty() : def.position()));
     }
 
@@ -320,7 +322,7 @@ public final class TsonSchemaLinker {
     private static boolean report(DiagnosticsReceiver receiver, TsonSchema schema, String name,
                                   TypeDefinition def, String message) {
         if (receiver == null) {
-            throw new TsonSchemaValidationException(message);
+            throw new SchemaValidationException(message);
         }
         receiver.report(schemaError(schema, name, def, message));
         return false;
@@ -373,7 +375,7 @@ public final class TsonSchemaLinker {
      * is supplied at the point the fact is stated rather than baked in at the point it is discovered.
      *
      * <p><b>Linker-internal, and never escapes.</b> It is caught in the one place it is thrown from and
-     * re-stated as a {@link TsonSchemaValidationException}, whose classification this shares: an unresolved
+     * re-stated as a {@link SchemaValidationException}, whose classification this shares: an unresolved
      * reference is the author's error, and a verdict this library will not change its mind about. It is not
      * a subclass of it because that type is deliberately {@code final} and lives in {@code tson-schema},
      * which holds no pipeline machinery.
@@ -453,10 +455,10 @@ public final class TsonSchemaLinker {
     private static void reportOrThrow(DiagnosticsReceiver receiver, TsonSchema schema, String at,
                                       Map<String, TypeDefinition> entries, String message, RuntimeException cause) {
         if (receiver == null) {
-            if (cause instanceof TsonSchemaValidationException original && message.equals(cause.getMessage())) {
+            if (cause instanceof SchemaValidationException original && message.equals(cause.getMessage())) {
                 throw original; // untouched, which is the fail-fast overloads' standing contract
             }
-            throw new TsonSchemaValidationException(message, cause);
+            throw new SchemaValidationException(message, cause);
         }
         receiver.report(schemaError(schema, at, entries.get(at), message));
     }
@@ -479,7 +481,7 @@ public final class TsonSchemaLinker {
 
     /** One entry's failure as a {@link Diagnostic}, positioned at that entry's own declaration. */
     private static Diagnostic schemaError(TsonSchema schema, String name, TypeDefinition def, String message) {
-        return TsonDiagnostics.ofSchemaError(TsonCanonicalIdentity.canonicalize(schema.id()), name, message,
+        return TsonDiagnostics.ofSchemaError(CanonicalIdentity.canonicalize(schema.id()), name, message,
                 def == null ? Optional.empty() : def.position());
     }
 
@@ -489,7 +491,7 @@ public final class TsonSchemaLinker {
      * diagnostic against the same declaration name the same document.
      */
     private static String localIdentity(TsonSchema schema) {
-        return TsonCanonicalIdentity.canonicalize(schema.id());
+        return CanonicalIdentity.canonicalize(schema.id());
     }
 
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
@@ -508,7 +510,7 @@ public final class TsonSchemaLinker {
         // type-name-namespace-only, per §3.3.2's explicit "NOT extended by the structure namespace". Empty
         // if !!meta isn't registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration).
         Optional<TsonLinkedSchema> governingMeta =
-                loader == null ? Optional.empty() : loader.load(TsonCanonicalIdentity.canonicalize(schema.meta()));
+                loader == null ? Optional.empty() : loader.load(CanonicalIdentity.canonicalize(schema.meta()));
         checkMayGovern(schema, governingMeta);
         Map<String, TypeDefinition> structureNamespace = governingMeta
                 .<Map<String, TypeDefinition>>map(linked -> linked.schema().entries()).orElse(Map.of());
@@ -588,7 +590,7 @@ public final class TsonSchemaLinker {
                 if (blamedOnce.add(author + "\u0000" + message)) {
                     reportOrThrow(receiver, schema, author, merged, message, e);
                 }
-            } catch (TsonSchemaValidationException e) {
+            } catch (SchemaValidationException e) {
                 reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged), merged,
                         e.getMessage(), e);
             }
@@ -699,7 +701,7 @@ public final class TsonSchemaLinker {
         AnnotatedMap<String, TypeDefinition> result = AnnotatedMap.of(merged);
         if (loader != null) {
             for (String importUri : schema.imports()) {
-                Optional<TsonLinkedSchema> imported = loader.load(TsonCanonicalIdentity.canonicalize(importUri));
+                Optional<TsonLinkedSchema> imported = loader.load(CanonicalIdentity.canonicalize(importUri));
                 if (imported.isPresent()) {
                     result = carryOver(result, imported.get().schema().entries());
                 }
@@ -754,7 +756,7 @@ public final class TsonSchemaLinker {
      * TsonCompiledMetaRegistry.loadMeta}, which reaches the same conclusion one layer up and knows only the
      * target (hence the nullable {@code governedId}). Public because that caller is in another module.
      *
-     * <p>It is a {@link TsonSchemaValidationException} rather than an {@code IllegalStateException} because
+     * <p>It is a {@link SchemaValidationException} rather than an {@code IllegalStateException} because
      * it is an <b>authoring</b> error in a schema document, not a library fault: a caller wrapping {@code
      * resolve} in the obvious {@code catch} sees it, and a CLI telling apart "your schema is wrong" from "this
      * tool is broken" gets the right answer.
@@ -762,9 +764,9 @@ public final class TsonSchemaLinker {
      * @param governedId the schema naming {@code target} as its {@code !!meta}, or {@code null} where the
      *     caller has only the target in hand
      */
-    public static TsonSchemaValidationException notAMetaSchema(String target, String targetsOwnMeta,
+    public static SchemaValidationException notAMetaSchema(String target, String targetsOwnMeta,
             String governedId) {
-        return new TsonSchemaValidationException("'" + target + "' is named as the !!meta"
+        return new SchemaValidationException("'" + target + "' is named as the !!meta"
                 + (governedId == null ? " of another schema" : " of '" + governedId + "'")
                 + " but is not a meta-schema -- its own !!meta is '" + targetsOwnMeta + "', not meta-kernel.tn, "
                 + "so it declares no type constructors and supplies no structure namespace (§2.2.2, §3.3.1). "
@@ -790,7 +792,7 @@ public final class TsonSchemaLinker {
      * meta.tn (governed one hop below it) alike.
      */
     private static boolean isMetaKernelGoverned(TsonSchema schema) {
-        return TsonCanonicalIdentity.sameIdentity(schema.meta(), TsonBundledSchemas.META_KERNEL_ID);
+        return CanonicalIdentity.sameIdentity(schema.meta(), TsonBundledSchemas.META_KERNEL_ID);
     }
 
     // ── Subtypes (reverse index) ─────────────────────────────────────────
@@ -905,13 +907,13 @@ public final class TsonSchemaLinker {
         Map<String, TypeDefinition> merged = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : imports) {
-            String importIdentity = TsonCanonicalIdentity.canonicalize(importUri);
+            String importIdentity = CanonicalIdentity.canonicalize(importUri);
             // Listing one schema twice (or under two spellings of one identity) is redundant, not an error:
             // the second mention asks for a namespace already present and contributes nothing new.
             if (!alreadyImported.add(importIdentity)) {
                 continue;
             }
-            TsonLinkedSchema imported = loader.load(importIdentity).orElseThrow(() -> new TsonSchemaValidationException(
+            TsonLinkedSchema imported = loader.load(importIdentity).orElseThrow(() -> new SchemaValidationException(
                     "!!import '" + importUri + "' is not registered"));
             for (Map.Entry<String, TypeDefinition> entry : imported.schema().entries().entrySet()) {
                 String name = entry.getKey();
@@ -921,7 +923,7 @@ public final class TsonSchemaLinker {
                 String incumbent = origins.get(name);
                 if (incumbent != null) {
                     if (!incumbent.equals(origin)) {
-                        throw new TsonSchemaValidationException("'" + name + "' is declared by two different "
+                        throw new SchemaValidationException("'" + name + "' is declared by two different "
                                 + "schemas reached through !!import ('" + incumbent + "' and '" + origin
                                 + "') -- distinct types cannot share one name in the flat namespace; import "
                                 + "one of them, or a version of each that agrees on where '" + name
@@ -995,12 +997,12 @@ public final class TsonSchemaLinker {
         // materialised in a user schema -- is gone with the size templates themselves.
         for (String supertype : def.supertypes()) {
             if (!namespace.containsKey(supertype) && !structureNamespace.containsKey(supertype)) {
-                throw new TsonSchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");
+                throw new SchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");
             }
         }
         for (String subtype : def.subtypes()) {
             if (!namespace.containsKey(subtype)) {
-                throw new TsonSchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
+                throw new SchemaValidationException("'" + name + "' has an unresolved subtype '" + subtype + "'");
             }
         }
         validateBody(name, def.body(), namespace, def.parameters());
@@ -1013,7 +1015,7 @@ public final class TsonSchemaLinker {
             case RecordBody r -> {
                 for (String supertype : r.supertypes()) {
                     if (!namespace.containsKey(supertype)) {
-                        throw new TsonSchemaValidationException(
+                        throw new SchemaValidationException(
                                 "'" + entryName + "' has an unresolved supertype '" + supertype + "'");
                     }
                 }
@@ -1025,7 +1027,7 @@ public final class TsonSchemaLinker {
                 for (FieldGroup group : r.groups()) {
                     for (String member : group.members()) {
                         if (r.fields().stream().noneMatch(f -> f.name().equals(member))) {
-                            throw new TsonSchemaValidationException(
+                            throw new SchemaValidationException(
                                     "'" + entryName + "' has a field group referencing unknown field '" + member + "'");
                         }
                     }
@@ -1174,7 +1176,7 @@ public final class TsonSchemaLinker {
             if (first == null) {
                 continue;
             }
-            throw new TsonSchemaValidationException("'" + entryName + "' " + (first.equals(variant.name())
+            throw new SchemaValidationException("'" + entryName + "' " + (first.equals(variant.name())
                     ? "lists the variant '" + variant.name() + "' twice"
                     : "variants '" + first + "' and '" + variant.name() + "' both resolve to '"
                             + flattened.name() + "'")
@@ -1192,7 +1194,7 @@ public final class TsonSchemaLinker {
                                                  Map<String, TypeDefinition> namespace) {
         for (TypeRef variant : choice.variants()) {
             if (ReferenceChain.terminal(variant.name(), namespace).equals("void")) {
-                throw new TsonSchemaValidationException("'" + entryName + "' has a variant"
+                throw new SchemaValidationException("'" + entryName + "' has a variant"
                         + (variant.name().equals("void") ? "" : " '" + variant.name() + "'")
                         + " resolving to 'void' -- optionality is not choice (§5.4): a value's absence is the "
                         + "position's own state, so mark the position optional ('?') instead of uniting its "
@@ -1214,7 +1216,7 @@ public final class TsonSchemaLinker {
      * {@code T} and never uses it, so no application of it could differ from any other -- the parameter is a
      * mistake, not a degenerate-but-legal template.
      *
-     * <p><b>A {@link TsonSchemaValidationException}.</b> A parameter list is author-written, so an unused one
+     * <p><b>A {@link SchemaValidationException}.</b> A parameter list is author-written, so an unused one
      * is the author's error rather than a library fault.
      *
      * <p>Its old converse -- §5.10's closed-entry rule, checked over {@code record_field.value_param} -- has
@@ -1238,7 +1240,7 @@ public final class TsonSchemaLinker {
         collectBodyNames(def.body(), referenced);
         for (String parameter : def.parameters()) {
             if (!referenced.contains(parameter)) {
-                throw new TsonSchemaValidationException("'" + entryName + "' declares the type parameter '"
+                throw new SchemaValidationException("'" + entryName + "' declares the type parameter '"
                         + parameter + "' and never references it, so every application of it would denote the "
                         + "same type -- a declared parameter must be used (§5.10)");
             }
@@ -1312,7 +1314,7 @@ public final class TsonSchemaLinker {
             // a materialised entry's name is content-derived, which is the one thing a diagnostic may never
             // put in front of an author. The location already names the declaration that wrote the
             // application; what is left to say is what the application closed onto.
-            throw new TsonSchemaValidationException("the constraints this application closes onto contradict "
+            throw new SchemaValidationException("the constraints this application closes onto contradict "
                     + "each other: " + String.join("; ", violations) + " -- no value can satisfy them, so "
                     + "nothing could ever be a valid instance of the type it denotes");
         }
@@ -1368,7 +1370,7 @@ public final class TsonSchemaLinker {
             // they are written, and the value is echoed as the schema spells it -- quoted if it was quoted,
             // so the author reads back their own line rather than a normalisation of it. The atom's own
             // message follows: it already states the rule and cites the section, so nothing here restates it.
-            throw new TsonSchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
+            throw new SchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
                     + "declared '" + field.type().name() + "', but its "
                     + (field.state() == FieldState.REQUIRED_DEFAULT ? "default" : "fixed value") + " "
                     + asWritten(value) + " is not a value of that type -- " + e.getMessage() + ". §5.2 makes "
@@ -1392,9 +1394,9 @@ public final class TsonSchemaLinker {
      * "the value must be the field's declared type" as requiring a type a token denotes directly, which is
      * what §5.2's "Which fields may carry a value" now states.
      */
-    private static TsonSchemaValidationException notAScalarType(String entryName, RecordField field,
+    private static SchemaValidationException notAScalarType(String entryName, RecordField field,
                                                                  Token value, Top body) {
-        return new TsonSchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
+        return new SchemaValidationException("'" + entryName + "': field '" + field.name() + "' is "
                 + "declared '" + field.type().name() + "', which is " + describe(body) + ", so it cannot "
                 + "have " + (field.state() == FieldState.REQUIRED_DEFAULT ? "a default" : "a fixed value")
                 + " -- " + asWritten(value) + " is a token, and §5.2 admits only a bare token there. A "
@@ -1437,7 +1439,7 @@ public final class TsonSchemaLinker {
             // way to say "declare me, but do not let anything name me as a type". The Data marker is that
             // way. Without this the misuse resolves, links AND compiles, and fails only when a document is
             // read against it. §4.1: naming a DATA entry where a type is expected is a resolver error.
-            throw new TsonSchemaValidationException(context + " names '" + ref.name() + "', which is built "
+            throw new SchemaValidationException(context + " names '" + ref.name() + "', which is built "
                     + "with '" + TsonCompiledMetaSchema.typenameOf(notAType) + "' and describes something "
                     + "other than a data value -- it is declared by this schema but is not a type, so "
                     + "nothing can be typed by it");
@@ -1511,7 +1513,7 @@ public final class TsonSchemaLinker {
                                     List<String> ownParameters, String context) {
         if (ownParameters.contains(ref.name())) {
             if (!ref.arguments().isEmpty()) {
-                throw new TsonSchemaValidationException(context + ": '" + ref.name() + "' is a type parameter "
+                throw new SchemaValidationException(context + ": '" + ref.name() + "' is a type parameter "
                         + "applied to arguments -- a parameter stands for a type, never for a template, and "
                         + "§5.10 admits no head abstraction, so '" + ref.name() + "<...>' is no form. Name the "
                         + "template and apply that, or take the applied type as the parameter instead");
@@ -1528,17 +1530,17 @@ public final class TsonSchemaLinker {
             return;
         }
         if (declared == 0) {
-            throw new TsonSchemaValidationException(context + ": '" + ref.name() + "' declares no type "
+            throw new SchemaValidationException(context + ": '" + ref.name() + "' declares no type "
                     + "parameters, so '" + ref.name() + "<...>' applies arguments to something that takes "
                     + "none (§5.10); drop the argument list");
         }
         if (supplied == 0) {
-            throw new TsonSchemaValidationException(context + ": '" + ref.name() + "' is a template taking "
+            throw new SchemaValidationException(context + ": '" + ref.name() + "' is a template taking "
                     + declared + " type argument" + (declared == 1 ? "" : "s") + " " + referenced.parameters()
                     + ", and a template is not a type until it is applied -- write '" + ref.name()
                     + "<...>' with its arguments (§5.10)");
         }
-        throw new TsonSchemaValidationException(context + ": '" + ref.name() + "' takes " + declared
+        throw new SchemaValidationException(context + ": '" + ref.name() + "' takes " + declared
                 + " type argument" + (declared == 1 ? "" : "s") + " " + referenced.parameters() + ", but "
                 + supplied + " " + (supplied == 1 ? "was" : "were") + " applied (§5.10)");
     }

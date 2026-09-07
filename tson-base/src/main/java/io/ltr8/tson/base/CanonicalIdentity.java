@@ -1,4 +1,4 @@
-package io.ltr8.tson.schema;
+package io.ltr8.tson.base;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -18,9 +18,9 @@ import java.util.Locale;
  * {@link #canonicalize(String)} therefore only ever performs the two reductions the spec actually
  * names; every other check is a rejection, never a rewrite.
  *
- * <p><b>Public, and part of the contract of every identity-bearing seam.</b> {@link
- * TsonSchemaLoader#load} takes a canonical identity as its argument, and a {@code TsonSchemaSource}
- * is asked for a document by one, so anything implementing either has to derive and compare
+ * <p><b>Public, and part of the contract of every identity-bearing seam.</b> {@code TsonSchemaLoader.load}
+ * takes a canonical identity as its argument, and a {@code SchemaSource} is asked for a document by one, so anything
+ * implementing either has to derive and compare
  * identities exactly the way the library does -- which is this class. The half of §2.2.1 that reads
  * the {@code ?sha256=} pin this one strips lives in {@code TsonContentHash}.
  *
@@ -28,11 +28,11 @@ import java.util.Locale;
  * canonical identity is a map key throughout the registries, and wrapping it would buy type-safety
  * only if every identity-carrying signature were converted at once.
  */
-public final class TsonCanonicalIdentity {
+public final class CanonicalIdentity {
 
     private static final String UNRESERVED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
 
-    private TsonCanonicalIdentity() {
+    private CanonicalIdentity() {
     }
 
     /**
@@ -41,44 +41,44 @@ public final class TsonCanonicalIdentity {
      * metadata, not identity) doesn't distinguish a pinned reference from a plain one, and {@code http://}
      * and {@code https://} spellings name the same thing.
      *
-     * @throws TsonSchemaValidationException if {@code uriString} isn't a valid canonical-identity candidate
+     * @throws SchemaValidationException if {@code uriString} isn't a valid canonical-identity candidate
      */
     public static String canonicalize(String uriString) {
         URI uri;
         try {
             uri = new URI(uriString);
         } catch (URISyntaxException e) {
-            throw new TsonSchemaValidationException("'" + uriString + "' is not a valid URI: " + e.getReason());
+            throw new SchemaValidationException("'" + uriString + "' is not a valid URI: " + e.getReason());
         }
 
         if (uri.getScheme() == null) {
-            throw new TsonSchemaValidationException("'" + uriString + "' has no scheme");
+            throw new SchemaValidationException("'" + uriString + "' has no scheme");
         }
         if (uri.getHost() == null) {
-            throw new TsonSchemaValidationException("'" + uriString + "' has no host");
+            throw new SchemaValidationException("'" + uriString + "' has no host");
         }
         if (uri.getUserInfo() != null) {
-            throw new TsonSchemaValidationException(
+            throw new SchemaValidationException(
                     "'" + uriString + "' carries userinfo, not permitted in an identifying URI");
         }
         if (uri.getPort() != -1) {
-            throw new TsonSchemaValidationException(
+            throw new SchemaValidationException(
                     "'" + uriString + "' carries a port, not permitted in an identifying URI");
         }
         if (uri.getRawFragment() != null) {
-            throw new TsonSchemaValidationException(
+            throw new SchemaValidationException(
                     "'" + uriString + "' carries a fragment, not permitted in an identifying URI");
         }
 
         String host = uri.getHost();
         if (!host.equals(host.toLowerCase(Locale.ROOT))) {
-            throw new TsonSchemaValidationException("'" + uriString + "' has a non-lowercase host '" + host + "'");
+            throw new SchemaValidationException("'" + uriString + "' has a non-lowercase host '" + host + "'");
         }
 
         String rawPath = uri.getRawPath() == null ? "" : uri.getRawPath();
         for (String segment : rawPath.split("/", -1)) {
             if (segment.equals(".") || segment.equals("..")) {
-                throw new TsonSchemaValidationException("'" + uriString + "' contains a dot-segment in its path");
+                throw new SchemaValidationException("'" + uriString + "' contains a dot-segment in its path");
             }
         }
 
@@ -94,7 +94,7 @@ public final class TsonCanonicalIdentity {
      * looking anything up. Exists so that intent reads at the call site, where computing an identity only to
      * throw it away would not.
      *
-     * @throws TsonSchemaValidationException if {@code uriString} isn't a valid canonical-identity candidate
+     * @throws SchemaValidationException if {@code uriString} isn't a valid canonical-identity candidate
      */
     public static void validate(String uriString) {
         canonicalize(uriString);
@@ -105,7 +105,7 @@ public final class TsonCanonicalIdentity {
      * spelling-insensitive comparison §2.2.1 calls for: scheme and {@code ?sha256=} pin differences don't
      * make two references distinct.
      *
-     * @throws TsonSchemaValidationException if either argument isn't a valid canonical-identity candidate
+     * @throws SchemaValidationException if either argument isn't a valid canonical-identity candidate
      */
     public static boolean sameIdentity(String uriString, String otherUriString) {
         return canonicalize(uriString).equals(canonicalize(otherUriString));
@@ -118,16 +118,16 @@ public final class TsonCanonicalIdentity {
                 continue;
             }
             if (i + 2 >= component.length()) {
-                throw new TsonSchemaValidationException("'" + uriString + "' has a malformed percent-encoding");
+                throw new SchemaValidationException("'" + uriString + "' has a malformed percent-encoding");
             }
             int decoded;
             try {
                 decoded = Integer.parseInt(component.substring(i + 1, i + 3), 16);
             } catch (NumberFormatException e) {
-                throw new TsonSchemaValidationException("'" + uriString + "' has a malformed percent-encoding");
+                throw new SchemaValidationException("'" + uriString + "' has a malformed percent-encoding");
             }
             if (decoded < 128 && UNRESERVED.indexOf((char) decoded) >= 0) {
-                throw new TsonSchemaValidationException(
+                throw new SchemaValidationException(
                         "'" + uriString + "' percent-encodes the unreserved character '" + (char) decoded + "'");
             }
             i += 2;

@@ -1,9 +1,10 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.suite.SuiteCheckout;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
@@ -45,9 +46,9 @@ class SidecarSchemaReadTest {
 
     private static TsonTypeReader<?> compile(String layer) {
         Path schemas = SuiteCheckout.schemasRoot().orElseThrow();
-        TsonSchemaSource source = uri -> {
-            String canonical = TsonCanonicalIdentity.canonicalize(uri);
-            String prefix = TsonCanonicalIdentity.canonicalize(SUITE_SCHEMA_PREFIX);
+        SchemaSource source = uri -> {
+            String canonical = CanonicalIdentity.canonicalize(uri);
+            String prefix = CanonicalIdentity.canonicalize(SUITE_SCHEMA_PREFIX);
             if (!canonical.startsWith(prefix)) {
                 throw new IllegalStateException("unexpected fetch: " + uri);
             }

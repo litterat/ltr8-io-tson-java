@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonWriteException;
 import io.ltr8.tson.tree.TsonAtom;
 import io.ltr8.tson.tree.TsonRecord;
@@ -42,7 +42,7 @@ class SelfDescribingWriteTest {
     }
 
     private static Tson tson() {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             if (uri.startsWith(ID)) {
                 return SCHEMA;
             }

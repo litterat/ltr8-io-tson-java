@@ -4,19 +4,19 @@ package io.ltr8.tson.base;
  * A schema reference that could not be turned into schema text, and why.
  *
  * <p><b>The pipeline's three-way classification has no slot for this.</b> A failure inside this library is
- * either the author's schema being wrong ({@code TsonSchemaValidationException}), a construct not implemented
+ * either the author's schema being wrong ({@code SchemaValidationException}), a construct not implemented
  * yet ({@code UnsupportedOperationException}), or a broken invariant ({@code IllegalStateException}). A schema
  * host that is down is none of the three: nobody's document is wrong, nothing is unimplemented, and no
  * invariant broke. Fetching brings its own failure modes, so it brings its own exception.
  *
- * <p><b>This is the type {@code TsonSchemaSource.fetch} names</b>, and the only one it permits for "cannot
+ * <p><b>This is the type {@code SchemaSource.fetch} names</b>, and the only one it permits for "cannot
  * supply this". That is what lets {@code SchemaFailure} classify a fetch failure positively and rethrow
  * everything it does not recognise as the fault it is -- with no mandated type, an unfetchable schema and a
  * broken invariant are indistinguishable where a read catches them, and every fault reads to a consumer as a
  * problem with the schema.
  *
  * <p>It lives here, beside the interface whose contract it is, rather than with the sources that throw it:
- * {@code TsonHttpSchemaSource}/{@code TsonFileSchemaSource} are in {@code tson}, which depends on this
+ * {@code HttpSchemaSource}/{@code FileSchemaSource} are in {@code tson}, which depends on this
  * module, so a type declared there is invisible to the classification that has to route on it.
  *
  * <p><b>{@link Reason} is the part worth acting on</b>, and the reason this is not just a message. It

@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 
 import org.junit.jupiter.api.Test;
 
@@ -39,8 +40,8 @@ class ContainerBoundCoherenceTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -50,8 +51,8 @@ class ContainerBoundCoherenceTest {
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
-    private static TsonSchemaValidationException refused(String declarations) {
-        return assertThrows(TsonSchemaValidationException.class, () -> compile(declarations), declarations);
+    private static SchemaValidationException refused(String declarations) {
+        return assertThrows(SchemaValidationException.class, () -> compile(declarations), declarations);
     }
 
     /**
@@ -93,7 +94,7 @@ class ContainerBoundCoherenceTest {
      */
     @Test
     void boundsThatOnlyBecomeConcreteAtMaterialisationAreJudgedToo() {
-        TsonSchemaValidationException thrown = refused("""
+        SchemaValidationException thrown = refused("""
                   sized => <MIN, MAX> !array { element_type: text  min_items: MIN  max_items: MAX }
                   bad   => { b: sized<10, 3> }""");
 

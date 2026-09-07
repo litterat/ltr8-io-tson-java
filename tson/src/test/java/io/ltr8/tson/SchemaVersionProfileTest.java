@@ -4,10 +4,10 @@ import io.ltr8.annotation.Profile;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.BindMismatchException;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 
 import org.junit.jupiter.api.Test;
 
@@ -75,9 +75,9 @@ class SchemaVersionProfileTest {
     }
 
     private static Tson tson(String profile, String... schemas) {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             for (String schema : schemas) {
-                if (TsonCanonicalIdentity.sameIdentity(uri, schema.contains(V1) ? V1 : V2)) {
+                if (CanonicalIdentity.sameIdentity(uri, schema.contains(V1) ? V1 : V2)) {
                     return schema;
                 }
             }

@@ -55,13 +55,19 @@ public final class Xid {
                 || cp == ZWNJ || cp == ZWJ;
     }
 
-    /** U+200C ZERO WIDTH NON-JOINER -- {@code XID_Continue}, and re-added by {@link #isContinue} because the ignorable subtraction removes it. */
+    /**
+     * U+200C ZERO WIDTH NON-JOINER -- {@code XID_Continue} , and re-added by {@link #isContinue} because the ignorable
+     * subtraction removes it.
+     */
     public static final int ZWNJ = 0x200C;
 
     /** U+200D ZERO WIDTH JOINER -- see {@link #ZWNJ}. */
     public static final int ZWJ = 0x200D;
 
-    /** Sorted, so a lookup is a binary search -- guarded by the lowest member, since every exclusion is above U+0379 and the code points that matter in practice are not. */
+    /**
+     * Sorted, so a lookup is a binary search -- guarded by the lowest member, since every exclusion is above U+0379 and the
+     * code points that matter in practice are not.
+     */
     private static boolean excluded(int[] table, int cp) {
         return cp >= table[0] && Arrays.binarySearch(table, cp) >= 0;
     }
@@ -78,7 +84,9 @@ public final class Xid {
         0xFF9E, 0xFF9F,
     };
 
-    /** {@code ID_Continue \ XID_Continue} for Unicode 16.0 -- {@link #NOT_XID_START} without the four that are continue-only. */
+    /**
+     * {@code ID_Continue \ XID_Continue} for Unicode 16.0 -- {@link #NOT_XID_START} without the four that are continue-only.
+     */
     private static final int[] NOT_XID_CONTINUE = {
         0x037A, 0x2E2F, 0x309B, 0x309C,
         0xFC5E, 0xFC5F, 0xFC60, 0xFC61, 0xFC62, 0xFC63, 0xFDFA, 0xFDFB,

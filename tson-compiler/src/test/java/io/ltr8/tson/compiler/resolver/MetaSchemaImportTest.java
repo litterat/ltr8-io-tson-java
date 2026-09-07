@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonSchemaParser;
@@ -130,7 +131,7 @@ class MetaSchemaImportTest {
         TsonSchema withFloatOnly =
                 new TsonSchema(meta.id(), meta.meta(), meta.imports(), Map.of("float_type", floatType));
 
-        assertThrows(io.ltr8.tson.schema.TsonSchemaValidationException.class,
+        assertThrows(io.ltr8.tson.base.SchemaValidationException.class,
                 () -> registry.register(TsonSchemaLinker.link(withFloatOnly, registry)));
     }
 }

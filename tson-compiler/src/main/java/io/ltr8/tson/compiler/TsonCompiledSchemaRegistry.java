@@ -4,7 +4,7 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -100,7 +100,7 @@ public final class TsonCompiledSchemaRegistry {
      * core caches the resolution itself, so a repeat is cheap.
      */
     public TsonCompiledSchema get(String uri) {
-        String identity = TsonCanonicalIdentity.canonicalize(uri);
+        String identity = CanonicalIdentity.canonicalize(uri);
         TsonLinkedSchema linked = core.resolveLinked(uri, identity, null);
         return compiledFor(identity, linked);
     }
@@ -115,7 +115,7 @@ public final class TsonCompiledSchemaRegistry {
      * compiled cleanly gets an entry.
      */
     public TsonCompiledSchema get(String uri, DiagnosticsReceiver receiver) {
-        String identity = TsonCanonicalIdentity.canonicalize(uri);
+        String identity = CanonicalIdentity.canonicalize(uri);
         TsonLinkedSchema linked = core.resolveLinked(uri, identity, receiver);
         if (linked == null) {
             return null;

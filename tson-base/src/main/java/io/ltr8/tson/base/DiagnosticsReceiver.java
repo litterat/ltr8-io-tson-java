@@ -11,7 +11,8 @@ package io.ltr8.tson.base;
  *
  * <p><b>An implementation aborts the read by throwing</b> -- which is exactly how {@link #throwing()} itself works,
  * so there is one mechanism rather than a separate "stop" signal. A receiver that returns normally lets the read
- * continue, and the reader keeps a {@code null} placeholder for the failed field/element (see {@code TsonReadContext}'s own note on placeholder-on-failure).
+ * continue, and the reader keeps a {@code null} placeholder for the failed field/element (see {@code TsonReadContext} 's own
+ * note on placeholder-on-failure).
  *
  * <p>Lifecycle belongs to the caller: a receiver holding an open resource is flushed or closed after the read
  * returns, which is why this stays a single-method interface with no {@code close()} of its own.

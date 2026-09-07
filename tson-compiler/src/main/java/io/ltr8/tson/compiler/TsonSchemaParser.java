@@ -31,8 +31,8 @@ import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.lexer.Token;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.lexer.TokenType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.IdentifierParser;
@@ -157,8 +157,8 @@ public final class TsonSchemaParser extends TsonDataParser {
      */
     private static String canonicalIdOrAsWritten(String id) {
         try {
-            return TsonCanonicalIdentity.canonicalize(id);
-        } catch (TsonSchemaValidationException e) {
+            return CanonicalIdentity.canonicalize(id);
+        } catch (SchemaValidationException e) {
             return id;
         }
     }

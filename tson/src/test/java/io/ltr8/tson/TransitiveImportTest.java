@@ -3,7 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ContentHashMismatchException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -232,7 +232,7 @@ class TransitiveImportTest {
                       pair => { left: alpha  right: beta }
                     }
                     """);
-        } catch (TsonSchemaValidationException e) {
+        } catch (SchemaValidationException e) {
             throw new AssertionError("the diamond must resolve: " + e.getMessage(), e);
         }
     }

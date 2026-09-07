@@ -5,7 +5,7 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLoader;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.base.SourcePosition;
@@ -116,6 +116,6 @@ class TsonSchemaLinkerDiagnosticsTest {
     void withoutAReceiverTheFirstFailureStillThrows() {
         TsonSchema schema = threeUnresolvedReferences();
 
-        assertThrows(TsonSchemaValidationException.class, () -> TsonSchemaLinker.link(schema, NO_IMPORTS));
+        assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(schema, NO_IMPORTS));
     }
 }

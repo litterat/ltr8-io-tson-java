@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.ast.schema.FieldDef;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.FieldState;
 
 import java.util.List;
@@ -43,7 +43,7 @@ final class FieldModifiers {
      * (for a tightening entry that restates only a modifier) the state it inherits. {@code parameters} is
      * the enclosing declaration's type-parameter list, empty outside a template.
      *
-     * @throws TsonSchemaValidationException for the three spellings §5.2 rules out: {@code ~ _} on any
+     * @throws SchemaValidationException for the three spellings §5.2 rules out: {@code ~ _} on any
      *     field, {@code = _} on a required one, and a default on an optional one.
      */
     static Resolved of(String fieldName, boolean optional, Optional<FieldDef.Modifier> modifier,
@@ -57,12 +57,12 @@ final class FieldModifiers {
             // §5.2's sixth spelling, `field: type? = _`: OPTIONAL_FIXED carrying no value at all, so the
             // field MUST be omitted or written as `_`.
             if (!fixed) {
-                throw new TsonSchemaValidationException("field '" + fieldName + "' uses '~ _' -- a required "
+                throw new SchemaValidationException("field '" + fieldName + "' uses '~ _' -- a required "
                         + "field cannot fall back to not-being-filled, so an absent default is a resolver "
                         + "error on any field (§5.2). Write 'type?' for a field that may be absent");
             }
             if (!optional) {
-                throw new TsonSchemaValidationException("field '" + fieldName + "' fixes a required field to "
+                throw new SchemaValidationException("field '" + fieldName + "' fixes a required field to "
                         + "absent ('= _') -- a field cannot be both required and forbidden from being present "
                         + "(§5.2). Make it optional ('" + fieldName + ": type? = _') to forbid its value "
                         + "while keeping it in the contract");
@@ -72,7 +72,7 @@ final class FieldModifiers {
 
         TokenValue token = ((FieldDef.Modifier.Value.Literal) modifier.get().value()).token();
         if (optional && !fixed) {
-            throw new TsonSchemaValidationException("field '" + fieldName + "' gives an optional field a "
+            throw new SchemaValidationException("field '" + fieldName + "' gives an optional field a "
                     + "default ('type? ~ value') -- a default implies the field is always present, which "
                     + "contradicts optional (§5.2). Use 'type ~ value' for a fallback, 'type?' for absence, "
                     + "or 'type? = value' for present-implies-value");

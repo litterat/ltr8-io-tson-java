@@ -5,7 +5,7 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.schema.Instance;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -106,7 +106,7 @@ final class SyntheticMerge {
                                       List<RecordValue.Field> fields) {
         try {
             return materialiser.closedFormName(head, fields);
-        } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
+        } catch (SchemaValidationException | UnsupportedOperationException e) {
             return null;
         }
     }

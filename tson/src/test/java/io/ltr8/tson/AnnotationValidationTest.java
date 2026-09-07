@@ -7,7 +7,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 
@@ -69,7 +69,7 @@ class AnnotationValidationTest {
         Map<String, Class<?>> names = Map.of("plain", Plain.class, "carrier", Carrier.class,
                 "shape", Shape.class, "circle", Circle.class, "holder", Holder.class);
         DataNameBinder binder = n -> names.containsKey(n) ? names.get(n) : SchemaMetaNameBinder.INSTANCE.resolve(n);
-        return Tson.builder().schemaSource((TsonSchemaSource) uri -> SCHEMA)
+        return Tson.builder().schemaSource((SchemaSource) uri -> SCHEMA)
                 .dataBindContext(TsonAtomContext.registerDefaults(
                         DataBindContext.builder().nameBinder(binder).build()))
                 .build();

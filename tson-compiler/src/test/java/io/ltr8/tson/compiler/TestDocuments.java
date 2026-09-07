@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 
 /**

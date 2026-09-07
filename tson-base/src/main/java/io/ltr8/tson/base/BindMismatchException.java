@@ -12,7 +12,7 @@ package io.ltr8.tson.base;
  * found by its symptom is a field that mysteriously holds its default, three layers into a service.
  *
  * <p><b>It names a misconfiguration, which is why it is neither of the other two.</b> The schema is not
- * wrong ({@code TsonSchemaValidationException}) and no library invariant broke ({@code
+ * wrong ({@code SchemaValidationException}) and no library invariant broke ({@code
  * IllegalStateException}); the schema is fine, the class is fine, and they have been pointed at each other
  * by mistake. It is deliberately not caught into an {@code ErrorReader} the way an ordinary build failure is
  * -- deferring it to first read is exactly the behaviour that makes it expensive.

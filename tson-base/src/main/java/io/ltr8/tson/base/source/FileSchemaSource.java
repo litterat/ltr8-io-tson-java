@@ -1,7 +1,7 @@
-package io.ltr8.tson;
+package io.ltr8.tson.base.source;
+
 
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.compiler.TsonSchemaSource;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,8 +15,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A {@link TsonSchemaSource} that reads a schema document from a directory on disk, under a host allow-list
- * and a hard cap on size. {@link TsonHttpSchemaSource} is its remote sibling, and the two share {@link
+ * A {@link SchemaSource} that reads a schema document from a directory on disk, under a host allow-list
+ * and a hard cap on size. {@link HttpSchemaSource} is its remote sibling, and the two share {@link
  * SchemaReference} for what a reference is allowed to be -- so an identity means the same thing whichever of
  * them serves it, which is what lets a deployment move a schema between them without renaming it.
  *
@@ -61,7 +61,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>This class is thread-safe, with the same caveat its sibling carries: resolution itself is not, so a
  * schema arriving at runtime still needs external serialisation. {@link #preload} is the intended path.
  */
-public final class TsonFileSchemaSource implements TsonSchemaSource {
+public final class FileSchemaSource implements SchemaSource {
 
     /** A schema document larger than this is refused. */
     public static final int DEFAULT_MAX_DOCUMENT_BYTES = 1 << 20;
@@ -75,7 +75,7 @@ public final class TsonFileSchemaSource implements TsonSchemaSource {
     private final boolean requireContentHashPin;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
 
-    private TsonFileSchemaSource(Builder builder) {
+    private FileSchemaSource(Builder builder) {
         this.hosts = Map.copyOf(builder.hosts);
         this.maxDocumentBytes = builder.maxDocumentBytes;
         this.maxCachedSchemas = builder.maxCachedSchemas;
@@ -211,7 +211,7 @@ public final class TsonFileSchemaSource implements TsonSchemaSource {
         }
     }
 
-    /** Builds a {@link TsonFileSchemaSource}. Every default is the safe one; nothing is read until a host is mapped. */
+    /** Builds a {@link FileSchemaSource}. Every default is the safe one; nothing is read until a host is mapped. */
     public static final class Builder {
 
         private final Map<String, Path> hosts = new LinkedHashMap<>();
@@ -273,8 +273,8 @@ public final class TsonFileSchemaSource implements TsonSchemaSource {
             return this;
         }
 
-        public TsonFileSchemaSource build() {
-            return new TsonFileSchemaSource(this);
+        public FileSchemaSource build() {
+            return new FileSchemaSource(this);
         }
     }
 }

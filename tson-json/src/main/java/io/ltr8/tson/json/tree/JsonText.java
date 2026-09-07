@@ -51,7 +51,9 @@ final class JsonText {
         out.append('"');
     }
 
-    /** Whether the surrogate at {@code i} stands alone -- a high one with no low after it, or a low one with no high before. */
+    /**
+     * Whether the surrogate at {@code i} stands alone -- a high one with no low after it, or a low one with no high before.
+     */
     private static boolean isUnpairedSurrogate(String value, int i, char c) {
         if (Character.isHighSurrogate(c)) {
             return i + 1 >= value.length() || !Character.isLowSurrogate(value.charAt(i + 1));

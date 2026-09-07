@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.SchemaRef;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ScopeKind;
 import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.tree.TsonScopedValue;
@@ -95,7 +95,7 @@ final class ScopedReader implements TsonTypeReader<Object> {
     private static Map<String, List<String>> canonicalKeys(Scoped body) {
         Map<String, List<String>> byIdentity = new LinkedHashMap<>();
         body.schemas().ifPresent(schemas -> schemas.forEach((uri, types) ->
-                byIdentity.put(TsonCanonicalIdentity.canonicalize(uri.toString()), types)));
+                byIdentity.put(CanonicalIdentity.canonicalize(uri.toString()), types)));
         return byIdentity;
     }
 
@@ -141,7 +141,7 @@ final class ScopedReader implements TsonTypeReader<Object> {
                             + "open a scope onto '" + ref.uri() + "' (§7.8)",
                     "a value carrying no '!!schema'", ref.uri());
         }
-        String identity = TsonCanonicalIdentity.canonicalize(ref.uri());
+        String identity = CanonicalIdentity.canonicalize(ref.uri());
         // Absent `schemas` is "any foreign schema"; present, it is a closed set, matched by canonical
         // identity so a pinned key and an unpinned directive are one schema (§2.2.1). The pin itself is the
         // loader's to verify, on the reference as written, exactly as for any other schema reference.

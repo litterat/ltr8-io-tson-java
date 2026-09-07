@@ -3,7 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonContentHash;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * {@link Tson#validate} works out on its own whether a data document's {@code !!schema} selects a
- * schema (resolved through the configured {@link TsonSchemaSource}, type from the root type-ref) or
+ * schema (resolved through the configured {@link SchemaSource}, type from the root type-ref) or
  * whether it's validated schemalessly, returning every problem as a {@link Diagnostic} (empty == valid).
  */
 class TsonValidateTest {
@@ -30,7 +30,7 @@ class TsonValidateTest {
             """;
 
     private static Tson tsonWithPoint() {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;   // ignore any ?sha256= pin
             if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;
@@ -172,7 +172,7 @@ class TsonValidateTest {
         // §2.2.1 cross-check: a source hands back the point schema (own !!id point-1.tn) for a data
         // file that references a different identity -- so the content doesn't own the identity it was
         // obtained under. Refuse it rather than resolve mismatched content.
-        TsonSchemaSource wrongIdSource = uri -> POINT_SCHEMA;   // ignores uri; always returns point-1.tn
+        SchemaSource wrongIdSource = uri -> POINT_SCHEMA;   // ignores uri; always returns point-1.tn
         Tson tson = Tson.builder().schemaSource(wrongIdSource).build();
 
         List<Diagnostic> problems = tson.validate(
@@ -190,7 +190,7 @@ class TsonValidateTest {
         String correctHash = TsonContentHash.sha256(POINT_SCHEMA.getBytes(StandardCharsets.UTF_8));
         String tampered = POINT_SCHEMA.replace("int32", "int64");   // same !!id, different body -> different hash
         AtomicInteger calls = new AtomicInteger();
-        TsonSchemaSource flaky = uri -> calls.getAndIncrement() == 0 ? tampered : POINT_SCHEMA;
+        SchemaSource flaky = uri -> calls.getAndIncrement() == 0 ? tampered : POINT_SCHEMA;
         Tson tson = Tson.builder().schemaSource(flaky).build();
 
         String pinnedData = "!!schema:\"" + POINT_ID + "?sha256=" + correctHash + "\"\n!point { x: 1  y: 2 }";

@@ -1,7 +1,7 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.ProcessorPolicy;
+import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.reader.JsonReadContext;
 import io.ltr8.tson.json.reader.SchemalessTreeReader;
 import io.ltr8.tson.json.stream.JsonEvent;

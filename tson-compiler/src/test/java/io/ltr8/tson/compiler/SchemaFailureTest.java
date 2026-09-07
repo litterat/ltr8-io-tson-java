@@ -1,7 +1,9 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.*;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +31,7 @@ class SchemaFailureTest {
     @Test
     void aSchemaThatWillNotLoadIsTheSchemasOwnProblem() {
         assertEquals(Diagnostic.Code.SCHEMA_ERROR,
-                SchemaFailure.of(new TsonSchemaValidationException("'x' is not registered")).code());
+                SchemaFailure.of(new SchemaValidationException("'x' is not registered")).code());
     }
 
     /**
@@ -104,7 +106,7 @@ class SchemaFailureTest {
     @Test
     void noOtherBranchLandsOnAFetchCode() {
         for (RuntimeException e : List.of(new BindMismatchException("x"), new UnsupportedOperationException("x"),
-                new TsonSchemaValidationException("x"), new ContentHashMismatchException("x"))) {
+                new SchemaValidationException("x"), new ContentHashMismatchException("x"))) {
             assertFalse(Arrays.stream(SchemaFetchException.Reason.values())
                     .map(Diagnostic.Code::of).toList().contains(SchemaFailure.of(e).code()), e::toString);
         }
@@ -127,7 +129,7 @@ class SchemaFailureTest {
     /**
      * <b>Anything else is a fault, and propagates as itself</b> -- the rule {@link
      * Diagnostic#ofBaseSyntaxError} states and this now shares. What makes it applicable is {@link
-     * TsonSchemaSource#fetch} naming {@link SchemaFetchException} as the way a source says "cannot
+     * SchemaSource#fetch} naming {@link SchemaFetchException} as the way a source says "cannot
      * supply this": with no mandated type, an {@code IllegalStateException} here could equally be a source's
      * miss or a broken invariant, and every classification of it is wrong half the time.
      */
@@ -145,6 +147,6 @@ class SchemaFailureTest {
                 SchemaFailure.of(new BindMismatchException("x")).expected());
         assertEquals("a schema this library can compile",
                 SchemaFailure.of(new UnsupportedOperationException("x")).expected());
-        assertEquals("a resolvable schema", SchemaFailure.of(new TsonSchemaValidationException("x")).expected());
+        assertEquals("a resolvable schema", SchemaFailure.of(new SchemaValidationException("x")).expected());
     }
 }

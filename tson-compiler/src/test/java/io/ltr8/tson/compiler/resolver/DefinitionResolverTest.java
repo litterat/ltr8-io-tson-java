@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -26,7 +26,7 @@ import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.Cidr4Type;
@@ -779,7 +779,7 @@ class DefinitionResolverTest {
                 }""").parseSchemaDocument().body();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolver.resolve(schemaMap.declarations().get("loosened")));
         assertTrue(thrown.getMessage().contains("can only restrict, never expand"), thrown.getMessage());
     }
@@ -811,13 +811,13 @@ class DefinitionResolverTest {
      * §5.7 makes the three places a modifier-only entry cannot stand <b>the author's</b> error, not a coverage
      * gap: "a modifier-only entry whose name matches no inherited field is a resolver error", and in a fresh
      * record "every field MUST have an explicit type-ref, and the resolver MUST reject modifier-only entries
-     * there". So each is a {@link TsonSchemaValidationException} -- an {@code UnsupportedOperationException}
+     * there". So each is a {@link SchemaValidationException} -- an {@code UnsupportedOperationException}
      * would tell an author their correct-but-rejected schema is this library's fault.
      */
     @Test
     void rejectsAModifierOnlyEntryWithNoInheritedFieldToTakeATypeFrom() {
         // (1) a fresh record: nothing to elide toward at all
-        TsonSchemaValidationException fresh = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException fresh = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("config => { host: = \"localhost\" }"));
         assertTrue(fresh.getMessage().contains("'host'"), fresh.getMessage());
         assertTrue(fresh.getMessage().contains("§5.7"), fresh.getMessage());
@@ -825,7 +825,7 @@ class DefinitionResolverTest {
         assertFalse(fresh.getMessage().contains("FieldDef["), fresh.getMessage());
 
         // (2) a composition body naming no inherited field: a source exists, but declares no such field
-        TsonSchemaValidationException composed = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException composed = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
                         config => { host: text }
                         production => config & { port: = 8080 }
@@ -876,7 +876,7 @@ class DefinitionResolverTest {
     /**
      * A refinement body field naming nothing inherited is the author's error (§5.7: a refinement copies its
      * source's whole field set and admits no new fields) -- distinct from composition, where a non-matching
-     * name is simply a new field. Hence a {@link TsonSchemaValidationException}: telling an author their
+     * name is simply a new field. Hence a {@link SchemaValidationException}: telling an author their
      * schema is unsupported, when it is in fact rejected by the spec, sends them looking for the wrong fix.
      */
     @Test
@@ -889,7 +889,7 @@ class DefinitionResolverTest {
                 }""").parseSchemaDocument().body();
         resolved.put("base", resolver.resolve(schemaMap.declarations().get("base")));
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolver.resolve(schemaMap.declarations().get("refined")));
         assertTrue(thrown.getMessage().contains("'extra'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("admits no new fields"), thrown.getMessage());
@@ -1118,7 +1118,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("is a constraint vocabulary"), thrown.getMessage());
     }
@@ -1133,7 +1133,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
                 { bad => !top ^ { x: integer } }""").parseSchemaDocument().body();
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> metaKernelBackedResolver.resolve(schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("needs an atom-family instance to narrow"),
                 thrown.getMessage());
@@ -1222,13 +1222,13 @@ class DefinitionResolverTest {
         chainNamespace.put("uint8", instanceResolver.resolve(schemaMap.declarations().get("uint8")));
         chainNamespace.put("percent", instanceResolver.resolve(schemaMap.declarations().get("percent")));
 
-        TsonSchemaValidationException widerThanTheWidth = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException widerThanTheWidth = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("escapesSize")));
         assertTrue(widerThanTheWidth.getMessage().contains("not a valid refinement of"), widerThanTheWidth.getMessage());
         assertTrue(widerThanTheWidth.getMessage().contains("min -10"), widerThanTheWidth.getMessage());
         assertTrue(widerThanTheWidth.getMessage().contains("max 300"), widerThanTheWidth.getMessage());
 
-        TsonSchemaValidationException widerThanTheBound = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException widerThanTheBound = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("escapesMax")));
         assertTrue(widerThanTheBound.getMessage().contains("max 1000 is above the source's own max 100"),
                 widerThanTheBound.getMessage());
@@ -1297,22 +1297,22 @@ class DefinitionResolverTest {
                   pinnedToOneValue   => !integer ^ { min: 5  max: 5 }
                 }""").parseSchemaDocument().body();
 
-        TsonSchemaValidationException refined = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException refined = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("emptyByRefinement")));
         assertTrue(refined.getMessage().contains("contradict each other"), refined.getMessage());
         assertTrue(refined.getMessage().contains("min 10 is above max 3"), refined.getMessage());
 
-        TsonSchemaValidationException applied = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException applied = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("emptyByApplication")));
         assertTrue(applied.getMessage().contains("min 10 is above max 3"), applied.getMessage());
 
-        TsonSchemaValidationException text = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException text = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("emptyText")));
         assertTrue(text.getMessage().contains("min_length 10 is above max_length 3"), text.getMessage());
 
         // Not merely vacuous: IntegerParser divides by this facet, so leaving it unchecked turns a read
         // of an otherwise valid document into an ArithmeticException reported as a library fault.
-        TsonSchemaValidationException step = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException step = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("zeroStep")));
         assertTrue(step.getMessage().contains("multiple_of is zero"), step.getMessage());
 
@@ -1373,14 +1373,14 @@ class DefinitionResolverTest {
         assertEquals(new TextType(Optional.of(1), Optional.of(5), Optional.empty(), Optional.empty()),
                 instanceResolver.resolve(schemaMap.declarations().get("shorter")).body());
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("longer")));
         assertTrue(thrown.getMessage().contains("max_length 50 is above the source's own 10"), thrown.getMessage());
     }
 
     /**
      * A body the constructor's vocabulary rejects is the author's error, so it has to arrive as a {@link
-     * TsonSchemaValidationException} -- the only exception type {@code SchemaResolver}'s reporting overload
+     * SchemaValidationException} -- the only exception type {@code SchemaResolver}'s reporting overload
      * collects into a diagnostic. An {@code UnsupportedOperationException} here (what the blanket
      * {@code catch (RuntimeException)} used to produce) aborts the whole run and prints a "this is a bug in
      * tson" banner over a plain typo, so the assertion is on the exception <em>type</em> first and the
@@ -1395,7 +1395,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
                 { bad => !integer ^ { min: "abc" } }""").parseSchemaDocument().body();
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("not valid data for 'integer_type'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("'abc' is not a valid integer"), thrown.getMessage());
@@ -1420,7 +1420,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
                 { quantity_t => !integer ^ { minimum: 1  maximum: 100 } }""").parseSchemaDocument().body();
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> instanceResolver.resolve(schemaMap.declarations().get("quantity_t")));
         assertTrue(thrown.getMessage().contains("unknown field 'minimum' on 'integer_type'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("min | max"), thrown.getMessage());
@@ -1459,7 +1459,7 @@ class DefinitionResolverTest {
                 !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> definitionResolverFor(metaKernelParser, EMPTY_NAMESPACE).resolve(
                         schemaMap.declarations().get("bad")));
         assertTrue(thrown.getMessage().contains("does not resolve against the type-name namespace"), thrown.getMessage());
@@ -1627,7 +1627,7 @@ class DefinitionResolverTest {
 
     @Test
     void rejectsARestatementThatLoosensARequiredGroup() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("bounds => { ( min: integer | exclusive_min: integer ) }"
                         + "  loose => bounds ^ { ( min: integer | exclusive_min: integer )? }"));
         assertTrue(thrown.getMessage().contains("OPTIONAL→REQUIRED"), thrown.getMessage());
@@ -1635,12 +1635,12 @@ class DefinitionResolverTest {
 
     @Test
     void rejectsARestatementThatReordersOrDropsAMember() {
-        TsonSchemaValidationException reordered = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException reordered = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
                         + "  odd => bounds ^ { ( exclusive_min: integer | min: integer ) }"));
         assertTrue(reordered.getMessage().contains("same member labels in the same order"), reordered.getMessage());
 
-        TsonSchemaValidationException added = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException added = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
                         + "  odd => bounds ^ { ( min: integer | exclusive_min: integer | other: integer ) }"));
         assertTrue(added.getMessage().contains("changing membership"), added.getMessage());
@@ -1649,7 +1649,7 @@ class DefinitionResolverTest {
     /** "Member type-refs restated verbatim" -- narrowing a member's type is done by naming it as a field. */
     @Test
     void rejectsARestatementThatChangesAMembersType() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
                         + "  odd => bounds ^ { ( min: text | exclusive_min: integer ) }"));
         assertTrue(thrown.getMessage().contains("restated verbatim"), thrown.getMessage());
@@ -1659,7 +1659,7 @@ class DefinitionResolverTest {
     /** A group whose members are inherited plain fields is not a restatement of anything. */
     @Test
     void rejectsAGroupOverInheritedFieldsThatWereNeverAGroup() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("pair => { x: integer  y: integer }"
                         + "  odd => pair ^ { ( x: integer | y: integer ) }"));
         assertTrue(thrown.getMessage().contains("not a group"), thrown.getMessage());
@@ -1668,7 +1668,7 @@ class DefinitionResolverTest {
     /** A refinement adds nothing, groups included -- the group analogue of the no-new-fields rule. */
     @Test
     void rejectsAWhollyNewGroupInARefinementBody() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("bounds => { a: text }"
                         + "  odd => bounds ^ { ( p: integer | q: integer ) }"));
         assertTrue(thrown.getMessage().contains("names no inherited group"), thrown.getMessage());
@@ -1737,7 +1737,7 @@ class DefinitionResolverTest {
     /** §5.2: "`~ _` (any field) -- a required field cannot fall back to not-being-filled." */
     @Test
     void rejectsAnAbsentDefault() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("config => { label: text? ~ _ }"));
         assertTrue(thrown.getMessage().contains("'~ _'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("§5.2"), thrown.getMessage());
@@ -1746,12 +1746,12 @@ class DefinitionResolverTest {
     /** §5.2: "`= _` on a REQUIRED field -- a field cannot be required and fixed to not-being-present." */
     @Test
     void rejectsFixingARequiredFieldToAbsent() {
-        TsonSchemaValidationException fresh = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException fresh = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("config => { label: text = _ }"));
         assertTrue(fresh.getMessage().contains("required"), fresh.getMessage());
 
         // and through inheritance: the source declares it REQUIRED, so the tightening entry inherits that
-        TsonSchemaValidationException inherited = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException inherited = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
                         base => { name: text }
                         odd => base ^ { name: = _ }
@@ -1762,7 +1762,7 @@ class DefinitionResolverTest {
     /** §5.2: "`type? ~ value` -- a default implies the field is always present, contradicting optional." */
     @Test
     void rejectsADefaultOnAnOptionalField() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("config => { label: text? ~ none }"));
         assertTrue(thrown.getMessage().contains("contradicts optional"), thrown.getMessage());
         // the message offers all three spellings the author might have meant
@@ -1809,7 +1809,7 @@ class DefinitionResolverTest {
      */
     @Test
     void rejectsARefinementMakingTwoGroupMembersAlwaysPresent() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
                         + "  impossible => bounds ^ { min: integer = 0  exclusive_min: integer = 1 }"));
         assertTrue(thrown.getMessage().contains("min and exclusive_min"), thrown.getMessage());
@@ -1824,7 +1824,7 @@ class DefinitionResolverTest {
      */
     @Test
     void rejectsACompositionBodyMakingTwoGroupMembersAlwaysPresent() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
                         + "  impossible => bounds & { min: integer = 0  exclusive_min: integer = 1 }"));
         assertTrue(thrown.getMessage().contains("at most one"), thrown.getMessage());
@@ -1833,7 +1833,7 @@ class DefinitionResolverTest {
     /** REQUIRED_DEFAULT counts too: a default supplies the value, so the field is there in every value. */
     @Test
     void aDefaultCountsAsAlwaysPresentForTheGroupRule() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(BOUNDS
                         + "  impossible => bounds ^ { min: integer ~ 0  exclusive_min: integer = 1 }"));
         assertTrue(thrown.getMessage().contains("min and exclusive_min"), thrown.getMessage());
@@ -1871,13 +1871,13 @@ class DefinitionResolverTest {
 
     // ── Composition/refinement rejections (§5.7, §5.8, §5.11) ─────────────
     //    Every one is the author's error under a MUST in the spec, so each is a
-    //    TsonSchemaValidationException. What varies is only which rule was broken,
+    //    SchemaValidationException. What varies is only which rule was broken,
     //    and the message has to say which -- that is what decides the author's fix.
 
     /** §5.8: "supertypes MUST contribute disjoint field sets" -- the message must name the supertype case. */
     @Test
     void rejectsAFieldNameTwoSupertypesBothContribute() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
                         address => { street: text  city: text }
                         contact => { city: text  email: text }
@@ -1891,7 +1891,7 @@ class DefinitionResolverTest {
     /** §5.11: a name is unique across a record's plain fields -- a different fix from the supertype case. */
     @Test
     void rejectsAFieldNameDeclaredTwiceInOneBody() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("point => { x: integer  x: text }"));
         assertTrue(thrown.getMessage().contains("'x'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("declares it twice"), thrown.getMessage());
@@ -1900,7 +1900,7 @@ class DefinitionResolverTest {
     /** §5.11: "member labels share the enclosing record's field namespace" -- the third distinct wording. */
     @Test
     void rejectsAGroupMemberRepeatingAPlainFieldName() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("bounds => { min: integer  ( min: text | other: text ) }"));
         assertTrue(thrown.getMessage().contains("'min'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("group member"), thrown.getMessage());
@@ -1914,7 +1914,7 @@ class DefinitionResolverTest {
      */
     @Test
     void rejectsRefiningADefinitionWhoseBodyIsABindingRecord() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel("""
                         bounded => integer ^ { min: = 0 }
                         """));
@@ -1928,7 +1928,7 @@ class DefinitionResolverTest {
      */
     @Test
     void rejectsComposingWithASupertypeWhoseBodyIsABindingRecord() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveSnippetsAgainstMetaKernel("""
                         weird => integer & { extra: text }
                         """));
@@ -1949,7 +1949,7 @@ class DefinitionResolverTest {
      */
     @Test
     void rejectsAChoiceOrABracketedFormAsASupertype() {
-        TsonSchemaValidationException choice = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException choice = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
                         a => { x: text }
                         b => { y: text }
@@ -1958,7 +1958,7 @@ class DefinitionResolverTest {
         assertTrue(choice.getMessage().contains("choice"), choice.getMessage());
         assertTrue(choice.getMessage().contains("variants"), choice.getMessage());
 
-        TsonSchemaValidationException bracketed = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException bracketed = assertThrows(SchemaValidationException.class,
                 () -> resolveAll("""
                         a => { x: text }
                         odd => a & [a]
@@ -2065,7 +2065,7 @@ class DefinitionResolverTest {
      */
     @Test
     void rejectsARemovalNamingAFieldTheBodyItselfIntroduces() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(ACCOUNT + "  odd => account & { badge: text } - { badge }"));
         assertTrue(thrown.getMessage().contains("own body also declares"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("§5.9 rule 4"), thrown.getMessage());
@@ -2074,7 +2074,7 @@ class DefinitionResolverTest {
     /** Rule 4's other half: a body entry tightening a field the same declaration removes. */
     @Test
     void rejectsARemovalNamingAFieldTheBodyTightens() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(ACCOUNT + "  odd => account & { password: text ~ \"x\" } - { password }"));
         assertTrue(thrown.getMessage().contains("own body also declares"), thrown.getMessage());
     }
@@ -2082,7 +2082,7 @@ class DefinitionResolverTest {
     /** Rule 2, symmetric with refinement's existing-fields-only rule: nothing to remove is an author error. */
     @Test
     void rejectsARemovalNamingAFieldThatIsNotThere() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolveAll(ACCOUNT + "  odd => account - { nickname }"));
         assertTrue(thrown.getMessage().contains("not a field of the composed type"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("§5.9 rule 2"), thrown.getMessage());
@@ -2151,7 +2151,7 @@ class DefinitionResolverTest {
 
     /**
      * A supertype naming nothing is the schema author's error, not a gap in this resolver, so it is a
-     * {@link TsonSchemaValidationException}. It used to be an {@code UnsupportedOperationException} saying
+     * {@link SchemaValidationException}. It used to be an {@code UnsupportedOperationException} saying
      * "not resolved yet (only supertypes declared earlier in the same schema map are visible so far)" --
      * a limitation that no longer exists, since {@code SchemaResolver} resolves on demand following
      * dependencies rather than source order (see {@code ForwardReferenceResolutionTest}).
@@ -2161,7 +2161,7 @@ class DefinitionResolverTest {
         SchemaMap schemaMap = new TsonSchemaParser(readFixture()).parseSchemaDocument().body();
         // "top" deliberately left out of the resolved map -- atom's supertype resolves to nothing
         // (the shared resolved field starts empty, and nothing puts "top" into it before this call).
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolver.resolve(schemaMap.declarations().get("atom")));
         assertTrue(thrown.getMessage().contains("names no type this schema declares or imports"),
                 thrown.getMessage());

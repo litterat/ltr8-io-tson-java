@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.LimitsPolicy;
-import io.ltr8.tson.base.ProcessorPolicy;
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
+import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.unicode.Xid;
 import org.junit.jupiter.api.Test;

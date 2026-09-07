@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
@@ -15,11 +15,11 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
 import io.ltr8.tson.compiler.stream.ListEventSource;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
@@ -98,10 +98,10 @@ public final class SchemaResolver {
      * {@code document.id()} must be present -- required by policy for a publishable schema (§2.2.1:
      * "publishing a schema... REQUIRES !!id"), and this resolver is about to treat {@code document}
      * as one that's going to *be* registered; (2) that {@code !!id} must be a well-formed
-     * canonical-identity candidate ({@link TsonCanonicalIdentity#validate}) -- the same check
+     * canonical-identity candidate ({@link CanonicalIdentity#validate}) -- the same check
      * {@link TsonSchemaRegistry#register} would run anyway, just surfaced here, before resolution
      * work is spent on a document that could never actually be registered. Both throw {@link
-     * IllegalStateException} (or, for (2), {@link TsonSchemaValidationException}, in an already-
+     * IllegalStateException} (or, for (2), {@link SchemaValidationException}, in an already-
      * established shape) naming the actual problem. {@code document.meta()} itself is then resolved
      * via this resolver's own {@link TsonCompiledSchemaLoader} (fetched/bootstrapped/compiled on
      * demand if it wasn't already available, rather than requiring it to pre-exist) -- and its
@@ -119,7 +119,7 @@ public final class SchemaResolver {
      * only has via its own {@code !!import}, would fail to resolve at all without this. Collision
      * handling mirrors {@code TsonSchemaLinker.mergeImports}'s own rule exactly: a name declared by
      * more than one import, or by an import *and* a local declaration, is a {@link
-     * TsonSchemaValidationException} -- checked as each import is merged in, and again as each local
+     * SchemaValidationException} -- checked as each import is merged in, and again as each local
      * declaration is about to be resolved, so a collision is caught at the earliest point either side
      * of it becomes known. <b>Merged entries keep their home namespace</b>, same as {@code
      * TsonSchemaLinker}'s own note on this: an imported entry is copied in exactly as its own schema
@@ -168,7 +168,7 @@ public final class SchemaResolver {
      * error). {@link DiagnosticsReceiver#throwing()}, the default the other overloads pass, makes the
      * first failure an exception again and so keeps that impossible by construction.
      *
-     * <p>Only a {@link TsonSchemaValidationException} -- the schema is wrong -- becomes a diagnostic. An
+     * <p>Only a {@link SchemaValidationException} -- the schema is wrong -- becomes a diagnostic. An
      * {@code UnsupportedOperationException} means this library hasn't implemented the construct and keeps
      * propagating: a gap is not a verdict on the author's schema, and reporting it as one sends them looking
      * for a fix that doesn't exist.
@@ -193,9 +193,9 @@ public final class SchemaResolver {
                                DiagnosticsReceiver receiver) {
         String id = document.id().orElseThrow(() -> new IllegalStateException(
                 "'" + document.meta() + "': !!id is required to register this schema, but is absent"));
-        TsonCanonicalIdentity.validate(id);
+        CanonicalIdentity.validate(id);
         for (String importUri : document.imports()) {
-            TsonCanonicalIdentity.validate(importUri);
+            CanonicalIdentity.validate(importUri);
         }
 
         TsonCompiledMetaSchema metaParser = loader.loadMeta(document.meta());
@@ -216,7 +216,7 @@ public final class SchemaResolver {
         // has to carry each one's position onto the node it produced -- see SchemaDesugarer.schemaMap. Every
         // position lookup below goes through this copy, so a rewritten declaration is located like any other.
         SchemaPositions positions = declarationPositions.copy();
-        Problems problems = new Problems(TsonCanonicalIdentity.canonicalize(id), positions, receiver);
+        Problems problems = new Problems(CanonicalIdentity.canonicalize(id), positions, receiver);
         SchemaDocument desugared = SchemaDesugarer.desugar(document,
                 namespace.keySet(), problems.collecting() ? problems::report : null, positions);
         Map<String, SchemaMap.Declaration> declarations = desugared.body().declarations();
@@ -230,7 +230,7 @@ public final class SchemaResolver {
         // Local-vs-import collisions, up front (local names are already unique -- SchemaMap dedupes them).
         for (String name : declarations.keySet()) {
             if (namespace.containsKey(name)) {
-                throw new TsonSchemaValidationException("'" + name
+                throw new SchemaValidationException("'" + name
                         + "' collides with an entry of the same name brought in by !!import");
             }
         }
@@ -345,7 +345,7 @@ public final class SchemaResolver {
             }
             try {
                 nameAnnotations.put(key, resolver.annotationsFor(name, declarations.get(name).nameAnnotations()));
-            } catch (TsonSchemaValidationException | UnsupportedOperationException
+            } catch (SchemaValidationException | UnsupportedOperationException
                      | BindMismatchException e) {
                 if (!problems.collecting()) {
                     throw e;
@@ -403,7 +403,7 @@ public final class SchemaResolver {
      * lookup being spelled out at each site.
      *
      * <p><b>The code is chosen by the project's own exception classification</b>, which has three outcomes
-     * and not two. A {@code TsonSchemaValidationException} is the author's error and an {@code
+     * and not two. A {@code SchemaValidationException} is the author's error and an {@code
      * UnsupportedOperationException} is this library's gap -- one says fix your schema, the other says this
      * could not be checked. A {@link BindMismatchException} is neither: it says the reading application
      * is wired wrong, and it is the one a caller most easily acts on, the message naming one of their own
@@ -523,7 +523,7 @@ public final class SchemaResolver {
                 return null; // not a local entry -- an as-yet-unverified reference the linker validates
             }
             if (!resolving.add(name)) {
-                throw new TsonSchemaValidationException("'" + name + "' is part of a circular composition/"
+                throw new SchemaValidationException("'" + name + "' is part of a circular composition/"
                         + "refinement chain (" + String.join(" -> ", resolving) + " -> " + name + ") -- a "
                         + "supertype or refinement source cannot depend, directly or transitively, on the type "
                         + "it helps define");
@@ -534,7 +534,7 @@ public final class SchemaResolver {
                 refuseHeadAbstraction(name, resolved);
                 entries.put(name, resolved);
                 return resolved;
-            } catch (TsonSchemaValidationException | UnsupportedOperationException
+            } catch (SchemaValidationException | UnsupportedOperationException
                      | BindMismatchException e) {
                 if (!problems.collecting()) {
                     throw e;
@@ -566,7 +566,7 @@ public final class SchemaResolver {
         }
         for (io.ltr8.tson.schema.meta.TypeRef application : HeldBody.of(held).applications()) {
             if (resolved.parameters().contains(application.name())) {
-                throw new TsonSchemaValidationException("'" + name + "': '" + application.name()
+                throw new SchemaValidationException("'" + name + "': '" + application.name()
                         + "' is a type parameter applied to arguments -- a parameter stands for a type, never "
                         + "for a template, and §5.10 admits no head abstraction, so '" + application.name()
                         + "<...>' is no form. Take the applied type as the parameter instead");
@@ -637,7 +637,7 @@ public final class SchemaResolver {
         Map<String, String> origins = new LinkedHashMap<>();
         Set<String> alreadyImported = new LinkedHashSet<>();
         for (String importUri : document.imports()) {
-            if (!alreadyImported.add(TsonCanonicalIdentity.canonicalize(importUri))) {
+            if (!alreadyImported.add(CanonicalIdentity.canonicalize(importUri))) {
                 continue;
             }
             TsonLinkedSchema imported = loader.resolveLinked(importUri);
@@ -647,7 +647,7 @@ public final class SchemaResolver {
                 String incumbent = origins.get(name);
                 if (incumbent != null) {
                     if (!incumbent.equals(origin)) {
-                        throw new TsonSchemaValidationException("'" + name + "' is declared by two different "
+                        throw new SchemaValidationException("'" + name + "' is declared by two different "
                                 + "schemas reached through !!import ('" + incumbent + "' and '" + origin
                                 + "') -- distinct types cannot share one name in the flat namespace; import "
                                 + "one of them, or a version of each that agrees on where '" + name

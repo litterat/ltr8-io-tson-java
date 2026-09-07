@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
@@ -57,8 +58,8 @@ class OpenOperandCompositionTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -204,7 +205,7 @@ class OpenOperandCompositionTest {
      */
     @Test
     void aParameterAppliedAsAHeadIsRefusedAtTheDeclarationThatWritesIt() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           box => <T> { v: T<text> }
                           use => box<int32>
@@ -220,7 +221,7 @@ class OpenOperandCompositionTest {
      */
     @Test
     void composingWithAnOpenOperandThatHasNoFieldsIsRefused() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           customer => { id: text }
                           list     => <T> [T]
@@ -234,7 +235,7 @@ class OpenOperandCompositionTest {
     /** Arity is answered here too, from the operand's own declaration, rather than left to substitution. */
     @Test
     void applyingAnOpenOperandToTheWrongNumberOfArgumentsIsRefused() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           customer => { id: text }
                           pair     => <A, B> { a: A  b: B }
