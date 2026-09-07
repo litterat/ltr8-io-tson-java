@@ -145,7 +145,7 @@ public final class JsonObjectReader {
         return read(new JsonStream(source), type);
     }
 
-    /** {@link #read(InputStream, Class)} under a nesting bound other than {@link JsonStream#DEFAULT_MAX_DEPTH}. */
+    /** {@link #read(InputStream, Class)} under a nesting bound other than {@link io.ltr8.tson.base.TsonLimitsPolicy#DEFAULT_MAX_DEPTH the processor's default}. */
     public <T> T read(InputStream source, Class<T> type, int maxDepth) {
         return read(new JsonStream(source, maxDepth), type);
     }

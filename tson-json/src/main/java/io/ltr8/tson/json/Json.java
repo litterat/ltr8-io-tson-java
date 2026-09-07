@@ -62,7 +62,7 @@ public final class Json {
         return parse(new JsonStream(source));
     }
 
-    /** {@link #parse(InputStream)} under a nesting bound other than {@link JsonStream#DEFAULT_MAX_DEPTH}. */
+    /** {@link #parse(InputStream)} under a nesting bound other than {@link io.ltr8.tson.base.TsonLimitsPolicy#DEFAULT_MAX_DEPTH the processor's default}. */
     public static JsonValue parse(InputStream source, int maxDepth) {
         return parse(new JsonStream(source, maxDepth));
     }

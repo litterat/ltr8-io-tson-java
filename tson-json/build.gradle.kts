@@ -13,6 +13,7 @@ dependencies {
     // `DataBindContext` to hand `JsonObjectReader` names its types directly.
     //
     // The schema-directed decode of [TSON-JSON] §5-§8 is what will bring a dependency on `tson-compiler`.
+    api(project(":tson-base"))
     api(project(":tson-bind"))
 
     // `io.ltr8.bind` requires it transitively, so the module path needs it here even though nothing in

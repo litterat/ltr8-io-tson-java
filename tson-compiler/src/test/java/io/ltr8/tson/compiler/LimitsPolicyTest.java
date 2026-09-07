@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonLimitExceededException;
+import io.ltr8.tson.base.TsonLimitsPolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.TsonDiagnosticsCollector;
 import io.ltr8.tson.tree.TsonValue;

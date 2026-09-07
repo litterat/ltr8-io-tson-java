@@ -225,7 +225,12 @@ module has a real `module-info.java`; module names mirror each module's root exp
   encoding's syntax failure" gap, since there is no longer one switch responsible for exceptions it cannot
   name. `SourcePosition` moved here from `schema.meta` so the base need not require `tson-schema`; the
   bonus is that any encoding's own position type can implement it and reach a `Diagnostic` with no
-  conversion.
+  conversion — `JsonPosition` does. **`TsonLimitsPolicy` and `TsonLimitExceededException` are here on the
+  same argument**: [TSON-JSON] §10.1 makes the bound §9.1's policy "in JSON clothing, and the same policy
+  applies with the same defaults", so one record and one refusal serve both encodings and a deployment that
+  raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and is the one factory that
+  stayed on the record — its nine siblings switch on an encoding's own exception type where it classifies
+  nothing at all.
 - **`tson-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations, plus `Annotations`/
   `Annotation`, the wire-annotation carrier a bound class declares a component of. The carrier lives here
   rather than with the engine because it is the one module `tson-bind` (which analyses classes),

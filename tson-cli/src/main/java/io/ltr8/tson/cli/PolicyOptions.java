@@ -1,7 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.TsonConfig;
-import io.ltr8.tson.compiler.TsonLimitsPolicy;
+import io.ltr8.tson.base.TsonLimitsPolicy;
 import io.ltr8.tson.compiler.TsonUnicodePolicy;
 
 import java.lang.Character.UnicodeScript;

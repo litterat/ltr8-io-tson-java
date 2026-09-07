@@ -1,5 +1,7 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.SourcePosition;
+
 /**
  * A position in a JSON document: 1-based line, 1-based column counted in Unicode code points, and a
  * 0-based UTF-8 byte offset from the start of the document (after any leading BOM has been stripped).
@@ -11,10 +13,12 @@ package io.ltr8.tson.json;
  * while the input is well-formed UTF-8, which is exactly the case where the offset matters most, so
  * {@code JsonLexer} counts it off the bytes it decodes.
  *
- * <p>Distinct from {@code io.ltr8.tson.compiler.Position} deliberately: the JSON encoding is its own
- * stack, and the two are converted at the one boundary where a JSON read reports a TSON diagnostic.
+ * <p><b>Implements {@link SourcePosition}</b>, which is what a {@code Diagnostic} points at -- so a JSON
+ * position reaches a diagnostic as itself, with no conversion at any boundary. Distinct from
+ * {@code io.ltr8.tson.compiler.Position} all the same: the JSON encoding is its own stack, and both are
+ * simply two encodings' own spellings of the same three coordinates.
  */
-public record JsonPosition(int line, int column, int byteOffset) {
+public record JsonPosition(int line, int column, int byteOffset) implements SourcePosition {
 
     /** Renders as JEP 540's {@code JsonParseException} does, so a message reads the same in either API. */
     @Override

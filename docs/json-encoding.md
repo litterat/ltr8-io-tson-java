@@ -233,11 +233,16 @@ and no member name is reserved, §3.2's `$`-namespace being a question about the
 
 **Nesting depth is bounded here** (§10.1) — the one place every container opens, so a refusal lands before
 any consumer descends, which matters because every consumer of this stream recurses where the stream itself
-iterates. The bound arrives as an `int`, not a policy object: §10.1 makes it [TSON-DATA] §9.1's policy "in
-JSON clothing", one policy across both encodings, so a second policy type here would be a second default to
-drift. `JsonLimitExceededException` *is* a separate type, and has to be — §10.1 makes a refusal §8.1's fifth
-outcome, never a verdict, so it must be distinguishable from `JsonParseException` or a configured bound
-reaches a consumer as a syntax failure. Both are `final` and unrelated, so javac itself proves the split.
+iterates. The bound arrives as an `int` because a stream needs a number rather than a policy, but **the
+number and the refusal are the processor's, not this encoding's**: §10.1 makes it [TSON-DATA] §9.1's policy
+"in JSON clothing, and the same policy applies with the same defaults", so the stream counts against
+`TsonLimitsPolicy.DEFAULT_MAX_DEPTH` and refuses with `TsonLimitExceededException` — the same type the text
+encoding refuses with, from `tson-base`. A deployment that raises the bound raises it for both encodings at
+once, which is what one policy means.
+
+That refusal type stays distinct from `JsonParseException`, and has to be: §10.1 makes a refusal §8.1's
+fifth outcome, never a verdict, so it must be distinguishable or a configured bound reaches a consumer as a
+syntax failure.
 
 **Error messages name the construct the position admits**, not the token class found — "a member name is due"
 where "expected STRING" would tell an author what a lexer calls the thing they already wrote.

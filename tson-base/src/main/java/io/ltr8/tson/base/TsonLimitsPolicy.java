@@ -1,6 +1,5 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
-import io.ltr8.tson.base.Diagnostic;
 
 /**
  * The resource limits this processor applies to a document it reads -- [TSON-DATA] §9.1's denial-of-service
@@ -13,13 +12,18 @@ import io.ltr8.tson.base.Diagnostic;
  * Diagnostic.Code#verdict()} is {@code false}, and never one of the codes that assert something about the
  * document's conformance.
  *
- * <p><b>Why the limits are a value and not a constant.</b> The argument is {@link
- * TsonUnicodeProcessorPolicy}'s, and for the same reason: the bound is the reading deployment's own choice,
+ * <p><b>Why the limits are a value and not a constant.</b> The argument is {@code TsonUnicodeProcessorPolicy}'s, and for the same reason: the bound is the reading deployment's own choice,
  * so the same bytes may be accepted by one server and refused by another, and that divergence is
  * unexplainable unless the configuration can be stated. A sender that can read the limits writes a document
  * that fits; one that cannot learns them one round trip too late. It is reported by the same surfaces --
- * {@code Tson.limitsPolicy()}, {@link TsonTreeReader#limitsPolicy()}, {@link
- * TsonObjectReader#limitsPolicy()}, and {@code tson policy} on the command line.
+ * {@code Tson.limitsPolicy()}, {@code TsonTreeReader.limitsPolicy()}, {@code TsonObjectReader.limitsPolicy()}, and {@code tson policy} on the command line.
+ *
+ * <p><b>One policy, every encoding.</b> [TSON-JSON] §10.1 makes JSON's nesting depth, member and element
+ * counts, string and number lengths and decoded binary sizes "the limits of [TSON-DATA] §9.1's limits
+ * policy in JSON clothing, and the same policy applies with the same defaults" -- so this is not the TSON
+ * text encoding's bound with a JSON copy beside it, it is the processor's bound, and each encoding counts
+ * it where its own tokens are consumed. That is why it lives here rather than in either engine: a second
+ * record would be a second default to drift.
  *
  * <p><b>Only nesting depth is bounded so far.</b> §9.1 states the whole set as one table with a default
  * each -- eleven more on the document side (token and decoded-text length, numeric-literal length, decoded
