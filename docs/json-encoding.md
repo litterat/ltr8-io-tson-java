@@ -299,13 +299,18 @@ Three exported, layered the way the module reads a document, and the split is th
 
 | Package | Holds |
 |---|---|
-| `io.ltr8.tson.json` | `Json`, `JsonPosition`, and the exceptions every layer raises |
+| `io.ltr8.tson.json` | `Json`, `JsonObjectReader`, `JsonPosition`, and the exceptions every layer raises |
 | `io.ltr8.tson.json.tree` | `JsonValue` and its six node types, plus `JsonValueException` |
 | `io.ltr8.tson.json.stream` | `JsonEvent`, `JsonEventSource`, `JsonStream` |
-| `io.ltr8.tson.json.lexer` | internal — a consumer names a value or an event, never a token |
+| `io.ltr8.tson.json.atom` | internal — one JSON leaf into one host value, and where §5's per-family readers land |
+| `io.ltr8.tson.json.lexer` | internal — a consumer names a value, an event or a reader, never a token or a parser |
 
 `tree` is the JSON counterpart of `io.ltr8.tson.tree` and stands in the same relation to its front door:
-`Json.parse` returns a `JsonValue` as `Tson`'s tree reader returns a `TsonValue`. `stream` is exported for
+`Json.parse` returns a `JsonValue` as `Tson`'s tree reader returns a `TsonValue`. `JsonObjectReader` sits
+in the front door beside `Json` for the same reason `TsonObjectReader` sits beside `Tson` — a reader is a
+front door, not a layer of one. `atom` is unexported and will grow: §5.1 hands a string's content to the
+atom's own parser exactly as a TSON quoted token's text would be, so each family needs a reader there and
+none of them belongs in a reader that walks structure. `stream` is exported for
 the reason `tson-compiler` exports its own — `Json.parse` takes a `JsonEventSource`, so it is a real contract
 rather than an internal dispatch type, and JEP 540 excludes streaming as a non-goal, so a caller who needs it
 has nowhere else to go.
@@ -313,3 +318,60 @@ has nowhere else to go.
 The rendering lives on `JsonValue.toDisplayString(indent)` rather than only on `Json`, because the string
 quoting it needs is `tree`'s and package-private there. `Json.toDisplayString(value, indent)` is JEP 540's
 spelling of the same call and delegates.
+
+## Binding (`JsonObjectReader`)
+
+`JsonObjectReader` reads a document straight into a Java object, driven by the target class's own
+`tson-bind` descriptor and streaming the event source rather than a tree. It is the JSON peer of
+`tson-compiler`'s `SchemalessObjectReader`, and `tson-bind` is `tson-json`'s only dependency — a
+dependency-free engine that reads a class, so a JSON document binds with no TSON schema in sight.
+
+Binding is JEP 540's other explicit non-goal, after streaming, and it is the one worth not inheriting: a
+library whose point is validated typed data has no business handing back a tree and calling it done.
+
+**The class is the schema, and that is the whole design.** §4.1 reads every JSON value at a typed
+position and never by inspecting the value twice; here the type is a `DataClass` rather than a resolved
+TSON schema. The brace question follows immediately: an object at a `DataClassRecord` is a record, at a
+`DataClassMap` a map. That is the ambiguity a shared `TsonEvent` vocabulary could not express, answered
+by the position exactly as §4.1 requires — the separate-stack decision paying for itself at the first
+place it was predicted to.
+
+Three rules are §7-shaped, as far as a Java class can express §7:
+
+- **JSON null at a required component is refused**, exactly as `_` is at a REQUIRED field
+  ([TSON-SCHEMA] §7.6). A component `tson-bind` marks required is a primitive, or one carrying
+  `@Field(required = true)`.
+- **JSON null anywhere else is the absence**, which a bound object spells `null`, having no third state —
+  so an omitted member and a null member are indistinguishable in the result, which §6.1.2 says outright.
+  It is the same treatment `SchemalessObjectReader` gives `_`, which is the point: §7 makes the two
+  spellings one concept.
+- **An `Annotations` carrier is filled empty**, §4.3 giving the JSON wire no annotation channel. Nothing
+  is dropped; there was nothing to drop.
+
+**A member the class does not declare is discarded**, as `SchemalessObjectReader` discards one. That is
+also what the on-ramp needs: `additionalProperties` defaults to *true* in JSON Schema, so refusing here
+would fail the first converted document carrying anything extra. §6.1.1's closure rule is a *schema's*,
+over declared fields and an `@rest` tail, and arrives with §5–§8.
+
+**A union target is refused, with the reason.** §8.2 admits a tag-free choice by exactly two routes — a
+declared discriminator, or a derived disjointness fact over class-stable variants — and forbids extending
+them ("no trying variants in order", which is how JSON Schema validates a `oneOf`). A Java union states
+neither, so there is nothing to dispatch on and inventing a rule would be inventing the one §8.2 rules
+out. The message says so rather than failing obscurely.
+
+**Numbers convert exactly or error** (§3.1's "error, never round silently"): every integral narrowing
+runs off one `BigDecimal`, so `1.5` and `2147483648` both fail at an `int` rather than truncating or
+wrapping. `float`/`double` are the exception and are meant to be — rounding onto the binary grid is the
+approximate families' own contract (§5.4). An enum needs no rule here at all: `tson-bind` bridges every
+plain Java enum through `EnumStringBridge`, so one arrives as a bridged `String` atom.
+
+**Fail-fast, with no collecting mode.** Collecting belongs with the schema-directed decode, where §9.4's
+four categories exist to sort what is collected. A receiver over this reader would carry one shape of
+problem, and the wrong shape at that: a class that does not match the document is a misconfiguration in
+the reading application, not a verdict on the document — the same line `BIND_MISMATCH` draws on the TSON
+side. `JsonBindException` is separate from `JsonParseException` for that reason: "this is not JSON"
+against "this is not my JSON", and a caller routes on which it caught.
+
+**What this reader is not** is validation against a TSON schema. Nothing here consults facets, field
+states, defaults, fixed values, groups or the discrimination predicate, because a Java class declares
+none of them. The honest name for what it checks is "does this document fit this class".
