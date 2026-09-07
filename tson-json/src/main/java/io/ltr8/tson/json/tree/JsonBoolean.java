@@ -1,4 +1,4 @@
-package io.ltr8.tson.json;
+package io.ltr8.tson.json.tree;
 
 /** {@code true} or {@code false}. */
 public record JsonBoolean(boolean value) implements JsonValue {

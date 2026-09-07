@@ -246,7 +246,7 @@ the JS object-literal habit and the commonest of these mistakes, never reaches t
 no JSON token, so the lexer refuses it first and names the character. The grammar cannot improve on that
 without the lexer knowing what position it is at, which is the layering.
 
-## Tree (`io.ltr8.tson.json`)
+## Tree (`tson-json/.../tree/`)
 
 `JsonValue` is a sealed interface over six records — `JsonObject`, `JsonArray`, `JsonString`,
 `JsonNumber`, `JsonBoolean`, `JsonNull` — with JEP 540's navigation (`get`/`tryGet`/`tryValue`),
@@ -292,6 +292,24 @@ to spell an ordinary character as an escape. A lone surrogate in a *hand-built* 
 `\u` escape rather than raw, which keeps the output well-formed UTF-8 — the value is still one §3.1
 refuses on the way back in, and refusing it there is where the spec puts the rule.
 
-**`io.ltr8.tson.json.stream` is exported**, for the reason `tson-compiler` exports its own: `Json.parse`
-takes a `JsonEventSource`, so it is a real contract rather than an internal dispatch type, and JEP 540
-excludes streaming as a non-goal, so a caller who needs it has nowhere else to go.
+## Packages
+
+Three exported, layered the way the module reads a document, and the split is the one `tson-compiler` and
+`tson-tree` already draw between a front door, a value model and an engine:
+
+| Package | Holds |
+|---|---|
+| `io.ltr8.tson.json` | `Json`, `JsonPosition`, and the exceptions every layer raises |
+| `io.ltr8.tson.json.tree` | `JsonValue` and its six node types, plus `JsonValueException` |
+| `io.ltr8.tson.json.stream` | `JsonEvent`, `JsonEventSource`, `JsonStream` |
+| `io.ltr8.tson.json.lexer` | internal — a consumer names a value or an event, never a token |
+
+`tree` is the JSON counterpart of `io.ltr8.tson.tree` and stands in the same relation to its front door:
+`Json.parse` returns a `JsonValue` as `Tson`'s tree reader returns a `TsonValue`. `stream` is exported for
+the reason `tson-compiler` exports its own — `Json.parse` takes a `JsonEventSource`, so it is a real contract
+rather than an internal dispatch type, and JEP 540 excludes streaming as a non-goal, so a caller who needs it
+has nowhere else to go.
+
+The rendering lives on `JsonValue.toDisplayString(indent)` rather than only on `Json`, because the string
+quoting it needs is `tree`'s and package-private there. `Json.toDisplayString(value, indent)` is JEP 540's
+spelling of the same call and delegates.

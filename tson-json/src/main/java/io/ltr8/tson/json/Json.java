@@ -3,6 +3,13 @@ package io.ltr8.tson.json;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
+import io.ltr8.tson.json.tree.JsonArray;
+import io.ltr8.tson.json.tree.JsonBoolean;
+import io.ltr8.tson.json.tree.JsonNull;
+import io.ltr8.tson.json.tree.JsonNumber;
+import io.ltr8.tson.json.tree.JsonObject;
+import io.ltr8.tson.json.tree.JsonString;
+import io.ltr8.tson.json.tree.JsonValue;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -128,69 +135,16 @@ public final class Json {
     // ── Rendering ────────────────────────────────────────────────────────
 
     /**
-     * A pretty-printed rendering, one member or element per line, indented by {@code indent} per level.
-     *
-     * <p>For a person to read. {@link JsonValue#toString()} is the compact form and the one to send:
-     * §9.3 makes whitespace insignificant to a round trip, so both parse back to the same value, and
-     * this one costs bytes to say so.
+     * A pretty-printed rendering, one member or element per line, indented by {@code indent} per level
+     * -- JEP 540's spelling of {@link JsonValue#toDisplayString(String)}, which is where the work lives
+     * because that is where the string quoting does.
      */
     public static String toDisplayString(JsonValue value, String indent) {
-        StringBuilder out = new StringBuilder();
-        display(value, indent, 0, out);
-        return out.toString();
+        return value.toDisplayString(indent);
     }
 
     /** {@link #toDisplayString(JsonValue, String)} at two spaces, the shape most JSON is read in. */
     public static String toDisplayString(JsonValue value) {
-        return toDisplayString(value, "  ");
-    }
-
-    private static void display(JsonValue value, String indent, int level, StringBuilder out) {
-        switch (value) {
-            case JsonObject object when !object.members().isEmpty() -> {
-                out.append("{\n");
-                boolean[] first = {true};
-                object.members().forEach((name, member) -> {
-                    separate(first, out);
-                    indent(indent, level + 1, out);
-                    JsonText.quote(name, out);
-                    out.append(": ");
-                    display(member, indent, level + 1, out);
-                });
-                out.append('\n');
-                indent(indent, level, out);
-                out.append('}');
-            }
-            case JsonArray array when !array.elements().isEmpty() -> {
-                out.append("[\n");
-                boolean first = true;
-                for (JsonValue element : array.elements()) {
-                    if (!first) {
-                        out.append(",\n");
-                    }
-                    first = false;
-                    indent(indent, level + 1, out);
-                    display(element, indent, level + 1, out);
-                }
-                out.append('\n');
-                indent(indent, level, out);
-                out.append(']');
-            }
-            // Every leaf, plus the two empty containers, which read better closed on one line.
-            default -> out.append(value);
-        }
-    }
-
-    /** Boxed because the object branch writes from inside a {@code forEach} lambda, where a local cannot be assigned. */
-    private static void separate(boolean[] first, StringBuilder out) {
-        if (first[0]) {
-            first[0] = false;
-        } else {
-            out.append(",\n");
-        }
-    }
-
-    private static void indent(String indent, int level, StringBuilder out) {
-        out.append(indent.repeat(level));
+        return value.toDisplayString();
     }
 }

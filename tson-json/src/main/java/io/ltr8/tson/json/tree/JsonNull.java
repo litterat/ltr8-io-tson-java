@@ -1,4 +1,4 @@
-package io.ltr8.tson.json;
+package io.ltr8.tson.json.tree;
 
 import java.util.Optional;
 

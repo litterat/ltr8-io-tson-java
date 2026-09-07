@@ -1,4 +1,4 @@
-package io.ltr8.tson.json;
+package io.ltr8.tson.json.tree;
 
 /**
  * A navigation or conversion this value cannot answer: a member of a value that is not an object, an

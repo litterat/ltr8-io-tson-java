@@ -1,4 +1,4 @@
-package io.ltr8.tson.json;
+package io.ltr8.tson.json.tree;
 
 import java.util.List;
 import java.util.Map;
@@ -20,7 +20,7 @@ import java.util.Optional;
  * <p><b>Nodes carry no source position</b>, so equality is over content and two structurally equal
  * documents parsed from different sources are equal. It is the same shape {@code TsonValue} takes and
  * for the same reason — a value model holds values — and it costs less than it appears to: a parse
- * failure and a duplicate member are reported by {@link Json#parse} with a {@link JsonPosition}
+ * failure and a duplicate member are reported by {@link io.ltr8.tson.json.Json#parse Json.parse} with a {@link io.ltr8.tson.json.JsonPosition JsonPosition}
  * already, and the schema-directed decode streams events, which carry positions, rather than walking a
  * tree. A {@link JsonValueException} therefore names the step and the value rather than a line.
  *
@@ -107,15 +107,71 @@ public sealed interface JsonValue
     /**
      * This value as compact RFC 8259 JSON, on one line.
      *
-     * <p>Within [TSON-JSON] §3.1's profile in both directions: what {@link Json#parse} accepts, this
-     * emits, and what this emits {@link Json#parse} accepts — §9.2's round trip, which is the
+     * <p>Within [TSON-JSON] §3.1's profile in both directions: what {@link io.ltr8.tson.json.Json#parse Json.parse} accepts, this
+     * emits, and what this emits {@link io.ltr8.tson.json.Json#parse Json.parse} accepts — §9.2's round trip, which is the
      * conformance test rather than a separate rule set. A {@link JsonNumber} re-emits its own digits
      * (§5.3), never a value routed through a host type.
      */
     @Override
     String toString();
 
+    /**
+     * A pretty-printed rendering, one member or element per line, indented by {@code indent} per level.
+     *
+     * <p>For a person to read. {@link #toString()} is the compact form and the one to send: §9.3 makes
+     * whitespace insignificant to a round trip, so both parse back to the same value and this one costs
+     * bytes to say so. {@code Json.toDisplayString} is JEP 540's spelling of the same call.
+     */
+    default String toDisplayString(String indent) {
+        StringBuilder out = new StringBuilder();
+        display(this, indent, 0, out);
+        return out.toString();
+    }
+
+    /** {@link #toDisplayString(String)} at two spaces, the shape most JSON is read in. */
+    default String toDisplayString() {
+        return toDisplayString("  ");
+    }
+
     // ── Helpers for the defaults above ───────────────────────────────────
+
+    private static void display(JsonValue value, String indent, int level, StringBuilder out) {
+        switch (value) {
+            case JsonObject object when !object.members().isEmpty() -> {
+                out.append("{\n");
+                boolean[] first = {true};
+                object.members().forEach((name, member) -> {
+                    separate(first, out);
+                    out.append(indent.repeat(level + 1));
+                    JsonText.quote(name, out);
+                    out.append(": ");
+                    display(member, indent, level + 1, out);
+                });
+                out.append('\n').append(indent.repeat(level)).append('}');
+            }
+            case JsonArray array when !array.elements().isEmpty() -> {
+                out.append("[\n");
+                boolean[] first = {true};
+                for (JsonValue element : array.elements()) {
+                    separate(first, out);
+                    out.append(indent.repeat(level + 1));
+                    display(element, indent, level + 1, out);
+                }
+                out.append('\n').append(indent.repeat(level)).append(']');
+            }
+            // Every leaf, plus the two empty containers, which read better closed on one line.
+            default -> out.append(value);
+        }
+    }
+
+    /** Boxed because the object branch writes from inside a {@code forEach} lambda, where a local cannot be assigned. */
+    private static void separate(boolean[] first, StringBuilder out) {
+        if (first[0]) {
+            first[0] = false;
+        } else {
+            out.append(",\n");
+        }
+    }
 
     /** How this value names itself in a message: "an object", "a number", and so on. */
     private String kind() {

@@ -1,4 +1,4 @@
-package io.ltr8.tson.json;
+package io.ltr8.tson.json.tree;
 
 /**
  * RFC 8259 string quoting -- the write-side inverse of {@code JsonLexer}'s escape decoding, and the
