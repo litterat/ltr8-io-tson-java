@@ -6,7 +6,7 @@ package io.ltr8.tson.schema;
  * than tightens, a name in a {@code !} position resolving in neither namespace), linking (an unresolved
  * reference, a constructor declared by a schema no meta-kernel governs), or registration (a
  * malformed/non-canonical {@code !!id}, a duplicate identity). Unchecked, matching {@code LexException}/
- * {@code TsonParseException}'s own established shape elsewhere in this codebase.
+ * {@code ParseException}'s own established shape elsewhere in this codebase.
  *
  * <p><b>Not</b> a library gap -- that is {@code UnsupportedOperationException}, deliberately a different
  * type, because only this one is collected into a {@code Diagnostic} by the resolver's and linker's

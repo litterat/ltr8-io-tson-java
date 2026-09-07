@@ -937,6 +937,12 @@ the class and (where noted) pinned by a test; the `docs/` notes carry the full w
 - **Lexer multi-line closing-delimiter detection strips leading whitespace *before* comparing against
   `"""`.** Backwards, every multi-line token is spuriously "unterminated". Happened once; guarded by
   `LexerTest`.
+- **`Position` must keep the record's default `toString()`.** `ResolvedForm` -- shared by
+  `ResolvedFixtureTest` and the Class 2 schema suite -- normalises the `@Unbound` `position` component away
+  by regex over rendered text, `position=Optional\[Position\[[^\]]*\]\]`. Give the record a `toString()`
+  of its own and the pattern stops matching, positions stop being normalised, and seven fixtures diverge on
+  a component §8's resolved form has no field for. The coupling is the test's to loosen; until it is, the
+  record renders as records do.
 - **Never put literal BOM/NEL/LS/PS characters in source or tests** — use `\uXXXX` escapes; the invisible
   character is an editing hazard (§9.4's confusable risk).
 - **`CompiledReaders` is rebound exactly once, from the in-progress `Compilation` to the finished

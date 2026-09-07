@@ -155,7 +155,7 @@ class SchemalessValidationTest {
     /**
      * A stack trace still says where, so nothing is lost for the fail-fast caller.
      *
-     * <p>The exception is {@link ReadException}, not {@link TsonParseException}: a base-syntax failure
+     * <p>The exception is {@link ReadException}, not {@link ParseException}: a base-syntax failure
      * goes through the read's receiver like every other problem now, and for a fail-fast read the receiver
      * is what throws. The position survives the trip -- on the diagnostic, and appended by {@code toString}
      * for the trace -- which is the property this fixture is actually about.

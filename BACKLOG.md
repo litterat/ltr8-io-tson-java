@@ -77,6 +77,13 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
   most one field per composed chain carries the mark — the chain being countable since §5.8's restated-field
   rule merges annotations rather than dropping them, which this implementation already applies.
 
+- [ ] **`ResolvedForm` normalises the `position` component away by regex over rendered text.** The pattern is
+  `position=Optional\[Position\[[^\]]*\]\]`, which matches the record's *default* `toString()` -- so giving
+  `Position` a `toString()` of its own silently stops positions being normalised and diverges seven fixtures
+  on a component §8's resolved form has no field for. The model has the component (`@Unbound`, this
+  resolver's own) and the comparison should drop it structurally, before rendering, the way it already drops
+  `kind`. `CLAUDE.md`'s traps list carries the hazard meanwhile.
+
 ## JSON encoding
 
 [TSON-SCHEMA] §6 makes this a spec obligation rather than an interop nicety, and `meta.tn` states it directly: "No

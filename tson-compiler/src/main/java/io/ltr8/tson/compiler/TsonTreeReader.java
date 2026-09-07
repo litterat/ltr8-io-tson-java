@@ -440,7 +440,7 @@ public final class TsonTreeReader {
      * <p><b>The pull is the point, not the assertion.</b> {@link TsonDataStream} is lazy, and its root frame
      * is what rejects trailing content -- but only when something asks for an event past the root value. Drop
      * this call and {@code "{ a: 1 } junk"} reads clean. The {@code instanceof} check is then belt-and-braces:
-     * the pull itself throws {@code TsonParseException} first on any real document.
+     * the pull itself throws {@code ParseException} first on any real document.
      */
     private static void requireDocumentEnd(TsonReadContext ctx) {
         TsonEvent trailing = ctx.next();

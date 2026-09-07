@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.AbsentValue;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
@@ -188,11 +189,11 @@ public class TsonDataParser {
         return stream.expect(type, construct);
     }
 
-    TsonParseException parseError(String message) {
+    ParseException parseError(String message) {
         return stream.parseError(message);
     }
 
-    TsonParseException mismatch(String construct) {
+    ParseException mismatch(String construct) {
         return stream.mismatch(construct);
     }
 

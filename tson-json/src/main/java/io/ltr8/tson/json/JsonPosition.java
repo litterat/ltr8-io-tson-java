@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.SourcePosition;
 
 /**
@@ -20,7 +21,7 @@ import io.ltr8.tson.base.SourcePosition;
  */
 public record JsonPosition(int line, int column, int byteOffset) implements SourcePosition {
 
-    /** Renders as JEP 540's {@code JsonParseException} does, so a message reads the same in either API. */
+    /** Renders as JEP 540's {@code ParseException} does, so a message reads the same in either API. */
     @Override
     public String toString() {
         return "line " + line + ", position " + column;

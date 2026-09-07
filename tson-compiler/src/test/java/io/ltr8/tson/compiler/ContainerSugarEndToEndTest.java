@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.ReadException;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -370,7 +371,7 @@ class ContainerSugarEndToEndTest {
                 {"a.b", "U+002E at index 1 cannot appear in an identifier"},
                 {"42", "cannot start an identifier -- an identifier never begins with a digit or a sign"},
         }) {
-            TsonParseException thrown = assertThrows(TsonParseException.class,
+            ParseException thrown = assertThrows(ParseException.class,
                     () -> compile("  ok => { " + c[0] + ": text }"), c[0]);
             assertTrue(thrown.getMessage().contains("invalid field name"), thrown.getMessage());
             assertTrue(thrown.getMessage().contains(c[1]), thrown.getMessage());

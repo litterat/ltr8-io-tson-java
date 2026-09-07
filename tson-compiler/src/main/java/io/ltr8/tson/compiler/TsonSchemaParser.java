@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -86,7 +87,7 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     /**
      * Where a recovered parse's problems go, and the switch between the two modes: {@code null} (the
-     * {@link #parseSchemaDocument()} entry point) is fail-fast, and the first {@link TsonParseException}
+     * {@link #parseSchemaDocument()} entry point) is fail-fast, and the first {@link ParseException}
      * leaves this class. A receiver turns on the declaration-level recovery in {@link #parseSchemaMap}.
      */
     private DiagnosticsReceiver receiver;
@@ -117,7 +118,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         return new SchemaPositions(new IdentityHashMap<>(declarationPositions), new IdentityHashMap<>(fieldPositions));
     }
 
-    /** Parses fail-fast: the first syntax error anywhere in the document leaves as a {@link TsonParseException}. */
+    /** Parses fail-fast: the first syntax error anywhere in the document leaves as a {@link ParseException}. */
     public SchemaDocument parseSchemaDocument() {
         // Only recovery can empty this, and recovery needs a receiver, which this entry point never sets.
         return parseDocumentBody().orElseThrow();
@@ -218,7 +219,7 @@ public final class TsonSchemaParser extends TsonDataParser {
             try {
                 putDeclaration(declarations, parseDeclaration());
                 more = consumeSeparatorOrCloseCheck(TokenType.RBRACE);
-            } catch (TsonParseException e) {
+            } catch (ParseException e) {
                 if (receiver == null) {
                     throw e;
                 }
@@ -231,7 +232,7 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     /** Hands one recovered declaration's syntax error to {@link #receiver}, pointed at the declaration it was found in. */
-    private void report(TsonParseException e) {
+    private void report(ParseException e) {
         reported++;
         receiver.report(TsonDiagnostics.ofSchemaSyntaxError(schemaId, declarationInProgress, e));
     }
@@ -541,7 +542,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         List<GroupDef.Member> members = new ArrayList<>();
         members.add(parseGroupMember());
         if (!check(TokenType.PIPE)) {
-            throw new TsonParseException("a field group requires at least two members separated by '|' (§5.11)", start);
+            throw new ParseException("a field group requires at least two members separated by '|' (§5.11)", start);
         }
         while (check(TokenType.PIPE)) {
             advance();
@@ -604,7 +605,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         List<TypeRef> variants = new ArrayList<>();
         variants.add(parseTypeRef());
         if (!check(TokenType.PIPE)) {
-            throw new TsonParseException("a choice type requires at least two variants separated by '|' (§5.4)", start);
+            throw new ParseException("a choice type requires at least two variants separated by '|' (§5.4)", start);
         }
         while (check(TokenType.PIPE)) {
             advance();
@@ -833,7 +834,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         try {
             IdentifierParser.validate(t.text());
         } catch (AtomTypeException e) {
-            throw new TsonParseException("'" + t.text() + "' is not a valid type name -- " + e.getMessage(),
+            throw new ParseException("'" + t.text() + "' is not a valid type name -- " + e.getMessage(),
                     t.start());
         }
     }

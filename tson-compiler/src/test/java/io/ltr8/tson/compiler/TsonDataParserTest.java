@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.AbsentValue;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -44,7 +45,7 @@ class TsonDataParserTest {
 
     /** The parse error a source produces -- every §3.2 fixture asserts on the wording, not just the type. */
     private static String messageOf(String source) {
-        return assertThrows(TsonParseException.class, () -> parse(source)).getMessage();
+        return assertThrows(ParseException.class, () -> parse(source)).getMessage();
     }
 
     private static TokenValue token(DataValue v) {
@@ -127,7 +128,7 @@ class TsonDataParserTest {
 
     @Test
     void multilineTokenAsDirectiveArgumentIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("!!id:\"\"\"\nx\n\"\"\"\n_"));
+        assertThrows(ParseException.class, () -> parse("!!id:\"\"\"\nx\n\"\"\"\n_"));
     }
 
     @Test
@@ -136,17 +137,17 @@ class TsonDataParserTest {
         // across a gap, so this actually fails as "unexpected content", which is still correct:
         // it's not a valid document header either way. Use a directly-malformed but same-shape
         // case: colon not adjacent to the directive name.
-        assertThrows(TsonParseException.class, () -> parse("!!id :\"https://example.com/x.tn\"\n_"));
+        assertThrows(ParseException.class, () -> parse("!!id :\"https://example.com/x.tn\"\n_"));
     }
 
     @Test
     void unknownDirectiveNameInHeaderIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("!!bogus:\"x\"\n_"));
+        assertThrows(ParseException.class, () -> parse("!!bogus:\"x\"\n_"));
     }
 
     @Test
     void extraContentAfterRootValueIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("Alice Bob"));
+        assertThrows(ParseException.class, () -> parse("Alice Bob"));
     }
 
     // ── Directive arguments must be valid URIs (§3.3) ────────────────────
@@ -157,25 +158,25 @@ class TsonDataParserTest {
     @Test
     void idDirectiveArgumentMustBeAValidUri() {
         // An unescaped space is not valid anywhere in a URI.
-        assertThrows(TsonParseException.class, () -> parse("!!id:\"not a uri\"\n_"));
+        assertThrows(ParseException.class, () -> parse("!!id:\"not a uri\"\n_"));
     }
 
     @Test
     void schemaDirectiveArgumentInHeaderMustBeAValidUri() {
-        assertThrows(TsonParseException.class, () -> parse("!!schema:\"not a uri\" Alice"));
+        assertThrows(ParseException.class, () -> parse("!!schema:\"not a uri\" Alice"));
     }
 
     @Test
     void schemaDirectiveArgumentOnFieldValueMustBeAValidUri() {
-        assertThrows(TsonParseException.class, () -> parse("{ x: !!schema:\"not a uri\" 1 }"));
+        assertThrows(ParseException.class, () -> parse("{ x: !!schema:\"not a uri\" 1 }"));
     }
 
     @Test
     void metaDirectiveArgumentMustBeAValidUriEvenThoughTheDocumentIsRejectedEitherWay() {
-        // A malformed !!meta argument is a genuine TsonParseException, not merely "a well-formed
+        // A malformed !!meta argument is a genuine ParseException, not merely "a well-formed
         // schema document this processor doesn't support" -- TsonUnsupportedDocumentException requires the
         // directive itself to actually be well-formed first.
-        assertThrows(TsonParseException.class, () -> parse("!!meta:\"not a uri\" { }"));
+        assertThrows(ParseException.class, () -> parse("!!meta:\"not a uri\" { }"));
     }
 
     // ── Records ──────────────────────────────────────────────────────────
@@ -245,25 +246,25 @@ class TsonDataParserTest {
         RecordValue record = assertInstanceOf(RecordValue.class, root("{ x: 1, }").coreValue());
         assertEquals(1, record.fields().size());
 
-        assertThrows(TsonParseException.class, () -> parse("{ x: 1, , y: 2 }"));
-        assertThrows(TsonParseException.class, () -> parse("{ , x: 1 }"));
+        assertThrows(ParseException.class, () -> parse("{ x: 1, , y: 2 }"));
+        assertThrows(ParseException.class, () -> parse("{ , x: 1 }"));
     }
 
     @Test
     void zeroWidthSeparationBetweenFieldsIsParseError() {
         // "1" (unquoted) directly followed by "y" (unquoted) would just merge into one token, so
         // use adjacent quoted/brace values, which the lexer keeps as distinct tokens.
-        assertThrows(TsonParseException.class, () -> parse("{ a: \"x\"b: \"y\" }"));
+        assertThrows(ParseException.class, () -> parse("{ a: \"x\"b: \"y\" }"));
     }
 
     @Test
     void annotatedValueAsAttemptedFieldNameIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("{ @deprecated x: 1 }"));
+        assertThrows(ParseException.class, () -> parse("{ @deprecated x: 1 }"));
     }
 
     @Test
     void typedValueAsAttemptedFieldNameIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("{ !string x: 1 }"));
+        assertThrows(ParseException.class, () -> parse("{ !string x: 1 }"));
     }
 
     // ── Maps ─────────────────────────────────────────────────────────────
@@ -317,7 +318,7 @@ class TsonDataParserTest {
         MapValue map = assertInstanceOf(MapValue.class, root("{ a => 1, }").coreValue());
         assertEquals(1, map.entries().size());
 
-        assertThrows(TsonParseException.class, () -> parse("{ a => 1, , b => 2 }"));
+        assertThrows(ParseException.class, () -> parse("{ a => 1, , b => 2 }"));
     }
 
     // ── Arrays ───────────────────────────────────────────────────────────
@@ -375,31 +376,31 @@ class TsonDataParserTest {
         ArrayValue array = assertInstanceOf(ArrayValue.class, root("[1, 2, 3,]").coreValue());
         assertEquals(3, array.elements().size());
 
-        assertThrows(TsonParseException.class, () -> parse("[1, , 2]"));
-        assertThrows(TsonParseException.class, () -> parse("[, 1]"));
+        assertThrows(ParseException.class, () -> parse("[1, , 2]"));
+        assertThrows(ParseException.class, () -> parse("[, 1]"));
     }
 
     @Test
     void unterminatedArrayIsParseErrorNotHang() {
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(2),
-                () -> assertThrows(TsonParseException.class, () -> parse("[1, 2, 3")));
+                () -> assertThrows(ParseException.class, () -> parse("[1, 2, 3")));
     }
 
     @Test
     void unterminatedRecordIsParseErrorNotHang() {
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(2),
-                () -> assertThrows(TsonParseException.class, () -> parse("{ x: 1")));
+                () -> assertThrows(ParseException.class, () -> parse("{ x: 1")));
     }
 
     @Test
     void unterminatedNestedStructureIsParseErrorNotHang() {
         assertTimeoutPreemptively(java.time.Duration.ofSeconds(2),
-                () -> assertThrows(TsonParseException.class, () -> parse("{ x: [1 2")));
+                () -> assertThrows(ParseException.class, () -> parse("{ x: [1 2")));
     }
 
     @Test
     void zeroWidthSeparationInArrayIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("[{a:1}{b:2}]"));
+        assertThrows(ParseException.class, () -> parse("[{a:1}{b:2}]"));
     }
 
     @Test
@@ -434,7 +435,7 @@ class TsonDataParserTest {
 
     @Test
     void typeAnnotationMissingSpaceBeforeQuotedTokenIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("!int32\"5\""));
+        assertThrows(ParseException.class, () -> parse("!int32\"5\""));
     }
 
     @Test
@@ -482,7 +483,7 @@ class TsonDataParserTest {
 
     @Test
     void bangNotAdjacentToTypeNameIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("! person Alice"));
+        assertThrows(ParseException.class, () -> parse("! person Alice"));
     }
 
     // ── Annotations (§3.1) ───────────────────────────────────────────────
@@ -533,7 +534,7 @@ class TsonDataParserTest {
     @Test
     void nestedAnnotationValueScopeAloneIsIncomplete() {
         // §3.1: once @a's nested value consumes everything, the outermost level has no core-value.
-        assertThrows(TsonParseException.class, () -> parse("@a:@b:val target"));
+        assertThrows(ParseException.class, () -> parse("@a:@b:val target"));
     }
 
     @Test
@@ -552,19 +553,19 @@ class TsonDataParserTest {
     @Test
     void annotationCannotItselfBeAValueSpecExample() {
         // Spec §3.1's own error example.
-        assertThrows(TsonParseException.class, () -> parse("{ x: @a:@b:val }"));
+        assertThrows(ParseException.class, () -> parse("{ x: @a:@b:val }"));
     }
 
     @Test
     void atNotAdjacentToAnnotationNameIsParseError() {
-        assertThrows(TsonParseException.class, () -> parse("@ deprecated GOLD"));
+        assertThrows(ParseException.class, () -> parse("@ deprecated GOLD"));
     }
 
     @Test
     void colonNotAdjacentToAnnotationNameFallsThroughToValuelessThenFails() {
         // "@foo : bar" -- no adjacent ':', so @foo is valueless (whitespace satisfies the
         // trailing-whitespace rule), leaving a bare ':' token where a core-value is expected.
-        assertThrows(TsonParseException.class, () -> parse("@foo : bar"));
+        assertThrows(ParseException.class, () -> parse("@foo : bar"));
     }
 
     @Test
@@ -572,7 +573,7 @@ class TsonDataParserTest {
         // "@foo(" -- no value (':' not adjacent... there is none at all), and no whitespace
         // before the next token either (a reserved special token, but that's a separate error;
         // this specifically must fail on the missing-whitespace rule first).
-        assertThrows(TsonParseException.class, () -> parse("{ x: @foo\"bar\" }"));
+        assertThrows(ParseException.class, () -> parse("{ x: @foo\"bar\" }"));
     }
 
     // ── !!schema on scoped values (§2.3, §3.3) ──────────────────────────
@@ -596,17 +597,17 @@ class TsonDataParserTest {
 
     @Test
     void otherDirectiveNamesInScopedValuePositionAreParseErrors() {
-        assertThrows(TsonParseException.class, () -> parse("{ x: !!id:\"https://example.com/x.tn\" 1 }"));
+        assertThrows(ParseException.class, () -> parse("{ x: !!id:\"https://example.com/x.tn\" 1 }"));
     }
 
     @Test
     void directivesNotPermittedBeforeMapKey() {
-        assertThrows(TsonParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn\" k => 1 }"));
+        assertThrows(ParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn\" k => 1 }"));
     }
 
     @Test
     void directivesNotPermittedBeforeFieldName() {
-        assertThrows(TsonParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn\" x: 1 }"));
+        assertThrows(ParseException.class, () -> parse("{ !!schema:\"https://example.com/s.tn\" x: 1 }"));
     }
 
     // ── Full example document (adapted from spec §2.1) ──────────────────
@@ -724,7 +725,7 @@ class TsonDataParserTest {
     @ValueSource(strings = {"!42x 1", "!-t 1", "!x.y 1", "@42x:1 v", "@x.y:1 v", "@-note 1"})
     @ParameterizedTest
     void aNameOutsideTheIdentifierProfileIsAParseError(String source) {
-        assertThrows(TsonParseException.class, () -> parse(source));
+        assertThrows(ParseException.class, () -> parse(source));
     }
 
     /** The ordinary names either position takes are untouched, {@code -} included. */
@@ -742,8 +743,8 @@ class TsonDataParserTest {
      */
     @Test
     void aMultiLineTokenIsNotAFieldName() {
-        assertThrows(TsonParseException.class, () -> parse("{" + MULTI_LINE + ": 1}"));
-        assertThrows(TsonParseException.class, () -> parse("{b: 1 " + MULTI_LINE + ": 2}"));
+        assertThrows(ParseException.class, () -> parse("{" + MULTI_LINE + ": 1}"));
+        assertThrows(ParseException.class, () -> parse("{b: 1 " + MULTI_LINE + ": 2}"));
     }
 
     /** A multi-line token stays an ordinary map key, which is a value and not a name (§2.6). */
@@ -764,7 +765,7 @@ class TsonDataParserTest {
         RecordValue record = assertInstanceOf(RecordValue.class, root("{\"order-id\": 1}").coreValue());
         assertEquals("order-id", record.fields().get(0).name());
 
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> root("{\"first name\": 1}"));
+        ParseException thrown = assertThrows(ParseException.class, () -> root("{\"first name\": 1}"));
         assertTrue(thrown.getMessage().contains("invalid field name"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("belongs in a map"), thrown.getMessage());
     }

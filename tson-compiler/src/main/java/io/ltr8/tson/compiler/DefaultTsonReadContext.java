@@ -1,12 +1,9 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.UnicodePolicy;
-import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.*;
 import io.ltr8.tson.compiler.atom.IdentifierParser;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
-import io.ltr8.tson.base.SourcePosition;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -172,7 +169,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * <p><b>Here rather than in {@code TsonDataStream}, because a refusal needs a receiver.</b> §8.2 makes a
      * restricted-character failure a policy refusal: the document is not invalid, it is refused by this processor
      * under a policy reading data the UCD does not freeze, and it MUST NOT be reported in any of §8.1's four
-     * categories. The stream throws {@link TsonParseException} and holds no receiver, so a check there can
+     * categories. The stream throws {@link ParseException} and holds no receiver, so a check there can
      * only say "invalid", which is the one thing this is not. The grammar stays there, where a failure
      * really is a parse error ({@code IdentifierParser.validate}), and the policy is applied here.
      *

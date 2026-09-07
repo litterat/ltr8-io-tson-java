@@ -1,7 +1,7 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.json.JsonParseException;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonStream;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -52,13 +52,13 @@ class DataClassObjectReaderTest {
         // document still cannot end early.
         JsonStream events = new JsonStream("{\"name\": \"Ada\", \"age\": 36} 99");
         assertEquals(new Person("Ada", 36), ENGINE.read(events, Person.class));
-        assertTrue(assertThrows(JsonParseException.class, events::next)
+        assertTrue(assertThrows(ParseException.class, events::next)
                 .getMessage().contains("this one is complete"));
     }
 
     @Test
     void a_failure_inside_the_value_still_reaches_the_caller() {
         JsonStream events = new JsonStream("{\"name\": ]}");
-        assertThrows(JsonParseException.class, () -> ENGINE.read(events, Person.class));
+        assertThrows(ParseException.class, () -> ENGINE.read(events, Person.class));
     }
 }

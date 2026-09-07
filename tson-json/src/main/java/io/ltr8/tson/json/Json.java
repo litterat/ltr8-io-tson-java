@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
@@ -45,12 +46,12 @@ public final class Json {
 
     // ── Parsing ──────────────────────────────────────────────────────────
 
-    /** @throws JsonParseException if the document is not JSON within §3.1's profile */
+    /** @throws ParseException if the document is not JSON within §3.1's profile */
     public static JsonValue parse(String source) {
         return parse(new JsonStream(source));
     }
 
-    /** @throws JsonParseException if the document is not JSON within §3.1's profile */
+    /** @throws ParseException if the document is not JSON within §3.1's profile */
     public static JsonValue parse(String source, int maxDepth) {
         return parse(new JsonStream(source, maxDepth));
     }
@@ -115,7 +116,7 @@ public final class Json {
                 // §3.1, and JEP 540 for the same reason: RFC 8259's "SHOULD be unique" leaves an object
                 // whose meaning depends on which member a reader kept, and §10.2 makes the divergence an
                 // attack -- two `$type` members, one seen by a filter and the other by the decoder.
-                throw new JsonParseException(
+                throw new ParseException(
                         "'%s' is already a member of this object, and a member name appears once"
                                 .formatted(name.name()), name.position());
             }

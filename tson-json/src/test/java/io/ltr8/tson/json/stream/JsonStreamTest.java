@@ -2,7 +2,7 @@ package io.ltr8.tson.json.stream;
 
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.LimitsPolicy;
-import io.ltr8.tson.json.JsonParseException;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -55,8 +55,8 @@ class JsonStreamTest {
         };
     }
 
-    private static JsonParseException refused(String source) {
-        return assertThrows(JsonParseException.class, () -> events(source));
+    private static ParseException refused(String source) {
+        return assertThrows(ParseException.class, () -> events(source));
     }
 
     @Nested
@@ -249,7 +249,7 @@ class JsonStreamTest {
             // later edit that makes one extend the other.
             LimitExceededException e = assertThrows(LimitExceededException.class,
                     () -> events(nested(65)));
-            assertFalse(JsonParseException.class.isAssignableFrom(e.getClass()));
+            assertFalse(ParseException.class.isAssignableFrom(e.getClass()));
         }
 
         @Test
@@ -355,7 +355,7 @@ class JsonStreamTest {
             JsonStream stream = new JsonStream("[1, +2]");
             stream.next();
             stream.next();
-            assertTrue(assertThrows(JsonParseException.class, stream::next).getMessage().contains("'+'"));
+            assertTrue(assertThrows(ParseException.class, stream::next).getMessage().contains("'+'"));
         }
     }
 }

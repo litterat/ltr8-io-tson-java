@@ -2,7 +2,7 @@ package io.ltr8.tson.json.stream;
 
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.LimitsPolicy;
-import io.ltr8.tson.json.JsonParseException;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
 import io.ltr8.tson.json.lexer.JsonLexer;
 import io.ltr8.tson.json.lexer.JsonTokenType;
@@ -317,8 +317,8 @@ public final class JsonStream implements JsonEventSource {
      * "a member name is due" tells an author what to write where "expected STRING" tells them what a
      * lexer calls the thing they did write. {@code TsonSchemaParser} makes the same choice.
      */
-    private static JsonParseException unexpected(JsonTokenType found, JsonPosition at, String expected) {
-        return new JsonParseException("%s, and %s is not one".formatted(expected, describe(found)), at);
+    private static ParseException unexpected(JsonTokenType found, JsonPosition at, String expected) {
+        return new ParseException("%s, and %s is not one".formatted(expected, describe(found)), at);
     }
 
     private static String describe(JsonTokenType type) {

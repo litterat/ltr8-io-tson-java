@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.base.LimitExceededException;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.atom.AtomParseException;
@@ -80,7 +81,7 @@ import java.util.Optional;
  *       token of lookahead settles it. A document that's actually malformed here (e.g. an
  *       annotated key immediately followed by {@code :} instead of {@code =>}) still commits to
  *       {@link MapStart} at this point; the mismatch surfaces one token later instead, at the
- *       point {@code =>} is expected -- a {@link TsonParseException} either way, just anchored to
+ *       point {@code =>} is expected -- a {@link ParseException} either way, just anchored to
  *       a slightly later token than a full first-value-then-decide parse would report.
  *   <li>{@code {}} followed by a bare token needs exactly one more token of lookahead: if {@code
  *       :} comes next it's a record field name; if {@code =>} comes next it's a map key that
@@ -266,7 +267,7 @@ public final class TsonDataStream implements TsonEventSource {
                     return new TsonDocumentHeader(id, Optional.of(parseNamedDirective("schema")), Optional.empty());
                 }
             }
-        } catch (TsonParseException | LexException e) {
+        } catch (ParseException | LexException e) {
             // Not this method's verdict to give -- see above.
         }
         return new TsonDocumentHeader(id, Optional.empty(), Optional.empty());
@@ -397,14 +398,14 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /** The failure {@link #expect} raises, for a throw site that decides on more than one token's type. */
-    TsonParseException mismatch(String construct) {
-        return new TsonParseException("expected " + construct + ", found " + describe(peekToken()),
+    ParseException mismatch(String construct) {
+        return new ParseException("expected " + construct + ", found " + describe(peekToken()),
                 construct, describe(peekToken()), peekToken().start());
     }
 
     /** A parse failure that states a rule rather than a substitution, so it carries no {@code expected}/{@code actual} pair. */
-    TsonParseException parseError(String message) {
-        return new TsonParseException(message, peekToken().start());
+    ParseException parseError(String message) {
+        return new ParseException(message, peekToken().start());
     }
 
     /**
@@ -478,7 +479,7 @@ public final class TsonDataStream implements TsonEventSource {
         try {
             IdentifierParser.validate(name.text());
         } catch (AtomTypeException e) {
-            throw new TsonParseException("invalid " + role + " -- " + e.getMessage(), name.start());
+            throw new ParseException("invalid " + role + " -- " + e.getMessage(), name.start());
         }
     }
 
@@ -564,7 +565,7 @@ public final class TsonDataStream implements TsonEventSource {
         try {
             UriParser.UNCONSTRAINED.read(new TokenValue(arg.text(), TokenForm.SINGLE_LINE_QUOTED));
         } catch (AtomParseException e) {
-            throw new TsonParseException(
+            throw new ParseException(
                     "'!!" + expectedName + "' argument '" + arg.text() + "' is not a valid URI (§3.3)", arg.start());
         }
         return arg.text();
@@ -646,7 +647,7 @@ public final class TsonDataStream implements TsonEventSource {
         try {
             IdentifierParser.validate(Nfc.of(name.text()));
         } catch (AtomTypeException e) {
-            throw new TsonParseException("invalid field name -- " + e.getMessage()
+            throw new ParseException("invalid field name -- " + e.getMessage()
                     + ". A record's fields are names a schema can declare; a key that is not a name belongs in "
                     + "a map, written '{ key => value }'", name.start());
         }

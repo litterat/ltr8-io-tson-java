@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Field;
@@ -292,7 +293,7 @@ class JsonObjectReaderTest {
 
         @Test
         void trailing_content_is_refused_because_the_source_is_drained() {
-            assertTrue(assertThrows(JsonParseException.class,
+            assertTrue(assertThrows(ParseException.class,
                     () -> READER.read("{\"name\": \"a\", \"age\": 1} 2", Person.class))
                     .getMessage().contains("this one is complete"));
         }
@@ -318,7 +319,7 @@ class JsonObjectReaderTest {
         void a_document_that_is_not_json_fails_as_a_parse_rather_than_a_bind() {
             // The two exceptions answer different questions: "this is not JSON" against "this is not my
             // JSON", and a caller routes on which it caught.
-            assertThrows(JsonParseException.class, () -> READER.read("{\"name\": }", Person.class));
+            assertThrows(ParseException.class, () -> READER.read("{\"name\": }", Person.class));
         }
     }
 }
