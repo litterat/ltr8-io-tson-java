@@ -8,7 +8,6 @@ import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -88,17 +87,17 @@ public final class Tson {
     private final TsonCompiledSchemaRegistry bind;
     private final DataBindContext dataBindContext;
 
-    /** UTS #39 §5.2 over every token a read off this instance pulls -- the token-surface half of the
-     * two policies, where {@code core.identifierPolicy()} is the declared-name half. */
-    private final UnicodePolicy tokenPolicy;
-
-    /** [TSON-DATA] §9.1's bounds every read off this instance applies -- {@link TsonConfig#limits}. */
-    private final LimitsPolicy limits;
+    /**
+     * What this instance will admit as a name and spend on a document -- {@link TsonConfig#processorPolicy},
+     * held whole rather than as its three components. The core is handed the identifier half at
+     * construction, since the linker judges declared names; this stays the one statement of the policy, so
+     * reporting it is an accessor rather than a reassembly of values living in three places.
+     */
+    private final ProcessorPolicy policy;
 
     Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext, boolean strictBinding,
-         UnicodePolicy tokenPolicy, LimitsPolicy limits) {
-        this.tokenPolicy = tokenPolicy;
-        this.limits = limits;
+         ProcessorPolicy policy) {
+        this.policy = policy;
         this.core = core;
         this.dataBindContext = dataBindContext;
         this.tree = TsonCompiledSchemaRegistry.tree(core);
@@ -162,7 +161,7 @@ public final class Tson {
      * itself ({@link TsonTreeReader#processorPolicy()}).
      */
     public ProcessorPolicy processorPolicy() {
-        return ProcessorPolicy.of(core.identifierPolicy(), tokenPolicy, limits);
+        return policy;
     }
 
     /**
@@ -176,7 +175,7 @@ public final class Tson {
      * a limit says nothing about what this processor admits as a name.
      */
     public LimitsPolicy limitsPolicy() {
-        return limits;
+        return policy.limits();
     }
 
     /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/{@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBindContext} to customize it. */

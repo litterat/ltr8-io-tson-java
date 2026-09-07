@@ -48,6 +48,14 @@ import java.util.Objects;
  * identifier profile and no scope to be distinct within. A deployment that has relaxed one has said nothing
  * about the other, which is exactly why both are stated.
  *
+ * <p><b>Which is why the token policy may not be per-segment, and why that is refused here.</b> {@code _}
+ * and {@code -} are word separators by convention in a name and ordinary characters in a value, so
+ * segmenting a value admits UTS #39's own {@code Toys-Я-Us} -- the spoof a strict token policy exists to
+ * refuse. It is a property of what a token policy can <em>mean</em>, not of any one way of stating one, so
+ * it is enforced on the value: every route that assembles a policy passes through this constructor, where a
+ * check on each named setter is a check each new route has to remember. The identifier surface is
+ * unaffected, per-segment being exactly where it means something.
+ *
  * <p>The components are named for the {@code TsonConfig} settings they report, so a configuration and the
  * report it produces are one vocabulary and one grep.
  *
@@ -72,6 +80,10 @@ public record ProcessorPolicy(UnicodePolicy identifierPolicy, UnicodePolicy toke
         Objects.requireNonNull(tokenPolicy, "tokenPolicy");
         Objects.requireNonNull(limits, "limits");
         Objects.requireNonNull(unicodeDataVersion, "unicodeDataVersion");
+        if (tokenPolicy.isPerSegment()) {
+            throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
+                    + "characters in a value, not word separators -- use the whole-text policy instead");
+        }
     }
 
     /**

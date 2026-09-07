@@ -181,14 +181,11 @@ public final class TsonTreeReader {
      * @throws IllegalArgumentException if {@code policy} is per-segment. {@code _} and {@code -} are word
      *         separators by convention in a name and ordinary characters in a value, so segmenting one admits
      *         UTS #39's own {@code Toys-Я-Us} -- the spoof a strict token policy exists to refuse. Refused
-     *         rather than ignored, so a policy that cannot mean what it says is never silently accepted.
+     *         rather than ignored, so a policy that cannot mean what it says is never silently accepted;
+     *         {@link ProcessorPolicy} is where the refusal lives, so every route to one refuses it alike
      */
     public TsonTreeReader withTokenPolicy(UnicodePolicy tokenPolicy) {
         Objects.requireNonNull(tokenPolicy, "tokenPolicy");
-        if (tokenPolicy.isPerSegment()) {
-            throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
-                    + "characters in a value, not word separators -- use the whole-text policy instead");
-        }
         return new TsonTreeReader(tree, receiver, schemaUri, schemaless,
                 policy.withTokenPolicy(tokenPolicy));
     }

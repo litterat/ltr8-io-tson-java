@@ -32,8 +32,9 @@ and its three name-hygiene mechanisms). Both have to be reader axes rather than 
 surface they guard includes the standalone schemaless constructors, which hold no registry at all — and a
 Class 1 read is exactly where a value arrives least constrained.
 
-**A `Tson` applies both to every reader it makes**, from `TsonConfig.tokenPolicy` and
-`TsonConfig.identifierPolicy` — the latter riding the registry to the linker *as well*, so a schema's declared
+**A `Tson` applies both to every reader it makes**, from the one `TsonConfig.processorPolicy` it was built
+with (`identifierPolicy`/`tokenPolicy`/`limits` are its components, each deriving from what is already
+stated) — the identifier half riding the registry to the linker *as well*, so a schema's declared
 names and a document's own type-ref and annotation names are judged under one setting. They are one processor,
 and `Tson.processorPolicy()` reports one answer for it, which is only true if one answer is what both ends
 use: a configured identifier policy that reached the linker alone would make that report name a policy no read
