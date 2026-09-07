@@ -229,85 +229,50 @@ Concrete items and decisions:
 
 ### JSON compatibility
 
-**This section is now the whole of it.** The notation no longer claims to be a JSON superset — §6 says so
-outright, and the JSON-compatibility principle is gone from §1.2 — so reading JSON is a reader's job rather
-than a property of the grammar, which is what the items below already assumed. Nothing here weakens; what changes is that a
-`TsonJsonParser` is the only place JSON compatibility lives, and it is free to map JSON's constructs rather
-than having to agree with TSON's by construction.
+**This is Part 3's now, and `docs/json-encoding.md` holds the design.** [TSON-JSON]
+(`spec/tson-part3-json.md`) is the normative JSON interoperability surface of the series, `tson-json` its
+implementation, and `BACKLOG.md`'s "JSON encoding" section the engineering list. What stays here is the part
+those do not cover: why this matters to *this* document's target use case, and the one design question still
+genuinely open.
 
-Worth calling out as arguably the **most immediately practical** path to Tier 1, not just a nice
-interop feature: most LLM APIs' own "JSON mode"/"structured output"/tool-use features (OpenAI,
-Anthropic, Gemini) constrain generation to plain JSON today, not to an arbitrary custom format —
-Tier 2 native-TSON constrained decoding is a real future direction, but TSON's stronger validation
-could apply to *today's* LLM output the moment JSON documents can be read against a TSON schema at
-all, with no decoder integration required.
+**It is arguably the most immediately practical path to Tier 1.** Every major LLM API's structured-output
+feature — OpenAI, Anthropic, Gemini — constrains generation to plain JSON today, not to an arbitrary custom
+format. Tier 2 native-TSON constrained decoding is a real future direction, but TSON's stronger validation
+applies to *today's* model output the moment a JSON document can be read against a TSON schema, with no
+decoder integration at all. It is the same reader the broader on-ramp needs — a JSON Schema or OpenAPI
+contract converted to a TSON schema, validating documents already in flight unchanged — so the two use cases
+fund one piece of work. `docs/json-encoding.md` states that goal and what it rules out of a converted schema.
 
-- [ ] **A dedicated JSON parser (RFC 8259), not a restricted mode of the TSON lexer** — JSON's
-  grammar (double-quote-only strings with a fixed, narrower escape set; no multi-line/unquoted
-  tokens; a single unified number grammar) is different enough from TSON's own that toggling
-  options on the existing `Lexer`/`TsonDataParser` isn't the right shape. A small, separate parser
-  (naming per this project's own `Tson`-prefix convention — `JsonParser` is exactly the kind of
-  bare name a consumer plausibly already has, e.g. Jackson/Gson/org.json all ship one, so this
-  would be `TsonJsonParser`) that produces the *same* `DataValue`/`CoreValue` AST
-  `TsonDataParser` does is what lets everything downstream — resolution, the compiled Class 2
-  reader stack — be reused completely unchanged.
-- [ ] **Duplicate object member names: the fork has closed, and the JSON front-end should inherit
-  deliberately rather than by accident.** TSON §2.5/§2.6 now reject duplicates outright, with the diagnostic
-  at the repeated occurrence, and this implementation does (last-value-wins survives only as the recovery
-  underneath). JEP 540 lands in the same place for JSON and argues it at length: duplicates are an
-  unconditional parse error, on the grounds that RFC 8259's "SHOULD be unique" leaves an ambiguous object
-  whose "behavior of software that receives such an object is unpredictable", citing RFC 9413 on robust
-  protocols, and betting the 2013-era documents that motivated the leniency have since been fixed. So a
-  `TsonJsonParser` producing the same `DataValue`/`CoreValue` AST inherits the right rule by default — what
-  remains is to assert it, since the agreement is now load-bearing for the case that matters: reading JSON
-  *against a TSON schema*, where accepting a duplicate would validate a document the JDK's own parser
-  rejects.
+**Two of this section's former items were wrong by Revision 35**, and both were load-bearing assumptions
+rather than details:
 
-- [ ] **A JSON object whose keys are not valid TSON *identifiers* still reads as a record, and fails only
-  against a schema.** JSON keys are arbitrary strings: `{"first name": 1}`, `{"": 1}`, `{"42": 1}` are all
-  well-formed JSON objects, and none of those keys is a TSON identifier under [TSON-DATA] §7.7's profile.
-  That costs the JSON front end nothing at Class 1, because §2.5 deliberately leaves `field-name` lexical —
-  the object is an ordinary record and no routing decision is needed. It surfaces only
-  under a schema, where no declared field can carry such a name, so the field is `UNRECOGNIZED_FIELD`: an
-  ordinary validation mismatch reported at the field, not a parse failure. The thing to get right in
-  `TsonJsonParser` is therefore nothing at all — which is the point of recording it, since the tempting
-  alternative (routing such objects to maps at parse time) would produce a different and worse diagnostic for
-  the same document.
+- **A JSON object whose keys are not identifiers no longer "reads as a record and fails only against a
+  schema".** That rested on §2.5 leaving `field-name` lexical, which Revision 35 withdrew: a field name is an
+  identifier at every layer. `{"first name": 1}` is now refused where the name is read, not reported as
+  `UNRECOGNIZED_FIELD` later — a much harder wall, and the largest single obstacle to the on-ramp.
+  `docs/json-encoding.md` has the consequences; `SPEC-FEEDBACK.md` #5 states the proposal.
+- **A JSON front end producing the same `DataValue`/`CoreValue` AST is not the shape.** `tson-json` is a
+  stack of its own; `docs/json-encoding.md` and `CLAUDE.md`'s "Not yet implemented" carry the two
+  disagreements that decide it. Duplicate member names and JSON `null`-as-absence, which that plan got right,
+  are §3.1 and §7 now — the implementation's obligations rather than this document's open questions.
 
-- [ ] **JSON `null` reads as the string `"null"` everywhere, and the JSON front end is where that is fixed.**
-  The notation has no `null`: §4 resolves boolean, number and string, so an unquoted `null` is the four-character
-  string at every position, a `void`-typed one included. A JSON-shaped `"nickname": null` aimed at an OPTIONAL
-  `text?` field therefore satisfies the `text` contract and lands as that string, where an LLM emitting it means
-  absence. This is the one place JSON's two states (present / `null`) and TSON's two (omitted / `_`) fail to line
-  up in the direction that matters here, and it is deliberately not papered over in the notation: `TsonJsonParser`
-  is where the mapping belongs, and it maps JSON `null` to **absence** in the model, leaving the position's own
-  state to decide whether absence is admitted — which is the answer for an optional field and a loud
-  `FIELD_REQUIRED` for a required one, both of which are what the emitter meant. What still wants deciding is
-  narrower than it was: whether the front end ever needs an opt-out (a schema that really wants the string), and
-  what it does at a position typed `(T | void)`, where absence is a variant rather than a state.
+- [ ] **The real sharp edge: untagged unions, and two candidate answers.** Native TSON data
+  self-announces a union member with `!typeName value` — the type-ref *is* the discriminator (see "Target use
+  case" above) — and bare JSON has no such mechanism. [TSON-JSON] §8.2 lets a tag be omitted by exactly two
+  routes and forbids extending them ("no trying variants in order", which is how JSON Schema validates a
+  `oneOf`): a declared discriminator, or a disjoint choice whose variants are class-stable. So an untagged
+  `oneOf` over object schemas — all brace class, hence non-disjoint — is unresolvable, and it is precisely
+  what an LLM emitting against a converted contract produces.
 
-- [ ] **Numeric compatibility is one-directional and already free on read.** Every valid JSON
-  number is a valid TSON number, so JSON numbers parse through `NumberGrammar`/`BaseTypeResolver`
-  with no changes needed. The reverse isn't true: TSON-only extensions (hex/binary/octal
-  `based-integer`s, `_` digit separators, `.nan`/`.inf` special float values) have no JSON
-  equivalent — irrelevant for *reading* JSON (JSON simply can't produce them), but they matter for
-  a JSON *writer* (see below) and for deciding whether a given TSON value is JSON-representable at
-  all.
-- [ ] **Object → record-vs-map disambiguation should already fall out of schema-position-driven
-  dispatch** — `RecordBindReader`/`MapBindReader` already dispatch by the *schema's* own declared
-  type at that position, not by data syntax, so a JSON `{}` reaching a record-typed field vs. a
-  map-typed field should already resolve correctly through the existing machinery. Needs
-  confirming against the new JSON front-end with real tests, not a new mechanism.
-- [ ] **The real sharp edge: untagged unions.** Native TSON data can self-announce a union member
-  via `!typeName value` (the type-ref *is* the discriminator — see "Target use case" above); bare
-  JSON has no such mechanism. A `choice`/union-typed field reached from JSON input is unresolvable
-  unless either (a) the schema simply avoids bare unions in JSON-facing positions — part of what
-  makes a schema "restricted" enough to validate JSON at all, in the user's own phrasing — or (b) a
-  discriminator-field convention is added (mirroring OpenAPI's `discriminator.propertyName` /
-  JSON Schema's informal `discriminator` keyword), letting a schema author designate one field as
-  the union-branch selector for JSON-only consumption. A real design decision, not just an
-  implementation detail.
-  - **The user's own proposed shape for (b), discussed 2026-07-29 while designing
+  **Two designs are in play and neither supersedes the other yet.** `@discriminator` ([TSON-SCHEMA] §6,
+  `meta.tn`) is the mechanism in place: an annotation naming a field pinned `REQUIRED_FIXED` and pairwise
+  distinct in every variant, with the value→variant mapping derived from the pins rather than declared. It
+  has never had a consumer — TSON text tags natively and never dispatches on a member — so this encoding is
+  its first, and whether dispatch on a flat pinned field carries the cases JSON actually presents is an open
+  question rather than a settled one. Against it stands the dependent-typing shape below, which reaches the
+  same place through the enum rather than through an annotation. `BACKLOG.md` tracks the implementation;
+  what belongs here is the pairing.
+  - **The dependent-typing alternative, from designing
     `ltr8-io-tson-test-suite`'s own sidecar-format schemas (see `BACKLOG.md`'s "Conformance test
     suite" section for the concrete case that surfaced it) — dependent typing at the meta-schema
     level.** Rather than the discriminator field's own *name* doing the selecting (a field group,
@@ -326,19 +291,16 @@ all, with no decoder integration required.
     shape of `enum`'s own constructor needing to carry a per-member type association, plus resolver
     support for reading a field's type dependently), not a `DefinitionResolver` bug fix — not
     designed or scoped beyond this note yet.
-- [ ] **A "is this schema/type JSON-compatible" check**, surfaced during linking (or as a property
-  on `TypeDefinition`) — so a schema author can tell which parts of their schema can validate JSON
-  input at all, given the union-tagging and numeric-extension limits above, rather than discovering
-  it only when a real JSON document fails to bind for an unclear reason.
 - [ ] **Converting a JSON Schema to a TSON schema is a manual/guided process, not an automated
   converter** — JSON Schema's looser semantics (`additionalProperties`, `patternProperties`,
   `if`/`then`/`else`, non-normative `format`, `$ref` cycles) don't map 1:1 onto TSON's stricter
   model, so a faithful automatic converter is its own separate, much larger, questionable-value
   effort — not proposed here. What would genuinely help: a documented mapping reference (JSON
   Schema keyword → the nearest TSON construct, and which JSON Schema features have no honest TSON
-  equivalent at all) to guide a human doing the conversion by hand. A human converting *from* JSON
-  Schema naturally lands in the JSON-compatible subset described above anyway, since they have no
-  reason to reach for TSON-only extensions their source schema never had.
+  equivalent at all) to guide a human doing the conversion by hand. What such a reference has to be honest
+  about is the six places where the conversion costs the *producer* a change, not merely the author one:
+  `docs/json-encoding.md` lists them, and a converter that lands outside that profile produces a schema whose
+  documents have to be rewritten — the one outcome the exercise exists to avoid.
 - [ ] A JSON *writer* (TSON data → valid JSON text) is the natural write-direction companion to
   this whole section — tracked alongside the general schema-aware writer in `BACKLOG.md`'s "Write
   side" rather than designed separately here.

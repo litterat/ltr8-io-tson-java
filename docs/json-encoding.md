@@ -4,6 +4,110 @@ Design notes for `tson-json` — the implementation of [TSON-JSON] (`spec/tson-p
 encoding of the TSON schema system. Current form only; history lives in git. `CLAUDE.md` holds the
 one-paragraph orientation; this file holds the detail.
 
+## What this is for, and what it constrains
+
+The target is an **on-ramp**: someone holds a JSON Schema or an OpenAPI contract, converts it to a TSON
+schema, and their existing JSON documents validate against it **unchanged**. Not "JSON that has been adjusted
+for TSON" — the documents already in flight, byte for byte. That is the test the encoding has to pass before
+any of its other virtues matter, because a format that asks a producer to change first has already lost the
+audience it was converting for. §1.3's principle 2 is the same commitment from the spec's side: the common
+case encodes to JSON "with no TSON-specific apparatus at all".
+
+The goal is a real constraint, not a slogan: it decides what a converted schema may contain. A converter that
+emits a schema outside the profile below produces one whose documents have to be rewritten, which is the one
+outcome the exercise exists to avoid.
+
+### What a converted schema will not contain
+
+Each of these is a shape TSON has and a converted schema cannot reach — either because JSON Schema has no
+source for it, or because reaching it would break documents already on the wire.
+
+- **Non-text map keys.** JSON Schema's `additionalProperties`/`patternProperties` are string-keyed, so
+  `{K => V}` with a compound `K` never arises. §6.5's **pairs form is therefore unreachable**, and with it one
+  of §8.3's two class-stability leaks.
+- **Annotations on data values.** No JSON carrier exists (§4.3) and JSON Schema has no source for one, so the
+  encode-side refusal never fires. It stays implemented, for values that arrive from the text encoding.
+- **Approximate atoms admitting the special values.** `.nan` and the infinities encode as JSON *strings*
+  (§5.4) and no JSON document carries one, JSON having no spelling for them. A converted `type: number`
+  should narrow `allow_nan`/`allow_infinity` to false — which closes §8.3's other leak, so **every type in a
+  converted schema is class-stable** and §8.2's route 2 is available wherever the choice is disjoint.
+- **Scoped positions.** `dynamic`/`extern` require an annotation object naming the type (§5.7, §8.5), which
+  existing JSON does not carry. `additionalProperties: true` converts to the recursive `json` choice of §5.7,
+  which is tag-free, never to `dynamic`.
+- **In-band root binding.** Existing JSON has no `$schema`/`$type`, so the root binds by §3.4's out-of-band
+  route — "the expected production route" in the spec's own words. `BACKLOG.md` carries the front-door and
+  CLI surface that owes.
+
+And two shapes that look like they belong on that list and do not: **tuples** convert from `prefixItems` and
+are ordinary JSON arrays, and **defaults** convert and inject on decode (§6.1.3), so a document omitting a
+defaulted member reads. Neither is friction.
+
+### Where the on-ramp actually breaks
+
+These are the ones that cost a producer a change, ordered by how often real JSON hits them. They are the
+work, and the first is the largest single obstacle to the stated goal.
+
+1. **A member name that is not an identifier.** `user-name`, `2fa_enabled`, `@type`, `first name`, `""` — all
+   ordinary JSON, none a TSON field name. This is [TSON-DATA] §7.7's **grammar**, not §8.2's policy, so no
+   configuration reaches it and no relaxation exists: kebab-case, JSON-LD's `@`-prefixed keys and OpenAPI's
+   own `x-` extensions are simply unspellable as declared fields. The two available answers are both bad —
+   collect them into an `@rest` map, which discards the typing that was the point of converting, or refuse.
+   A projection annotation binding a wire spelling to a declared field would fit [TSON-SCHEMA] §6's licence
+   exactly, on `@rest`'s own precedent; `SPEC-FEEDBACK.md` #5 states it.
+2. **Records are closed and JSON Schema's are open.** `additionalProperties` defaults to *true*, so a
+   converted record with no `@rest` field fails §6.1.1 on the first document carrying an extra member.
+   **`@rest` is the default shape of a converted record**, not an optional refinement — which makes this
+   encoding the annotation's first real consumer, as `BACKLOG.md` says.
+3. **An untagged `oneOf` over object schemas.** All brace class, so non-disjoint; with no OpenAPI
+   `discriminator` there is no in-band selector, and §8.2 requires the tag. JSON Schema validates such a union
+   by *trying each branch*, which §8.2 forbids in as many words ("no trying variants in order"). Existing
+   documents carry nothing to dispatch on, so this is a genuine wall: the converter finds a discriminator or
+   reports.
+4. **Enum members must be identifiers.** `"in-progress"` converts; `"not found"` does not. The fallback is a
+   `text` refinement with a pattern, which costs the enum its discrimination class and so costs §8.2 route 2
+   a variant it could have dispatched on.
+5. **Required-but-nullable.** `required: [x]` beside `type: [X, "null"]` has no TSON spelling — present with
+   an absent value is not a state (§7.3), and OPTIONAL would *weaken* the source contract. Drop-with-report,
+   per the companion note's list D.
+6. **`format` becomes binding.** JSON Schema's `format` is advisory; the atom it converts to is not. A
+   document that passed with a malformed `format: email` value fails here. That is the point of converting and
+   still a change of behaviour, so a converter should say so rather than let it surface as a first-request
+   failure.
+
+## The Unicode policies, and which reach JSON
+
+[TSON-DATA] §8.2's two policies are one object (`TsonUnicodeProcessorPolicy`) and reach this encoding
+differently. §9.4 states the split: the **identifier policy** reaches member names read as field names and
+every `$type`; the **token policy**, when a deployment sets one, reaches map keys and string values.
+
+**The identifier policy runs at schema load, and at exactly one place in a data read.** A converted schema's
+declared names are judged once, when the schema links (`TsonSchemaLinker.checkNames`, §11.4's scopes) — so a
+member name matching a declared field has already inherited that verdict and needs no second test, which is
+what §9.4's parenthetical means. The one name that reaches the policy fresh is a member matching **no**
+declared field in a record with **no** rest field, and it must be tested before it is reported: a homoglyph
+(`pаssword`, Cyrillic а) would otherwise get `UNRECOGNIZED_FIELD` — a *verdict* — where §8.2 requires a
+refusal reported in none of the four categories. That single case is the whole of the identifier policy's job
+at the JSON data layer, and it is why the check cannot simply be dropped as redundant.
+
+**A rest key is a map key, not a name.** §6.2 collects unmatched members into the rest map, parsed by its key
+type; §9.4 puts map keys under the *token* policy, which defaults to `unrestricted()`. So the order matters —
+declared fields, then rest collection, then hygiene — and a converted schema's `@rest` tail is what keeps
+ordinary foreign JSON from meeting an identifier rule at all. That is the on-ramp working as intended, not a
+hole: the names in a rest map were never declared, so nothing about them is a name.
+
+**A JSON tree read with no schema applies neither policy.** There is no Class 1 in this encoding (§1.3
+principle 1, §1.5) — a JSON document with no binding is just JSON, and its member names are data. Judging
+them under an identifier policy would refuse ordinary JSON for a rule that exists only where names are
+declared.
+
+**When each arrives.** Neither belongs in the lexer or the event layer, for the reason
+`DefaultTsonReadContext`'s Javadoc gives on the other side: a refusal needs a receiver, and a layer that can
+only throw can only say "invalid", which is the one thing a policy refusal is not. Both arrive with the
+schema-directed decode: the identifier policy in the record reader's unmatched-member path, the token policy
+upstream of it over keys and string values, the way `TokenPolicyEventSource` sits upstream on the TSON side.
+§10.1's limits policy is different and arrives sooner — nesting depth is counted in the event layer, the one
+place every token is consumed.
+
 ## A stack of its own
 
 `tson-json` does not build on `tson-compiler`'s `TsonEventSource`. That was the plan `BACKLOG.md` carried, and

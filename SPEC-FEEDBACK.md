@@ -386,3 +386,116 @@ thing left free. And the revision added three set-typed fields where there was o
 numeric tiers (§7.4) and `scoped.scope` (§7.8). That strengthens the case rather than weakening it — the table
 a conforming comparison has to carry is now four rows long, still read out of §9 rather than out of §8, and
 still describing a freedom no producer takes.
+
+
+## 5. A JSON member name that is not an identifier has no home, and it is the commonest shape in real JSON
+
+**Documents:** [TSON-JSON] §6.1, §6.2; [TSON-DATA] §7.7; [TSON-SCHEMA] §6, §12.1.
+**Kind:** underspecification, against a goal the document states for itself.
+
+**This entry is a proposal, not a report.** Nothing here is running: `tson-json` has its lexer and no record
+reader yet. What is evidenced is the gap, which is a reading of the published documents rather than a finding
+from a build.
+
+[TSON-JSON] §1.2 makes this document "the normative JSON interoperability surface of the series", and §1.3's
+principle 2 promises that the common case reaches the wire as plain JSON a consumer with no knowledge of TSON
+reads as ordinary JSON. The conversion path both sentences imply — a JSON Schema or OpenAPI contract becomes a
+TSON schema, and the documents already in flight validate against it unchanged — meets a wall the documents do
+not address.
+
+**A JSON member name is an arbitrary string; a TSON field name is an identifier.** Revision 35 settled the
+second half deliberately (`field-name` is an identifier at every layer, [TSON-DATA] §7.7, §2.5), and §3.2's
+reserved-namespace argument depends on it. But `user-name`, `2fa_enabled`, `@type`, `first name` and `""` are
+all ordinary JSON member names and none is an identifier. This is §7.7's **grammar**, not §8.2's policy, so no
+processor configuration reaches it and no relaxation exists — which is correct, and is exactly why the gap
+needs an answer somewhere else.
+
+Kebab-case is pervasive; JSON-LD's `@context`/`@type` and OpenAPI's own `x-` extensions are `@`- and
+`-`-bearing by specification. A converter meeting one has two options today and both are bad:
+
+- **Collect them into an `@rest` map** (§6.2). The members read, and lose every declared type, facet and
+  field state — discarding the validation that was the reason to convert. A contract whose ten fields are
+  kebab-case converts to a record with no fields.
+- **Refuse.** The producer changes their wire format, which is the outcome §1.3's principle 2 exists to
+  prevent, and the on-ramp ends.
+
+Neither is a decision an encoding-rules document should leave to each converter, because the two produce
+schemas that disagree about what the same JSON means.
+
+**Suggested resolution — a projection annotation, on `@rest`'s own precedent.** [TSON-SCHEMA] §6 already
+carries the licence: "An encoding-rules document MAY bind projection behaviour to a schema-side annotation
+declared for it." `@rest` and `@discriminator` both walked through that door in this revision, and a wire-name
+projection is the same shape — force in the encodings that carry it, none in the model, the declared field
+keeping its identifier name everywhere the name is a name.
+
+```
+web_hook => {
+  @json_name:"user-name"     user_name:     text
+  @json_name:"2fa_enabled"   two_fa_enabled: boolean
+}
+```
+
+The load checks follow the established pattern and are few: the argument is a non-empty string that is a
+well-formed member name under §3.1's profile; it does not begin with `$` (§3.2's namespace is not spellable
+from data); and it collides with no other declared field's own name or projection within one composed record.
+Decode's binding order in §6.2 gains one step — reserved names, declared names, **declared projections**,
+rest collection — and the encoder writes the projection where it has one.
+
+Three alternatives were considered and are worse. **Relaxing §7.7** to admit `-` and `@` in field names
+undoes a Revision 35 decision, breaks §3.2's collision-free argument, and changes the *model* to serve one
+encoding. **A `patternProperties`-style key map** types the values but not the names, so `user-name` and
+`usr-name` validate alike. And **leaving it to `@rest`** is the status quo, whose cost is stated above.
+
+The narrower question, if the annotation is not wanted: §6.1.1 should at least *say* what a member name that
+is not an identifier does, since a reader today has to derive it from §7.7 and it is not obvious that the
+answer is "nothing in this encoding can declare it".
+
+
+## 6. §9.4 does not say whether a JSON member name is judged by the identifier policy or merely inherits a verdict, and the homoglyph case decides it
+
+**Documents:** [TSON-JSON] §9.4; [TSON-DATA] §8.2; [TSON-JSON] §6.1.1, §6.2.
+**Kind:** ambiguity — two readings, one of which reports a policy refusal as a verdict.
+
+§9.4 states the name-hygiene layer's reach in one sentence:
+
+> the **identifier policy** reaches every member name read as a field name and every `$type` (both
+> identifiers, matched against declared names, so a data document inherits the declaration's verdict)
+
+The parenthetical carries two readings, and they differ in behaviour rather than in emphasis:
+
+1. **Inheritance only.** A member name is matched against the declared names, which were judged when the
+   schema loaded; nothing is judged at read time. A name matching nothing is an ordinary closure error
+   (§6.1.1) or a rest entry (§6.2).
+2. **The policy runs, and inheritance is why it is usually cheap.** A member name matching a declared field
+   has already passed; one matching nothing is tested before it is reported.
+
+**Reading 1 reports a refusal as a verdict, so reading 2 must be right.** Take a record declaring `password`
+and a document sending `pаssword` with U+0430 CYRILLIC SMALL LETTER A. Under reading 1 the name matches no
+declared field, so it is `UNRECOGNIZED_FIELD` — a validation error, one of [TSON-DATA] §8.1's four
+categories. §8.2 requires the opposite in as many words: a name-hygiene refusal "MUST NOT be reported in any
+of the four categories", because the rules read data the UCD does not freeze and so may not decide validity.
+Reading 1 therefore makes the encoding refuse a document under a §8.1 category for a §8.2 rule, in exactly
+the case §8.2's look-alike rule exists for.
+
+**The interpretation this implementation will take** is reading 2, with the reach stated precisely, since it
+is narrower than it first appears: the identifier policy's whole job at the JSON data layer is a member name
+matching **no** declared field in a record with **no** rest field. A name matching a declared field inherits;
+a name reaching §6.2's collect rule is a **map key**, which §9.4 itself puts under the *token* policy, not
+this one. So the order is declared fields, then rest collection, then hygiene — and only the last reaches the
+policy.
+
+That ordering matters beyond the wording, and is worth stating in §6.2 rather than leaving to be derived: it
+is what lets a converted schema's `@rest` tail carry ordinary foreign JSON whose member names were never
+declared, without meeting an identifier rule at all. Getting it the other way round — hygiene before
+collection — would refuse ordinary JSON under a rule that exists only where names are declared.
+
+**Suggested resolution.** Replace §9.4's parenthetical with the reach and the order:
+
+> the **identifier policy** reaches every `$type`, and every member name read as a field name that matches no
+> declared field of the position's type and is not collected by a rest field (§6.2) — a member name matching
+> a declared field carries that declaration's verdict, and a collected member is a map key, under the token
+> policy. A look-alike member name MUST be refused under §8.2 rather than reported as a closure violation.
+
+One consequence worth stating alongside it: a JSON document read with **no** schema binding is outside this
+document (§3.4) and applies neither policy. Its member names are data, not names, and there is no declaration
+for them to be look-alikes of.
