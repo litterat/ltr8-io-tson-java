@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.lexer.IdentifierStatus;
-import io.ltr8.tson.compiler.lexer.JoiningControls;
-import io.ltr8.tson.compiler.lexer.Xid;
+import io.ltr8.tson.base.unicode.IdentifierStatus;
+import io.ltr8.tson.base.unicode.JoiningControls;
+import io.ltr8.tson.base.unicode.Xid;
 
 import java.text.Normalizer;
 import java.util.Optional;

@@ -1,10 +1,10 @@
-package io.ltr8.tson.compiler.lexer;
+package io.ltr8.tson.base.unicode;
 
 import java.util.Arrays;
 
 /**
  * UAX #31's {@code XID_Start} and {@code XID_Continue}, exactly, over the running JDK's character data.
- * Shared by the two layers that need them: {@link Lexer}'s unquoted-token profile ([TSON-DATA] §7.1) and the
+ * Shared by the two layers that need them: {@code Lexer}'s unquoted-token profile ([TSON-DATA] §7.1) and the
  * identifier profile the meta-kernel's {@code identifier} type carries. Neither is XID alone -- each adds
  * and removes its own characters -- so what is shared is the property, not either profile.
  *

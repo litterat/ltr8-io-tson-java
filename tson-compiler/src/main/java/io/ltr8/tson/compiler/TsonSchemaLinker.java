@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.resolver.HeldBody;
@@ -10,7 +11,7 @@ import io.ltr8.tson.compiler.atom.AtomParsers;
 import io.ltr8.tson.compiler.atom.AtomType;
 import io.ltr8.tson.compiler.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.IdentifierParser;
-import io.ltr8.tson.compiler.lexer.ConfusableNames;
+import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;

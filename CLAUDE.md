@@ -230,7 +230,14 @@ module has a real `module-info.java`; module names mirror each module's root exp
   applies with the same defaults", so one record and one refusal serve both encodings and a deployment that
   raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and is the one factory that
   stayed on the record — its nine siblings switch on an encoding's own exception type where it classifies
-  nothing at all.
+  nothing at all. **The Unicode machinery is here too**, in an exported `io.ltr8.tson.base.unicode`: `Xid`,
+  `IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — UCD 16.0 tables and the
+  UTS #39 rules over them, read by two engines and knowing nothing about either format. `TsonUnicodePolicy`
+  sits beside `Diagnostic`. What it leaves behind in `tson-compiler` is `IdentifierParser`, which mixes
+  [TSON-DATA] §7.7's *grammar* (`validate`, throwing `LexException`) with §8.2's *policy* (`hygiene`,
+  returning) — the one piece whose home is a real question rather than a move, and it is smaller now that
+  the tables are not part of it. A side effect worth having: `lexer` is now exactly `Lexer`, `LexException`,
+  `Token` and `TokenType`.
 - **`tson-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations, plus `Annotations`/
   `Annotation`, the wire-annotation carrier a bound class declares a component of. The carrier lives here
   rather than with the engine because it is the one module `tson-bind` (which analyses classes),
@@ -345,7 +352,7 @@ no `\/`**, and a leading BOM is still stripped on §7.1's own authority rather t
 §7.1's UAX #31 profile is implemented exactly, not approximated: the JDK's identifier predicates are
 `ID_*` unioned with the identifier-ignorable set (all `Cf`, plus non-whitespace controls), so `Lexer`
 subtracts that set and two literal `ID_ \ XID_` tables — verified zero-over/zero-under against Unicode
-16.0, which `Lexer.UNICODE_VERSION` declares. ZWNJ/ZWJ continue a token, `XID_Continue` containing both and
+16.0, which `Xid.UNICODE_VERSION` declares. ZWNJ/ZWJ continue a token, `XID_Continue` containing both and
 §7.1 admitting them on that basis; what constrains them is a *name* rule (§7.7 rule 2), applied by
 `IdentifierParser` through `JoiningControls` (UTS #39 §3.1.1.1's contexts A1/A2/B).
 Errors are fail-fast (`LexException`); multi-error recovery is deferred.

@@ -1,6 +1,6 @@
 package io.ltr8.tson.cli;
 
-import io.ltr8.tson.compiler.TsonUnicodePolicy;
+import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonReadContext;

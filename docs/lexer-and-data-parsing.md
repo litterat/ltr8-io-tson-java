@@ -63,7 +63,7 @@ tokens, modes, or character-classification changes).
   subtracts the ignorable set and two literal `ID_ \ XID_` tables (24 code points for start, 20 for
   continue — the characters XID drops for not being NFKC-closed), which is **exact** against Unicode 16.0:
   zero over-, zero under-acceptance on both predicates across all 1,112,064 non-surrogate code points.
-  `Lexer.UNICODE_VERSION` declares the version, as §7.1 asks.
+  `Xid.UNICODE_VERSION` declares the version, as §7.1 asks.
 - **`Xid` is the shared property, and neither profile is it.** `Xid.isStart`/`isContinue` are exactly
   `XID_Start`/`XID_Continue`; the lexer's token profile adds `Nd`/`-`/`+`/`.` and subtracts the joiners,
   and the kernel's `identifier` contract (`IdentifierParser`) adds only `-` and requires NFC. Keeping the

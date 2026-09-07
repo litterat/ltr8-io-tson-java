@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.compiler.TsonSchemaSource;
-import io.ltr8.tson.compiler.TsonUnicodePolicy;
+import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 import org.junit.jupiter.api.Test;
 

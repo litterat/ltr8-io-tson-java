@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import org.junit.jupiter.api.Test;
 

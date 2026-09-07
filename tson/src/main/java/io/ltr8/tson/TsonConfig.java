@@ -6,7 +6,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.TsonLimitsPolicy;
-import io.ltr8.tson.compiler.TsonUnicodePolicy;
+import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 

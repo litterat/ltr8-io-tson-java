@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.compiler.TsonUnicodePolicy;
+import io.ltr8.tson.base.TsonUnicodePolicy;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

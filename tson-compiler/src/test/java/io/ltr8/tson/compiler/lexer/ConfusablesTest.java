@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.lexer;
 
+import io.ltr8.tson.base.unicode.Confusables;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.lexer;
 
+import io.ltr8.tson.base.unicode.Xid;
 import io.ltr8.tson.compiler.Position;
 
 import java.io.IOException;

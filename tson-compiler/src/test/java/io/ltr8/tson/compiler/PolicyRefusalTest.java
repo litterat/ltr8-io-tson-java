@@ -1,7 +1,8 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.lexer.Xid;
+import io.ltr8.tson.base.unicode.Xid;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
