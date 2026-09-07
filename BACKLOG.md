@@ -106,18 +106,6 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **No structural layer — `JsonEvent`/`JsonEventSource`.** The lexer lands in `tson-json`; RFC 8259's grammar over
-  it does not. A pull-based event source is what the schema-directed decode of §5–§8 will consume, so the read stays
-  bounded by nesting depth rather than by document size, and it is the JSON counterpart of Tier 2 — grammar only, no
-  dedupe, no interpretation, on the same layering [TSON-DATA] §1.2 draws. Nesting depth is §10.1's limit and is
-  counted here, the one place every token is consumed.
-
-- [ ] **No tree — `JsonValue` and `Json.parse`.** JEP 540's sealed hierarchy (`JsonObject`/`JsonArray`/`JsonString`/
-  `JsonNumber`/`JsonBoolean`/`JsonNull`), reduced off the event source. `JsonNumber` holds the source lexeme, since
-  §5.3 preserves an exact number's digits and scale and §3.1 forbids rounding one silently. §3.1's duplicate-member
-  rule lands here rather than in the event layer: the *category* follows the position's type, which no grammar layer
-  holds, but the refusal itself is what JEP 540 and §3.1 both require of a parse.
-
 - [ ] **No binding — a JSON object reader.** `tson-bind`'s `DataClass` descriptors drive it, the way
   `SchemalessObjectReader` drives the TSON side: the target class is in effect the schema, so this needs no TSON
   schema and is the JSON stack's own peer of the Class 1 read. Streams the event source rather than the tree, so
