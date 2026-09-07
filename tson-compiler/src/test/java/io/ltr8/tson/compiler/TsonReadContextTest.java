@@ -26,8 +26,7 @@ class TsonReadContextTest {
 
     /** A context over {@code events} whose diagnostics are collected but not inspected -- for the cursor/path tests. */
     private static TsonReadContext contextOver(TsonEvent... events) {
-        return TsonReadContext.of(new ListEventSource(List.of(events)), new DiagnosticsCollector(),
-                UnicodePolicy.unrestricted());
+        return TsonReadContext.of(new ListEventSource(List.of(events)), new DiagnosticsCollector());
     }
 
     @Test
@@ -169,7 +168,7 @@ class TsonReadContextTest {
     @Test
     void aCollectingReceiverAccumulatesWithoutThrowing() {
         DiagnosticsCollector problems = new DiagnosticsCollector();
-        TsonReadContext ctx = TsonReadContext.of(new ListEventSource(List.of()), problems, UnicodePolicy.unrestricted());
+        TsonReadContext ctx = TsonReadContext.of(new ListEventSource(List.of()), problems);
 
         assertTrue(problems.isEmpty());
         ctx.report(Diagnostic.Code.FIELD_REQUIRED, "first problem", "x", "y");
@@ -186,8 +185,7 @@ class TsonReadContextTest {
     void reportedCountsEveryProblemAcrossScopedCopiesWhateverTheReceiverDoesWithThem() {
         // A receiver that keeps nothing at all -- reported() still has to answer, since that is what the
         // readers' own "did my children complain?" checkpoints are built on.
-        TsonReadContext ctx = TsonReadContext.of(new ListEventSource(List.of()), diagnostic -> { },
-                UnicodePolicy.unrestricted());
+        TsonReadContext ctx = TsonReadContext.of(new ListEventSource(List.of()), diagnostic -> { });
 
         assertEquals(0, ctx.reported());
         ctx.report(Diagnostic.Code.FIELD_REQUIRED, "first", "x", "y");
@@ -207,7 +205,7 @@ class TsonReadContextTest {
         SourcePosition schemaPosition = new Position(10, 1, 100);
         DiagnosticsCollector problems = new DiagnosticsCollector();
         TsonReadContext ctx = TsonReadContext.of(
-                new ListEventSource(List.of(token("42", dataPosition))), problems, UnicodePolicy.unrestricted());
+                new ListEventSource(List.of(token("42", dataPosition))), problems);
 
         TsonReadContext scoped =
                 ctx.inRecord(SchemaLocation.of(SCHEMA_ID, "my_type", Optional.of(schemaPosition))).field("value");
@@ -230,8 +228,7 @@ class TsonReadContextTest {
     void aReportWithNoSchemaLocationStampedCarriesNeitherPointerNorPosition() {
         DiagnosticsCollector problems = new DiagnosticsCollector();
         TsonReadContext ctx = TsonReadContext.of(
-                new ListEventSource(List.of(token("42", new Position(1, 1, 0)))), problems,
-                UnicodePolicy.unrestricted());
+                new ListEventSource(List.of(token("42", new Position(1, 1, 0)))), problems);
         ctx.peek();
 
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, "wrong shape", "a record", "a token");

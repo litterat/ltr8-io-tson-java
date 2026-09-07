@@ -177,9 +177,8 @@ public interface TsonReadContext {
      * <p>The policy is applied here rather than by the caller, so no context can exist whose events went
      * unchecked. Nothing is installed when the policy checks nothing, so the default costs a read no wrapper.
      */
-    static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
-                              UnicodePolicy tokenPolicy) {
-        return of(events, receiver, tokenPolicy, UnicodePolicy.highlyRestrictive());
+    static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver) {
+        return of(events, receiver, UnicodePolicy.highlyRestrictive());
     }
 
     /**
@@ -190,13 +189,10 @@ public interface TsonReadContext {
      * so a caller that names only a token policy still gets the name surface checked.
      */
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
-                              UnicodePolicy tokenPolicy, UnicodePolicy identifierPolicy) {
-        Objects.requireNonNull(tokenPolicy, "tokenPolicy -- name one, UnicodePolicy.unrestricted() if "
-                + "this source's tokens are not to be checked");
+                              UnicodePolicy identifierPolicy) {
         Objects.requireNonNull(identifierPolicy, "identifierPolicy -- state one, UnicodePolicy"
                 + ".unrestricted() if this source's names are not to be checked");
-        return DefaultTsonReadContext.of(TokenPolicyEventSource.wrap(events, tokenPolicy, receiver), receiver,
-                identifierPolicy);
+        return DefaultTsonReadContext.of(events, receiver, identifierPolicy);
     }
 
     /**

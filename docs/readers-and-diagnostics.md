@@ -369,6 +369,15 @@ is a misconfiguration in the reading application and says nothing about the docu
 Reporting it as `SCHEMA_ERROR` told a caller routing on the answer that the document was wrong when nothing
 had looked at it. Both encodings' class-driven readers report it the same way.
 
+**The token policy is the stream's, not the context's.** Both `TsonDataStream` and `JsonStream` apply it as
+an event leaves them; neither read context takes one, and `TsonReadContext.of` no longer has a parameter for
+it. The reason is unchanged from when this was a decorator: a context **rewinds** — an event consumed during
+lookahead is delivered again, and a probe context can be built over events already seen — so a check there
+reports one token once per lookahead that crossed it, where a stream produces each token exactly once. It
+stopped being a decorator when the JSON stream needed the same rule: a wrapper is a second place to forget to
+apply it, and two encodings with one rule should not have two mechanisms. At `unrestricted()` — the default,
+and every ordinary read — the check is a field read and a branch.
+
 **A refused name draws no verdict beside its refusal.** Name hygiene runs inside `ctx.next()`, so a name
 §8.2 refused is reported before the reader has looked it up — and then the reader does not look it up:
 `RecordAbstractReader.readFields` and `SchemalessObjectReader.bindRecord` both checkpoint `ctx.reported()`
@@ -404,7 +413,7 @@ failure really is a parse error.
 one name once per lookahead that crossed it. `NameHygieneTest` counts every shape an annotation takes,
 because that is the failure that would survive every other test.
 
-**Not in `TokenPolicyEventSource`**, which is where the *token* surface's policy runs and gets exactly-once
+**Not in `TsonDataStream`**, which is where the *token* surface's policy runs and gets exactly-once
 for free by sitting upstream of the rewind. That decorator skips itself entirely at its default —
 `unrestricted()`, which is every ordinary read — so a rule §8.2 defaults *on* cannot live behind it
 without making the wrapper unconditional and putting a switch per token back into the cost of a read that

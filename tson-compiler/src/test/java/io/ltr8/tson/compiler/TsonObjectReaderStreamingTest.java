@@ -83,7 +83,7 @@ class TsonObjectReaderStreamingTest {
         TsonDataStream stream = new TsonDataStream(source);
         stream.next(); // DocumentStart
         DiagnosticsCollector problems = new DiagnosticsCollector();
-        TsonReadContext ctx = TsonReadContext.of(stream, problems, UnicodePolicy.unrestricted());
+        TsonReadContext ctx = TsonReadContext.of(stream, problems);
 
         TwoFields result = new TsonObjectReader().read(ctx, TwoFields.class);
 

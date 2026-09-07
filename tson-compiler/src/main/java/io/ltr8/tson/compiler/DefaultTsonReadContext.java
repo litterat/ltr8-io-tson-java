@@ -178,11 +178,11 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * lookahead that crossed it. {@code NameHygieneTest} pins exactly-once across every shape an annotation
      * takes, the nested and map-key ones included, because that is what would regress silently.
      *
-     * <p><b>Not in {@code TokenPolicyEventSource}</b>, which is where the token surface's own policy runs and
-     * gets exactly-once for free by sitting upstream of the rewind. That decorator skips itself entirely at
-     * the default policy -- {@code unrestricted()}, which is every ordinary read -- so a rule §8.2
-     * defaults <em>on</em> cannot live behind it without making the wrapper unconditional and putting a
-     * switch per token back into the steady-state cost of a read that has no policy at all.
+     * <p><b>Not where the token surface's policy runs</b> -- that is {@code TsonDataStream}, which gets
+     * exactly-once for free by sitting upstream of the rewind. The two surfaces sit on opposite sides of
+     * it because they default differently: the token policy defaults <em>off</em>, so the stream's check is
+     * a field read and a branch on every ordinary read, where this rule §8.2 defaults <em>on</em> and has
+     * to run wherever a name is actually delivered.
      */
     private void checkNameHygiene(TsonEvent event) {
         String name = switch (event) {
