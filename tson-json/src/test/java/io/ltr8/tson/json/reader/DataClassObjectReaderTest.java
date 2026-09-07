@@ -1,6 +1,7 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonStream;
@@ -37,7 +38,7 @@ class DataClassObjectReaderTest {
         JsonStream events = new JsonStream("[{\"name\": \"Ada\", \"age\": 36}, 99]");
         assertInstanceOf(JsonEvent.ArrayStart.class, events.next());
 
-        assertEquals(new Person("Ada", 36), ENGINE.read(events, Person.class));
+        assertEquals(new Person("Ada", 36), ENGINE.read(events, Person.class, DiagnosticsReceiver.throwing()));
 
         assertEquals("99", ((JsonEvent.NumberValue) events.next()).literal());
         assertInstanceOf(JsonEvent.ArrayEnd.class, events.next());
@@ -51,7 +52,7 @@ class DataClassObjectReaderTest {
         // the facade's contribution is only to make that pull happen. So the engine composes and the
         // document still cannot end early.
         JsonStream events = new JsonStream("{\"name\": \"Ada\", \"age\": 36} 99");
-        assertEquals(new Person("Ada", 36), ENGINE.read(events, Person.class));
+        assertEquals(new Person("Ada", 36), ENGINE.read(events, Person.class, DiagnosticsReceiver.throwing()));
         assertTrue(assertThrows(ParseException.class, events::next)
                 .getMessage().contains("this one is complete"));
     }
@@ -59,6 +60,6 @@ class DataClassObjectReaderTest {
     @Test
     void a_failure_inside_the_value_still_reaches_the_caller() {
         JsonStream events = new JsonStream("{\"name\": ]}");
-        assertThrows(ParseException.class, () -> ENGINE.read(events, Person.class));
+        assertThrows(ParseException.class, () -> ENGINE.read(events, Person.class, DiagnosticsReceiver.throwing()));
     }
 }

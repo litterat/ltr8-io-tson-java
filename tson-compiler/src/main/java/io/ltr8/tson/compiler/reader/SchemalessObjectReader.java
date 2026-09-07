@@ -165,16 +165,23 @@ public final class SchemalessObjectReader {
     }
 
     /**
-     * Resolves {@code targetClass}'s own descriptor; a class {@code tson-bind} can't analyze (e.g. two
-     * {@code Annotations} components) is reported as a {@code SCHEMA_ERROR}, not silently. Consumes nothing
-     * on failure -- each caller knows how much of the value's framing it has already taken, so the skip is
+     * Resolves {@code targetClass}'s own descriptor; a class {@code tson-bind} cannot analyse (two
+     * {@code Annotations} components, say) is reported, not passed over silently. Consumes nothing on
+     * failure -- each caller knows how much of the value's framing it has already taken, so the skip is
      * theirs to make.
+     *
+     * <p><b>{@code BIND_MISMATCH}, which is not a verdict.</b> A class this context cannot analyse is a
+     * misconfiguration in the reading application and says nothing whatever about the document -- the
+     * distinction {@code Code.verdict()} exists to carry, and the same line {@code TsonBindMismatchException}
+     * draws at compile time between a schema and a class that disagree. It reported {@code SCHEMA_ERROR}
+     * before, which is a verdict, so a caller routing on the answer was told the document was wrong when
+     * nothing had looked at it.
      */
     private DataClass descriptorFor(TsonReadContext ctx, Class<?> targetClass) {
         try {
             return context.getDescriptor(targetClass);
         } catch (DataBindException e) {
-            ctx.report(Diagnostic.Code.SCHEMA_ERROR, "cannot bind to " + targetClass + ": " + e.getMessage(),
+            ctx.report(Diagnostic.Code.BIND_MISMATCH, "cannot bind to " + targetClass + ": " + e.getMessage(),
                     targetClass.getName(), "(unbindable)");
             return null;
         }

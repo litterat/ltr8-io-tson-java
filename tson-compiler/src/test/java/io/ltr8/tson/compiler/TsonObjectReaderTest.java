@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -726,7 +727,7 @@ class TsonObjectReaderTest {
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertNull(mapper.withDiagnostics(problems).read("{ x: 1  y: 2 }", Unbindable.class));
-        assertEquals(List.of(Diagnostic.Code.SCHEMA_ERROR),
+        assertEquals(List.of(Diagnostic.Code.BIND_MISMATCH),
                 problems.diagnostics().stream().map(Diagnostic::code).toList());
     }
 
@@ -736,7 +737,7 @@ class TsonObjectReaderTest {
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertNull(mapper.withDiagnostics(problems).read("@doc:\"why\" !point { x: 1  y: 2 }", Unbindable.class));
-        assertEquals(List.of(Diagnostic.Code.SCHEMA_ERROR),
+        assertEquals(List.of(Diagnostic.Code.BIND_MISMATCH),
                 problems.diagnostics().stream().map(Diagnostic::code).toList());
     }
 
@@ -749,7 +750,7 @@ class TsonObjectReaderTest {
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertNull(mapper.withDiagnostics(problems).read("{ x: 1  y: 2 } junk", Unbindable.class));
-        assertEquals(List.of(Diagnostic.Code.SCHEMA_ERROR, Diagnostic.Code.VALIDATION_ERROR),
+        assertEquals(List.of(Diagnostic.Code.BIND_MISMATCH, Diagnostic.Code.VALIDATION_ERROR),
                 problems.diagnostics().stream().map(Diagnostic::code).toList());
     }
 
@@ -759,7 +760,9 @@ class TsonObjectReaderTest {
         ReadException thrown = assertThrows(ReadException.class,
                 () -> mapper.read("{ x: 1  y: 2 }", Unbindable.class));
 
-        assertEquals(Diagnostic.Code.SCHEMA_ERROR, thrown.diagnostic().code());
+        assertEquals(Diagnostic.Code.BIND_MISMATCH, thrown.diagnostic().code());
+        // Not a verdict: nothing about the document is being asserted by a class that cannot be analysed.
+        assertFalse(thrown.diagnostic().code().verdict());
         assertTrue(thrown.getMessage().contains(Unbindable.class.getName()), thrown.getMessage());
     }
 
