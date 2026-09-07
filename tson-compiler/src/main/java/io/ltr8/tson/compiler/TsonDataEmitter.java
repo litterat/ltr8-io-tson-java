@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.atom.AtomTypeException;
-import io.ltr8.tson.compiler.atom.AtomType;
-import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.ast.TokenForm;
 
 import java.io.IOException;

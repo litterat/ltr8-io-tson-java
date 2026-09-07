@@ -4,6 +4,29 @@ Design notes for the Class 1 input path: the lexer, the Tier 2 event stream, the
 resolution, and the built-in atom vocabulary. Current form only; history lives in git. `CLAUDE.md` holds
 the one-paragraph orientation; this file holds the detail.
 
+## Where the atom vocabulary lives
+
+`tson-atom`, not `tson-compiler`. [TSON-JSON] §5.1 hands a JSON string's content to the atom's own parser
+exactly as a TSON quoted token's text would be, so which families a reader can bind, and what host value
+each produces, is a property of the type system rather than of the encoding that carried them. Left inside
+the text engine it would be TSON text's by accident of placement, and a second encoding would either depend
+on the whole engine or mint a second vocabulary for one fact.
+
+**`AtomType` takes a `String`.** Of 25 parsers, two need the lexical form and both are escape hatches rather
+than types — the kernel's `value`, decoded by §4 base type resolution whose §4.4 rule is that a quoted token
+is a string, and `Token`, which *is* the token because §8's resolved form records the spelling. Those two,
+`TokenAtomType` which describes them, `TokenValue`/`TokenForm` and `BaseTypeResolver` stay with the text
+encoding. That the form-dependent set is exactly where the two encodings legitimately differ is not a
+coincidence: JSON has no token forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
+
+**Three indices, three questions, and no fourth.** `BuiltinTypeVocabulary` maps a built-in *name* to a
+parser carrying the constraints §5 fixes; `AtomParsers` maps a resolved *body* to one carrying whatever the
+schema resolved, which is what a user's own `!integer ^ { max: 100 }` needs; `HostAtoms` maps a *host class*
+back to the family that produces it, which is what a reader with no type-ref dispatches on and what a
+`value`-typed slot asks. `VocabularyAtoms` is the write direction. The compiled reader stack used to carry a
+fourth — a body→parser table restating `AtomParsers` entry for entry — and the two had already drifted, so a
+`period`-typed field's `~` default was reported as "not a scalar type" while `duration` beside it worked.
+
 ## Lexer (`tson-compiler/.../lexer/`)
 
 `Lexer` is a single hand-written scanner producing `Token`s, driven off `nextToken()` (never a

@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+
 import io.ltr8.tson.base.Diagnostic;
 import org.junit.jupiter.api.Test;
 import java.util.List;

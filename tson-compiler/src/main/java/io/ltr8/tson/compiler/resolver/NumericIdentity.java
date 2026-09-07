@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.compiler.base.NumberForm;
-import io.ltr8.tson.compiler.base.NumberForms;
-import io.ltr8.tson.compiler.base.NumberGrammar;
+import io.ltr8.tson.atom.number.NumberForm;
+import io.ltr8.tson.atom.number.NumberForms;
+import io.ltr8.tson.atom.number.NumberGrammar;
 
 /**
  * [TSON-DATA] §4.3's numeric equivalence, applied where an entry's identity is derived.

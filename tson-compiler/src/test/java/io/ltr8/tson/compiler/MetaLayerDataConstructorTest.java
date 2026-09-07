@@ -22,7 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
-import io.ltr8.tson.compiler.atom.IdentifierParser;
+import io.ltr8.tson.atom.IdentifierParser;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;

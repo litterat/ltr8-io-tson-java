@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.Diagnostic;
@@ -21,12 +22,12 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.atom.AtomType;
-import io.ltr8.tson.compiler.atom.HostAtoms;
-import io.ltr8.tson.compiler.atom.AtomTypeException;
-import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.HostAtoms;
+import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
-import io.ltr8.tson.compiler.base.BaseValue;
+import io.ltr8.tson.atom.number.BaseValue;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayEnd;

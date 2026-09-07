@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler.lexer;
 
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.atom.AtomParseException;
-import io.ltr8.tson.compiler.atom.IdentifierParser;
+import io.ltr8.tson.atom.AtomParseException;
+import io.ltr8.tson.atom.IdentifierParser;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

@@ -20,7 +20,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
-import io.ltr8.tson.compiler.base.NumberNarrowing;
+import io.ltr8.tson.atom.number.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;

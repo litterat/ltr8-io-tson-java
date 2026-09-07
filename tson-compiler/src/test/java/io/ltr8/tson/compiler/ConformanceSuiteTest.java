@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
@@ -19,13 +20,13 @@ import io.ltr8.tson.compiler.lexer.Token;
 import io.ltr8.tson.compiler.lexer.TokenType;
 import io.ltr8.tson.base.unicode.Xid;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
-import io.ltr8.tson.compiler.base.BaseValue;
-import io.ltr8.tson.compiler.base.NumberForm;
-import io.ltr8.tson.compiler.atom.AtomParseException;
-import io.ltr8.tson.compiler.atom.AtomType;
-import io.ltr8.tson.compiler.atom.AtomValidationException;
+import io.ltr8.tson.atom.number.BaseValue;
+import io.ltr8.tson.atom.number.NumberForm;
+import io.ltr8.tson.atom.AtomParseException;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.atom.BuiltinTypeVocabulary;
+import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.atom.Complex;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;

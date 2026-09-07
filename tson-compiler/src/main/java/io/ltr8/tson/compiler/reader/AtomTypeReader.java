@@ -1,14 +1,15 @@
 package io.ltr8.tson.compiler.reader;
 
+
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.compiler.atom.AtomParsers;
-import io.ltr8.tson.compiler.atom.AtomType;
+import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
-import io.ltr8.tson.compiler.atom.AtomTypeException;
+import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
@@ -66,14 +67,19 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * {@code unit}'s three real instances -- {@code value}/{@code token}/{@code void} -- all resolve to the
      * identical empty body, so, per the kernel's own doc ("distinguished by name and prose-level parsing
      * contract, not by schema shape"), dispatch is keyed on the declaration's own name rather than its
-     * resolved shape. {@code AtomParsers} performs that dispatch and {@link #ATOM} inherits it; what stays
-     * here is {@code void} alone, which is not a scalar -- its contract admits only the absent sentinel
-     * {@code _}, never a token -- so it bypasses {@link AtomType} entirely via {@link VoidReader}.
+     * resolved shape. §4.2 makes that dispatch normative.
+     *
+     * <p><b>Two of the three are this encoding's, not the vocabulary's</b>, which is why they are named here
+     * and not left to {@link #ATOM}. {@code void} is not a scalar at all -- its contract admits only the
+     * absent sentinel {@code _}, never a token -- so it bypasses {@link AtomType} via {@link VoidReader}.
+     * {@code value} is decoded by [TSON-DATA] §4 base type resolution, whose §4.4 rule is that a quoted
+     * token is a string: it depends on the lexical form, which an {@link AtomType} deliberately cannot see,
+     * so {@code AtomParsers} declines it and {@link ValueParser} answers here. Every other
+     * {@code unit}-constructed name is an ordinary identifier and {@link #ATOM} has it.
      */
     static final ValueReaderFactory UNIT = (name, definition, context) -> switch (name) {
         case "void" -> new VoidReader(context.locationOf(name, definition));
-        // `value` and every other unit-constructed name are AtomParsers' to tell apart -- §4.2 makes that
-        // name dispatch normative, and it is stated there rather than restated here.
+        case "value" -> new AtomTypeReader<>(name, ValueParser.INSTANCE, context.locationOf(name, definition));
         default -> ATOM.create(name, definition, context);
     };
 
@@ -88,7 +94,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * says strictly less than the message already does -- a consumer wanting the bound has to recover it by
      * regexing the sentence, which is the one thing {@link Diagnostic}'s structured half exists to avoid.
      * The atom knows the facet it just violated and carries it on the exception; see {@link
-     * io.ltr8.tson.compiler.atom.AtomTypeException} for the vocabulary. The name still leads the
+     * io.ltr8.tson.atom.AtomTypeException} for the vocabulary. The name still leads the
      * <em>message</em>, which is where the author needs to see it.
      */
     private final String name;

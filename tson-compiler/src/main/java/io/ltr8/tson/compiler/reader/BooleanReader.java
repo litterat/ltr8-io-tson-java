@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;

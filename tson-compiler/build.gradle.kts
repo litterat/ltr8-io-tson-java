@@ -7,6 +7,10 @@ sourceSets["test"].java.srcDir("src/testShared/java")
 dependencies {
     implementation(project(":tson-base"))
     implementation(project(":tson-schema"))
+    // The built-in atom vocabulary -- which tokens each family accepts and what host value results. A
+    // module of its own rather than a package here because [TSON-JSON] §5.1 makes it the type system's
+    // rather than this encoding's, so tson-json reads the same families without depending on this engine.
+    implementation(project(":tson-atom"))
     implementation(project(":tson-annotation"))
     // The immutable TsonValue tree model, a pure leaf module. tson-compiler holds the engine that produces
     // and consumes it (TsonTreeReader/TsonTreeWriter, the reader.*TreeReader family) -- the same direction

@@ -1,14 +1,15 @@
 package io.ltr8.tson.compiler;
 
+
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.compiler.base.NumberForms;
+import io.ltr8.tson.atom.number.NumberForms;
 
 /**
  * The write-side counterpart to {@link AtomBinder}: <b>framing a value that carries no type-ref of its
  * own</b>. Mostly that is §4's default resolution -- boolean/number/string/null -- where the framing follows
  * from the host type, since that is all such a value has to go on.
  * Formatting a *vocabulary* atom's value is each atom's own job now ({@code
- * io.ltr8.tson.compiler.atom.AtomType#write}), looked up through {@code
+ * io.ltr8.tson.atom.AtomType#write}), looked up through {@code
  * TsonObjectWriter}'s own registry rather than duplicated here; see {@code
  * TsonObjectWriter.toTson}'s Javadoc. {@code Double}/{@code Float} are the one default-resolvable
  * case that still delegates to a vocabulary type ({@link NumberForms#floatToken}) purely to reuse its {@code

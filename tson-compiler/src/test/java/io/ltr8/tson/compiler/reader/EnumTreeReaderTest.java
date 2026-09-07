@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;

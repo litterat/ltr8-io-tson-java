@@ -15,6 +15,7 @@ val moduleDescriptions = mapOf(
     "tson-compiler" to "TSON engine: lexer, both grammars, schema resolution, Class 2 compilation, readers, writers",
     "tson-base" to "The diagnostic vocabulary and source positions every encoding and phase reports through",
     "tson-schema" to "TSON resolved-schema value model (schema.meta) plus the schema registry and identity algorithm",
+    "tson-atom" to "The built-in atom vocabulary: which tokens each family accepts, and what host value results",
     "tson-tree" to "TSON data-document tree model: TsonValue and its pure immutable node types",
     "tson-bind" to "TSON binding engine between data values and Java objects",
     "tson-annotation" to "TSON binding annotations and the wire-annotation carrier a bound class declares",

@@ -309,6 +309,24 @@ module has a real `module-info.java`; module names mirror each module's root exp
   one structurally it declares a local stand-in (`schema.meta.Token` mirrors `ast.TokenValue`/`TokenForm`;
   `schema.meta.SourcePosition` is an interface `tson-compiler`'s `Position` implements), converted at the
   one spot that needs it.
+- **`tson-atom`** — the built-in atom vocabulary: which tokens each family accepts and what host value
+  results (§5.2's parsing contracts). **A module rather than a package inside an engine, because the
+  vocabulary is not an engine's** — [TSON-JSON] §5.1 hands a JSON string's content to the atom's own parser
+  exactly as a TSON quoted token's text would be, so which families a reader binds, and what they read to,
+  is a property of the type system and not of the encoding that carried them. Three packages, split by who
+  touches them: `io.ltr8.tson.atom` is what a caller names — `AtomType`, the two indices over it
+  (`BuiltinTypeVocabulary` by name, `HostAtoms` by host class), `AtomParsers` from a resolved body,
+  `VocabularyAtoms` for the write direction, the exceptions a refusal arrives as, and `IdentifierParser`,
+  which is §7.7's name profile as much as it is an atom; `io.ltr8.tson.atom.number` is §4's number
+  production and the narrowing over it, exported because base type resolution stays with the text encoding
+  and reads it; `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on the
+  same terms as `tson-compiler`'s own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its
+  constraint record), `tson-base` and `tson-regex`. **What deliberately stayed behind is everything that
+  depends on *how* a token was written**: `AtomType` takes a `String`, and the two atoms needing the lexical
+  form — the kernel's `value`, whose §4.4 rule is that a quoted token is a string, and `Token`, which
+  records the spelling §8's resolved form carries — stay in `tson-compiler` with `TokenValue` and
+  `BaseTypeResolver`. That those two are exactly where the encodings legitimately differ is no coincidence:
+  JSON has no token forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
 - **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonValue` and its
   pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
   true leaf: depends on **nothing** (not even `tson-annotation` — the nodes aren't bind targets, they're
@@ -431,14 +449,19 @@ host type and enforces the
 `255`/`0xFF` equivalences. Quoted tokens always resolve to `StringValue` (§4.4); form is consulted once,
 here.
 
-### Built-in atom vocabulary (`.../atom/`) — `docs/lexer-and-data-parsing.md`
+### Built-in atom vocabulary (`tson-atom`) — `docs/lexer-and-data-parsing.md`
 
-`AtomType<T>` is a built-in atom's parsing contract; `BuiltinTypeVocabulary` is the fixed name→`AtomType`
-table (§5). Each constructor splits into a constraint-values record in `schema.meta` (`IntegerType`, …)
-plus a same-named `*Parser` in `atom` that holds one and does the work. Pattern facets stay `String`, not
-`Pattern` — validated and matched via `tson-regex` (I-Regexp, ReDoS-safe), never `java.util.regex`.
-`unit`'s three instances are three separate parsers dispatched on the declaration's own name — §4.2 makes
-that dispatch normative, the resolved shapes being identical and deliberately uninformative.
+`AtomType<T>` is a built-in atom's parsing contract, **over a `String`**: every family but two is a function of the text
+alone, which is what lets one vocabulary serve both encodings (§5.1). `BuiltinTypeVocabulary` is the fixed name→`AtomType`
+table (§5), `HostAtoms` the reverse index by host class — what a reader with no type-ref dispatches on, restricted to
+[TSON-JSON] §5.6's string-content families since §4.4 makes a quoted token a string — and `AtomParsers` the one from a
+resolved body, which the compiled readers and the linker both ask so there is no second opinion about which parser reads
+which body. Each constructor splits into a constraint-values record in `schema.meta` (`IntegerType`, …) plus a same-named
+`*Parser` in `atom.parser` that holds one and does the work. Pattern facets stay `String`, not `Pattern` — validated and
+matched via `tson-regex` (I-Regexp, ReDoS-safe), never `java.util.regex`. `unit`'s three instances are dispatched on the
+declaration's own name — §4.2 makes that dispatch normative, the resolved shapes being identical and deliberately
+uninformative — and two of the three are the *encoding's* rather than this vocabulary's: `AtomParsers` answers for
+`identifier` and declines `value` and `void`, whose readings depend on the lexical form and on a sentinel no token is.
 
 ### Schema grammar (`TsonSchemaParser`, `.../ast/schema/`) — `docs/schema-grammar-and-desugaring.md`
 
