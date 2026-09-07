@@ -3,9 +3,10 @@
 The actively-tracked engineering backlog for this implementation. Same convention as
 `SPEC-FEEDBACK.md` (a versioned, checked-in list) but for project work rather than spec
 ambiguities. Grouped by theme, not priority — reorder/prioritize as needed. See `STRUCTURED-OUTPUT.md`
-for the target-use-case plan (LLM structured output validation, JSON compatibility) — that's tracked
-separately since it's a vision/plan document, not a plain punch list — and `CLAUDE.md`'s own "Not
-yet implemented" section for the technical detail behind several of these items.
+for the target-use-case plan (LLM structured output validation) — that's tracked separately since it's a
+vision/plan document, not a plain punch list; the JSON encoding's own outstanding work is a section
+below — and `CLAUDE.md`'s own "Not yet implemented" section for the technical detail behind several of
+these items.
 
 **This file is a clean list of outstanding work and nothing else.** Every entry must name something someone
 could pick up and do. Three things are therefore not entries, however true they are:
@@ -75,6 +76,87 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 - [ ] **`@rest` is not checked.** Two checks: the annotated field's type resolves to a text-keyed map, and at
   most one field per composed chain carries the mark — the chain being countable since §5.8's restated-field
   rule merges annotations rather than dropping them, which this implementation already applies.
+
+## JSON encoding
+
+[TSON-SCHEMA] §6 makes this a spec obligation rather than an interop nicety, and `meta.tn` states it directly: "No
+encoding is privileged — TSON text is one member of the text class, beside JSON — so a directive binds every encoding
+in its class, and a document in a directed encoding may not be readable without it." Two representation directives are
+declared on those terms and neither has a consumer, because TSON text tags its choice variants with `!variant` and
+never flattens — so it cannot exercise `@discriminator` or `@rest` at all. A JSON front end is what puts that half of
+§6 under test, and is expected to move both: a directive with no consumer has never had its shape checked against one.
+
+- [ ] **A JSON document cannot name the schema that governs it, so the front door and the CLI need a surface that
+  does.** `!!schema` is TSON text syntax (`SPEC-FEEDBACK.md` #2, open): a JSON body has no in-band channel, so
+  `Tson.validate(text)` and `tson validate`'s auto-classification — both of which read a header to decide what a
+  document is — have nothing to read. Reading against a named schema already works
+  (`withSchema(uri).readAs(text, typeName)`), so what is owed is the surface: which front-door and CLI forms take the
+  schema identity and root type out of band, and what a JSON document naming neither gets. #2's own interpretation —
+  the `TSON-Schema` header as a projection of the directive — is the channel a server would use, and is where this
+  answer has to stay consistent.
+
+- [ ] **No JSON front end — `TsonJsonStream`.** RFC 8259 read against a TSON schema, built as a `TsonEventSource`
+  rather than as a second AST producer: the compiled reader stack consumes that contract, so an encoding that emits
+  events reuses resolution, linking and every compiled reader unchanged. What the scanner has to decide is the
+  `TokenForm` on each `TokenEvent`, since [TSON-DATA] §4 resolves a base type by form — a JSON string is quoted and
+  must reach `StringValue`, where `true`/`false` and numbers are unquoted; duplicate object members, which §2.5/§2.6
+  refuse and JEP 540 refuses for JSON on the same reasoning; and JSON `null`, which maps to `AbsentEvent` so the
+  position's own field state decides whether absence is admitted, rather than the four-character string satisfying a
+  `text` contract. An object key that is no identifier needs nothing — §2.5 leaves `field-name` lexical, so such a key
+  is an ordinary `UNRECOGNIZED_FIELD` against a schema, where routing it to a map would report worse.
+
+- [ ] **The read facades take a concrete `TsonDataStream`, so no second encoding can reach them.**
+  `TsonTreeReader`/`TsonObjectReader`'s private `readRoot`/`readRootAs`/`readDocument` are typed to it and use it only
+  as a `TsonEventSource`. Widening those, plus a public entry point taking one, is what makes a second encoding a
+  client of the facades rather than a fork of them; everything it must not reimplement sits behind that seam — schema
+  fetching and `withSchema`/`readAs`, diagnostics wiring, `TsonLimitsPolicy` counting, §7.8's scope push,
+  `requireDocumentEnd`, and `readFailure`'s verdict-vs-fault split.
+
+- [ ] **`Diagnostic.ofBaseSyntaxError` cannot classify another encoding's syntax failure.** Its switch covers
+  `TsonParseException`/`LexException`/`TsonUnsupportedDocumentException` and rethrows the rest, so a JSON syntax error
+  would escape as a fault — the please-report-it banner, exit 70 — where §8.1 makes it a verdict the sender can act on
+  and `TsonCli.exitCodeFor` owes it exit 1. `TsonParseException` is `final`, so a front end cannot ride the
+  classification by subclassing it. What is left is choosing between a fourth case and a seam each encoding
+  contributes to, and making the `expected: "well-formed TSON"` default name the encoding that actually refused.
+
+- [ ] **Nothing dispatches a choice on `@discriminator`, and the JSON reader is what settles its shape.** meta.tn
+  declares it as naming "the field a member-dispatching encoding selects a choice's variant on", with force in that
+  class of encodings and none in the model, and states three load-time checks — but no encoding in the class exists,
+  so neither the semantics nor the checks have been exercised by anything. A `choice`-typed position is unreachable
+  from JSON without it, which makes the JSON reader the annotation's first consumer and the first real test of
+  whether dispatch on a flat `REQUIRED_FIXED` field carries the cases JSON actually presents. **A change to the
+  annotation is an expected output of this work, not a failure of it** — it goes to `SPEC-FEEDBACK.md` against the
+  current revision, the same way anything else this implementation is first to exercise does. What the reader owes
+  beyond the dispatch is the verdict for a JSON-facing choice carrying no mark. The three load-time checks are a
+  prerequisite, tracked under "Checked annotations".
+
+- [ ] **Nothing flattens on `@rest`, unexercised for the same reason.** meta.tn declares it for "an encoding that
+  flattens" — the map-typed field a record's undeclared entries live in, a record being closed under its type
+  ([TSON-SCHEMA] §7.2) — which TSON text never is. A JSON reader is where an undeclared member either lands in the
+  marked field or stays `UNRECOGNIZED_FIELD`, and is the first thing able to say whether the directive's stated shape
+  survives a consumer. Its load-time check is likewise tracked under "Checked annotations".
+
+- [ ] **No "can this type receive JSON" answer for a schema author.** Which of an author's types a JSON document can
+  validate against is discoverable only by sending one and reading the failure. The facts that decide it are all
+  available at link time — an undiscriminated `choice` in a JSON-facing position, and a position whose only admissible
+  values are ones JSON cannot spell (a `REQUIRED_FIXED` field fixed to a based-integer or to `.nan`/`.inf`, a `bytes`
+  value) — so this is a report over the linked namespace or a property on `TypeDefinition`, not a new mechanism. What
+  needs deciding is whether it is a diagnostic, a queryable property, or both.
+
+- [ ] **The corpus has no way to state a fact about two encodings.** `class1/`/`class2/` are TSON-processor
+  conformance classes, so a vector asserting that one schema yields one verdict over both encodings has nowhere to go
+  — and §6's directive half, the place TSON text and JSON deliberately differ, is exactly what a single-encoding
+  corpus cannot express. Needs the upstream decision on whether that is a layer, a further conformance class, or a
+  per-vector encoding axis, before any vectors are owed; `RUNNER.md` is normative for whichever shape it takes.
+
+- [ ] **`STRUCTURED-OUTPUT.md`'s JSON section predates `@discriminator` and the void-variant rule, and holds items
+  belonging here.** It asks what a position typed `(T | void)` does with JSON `null`, which
+  `TsonSchemaLinker.checkVariantsAreNotVoid` answers by refusing that position outright (§5.4). It also records
+  untagged-union dispatch as undesigned and wanting a new meta.tn vocabulary addition — which is **not** simply
+  superseded: `@discriminator` is the mechanism in place, the section's own dependent-typing proposal (an enum member
+  carrying a per-member type association) is the alternative it is being tested against, and the annotation is
+  unexercised, so the section should record that pairing rather than drop either half. The engineering items above
+  stay only here.
 
 ## Write side
 
