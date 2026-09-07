@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.atom.AtomType;
-
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.reader.ValueReaderFactory;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;

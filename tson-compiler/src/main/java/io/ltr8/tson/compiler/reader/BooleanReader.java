@@ -1,13 +1,11 @@
 package io.ltr8.tson.compiler.reader;
 
-
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-
 
 /**
  * Reads meta-kernel's {@code boolean => !enum [true false]} as a genuine Java {@code Boolean} rather than

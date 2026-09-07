@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -8,12 +7,11 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 
-
 /**
  * Parses meta-kernel's {@code void} instance of the {@code unit} atom constructor -- per its own
  * kernel doc, "parsing contract admits only the absent sentinel {@code _}. The host value is
  * absent." That contract can't be expressed as an {@code io.ltr8.tson.atom.AtomType<T>} at
- * all ({@code AtomType.read(TokenValue)} only ever sees a token, and {@code _} isn't one), so this
+ * all ({@code AtomType.read} only ever sees a token's text, and {@code _} has none), so this
  * reads the {@link DataValue} directly rather than going through {@link AtomTypeReader}.
  *
  * <p>Reads to plain Java {@code null} -- "the host value is absent" has no more specific natural

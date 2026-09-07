@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.tree.TsonValue;
-
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;

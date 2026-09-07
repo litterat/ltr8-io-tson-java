@@ -5,7 +5,6 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.ast.TokenForm;
-
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayDeque;

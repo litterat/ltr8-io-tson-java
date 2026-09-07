@@ -3,9 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
-
 import io.ltr8.tson.schema.meta.EnumBody;
-
 import java.util.List;
 
 /**

@@ -2,11 +2,9 @@ package io.ltr8.tson.atom;
 
 import io.ltr8.tson.atom.parser.EnumParser;
 import io.ltr8.tson.atom.parser.TextParser;
-
 import io.ltr8.tson.base.unicode.IdentifierStatus;
 import io.ltr8.tson.base.unicode.JoiningControls;
 import io.ltr8.tson.base.unicode.Xid;
-
 import java.text.Normalizer;
 import java.util.Optional;
 

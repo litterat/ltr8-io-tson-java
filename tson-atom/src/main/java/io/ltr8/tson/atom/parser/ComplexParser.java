@@ -2,13 +2,11 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
-
 import io.ltr8.tson.atom.number.ComplexForm;
 import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberForms;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.schema.atom.Complex;
-
 import java.math.BigDecimal;
 import java.util.Optional;
 

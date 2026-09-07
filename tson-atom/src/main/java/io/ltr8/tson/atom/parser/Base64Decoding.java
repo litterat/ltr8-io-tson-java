@@ -1,7 +1,6 @@
 package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
-
 import java.util.Base64;
 
 /**

@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.atom.number.NumberForms;
 

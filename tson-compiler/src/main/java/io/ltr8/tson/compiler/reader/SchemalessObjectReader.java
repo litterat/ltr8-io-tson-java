@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.reader;
 
-
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.Diagnostic;
@@ -40,7 +39,6 @@ import io.ltr8.tson.compiler.stream.RecordEnd;
 import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;

@@ -20,9 +20,7 @@ import io.ltr8.tson.atom.parser.TextParser;
 import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
-
 import io.ltr8.tson.schema.meta.IntegerSize;
-
 import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;

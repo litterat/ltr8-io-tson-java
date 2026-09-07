@@ -3,14 +3,12 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-
 import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberForms;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.atom.number.NumberNarrowing;
 import io.ltr8.tson.schema.meta.IntegerSize;
 import io.ltr8.tson.schema.meta.IntegerType;
-
 import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,10 +34,10 @@ import java.util.stream.Collectors;
  * requires the distinction to survive to error reporting: a token the grammar rejects is a parse
  * error, a parsed value outside the atom's range is a validation error.
  *
- * <p>One parse-then-validate pipeline ({@link #readBigInteger}) backs both {@link #read(TokenValue)}
+ * <p>One parse-then-validate pipeline ({@link #readBigInteger}) backs both {@link #read(String)}
  * (narrows to this atom's own natural host type -- {@link #hostType} when {@code size} is present,
  * {@link BigInteger} otherwise, so a fixed-width {@code int8} instance never hands back a {@code
- * BigInteger} for a value that fits a {@code Byte}) and {@link #read(TokenValue, Class)} (narrows
+ * BigInteger} for a value that fits a {@code Byte}) and {@link #read(String, Class)} (narrows
  * directly to a caller-supplied target via {@link NumberNarrowing}, e.g. {@code !uint8 42} into a
  * declared {@code int} field is one call, no intermediate {@code Number} created). Validation is
  * always against *this atom's own* declared constraint regardless of which entry point is used -- if

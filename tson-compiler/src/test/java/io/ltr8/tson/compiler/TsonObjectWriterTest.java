@@ -1,13 +1,10 @@
 package io.ltr8.tson.compiler;
 
-
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import org.junit.jupiter.api.Test;
-
 import java.util.List;
 import java.util.Optional;
-
 import io.ltr8.tson.compiler.TsonObjectReaderTest.BytesHolder;
 import io.ltr8.tson.compiler.TsonObjectReaderTest.CountsHolder;
 import io.ltr8.tson.compiler.TsonObjectReaderTest.Customer;
@@ -33,7 +30,6 @@ import io.ltr8.tson.compiler.TsonObjectReaderTest.UserFraction;
 import io.ltr8.tson.compiler.TsonObjectReaderTest.UserFractionBridge;
 import io.ltr8.tson.compiler.TsonObjectReaderTest.UserFractionHolder;
 import io.ltr8.tson.compiler.TsonObjectReaderTest.UuidHolder;
-
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

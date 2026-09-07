@@ -1,17 +1,14 @@
 package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.atom.IdentifierParser;
-
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.HostAtoms;
-
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.atom.number.BaseValue;
 import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberForms;
 import io.ltr8.tson.atom.number.NumberNarrowing;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 

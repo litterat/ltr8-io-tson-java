@@ -2,7 +2,6 @@ package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomValidationException;
-
 import java.math.BigInteger;
 import java.util.Optional;
 

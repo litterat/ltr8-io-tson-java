@@ -2,11 +2,9 @@ package io.ltr8.tson.compiler.base;
 
 import io.ltr8.tson.atom.number.BaseValue;
 import io.ltr8.tson.atom.number.NumberForm;
-
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;

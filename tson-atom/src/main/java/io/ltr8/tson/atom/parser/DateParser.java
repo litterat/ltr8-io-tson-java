@@ -3,9 +3,7 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-
 import io.ltr8.tson.schema.meta.DateType;
-
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;

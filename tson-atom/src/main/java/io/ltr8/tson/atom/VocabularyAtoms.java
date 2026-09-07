@@ -13,11 +13,9 @@ import io.ltr8.tson.atom.parser.RationalParser;
 import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
-
 import io.ltr8.tson.atom.parser.*;
 import io.ltr8.tson.schema.atom.Complex;
 import io.ltr8.tson.schema.atom.Rational;
-
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.URI;

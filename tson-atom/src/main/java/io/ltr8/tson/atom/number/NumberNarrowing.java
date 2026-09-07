@@ -1,7 +1,6 @@
 package io.ltr8.tson.atom.number;
 
 import io.ltr8.tson.atom.parser.IntegerParser;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 

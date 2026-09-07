@@ -5,7 +5,6 @@ import io.ltr8.tson.atom.number.BaseValue;
 import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberForms;
 import io.ltr8.tson.atom.number.NumberNarrowing;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 

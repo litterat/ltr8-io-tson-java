@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler.atom;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-
 import io.ltr8.tson.compiler.ast.TokenValue;
 
 /**

@@ -3,7 +3,6 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
-
 import io.ltr8.tson.regex.TsonRegex;
 import io.ltr8.tson.regex.TsonRegexSyntaxException;
 import io.ltr8.tson.schema.meta.RegexType;

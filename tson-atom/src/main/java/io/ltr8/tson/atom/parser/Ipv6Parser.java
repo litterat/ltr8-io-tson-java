@@ -3,12 +3,10 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import java.util.List;
 import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.atom.InternetAddress;
-
 import java.net.Inet6Address;
 import java.net.UnknownHostException;
 import java.util.regex.Pattern;

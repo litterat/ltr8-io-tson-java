@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 
-
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
@@ -46,7 +45,6 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 import org.junit.jupiter.api.io.TempDir;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -68,7 +66,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
-
 import static io.ltr8.tson.suite.Sidecar.fieldCore;
 import static io.ltr8.tson.suite.Sidecar.fieldText;
 import static io.ltr8.tson.suite.Sidecar.fieldTextOrAbsent;

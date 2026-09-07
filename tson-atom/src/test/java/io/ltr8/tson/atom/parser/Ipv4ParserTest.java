@@ -1,12 +1,9 @@
 package io.ltr8.tson.atom.parser;
 
 import io.ltr8.tson.atom.AtomParseException;
-
 import org.junit.jupiter.api.Test;
-
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

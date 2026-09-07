@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.base;
 
 import io.ltr8.tson.atom.number.BaseValue;
 import io.ltr8.tson.atom.number.NumberGrammar;
-
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 

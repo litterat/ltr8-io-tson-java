@@ -37,7 +37,6 @@ import io.ltr8.tson.compiler.lexer.TokenType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.IdentifierParser;
 import io.ltr8.tson.atom.number.NumberGrammar;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;

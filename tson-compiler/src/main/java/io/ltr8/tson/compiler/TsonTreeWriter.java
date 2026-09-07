@@ -1,12 +1,10 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.atom.VocabularyAtoms;
-
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonDocument;
 import io.ltr8.tson.tree.TsonValue;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
