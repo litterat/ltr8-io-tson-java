@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonLimitExceededException;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SourcePosition;
 
@@ -35,7 +36,7 @@ public final class TsonDiagnostics {
      * "malformed").
      *
      * <p><b>Anything else is rethrown, deliberately</b> -- including {@link TsonLimitExceededException},
-     * which has its own classifier ({@link #ofLimitExceeded}) and is caught ahead of this. {@code
+     * which has its own classifier ({@link Diagnostic#ofLimitExceeded}) and is caught ahead of this. {@code
      * Tson.validate} promises never to throw for a
      * bad input <i>document</i>, which is not the same as never throwing: an exception that isn't one of
      * these three is a fault in this library, and turning it into a diagnostic would tell a caller their
@@ -77,26 +78,6 @@ public final class TsonDiagnostics {
                 expected, actual, Optional.ofNullable(position), Optional.empty());
     }
 
-    /**
-     * A document this processor's {@link TsonLimitsPolicy} declined to read ([TSON-DATA] §9.1) -- {@link
-     * #ofBaseSyntaxError}'s sibling, and deliberately not a case inside it.
-     *
-     * <p><b>The two are separated at the type, because they are separated in what they claim.</b> A
-     * base-syntax failure is a verdict every processor reaching the same bytes repeats; this one is a
-     * statement about the reader's configuration, which is why it carries {@link Diagnostic.Code#LIMIT_EXCEEDED}
-     * ({@link Diagnostic.Code#verdict()} {@code false}) and why a facade catches {@link TsonLimitExceededException}
-     * before the {@code RuntimeException} that reaches {@code ofBaseSyntaxError}. Routing it through that
-     * method instead would report a configured bound as malformed input.
-     *
-     * <p>{@code expected}/{@code actual} carry the pair a sender can act on: the depth the reader admits
-     * against the depth the document reached at the point it was stopped. They are the constraint that
-     * failed, in {@code AtomTypeException}'s own vocabulary, rather than the type's name.
-     */
-    public static Diagnostic ofLimitExceeded(TsonLimitExceededException e) {
-        return new Diagnostic(Optional.of(""), Optional.empty(), "", Diagnostic.Code.LIMIT_EXCEEDED, e.getMessage(),
-                "at most " + e.limit() + " levels of nesting", "more than " + e.limit(),
-                Optional.of(e.position()), Optional.empty());
-    }
 
     /**
      * A token whose scripts the read's {@code TsonUnicodePolicy} does not permit ([TSON-DATA] §8.2's

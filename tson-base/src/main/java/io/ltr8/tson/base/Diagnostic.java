@@ -77,6 +77,31 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                           String message, String expected, String actual,
                           Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition) {
 
+    /**
+     * A document this processor's {@link TsonLimitsPolicy} declined to read ([TSON-DATA] §9.1) -- {@code TsonDiagnostics.ofBaseSyntaxError}'s sibling, and deliberately not a case inside it.
+     *
+     * <p><b>The one factory that lives on this record, because it is the one that classifies nothing.</b>
+     * Its nine siblings each switch on an exception type an encoding declares, so they belong to that
+     * encoding ({@code TsonDiagnostics}); this one takes an already-classified refusal and reshapes it, and
+     * a limit refusal is one fact across every encoding ([TSON-JSON] §10.1). It follows its input.
+     *
+     * <p><b>The two are separated at the type, because they are separated in what they claim.</b> A
+     * base-syntax failure is a verdict every processor reaching the same bytes repeats; this one is a
+     * statement about the reader's configuration, which is why it carries {@link Code#LIMIT_EXCEEDED}
+     * ({@link Code#verdict()} {@code false}) and why a facade catches {@link TsonLimitExceededException}
+     * before the {@code RuntimeException} that reaches {@code ofBaseSyntaxError}. Routing it through that
+     * method instead would report a configured bound as malformed input.
+     *
+     * <p>{@code expected}/{@code actual} carry the pair a sender can act on: the depth the reader admits
+     * against the depth the document reached at the point it was stopped. They are the constraint that
+     * failed, in {@code AtomTypeException}'s own vocabulary, rather than the type's name.
+     */
+    public static Diagnostic ofLimitExceeded(TsonLimitExceededException e) {
+        return new Diagnostic(Optional.of(""), Optional.empty(), "", Code.LIMIT_EXCEEDED, e.getMessage(),
+                "at most " + e.limit() + " levels of nesting", "more than " + e.limit(),
+                Optional.of(e.position()), Optional.empty());
+    }
+
     // ── Absence, for a renderer ──────────────────────────────────────────
     //
     // This record spells "nothing to say here" two ways, and both are deliberate: `""` for the three

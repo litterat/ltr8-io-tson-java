@@ -1,6 +1,7 @@
 package io.ltr8.tson.json.stream;
 
-import io.ltr8.tson.json.JsonLimitExceededException;
+import io.ltr8.tson.base.TsonLimitExceededException;
+import io.ltr8.tson.base.TsonLimitsPolicy;
 import io.ltr8.tson.json.JsonParseException;
 import io.ltr8.tson.json.JsonPosition;
 import io.ltr8.tson.json.lexer.JsonLexer;
@@ -42,18 +43,16 @@ import java.util.NoSuchElementException;
  * <p><b>Nesting depth is bounded here</b> ([TSON-JSON] §10.1), because this is the one place every
  * container is opened -- so a refusal lands before any consumer descends, which matters because every
  * consumer of this stream recurses where the stream itself iterates. The bound arrives as an {@code
- * int} rather than as a policy object: §10.1 makes it [TSON-DATA] §9.1's policy "in JSON clothing",
- * one policy across both encodings, so a second policy type here would be a second default to drift.
+ * int} rather than as a policy object because a stream needs one number, not a policy -- but the number
+ * and the refusal are the processor's, not this encoding's: §10.1 makes the bound [TSON-DATA] §9.1's
+ * policy "in JSON clothing, and the same policy applies with the same defaults", so this counts against
+ * {@link TsonLimitsPolicy}'s own default and refuses with {@link TsonLimitExceededException}, the same
+ * type the text encoding refuses with. A second default or a second exception would be a second answer to
+ * one question.
  *
  * <p>Not thread-safe; single-use over one source.
  */
 public final class JsonStream implements JsonEventSource {
-
-    /**
-     * [TSON-DATA] §9.1's own default, and the same number {@code TsonLimitsPolicy.DEFAULT_MAX_DEPTH}
-     * carries -- the tightest bound in common use, so a document that fits travels.
-     */
-    public static final int DEFAULT_MAX_DEPTH = 64;
 
     private final JsonLexer lexer;
     private final int maxDepth;
@@ -98,11 +97,11 @@ public final class JsonStream implements JsonEventSource {
     }
 
     public JsonStream(InputStream source) {
-        this(new JsonLexer(source), DEFAULT_MAX_DEPTH);
+        this(new JsonLexer(source), TsonLimitsPolicy.DEFAULT_MAX_DEPTH);
     }
 
     public JsonStream(String source) {
-        this(new JsonLexer(source), DEFAULT_MAX_DEPTH);
+        this(new JsonLexer(source), TsonLimitsPolicy.DEFAULT_MAX_DEPTH);
     }
 
     public JsonStream(InputStream source, int maxDepth) {
@@ -291,7 +290,7 @@ public final class JsonStream implements JsonEventSource {
 
     private void push(boolean object, JsonPosition at) {
         if (depth == maxDepth) {
-            throw new JsonLimitExceededException(
+            throw new TsonLimitExceededException(
                     "the document nests deeper than this processor reads (%d)".formatted(maxDepth), maxDepth, at);
         }
         if (depth == frames.length) {

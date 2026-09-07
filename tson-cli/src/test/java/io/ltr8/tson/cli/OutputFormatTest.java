@@ -4,7 +4,7 @@ import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonUnicodeProcessorPolicy;
-import io.ltr8.tson.compiler.TsonLimitsPolicy;
+import io.ltr8.tson.base.TsonLimitsPolicy;
 import io.ltr8.tson.compiler.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.TsonReadContext;
 import org.junit.jupiter.api.Test;

@@ -3,8 +3,9 @@
  *
  * <p>A pure leaf, depending on nothing. It holds {@link io.ltr8.tson.base.Diagnostic} -- one record for
  * every problem the library states, with the closed {@code Code} enum a consumer routes on -- the
- * receivers that decide a diagnostic's fate, and {@link io.ltr8.tson.base.SourcePosition}, the three
- * coordinates a report points at.
+ * receivers that decide a diagnostic's fate, {@link io.ltr8.tson.base.SourcePosition} -- the three
+ * coordinates a report points at -- and {@link io.ltr8.tson.base.TsonLimitsPolicy} with the refusal it
+ * raises, which [TSON-JSON] §10.1 makes one policy across every encoding "with the same defaults".
  *
  * <p><b>Why a module of its own.</b> [TSON-JSON] §9.4 makes the JSON encoding report in
  * [TSON-DATA] §8.1's four categories and adds none of its own, so the vocabulary is one vocabulary across
