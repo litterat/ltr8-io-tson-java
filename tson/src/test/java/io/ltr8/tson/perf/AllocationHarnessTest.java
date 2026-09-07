@@ -1,6 +1,6 @@
 package io.ltr8.tson.perf;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.compiler.TsonDataEmitter;
 import io.ltr8.tson.compiler.TsonDataStream;
@@ -195,7 +195,7 @@ class AllocationHarnessTest {
         double unrestricted = AllocationProbe.allocatedPerOperation(20_000, () ->
                 AllocationProbe.sink = reader.read(DOCUMENT, Order.class));
         double restricted = AllocationProbe.allocatedPerOperation(20_000, () -> AllocationProbe.sink =
-                reader.withTokenPolicy(TsonUnicodePolicy.highlyRestrictive()).read(DOCUMENT, Order.class));
+                reader.withTokenPolicy(UnicodePolicy.highlyRestrictive()).read(DOCUMENT, Order.class));
         double overhead = restricted - unrestricted;
 
         report("allocated per read, tokenPolicy raised to highlyRestrictive", restricted, "bytes");

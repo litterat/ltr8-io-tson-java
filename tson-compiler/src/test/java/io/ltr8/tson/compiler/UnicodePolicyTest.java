@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import org.junit.jupiter.api.Test;
 
 import static java.lang.Character.UnicodeScript.CYRILLIC;
@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Mixed-script names are built from code points, never typed: the whole subject is spellings that look
  * alike, so a literal would be unreviewable.
  */
-class TsonUnicodePolicyTest {
+class UnicodePolicyTest {
 
     private static final String CYR_A = new String(Character.toChars(0x0430));   // а
     private static final String CYR_P = new String(Character.toChars(0x043F));   // п
@@ -22,19 +22,19 @@ class TsonUnicodePolicyTest {
     private static final String HAN = new String(Character.toChars(0x65E5));     // 日
     private static final String DEVANAGARI = new String(Character.toChars(0x0905));
 
-    private static void accepts(TsonUnicodePolicy policy, String text) {
+    private static void accepts(UnicodePolicy policy, String text) {
         assertTrue(policy.violation(text).isEmpty(),
                 () -> policy + " should accept " + text + " but said " + policy.violation(text).orElse(""));
     }
 
-    private static void refuses(TsonUnicodePolicy policy, String text) {
+    private static void refuses(UnicodePolicy policy, String text) {
         assertFalse(policy.violation(text).isEmpty(), () -> policy + " should refuse " + text);
     }
 
     /** The default: strictest of the practically deployable levels, and a level UTS #39 names. */
     @Test
     void highlyRestrictiveOverAWholeNameIsTheDefaultPosition() {
-        TsonUnicodePolicy policy = TsonUnicodePolicy.highlyRestrictive();
+        UnicodePolicy policy = UnicodePolicy.highlyRestrictive();
 
         accepts(policy, "admin");
         accepts(policy, "пользователь");
@@ -47,7 +47,7 @@ class TsonUnicodePolicyTest {
     /** The first relaxation: the unit, not the level. It keeps every rejection that matters. */
     @Test
     void perSegmentKeepsTheHomographsAndAdmitsTheCompounds() {
-        TsonUnicodePolicy policy = TsonUnicodePolicy.highlyRestrictive().perSegment();
+        UnicodePolicy policy = UnicodePolicy.highlyRestrictive().perSegment();
 
         accepts(policy, "id_" + CYR_P);
         accepts(policy, "alpha_" + GREEK_ALPHA);
@@ -59,7 +59,7 @@ class TsonUnicodePolicyTest {
     /** The narrowest relaxation: name the combination instead of dropping a level. */
     @Test
     void anAdditionalPermittedSetAdmitsOnlyThatCombination() {
-        TsonUnicodePolicy policy = TsonUnicodePolicy.highlyRestrictive().permitting(LATIN, CYRILLIC);
+        UnicodePolicy policy = UnicodePolicy.highlyRestrictive().permitting(LATIN, CYRILLIC);
 
         accepts(policy, "id_" + CYR_P);
         accepts(policy, CYR_A + "dmin");                      // deliberately: the deployment said so
@@ -69,7 +69,7 @@ class TsonUnicodePolicyTest {
     /** Moderately Restrictive: Latin plus one other, except the two §5.2 names. */
     @Test
     void moderatelyRestrictiveAdmitsLatinPlusOneExceptCyrillicAndGreek() {
-        TsonUnicodePolicy policy = TsonUnicodePolicy.moderatelyRestrictive();
+        UnicodePolicy policy = UnicodePolicy.moderatelyRestrictive();
 
         accepts(policy, "id_" + DEVANAGARI);
         refuses(policy, "id_" + CYR_P);
@@ -78,14 +78,14 @@ class TsonUnicodePolicyTest {
 
     @Test
     void singleScriptRefusesEvenTheAugmentedSets() {
-        accepts(TsonUnicodePolicy.singleScript(), "admin");
-        refuses(TsonUnicodePolicy.singleScript(), HAN + HAN + "id");
+        accepts(UnicodePolicy.singleScript(), "admin");
+        refuses(UnicodePolicy.singleScript(), HAN + HAN + "id");
     }
 
     @Test
     void asciiOnlyIsWhatItSays() {
-        accepts(TsonUnicodePolicy.asciiOnly(), "order_id");
-        refuses(TsonUnicodePolicy.asciiOnly(), "café");
+        accepts(UnicodePolicy.asciiOnly(), "order_id");
+        refuses(UnicodePolicy.asciiOnly(), "café");
     }
 
     /**
@@ -94,8 +94,8 @@ class TsonUnicodePolicyTest {
      */
     @Test
     void theTwoOffPositionsDifferOnlyInTheIdentifierProfile() {
-        TsonUnicodePolicy five = TsonUnicodePolicy.scriptsUnchecked();
-        TsonUnicodePolicy six = TsonUnicodePolicy.unrestricted();
+        UnicodePolicy five = UnicodePolicy.scriptsUnchecked();
+        UnicodePolicy six = UnicodePolicy.unrestricted();
 
         assertFalse(five.checksScripts());
         assertFalse(six.checksScripts());

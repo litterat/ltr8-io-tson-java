@@ -4,8 +4,8 @@ import java.util.Objects;
 
 /**
  * What this processor will admit, and what it will spend -- everything about a read that is neither in the
- * document nor in the schema. The two {@link TsonUnicodePolicy} surfaces [TSON-DATA] §8.2 defines, the
- * Unicode data version they were computed against, and the {@link TsonLimitsPolicy} bounds of §9.1.
+ * document nor in the schema. The two {@link UnicodePolicy} surfaces [TSON-DATA] §8.2 defines, the
+ * Unicode data version they were computed against, and the {@link LimitsPolicy} bounds of §9.1.
  *
  * <p><b>Three settings, one value, because a deployment states one policy.</b> The limits used to sit
  * beside this record rather than inside it, on the argument that "what this processor will spend" and "what
@@ -58,14 +58,14 @@ import java.util.Objects;
  * @param identifierPolicy    the policy applied to names -- {@code TsonConfig.identifierPolicy}
  * @param tokenPolicy         the policy applied to token values -- {@code TsonConfig.tokenPolicy}
  * @param limits              what this processor will spend reading a document -- {@code TsonConfig.limits}
- * @param unicodeDataVersion  {@link TsonUnicodePolicy#dataVersion()}, the UCD release whose tables the
+ * @param unicodeDataVersion  {@link UnicodePolicy#dataVersion()}, the UCD release whose tables the
  *                            rules were computed against ([TSON-DATA] §8.2 on why that is the
  *                            version §8.2's "UTS #39 data version" means)
  */
-public record TsonProcessorPolicy(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy tokenPolicy,
-                                  TsonLimitsPolicy limits, String unicodeDataVersion) {
+public record ProcessorPolicy(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
+                              LimitsPolicy limits, String unicodeDataVersion) {
 
-    public TsonProcessorPolicy {
+    public ProcessorPolicy {
         Objects.requireNonNull(identifierPolicy, "identifierPolicy");
         Objects.requireNonNull(tokenPolicy, "tokenPolicy");
         Objects.requireNonNull(limits, "limits");
@@ -79,9 +79,9 @@ public record TsonProcessorPolicy(TsonUnicodePolicy identifierPolicy, TsonUnicod
      * into this library, and a caller stating a different one would be describing a processor that does not
      * exist.
      */
-    public static TsonProcessorPolicy of(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy tokenPolicy,
-                                        TsonLimitsPolicy limits) {
-        return new TsonProcessorPolicy(identifierPolicy, tokenPolicy, limits, TsonUnicodePolicy.dataVersion());
+    public static ProcessorPolicy of(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
+                                     LimitsPolicy limits) {
+        return new ProcessorPolicy(identifierPolicy, tokenPolicy, limits, UnicodePolicy.dataVersion());
     }
 
     @Override

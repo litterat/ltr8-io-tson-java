@@ -12,7 +12,7 @@ package io.ltr8.tson.base;
  * Diagnostic.Code#verdict()} is {@code false}, and never one of the codes that assert something about the
  * document's conformance.
  *
- * <p><b>Why the limits are a value and not a constant.</b> The argument is {@code TsonProcessorPolicy}'s, and for the same reason: the bound is the reading deployment's own choice,
+ * <p><b>Why the limits are a value and not a constant.</b> The argument is {@code ProcessorPolicy}'s, and for the same reason: the bound is the reading deployment's own choice,
  * so the same bytes may be accepted by one server and refused by another, and that divergence is
  * unexplainable unless the configuration can be stated. A sender that can read the limits writes a document
  * that fits; one that cannot learns them one round trip too late. It is reported by the same surfaces --
@@ -34,7 +34,7 @@ package io.ltr8.tson.base;
  *
  * @param maxDepth the deepest a container may nest before the read is refused -- see {@link #maxDepth()}
  */
-public record TsonLimitsPolicy(int maxDepth) {
+public record LimitsPolicy(int maxDepth) {
 
     /**
      * The default nesting depth, 64.
@@ -52,15 +52,15 @@ public record TsonLimitsPolicy(int maxDepth) {
      */
     public static final int DEFAULT_MAX_DEPTH = 64;
 
-    public TsonLimitsPolicy {
+    public LimitsPolicy {
         if (maxDepth < 1) {
             throw new IllegalArgumentException("maxDepth must be at least 1, not " + maxDepth);
         }
     }
 
     /** The limits a processor applies when a caller has stated none. */
-    public static TsonLimitsPolicy defaults() {
-        return new TsonLimitsPolicy(DEFAULT_MAX_DEPTH);
+    public static LimitsPolicy defaults() {
+        return new LimitsPolicy(DEFAULT_MAX_DEPTH);
     }
 
     /**
@@ -72,8 +72,8 @@ public record TsonLimitsPolicy(int maxDepth) {
      * replaces is not a diagnostic at all. A depth set above what the host stack carries reintroduces exactly
      * that, which is a choice a caller may make and not one this offers a name for.
      */
-    public TsonLimitsPolicy withMaxDepth(int depth) {
-        return new TsonLimitsPolicy(depth);
+    public LimitsPolicy withMaxDepth(int depth) {
+        return new LimitsPolicy(depth);
     }
 
     /**

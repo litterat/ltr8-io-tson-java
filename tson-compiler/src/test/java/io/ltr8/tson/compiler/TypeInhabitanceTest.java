@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
@@ -216,7 +216,7 @@ class TypeInhabitanceTest {
     /** Collecting mode reports each uninhabited entry against itself rather than stopping at the first. */
     @Test
     void everyUninhabitedEntryIsReportedNotJustTheFirst() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("x", TypeDefinition.product(RecordBody.of(
                 List.of(RecordField.required("y", TypeRef.of("y"))))));

@@ -1,19 +1,14 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonProcessorPolicy;
-import io.ltr8.tson.base.TsonUnicodePolicy;
-import io.ltr8.tson.base.TsonLimitExceededException;
-import io.ltr8.tson.base.TsonLimitsPolicy;
-import io.ltr8.tson.base.TsonReadException;
-import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.*;
+import io.ltr8.tson.base.UnicodePolicy;
+
 import java.util.Objects;
 import io.ltr8.tson.compiler.reader.EventSkip;
 import io.ltr8.tson.compiler.reader.SchemalessTreeReader;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.compiler.stream.TypeRef;
 import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonRecord;
 import io.ltr8.tson.tree.TsonDocument;
@@ -40,8 +35,8 @@ import java.io.InputStream;
  *
  * <p>Either way the tree is streamed off the event source ({@link TsonDataStream}) directly, building nodes
  * as events arrive without an intermediate {@code DataValue} AST. A read is fail-fast by default: a malformed
- * document or an out-of-range typed value throws {@link TsonReadException} at the first problem. {@link
- * #withDiagnostics} swaps that for any other {@link TsonDiagnosticsReceiver} -- a collector gathers every
+ * document or an out-of-range typed value throws {@link ReadException} at the first problem. {@link
+ * #withDiagnostics} swaps that for any other {@link DiagnosticsReceiver} -- a collector gathers every
  * problem in one pass and still hands back the (possibly partial) tree, in schema-aware and schemaless mode
  * alike. That is what makes this reader, with a collecting receiver, exactly what {@code Tson#validate}
  * delegates to.
@@ -69,18 +64,18 @@ public final class TsonTreeReader {
     private final TsonCompiledSchemaRegistry tree;
 
     /** Where this reader's reads report their problems -- fail-fast unless {@link #withDiagnostics} said otherwise. */
-    private final TsonDiagnosticsReceiver receiver;
+    private final DiagnosticsReceiver receiver;
 
     /** The schema {@link #readAs} validates against, or {@code null} until {@link #withSchema} names one. */
     private final String schemaUri;
 
     /** UTS #39 §5.2 over every token this reader pulls. Never {@code null} -- the unset default is
-     * {@link TsonUnicodePolicy#unrestricted()}, which checks nothing. */
-    private final TsonUnicodePolicy tokenPolicy;
-    private final TsonUnicodePolicy identifierPolicy;
+     * {@link UnicodePolicy#unrestricted()}, which checks nothing. */
+    private final UnicodePolicy tokenPolicy;
+    private final UnicodePolicy identifierPolicy;
 
     /** [TSON-DATA] §9.1's bounds on what this reader will spend. Never {@code null}. */
-    private final TsonLimitsPolicy limits;
+    private final LimitsPolicy limits;
 
     /**
      * Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved and
@@ -95,9 +90,9 @@ public final class TsonTreeReader {
      *         bound objects this reader cannot assemble into a tree
      */
     public TsonTreeReader(TsonCompiledSchemaRegistry tree) {
-        this(requireTreeMode(tree), TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(),
-                TsonUnicodePolicy.unrestricted(), TsonUnicodePolicy.highlyRestrictive(),
-                TsonLimitsPolicy.defaults());
+        this(requireTreeMode(tree), DiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(),
+                UnicodePolicy.unrestricted(), UnicodePolicy.highlyRestrictive(),
+                LimitsPolicy.defaults());
     }
 
     /**
@@ -121,15 +116,15 @@ public final class TsonTreeReader {
 
     /** Schemaless (Class 1) -- reads the wire structure into a tree, ignoring any {@code !!schema} the document declares. */
     public TsonTreeReader() {
-        this(null, TsonDiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(),
-                TsonUnicodePolicy.unrestricted(), TsonUnicodePolicy.highlyRestrictive(),
-                TsonLimitsPolicy.defaults());
+        this(null, DiagnosticsReceiver.throwing(), null, new SchemalessTreeReader(),
+                UnicodePolicy.unrestricted(), UnicodePolicy.highlyRestrictive(),
+                LimitsPolicy.defaults());
     }
 
     /** Shares {@code tree} rather than rebuilding it -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
-    private TsonTreeReader(TsonCompiledSchemaRegistry tree, TsonDiagnosticsReceiver receiver, String schemaUri,
-                           SchemalessTreeReader schemaless, TsonUnicodePolicy tokenPolicy,
-                           TsonUnicodePolicy identifierPolicy, TsonLimitsPolicy limits) {
+    private TsonTreeReader(TsonCompiledSchemaRegistry tree, DiagnosticsReceiver receiver, String schemaUri,
+                           SchemalessTreeReader schemaless, UnicodePolicy tokenPolicy,
+                           UnicodePolicy identifierPolicy, LimitsPolicy limits) {
         this.tree = tree;
         this.receiver = receiver;
         this.schemaUri = schemaUri;
@@ -191,7 +186,7 @@ public final class TsonTreeReader {
      *         UTS #39's own {@code Toys-Я-Us} -- the spoof a strict token policy exists to refuse. Refused
      *         rather than ignored, so a policy that cannot mean what it says is never silently accepted.
      */
-    public TsonTreeReader withTokenPolicy(TsonUnicodePolicy policy) {
+    public TsonTreeReader withTokenPolicy(UnicodePolicy policy) {
         Objects.requireNonNull(policy, "policy");
         if (policy.isPerSegment()) {
             throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
@@ -211,7 +206,7 @@ public final class TsonTreeReader {
      * is greppable, attributable, and scoped to the reader that holds it.
      *
      * <p><b>The relaxation to reach for first is the unit, not the level</b> ({@link
-     * TsonUnicodePolicy#perSegment}). Applied per {@code _}/{@code -} delimited segment, Highly Restrictive
+     * UnicodePolicy#perSegment}). Applied per {@code _}/{@code -} delimited segment, Highly Restrictive
      * still refuses every within-word homograph while admitting the compounds that mix a Latin abbreviation
      * with a name in another script -- {@code id_пользователя}, {@code url_адрес} -- which is the common case
      * for an author working outside Latin script.
@@ -220,7 +215,7 @@ public final class TsonTreeReader {
      * legitimately be anything, so tokens default to Unrestricted, while a name is what a reader has to be
      * able to tell apart. A token policy stricter than this one subsumes it -- a name is a token.
      */
-    public TsonTreeReader withIdentifierPolicy(TsonUnicodePolicy policy) {
+    public TsonTreeReader withIdentifierPolicy(UnicodePolicy policy) {
         Objects.requireNonNull(policy, "policy");
         return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy, policy, limits);
     }
@@ -235,7 +230,7 @@ public final class TsonTreeReader {
      * list.</p>
      *
      * <pre>{@code
-     * var problems = TsonDiagnosticsReceiver.collecting();
+     * var problems = DiagnosticsReceiver.collecting();
      * TsonValue tree = tson.treeReader().withDiagnostics(problems).read(source);
      * problems.diagnostics();      // every problem, alongside a possibly-partial tree
      * }</pre>
@@ -243,7 +238,7 @@ public final class TsonTreeReader {
      * <p>Applies to the whole-document entry points only. {@link #read(TsonReadContext)} takes a context that
      * carries its own receiver, and that one wins.
      */
-    public TsonTreeReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
+    public TsonTreeReader withDiagnostics(DiagnosticsReceiver receiver) {
         return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy, identifierPolicy, limits);
     }
 
@@ -256,8 +251,8 @@ public final class TsonTreeReader {
      * derived reader ({@link #withIdentifierPolicy}, {@link #withTokenPolicy}) is exactly where the two can differ,
      * and a response quoting the wrong one is worse than quoting none.
      */
-    public TsonProcessorPolicy processorPolicy() {
-        return TsonProcessorPolicy.of(identifierPolicy, tokenPolicy, limits);
+    public ProcessorPolicy processorPolicy() {
+        return ProcessorPolicy.of(identifierPolicy, tokenPolicy, limits);
     }
 
     /**
@@ -266,7 +261,7 @@ public final class TsonTreeReader {
      * code rather than from the ambient environment, for the reason {@link #withTokenPolicy} is: a limit a
      * deployment did not choose is one it cannot explain.
      */
-    public TsonTreeReader withLimits(TsonLimitsPolicy limits) {
+    public TsonTreeReader withLimits(LimitsPolicy limits) {
         return new TsonTreeReader(tree, receiver, schemaUri, schemaless, tokenPolicy, identifierPolicy, limits);
     }
 
@@ -277,7 +272,7 @@ public final class TsonTreeReader {
      * <p>Read off the reader that judged, for {@link #processorPolicy}'s own reason: {@link #withLimits} is
      * where a derived reader and its parent can differ.
      */
-    public TsonLimitsPolicy limitsPolicy() {
+    public LimitsPolicy limitsPolicy() {
         return limits;
     }
 
@@ -433,7 +428,7 @@ public final class TsonTreeReader {
      * Diagnostic#ofLimitExceeded}'s reason for existing beside {@code ofBaseSyntaxError}.
      */
     private TsonValue readFailure(RuntimeException e) {
-        receiver.report(e instanceof TsonLimitExceededException limit
+        receiver.report(e instanceof LimitExceededException limit
                 ? Diagnostic.ofLimitExceeded(limit)
                 : TsonDiagnostics.ofBaseSyntaxError(e));
         return null;

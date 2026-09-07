@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.tree.TsonMap;
 import io.ltr8.tson.tree.TsonRecord;
 import io.ltr8.tson.tree.TsonValue;
@@ -35,14 +35,14 @@ class NfcNameIdentityTest {
 
     @Test
     void theTwoSpellingsAreOneFieldName() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> read("{ \"" + NFC + "\": 1  \"" + NFD + "\": 2 }"));
         assertTrue(thrown.getMessage().contains("duplicate field"), thrown.getMessage());
     }
 
     @Test
     void theTwoSpellingsAreOneMapKey() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> read("{ \"" + NFC + "\" => 1  \"" + NFD + "\" => 2 }"));
         assertTrue(thrown.getMessage().contains("duplicate key"), thrown.getMessage());
     }
@@ -63,7 +63,7 @@ class NfcNameIdentityTest {
     /** §2.5's own example, which held before and still does: quoting is not part of a name's identity. */
     @Test
     void aBareNameAndItsQuotedSpellingAreOneName() {
-        assertTrue(assertThrows(TsonReadException.class, () -> read("{ name: 1  \"name\": 2 }"))
+        assertTrue(assertThrows(ReadException.class, () -> read("{ name: 1  \"name\": 2 }"))
                 .getMessage().contains("duplicate field"));
     }
 
@@ -82,6 +82,6 @@ class NfcNameIdentityTest {
     /** And an unquoted name was never at risk: the lexer refuses a non-NFC unquoted token outright (§7.2.1). */
     @Test
     void anUnquotedNonNfcTokenIsStillALexerError() {
-        assertThrows(TsonReadException.class, () -> read("{ " + NFD + ": 1 }"));
+        assertThrows(ReadException.class, () -> read("{ " + NFD + ": 1 }"));
     }
 }

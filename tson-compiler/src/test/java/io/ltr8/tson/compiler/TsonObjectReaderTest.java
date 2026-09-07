@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.annotation.Atom;
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Field;
@@ -104,7 +104,7 @@ class TsonObjectReaderTest {
 
     @Test
     void missingRequiredFieldThrows() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ y: 2 }", Point.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ y: 2 }", Point.class));
     }
 
     @Test
@@ -113,11 +113,11 @@ class TsonObjectReaderTest {
         // That recovery still runs underneath -- see
         // DuplicateFieldTest, which can observe it; bind mode is all-or-nothing (ConstructionGuard), so a
         // reported document binds to null whatever the problem was and this one asserts the verdict only.
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> mapper.read("{ x: 1 x: 99 y: 2 }", Point.class));
         assertTrue(thrown.getMessage().contains("duplicate field 'x'"), thrown.getMessage());
 
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
         mapper.withDiagnostics(problems).read("{ x: 1 x: 99 y: 2 }", Point.class);
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD),
                 problems.diagnostics().stream().map(Diagnostic::code).toList());
@@ -266,7 +266,7 @@ class TsonObjectReaderTest {
 
     @Test
     void atMostOneCarrierIsAllowed() {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ name: Widget }", TwoCarriers.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ name: Widget }", TwoCarriers.class));
     }
 
     // ── Arrays ───────────────────────────────────────────────────────────
@@ -337,11 +337,11 @@ class TsonObjectReaderTest {
         // §2.6, the map half of the record rule above. "Last value wins" still falls out of the repeated
         // put() calls in source order; MapTreeReaderTest is where that is observable, since bind mode is
         // all-or-nothing (ConstructionGuard) and this document binds to null once anything is reported.
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> mapper.read("{ counts: { apples => 3 apples => 7 } }", CountsHolder.class));
         assertTrue(thrown.getMessage().contains("duplicate key 'apples'"), thrown.getMessage());
 
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
         mapper.withDiagnostics(problems).read("{ counts: { apples => 3 apples => 7 } }", CountsHolder.class);
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_MAP_KEY),
                 problems.diagnostics().stream().map(Diagnostic::code).toList());
@@ -352,7 +352,7 @@ class TsonObjectReaderTest {
         // §2.9: "_" MUST NOT appear as a map key -- a resolver-layer constraint, not a grammar
         // one, so the compiler itself accepts { _ => 1 } (see TsonDataParserTest); toMap is where it's
         // actually rejected.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ counts: { _ => 3 } }", CountsHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ counts: { _ => 3 } }", CountsHolder.class));
     }
 
     @Test
@@ -410,14 +410,14 @@ class TsonObjectReaderTest {
     void tupleRejectsRecordSyntax() throws DataBindException {
         // { name: ... age: ... } is a TSON record, not an array -- @Tuple binds positionally from
         // an ArrayValue only.
-        assertThrows(TsonReadException.class,
+        assertThrows(ReadException.class,
                 () -> mapper.read("{ person: { name: Alice age: 30 } }", PersonHolder.class));
     }
 
     @Test
     void tupleRejectsWrongArity() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ person: [ Alice ] }", PersonHolder.class));
-        assertThrows(TsonReadException.class,
+        assertThrows(ReadException.class, () -> mapper.read("{ person: [ Alice ] }", PersonHolder.class));
+        assertThrows(ReadException.class,
                 () -> mapper.read("{ person: [ Alice 30 extra ] }", PersonHolder.class));
     }
 
@@ -469,7 +469,7 @@ class TsonObjectReaderTest {
 
     @Test
     void cannotBindTheAbsentSentinelToPrimitive() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ x: _ }", RequiresInt.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ x: _ }", RequiresInt.class));
     }
 
     // ── Atoms: enums (EnumStringBridge) ──────────────────────────────────
@@ -496,7 +496,7 @@ class TsonObjectReaderTest {
 
     @Test
     void unrecognizedEnumMemberThrows() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ color: PURPLE }", Paint.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ color: PURPLE }", Paint.class));
     }
 
     public record UnannotatedColorHolder(UnannotatedColor color) {
@@ -567,7 +567,7 @@ class TsonObjectReaderTest {
 
     @Test
     void floatFormCannotBindToIntegralType() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: 199.90 }", IntHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: 199.90 }", IntHolder.class));
     }
 
     public record ByteHolder(byte value) {
@@ -575,7 +575,7 @@ class TsonObjectReaderTest {
 
     @Test
     void overflowingIntegerThrows() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: 1000 }", ByteHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: 1000 }", ByteHolder.class));
     }
 
     public record DoublePair(double a, double b) {
@@ -611,13 +611,13 @@ class TsonObjectReaderTest {
         // Class 1 processing step (tson-compiler), not this binding layer -- an unresolvable
         // annotation on a value we're actively binding to a declared type is treated as an error,
         // so a typo doesn't silently disable the validation the author intended.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !notabuiltin 42 }", IntHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !notabuiltin 42 }", IntHolder.class));
     }
 
     @Test
     void caseSensitiveTypoOfABuiltinNameIsRejectedRatherThanSilentlyUnvalidated() throws DataBindException {
         // §5.1: "Annotation names are case-sensitive." !Int32 is not !int32.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !Int32 42 }", IntHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !Int32 42 }", IntHolder.class));
     }
 
     // ── Type-refs on a container (TypeRefCheck's rules) ─────────────────────
@@ -625,8 +625,8 @@ class TsonObjectReaderTest {
     @Test
     void aBuiltInTypeRefOnAContainerIsAMismatch() {
         // !uuid names a scalar atom; a record is not one, whatever the target class says.
-        assertThrows(TsonReadException.class, () -> mapper.read("!uuid { x: 1  y: 2 }", Point.class));
-        assertThrows(TsonReadException.class, () -> mapper.read("{ tags: !date [\"a\"] }", StringListHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("!uuid { x: 1  y: 2 }", Point.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ tags: !date [\"a\"] }", StringListHolder.class));
     }
 
     @Test
@@ -644,7 +644,7 @@ class TsonObjectReaderTest {
 
     @Test
     void aTypeRefOnAContainerThatNamesNothingIsReported() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> mapper.read("!nosuchtype { x: 1  y: 2 }", Point.class));
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, thrown.diagnostic().code());
     }
@@ -652,7 +652,7 @@ class TsonObjectReaderTest {
     /** A collection target answers to no wire name at all, so a tagged array is reported -- the documented sharp edge. */
     @Test
     void aTypeRefOnACollectionTargetHasNothingToNameAndIsReported() {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ tags: !tags [\"a\"] }", StringListHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ tags: !tags [\"a\"] }", StringListHolder.class));
     }
 
     // ── All-or-nothing binding (ConstructionGuard, GitHub #7) ──────────────
@@ -665,7 +665,7 @@ class TsonObjectReaderTest {
      */
     @Test
     void aDocumentThatReportedAnythingBindsToNull() {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertNull(mapper.withDiagnostics(problems).read("{ x: 1  y: nope }", Point.class));
         assertEquals(List.of(Diagnostic.Code.TYPE_MISMATCH),
@@ -679,7 +679,7 @@ class TsonObjectReaderTest {
      */
     @Test
     void aReportedTypeRefOnTheRootValueStillBindsToNull() {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertNull(mapper.withDiagnostics(problems).read("!nosuchtype { x: 1  y: 2 }", Point.class));
         assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
@@ -693,7 +693,7 @@ class TsonObjectReaderTest {
      */
     @Test
     void aRootArrayWithAFailedElementBindsToNullRatherThanToAHole() {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertNull(mapper.withDiagnostics(problems).read("[1 !notabuiltin 2 3]", int[].class));
         assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
@@ -703,7 +703,7 @@ class TsonObjectReaderTest {
     /** A clean document is unaffected: the rule only ever turns a reported read into {@code null}. */
     @Test
     void aCleanDocumentBindsNormallyUnderACollectingReceiver() throws DataBindException {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertEquals(new Point(1, 2), mapper.withDiagnostics(problems).read("{ x: 1  y: 2 }", Point.class));
         assertTrue(problems.diagnostics().isEmpty());
@@ -723,7 +723,7 @@ class TsonObjectReaderTest {
      */
     @Test
     void anUnbindableTargetIsReportedRatherThanBreakingTheDocumentFraming() {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertNull(mapper.withDiagnostics(problems).read("{ x: 1  y: 2 }", Unbindable.class));
         assertEquals(List.of(Diagnostic.Code.SCHEMA_ERROR),
@@ -733,7 +733,7 @@ class TsonObjectReaderTest {
     /** The leading {@code annotation* type-ref?} framing is part of the value, so it is skipped with it. */
     @Test
     void anUnbindableTargetConsumesTheRootValuesFramingToo() {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertNull(mapper.withDiagnostics(problems).read("@doc:\"why\" !point { x: 1  y: 2 }", Unbindable.class));
         assertEquals(List.of(Diagnostic.Code.SCHEMA_ERROR),
@@ -746,7 +746,7 @@ class TsonObjectReaderTest {
      */
     @Test
     void anUnbindableTargetStillLeavesTrailingContentRejected() {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertNull(mapper.withDiagnostics(problems).read("{ x: 1  y: 2 } junk", Unbindable.class));
         assertEquals(List.of(Diagnostic.Code.SCHEMA_ERROR, Diagnostic.Code.VALIDATION_ERROR),
@@ -756,7 +756,7 @@ class TsonObjectReaderTest {
     /** Fail-fast is unchanged: the first problem throws, naming the class, before framing can matter. */
     @Test
     void anUnbindableTargetThrowsUnderTheFailFastReceiver() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> mapper.read("{ x: 1  y: 2 }", Unbindable.class));
 
         assertEquals(Diagnostic.Code.SCHEMA_ERROR, thrown.diagnostic().code());
@@ -776,8 +776,8 @@ class TsonObjectReaderTest {
     void preservingStillChecksBuiltInTypeRefs() {
         TsonObjectReader lenient = mapper.preservingUnknownTypeRefs();
 
-        assertThrows(TsonReadException.class, () -> lenient.read("{ value: !uint8 300 }", IntHolder.class));
-        assertThrows(TsonReadException.class, () -> lenient.read("!uuid { x: 1  y: 2 }", Point.class));
+        assertThrows(ReadException.class, () -> lenient.read("{ value: !uint8 300 }", IntHolder.class));
+        assertThrows(ReadException.class, () -> lenient.read("!uuid { x: 1  y: 2 }", Point.class));
     }
 
     /**
@@ -786,7 +786,7 @@ class TsonObjectReaderTest {
      */
     @Test
     void aBuiltinConstraintViolationCarriesTheViolatedBound() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         mapper.withDiagnostics(problems).read("{ value: !uint8 300 }", IntHolder.class);
 
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
@@ -805,25 +805,25 @@ class TsonObjectReaderTest {
     void builtinIntegerAnnotationValidatesAgainstItsOwnRangeNotJustTheTarget() throws DataBindException {
         // 300 would fit comfortably in an int field, but uint8's own declared range rejects it --
         // the built-in vocabulary's constraint applies regardless of how wide the target is.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !uint8 300 }", IntHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !uint8 300 }", IntHolder.class));
     }
 
     @Test
     void builtinIntegerAnnotationRejectsATargetNarrowerThanItsOwnGuarantee() throws DataBindException {
         // int32 guarantees up to 2^31-1; a byte target can't hold 200 even though 200 alone would
         // satisfy int32's own range.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !int32 200 }", ByteHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !int32 200 }", ByteHolder.class));
     }
 
     @Test
     void unsignedNegativeValueParsesThenFailsValidationThroughTheMapper() throws DataBindException {
         // §5.6: "the range constraint, not the lexer, enforces unsignedness" -- exercised end to end.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !uint32 -10 }", IntHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !uint32 -10 }", IntHolder.class));
     }
 
     @Test
     void nonIntegerTokenUnderAnIntegerAnnotationIsAParseErrorThroughTheMapper() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !int32 3.14 }", IntHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !int32 3.14 }", IntHolder.class));
     }
 
     public record WideInt(long value) {
@@ -847,7 +847,7 @@ class TsonObjectReaderTest {
     @Test
     void builtinNumberAnnotationRejectsSpecialValuesThroughTheMapper() throws DataBindException {
         // §5.6: "!number, being exact, does not accept the special values."
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !number .inf }", DecimalHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !number .inf }", DecimalHolder.class));
     }
 
     @Test
@@ -867,7 +867,7 @@ class TsonObjectReaderTest {
     @Test
     void builtinFloat64AnnotationRejectsBasedIntegerThroughTheMapper() throws DataBindException {
         // §5.6: float atoms accept integer/float/hex-float/special-value, not based-integer.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !float64 0xFF }", DoubleHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !float64 0xFF }", DoubleHolder.class));
     }
 
     // ── UUID (§5.5) ──────────────────────────────────────────────────────
@@ -888,7 +888,7 @@ class TsonObjectReaderTest {
     @Test
     void builtinUuidAnnotationRejectsMalformedUuidThroughTheMapper() throws DataBindException {
         // UUID.fromString itself would accept "1-2-3-4-5" -- UuidParser's own shape check must not.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !uuid 1-2-3-4-5 }", UuidHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !uuid 1-2-3-4-5 }", UuidHolder.class));
     }
 
     // ── URI (§5.5) ───────────────────────────────────────────────────────
@@ -911,7 +911,7 @@ class TsonObjectReaderTest {
     void builtinUriAnnotationRejectsMalformedUriThroughTheMapper() throws DataBindException {
         // An unescaped space is not valid anywhere in a URI -- java.net.URI itself rejects it, so
         // this is really exercising the mapper wiring rather than UriParser's own leniency.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !uri \"http://example.com/a b\" }", UriHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !uri \"http://example.com/a b\" }", UriHolder.class));
     }
 
     // ── IPv4 (§5.5) ──────────────────────────────────────────────────────
@@ -933,8 +933,8 @@ class TsonObjectReaderTest {
     void builtinIpv4AnnotationRejectsLenientFormsThroughTheMapper() throws DataBindException {
         // InetAddress.ofLiteral itself would accept both of these -- Ipv4Parser's own RFC 3986
         // dec-octet check must not.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !ipv4 010.0.0.1 }", Ipv4Holder.class));
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !ipv4 3232235521 }", Ipv4Holder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !ipv4 010.0.0.1 }", Ipv4Holder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !ipv4 3232235521 }", Ipv4Holder.class));
     }
 
     // ── IPv6 (§5.5) ──────────────────────────────────────────────────────
@@ -957,7 +957,7 @@ class TsonObjectReaderTest {
     void builtinIpv6AnnotationRejectsAmbiguousCompressionThroughTheMapper() throws DataBindException {
         // More than one "::" run is ambiguous -- how many zero groups each one represents can't be
         // determined -- so Ipv6Parser's own grammar check must reject it.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !ipv6 \"1::2::3\" }", Ipv6Holder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !ipv6 \"1::2::3\" }", Ipv6Holder.class));
     }
 
     // ── CIDR networks (§5.5) ─────────────────────────────────────────────
@@ -989,8 +989,8 @@ class TsonObjectReaderTest {
     void builtinCidrAnnotationsRejectNonzeroHostBitsThroughTheMapper() throws DataBindException {
         // §5.5: the host value is a network, and accept-and-mask would be lossy. Without this the two
         // atoms would say nothing an ordinary text field doesn't.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !cidr4 \"10.1.0.0/8\" }", CidrHolder.class));
-        assertThrows(TsonReadException.class,
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !cidr4 \"10.1.0.0/8\" }", CidrHolder.class));
+        assertThrows(ReadException.class,
                 () -> mapper.read("{ value: !cidr6 \"2001:db8:1::/32\" }", CidrHolder.class));
     }
 
@@ -998,7 +998,7 @@ class TsonObjectReaderTest {
     void builtinCidrAnnotationsRejectAPrefixLengthOutsideTheirOwnFamilyRangeThroughTheMapper()
             throws DataBindException {
         // /33 is out of range for IPv4 and perfectly ordinary for IPv6 -- the range is per family.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !cidr4 \"10.0.0.0/33\" }", CidrHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !cidr4 \"10.0.0.0/33\" }", CidrHolder.class));
         assertEquals(CidrNetwork.parse("2001:db8:8000::/33", 128),
                 mapper.read("{ value: !cidr6 \"2001:db8:8000::/33\" }", CidrHolder.class).value());
     }
@@ -1021,7 +1021,7 @@ class TsonObjectReaderTest {
     void builtinDateAnnotationRejectsExtendedYearThroughTheMapper() throws DataBindException {
         // LocalDate.parse("+12025-03-13") would succeed on its own -- DateParser's own shape check
         // must not accept RFC 3339's stricter 4-digit-year requirement being violated.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !date +12025-03-13 }", DateHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !date +12025-03-13 }", DateHolder.class));
     }
 
     public record TimeHolder(OffsetTime value) {
@@ -1105,7 +1105,7 @@ class TsonObjectReaderTest {
         // constructor does (see TsonAtomContext.defaultContext()). This documents *why* that
         // pre-registration exists.
         TsonObjectReader bareMapper = new TsonObjectReader(DataBindContext.builder().build());
-        assertThrows(TsonReadException.class, () -> bareMapper.read("{ value: !bytes TWFu }", BytesHolder.class));
+        assertThrows(ReadException.class, () -> bareMapper.read("{ value: !bytes TWFu }", BytesHolder.class));
     }
 
     @Test
@@ -1119,7 +1119,7 @@ class TsonObjectReaderTest {
 
     @Test
     void builtinBytesAnnotationRejectsMissingPaddingThroughTheMapper() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !bytes TWE }", BytesHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !bytes TWE }", BytesHolder.class));
     }
 
     // ── Rational/Complex: binding to a richer third-party type via DataBridge ──────────────
@@ -1135,7 +1135,7 @@ class TsonObjectReaderTest {
         // a token ("2/3"), not a record, so binding fails outright. This is exactly why the
         // recommended path is a DataBridge (below), not direct binding to tson-compiler's own minimal
         // Rational/Complex types.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !rational \"2/3\" }", RationalHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !rational \"2/3\" }", RationalHolder.class));
     }
 
     /** Stand-in for a richer third-party type an application might already use, e.g. Apache Commons Math's {@code BigFraction} -- structurally similar, but a different class the binder has never heard of. */
@@ -1174,7 +1174,7 @@ class TsonObjectReaderTest {
     void directBindingToTsonsOwnComplexDoesNotWork() throws DataBindException {
         // Same reasoning as Rational: Complex is itself a Java record (real, imaginary), so it's
         // auto-detected as a record target, not routed through ComplexParser.
-        assertThrows(TsonReadException.class, () -> mapper.read("{ value: !complex 3+4i }", ComplexHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !complex 3+4i }", ComplexHolder.class));
     }
 
     /** Stand-in for e.g. Apache Commons Math's {@code Complex} (always double-precision, unlike tson-compiler's exact-by-default {@link Complex}). */
@@ -1253,12 +1253,12 @@ class TsonObjectReaderTest {
 
     @Test
     void unionWithoutTypeAnnotationThrows() throws DataBindException {
-        assertThrows(TsonReadException.class, () -> mapper.read("{ shape: { radius: 5 } }", ShapeHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ shape: { radius: 5 } }", ShapeHolder.class));
     }
 
     @Test
     void unionWithUnknownTypeNameThrows() throws DataBindException {
-        assertThrows(TsonReadException.class,
+        assertThrows(ReadException.class,
                 () -> mapper.read("{ shape: !triangle { a: 1 } }", ShapeHolder.class));
     }
 
@@ -1270,7 +1270,7 @@ class TsonObjectReaderTest {
         // mean -- a `currency` beside an `amount`, a `unit` beside a `quantity`. A reader that drops it has
         // not read a subset of the document, it has read a different document and cannot tell. The same
         // rule a schema-driven read applies (RecordAbstractReader, UNRECOGNIZED_FIELD).
-        TsonReadException e = assertThrows(TsonReadException.class,
+        ReadException e = assertThrows(ReadException.class,
                 () -> mapper.read("{ x: 1  y: 2  z: 3 }", Point.class));
         assertTrue(e.getMessage().contains("unknown field 'z'"), e.getMessage());
         assertTrue(e.getMessage().contains("x, y"), e.getMessage());
@@ -1278,7 +1278,7 @@ class TsonObjectReaderTest {
 
     @Test
     void aCollectingReadGathersEveryUnknownFieldRatherThanOnlyTheFirst() {
-        TsonDiagnosticsCollector collected = new TsonDiagnosticsCollector();
+        DiagnosticsCollector collected = new DiagnosticsCollector();
         mapper.withDiagnostics(collected).read("{ x: 1  y: 2  z: 3  w: 4 }", Point.class);
         assertEquals(List.of(Diagnostic.Code.UNRECOGNIZED_FIELD, Diagnostic.Code.UNRECOGNIZED_FIELD),
                 collected.diagnostics().stream().map(Diagnostic::code).toList());
@@ -1289,7 +1289,7 @@ class TsonObjectReaderTest {
         // The opt-out is the derived reader, never the default: the safe reading is the one nobody has to
         // know to ask for.
         assertEquals(new Point(1, 2), mapper.ignoringUnknownFields().read("{ x: 1  y: 2  z: 3 }", Point.class));
-        assertThrows(TsonReadException.class, () -> mapper.read("{ x: 1  y: 2  z: 3 }", Point.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ x: 1  y: 2  z: 3 }", Point.class));
     }
 
     @Test

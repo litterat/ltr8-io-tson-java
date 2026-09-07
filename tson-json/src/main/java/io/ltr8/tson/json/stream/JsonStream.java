@@ -1,7 +1,7 @@
 package io.ltr8.tson.json.stream;
 
-import io.ltr8.tson.base.TsonLimitExceededException;
-import io.ltr8.tson.base.TsonLimitsPolicy;
+import io.ltr8.tson.base.LimitExceededException;
+import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.json.JsonParseException;
 import io.ltr8.tson.json.JsonPosition;
 import io.ltr8.tson.json.lexer.JsonLexer;
@@ -46,7 +46,7 @@ import java.util.NoSuchElementException;
  * int} rather than as a policy object because a stream needs one number, not a policy -- but the number
  * and the refusal are the processor's, not this encoding's: §10.1 makes the bound [TSON-DATA] §9.1's
  * policy "in JSON clothing, and the same policy applies with the same defaults", so this counts against
- * {@link TsonLimitsPolicy}'s own default and refuses with {@link TsonLimitExceededException}, the same
+ * {@link LimitsPolicy}'s own default and refuses with {@link LimitExceededException}, the same
  * type the text encoding refuses with. A second default or a second exception would be a second answer to
  * one question.
  *
@@ -97,11 +97,11 @@ public final class JsonStream implements JsonEventSource {
     }
 
     public JsonStream(InputStream source) {
-        this(new JsonLexer(source), TsonLimitsPolicy.DEFAULT_MAX_DEPTH);
+        this(new JsonLexer(source), LimitsPolicy.DEFAULT_MAX_DEPTH);
     }
 
     public JsonStream(String source) {
-        this(new JsonLexer(source), TsonLimitsPolicy.DEFAULT_MAX_DEPTH);
+        this(new JsonLexer(source), LimitsPolicy.DEFAULT_MAX_DEPTH);
     }
 
     public JsonStream(InputStream source, int maxDepth) {
@@ -290,7 +290,7 @@ public final class JsonStream implements JsonEventSource {
 
     private void push(boolean object, JsonPosition at) {
         if (depth == maxDepth) {
-            throw new TsonLimitExceededException(
+            throw new LimitExceededException(
                     "the document nests deeper than this processor reads (%d)".formatted(maxDepth), maxDepth, at);
         }
         if (depth == frames.length) {

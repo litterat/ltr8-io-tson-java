@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.ForeignSchemas;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -95,7 +95,7 @@ class ChoiceUntaggedRecoveryTest {
         TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "text");
 
         // 'true' is the boolean class; the choice has no boolean variant.
-        assertThrows(TsonReadException.class, () -> read(reader, "true"));
+        assertThrows(ReadException.class, () -> read(reader, "true"));
     }
 
     @Test
@@ -104,7 +104,7 @@ class ChoiceUntaggedRecoveryTest {
         variant("text", TypeKind.ATOM, TextType.UNCONSTRAINED);
         TsonTypeReader<?> reader = choice(Optional.empty(), "int32", "text");
 
-        assertThrows(TsonReadException.class, () -> read(reader, "42"));
+        assertThrows(ReadException.class, () -> read(reader, "42"));
         assertEquals("int32", read(reader, "!int32 42")); // tagged still works
     }
 
@@ -115,6 +115,6 @@ class ChoiceUntaggedRecoveryTest {
         // Disjoint (different kinds), but a record isn't a base-type-class scalar -- no structural recovery here.
         TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "point");
 
-        assertThrows(TsonReadException.class, () -> read(reader, "42"));
+        assertThrows(ReadException.class, () -> read(reader, "42"));
     }
 }

@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
@@ -50,10 +50,10 @@ class ConfusableNameScopesTest {
     private static final String ID = "https://example.test/confusable.tn";
 
     private static TsonCompiledSchema compile(String declarations) {
-        return compileWith(TsonUnicodePolicy.highlyRestrictive(), declarations);
+        return compileWith(UnicodePolicy.highlyRestrictive(), declarations);
     }
 
-    private static TsonCompiledSchema compileWith(TsonUnicodePolicy identifiers, String declarations) {
+    private static TsonCompiledSchema compileWith(UnicodePolicy identifiers, String declarations) {
         String schema = """
                 !!id:"https://example.test/confusable.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
@@ -165,7 +165,7 @@ class ConfusableNameScopesTest {
      */
     @Test
     void theConfusableRuleNeverFiresOnALoneName() {
-        assertNotNull(compileWith(TsonUnicodePolicy.highlyRestrictive().perSegment(),
+        assertNotNull(compileWith(UnicodePolicy.highlyRestrictive().perSegment(),
                 "  rec => { id_" + new String(Character.toChars(0x043F))
                         + ": text  url_" + new String(Character.toChars(0x0430)) + ": text }"));
     }
@@ -189,7 +189,7 @@ class ConfusableNameScopesTest {
      */
     @Test
     void aSchemalessRecordsFieldNamesAreChecked() {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
         new TsonTreeReader().withDiagnostics(problems).read("{ pass: 1  " + CYRILLIC_PASS + ": 2 }");
 
         assertEquals(List.of(Diagnostic.Code.CONFUSABLE_NAMES),
@@ -200,7 +200,7 @@ class ConfusableNameScopesTest {
     /** A duplicate is still the duplicate rule, not this one — the two are different defects. */
     @Test
     void anOutrightDuplicateIsStillReportedAsADuplicate() {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
         new TsonTreeReader().withDiagnostics(problems).read("{ admin: 1  admin: 2 }");
 
         assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD),

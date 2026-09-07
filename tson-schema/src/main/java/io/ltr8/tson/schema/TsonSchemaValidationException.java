@@ -24,7 +24,7 @@ public final class TsonSchemaValidationException extends RuntimeException {
 
     /**
      * For an error discovered by machinery that reports in its own currency and has to be re-stated as a
-     * schema error -- notably a {@code TsonReadException} from binding a constructor body through the
+     * schema error -- notably a {@code ReadException} from binding a constructor body through the
      * governing meta's compiled reader, where the body is data of the constructor's vocabulary but a
      * failure to read it is the schema author's problem. {@code cause} is kept for the stack trace alone;
      * the message must already say everything a reader of the diagnostic needs.

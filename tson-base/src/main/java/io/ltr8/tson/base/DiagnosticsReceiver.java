@@ -17,21 +17,21 @@ package io.ltr8.tson.base;
  * returns, which is why this stays a single-method interface with no {@code close()} of its own.
  */
 @FunctionalInterface
-public interface TsonDiagnosticsReceiver {
+public interface DiagnosticsReceiver {
 
     /** Accepts one problem found during a read. Throwing from here aborts the read. */
     void report(Diagnostic diagnostic);
 
     /**
-     * Throws {@link TsonReadException} carrying the first diagnostic reported -- the default for every read that
+     * Throws {@link ReadException} carrying the first diagnostic reported -- the default for every read that
      * doesn't name a receiver. Stateless, so one shared instance serves every read.
      */
-    static TsonDiagnosticsReceiver throwing() {
+    static DiagnosticsReceiver throwing() {
         return ThrowingDiagnosticsReceiver.INSTANCE;
     }
 
     /** A fresh collector that accumulates every diagnostic and lets the read continue to the end. */
-    static TsonDiagnosticsCollector collecting() {
-        return new TsonDiagnosticsCollector();
+    static DiagnosticsCollector collecting() {
+        return new DiagnosticsCollector();
     }
 }

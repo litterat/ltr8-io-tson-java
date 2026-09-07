@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import org.junit.jupiter.api.Test;
@@ -68,9 +68,9 @@ class TsonObjectReaderStreamingTest {
         TsonDataStream realStream = new TsonDataStream(source);
         realStream.next(); // DocumentStart
         CountingEventSource counting = new CountingEventSource(realStream);
-        TsonReadContext ctx = TsonReadContext.throwing(counting, TsonUnicodePolicy.unrestricted());
+        TsonReadContext ctx = TsonReadContext.throwing(counting, UnicodePolicy.unrestricted());
 
-        assertThrows(TsonReadException.class, () -> new TsonObjectReader().read(ctx, Holder.class));
+        assertThrows(ReadException.class, () -> new TsonObjectReader().read(ctx, Holder.class));
 
         assertTrue(counting.pulled < 100, "pulled " + counting.pulled + " events, expected well under 100");
     }
@@ -82,8 +82,8 @@ class TsonObjectReaderStreamingTest {
         String source = "{ first: [1]  second: [2] }";
         TsonDataStream stream = new TsonDataStream(source);
         stream.next(); // DocumentStart
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
-        TsonReadContext ctx = TsonReadContext.of(stream, problems, TsonUnicodePolicy.unrestricted());
+        DiagnosticsCollector problems = new DiagnosticsCollector();
+        TsonReadContext ctx = TsonReadContext.of(stream, problems, UnicodePolicy.unrestricted());
 
         TwoFields result = new TsonObjectReader().read(ctx, TwoFields.class);
 

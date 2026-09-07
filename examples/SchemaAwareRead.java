@@ -51,7 +51,7 @@ void main() {
                 !!schema:"https://example.com/2026/35/app/server-1.tn"
                 !server { hostname: "bad"  port: 99999999999999 }""");   // out of int32 range
         IO.println("unexpected: bad port was accepted");
-    } catch (TsonReadException rejected) {
+    } catch (ReadException rejected) {
         IO.println("rejected out-of-range port: " + rejected.getMessage());
     }
 }

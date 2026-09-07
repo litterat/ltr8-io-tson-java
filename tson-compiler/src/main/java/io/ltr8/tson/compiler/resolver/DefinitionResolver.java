@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonBindMismatchException;
 import io.ltr8.tson.compiler.TsonMissingBindingException;
-import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonWriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -158,7 +158,7 @@ import java.util.Set;
  * {@code !} form used against the wrong kind of target -- refining a constructor, applying a
  * non-constructor, or refining a non-atom -- each of which the message answers with the form the author
  * probably meant; and a body (or an annotation value) the governing meta's compiled reader rejects, which
- * arrives as a {@link TsonReadException} and is restated as a schema error rather than passed on in the
+ * arrives as a {@link ReadException} and is restated as a schema error rather than passed on in the
  * reader's own currency ({@link #bodyIsNotValidData}).
  *
  * <p>Declarations are resolved against two separate namespaces (§3.3.1), each exposed through a
@@ -417,7 +417,7 @@ final class DefinitionResolver {
         }
         try {
             return annotationValueReader.read(annotationName, value);
-        } catch (TsonReadException e) {
+        } catch (ReadException e) {
             // Same split as bindAtomInstance, for the same reason: an annotation value that does not conform
             // to the type its name refers to (§6) is the author's error, and relabelling it a coverage gap
             // aborts the run over a typo.
@@ -931,7 +931,7 @@ final class DefinitionResolver {
         Top body;
         try {
             body = definitionMetaReader.read(constructorName, value);
-        } catch (TsonReadException e) {
+        } catch (ReadException e) {
             throw bodyIsNotValidData(name, constructorName, e);
         } catch (TsonBindMismatchException e) {
             // The constructor is a meta layer's own and the consumer never registered a class for it, or
@@ -1003,7 +1003,7 @@ final class DefinitionResolver {
      * UnsupportedOperationException}, which aborts the run under the "this is a bug in tson" banner. Both a
      * wrong-typed member ({@code !integer ^ { min: "abc" }}) and an unknown one ({@code minimum}) arrive here.
      *
-     * <p>The {@link TsonReadException}'s own {@link io.ltr8.tson.base.Diagnostic} is deliberately
+     * <p>The {@link ReadException}'s own {@link io.ltr8.tson.base.Diagnostic} is deliberately
      * discarded and only its message kept: it was produced against a {@code DataValueEvents} replay of an
      * already-parsed AST, whose positions are all the {@code (0,0,0)} placeholder and whose {@code path} is a
      * data pointer into a synthetic body. Carrying those into a schema diagnostic would furnish a schema-side
@@ -1011,7 +1011,7 @@ final class DefinitionResolver {
      * {@code schemaPointer} come from {@code SchemaResolver}'s catch instead, which is where they are real.
      */
     private static TsonSchemaValidationException bodyIsNotValidData(String name, String constructorName,
-                                                                    TsonReadException cause) {
+                                                                    ReadException cause) {
         return new TsonSchemaValidationException("'" + name + "': the body is not valid data for '"
                 + constructorName + "', the constructor's own constraint vocabulary -- " + cause.getMessage(), cause);
     }

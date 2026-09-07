@@ -1,9 +1,9 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
@@ -251,7 +251,7 @@ class RecordTemplateTest {
         TsonValue value = (TsonValue) compiled.get("holder")
                 .read(TestDocuments.document("{ b: { v: 7 } }"));
         assertNotNull(value);
-        assertTrue(assertThrows(TsonReadException.class, () -> compiled.get("holder")
+        assertTrue(assertThrows(ReadException.class, () -> compiled.get("holder")
                 .read(TestDocuments.document("{ b: { v: \"seven\" } }"))).getMessage().contains("int32"));
     }
 
@@ -335,7 +335,7 @@ class RecordTemplateTest {
 
         assertNotNull(compiled.get("holder")
                 .read(TestDocuments.document("{ t: { xs: [ \"a\" \"b\" ] } }")));
-        assertTrue(assertThrows(TsonReadException.class, () -> compiled.get("holder")
+        assertTrue(assertThrows(ReadException.class, () -> compiled.get("holder")
                 .read(TestDocuments.document("{ t: { xs: [ \"a\" ] } }"))).getMessage().contains("2"),
                 "the bound the parameter supplied is the one that is enforced");
     }
@@ -398,7 +398,7 @@ class RecordTemplateTest {
         assertEquals(TypeRef.of("int32"), fieldOf(compiled, "vip", "v").type(), "absorbed, with T bound");
         assertEquals(TypeRef.of("text"), fieldOf(compiled, "vip", "extra").type());
         assertNotNull(compiled.get("vip").read(TestDocuments.document("{ v: 7  extra: \"x\" }")));
-        assertTrue(assertThrows(TsonReadException.class, () -> compiled.get("vip")
+        assertTrue(assertThrows(ReadException.class, () -> compiled.get("vip")
                 .read(TestDocuments.document("{ v: \"seven\"  extra: \"x\" }"))).getMessage().contains("int32"));
     }
 
@@ -667,7 +667,7 @@ class RecordTemplateTest {
                   pair      => <A, B> { first: A  second: B }
                   text_pair => <B> pair<text, B>
                   holder    => { p: text_pair<int32> }""");
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         TsonValue value = (TsonValue) compiled.get("holder")
                 .read(TestDocuments.document("{ p: { first: \"a\"  second: 1 } }", problems));
@@ -675,7 +675,7 @@ class RecordTemplateTest {
         assertEquals(List.of(), problems.diagnostics());
         assertEquals(Optional.of("a"), value.at("/p/first").asString());
 
-        TsonDiagnosticsCollector rejected = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector rejected = DiagnosticsReceiver.collecting();
         compiled.get("holder").read(TestDocuments.document("{ p: { first: \"a\"  second: \"x\" } }", rejected));
         assertEquals(1, rejected.diagnostics().size(), () -> rejected.diagnostics().toString());
     }
@@ -692,7 +692,7 @@ class RecordTemplateTest {
                   order => { id: text }
                   paged => <T> { items: [T] }
                   orders_page => paged<order>""");
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         Object value = compiled.get("paged")
                 .read(TestDocuments.document("!paged { items: [ { id: \"a\" } ] }", problems));
@@ -720,7 +720,7 @@ class RecordTemplateTest {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   int_box => box<int32>""");
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         compiled.get("box").read(TestDocuments.document("!box { v: 1 }", problems));
 
@@ -736,7 +736,7 @@ class RecordTemplateTest {
                   box => <T> { v: T }
                   int_box => box<int32>""");
 
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> compiled.get("box").read(TestDocuments.document("!box { v: 1 }")));
 
         assertTrue(thrown.getMessage().contains("is a template taking"), thrown.getMessage());

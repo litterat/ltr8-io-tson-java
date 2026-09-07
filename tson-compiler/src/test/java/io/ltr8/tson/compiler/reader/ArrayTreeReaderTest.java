@@ -1,11 +1,11 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -81,7 +81,7 @@ class ArrayTreeReaderTest {
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
-        assertThrows(TsonReadException.class, () -> readArray(compiled, "numbers", "[1]"));
+        assertThrows(ReadException.class, () -> readArray(compiled, "numbers", "[1]"));
     }
 
     @Test
@@ -91,7 +91,7 @@ class ArrayTreeReaderTest {
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
-        assertThrows(TsonReadException.class, () -> readArray(compiled, "numbers", "[1 2 3]"));
+        assertThrows(ReadException.class, () -> readArray(compiled, "numbers", "[1 2 3]"));
     }
 
     @Test
@@ -101,7 +101,7 @@ class ArrayTreeReaderTest {
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
         assertEquals(List.of(BigInteger.ONE, BigInteger.TWO), readArray(compiled, "numbers", "[1 2]"));
-        assertThrows(TsonReadException.class, () -> readArray(compiled, "numbers", "[1 2 1]"));
+        assertThrows(ReadException.class, () -> readArray(compiled, "numbers", "[1 2 1]"));
     }
 
     /**
@@ -114,7 +114,7 @@ class ArrayTreeReaderTest {
         ArrayBody body = new ArrayBody(TypeRef.of("integer"), ElementState.REQUIRED, false, true,
                 Optional.empty(), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         compiled.get("numbers").read(TestDocuments.document("[1 2 1]", problems));
 
@@ -141,7 +141,7 @@ class ArrayTreeReaderTest {
                 Optional.empty(), Optional.empty());
         TsonCompiledSchema compiled = compile(Map.of("numbers", TypeDefinition.product(body)));
 
-        assertThrows(TsonReadException.class, () -> readArray(compiled, "numbers", "[1 _ 3]"));
+        assertThrows(ReadException.class, () -> readArray(compiled, "numbers", "[1 _ 3]"));
     }
 
     @Test

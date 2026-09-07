@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
@@ -323,7 +323,7 @@ class SchemaDrivenBindAnnotationTest {
      */
     @Test
     void anAnnotationNamingNoDeclaredTypeIsReportedNotSilentlyDropped() {
-        TsonReadException thrown = org.junit.jupiter.api.Assertions.assertThrows(TsonReadException.class,
+        ReadException thrown = org.junit.jupiter.api.Assertions.assertThrows(ReadException.class,
                 () -> read("@nosuchtype:\"x\" { name: \"Widget\" }"));
 
         assertTrue(thrown.getMessage().contains("nosuchtype"), thrown.getMessage());

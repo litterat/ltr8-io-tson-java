@@ -1,10 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
-import io.ltr8.tson.base.TsonReadException;
-import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.base.*;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -33,7 +30,7 @@ class SchemalessValidationTest {
 
     /** {@code Tson.validate}'s body: collect, and convert the one class of failure that can't be collected. */
     private static List<Diagnostic> validate(String source) {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         try {
             READER.withDiagnostics(problems).read(source);
         } catch (RuntimeException e) {
@@ -158,14 +155,14 @@ class SchemalessValidationTest {
     /**
      * A stack trace still says where, so nothing is lost for the fail-fast caller.
      *
-     * <p>The exception is {@link TsonReadException}, not {@link TsonParseException}: a base-syntax failure
+     * <p>The exception is {@link ReadException}, not {@link TsonParseException}: a base-syntax failure
      * goes through the read's receiver like every other problem now, and for a fail-fast read the receiver
      * is what throws. The position survives the trip -- on the diagnostic, and appended by {@code toString}
      * for the trace -- which is the property this fixture is actually about.
      */
     @Test
     void theExceptionItselfStillCarriesItsPositionIntoAStackTrace() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> new TsonTreeReader().read("{ a: 1  b: ] }"));
 
         SourcePosition position = thrown.diagnostic().dataPosition().orElseThrow();
@@ -181,7 +178,7 @@ class SchemalessValidationTest {
      */
     @Test
     void aCollectingReadDoesNotThrowForADocumentThatWillNotParse() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         TsonValue tree = new TsonTreeReader().withDiagnostics(problems).read("{ a: 1  b: ] }");
 
@@ -198,7 +195,7 @@ class SchemalessValidationTest {
      */
     @Test
     void aBaseSyntaxFailureJoinsWhatTheReadHadAlreadyReported() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         new TsonTreeReader().withDiagnostics(problems).read("{ a: !nope 1  b: ,, }");
 

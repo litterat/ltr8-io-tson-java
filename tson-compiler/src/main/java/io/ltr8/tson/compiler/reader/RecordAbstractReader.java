@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.SchemaLocation;
@@ -524,7 +524,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         // Unrestricted deliberately: this replays a token the real stream already delivered, so it has been
         // judged once. Checking it again here would report one author token twice.
         TsonReadContext syntheticCtx = TsonReadContext.throwing(new ListEventSource(List.of(event)),
-                TsonUnicodePolicy.unrestricted());
+                UnicodePolicy.unrestricted());
         return field.parser().read(syntheticCtx);
     }
 }

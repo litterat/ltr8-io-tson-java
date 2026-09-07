@@ -4,7 +4,7 @@ import io.ltr8.annotation.Tuple;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -102,7 +102,7 @@ class TupleReadTest {
     /** Arity is fixed and exact (§5.3) -- too few positions is a WRONG_ARITY, not a partial read. */
     @Test
     void tooFewPositionsIsAnArityError() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> read("[integer, text]", "pair", "[42]"));
 
         assertEquals(Diagnostic.Code.WRONG_ARITY, thrown.diagnostic().code());
@@ -110,7 +110,7 @@ class TupleReadTest {
 
     @Test
     void tooManyPositionsIsAnArityErrorToo() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> read("[integer, text]", "pair", "[42 \"hello\" \"extra\"]"));
 
         assertEquals(Diagnostic.Code.WRONG_ARITY, thrown.diagnostic().code());
@@ -119,7 +119,7 @@ class TupleReadTest {
     /** Each position is validated against its own declared type, not against a single shared element type. */
     @Test
     void eachPositionIsCheckedAgainstItsOwnType() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> read("[integer, text]", "pair", "[\"not a number\" \"hello\"]"));
 
         assertEquals(Optional.of("/0"), thrown.diagnostic().path(), "reported at the offending position");
@@ -150,7 +150,7 @@ class TupleReadTest {
     /** And a REQUIRED one does not -- the default state, since a tuple element's `state` defaults to REQUIRED. */
     @Test
     void aRequiredPositionRejectsTheAbsentSentinel() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> read("[integer, text]", "pair", "[_ \"hello\"]"));
 
         assertEquals(Diagnostic.Code.FIELD_REQUIRED, thrown.diagnostic().code());
@@ -193,7 +193,7 @@ class TupleReadTest {
         Tson tson = tsonBindingPair();
         TsonTypeReader<?> reader = tson.bindRegistry().compile(tson.resolve(schema("[integer, text]"))).get("pair");
 
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> reader.read(TestDocuments.document("[42]")));
 
         assertEquals(Diagnostic.Code.WRONG_ARITY, thrown.diagnostic().code());

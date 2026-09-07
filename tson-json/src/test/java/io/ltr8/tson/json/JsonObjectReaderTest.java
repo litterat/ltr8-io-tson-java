@@ -1,6 +1,6 @@
 package io.ltr8.tson.json;
 
-import io.ltr8.tson.base.TsonLimitExceededException;
+import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Field;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -310,7 +310,7 @@ class JsonObjectReaderTest {
             // exactly where a bound is easiest to lose -- skipValue walks it and must still be counted.
             JsonObjectReader lenient = READER.ignoringUnknownMembers();
             String deep = "{\"name\": \"a\", \"age\": 1, \"extra\": " + "[".repeat(200) + "]".repeat(200) + "}";
-            assertThrows(TsonLimitExceededException.class, () -> lenient.read(deep, Person.class));
+            assertThrows(LimitExceededException.class, () -> lenient.read(deep, Person.class));
             assertInstanceOf(Person.class, lenient.read(deep, Person.class, 256));
         }
 

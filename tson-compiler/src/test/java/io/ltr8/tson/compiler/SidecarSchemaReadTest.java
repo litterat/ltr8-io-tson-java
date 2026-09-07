@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.suite.SuiteCheckout;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
@@ -73,7 +73,7 @@ class SidecarSchemaReadTest {
     }
 
     private static String refuses(String layer, String body) {
-        return assertThrows(TsonReadException.class, () -> accepts(layer, body)).getMessage();
+        return assertThrows(ReadException.class, () -> accepts(layer, body)).getMessage();
     }
 
     /**

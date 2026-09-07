@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
@@ -61,8 +62,8 @@ import java.util.Set;
  * materializing a full {@code DataValue} tree first -- so a large document never has to be buffered
  * before binding can begin, memory held at any point is proportional to nesting depth. Problems are
  * reported through {@code ctx} using the same model the compiled readers use: the context's own {@link
- * io.ltr8.tson.base.TsonDiagnosticsReceiver} decides each problem's fate -- the fail-fast one throws
- * {@link TsonReadException} at the first, a collecting one accumulates every independent problem and reads
+ * DiagnosticsReceiver} decides each problem's fate -- the fail-fast one throws
+ * {@link ReadException} at the first, a collecting one accumulates every independent problem and reads
  * on. A {@code tson-bind} {@link DataBindException} thrown while narrowing a value or
  * invoking a constructor is caught and re-reported through {@code ctx} too, so a caller sees one
  * uniform error model regardless of which layer noticed the problem.
@@ -144,7 +145,7 @@ public final class SchemalessObjectReader {
     /**
      * Binds one value at {@code ctx}'s current position into {@code targetClass}. The general form, for a
      * caller managing their own {@link TsonReadContext} -- one built with a collecting {@link
-     * io.ltr8.tson.base.TsonDiagnosticsReceiver} gathers every problem in one pass rather than throwing
+     * DiagnosticsReceiver} gathers every problem in one pass rather than throwing
      * on the first. Frame-free: whole-document framing belongs to whoever owns the document --
      * {@link io.ltr8.tson.compiler.TsonObjectReader}, which builds the context.
      *

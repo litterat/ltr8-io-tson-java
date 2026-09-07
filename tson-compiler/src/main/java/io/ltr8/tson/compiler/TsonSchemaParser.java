@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -24,7 +24,6 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.ast.schema.SimpleRef;
 import io.ltr8.tson.compiler.ast.schema.SizeSpec;
-import io.ltr8.tson.compiler.ast.schema.StructuralDef;
 import io.ltr8.tson.compiler.ast.schema.StructuralTypeDef;
 import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
@@ -90,7 +89,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * {@link #parseSchemaDocument()} entry point) is fail-fast, and the first {@link TsonParseException}
      * leaves this class. A receiver turns on the declaration-level recovery in {@link #parseSchemaMap}.
      */
-    private TsonDiagnosticsReceiver receiver;
+    private DiagnosticsReceiver receiver;
 
     /** Count of problems handed to {@link #receiver} -- the {@code ctx.reported()} idiom, for a receiver that keeps no list. */
     private int reported;
@@ -143,7 +142,7 @@ public final class TsonSchemaParser extends TsonDataParser {
      * means reading the very tokens that don't exist; the lexer being fail-fast is the floor on how much of a
      * broken document this can report ({@code STRUCTURED-OUTPUT.md} tracks it).
      */
-    public Optional<SchemaDocument> parseSchemaDocument(TsonDiagnosticsReceiver receiver) {
+    public Optional<SchemaDocument> parseSchemaDocument(DiagnosticsReceiver receiver) {
         this.receiver = receiver;
         Optional<SchemaDocument> document = parseDocumentBody();
         return reported > 0 ? Optional.empty() : document;
@@ -163,7 +162,7 @@ public final class TsonSchemaParser extends TsonDataParser {
         }
     }
 
-    /** How many problems {@link #parseSchemaDocument(TsonDiagnosticsReceiver)} reported -- zero meaning the document parsed clean. */
+    /** How many problems {@link #parseSchemaDocument(DiagnosticsReceiver)} reported -- zero meaning the document parsed clean. */
     public int reported() {
         return reported;
     }
@@ -203,7 +202,7 @@ public final class TsonSchemaParser extends TsonDataParser {
 
     /**
      * Empty only when recovery reported every declaration there was, leaving nothing §2.1's at-least-one rule
-     * could be satisfied with -- {@link #parseSchemaDocument(TsonDiagnosticsReceiver)} already discards the
+     * could be satisfied with -- {@link #parseSchemaDocument(DiagnosticsReceiver)} already discards the
      * document in that case, so there is no map to build and nothing that would read it.
      */
     private Optional<SchemaMap> parseSchemaMap() {

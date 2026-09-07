@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.TokenEvent;
@@ -12,7 +12,7 @@ import io.ltr8.tson.compiler.stream.TypeRef;
 import java.util.Optional;
 
 /**
- * Applies a read's {@link TsonUnicodePolicy} to every token as it leaves the stream
+ * Applies a read's {@link UnicodePolicy} to every token as it leaves the stream
  * ([TSON-DATA] §8.2's "Values") -- the token-surface half of UTS #39 §5.2, where the name surface's half
  * runs in {@code TsonSchemaLinker} over declared names.
  *
@@ -32,18 +32,18 @@ import java.util.Optional;
  * an external resource rather than document content, [TSON-DATA] §2.2.1 governs what an identity may be, and
  * an IRI's scripts are the resource owner's business, not this document's.
  *
- * <p>At {@link TsonUnicodePolicy#unrestricted()} -- the default -- {@code checksScripts()} is false and
- * {@link TsonUnicodePolicy#violation} returns immediately, so an ordinary read pays a predicate per token and
+ * <p>At {@link UnicodePolicy#unrestricted()} -- the default -- {@code checksScripts()} is false and
+ * {@link UnicodePolicy#violation} returns immediately, so an ordinary read pays a predicate per token and
  * nothing else. {@link #wrap} skips the decorator entirely in that case, so it pays not even that.
  */
 final class TokenPolicyEventSource implements TsonEventSource {
 
     private final TsonEventSource delegate;
-    private final TsonUnicodePolicy policy;
-    private final TsonDiagnosticsReceiver receiver;
+    private final UnicodePolicy policy;
+    private final DiagnosticsReceiver receiver;
 
-    private TokenPolicyEventSource(TsonEventSource delegate, TsonUnicodePolicy policy,
-                                   TsonDiagnosticsReceiver receiver) {
+    private TokenPolicyEventSource(TsonEventSource delegate, UnicodePolicy policy,
+                                   DiagnosticsReceiver receiver) {
         this.delegate = delegate;
         this.policy = policy;
         this.receiver = receiver;
@@ -53,8 +53,8 @@ final class TokenPolicyEventSource implements TsonEventSource {
      * {@code source} itself when {@code policy} checks nothing, so the default costs a read no wrapper at
      * all; a checking decorator otherwise.
      */
-    static TsonEventSource wrap(TsonEventSource source, TsonUnicodePolicy policy,
-                                TsonDiagnosticsReceiver receiver) {
+    static TsonEventSource wrap(TsonEventSource source, UnicodePolicy policy,
+                                DiagnosticsReceiver receiver) {
         return policy == null || !policy.checksScripts() ? source
                 : new TokenPolicyEventSource(source, policy, receiver);
     }

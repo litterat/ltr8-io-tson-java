@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.base.Diagnostic;
@@ -198,7 +198,7 @@ final class AnnotationCapture {
         // no author token to judge -- and the real one it stands for was checked when it left the stream.
         TsonReadContext probe = TsonReadContext.of(
                 new ListEventSource(List.of(new AbsentEvent(start.position()))), diagnostic -> { },
-                TsonUnicodePolicy.unrestricted());
+                UnicodePolicy.unrestricted());
         boolean admitted;
         try {
             reader.read(probe);

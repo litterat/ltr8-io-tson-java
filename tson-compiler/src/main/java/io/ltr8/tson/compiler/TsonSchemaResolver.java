@@ -1,13 +1,9 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
-import io.ltr8.tson.compiler.ast.schema.SchemaMap;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.base.SourcePosition;
-
-import java.util.Map;
 
 /**
  * The public front door for the "resolve" stage of this project's own parse -&gt; resolve -&gt; link
@@ -55,12 +51,12 @@ public class TsonSchemaResolver {
     /**
      * {@link #resolveSchema(SchemaDocument, SchemaPositions)} reporting every declaration that fails through {@code
      * receiver} rather than throwing at the first -- see {@link SchemaResolver#resolveSchema(SchemaDocument,
-     * SchemaPositions, TsonDiagnosticsReceiver)} for the contract, and in particular for why the returned schema must not
+     * SchemaPositions, DiagnosticsReceiver)} for the contract, and in particular for why the returned schema must not
      * be linked, registered or compiled when anything was reported.
      */
     public TsonSchema resolveSchema(SchemaDocument document,
                                     SchemaPositions declarationPositions,
-                                    TsonDiagnosticsReceiver receiver) {
+                                    DiagnosticsReceiver receiver) {
         return this.resolver.resolveSchema(document, declarationPositions, receiver);
     }
 }

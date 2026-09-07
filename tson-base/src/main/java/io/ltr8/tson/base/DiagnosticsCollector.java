@@ -5,19 +5,19 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A {@link TsonDiagnosticsReceiver} that accumulates every problem instead of throwing, so a read runs to the end
+ * A {@link DiagnosticsReceiver} that accumulates every problem instead of throwing, so a read runs to the end
  * and returns a partial value alongside the full list of what was wrong with it. The value-plus-diagnostics shape
  * a validate-and-retry loop wants.
  *
  * <p>Stateful and single-read: {@link #diagnostics()} reports what this instance has been given, so reusing one
- * across two reads accumulates both. Take a fresh one per read -- {@link TsonDiagnosticsReceiver#collecting()}.
+ * across two reads accumulates both. Take a fresh one per read -- {@link DiagnosticsReceiver#collecting()}.
  */
-public final class TsonDiagnosticsCollector implements TsonDiagnosticsReceiver {
+public final class DiagnosticsCollector implements DiagnosticsReceiver {
 
     private final List<Diagnostic> diagnostics = new ArrayList<>();
 
-    /** A collector holding nothing yet -- equivalent to {@link TsonDiagnosticsReceiver#collecting()}. */
-    public TsonDiagnosticsCollector() {
+    /** A collector holding nothing yet -- equivalent to {@link DiagnosticsReceiver#collecting()}. */
+    public DiagnosticsCollector() {
     }
 
     @Override

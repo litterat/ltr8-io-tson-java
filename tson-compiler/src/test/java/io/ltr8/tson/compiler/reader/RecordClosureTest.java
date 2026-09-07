@@ -4,8 +4,8 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -66,7 +66,7 @@ class RecordClosureTest {
 
     @Test
     void anUnknownFieldIsReportedAtEveryDepthInOnePass() {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
         String source = """
                 {
                   name: "a"
@@ -104,7 +104,7 @@ class RecordClosureTest {
      */
     @Test
     void theDiagnosticNamesTheTypesRealVocabularyInSchemaOrder() {
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         personSchema().get("person").read(TestDocuments.document("{ nope: 1 }", problems));
 
@@ -118,7 +118,7 @@ class RecordClosureTest {
     /** Fail-fast is the default receiver, so an unknown field stops the read like any other violation. */
     @Test
     void failFastThrowsOnTheFirstUnknownField() {
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> personSchema().get("person").read(TestDocuments.document("{ name: \"a\" nope: 1 }")));
 
         assertEquals(Diagnostic.Code.UNRECOGNIZED_FIELD, thrown.diagnostic().code());
@@ -151,7 +151,7 @@ class RecordClosureTest {
         DataBindContext context = SchemaMetaNameBinder.defaultContext();
         TsonCompiledSchema compiled = TsonSchemaCompiler.compile(new TsonLinkedSchema(schema),
                 ValueReaderFactoryRegistry.bind(context));
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         Object bound = compiled.get("text_type")
                 .read(TestDocuments.document("{ min_length: 1  minLength: 2 }", problems));

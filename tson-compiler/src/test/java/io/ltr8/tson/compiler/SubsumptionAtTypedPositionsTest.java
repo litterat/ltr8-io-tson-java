@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ class SubsumptionAtTypedPositionsTest {
     }
 
     private static String refused(String document) {
-        return assertThrows(TsonReadException.class, () -> read(document)).getMessage();
+        return assertThrows(ReadException.class, () -> read(document)).getMessage();
     }
 
     private static final String REST = "  r: { name: \"n\" }  a: [ \"x\" ]  m: { \"k\" => \"v\" }";
@@ -80,7 +80,7 @@ class SubsumptionAtTypedPositionsTest {
     @Test
     void anUnrelatedTypeIsRefusedAtARecordPositionWithNoSubtypes() {
         TsonCompiledSchema compiled = compile("  base => { name: text }\n  h => { f: base }");
-        assertTrue(assertThrows(TsonReadException.class,
+        assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("h").read(TestDocuments.document("{ f: !nosuch { name: \"x\" } }")))
                 .getMessage().contains("'nosuch' is not valid at a 'base' position"));
     }

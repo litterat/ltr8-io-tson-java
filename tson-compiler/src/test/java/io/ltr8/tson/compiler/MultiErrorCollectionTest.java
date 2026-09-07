@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.reader.Dom;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -68,7 +68,7 @@ class MultiErrorCollectionTest {
                   items: [1 hello 3]
                 }
                 """;
-        TsonDiagnosticsCollector problems = new TsonDiagnosticsCollector();
+        DiagnosticsCollector problems = new DiagnosticsCollector();
 
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) Dom.of((TsonValue)

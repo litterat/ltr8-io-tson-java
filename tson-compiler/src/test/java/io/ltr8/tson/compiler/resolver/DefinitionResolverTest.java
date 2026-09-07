@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -51,7 +51,6 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import io.ltr8.tson.schema.meta.Unit;
 import io.ltr8.tson.schema.meta.ScopeKind;
 import io.ltr8.tson.schema.meta.Scoped;
-import io.ltr8.tson.schema.meta.TypeArgument;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -141,7 +140,7 @@ class DefinitionResolverTest {
     private static DefinitionResolver definitionResolverFor(TsonCompiledMetaSchema metaParser, DefinitionGetter definitionGetter) {
         return new DefinitionResolver((type, value) -> (Top) metaParser.reader(type)
                         .read(TsonReadContext.throwing(new ListEventSource(DataValueEvents.of(value)),
-                                TsonUnicodePolicy.unrestricted())),
+                                UnicodePolicy.unrestricted())),
                 metaParser.schema().entries()::get, definitionGetter);
     }
 

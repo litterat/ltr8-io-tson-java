@@ -1,13 +1,9 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonProcessorPolicy;
-import io.ltr8.tson.base.TsonUnicodePolicy;
-import io.ltr8.tson.base.TsonReadException;
-import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.*;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
-import io.ltr8.tson.base.SourcePosition;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -32,9 +28,9 @@ import java.util.Optional;
  * event was most recently peeked or consumed, on *any* copy, since there is only ever one real cursor
  * per read.
  *
- * <p><b>Where a problem goes is the {@link TsonDiagnosticsReceiver}'s decision, not this context's</b>
+ * <p><b>Where a problem goes is the {@link DiagnosticsReceiver}'s decision, not this context's</b>
  * -- {@link #report} builds the {@link Diagnostic} from the path and positions tracked here, then hands
- * it over. A fail-fast receiver throws {@link TsonReadException} the instant it's called; a collecting
+ * it over. A fail-fast receiver throws {@link ReadException} the instant it's called; a collecting
  * one accumulates and returns normally, letting the read continue. Every reader calls {@code report(...)}
  * identically either way, and no call site branches on the policy. A reader needing to know whether its
  * own children reported anything asks {@link #reported()}, which works for every receiver -- including
@@ -141,8 +137,8 @@ public interface TsonReadContext {
 
     /**
      * Builds a {@link Diagnostic} for one problem at the current {@link #path()}/{@link #position()}/{@link
-     * #schemaLocation()} and hands it to this read's {@link TsonDiagnosticsReceiver}, which decides its
-     * fate -- a fail-fast receiver throws {@link TsonReadException} from here and never returns.
+     * #schemaLocation()} and hands it to this read's {@link DiagnosticsReceiver}, which decides its
+     * fate -- a fail-fast receiver throws {@link ReadException} from here and never returns.
      */
     void report(Diagnostic.Code code, String message, String expected, String actual);
 
@@ -150,7 +146,7 @@ public interface TsonReadContext {
     // own: what distinguishes it is its `code` (CONFUSABLE_NAMES / RESTRICTED_CHARACTER / RESTRICTED_SCRIPT,
     // one per rule), which is what a consumer routes on. The Unicode data version §8.2 requires a refusal to
     // name is a fact about this processor rather than about the problem, so it is stated once per run beside
-    // the diagnostics -- TsonProcessorPolicy -- rather than stamped onto each one.
+    // the diagnostics -- ProcessorPolicy -- rather than stamped onto each one.
 
     /**
      * How many problems have been reported through this read so far, counting every scoped copy since they
@@ -175,15 +171,15 @@ public interface TsonReadContext {
      * parameter.</b> This is where every read converges, so a policy defaulted here would be one any caller
      * could drop by saying nothing -- and [TSON-DATA] §8.2 requires that a relaxation be a code decision,
      * greppable and attributable rather than ambient. Naming
-     * {@link TsonUnicodePolicy#unrestricted()} is a fine answer, and the right one for a source whose events
+     * {@link UnicodePolicy#unrestricted()} is a fine answer, and the right one for a source whose events
      * did not come from document text; it is just not an answer a caller gives by accident.
      *
      * <p>The policy is applied here rather than by the caller, so no context can exist whose events went
      * unchecked. Nothing is installed when the policy checks nothing, so the default costs a read no wrapper.
      */
-    static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
-                              TsonUnicodePolicy tokenPolicy) {
-        return of(events, receiver, tokenPolicy, TsonUnicodePolicy.highlyRestrictive());
+    static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
+                              UnicodePolicy tokenPolicy) {
+        return of(events, receiver, tokenPolicy, UnicodePolicy.highlyRestrictive());
     }
 
     /**
@@ -193,22 +189,22 @@ public interface TsonReadContext {
      * a name's scripts SHOULD be judged at Highly Restrictive. The overload above carries that default,
      * so a caller that names only a token policy still gets the name surface checked.
      */
-    static TsonReadContext of(TsonEventSource events, TsonDiagnosticsReceiver receiver,
-                              TsonUnicodePolicy tokenPolicy, TsonUnicodePolicy identifierPolicy) {
-        Objects.requireNonNull(tokenPolicy, "tokenPolicy -- name one, TsonUnicodePolicy.unrestricted() if "
+    static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
+                              UnicodePolicy tokenPolicy, UnicodePolicy identifierPolicy) {
+        Objects.requireNonNull(tokenPolicy, "tokenPolicy -- name one, UnicodePolicy.unrestricted() if "
                 + "this source's tokens are not to be checked");
-        Objects.requireNonNull(identifierPolicy, "identifierPolicy -- state one, TsonUnicodePolicy"
+        Objects.requireNonNull(identifierPolicy, "identifierPolicy -- state one, UnicodePolicy"
                 + ".unrestricted() if this source's names are not to be checked");
         return DefaultTsonReadContext.of(TokenPolicyEventSource.wrap(events, tokenPolicy, receiver), receiver,
                 identifierPolicy);
     }
 
     /**
-     * {@link #of(TsonEventSource, TsonDiagnosticsReceiver, TsonUnicodePolicy)} with the fail-fast receiver --
-     * the first problem throws {@link TsonReadException}.
+     * {@link #of(TsonEventSource, DiagnosticsReceiver, UnicodePolicy)} with the fail-fast receiver --
+     * the first problem throws {@link ReadException}.
      */
-    static TsonReadContext throwing(TsonEventSource events, TsonUnicodePolicy tokenPolicy) {
-        return of(events, TsonDiagnosticsReceiver.throwing(), tokenPolicy);
+    static TsonReadContext throwing(TsonEventSource events, UnicodePolicy tokenPolicy) {
+        return of(events, DiagnosticsReceiver.throwing(), tokenPolicy);
     }
 
     /**

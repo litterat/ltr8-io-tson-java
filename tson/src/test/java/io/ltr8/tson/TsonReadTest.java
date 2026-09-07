@@ -3,12 +3,12 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonTreeReader;
-import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link Tson#treeReader()} / {@link Tson#objectReader()} -- the value-returning counterparts to {@link
  * Tson#validate}: a self-describing document read into a {@link TsonValue} tree (or a bound Java object),
  * schema-validated when it declares a {@code !!schema} and schemaless otherwise, fail-fast (a bad value or
- * a document-selection failure throws {@link TsonReadException}).
+ * a document-selection failure throws {@link ReadException}).
  */
 class TsonReadTest {
 
@@ -80,7 +80,7 @@ class TsonReadTest {
 
     @Test
     void aBadValueThrowsFailFast() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
+        ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }"""));
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, thrown.diagnostic().code());
@@ -88,7 +88,7 @@ class TsonReadTest {
 
     @Test
     void aSchemaDrivenDocumentWithNoRootTypeRefThrows() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
+        ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/point-1.tn"
                 { x: 3  y: 4 }"""));
         assertEquals(Diagnostic.Code.VALIDATION_ERROR, thrown.diagnostic().code());
@@ -97,7 +97,7 @@ class TsonReadTest {
 
     @Test
     void aSchemaTheSourceCannotProvideThrows() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
+        ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/not-there.tn"
                 !point { x: 3  y: 4 }"""));
         assertEquals(Diagnostic.Code.SCHEMA_NOT_FOUND, thrown.diagnostic().code());
@@ -114,7 +114,7 @@ class TsonReadTest {
     @Test
     void aCollectedFetchFailureStatesWhichReasonItWas() {
         for (TsonSchemaFetchException.Reason reason : TsonSchemaFetchException.Reason.values()) {
-            TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+            DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
             failing(reason).treeReader().withDiagnostics(problems).read("""
                     !!schema:"https://example.test/not-there.tn"
                     !point { x: 3  y: 4 }""");
@@ -138,8 +138,8 @@ class TsonReadTest {
                 !point { x: 3  y: 4 }""";
         Tson tson = failing(TsonSchemaFetchException.Reason.NOT_PERMITTED);
 
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tson.treeReader().read(document));
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        ReadException thrown = assertThrows(ReadException.class, () -> tson.treeReader().read(document));
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         tson.treeReader().withDiagnostics(problems).read(document);
 
         assertEquals(Diagnostic.Code.SCHEMA_NOT_PERMITTED, thrown.diagnostic().code());
@@ -153,7 +153,7 @@ class TsonReadTest {
      */
     @Test
     void aProblemThatIsNotAFetchFailureCarriesNoReason() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         tsonWithPoint().treeReader().withDiagnostics(problems).read("""
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""");
@@ -175,7 +175,7 @@ class TsonReadTest {
 
     @Test
     void aRootTypeRefTheSchemaDoesNotDeclareThrows() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read("""
+        ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPoint().treeReader().read("""
                 !!schema:"https://example.test/point-1.tn"
                 !no_such_type { x: 3  y: 4 }"""));
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE, thrown.diagnostic().code());
@@ -219,7 +219,7 @@ class TsonReadTest {
     @Test
     void objectReaderWithTheWrongClassThrowsBeforeReading() {
         // The schema's root type `point` binds to Point, not String -- caught up front, before any value read.
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPointBinding().objectReader()
+        ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPointBinding().objectReader()
                 .read("""
                         !!schema:"https://example.test/point-1.tn"
                         !point { x: 3  y: 4 }""", String.class));
@@ -229,7 +229,7 @@ class TsonReadTest {
     @Test
     void objectReaderValidatesAsItBinds() {
         // y is out of int32 range -- fail-fast, same validation the tree read applies.
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> tsonWithPointBinding().objectReader()
+        ReadException thrown = assertThrows(ReadException.class, () -> tsonWithPointBinding().objectReader()
                 .read("""
                         !!schema:"https://example.test/point-1.tn"
                         !point { x: 3  y: 99999999999999 }""", Point.class));
@@ -263,7 +263,7 @@ class TsonReadTest {
     void aCollectingTreeReadValidatesAgainstTheSchemaAndReturnsEveryProblemAtOnce() {
         // Both fields are out of int32 range. Fail-fast stops at the first; collecting reports both,
         // against the schema -- which is the combination no route offered before.
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         TsonValue node = tsonWithPoint().treeReader().withDiagnostics(problems).read("""
                 !!schema:"https://example.test/point-1.tn"
@@ -279,7 +279,7 @@ class TsonReadTest {
 
     @Test
     void aCollectingObjectReadValidatesAgainstTheSchemaAndReturnsEveryProblemAtOnce() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         tsonWithPointBinding().objectReader().withDiagnostics(problems).read("""
                 !!schema:"https://example.test/point-1.tn"
@@ -308,7 +308,7 @@ class TsonReadTest {
                         !no_such_type { x: 3  y: 4 }""", Diagnostic.Code.UNKNOWN_TYPE));
 
         for (Case testCase : cases) {
-            TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+            DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
             TsonValue node = tsonWithPoint().treeReader().withDiagnostics(problems).read(testCase.source());
 
             assertEquals(1, problems.diagnostics().size(), problems.diagnostics()::toString);
@@ -316,7 +316,7 @@ class TsonReadTest {
             assertNull(node, "no tree is produced when the schema can't be reached");
 
             // The default reader is untouched by the derived one -- still fail-fast.
-            assertThrows(TsonReadException.class, () -> tsonWithPoint().treeReader().read(testCase.source()));
+            assertThrows(ReadException.class, () -> tsonWithPoint().treeReader().read(testCase.source()));
         }
     }
 
@@ -333,7 +333,7 @@ class TsonReadTest {
         assertEquals(3, asLong(node.at("/x")));
 
         // Same validation as the self-describing path -- the caller supplied what !!schema + !point would.
-        assertThrows(TsonReadException.class,
+        assertThrows(ReadException.class,
                 () -> tson.treeReader().withSchema(POINT_ID).readAs("{ x: 3  y: 99999999999999 }", "point"));
     }
 
@@ -345,7 +345,7 @@ class TsonReadTest {
         assertEquals(new Point(3, 4),
                 tson.objectReader().withSchema(POINT_ID).readAs("{ x: 3  y: 4 }", "point", Point.class));
 
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         tson.objectReader().withSchema(POINT_ID).withDiagnostics(problems)
                 .readAs("{ x: 99999999999999  y: 88888888888888 }", "point", Point.class);
         assertEquals(List.of("/x", "/y"), problems.diagnostics().stream().map(d -> d.path().orElseThrow()).toList());
@@ -355,7 +355,7 @@ class TsonReadTest {
     void readAsReportsATypeTheSchemaDoesNotDeclare() {
         Tson tson = tsonWithPoint();
         tson.resolve(POINT_SCHEMA);
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         tson.treeReader().withSchema(POINT_ID).withDiagnostics(problems).readAs("{ x: 3  y: 4 }", "no_such_type");
 
@@ -393,11 +393,11 @@ class TsonReadTest {
                 !!schema:"https://example.test/point-1.tn"
                 !point { x: 3  y: 99999999999999 }""";
         var reader = tsonWithPoint().treeReader();
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         reader.withDiagnostics(problems).read(bad);
         assertEquals(1, problems.diagnostics().size());
 
-        assertThrows(TsonReadException.class, () -> reader.read(bad));
+        assertThrows(ReadException.class, () -> reader.read(bad));
     }
 }

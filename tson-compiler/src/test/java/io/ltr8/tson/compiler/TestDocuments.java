@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 
 /**
  * Positions a {@link TsonReadContext} at a whole document's root value, so a unit test can drive one
@@ -21,13 +21,13 @@ public final class TestDocuments {
 
     /** Fail-fast, over a whole document's own source text -- the cursor is left on the root value's first event. */
     public static TsonReadContext document(String source) {
-        return document(source, TsonDiagnosticsReceiver.throwing());
+        return document(source, DiagnosticsReceiver.throwing());
     }
 
     /** As {@link #document(String)}, reporting through {@code receiver} instead of throwing at the first problem. */
-    public static TsonReadContext document(String source, TsonDiagnosticsReceiver receiver) {
+    public static TsonReadContext document(String source, DiagnosticsReceiver receiver) {
         TsonDataStream stream = new TsonDataStream(source);
-        TsonReadContext ctx = TsonReadContext.of(stream, receiver, TsonUnicodePolicy.unrestricted());
+        TsonReadContext ctx = TsonReadContext.of(stream, receiver, UnicodePolicy.unrestricted());
         ctx.next(); // DocumentStart
         return ctx;
     }

@@ -1,6 +1,6 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +39,7 @@ class RecordGroupValidationTest {
 
     @Test
     void twoPresentMembersAreRejected() {
-        TsonReadException e = assertThrows(TsonReadException.class,
+        ReadException e = assertThrows(ReadException.class,
                 () -> contactReader()
                         .read(TestDocuments.document("{ name: \"Ada\"  email: \"ada@example.com\"  phone: \"111\" }")));
         assertTrue(e.getMessage().contains("at most one"), e.getMessage());
@@ -47,7 +47,7 @@ class RecordGroupValidationTest {
 
     @Test
     void zeroPresentMembersAreRejectedForARequiredGroup() {
-        TsonReadException e = assertThrows(TsonReadException.class,
+        ReadException e = assertThrows(ReadException.class,
                 () -> contactReader().read(TestDocuments.document("{ name: \"Ada\" }")));
         assertTrue(e.getMessage().contains("exactly one"), e.getMessage());
     }

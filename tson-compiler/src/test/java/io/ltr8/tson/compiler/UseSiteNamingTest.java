@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonCanonicalIdentity;
 
@@ -63,7 +63,7 @@ class UseSiteNamingTest {
         TsonCompiledMetaRegistry core =
                 TsonCompiledMetaRegistry.withStandardLibrary(SchemaMetaNameBinder.defaultContext(), source);
         TsonCompiledSchema compiled = TsonCompiledSchemaRegistry.tree(core).get(ID);
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         compiled.get("r").read(TestDocuments.document(data, problems));
         return problems.diagnostics().stream().map(Diagnostic::message).toList();
     }

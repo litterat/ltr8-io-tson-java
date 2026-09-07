@@ -1,12 +1,12 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.ast.schema.SchemaMap;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The end-to-end stripe: a missing-required-field {@link TsonReadException} carries enough for a
+ * The end-to-end stripe: a missing-required-field {@link ReadException} carries enough for a
  * caller to report both where the offending record sits in the <em>data</em> source and where the
  * field was <em>declared</em> in the <em>schema</em> source -- proving {@link
  * TsonSchemaParser#declarationPositions()}, {@link TypeDefinition#position()}, and every real
@@ -87,7 +87,7 @@ class PositionalReadErrorsTest {
 
         String dataSource = "{}";
         TsonReadContext ctx = TestDocuments.document(dataSource);
-        TsonReadException thrown = assertThrows(TsonReadException.class,
+        ReadException thrown = assertThrows(ReadException.class,
                 () -> compiled.get("my_record").read(ctx));
 
         assertTrue(thrown.getMessage().contains("value"), thrown.getMessage());

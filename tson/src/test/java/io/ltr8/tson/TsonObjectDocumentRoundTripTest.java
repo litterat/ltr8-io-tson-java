@@ -1,6 +1,6 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.TsonObjectDocument;
 import io.ltr8.tson.compiler.TsonObjectWriter;
@@ -168,7 +168,7 @@ class TsonObjectDocumentRoundTripTest {
     @Test
     void anUnparseableDocumentYieldsNothing() {
         assertNull(tson().objectReader()
-                .withDiagnostics(io.ltr8.tson.base.TsonDiagnosticsReceiver.collecting())
+                .withDiagnostics(DiagnosticsReceiver.collecting())
                 .readDocument("{ a: 1  b: ] }", Order.class));
     }
 }

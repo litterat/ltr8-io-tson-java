@@ -2,8 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TestDocuments;
-import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.ReadException;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -29,13 +28,13 @@ class VoidReaderTest {
      */
     @Test
     void rejectsTheNullToken() {
-        assertThrows(TsonReadException.class, () -> READER.read(TestDocuments.document("null")));
-        assertThrows(TsonReadException.class, () -> READER.read(TestDocuments.document("\"null\"")));
+        assertThrows(ReadException.class, () -> READER.read(TestDocuments.document("null")));
+        assertThrows(ReadException.class, () -> READER.read(TestDocuments.document("\"null\"")));
     }
 
     @Test
     void rejectsAnOrdinaryToken() {
-        TsonReadException thrown = assertThrows(TsonReadException.class, () -> READER
+        ReadException thrown = assertThrows(ReadException.class, () -> READER
                 .read(TestDocuments.document("hello")));
         assertTrue(thrown.getMessage().contains("void"));
     }

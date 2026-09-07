@@ -5,8 +5,8 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonSchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
@@ -143,7 +143,7 @@ class DispatchedAnnotationTest {
      */
     @Test
     void anUnknownDispatchTargetDiscardsTheWholeValueFramingIncluded() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         TsonValue root = tson().treeReader().withDiagnostics(problems).read("""
                 !!schema:"https://example.test/dispatch-1.tn"
                 !holder { thing: @note:"why" !square { side: "3" } }""");
@@ -156,7 +156,7 @@ class DispatchedAnnotationTest {
     /** The same, in bind mode, where the union bounds the candidates instead of the schema's subtypes. */
     @Test
     void anUnknownUnionMemberDiscardsTheWholeValueToo() {
-        TsonDiagnosticsCollector problems = TsonDiagnosticsReceiver.collecting();
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
         tson().objectReader().withDiagnostics(problems).read("""
                 !!schema:"https://example.test/dispatch-1.tn"
                 !holder { thing: @note:"why" !square { side: "3" } }""", Holder.class);

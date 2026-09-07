@@ -1,12 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonProcessorPolicy;
-import io.ltr8.tson.base.TsonUnicodePolicy;
-import io.ltr8.tson.base.TsonLimitExceededException;
-import io.ltr8.tson.base.TsonLimitsPolicy;
-import io.ltr8.tson.base.TsonReadException;
-import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
+import io.ltr8.tson.base.*;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
@@ -16,7 +11,6 @@ import io.ltr8.tson.compiler.reader.SchemalessObjectReader;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.compiler.stream.TypeRef;
 
 import java.io.InputStream;
 import java.util.Objects;
@@ -45,8 +39,8 @@ import java.util.Optional;
  * form or schema-composed defaults (a record must be written braced; an absent required field is a {@code
  * FIELD_REQUIRED} problem).
  *
- * <p>A read is fail-fast by default, throwing {@link TsonReadException} at the first problem. {@link
- * #withDiagnostics} swaps that for any other {@link TsonDiagnosticsReceiver} -- a collector gathers every
+ * <p>A read is fail-fast by default, throwing {@link ReadException} at the first problem. {@link
+ * #withDiagnostics} swaps that for any other {@link DiagnosticsReceiver} -- a collector gathers every
  * problem in the document in one pass, in schema-aware and schemaless mode alike.
  *
  * <p><b>Binding is all-or-nothing: a document that reported anything binds to {@code null}</b>, and the
@@ -68,18 +62,18 @@ public final class TsonObjectReader {
     private final TsonCompiledSchemaRegistry bind;
 
     /** Where this reader's reads report their problems -- fail-fast unless {@link #withDiagnostics} said otherwise. */
-    private final TsonDiagnosticsReceiver receiver;
+    private final DiagnosticsReceiver receiver;
 
     /** The schema {@link #readAs} validates against, or {@code null} until {@link #withSchema} names one. */
     private final String schemaUri;
 
     /** UTS #39 §5.2 over every token this reader pulls. Never {@code null} -- the unset default is
-     * {@link TsonUnicodePolicy#unrestricted()}, which checks nothing. */
-    private final TsonUnicodePolicy tokenPolicy;
-    private final TsonUnicodePolicy identifierPolicy;
+     * {@link UnicodePolicy#unrestricted()}, which checks nothing. */
+    private final UnicodePolicy tokenPolicy;
+    private final UnicodePolicy identifierPolicy;
 
     /** [TSON-DATA] §9.1's bounds on what this reader will spend. Never {@code null}. */
-    private final TsonLimitsPolicy limits;
+    private final LimitsPolicy limits;
 
     /**
      * Schema-aware -- validates a self-describing document against its {@code !!schema}, resolved and
@@ -95,9 +89,9 @@ public final class TsonObjectReader {
      */
     public TsonObjectReader(TsonCompiledSchemaRegistry bind, DataBindContext dataBindContext) {
         this(dataBindContext, new SchemalessObjectReader(dataBindContext),
-                requireBindMode(bind), TsonDiagnosticsReceiver.throwing(), null,
-                TsonUnicodePolicy.unrestricted(), TsonUnicodePolicy.highlyRestrictive(),
-                TsonLimitsPolicy.defaults());
+                requireBindMode(bind), DiagnosticsReceiver.throwing(), null,
+                UnicodePolicy.unrestricted(), UnicodePolicy.highlyRestrictive(),
+                LimitsPolicy.defaults());
     }
 
     /**
@@ -120,9 +114,9 @@ public final class TsonObjectReader {
 
     /** Schemaless -- binds to the target class alone, ignoring any {@code !!schema} the document declares. */
     public TsonObjectReader(DataBindContext context) {
-        this(context, new SchemalessObjectReader(context), null, TsonDiagnosticsReceiver.throwing(), null,
-                TsonUnicodePolicy.unrestricted(), TsonUnicodePolicy.highlyRestrictive(),
-                TsonLimitsPolicy.defaults());
+        this(context, new SchemalessObjectReader(context), null, DiagnosticsReceiver.throwing(), null,
+                UnicodePolicy.unrestricted(), UnicodePolicy.highlyRestrictive(),
+                LimitsPolicy.defaults());
     }
 
     /** Schemaless, over {@link TsonAtomContext#defaultContext()}. */
@@ -132,9 +126,9 @@ public final class TsonObjectReader {
 
     /** Shares {@code bind} and {@code schemaless} rather than rebuilding them -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
     private TsonObjectReader(DataBindContext dataBindContext, SchemalessObjectReader schemaless,
-                             TsonCompiledSchemaRegistry bind, TsonDiagnosticsReceiver receiver, String schemaUri,
-                             TsonUnicodePolicy tokenPolicy, TsonUnicodePolicy identifierPolicy,
-                             TsonLimitsPolicy limits) {
+                             TsonCompiledSchemaRegistry bind, DiagnosticsReceiver receiver, String schemaUri,
+                             UnicodePolicy tokenPolicy, UnicodePolicy identifierPolicy,
+                             LimitsPolicy limits) {
         this.dataBindContext = dataBindContext;
         this.schemaless = schemaless;
         this.bind = bind;
@@ -151,7 +145,7 @@ public final class TsonObjectReader {
      * Highly Restrictive over the whole name, which is what a reader carries until this is called. The peer of
      * {@link TsonTreeReader#withIdentifierPolicy}, whose Javadoc carries the reasoning.
      */
-    public TsonObjectReader withIdentifierPolicy(TsonUnicodePolicy policy) {
+    public TsonObjectReader withIdentifierPolicy(UnicodePolicy policy) {
         Objects.requireNonNull(policy, "policy");
         return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, tokenPolicy, policy, limits);
     }
@@ -191,7 +185,7 @@ public final class TsonObjectReader {
      *         UTS #39's own {@code Toys-Я-Us} -- the spoof a strict token policy exists to refuse. Refused
      *         rather than ignored, so a policy that cannot mean what it says is never silently accepted.
      */
-    public TsonObjectReader withTokenPolicy(TsonUnicodePolicy policy) {
+    public TsonObjectReader withTokenPolicy(UnicodePolicy policy) {
         Objects.requireNonNull(policy, "policy");
         if (policy.isPerSegment()) {
             throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
@@ -209,7 +203,7 @@ public final class TsonObjectReader {
      * leaving this one unchanged, sharing its compiled-schema registry:
      *
      * <pre>{@code
-     * var problems = TsonDiagnosticsReceiver.collecting();
+     * var problems = DiagnosticsReceiver.collecting();
      * Server server = tson.objectReader().withDiagnostics(problems).read(source, Server.class);
      * problems.diagnostics();      // every problem, alongside a possibly-partial object
      * }</pre>
@@ -217,7 +211,7 @@ public final class TsonObjectReader {
      * <p>Applies to the whole-document entry points only. {@link #read(TsonReadContext, Class)} takes a context
      * that carries its own receiver, and that one wins.
      */
-    public TsonObjectReader withDiagnostics(TsonDiagnosticsReceiver receiver) {
+    public TsonObjectReader withDiagnostics(DiagnosticsReceiver receiver) {
         return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, tokenPolicy, identifierPolicy, limits);
     }
 
@@ -267,8 +261,8 @@ public final class TsonObjectReader {
      * derived reader ({@link #withIdentifierPolicy}, {@link #withTokenPolicy}) is exactly where the two can differ,
      * and a response quoting the wrong one is worse than quoting none.
      */
-    public TsonProcessorPolicy processorPolicy() {
-        return TsonProcessorPolicy.of(identifierPolicy, tokenPolicy, limits);
+    public ProcessorPolicy processorPolicy() {
+        return ProcessorPolicy.of(identifierPolicy, tokenPolicy, limits);
     }
 
     /**
@@ -277,7 +271,7 @@ public final class TsonObjectReader {
      * code rather than from the ambient environment, for the reason {@link #withTokenPolicy} is: a limit a
      * deployment did not choose is one it cannot explain.
      */
-    public TsonObjectReader withLimits(TsonLimitsPolicy limits) {
+    public TsonObjectReader withLimits(LimitsPolicy limits) {
         return new TsonObjectReader(dataBindContext, schemaless, bind, receiver, schemaUri, tokenPolicy,
                 identifierPolicy, limits);
     }
@@ -289,7 +283,7 @@ public final class TsonObjectReader {
      * <p>Read off the reader that judged, for {@link #processorPolicy}'s own reason: {@link #withLimits} is
      * where a derived reader and its parent can differ.
      */
-    public TsonLimitsPolicy limitsPolicy() {
+    public LimitsPolicy limitsPolicy() {
         return limits;
     }
 
@@ -434,13 +428,13 @@ public final class TsonObjectReader {
     }
 
     /**
-     * A document that will not lex or parse, or that this processor's {@link TsonLimitsPolicy} declined to
+     * A document that will not lex or parse, or that this processor's {@link LimitsPolicy} declined to
      * read, reported through this read's own receiver rather than thrown past it -- the object-binding half
      * of {@link TsonTreeReader#readFailure}, which carries the argument for both halves. Binds to {@code
      * null}, the same all-or-nothing answer {@link #valid} gives a document that reported anything.
      */
     private <T> T readFailure(RuntimeException e) {
-        receiver.report(e instanceof TsonLimitExceededException limit
+        receiver.report(e instanceof LimitExceededException limit
                 ? Diagnostic.ofLimitExceeded(limit)
                 : TsonDiagnostics.ofBaseSyntaxError(e));
         return null;

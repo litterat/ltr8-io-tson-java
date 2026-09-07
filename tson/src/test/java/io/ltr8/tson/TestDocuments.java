@@ -1,8 +1,8 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonDataStream;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.TsonReadContext;
 
 /**
@@ -20,13 +20,13 @@ final class TestDocuments {
 
     /** Fail-fast, over a whole document's own source text -- the cursor is left on the root value's first event. */
     static TsonReadContext document(String source) {
-        return document(source, TsonDiagnosticsReceiver.throwing());
+        return document(source, DiagnosticsReceiver.throwing());
     }
 
     /** As {@link #document(String)}, reporting through {@code receiver} instead of throwing at the first problem. */
-    static TsonReadContext document(String source, TsonDiagnosticsReceiver receiver) {
+    static TsonReadContext document(String source, DiagnosticsReceiver receiver) {
         TsonDataStream stream = new TsonDataStream(source);
-        TsonReadContext ctx = TsonReadContext.of(stream, receiver, TsonUnicodePolicy.unrestricted());
+        TsonReadContext ctx = TsonReadContext.of(stream, receiver, UnicodePolicy.unrestricted());
         ctx.next(); // DocumentStart
         return ctx;
     }

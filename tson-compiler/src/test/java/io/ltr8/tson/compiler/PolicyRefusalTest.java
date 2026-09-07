@@ -1,15 +1,14 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonLimitsPolicy;
-import io.ltr8.tson.base.TsonProcessorPolicy;
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.ProcessorPolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.unicode.Xid;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -105,7 +104,7 @@ class PolicyRefusalTest {
     @Test
     void oneReadCanRefuseAtBothSurfaces() {
         List<Diagnostic> reported = read(
-                new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
+                new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
                 "@p" + CYR_A + "y:1 2");
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT, Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -122,7 +121,7 @@ class PolicyRefusalTest {
     @Test
     void aRefusedValueIsRestrictedScript() {
         Diagnostic refusal = soleRefusal(
-                new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
+                new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
                 "{ note: \"p" + CYR_A + "y\" }");
 
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, refusal.code());
@@ -137,7 +136,7 @@ class PolicyRefusalTest {
     @Test
     void aSingleScriptValueIsRefusedWhereTheLevelAdmitsNoSuchScript() {
         Diagnostic refusal = soleRefusal(
-                new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly()),
+                new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly()),
                 "{ note: \"" + CYR_A + "\" }");
 
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, refusal.code());
@@ -145,7 +144,7 @@ class PolicyRefusalTest {
     }
 
     /**
-     * <b>A refused token is named once.</b> {@code TsonUnicodePolicy.violation} opens with the unit it
+     * <b>A refused token is named once.</b> {@code UnicodePolicy.violation} opens with the unit it
      * refused, so a factory prefixing the text again reads {@code the token 'x' 'x' mixes the scripts ...} --
      * on a message a consumer sees, and one this library forwards over a wire. The name path composes the
      * same two halves correctly, which is what makes this a defect rather than a preference.
@@ -154,7 +153,7 @@ class PolicyRefusalTest {
     void aRefusedTokenIsNamedOnceAndReadsAsOneSentence() {
         String mixed = "p" + CYR_A + "y";
         Diagnostic refusal = soleRefusal(
-                new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.singleScript()),
+                new TsonTreeReader().withTokenPolicy(UnicodePolicy.singleScript()),
                 "{ note: \"" + mixed + "\" }");
 
         assertEquals("the token '" + mixed + "' mixes the scripts [LATIN, CYRILLIC], which UTS #39 §5.2's "
@@ -187,7 +186,7 @@ class PolicyRefusalTest {
      */
     @Test
     void aRefusalIsShapedLikeAnyOtherDiagnostic() {
-        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(TsonUnicodePolicy.asciiOnly());
+        TsonTreeReader reader = new TsonTreeReader().withTokenPolicy(UnicodePolicy.asciiOnly());
         Diagnostic refusal = soleRefusal(reader, "{ note: \"" + CYR_A + "\" }");
         Diagnostic verdict = read(new TsonTreeReader(), "{ a: 1  a: 2 }").getFirst();
 
@@ -205,18 +204,18 @@ class PolicyRefusalTest {
      */
     @Test
     void twoPoliciesConfiguredAlikeAreEqual() {
-        TsonUnicodePolicy one = TsonUnicodePolicy.highlyRestrictive().perSegment()
+        UnicodePolicy one = UnicodePolicy.highlyRestrictive().perSegment()
                 .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC);
-        TsonUnicodePolicy same = TsonUnicodePolicy.highlyRestrictive().perSegment()
+        UnicodePolicy same = UnicodePolicy.highlyRestrictive().perSegment()
                 .permitting(java.lang.Character.UnicodeScript.LATIN, java.lang.Character.UnicodeScript.CYRILLIC);
 
         assertEquals(one, same);
         assertEquals(one.hashCode(), same.hashCode());
-        assertEquals(TsonProcessorPolicy.of(one, TsonUnicodePolicy.unrestricted(), TsonLimitsPolicy.defaults()),
-                TsonProcessorPolicy.of(same, TsonUnicodePolicy.unrestricted(), TsonLimitsPolicy.defaults()),
+        assertEquals(ProcessorPolicy.of(one, UnicodePolicy.unrestricted(), LimitsPolicy.defaults()),
+                ProcessorPolicy.of(same, UnicodePolicy.unrestricted(), LimitsPolicy.defaults()),
                 "the record that reports them is component-wise, so it inherits this");
-        assertNotEquals(one, TsonUnicodePolicy.highlyRestrictive().perSegment());
-        assertNotEquals(TsonUnicodePolicy.highlyRestrictive(), TsonUnicodePolicy.singleScript());
+        assertNotEquals(one, UnicodePolicy.highlyRestrictive().perSegment());
+        assertNotEquals(UnicodePolicy.highlyRestrictive(), UnicodePolicy.singleScript());
     }
 
     /**
@@ -232,15 +231,15 @@ class PolicyRefusalTest {
      */
     @Test
     void theProcessorPolicyIsReachableWithoutARefusal() {
-        TsonProcessorPolicy policy = new TsonTreeReader()
-                .withTokenPolicy(TsonUnicodePolicy.asciiOnly())
-                .withIdentifierPolicy(TsonUnicodePolicy.singleScript().perSegment())
+        ProcessorPolicy policy = new TsonTreeReader()
+                .withTokenPolicy(UnicodePolicy.asciiOnly())
+                .withIdentifierPolicy(UnicodePolicy.singleScript().perSegment())
                 .processorPolicy();
 
-        assertEquals(TsonUnicodePolicy.Level.SINGLE_SCRIPT, policy.identifierPolicy().level());
+        assertEquals(UnicodePolicy.Level.SINGLE_SCRIPT, policy.identifierPolicy().level());
         assertTrue(policy.identifierPolicy().isPerSegment());
-        assertEquals(TsonUnicodePolicy.Level.ASCII_ONLY, policy.tokenPolicy().level());
+        assertEquals(UnicodePolicy.Level.ASCII_ONLY, policy.tokenPolicy().level());
         assertEquals(Xid.UNICODE_VERSION, policy.unicodeDataVersion());
-        assertEquals(Xid.UNICODE_VERSION, TsonUnicodePolicy.dataVersion());
+        assertEquals(Xid.UNICODE_VERSION, UnicodePolicy.dataVersion());
     }
 }

@@ -1,8 +1,8 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -61,7 +61,6 @@ import io.ltr8.tson.schema.meta.UriType;
 import io.ltr8.tson.schema.meta.UuidType;
 
 import java.util.HashSet;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -165,15 +164,15 @@ public final class TsonSchemaLinker {
         }
         // The bootstrap is this library's own artifact, not user input, so it is linked under the default
         // rather than under whatever a caller configured -- a policy should not be able to break meta-kernel.
-        return linkWith(bootstrap, null, null, TsonUnicodePolicy.highlyRestrictive());
+        return linkWith(bootstrap, null, null, UnicodePolicy.highlyRestrictive());
     }
 
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader) {
-        return linkWith(schema, loader, null, TsonUnicodePolicy.highlyRestrictive());
+        return linkWith(schema, loader, null, UnicodePolicy.highlyRestrictive());
     }
 
     /** {@link #link(TsonSchema, TsonSchemaLoader)} with the §5.2 restriction level for declared names chosen. */
-    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, TsonUnicodePolicy identifiers) {
+    public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader, UnicodePolicy identifiers) {
         return linkWith(schema, loader, null, identifiers);
     }
 
@@ -196,13 +195,13 @@ public final class TsonSchemaLinker {
      * @param receiver where a failing entry is reported; must not be {@code null}
      */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
-                                        TsonDiagnosticsReceiver receiver) {
-        return link(schema, loader, receiver, TsonUnicodePolicy.highlyRestrictive());
+                                        DiagnosticsReceiver receiver) {
+        return link(schema, loader, receiver, UnicodePolicy.highlyRestrictive());
     }
 
     /** The reporting overload with the §5.2 restriction level for declared names chosen. */
     public static TsonLinkedSchema link(TsonSchema schema, TsonSchemaLoader loader,
-                                        TsonDiagnosticsReceiver receiver, TsonUnicodePolicy identifiers) {
+                                        DiagnosticsReceiver receiver, UnicodePolicy identifiers) {
         Objects.requireNonNull(receiver, "receiver");
         return linkWith(schema, loader, receiver, identifiers);
     }
@@ -223,8 +222,8 @@ public final class TsonSchemaLinker {
      * it matches a declared one, so restricting declarations restricts the data by construction. A Class 1
      * record is the case that has no declaration, and is checked by the schemaless readers instead.
      */
-    private static void checkNames(TsonDiagnosticsReceiver receiver, TsonSchema schema,
-                                   Map<String, TypeDefinition> merged, TsonUnicodePolicy identifiers) {
+    private static void checkNames(DiagnosticsReceiver receiver, TsonSchema schema,
+                                   Map<String, TypeDefinition> merged, UnicodePolicy identifiers) {
         ConfusableNames.firstCollision(merged.keySet()).ifPresent(collision -> refuse(receiver, schema,
                 collision.second(), merged.get(collision.second()), Diagnostic.Code.CONFUSABLE_NAMES,
                 "in the namespace of '" + schema.id() + "': " + collision.describe()));
@@ -259,9 +258,9 @@ public final class TsonSchemaLinker {
     }
 
     /** One named scope ([TSON-DATA] §8.2): its own collision relation, then each name's own two rules. */
-    private static void checkScope(TsonDiagnosticsReceiver receiver, TsonSchema schema, String entry,
+    private static void checkScope(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                    TypeDefinition definition, List<String> names, String noun,
-                                   TsonUnicodePolicy identifiers) {
+                                   UnicodePolicy identifiers) {
         ConfusableNames.firstCollision(names).ifPresent(collision -> refuse(receiver, schema, entry,
                 definition, Diagnostic.Code.CONFUSABLE_NAMES,
                 "'" + entry + "' has " + noun + " that read alike: " + collision.describe()));
@@ -282,9 +281,9 @@ public final class TsonSchemaLinker {
      * schema layer's, so the walk that already enumerates those scopes is the one place all three belong.
      * What stays at the reading positions is §7.7's grammar, which is validity and really is a parse error.
      */
-    private static void perName(TsonDiagnosticsReceiver receiver, TsonSchema schema, String entry,
+    private static void perName(DiagnosticsReceiver receiver, TsonSchema schema, String entry,
                                 TypeDefinition definition, String name, String prefix,
-                                TsonUnicodePolicy identifiers) {
+                                UnicodePolicy identifiers) {
         // The restricted-character rule is gated on the level: §8.2's Unrestricted "drops the profile too",
         // taking that rule with it. Script mixing gates itself inside violation(). Each reports under its own
         // code, since the
@@ -302,7 +301,7 @@ public final class TsonSchemaLinker {
      * separate from it because the two say different things: that one is "this schema is wrong", this one is
      * "this processor declines it", and §8.2 requires that a consumer be able to tell them apart.
      */
-    private static void refuse(TsonDiagnosticsReceiver receiver, TsonSchema schema, String name,
+    private static void refuse(DiagnosticsReceiver receiver, TsonSchema schema, String name,
                                TypeDefinition def, Diagnostic.Code code, String message) {
         if (receiver == null) {
             throw new TsonSchemaValidationException(message);
@@ -317,7 +316,7 @@ public final class TsonSchemaLinker {
      * @return {@code true} if the caller should carry on as though the check had passed -- always, since a
      *         throw is the only other outcome. Reads as a guard at the call sites that want to skip the entry.
      */
-    private static boolean report(TsonDiagnosticsReceiver receiver, TsonSchema schema, String name,
+    private static boolean report(DiagnosticsReceiver receiver, TsonSchema schema, String name,
                                   TypeDefinition def, String message) {
         if (receiver == null) {
             throw new TsonSchemaValidationException(message);
@@ -450,8 +449,8 @@ public final class TsonSchemaLinker {
     }
 
     /** One entry's failure, reported when there is a receiver and rethrown as a schema error when there is not. */
-    private static void reportOrThrow(TsonDiagnosticsReceiver receiver, TsonSchema schema, String at,
-                                       Map<String, TypeDefinition> entries, String message, RuntimeException cause) {
+    private static void reportOrThrow(DiagnosticsReceiver receiver, TsonSchema schema, String at,
+                                      Map<String, TypeDefinition> entries, String message, RuntimeException cause) {
         if (receiver == null) {
             if (cause instanceof TsonSchemaValidationException original && message.equals(cause.getMessage())) {
                 throw original; // untouched, which is the fail-fast overloads' standing contract
@@ -494,7 +493,7 @@ public final class TsonSchemaLinker {
 
     /** The shared body; {@code receiver} is {@code null} for the fail-fast overloads, which rethrow instead. */
     private static TsonLinkedSchema linkWith(TsonSchema schema, TsonSchemaLoader loader,
-                                             TsonDiagnosticsReceiver receiver, TsonUnicodePolicy identifiers) {
+                                             DiagnosticsReceiver receiver, UnicodePolicy identifiers) {
         Map<String, String> origins = new LinkedHashMap<>();
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins);
 
@@ -618,7 +617,7 @@ public final class TsonSchemaLinker {
      * for an uninhabited one.
      */
     private static void checkEveryEntryIsInhabited(TsonSchema schema, Map<String, TypeDefinition> merged,
-                                                    Set<String> localNames, TsonDiagnosticsReceiver receiver) {
+                                                    Set<String> localNames, DiagnosticsReceiver receiver) {
         Set<String> inhabited = TypeInhabitance.derive(merged);
         for (String name : localNames) {
             if (inhabited.contains(name)) {
@@ -663,7 +662,7 @@ public final class TsonSchemaLinker {
      * problem against this one.
      */
     private static void checkDisjointAssertions(TsonSchema schema, AnnotatedMap<String, TypeDefinition> entries,
-                                                 Set<String> localNames, TsonDiagnosticsReceiver receiver) {
+                                                 Set<String> localNames, DiagnosticsReceiver receiver) {
         for (String name : localNames) {
             TypeDefinition def = entries.get(name);
             if (def == null || !(def.body() instanceof ChoiceBody choice)) {

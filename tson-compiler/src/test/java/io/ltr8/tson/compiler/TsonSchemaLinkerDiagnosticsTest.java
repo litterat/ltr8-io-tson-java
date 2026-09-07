@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaLoader;
@@ -57,7 +57,7 @@ class TsonSchemaLinkerDiagnosticsTest {
     private static final TsonSchemaLoader NO_IMPORTS = uri -> Optional.empty();
 
     private static List<Diagnostic> linkCollecting(TsonSchema schema) {
-        TsonDiagnosticsCollector collector = new TsonDiagnosticsCollector();
+        DiagnosticsCollector collector = new DiagnosticsCollector();
         TsonLinkedSchema linked = TsonSchemaLinker.link(schema, NO_IMPORTS, collector);
         // Linking still returns a result -- it is just not a proof that linking succeeded, which is what the
         // receiver's own report count tells the caller.

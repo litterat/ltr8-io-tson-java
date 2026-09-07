@@ -5,7 +5,7 @@ import java.util.Optional;
 
 /**
  * One problem found while reading a value against a compiled schema -- the unit both
- * {@link TsonReadException} (fail-fast mode) and a collecting {@code TsonReadContext} (multi-error
+ * {@link ReadException} (fail-fast mode) and a collecting {@code TsonReadContext} (multi-error
  * mode) report through, so both modes produce the identical shape of information regardless of which
  * one a caller chose.
  *
@@ -52,7 +52,7 @@ import java.util.Optional;
  * version it was computed against, which is a fact about <em>this processor</em>: constant for the life of
  * a process, so a copy on each problem is N copies of a string that cannot differ, and needed by a sender
  * before it writes a document rather than after it is refused. It is stated once, beside the diagnostics
- * rather than inside them ({@code TsonProcessorPolicy}), which also states the thing a version cannot --
+ * rather than inside them ({@code ProcessorPolicy}), which also states the thing a version cannot --
  * what this deployment <em>would</em> admit. What is left here is the remedy: which name failed, and
  * <b>which rule fired, which is the code</b> ({@link Code#CONFUSABLE_NAMES}, {@link
  * Code#RESTRICTED_CHARACTER}, {@link Code#RESTRICTED_SCRIPT}, one each).
@@ -78,7 +78,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                           Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition) {
 
     /**
-     * A document this processor's {@link TsonLimitsPolicy} declined to read ([TSON-DATA] §9.1) -- {@code TsonDiagnostics.ofBaseSyntaxError}'s sibling, and deliberately not a case inside it.
+     * A document this processor's {@link LimitsPolicy} declined to read ([TSON-DATA] §9.1) -- {@code TsonDiagnostics.ofBaseSyntaxError}'s sibling, and deliberately not a case inside it.
      *
      * <p><b>The one factory that lives on this record, because it is the one that classifies nothing.</b>
      * Its nine siblings each switch on an exception type an encoding declares, so they belong to that
@@ -88,7 +88,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * <p><b>The two are separated at the type, because they are separated in what they claim.</b> A
      * base-syntax failure is a verdict every processor reaching the same bytes repeats; this one is a
      * statement about the reader's configuration, which is why it carries {@link Code#LIMIT_EXCEEDED}
-     * ({@link Code#verdict()} {@code false}) and why a facade catches {@link TsonLimitExceededException}
+     * ({@link Code#verdict()} {@code false}) and why a facade catches {@link LimitExceededException}
      * before the {@code RuntimeException} that reaches {@code ofBaseSyntaxError}. Routing it through that
      * method instead would report a configured bound as malformed input.
      *
@@ -96,7 +96,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * against the depth the document reached at the point it was stopped. They are the constraint that
      * failed, in {@code AtomTypeException}'s own vocabulary, rather than the type's name.
      */
-    public static Diagnostic ofLimitExceeded(TsonLimitExceededException e) {
+    public static Diagnostic ofLimitExceeded(LimitExceededException e) {
         return new Diagnostic(Optional.of(""), Optional.empty(), "", Code.LIMIT_EXCEEDED, e.getMessage(),
                 "at most " + e.limit() + " levels of nesting", "more than " + e.limit(),
                 Optional.of(e.position()), Optional.empty());
@@ -178,7 +178,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * would only be a fact the code already fixes, free to disagree with it.
      *
      * <p><b>{@code RESTRICTED_SCRIPT} is a script the policy does not admit, which is wider than a mix.</b>
-     * A script <em>combination</em> is the usual finding, and at {@code TsonUnicodePolicy.Level.ASCII_ONLY}
+     * A script <em>combination</em> is the usual finding, and at {@code UnicodePolicy.Level.ASCII_ONLY}
      * a single-script name is refused with nothing mixed at all -- so the code names what the policy would
      * not admit rather than what the text did, and pairs with {@code RESTRICTED_CHARACTER} as the two halves
      * of one identifier policy. It is also the one of the three a <em>value</em> can carry ({@code TsonDiagnostics.ofRestrictedToken}), a token having no identifier profile and no scope to be distinct within.
@@ -225,13 +225,13 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         BIND_MISMATCH,
 
         /**
-         * The document asked for more than this processor's {@code TsonLimitsPolicy} will spend ([TSON-DATA]
-         * §9.1) -- nested deeper than {@code TsonLimitsPolicy.maxDepth()}, so far.
+         * The document asked for more than this processor's {@code LimitsPolicy} will spend ([TSON-DATA]
+         * §9.1) -- nested deeper than {@code LimitsPolicy.maxDepth()}, so far.
          *
          * <p><b>Not a verdict, and the one code here where that is a property of the reader rather than of
          * the document.</b> The bytes may be well-formed, valid, and read in full by the next processor
          * along; what happened is that this deployment declined. Which is also why the run's own {@code
-         * TsonLimitsPolicy} is stated beside the diagnostics rather than copied into each one -- the same
+         * LimitsPolicy} is stated beside the diagnostics rather than copied into each one -- the same
          * division §8.2's name policy makes.
          */
         LIMIT_EXCEEDED,
