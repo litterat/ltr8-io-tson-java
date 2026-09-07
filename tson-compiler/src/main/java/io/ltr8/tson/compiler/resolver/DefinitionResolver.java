@@ -32,7 +32,7 @@ import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.TsonObjectWriter;
-import io.ltr8.tson.atom.IdentifierParser;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Atom;
@@ -386,10 +386,9 @@ final class DefinitionResolver {
      * makes one contract reach every naming position rather than the subset the model happens to round-trip.
      */
     private static void requireIdentifier(String name, String role) {
-        try {
-            IdentifierParser.validate(name);
-        } catch (AtomTypeException e) {
-            throw new SchemaValidationException("invalid " + role + " -- " + e.getMessage());
+        Optional<String> violation = IdentifierProfile.validate(name);
+        if (violation.isPresent()) {
+            throw new SchemaValidationException("invalid " + role + " -- " + violation.get());
         }
     }
 

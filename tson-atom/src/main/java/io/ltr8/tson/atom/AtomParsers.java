@@ -10,6 +10,7 @@ import io.ltr8.tson.atom.parser.DecimalParser;
 import io.ltr8.tson.atom.parser.DurationParser;
 import io.ltr8.tson.atom.parser.EmailParser;
 import io.ltr8.tson.atom.parser.EnumParser;
+import io.ltr8.tson.atom.parser.IdentifierAtom;
 import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
 import io.ltr8.tson.atom.parser.Ipv4Parser;
@@ -99,7 +100,7 @@ public final class AtomParsers {
                 // defines -- [TSON-DATA] §4 for the text encoding, [TSON-JSON] §5.7's own rule for JSON.
                 // A caller that has one supplies it; see the note above.
                 case "void", "value" -> null;
-                default -> IdentifierParser.INSTANCE;
+                default -> IdentifierAtom.INSTANCE;
             };
             case IntegerType t -> new IntegerParser(t);
             case TextType t -> new TextParser(t);

@@ -89,12 +89,12 @@ tokens, modes, or character-classification changes).
   `Xid.UNICODE_VERSION` declares the version, as §7.1 asks.
 - **`Xid` is the shared property, and neither profile is it.** `Xid.isStart`/`isContinue` are exactly
   `XID_Start`/`XID_Continue`; the lexer's token profile adds `Nd`/`-`/`+`/`.` and subtracts the joiners,
-  and the kernel's `identifier` contract (`IdentifierParser`) adds only `-` and requires NFC. Keeping the
+  and the kernel's `identifier` contract (`IdentifierProfile`) adds only `-` and requires NFC. Keeping the
   property in one place is what stops the two drifting — the identifier profile is written to
   `XID_Continue`, joiners included, and the lexer no longer subtracts them.
 - **ZWNJ/ZWJ continue a token; whether they may appear in a *name* is decided one layer up.** U+200C and
   U+200D are in `XID_Continue` (Unicode 16.0 `DerivedCoreProperties.txt`), so §7.1's set algebra admits them
-  while its prose excludes them by name. The lexer follows the algebra, and `IdentifierParser` applies UTS
+  while its prose excludes them by name. The lexer follows the algebra, and `IdentifierProfile` applies UTS
   #39 §3.1.1.1's contextual rule (`JoiningControls`): a joiner is admitted where it has a shaping effect —
   Persian `کتاب<ZWNJ>ها`, a Malayalam conjunct — and refused where it is invisible, which is every Latin
   position. That is sharper than a blanket exclusion in both directions, and it is why quoting is no
@@ -179,7 +179,7 @@ Key points:
   unchanged and still catches everything else (`!int32"5"`).
 - **A name position takes an `identifier`, not merely a bare token, and the check sits in the grammar.**
   `type-ref = "!" identifier` and `annotation = "@" identifier` (§7.4): `TsonDataStream` matches each name's
-  text in full against `IdentifierParser` once adjacency is settled, which is §7.6's own two-layer shape —
+  text in full against `IdentifierProfile` once adjacency is settled, which is §7.6's own two-layer shape —
   the lexer produces a token, and a production that is no part of the token-stream grammar then matches its
   decoded text, exactly as a number is matched. It has to be the profile and not the token class, because
   token-Start carries `Nd`/`-`/`+`/`.` so a *number* can be an unquoted token, and those reach names only
@@ -193,7 +193,7 @@ Key points:
   is not a name belongs in a map. A record's fields are the named members of a shape, which is what makes them
   declarable.
   **Normalisation runs before the match**, which is the one thing the profile does not decide here.
-  `IdentifierParser` requires NFC as a *form* and would refuse a decomposed name outright, where §2.5 gives a
+  `IdentifierProfile` requires NFC as a *form* and would refuse a decomposed name outright, where §2.5 gives a
   field name its identity by NFC-normalised comparison — a decomposed spelling is the same name, and a
   duplicate rather than a malformed one. The lexer already normalises the unquoted spelling, so refusing the
   form here would make the quoted spelling the stricter of the two, which is the asymmetry the rule removes.

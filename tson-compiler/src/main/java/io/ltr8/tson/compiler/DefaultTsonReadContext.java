@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.UnicodePolicy;
-import io.ltr8.tson.atom.IdentifierParser;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import java.util.ArrayDeque;
@@ -171,7 +171,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * under a policy reading data the UCD does not freeze, and it MUST NOT be reported in any of §8.1's four
      * categories. The stream throws {@link ParseException} and holds no receiver, so a check there can
      * only say "invalid", which is the one thing this is not. The grammar stays there, where a failure
-     * really is a parse error ({@code IdentifierParser.validate}), and the policy is applied here.
+     * really is a parse error ({@code IdentifierProfile.validate}), and the policy is applied here.
      *
      * <p><b>Only on a freshly pulled event.</b> {@link TsonReadContext#lookingAhead} rewinds what it
      * consumed and a reader replays it, so checking every event would report a refused name once per
@@ -197,7 +197,7 @@ final class DefaultTsonReadContext implements TsonReadContext {
         // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile
         // too", taking that rule with it. Script mixing gates itself inside violation().
         if (cursor.identifierPolicy.appliesIdentifierProfile()) {
-            IdentifierParser.hygiene(name).ifPresent(violation ->
+            IdentifierProfile.hygiene(name).ifPresent(violation ->
                     refuse(name, violation, Diagnostic.Code.RESTRICTED_CHARACTER));
         }
         cursor.identifierPolicy.violation(name).ifPresent(violation ->

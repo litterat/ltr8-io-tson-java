@@ -268,10 +268,13 @@ module has a real `module-info.java`; module names mirror each module's root exp
   in `policy` rather than beside the tables it reads, because the line between the two Unicode packages is
   **who touches them**: a consumer names `policy` to configure a processor and never names `unicode`; the
   engines read `unicode` and never name `policy`.
-  What `unicode` leaves behind in `tson-compiler` is `IdentifierParser`, which mixes
-  [TSON-DATA] §7.7's *grammar* (`validate`, throwing `LexException`) with §8.2's *policy* (`hygiene`,
-  returning) — the one piece whose home is a real question rather than a move, and it is smaller now that
-  the tables are not part of it. A side effect worth having: `lexer` is now exactly `Lexer`, `LexException`,
+  **`IdentifierProfile` is here too**, beside the tables it reads: [TSON-DATA] §7.7's grammar (`validate`)
+  and §8.2's restricted-character rule (`hygiene`), both **reporting** a violation rather than throwing one.
+  That is what lets one check serve a caller that owes a parse error and one that owes a diagnostic — the
+  identical violation is a `ParseException` from the lexer and a refusal from the linker — where a signature
+  that threw forced the lexer's answer on everyone. It is not a parser: nothing here turns a token into a
+  host value, and the `identifier` atom is a wrapper over `validate` living with the rest of the vocabulary
+  (`atom.parser.IdentifierAtom`). A side effect worth having: `lexer` is now exactly `Lexer`, `LexException`,
   `Token` and `TokenType`.
 - **`tson-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations, plus `Annotations`/
   `Annotation`, the wire-annotation carrier a bound class declares a component of. The carrier lives here
@@ -309,24 +312,22 @@ module has a real `module-info.java`; module names mirror each module's root exp
   one structurally it declares a local stand-in (`schema.meta.Token` mirrors `ast.TokenValue`/`TokenForm`;
   `schema.meta.SourcePosition` is an interface `tson-compiler`'s `Position` implements), converted at the
   one spot that needs it.
-- **`tson-atom`** — the built-in atom vocabulary: which tokens each family accepts and what host value
-  results (§5.2's parsing contracts). **A module rather than a package inside an engine, because the
-  vocabulary is not an engine's** — [TSON-JSON] §5.1 hands a JSON string's content to the atom's own parser
-  exactly as a TSON quoted token's text would be, so which families a reader binds, and what they read to,
-  is a property of the type system and not of the encoding that carried them. Three packages, split by who
-  touches them: `io.ltr8.tson.atom` is what a caller names — `AtomType`, the two indices over it
-  (`BuiltinTypeVocabulary` by name, `HostAtoms` by host class), `AtomParsers` from a resolved body,
-  `VocabularyAtoms` for the write direction, the exceptions a refusal arrives as, and `IdentifierParser`,
-  which is §7.7's name profile as much as it is an atom; `io.ltr8.tson.atom.number` is §4's number
-  production and the narrowing over it, exported because base type resolution stays with the text encoding
-  and reads it; `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on the
-  same terms as `tson-compiler`'s own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its
-  constraint record), `tson-base` and `tson-regex`. **What deliberately stayed behind is everything that
-  depends on *how* a token was written**: `AtomType` takes a `String`, and the two atoms needing the lexical
-  form — the kernel's `value`, whose §4.4 rule is that a quoted token is a string, and `Token`, which
-  records the spelling §8's resolved form carries — stay in `tson-compiler` with `TokenValue` and
-  `BaseTypeResolver`. That those two are exactly where the encodings legitimately differ is no coincidence:
-  JSON has no token forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
+- **`tson-atom`** — the built-in atom vocabulary: which tokens each family accepts and what host value results (§5.2's
+  parsing contracts). **A module rather than a package inside an engine, because the vocabulary is not an engine's** —
+  [TSON-JSON] §5.1 hands a JSON string's content to the atom's own parser exactly as a TSON quoted token's text would be, so
+  which families a reader binds, and what they read to, is a property of the type system and not of the encoding that carried
+  them. Three packages, split by who touches them: `io.ltr8.tson.atom` is what a caller names — `AtomType`, the two indices
+  over it (`BuiltinTypeVocabulary` by name, `HostAtoms` by host class), `AtomParsers` from a resolved body, `VocabularyAtoms`
+  for the write direction, and the exceptions a refusal arrives as; `io.ltr8.tson.atom.number` is §4's number production and
+  the narrowing over it, exported because base type resolution stays with the text encoding and reads it;
+  `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on the same terms as `tson-compiler`'s
+  own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its constraint record), `tson-base` and `tson-regex`.
+  **What deliberately stayed behind is everything that depends on *how* a token was written**: `AtomType` takes a `String`,
+  and the two atoms needing the lexical form — the kernel's `value`, whose §4.4 rule is that a quoted token is a
+  string, and
+  `Token`, which records the spelling §8's resolved form carries — stay in `tson-compiler` with `TokenValue` and
+  `BaseTypeResolver`. That those two are exactly where the encodings legitimately differ is no coincidence: JSON has no token
+  forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
 - **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonValue` and its
   pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
   true leaf: depends on **nothing** (not even `tson-annotation` — the nodes aren't bind targets, they're
@@ -407,7 +408,7 @@ no `\/`**, and a leading BOM is still stripped on §7.1's own authority rather t
 subtracts that set and two literal `ID_ \ XID_` tables — verified zero-over/zero-under against Unicode
 16.0, which `Xid.UNICODE_VERSION` declares. ZWNJ/ZWJ continue a token, `XID_Continue` containing both and
 §7.1 admitting them on that basis; what constrains them is a *name* rule (§7.7 rule 2), applied by
-`IdentifierParser` through `JoiningControls` (UTS #39 §3.1.1.1's contexts A1/A2/B).
+`IdentifierProfile` through `JoiningControls` (UTS #39 §3.1.1.1's contexts A1/A2/B).
 Errors are fail-fast (`LexException`); multi-error recovery is deferred.
 
 ### Structural parsing: Tier 2 stream + Tier 3 AST — `docs/lexer-and-data-parsing.md`
@@ -422,7 +423,7 @@ own. The layering is deliberately incomplete per §1.2:
 neither tier dedupes fields/keys, resolves `EmptyBrace`, or interprets token text — those belong to later
 layers. **A name is the one exception, and §7.6 is the precedent**: `type-ref = "!" identifier` and
 `annotation = "@" identifier`, so `TsonDataStream` matches each name's decoded text against
-`IdentifierParser` the way a number's text is matched against the number grammar — a production that is no
+`IdentifierProfile` the way a number's text is matched against the number grammar — a production that is no
 part of the token-stream grammar, over a token the lexer has already produced. `field-name` stays lexical
 (`unquoted-token / single-line-token`, where a map key keeps all three forms), but **that is the token rule
 only**: a field name is an identifier at every layer, so `TsonDataStream` matches its decoded text against the
@@ -1081,9 +1082,10 @@ mechanisms 2 and 3 are per-name and reach every identifier position anyway (§8.
 **The grammar runs where a name is read; the policy runs once per layer, over scopes.** That split is
 §8.2's own — §7.7 is validity, stable across Unicode versions, and a failure is a parse error; §8.2's three
 name-hygiene rules are policy over *named scopes*, read unstable data, and a failure is a refusal. So
-`IdentifierParser.validate` is the grammar and throws, `IdentifierParser.hygiene` is the restricted-character
-rule and
-returns, and **no position that reads a name applies a policy**. The joiners belong to the grammar despite
+`IdentifierProfile.validate` is the grammar and `IdentifierProfile.hygiene` the restricted-character rule;
+**both report a violation and neither throws**, so what a failure becomes is the caller's — a parse error
+where the grammar is read, a refusal where the policy is applied — and **no position that reads a name
+applies a policy**. The joiners belong to the grammar despite
 being `Identifier_Status=Restricted` — §7.7 rule 2 makes their admission a question of form.
 
 Each layer has exactly one place that walks its scopes, and all three rules run there — names that read
