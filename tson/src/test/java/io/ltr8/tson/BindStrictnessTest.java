@@ -10,7 +10,7 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.atom.TsonAtomContext;
 
 import java.util.List;
 import java.util.Optional;

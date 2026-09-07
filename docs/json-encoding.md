@@ -4,6 +4,28 @@ Design notes for `tson-json` — the implementation of [TSON-JSON] (`spec/tson-p
 encoding of the TSON schema system. Current form only; history lives in git. `CLAUDE.md` holds the
 one-paragraph orientation; this file holds the detail.
 
+## One atom vocabulary, both encodings
+
+`TsonAtomContext` lives in `tson-atom`, beside `HostAtoms` — the index from the same host classes back to
+the family that produces each — and both front doors' defaults start from it: `Json.standard()`,
+`JsonObjectReader.standard()`, `Tson.builder()`. [TSON-JSON] §5.1 is why that is right rather than merely
+tidy: a string's content is handed to the atom's own parser exactly as a TSON quoted token's text would be,
+so *which* families a reader can bind is a property of the type system and not of the encoding that carried
+them. A consumer whose class has a `UUID` component must not have to discover that one front door treats it
+as a scalar and the other takes it apart.
+
+What the registration buys is that `tson-bind` treats each host type as a **scalar** — `CidrNetwork` is a
+Java record and would otherwise bind as `{ prefix: … prefixLength: … }`, refusing the scalar `cidr4`/`cidr6`
+actually carry. What it does **not** buy is the string-to-host-value conversion: none of these registrations
+carries a bridge, so a schemaless bind of a `UUID` component fails — on *both* encodings alike, which is the
+honest statement of it. `BACKLOG.md`'s "Binding" section carries the shared conversion that would close it,
+and `HostAtoms.forStringContentHostType` is the index it would go through.
+
+`SourcePosition`'s bridge could not travel: it names `tson-compiler`'s own `Position`, so that engine keeps
+it in `config.ResolverBindContext`, applied on top of the shared list. The split is by what needs it — the
+shared list is what a consumer's classes bind, the addition is what binding this library's own schema model
+needs.
+
 ## What this is for, and what it constrains
 
 The target is an **on-ramp**: someone holds a JSON Schema or an OpenAPI contract, converts it to a TSON

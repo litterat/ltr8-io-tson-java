@@ -84,6 +84,21 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
   resolver's own) and the comparison should drop it structurally, before rendering, the way it already drops
   `kind`. `CLAUDE.md`'s traps list carries the hazard meanwhile.
 
+## Binding
+
+- [ ] **A schemaless bind cannot convert an atom host type, on either encoding.** `TsonAtomContext`
+  registers `UUID`, the temporal, network and identifier families as atoms so `tson-bind` treats them as
+  scalars rather than taking them apart structurally — but with no bridge, so nothing converts the string on
+  the wire into one. Under a schema that is right: the position's own atom parser produces the host value
+  ([TSON-DATA] §5, [TSON-JSON] §5.1). With no schema both encodings fail alike —
+  `new TsonObjectReader().read("{ id: \"3f25…\" }", WithAUuid.class)` and
+  `Json.standard().objectReader().read(…)` both report that a string cannot become a `UUID` — so a consumer
+  whose class has a `UUID` component must have a schema, and nothing says so at the point of failure. The
+  machinery is already there and keyed the right way: `HostAtoms.forStringContentHostType` maps the host
+  class back to the family that parses it, and `SchemalessObjectReader` already consults it when no type-ref
+  supplies a name. What is left is the JSON side (`JsonAtoms.fromString` asking the same index) and deciding
+  whether the text side's remaining families follow.
+
 ## JSON encoding
 
 [TSON-SCHEMA] §6 makes this a spec obligation rather than an interop nicety, and `meta.tn` states it directly: "No

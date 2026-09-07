@@ -9,7 +9,7 @@ import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.atom.TsonAtomContext;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 

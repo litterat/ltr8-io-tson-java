@@ -5,7 +5,7 @@ import io.ltr8.annotation.Profile;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.atom.TsonAtomContext;
 
 import java.util.Map;
 

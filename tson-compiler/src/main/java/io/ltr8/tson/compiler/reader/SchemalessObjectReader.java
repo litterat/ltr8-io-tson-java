@@ -27,7 +27,7 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.atom.number.BaseValue;
-import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.atom.TsonAtomContext;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;

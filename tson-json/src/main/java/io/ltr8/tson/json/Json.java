@@ -1,6 +1,7 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.atom.TsonAtomContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -43,9 +44,17 @@ public final class Json {
 
     // ── The front door ───────────────────────────────────────────────────
 
-    /** Over a default bind context and the processor's default policy, raising what it refuses. */
+    /**
+     * Over the default bind context and the processor's default policy, raising what it refuses.
+     *
+     * <p>The context is {@link TsonAtomContext#defaultContext()} -- the same vocabulary the TSON text front
+     * door starts from, so a class binds the same under both encodings. [TSON-JSON] §5.1 is why that is
+     * right rather than merely convenient: a string's content is handed to the atom's own parser exactly as
+     * a TSON quoted token's text would be, which makes the vocabulary the type system's rather than either
+     * encoding's.
+     */
     public static Json standard() {
-        return new Json(DataBindContext.builder().build(), ProcessorPolicy.defaults(),
+        return new Json(TsonAtomContext.defaultContext(), ProcessorPolicy.defaults(),
                 DiagnosticsReceiver.throwing());
     }
 
@@ -65,6 +74,16 @@ public final class Json {
     }
 
     /** Everything a read off this instance will admit and spend. */
+    /**
+     * The bind context every {@link #objectReader()} from this instance binds through --
+     * {@link TsonAtomContext#defaultContext()} unless {@link #using} supplied one.
+     * {@code Tson.dataBindContext()} is the TSON front door's counterpart, and the two answer with the same
+     * kind of value on purpose.
+     */
+    public DataBindContext dataBindContext() {
+        return bindContext;
+    }
+
     public ProcessorPolicy processorPolicy() {
         return policy;
     }

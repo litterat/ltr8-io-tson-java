@@ -73,12 +73,12 @@ public final class SchemaMetaNameBinder {
     public static final DataNameBinder INSTANCE = new DataNameBinder.DefaultDataNameBinder(Set.of(NAMESPACE), ALIASES);
 
     /**
-     * The {@code io.ltr8.tson.schema.meta} default -- {@link TsonAtomContext}'s own built-in atom
+     * The {@code io.ltr8.tson.schema.meta} default -- {@link ResolverBindContext}'s own built-in atom
      * registrations, plus a {@link DataNameBinder} scoped to {@link #INSTANCE}'s own namespace/alias
      * table. A {@link DataNameBinder} is fixed at a {@link DataBindContext}'s own construction, so
      * it can't be attached after the fact -- a caller binding their own schema to their own Java
      * library builds their own {@link DataBindContext} instead (typically {@link
-     * TsonAtomContext#registerDefaults} applied to a {@link DataBindContext.Builder} configured with
+     * ResolverBindContext#registerDefaults} applied to a {@link DataBindContext.Builder} configured with
      * their own {@link DataNameBinder}) and passes it to {@link ValueReaderFactoryRegistry#bind}
      * directly.
      */
@@ -94,7 +94,7 @@ public final class SchemaMetaNameBinder {
      *
      * <p>Composition, never replacement: {@link #INSTANCE} answers first and {@code additional} is asked
      * only for a name the kernel's own vocabulary does not know. So a consumer cannot shadow {@code
-     * record}/{@code enum}, and cannot lose {@link TsonAtomContext}'s registrations by building a context
+     * record}/{@code enum}, and cannot lose {@link ResolverBindContext}'s registrations by building a context
      * that forgets them -- what the extension adds is names, and nothing else.
      *
      * <p>This is the whole seam. A meta-layer constructor needs three things and no more: the meta schema
@@ -124,6 +124,6 @@ public final class SchemaMetaNameBinder {
     }
 
     private static DataBindContext context(DataNameBinder binder) {
-        return TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+        return ResolverBindContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
     }
 }
