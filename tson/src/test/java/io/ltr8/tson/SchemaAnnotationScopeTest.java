@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import org.junit.jupiter.api.Test;

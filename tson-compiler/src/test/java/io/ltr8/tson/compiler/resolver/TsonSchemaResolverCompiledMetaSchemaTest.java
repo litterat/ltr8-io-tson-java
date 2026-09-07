@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;

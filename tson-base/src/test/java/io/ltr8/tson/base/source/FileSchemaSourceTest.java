@@ -1,5 +1,6 @@
-package io.ltr8.tson.base;
+package io.ltr8.tson.base.source;
 
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.SchemaFetchException.Reason;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

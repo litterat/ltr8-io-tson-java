@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.tree.TsonDocument;

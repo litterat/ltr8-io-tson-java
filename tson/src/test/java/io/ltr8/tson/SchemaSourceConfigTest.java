@@ -1,8 +1,8 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.FileSchemaSource;
-import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.source.FileSchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

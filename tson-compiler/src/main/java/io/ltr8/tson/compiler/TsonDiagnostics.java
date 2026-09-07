@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.*;
 
 import java.util.Optional;

@@ -1,5 +1,7 @@
-package io.ltr8.tson.base;
+package io.ltr8.tson.base.policy;
 
+
+import io.ltr8.tson.base.Diagnostic;
 
 /**
  * The resource limits this processor applies to a document it reads -- [TSON-DATA] §9.1's denial-of-service

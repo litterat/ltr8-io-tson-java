@@ -23,7 +23,7 @@ import java.util.Optional;
  * io.ltr8.tson.compiler.TsonCompiledMetaRegistry}, {@code MetaKernelBootstrapResolver},
  * {@code TsonSchemaLinker}'s own meta-kernel-governed check), since `tson-schema`
  * has no dependency on `tson-compiler` (only the reverse). {@link #fetch} deliberately doesn't
- * implement {@code io.ltr8.tson.base.SchemaSource} -- that interface lives in
+ * implement {@code io.ltr8.tson.base.source.SchemaSource} -- that interface lives in
  * `tson-compiler`, a module this one has no dependency on -- but its shape (a single {@code
  * String fetch(String uri)} method) already matches that interface's own single abstract method
  * exactly, so a `tson-compiler`-side caller needing a real {@code SchemaSource} instance passes

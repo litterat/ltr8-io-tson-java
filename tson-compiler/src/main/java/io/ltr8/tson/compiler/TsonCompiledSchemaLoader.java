@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.SchemaSource;
-import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 

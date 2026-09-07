@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.annotation.Annotation;
 import io.ltr8.annotation.Annotations;

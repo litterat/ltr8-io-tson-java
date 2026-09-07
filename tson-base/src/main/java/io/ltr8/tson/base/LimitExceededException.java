@@ -1,8 +1,8 @@
 package io.ltr8.tson.base;
 
-
 /**
- * A document asked for more than this processor's {@link LimitsPolicy} will spend -- [TSON-DATA] §9.1.
+ * A document asked for more than this processor's {@link io.ltr8.tson.base.policy.LimitsPolicy LimitsPolicy}
+ * will spend -- [TSON-DATA] §9.1.
  *
  * <p><b>Not a parse error, and deliberately not a subclass of one.</b> {@code ParseException} says the
  * document is malformed, which is a verdict every processor reaching the same bytes would repeat; this says

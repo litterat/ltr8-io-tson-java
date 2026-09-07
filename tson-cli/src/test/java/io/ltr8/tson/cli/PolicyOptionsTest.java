@@ -1,7 +1,7 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.Tson;
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import org.junit.jupiter.api.Test;
 
 import java.lang.Character.UnicodeScript;

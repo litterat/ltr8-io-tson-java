@@ -212,11 +212,20 @@ Package group is `io.ltr8` (reverse-DNS identifies who *publishes* the artifact 
 implementation of the spec published under the `ltr8.io` banner, not *the* tson.io-blessed one). Every
 module has a real `module-info.java`; module names mirror each module's root exported package.
 
-- **`tson-base`** — `io.ltr8.tson.base`: `Diagnostic` (the record and its closed `Code` enum), the three
-  diagnostics receivers, `SourcePosition`, and the exceptions whose fact is the **processor's** rather than
-  any one encoding's — `ReadException`, `LimitExceededException`, `BindMismatchException` and its
+- **`tson-base`** — four packages, and **the root names none of the other three**: every dependency runs
+  inward, so a subpackage reads on its own and the vocabulary at the centre stays free of the machinery
+  around it. `io.ltr8.tson.base` is how a problem is stated — `Diagnostic` (the record and its closed `Code`
+  enum), the three diagnostics receivers, `SourcePosition`, `CanonicalIdentity` (§2.2.1's algorithm, how a
+  schema is named), and the exceptions whose fact is the **processor's** rather than
+  any one encoding's — `ReadException`, `ParseException`, `LimitExceededException`, `SchemaValidationException`,
+  `BindMismatchException` and its
   `MissingBindingException` subclass, `SchemaFetchException` (whose `Reason` is what `Diagnostic.Code.of`
-  maps), `ContentHashMismatchException`. **The prefix is dropped here and only here**: `Tson` earns its keep
+  maps), `ContentHashMismatchException`. **The exceptions stay at the root rather than following their
+  subject**, which is what keeps the inward rule true — `Diagnostic.ofLimitExceeded` and
+  `Code.of(SchemaFetchException.Reason)` are same-package calls, where filing each exception with the package
+  it is thrown by would have the centre depend on two of its own subpackages. Sorting the eight by "is a
+  `Throwable`" would be sorting by Java mechanism in any case; this library files by subject, which is why
+  `LexException` sits in `lexer`. **The prefix is dropped here and only here**: `Tson` earns its keep
   disambiguating a consumer's own `Schema` from `TsonSchema`, and in this module the competing name is
   another *encoding's* type in this same library — `ReadException` beside `JsonParseException` reads right
   where `TsonReadException` beside it implies the first belongs to the text encoding, which is exactly what
@@ -237,10 +246,22 @@ module has a real `module-info.java`; module names mirror each module's root exp
   applies with the same defaults", so one record and one refusal serve both encodings and a deployment that
   raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and is the one factory that
   stayed on the record — its nine siblings switch on an encoding's own exception type where it classifies
-  nothing at all. **The Unicode machinery is here too**, in an exported `io.ltr8.tson.base.unicode`: `Xid`,
-  `IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — UCD 16.0 tables and the
-  UTS #39 rules over them, read by two engines and knowing nothing about either format. `UnicodePolicy`
-  sits beside `Diagnostic`. What it leaves behind in `tson-compiler` is `IdentifierParser`, which mixes
+  nothing at all.
+  **`io.ltr8.tson.base.policy`** is what this processor will admit and spend — `ProcessorPolicy` and the two
+  it composes, `UnicodePolicy` (§8.2's levels) and `LimitsPolicy` (§9.1's bounds) — one package because a
+  deployment states one policy, and §8.2 requires a relaxation be code rather than ambient: this is where
+  that code points. **`io.ltr8.tson.base.source`** is where a schema comes from — `SchemaSource` and the two
+  implementations that ship, a directory and an HTTPS host allow-list, both denying by default, with
+  `SchemaReference` (§2.2.1's rules on what an identity may be) package-private among them. [TSON-JSON]
+  §10.4 names that as the restriction an application processing untrusted input sets, which makes it
+  configuration like the policies rather than machinery like an encoding's reader.
+  **`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
+  `IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — and the
+  UTS #39 rules over them, read by two engines and knowing nothing about either format. `UnicodePolicy` is
+  in `policy` rather than beside the tables it reads, because the line between the two Unicode packages is
+  **who touches them**: a consumer names `policy` to configure a processor and never names `unicode`; the
+  engines read `unicode` and never name `policy`.
+  What `unicode` leaves behind in `tson-compiler` is `IdentifierParser`, which mixes
   [TSON-DATA] §7.7's *grammar* (`validate`, throwing `LexException`) with §8.2's *policy* (`hygiene`,
   returning) — the one piece whose home is a real question rather than a move, and it is smaller now that
   the tables are not part of it. A side effect worth having: `lexer` is now exactly `Lexer`, `LexException`,

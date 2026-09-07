@@ -1,11 +1,14 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.HttpSchemaSource;
-import io.ltr8.tson.base.FileSchemaSource;
-import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.source.HttpSchemaSource;
+import io.ltr8.tson.base.source.FileSchemaSource;
+import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.*;
-import io.ltr8.tson.base.ProcessorPolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
+import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.schema.TsonLinkedSchema;

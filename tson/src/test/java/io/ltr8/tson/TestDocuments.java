@@ -1,7 +1,6 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonReadContext;
 

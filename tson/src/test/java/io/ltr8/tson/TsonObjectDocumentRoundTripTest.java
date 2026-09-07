@@ -4,7 +4,7 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.TsonObjectDocument;
 import io.ltr8.tson.compiler.TsonObjectWriter;
-import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonWriteException;
 import org.junit.jupiter.api.Test;
 

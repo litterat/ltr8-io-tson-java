@@ -4,7 +4,7 @@ import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.schema.*;

@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchemaLoader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;

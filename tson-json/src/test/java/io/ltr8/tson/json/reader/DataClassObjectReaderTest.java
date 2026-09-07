@@ -1,6 +1,6 @@
 package io.ltr8.tson.json.reader;
 
-import io.ltr8.tson.base.ProcessorPolicy;
+import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;

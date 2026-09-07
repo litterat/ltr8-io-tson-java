@@ -1,6 +1,5 @@
 package io.ltr8.tson.base;
 
-
 import java.util.Optional;
 
 /**
@@ -78,7 +77,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                           Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition) {
 
     /**
-     * A document this processor's {@link LimitsPolicy} declined to read ([TSON-DATA] §9.1) --
+     * A document this processor's {@link io.ltr8.tson.base.policy.LimitsPolicy LimitsPolicy} declined to
+     * read ([TSON-DATA] §9.1) --
      * {@code TsonDiagnostics.ofBaseSyntaxError} 's sibling, and deliberately not a case inside it.
      *
      * <p><b>The one factory that lives on this record, because it is the one that classifies nothing.</b>
@@ -290,7 +290,6 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
 
         /** The location answered with more bytes than a schema document is allowed to be. */
         SCHEMA_TOO_LARGE;
-
 
         /**
          * The code a fetch failure reports, one per {@link SchemaFetchException.Reason}.

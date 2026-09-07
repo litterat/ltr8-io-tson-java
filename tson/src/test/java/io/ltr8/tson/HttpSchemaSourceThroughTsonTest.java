@@ -1,8 +1,8 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.HttpSchemaSource;
+import io.ltr8.tson.base.source.HttpSchemaSource;
 import com.sun.net.httpserver.HttpServer;
-import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

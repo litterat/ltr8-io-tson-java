@@ -1,8 +1,8 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.tson.TsonConfig;
-import io.ltr8.tson.base.LimitsPolicy;
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 
 import java.lang.Character.UnicodeScript;
 import java.util.ArrayList;

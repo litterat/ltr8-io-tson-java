@@ -1,7 +1,7 @@
 package io.ltr8.tson.json;
 
-import io.ltr8.tson.base.LimitsPolicy;
-import io.ltr8.tson.base.ProcessorPolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
+import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.annotation.Annotations;

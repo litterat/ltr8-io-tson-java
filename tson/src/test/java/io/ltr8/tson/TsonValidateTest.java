@@ -3,7 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonContentHash;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;

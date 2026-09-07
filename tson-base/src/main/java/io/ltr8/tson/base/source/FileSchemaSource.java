@@ -1,5 +1,7 @@
-package io.ltr8.tson.base;
+package io.ltr8.tson.base.source;
 
+
+import io.ltr8.tson.base.SchemaFetchException;
 
 import java.io.IOException;
 import java.io.InputStream;

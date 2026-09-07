@@ -1,5 +1,9 @@
-package io.ltr8.tson.base;
+package io.ltr8.tson.base.source;
 
+
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.SchemaValidationException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

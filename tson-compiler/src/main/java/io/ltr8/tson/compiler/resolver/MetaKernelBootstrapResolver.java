@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
@@ -31,7 +31,6 @@ import io.ltr8.tson.schema.meta.UriType;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Set;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

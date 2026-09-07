@@ -2,10 +2,9 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.base.Diagnostic;
 
-import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.base.UnicodePolicy;
-import io.ltr8.tson.compiler.TsonDiagnostics;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

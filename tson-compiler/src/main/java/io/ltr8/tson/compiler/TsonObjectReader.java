@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.*;
-import io.ltr8.tson.base.UnicodePolicy;
+import io.ltr8.tson.base.policy.LimitsPolicy;
+import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;

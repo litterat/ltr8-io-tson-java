@@ -1,11 +1,9 @@
-package io.ltr8.tson.base;
+package io.ltr8.tson.base.source;
 
 import com.sun.net.httpserver.HttpServer;
+import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.SchemaFetchException.Reason;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.*;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -100,7 +98,7 @@ class HttpSchemaSourceTest {
     void fetchesNothingUntilAnOriginIsAllowed() {
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
         try (HttpSchemaSource source = HttpSchemaSource.builder().build()) {
-            assertEquals(Reason.NOT_PERMITTED, refusal(source, reference("/order-1.tn")).reason());
+            Assertions.assertEquals(Reason.NOT_PERMITTED, refusal(source, reference("/order-1.tn")).reason());
             assertEquals(0, requests.get(), "policy must refuse before opening a connection");
         }
     }
@@ -112,9 +110,9 @@ class HttpSchemaSourceTest {
     @Test
     void aHostIsMatchedExactlyNotBySuffix() {
         try (HttpSchemaSource source = HttpSchemaSource.builder().allowHost(HOST).build()) {
-            assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://evil-schemas.example.com/x.tn").reason());
-            assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://sub.schemas.example.com/x.tn").reason());
-            assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://example.com/x.tn").reason());
+            Assertions.assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://evil-schemas.example.com/x.tn").reason());
+            Assertions.assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://sub.schemas.example.com/x.tn").reason());
+            Assertions.assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://example.com/x.tn").reason());
         }
     }
 
