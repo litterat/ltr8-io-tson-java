@@ -1,6 +1,5 @@
-package io.ltr8.tson.json.bind;
+package io.ltr8.tson.json;
 
-import io.ltr8.tson.json.JsonPosition;
 
 /**
  * A JSON document and the class it was read into disagree: a value of the wrong shape for the

@@ -299,14 +299,18 @@ Three exported, layered the way the module reads a document, and the split is th
 
 | Package | Holds |
 |---|---|
-| `io.ltr8.tson.json` | `Json`, `JsonPosition`, and the exceptions every layer raises |
+| `io.ltr8.tson.json` | `Json`, `JsonObjectReader`, `JsonPosition`, and the exceptions every layer raises |
 | `io.ltr8.tson.json.tree` | `JsonValue` and its six node types, plus `JsonValueException` |
 | `io.ltr8.tson.json.stream` | `JsonEvent`, `JsonEventSource`, `JsonStream` |
-| `io.ltr8.tson.json.bind` | `JsonObjectReader`, `JsonBindException` |
-| `io.ltr8.tson.json.lexer` | internal — a consumer names a value or an event, never a token |
+| `io.ltr8.tson.json.atom` | internal — one JSON leaf into one host value, and where §5's per-family readers land |
+| `io.ltr8.tson.json.lexer` | internal — a consumer names a value, an event or a reader, never a token or a parser |
 
 `tree` is the JSON counterpart of `io.ltr8.tson.tree` and stands in the same relation to its front door:
-`Json.parse` returns a `JsonValue` as `Tson`'s tree reader returns a `TsonValue`. `stream` is exported for
+`Json.parse` returns a `JsonValue` as `Tson`'s tree reader returns a `TsonValue`. `JsonObjectReader` sits
+in the front door beside `Json` for the same reason `TsonObjectReader` sits beside `Tson` — a reader is a
+front door, not a layer of one. `atom` is unexported and will grow: §5.1 hands a string's content to the
+atom's own parser exactly as a TSON quoted token's text would be, so each family needs a reader there and
+none of them belongs in a reader that walks structure. `stream` is exported for
 the reason `tson-compiler` exports its own — `Json.parse` takes a `JsonEventSource`, so it is a real contract
 rather than an internal dispatch type, and JEP 540 excludes streaming as a non-goal, so a caller who needs it
 has nowhere else to go.
@@ -315,7 +319,7 @@ The rendering lives on `JsonValue.toDisplayString(indent)` rather than only on `
 quoting it needs is `tree`'s and package-private there. `Json.toDisplayString(value, indent)` is JEP 540's
 spelling of the same call and delegates.
 
-## Binding (`tson-json/.../bind/`)
+## Binding (`JsonObjectReader`)
 
 `JsonObjectReader` reads a document straight into a Java object, driven by the target class's own
 `tson-bind` descriptor and streaming the event source rather than a tree. It is the JSON peer of

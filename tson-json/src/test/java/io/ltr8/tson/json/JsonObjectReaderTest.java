@@ -1,10 +1,7 @@
-package io.ltr8.tson.json.bind;
+package io.ltr8.tson.json;
 
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Field;
-import io.ltr8.tson.json.JsonLimitExceededException;
-import io.ltr8.tson.json.JsonParseException;
-import io.ltr8.tson.json.JsonPosition;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
 import org.junit.jupiter.api.Nested;

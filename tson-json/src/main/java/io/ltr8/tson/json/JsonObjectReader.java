@@ -1,4 +1,4 @@
-package io.ltr8.tson.json.bind;
+package io.ltr8.tson.json;
 
 import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
@@ -13,7 +13,7 @@ import io.ltr8.bind.DataClassMap;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
-import io.ltr8.tson.json.JsonPosition;
+import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
@@ -41,7 +41,9 @@ import java.util.Set;
  * <p>Binding is JEP 540's other explicit non-goal, after streaming, and it is the one worth not
  * inheriting: a library whose point is validated typed data has no business handing back a tree and
  * calling it done. This is the JSON peer of {@code tson-compiler}'s {@code SchemalessObjectReader},
- * which does the same job against the TSON event stream.
+ * which does the same job against the TSON event stream, and it sits beside {@link Json} for the
+ * same reason {@code TsonObjectReader} sits beside {@code Tson}: a reader is a front door, not a
+ * layer of one.
  *
  * <p><b>Streams the events, never a tree.</b> Memory held is proportional to nesting depth rather than
  * to document size, and {@link JsonStream}'s §10.1 bound refuses a document before this descends into

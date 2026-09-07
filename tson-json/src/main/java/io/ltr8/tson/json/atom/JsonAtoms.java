@@ -1,6 +1,7 @@
-package io.ltr8.tson.json.bind;
+package io.ltr8.tson.json.atom;
 
 import io.ltr8.bind.DataClassAtom;
+import io.ltr8.tson.json.JsonBindException;
 import io.ltr8.bind.DataClassBridge;
 import io.ltr8.tson.json.JsonPosition;
 import io.ltr8.tson.json.stream.JsonEvent;
@@ -10,6 +11,12 @@ import java.math.BigInteger;
 
 /**
  * One JSON leaf into one host value, at a {@link DataClassAtom} position.
+ *
+ * <p>The seed of this module's atom vocabulary, and where [TSON-JSON] §5's per-family readers land when
+ * the schema-directed decode arrives: §5.1 hands a string's content to the atom's own parser exactly as a
+ * TSON quoted token's text would be, so each family needs a reader here and none of them belongs in a
+ * reader that walks structure. Unexported, on the same terms as {@code tson-compiler}'s own {@code atom}
+ * package -- a consumer names a value or a reader, never a parser.
  *
  * <p><b>The target type decides, never the JSON kind.</b> A {@code JsonEvent.NumberValue} at an
  * {@code int} component is an {@code int}; the same event at a {@code BigDecimal} component keeps every
@@ -33,13 +40,13 @@ import java.math.BigInteger;
  * bridge does the lookup -- a rule matching constants by name in this class would never be reached, and a
  * rule that is never reached still has to be read by everyone who comes after it.
  */
-final class JsonAtoms {
+public final class JsonAtoms {
 
     private JsonAtoms() {
     }
 
     /** {@code leaf} at {@code atom}'s type, bridge applied. {@code null} only where the leaf was JSON null. */
-    static Object bind(JsonEvent leaf, DataClassAtom atom, JsonPosition at) {
+    public static Object bind(JsonEvent leaf, DataClassAtom atom, JsonPosition at) {
         Class<?> wire = atom.dataClass();
         Object value = leaf instanceof JsonEvent.NullValue ? null : bindTo(leaf, wire, at);
         DataClassBridge bridge = atom.bridge().orElse(null);
@@ -126,7 +133,7 @@ final class JsonAtoms {
     }
 
     /** How a leaf names itself in a message. */
-    static String describe(JsonEvent event) {
+    public static String describe(JsonEvent event) {
         return switch (event) {
             case JsonEvent.ObjectStart ignored -> "an object";
             case JsonEvent.ArrayStart ignored -> "an array";
