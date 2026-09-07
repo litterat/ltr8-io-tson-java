@@ -12,7 +12,7 @@ package io.ltr8.tson.base;
  * Diagnostic.Code#verdict()} is {@code false}, and never one of the codes that assert something about the
  * document's conformance.
  *
- * <p><b>Why the limits are a value and not a constant.</b> The argument is {@code TsonUnicodeProcessorPolicy}'s, and for the same reason: the bound is the reading deployment's own choice,
+ * <p><b>Why the limits are a value and not a constant.</b> The argument is {@code TsonProcessorPolicy}'s, and for the same reason: the bound is the reading deployment's own choice,
  * so the same bytes may be accepted by one server and refused by another, and that divergence is
  * unexplainable unless the configuration can be stated. A sender that can read the limits writes a document
  * that fits; one that cannot learns them one round trip too late. It is reported by the same surfaces --

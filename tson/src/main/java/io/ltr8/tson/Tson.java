@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.TsonProcessorPolicy;
 import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.base.TsonLimitsPolicy;
 import io.ltr8.tson.base.Diagnostic;
@@ -148,9 +149,10 @@ public final class Tson {
     }
 
     /**
-     * The two [TSON-DATA] §8.2 Unicode policies this instance applies -- {@link TsonConfig#identifierPolicy}
-     * over declared names and {@link TsonConfig#tokenPolicy} over token values -- and the Unicode data
-     * version they are computed against, under the names that configured them.
+     * Everything this instance will admit and spend -- [TSON-DATA] §8.2's two Unicode policies
+     * ({@link TsonConfig#identifierPolicy} over declared names, {@link TsonConfig#tokenPolicy} over token
+     * values), the Unicode data version they are computed against, and §9.1's resource limits
+     * ({@link TsonConfig#limits}) -- under the names that configured them.
      *
      * <p><b>What a run or a response states beside its diagnostics</b>, and what a deployment can publish
      * with no document in hand at all. §8.2's rules read data the UCD does not freeze and are applied at a
@@ -159,19 +161,19 @@ public final class Tson {
      * than after being refused. A reader derived with {@link TsonTreeReader#withIdentifierPolicy} answers for
      * itself ({@link TsonTreeReader#processorPolicy()}).
      */
-    public TsonUnicodeProcessorPolicy processorPolicy() {
-        return TsonUnicodeProcessorPolicy.of(core.identifierPolicy(), tokenPolicy);
+    public TsonProcessorPolicy processorPolicy() {
+        return TsonProcessorPolicy.of(core.identifierPolicy(), tokenPolicy, limits);
     }
 
     /**
-     * The [TSON-DATA] §9.1 resource limits this instance applies -- {@link TsonConfig#limits}.
+     * The [TSON-DATA] §9.1 resource limits this instance applies -- {@link TsonConfig#limits}, and
+     * {@link #processorPolicy()}'s {@code limits} component in one call.
      *
-     * <p><b>{@link #processorPolicy()}'s companion, and stated for the same reason.</b> A limit is the
-     * reading deployment's own choice, so the same bytes may be read here and refused elsewhere; a sender
-     * that can consult the bound writes a document that fits, where one that cannot learns it from a refusal.
-     * The two are separate values rather than one because they answer separate questions -- what this
-     * processor will <em>read</em>, and what it will <em>admit as a name</em> -- and a deployment that has
-     * changed one has said nothing about the other.
+     * <p>A limit is the reading deployment's own choice, so the same bytes may be read here and refused
+     * elsewhere; a sender that can consult the bound writes a document that fits, where one that cannot
+     * learns it from a refusal. It is one component of one policy rather than a value of its own because a
+     * deployment states one policy -- and it stays a component, independent of the two beside it: changing
+     * a limit says nothing about what this processor admits as a name.
      */
     public TsonLimitsPolicy limitsPolicy() {
         return limits;

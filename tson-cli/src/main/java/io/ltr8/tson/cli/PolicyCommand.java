@@ -33,7 +33,7 @@ final class PolicyCommand {
         // Through a real Tson rather than from the flags directly: this prints what a read would actually be
         // judged under, which is the question, and the two would only ever agree by inspection otherwise.
         Tson tson = policies.applyTo(Tson.builder()).build();
-        System.out.println(format.render(CliPolicy.from(tson.processorPolicy(), tson.limitsPolicy())));
+        System.out.println(format.render(CliPolicy.from(tson.processorPolicy())));
         return 0;
     }
 }

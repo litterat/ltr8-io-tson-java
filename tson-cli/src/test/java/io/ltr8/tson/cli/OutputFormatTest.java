@@ -3,7 +3,7 @@ package io.ltr8.tson.cli;
 import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonSchemaFetchException;
-import io.ltr8.tson.compiler.TsonUnicodeProcessorPolicy;
+import io.ltr8.tson.base.TsonProcessorPolicy;
 import io.ltr8.tson.base.TsonLimitsPolicy;
 import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -27,9 +27,9 @@ class OutputFormatTest {
      * one, because every envelope the CLI emits does: [TSON-DATA] §8.2's rules are the deployment's own
      * configuration, so a report that did not state them could not be interpreted anywhere but here.
      */
-    private static final CliPolicy POLICY = CliPolicy.from(TsonUnicodeProcessorPolicy.of(
-            TsonUnicodePolicy.highlyRestrictive(), TsonUnicodePolicy.unrestricted()),
-            TsonLimitsPolicy.defaults());
+    private static final CliPolicy POLICY = CliPolicy.from(TsonProcessorPolicy.of(
+            TsonUnicodePolicy.highlyRestrictive(), TsonUnicodePolicy.unrestricted(),
+            TsonLimitsPolicy.defaults()));
 
     /** {@link #POLICY} as {@code --output json} writes it -- built from the accessor, not pinned to a version. */
     private static final String POLICY_JSON =
@@ -234,10 +234,10 @@ class OutputFormatTest {
      */
     @Test
     void tsonOutputRoundTripsARelaxedPolicy() {
-        CliPolicy relaxed = CliPolicy.from(TsonUnicodeProcessorPolicy.of(
+        CliPolicy relaxed = CliPolicy.from(TsonProcessorPolicy.of(
                 TsonUnicodePolicy.moderatelyRestrictive().perSegment()
                         .permitting(UnicodeScript.LATIN, UnicodeScript.CYRILLIC),
-                TsonUnicodePolicy.unrestricted()), TsonLimitsPolicy.defaults());
+                TsonUnicodePolicy.unrestricted(), TsonLimitsPolicy.defaults()));
         ValidationReport original = ValidationReport.ok(relaxed);
 
         String rendered = OutputFormat.TSON.render(original);
@@ -304,9 +304,9 @@ class OutputFormatTest {
      */
     @Test
     void textPrintsANonDefaultPolicyEvenWhenNothingWasRefused() {
-        CliPolicy relaxed = CliPolicy.from(TsonUnicodeProcessorPolicy.of(
-                TsonUnicodePolicy.scriptsUnchecked(), TsonUnicodePolicy.unrestricted()),
-                TsonLimitsPolicy.defaults());
+        CliPolicy relaxed = CliPolicy.from(TsonProcessorPolicy.of(
+                TsonUnicodePolicy.scriptsUnchecked(), TsonUnicodePolicy.unrestricted(),
+                TsonLimitsPolicy.defaults()));
 
         String rendered = OutputFormat.TEXT.render(ValidationReport.ok(relaxed));
 

@@ -1,13 +1,21 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
-import io.ltr8.tson.base.TsonUnicodePolicy;
-import io.ltr8.tson.base.Diagnostic;
 import java.util.Objects;
 
 /**
- * What this processor's own Unicode configuration does to a document's fate -- the two {@link
- * TsonUnicodePolicy} surfaces [TSON-DATA] §8.2 defines, and the Unicode data version they were computed
- * against.
+ * What this processor will admit, and what it will spend -- everything about a read that is neither in the
+ * document nor in the schema. The two {@link TsonUnicodePolicy} surfaces [TSON-DATA] §8.2 defines, the
+ * Unicode data version they were computed against, and the {@link TsonLimitsPolicy} bounds of §9.1.
+ *
+ * <p><b>Three settings, one value, because a deployment states one policy.</b> The limits used to sit
+ * beside this record rather than inside it, on the argument that "what this processor will spend" and "what
+ * it will admit as a name" answer two questions and a deployment changing one has said nothing about the
+ * other. Both halves of that are still true -- and neither was ever an argument for two values. It was an
+ * argument against putting a nesting bound inside something called a <em>Unicode</em> processor policy,
+ * which was correct: the container was the problem, not the grouping. Under this name the objection
+ * dissolves, and the components stay independent exactly as they were. The wire shape had already settled
+ * it: the CLI envelope nests {@code limits} inside its {@code policy} field, because that is what a
+ * consumer asks for.
  *
  * <p><b>Why this exists as a value at all.</b> §8.2's three name-hygiene rules read data the Unicode
  * Consortium declines to freeze, and the level they are applied at is the reading deployment's own choice,
@@ -29,7 +37,7 @@ import java.util.Objects;
  * <p>So a refusal carries the remedy -- which name, which rule ({@link Diagnostic.Code}, one per rule), and
  * what the policy would admit -- and this carries the configuration, stated once per run or per response
  * beside the diagnostics, and available with no document in hand at all ({@code Tson.processorPolicy()},
- * {@link TsonTreeReader#processorPolicy()}, {@link TsonObjectReader#processorPolicy()}, {@code tson
+ * {@code TsonTreeReader.processorPolicy()}, {@code TsonObjectReader.processorPolicy()}, {@code tson
  * policy}).
  *
  * <p><b>The two policies are the two surfaces, and they are not interchangeable.</b> The identifier policy
@@ -41,18 +49,26 @@ import java.util.Objects;
  * <p>The components are named for the {@code TsonConfig} settings they report, so a configuration and the
  * report it produces are one vocabulary and one grep.
  *
+ * <p><b>A record, and not yet an interface.</b> [TSON-JSON] adds policies of its own -- §4.3's annotation
+ * stripping, §9.2's encoder latitude -- and a {@code JsonProcessorPolicy} carrying them will need something
+ * to be a variant of. Records are final, so that will be composition or a sealed interface over this; which
+ * one depends on what JSON actually adds, and every candidate today is encode-side. Deciding it now would
+ * be designing against a guess.
+ *
  * @param identifierPolicy    the policy applied to names -- {@code TsonConfig.identifierPolicy}
  * @param tokenPolicy         the policy applied to token values -- {@code TsonConfig.tokenPolicy}
+ * @param limits              what this processor will spend reading a document -- {@code TsonConfig.limits}
  * @param unicodeDataVersion  {@link TsonUnicodePolicy#dataVersion()}, the UCD release whose tables the
  *                            rules were computed against ([TSON-DATA] §8.2 on why that is the
  *                            version §8.2's "UTS #39 data version" means)
  */
-public record TsonUnicodeProcessorPolicy(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy tokenPolicy,
-                                         String unicodeDataVersion) {
+public record TsonProcessorPolicy(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy tokenPolicy,
+                                  TsonLimitsPolicy limits, String unicodeDataVersion) {
 
-    public TsonUnicodeProcessorPolicy {
+    public TsonProcessorPolicy {
         Objects.requireNonNull(identifierPolicy, "identifierPolicy");
         Objects.requireNonNull(tokenPolicy, "tokenPolicy");
+        Objects.requireNonNull(limits, "limits");
         Objects.requireNonNull(unicodeDataVersion, "unicodeDataVersion");
     }
 
@@ -63,14 +79,14 @@ public record TsonUnicodeProcessorPolicy(TsonUnicodePolicy identifierPolicy, Tso
      * into this library, and a caller stating a different one would be describing a processor that does not
      * exist.
      */
-    public static TsonUnicodeProcessorPolicy of(TsonUnicodePolicy identifierPolicy,
-                                                TsonUnicodePolicy tokenPolicy) {
-        return new TsonUnicodeProcessorPolicy(identifierPolicy, tokenPolicy, TsonUnicodePolicy.dataVersion());
+    public static TsonProcessorPolicy of(TsonUnicodePolicy identifierPolicy, TsonUnicodePolicy tokenPolicy,
+                                        TsonLimitsPolicy limits) {
+        return new TsonProcessorPolicy(identifierPolicy, tokenPolicy, limits, TsonUnicodePolicy.dataVersion());
     }
 
     @Override
     public String toString() {
         return "identifier policy " + identifierPolicy + ", token policy " + tokenPolicy
-                + ", Unicode " + unicodeDataVersion;
+                + ", " + limits + ", Unicode " + unicodeDataVersion;
     }
 }

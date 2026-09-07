@@ -204,14 +204,19 @@ public interface TsonDiagnosticsReceiver { void report(Diagnostic d);
 public final class TsonDiagnosticsCollector implements TsonDiagnosticsReceiver {
     public List<Diagnostic> diagnostics();  public boolean isEmpty(); }
 public record Position(int line, int column, int byteOffset) implements SourcePosition {}
+// Diagnostic, the receivers, TsonReadException, SourcePosition, TsonUnicodePolicy,
+// TsonLimitsPolicy and TsonProcessorPolicy live in `io.ltr8.tson.base` -- one vocabulary
+// across every encoding ([TSON-JSON] §9.4 adds no category of its own).
 public record SchemaLocation(…)             // id + pointer + position, accumulated as a read descends
 ```
 
 ```java
-public record TsonUnicodeProcessorPolicy(TsonUnicodePolicy identifierPolicy,
-                                         TsonUnicodePolicy tokenPolicy,
-                                         String unicodeDataVersion) {
-    public static TsonUnicodeProcessorPolicy of(TsonUnicodePolicy identifier, TsonUnicodePolicy token);
+public record TsonProcessorPolicy(TsonUnicodePolicy identifierPolicy,
+                                  TsonUnicodePolicy tokenPolicy,
+                                  TsonLimitsPolicy limits,
+                                  String unicodeDataVersion) {
+    public static TsonProcessorPolicy of(TsonUnicodePolicy identifier, TsonUnicodePolicy token,
+                                         TsonLimitsPolicy limits);
 }
 ```
 

@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonLimitsPolicy;
+import io.ltr8.tson.base.TsonProcessorPolicy;
 import io.ltr8.tson.base.TsonUnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.unicode.Xid;
@@ -210,8 +212,8 @@ class PolicyRefusalTest {
 
         assertEquals(one, same);
         assertEquals(one.hashCode(), same.hashCode());
-        assertEquals(TsonUnicodeProcessorPolicy.of(one, TsonUnicodePolicy.unrestricted()),
-                TsonUnicodeProcessorPolicy.of(same, TsonUnicodePolicy.unrestricted()),
+        assertEquals(TsonProcessorPolicy.of(one, TsonUnicodePolicy.unrestricted(), TsonLimitsPolicy.defaults()),
+                TsonProcessorPolicy.of(same, TsonUnicodePolicy.unrestricted(), TsonLimitsPolicy.defaults()),
                 "the record that reports them is component-wise, so it inherits this");
         assertNotEquals(one, TsonUnicodePolicy.highlyRestrictive().perSegment());
         assertNotEquals(TsonUnicodePolicy.highlyRestrictive(), TsonUnicodePolicy.singleScript());
@@ -230,7 +232,7 @@ class PolicyRefusalTest {
      */
     @Test
     void theProcessorPolicyIsReachableWithoutARefusal() {
-        TsonUnicodeProcessorPolicy policy = new TsonTreeReader()
+        TsonProcessorPolicy policy = new TsonTreeReader()
                 .withTokenPolicy(TsonUnicodePolicy.asciiOnly())
                 .withIdentifierPolicy(TsonUnicodePolicy.singleScript().perSegment())
                 .processorPolicy();
