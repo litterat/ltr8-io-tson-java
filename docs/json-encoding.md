@@ -104,7 +104,7 @@ declared.
 `DefaultTsonReadContext`'s Javadoc gives on the other side: a refusal needs a receiver, and a layer that can
 only throw can only say "invalid", which is the one thing a policy refusal is not. Both arrive with the
 schema-directed decode: the identifier policy in the record reader's unmatched-member path, the token policy
-upstream of it over keys and string values, the way `TokenPolicyEventSource` sits upstream on the TSON side.
+in the stream over keys and string values, the way `TsonDataStream` applies it on the TSON side.
 §10.1's limits policy is different and arrives sooner — nesting depth is counted in the event layer, the one
 place every token is consumed.
 
@@ -433,3 +433,24 @@ container's own contents.
 **What this reader is not** is validation against a TSON schema. Nothing here consults facets, field
 states, defaults, fixed values, groups or the discrimination predicate, because a Java class declares
 none of them. The honest name for what it checks is "does this document fit this class".
+
+## The token policy ([TSON-DATA] §8.2, reached by §9.4)
+
+`JsonStream` applies it to every token it hands out — strings, numbers and member names — because at that
+layer nothing yet knows which of those a member name will turn out to be. §9.4 names "map keys and string
+values"; a member name read as a *field* name meets the identifier policy as well, where the position that
+decides it is known, so **a token policy stricter than the identifier policy subsumes it**, exactly as on the
+TSON side.
+
+`JsonObjectReader.withTokenPolicy` is the surface, defaulting to `unrestricted()`: a value is data and may
+legitimately be anything, so §8.2 scans none of it until a deployment says otherwise — and §8.2 requires that
+saying so be code rather than ambient, which is what the method is.
+
+**Built into the stream rather than wrapped around it**, and `TsonDataStream` now does the same — the
+decorator that used to do this on the TSON side is gone. The property the check needs is that each token is
+produced exactly once, which a stream gives and a read context does not (it rewinds). A wrapper bought that
+property and cost a second place to forget to apply it; with two encodings needing one rule, the mechanism
+should be one too.
+
+A number's digits are ASCII so a number never trips the check, and it is checked anyway rather than exempted
+— a rule with an exception nobody can state is a rule someone gets wrong when the exception stops holding.

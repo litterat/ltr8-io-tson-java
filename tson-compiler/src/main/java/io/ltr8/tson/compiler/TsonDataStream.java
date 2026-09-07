@@ -1,6 +1,9 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.TokenForm;
@@ -132,6 +135,10 @@ public final class TsonDataStream implements TsonEventSource {
     /** [TSON-DATA] §9.1's bounds -- consulted by {@link #advance()} as containers open. */
     private final LimitsPolicy limits;
 
+    /** §8.2's token surface, or {@code null} where a read named none -- see {@link #checkTokenPolicy}. */
+    private UnicodePolicy tokenPolicy;
+    private DiagnosticsReceiver tokenPolicyReceiver;
+
     public TsonDataStream(String source) {
         this(source, LimitsPolicy.defaults());
     }
@@ -154,6 +161,34 @@ public final class TsonDataStream implements TsonEventSource {
      * As {@link #TsonDataStream(InputStream)}, under a caller's own resource limits rather than the
      * defaults -- what the facades pass when a {@code TsonConfig} states one.
      */
+    /**
+     * A stream applying {@code tokenPolicy} to every token it hands out ([TSON-DATA] §8.2's "Values").
+     *
+     * <p><b>Here rather than in a decorator around this, and here rather than in the read context.</b> The
+     * context rewinds -- an event consumed during lookahead is delivered again, and a probe context can be
+     * built over events already seen -- so a check there reports one token once per lookahead that crossed
+     * it. This produces each token exactly once, so the check is exactly-once for free, with no set of
+     * already-reported positions to carry. It was a decorator for that reason and is inlined now because
+     * the JSON stream needs the same rule and a second wrapper would have been a second place to forget it.
+     *
+     * <p>At {@code unrestricted()} -- the default, and every ordinary read -- the check is a field read and
+     * a branch: {@code checksScripts()} is false and nothing else happens.
+     */
+    public TsonDataStream(InputStream source, LimitsPolicy limits, UnicodePolicy tokenPolicy,
+                          DiagnosticsReceiver receiver) {
+        this(source, limits);
+        this.tokenPolicy = tokenPolicy;
+        this.tokenPolicyReceiver = receiver;
+    }
+
+    /** {@link #TsonDataStream(InputStream, LimitsPolicy, UnicodePolicy, DiagnosticsReceiver)} over a string. */
+    public TsonDataStream(String source, LimitsPolicy limits, UnicodePolicy tokenPolicy,
+                          DiagnosticsReceiver receiver) {
+        this(source, limits);
+        this.tokenPolicy = tokenPolicy;
+        this.tokenPolicyReceiver = receiver;
+    }
+
     public TsonDataStream(InputStream source, LimitsPolicy limits) {
         this.lexer = new Lexer(source);
         this.limits = Objects.requireNonNull(limits, "limits");
@@ -171,7 +206,39 @@ public final class TsonDataStream implements TsonEventSource {
         if (!hasNext()) {
             throw new NoSuchElementException("no more TSON stream events");
         }
-        return ready.poll();
+        TsonEvent event = ready.poll();
+        checkTokenPolicy(event);
+        return event;
+    }
+
+    /**
+     * [TSON-DATA] §8.2's token surface, applied as an event leaves this stream.
+     *
+     * <p><b>A name is a token here.</b> The four events carrying text are checked alike -- a value, a field
+     * name, a type-ref, an annotation name -- because at this layer nothing yet knows which is which. So a
+     * token policy stricter than the identifier policy subsumes it: a name has already cleared the stricter
+     * rule by the time the name rule looks at it. That is a property of where the check sits, and the
+     * setter is named {@code tokenPolicy} to state it rather than hide it.
+     *
+     * <p>Document directives are deliberately not checked. A {@code !!schema}/{@code !!id} token is a URI
+     * naming an external resource rather than document content, §2.2.1 governs what an identity may be,
+     * and an IRI's scripts are the resource owner's business, not this document's.
+     */
+    private void checkTokenPolicy(TsonEvent event) {
+        if (tokenPolicy == null || !tokenPolicy.checksScripts()) {
+            return;
+        }
+        String text = switch (event) {
+            case TokenEvent t -> t.text();
+            case FieldName f -> f.name();
+            case io.ltr8.tson.compiler.stream.TypeRef t -> t.name();
+            case io.ltr8.tson.compiler.stream.AnnotationStart a -> a.name();
+            default -> null;
+        };
+        if (text != null) {
+            tokenPolicy.violation(text).ifPresent(why ->
+                    tokenPolicyReceiver.report(Diagnostic.ofRestrictedToken(text, why, event.position())));
+        }
     }
 
     @Override

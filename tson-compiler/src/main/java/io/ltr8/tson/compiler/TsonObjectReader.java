@@ -291,12 +291,12 @@ public final class TsonObjectReader {
 
     /** Reads {@code source}'s whole document into {@code targetClass}, fail-fast -- validated against its {@code !!schema} if this reader is schema-aware and the document declares one, schemaless otherwise. */
     public <T> T read(String source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, limits), targetClass, false);
+        return readDocument(new TsonDataStream(source, limits, tokenPolicy, receiver), targetClass, false);
     }
 
     /** {@link #read(String, Class)} straight off a stream -- binds {@code source}'s bytes (UTF-8) genuinely, never buffering the whole document into a {@code String} first; {@code source} is not closed here. */
     public <T> T read(InputStream source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, limits), targetClass, false);
+        return readDocument(new TsonDataStream(source, limits, tokenPolicy, receiver), targetClass, false);
     }
 
     /**
@@ -315,22 +315,22 @@ public final class TsonObjectReader {
      * @return the document, or {@code null} where {@link #read} would also yield nothing
      */
     public <T> TsonObjectDocument<T> readDocument(String source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, limits), targetClass);
+        return readDocument(new TsonDataStream(source, limits, tokenPolicy, receiver), targetClass);
     }
 
     /** {@link #readDocument(String, Class)} straight off a stream; {@code source} is not closed here. */
     public <T> TsonObjectDocument<T> readDocument(InputStream source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, limits), targetClass);
+        return readDocument(new TsonDataStream(source, limits, tokenPolicy, receiver), targetClass);
     }
 
     /** Like {@link #read(String, Class)} but always schemaless -- binds to {@code targetClass} without validating, even when the document declares a {@code !!schema}. (A schemaless reader's {@link #read} already does this.) */
     public <T> T readWithoutSchema(String source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, limits), targetClass, true);
+        return readDocument(new TsonDataStream(source, limits, tokenPolicy, receiver), targetClass, true);
     }
 
     /** {@link #readWithoutSchema(String, Class)} straight off a stream. */
     public <T> T readWithoutSchema(InputStream source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, limits), targetClass, true);
+        return readDocument(new TsonDataStream(source, limits, tokenPolicy, receiver), targetClass, true);
     }
 
     /**
@@ -340,12 +340,12 @@ public final class TsonObjectReader {
      * {@code targetClass} can hold that type) is identical either way.
      */
     public <T> T readAs(String source, String typeName, Class<T> targetClass) {
-        return readDocumentAs(new TsonDataStream(source, limits), typeName, targetClass);
+        return readDocumentAs(new TsonDataStream(source, limits, tokenPolicy, receiver), typeName, targetClass);
     }
 
     /** {@link #readAs(String, String, Class)} straight off a stream. */
     public <T> T readAs(InputStream source, String typeName, Class<T> targetClass) {
-        return readDocumentAs(new TsonDataStream(source, limits), typeName, targetClass);
+        return readDocumentAs(new TsonDataStream(source, limits, tokenPolicy, receiver), typeName, targetClass);
     }
 
     /**
@@ -375,7 +375,7 @@ public final class TsonObjectReader {
     private <T> TsonObjectDocument<T> readDocument(TsonDataStream stream, Class<T> type) {
         Objects.requireNonNull(type, "type");
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, identifierPolicy);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, identifierPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             T value;
             Optional<String> rootType = Optional.empty();
@@ -399,7 +399,7 @@ public final class TsonObjectReader {
     private <T> T readDocument(TsonDataStream stream, Class<T> type, boolean ignoreSchema) {
         Objects.requireNonNull(type, "type");
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, identifierPolicy);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, identifierPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             T result = (ignoreSchema || bind == null || start.schema().isEmpty())
                     ? schemaless.read(ctx, type)
@@ -417,7 +417,7 @@ public final class TsonObjectReader {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, identifierPolicy);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, identifierPolicy);
             ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
             T result = valueOf(readAgainstSchema(schemaUri, ctx, type, typeName));
             requireDocumentEnd(ctx);

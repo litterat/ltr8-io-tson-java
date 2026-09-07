@@ -1,7 +1,10 @@
 package io.ltr8.tson.json.stream;
 
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
 import io.ltr8.tson.json.lexer.JsonLexer;
@@ -56,6 +59,10 @@ public final class JsonStream implements JsonEventSource {
 
     private final JsonLexer lexer;
     private final int maxDepth;
+
+    /** §8.2's token surface, or {@code null} where a read named none -- see {@link #checkTokenPolicy}. */
+    private UnicodePolicy tokenPolicy;
+    private DiagnosticsReceiver tokenPolicyReceiver;
 
     /**
      * One entry per open container, deepest last: {@code true} for an object, {@code false} for an
@@ -112,6 +119,37 @@ public final class JsonStream implements JsonEventSource {
         this(new JsonLexer(source), maxDepth);
     }
 
+    /**
+     * A stream applying {@code tokenPolicy} to every token it hands out.
+     *
+     * <p>[TSON-JSON] §9.4 puts the token policy on "map keys and string values"; this checks every token
+     * a JSON document carries -- strings, numbers, and member names -- because at this layer nothing knows
+     * which of those a member name will turn out to be. A member name read as a <em>field</em> name meets
+     * the identifier policy as well, where the position that decides it is known; a token policy stricter
+     * than that one therefore subsumes it, exactly as on the TSON side.
+     *
+     * <p><b>Built in rather than wrapped.</b> {@code TsonDataStream} does the same, and had a decorator
+     * until a second encoding needed the rule: a wrapper is a second place to forget to apply it. Both
+     * streams produce each token exactly once, which is the property the check needs and the reason it
+     * cannot live in the read context, which rewinds.
+     *
+     * <p>At {@code unrestricted()} -- the default, and every ordinary read -- it is a field read and a
+     * branch.
+     */
+    public JsonStream(InputStream source, int maxDepth, UnicodePolicy tokenPolicy,
+                      DiagnosticsReceiver receiver) {
+        this(new JsonLexer(source), maxDepth);
+        this.tokenPolicy = tokenPolicy;
+        this.tokenPolicyReceiver = receiver;
+    }
+
+    /** {@link #JsonStream(InputStream, int, UnicodePolicy, DiagnosticsReceiver)} over a string. */
+    public JsonStream(String source, int maxDepth, UnicodePolicy tokenPolicy, DiagnosticsReceiver receiver) {
+        this(new JsonLexer(source), maxDepth);
+        this.tokenPolicy = tokenPolicy;
+        this.tokenPolicyReceiver = receiver;
+    }
+
     private JsonStream(JsonLexer lexer, int maxDepth) {
         if (maxDepth < 1) {
             throw new IllegalArgumentException("maxDepth must be at least 1, not " + maxDepth);
@@ -137,12 +175,41 @@ public final class JsonStream implements JsonEventSource {
 
     @Override
     public JsonEvent next() {
+        JsonEvent event;
         if (lookahead != null) {
-            JsonEvent held = lookahead;
+            event = lookahead;
             lookahead = null;
-            return held;
+        } else {
+            event = advance();
         }
-        return advance();
+        checkTokenPolicy(event);
+        return event;
+    }
+
+    /**
+     * [TSON-DATA] §8.2's token surface, applied as an event leaves this stream.
+     *
+     * <p>Every event carrying text: a string, a number's lexeme, a member name. A number's digits are ASCII
+     * so it never trips, and it is checked anyway rather than exempted -- a rule with an exception nobody
+     * can state is a rule someone will get wrong when the exception stops holding.
+     *
+     * <p>Applied on the way out rather than on the way in, so an event held back by {@link #peek()} is
+     * checked once, when it is finally taken.
+     */
+    private void checkTokenPolicy(JsonEvent event) {
+        if (tokenPolicy == null || !tokenPolicy.checksScripts()) {
+            return;
+        }
+        String text = switch (event) {
+            case JsonEvent.StringValue string -> string.value();
+            case JsonEvent.NumberValue number -> number.literal();
+            case JsonEvent.MemberName name -> name.name();
+            default -> null;
+        };
+        if (text != null) {
+            tokenPolicy.violation(text).ifPresent(why ->
+                    tokenPolicyReceiver.report(Diagnostic.ofRestrictedToken(text, why, event.position())));
+        }
     }
 
     /** The next event, produced by consuming as many tokens as the grammar needs -- one, at every step. */

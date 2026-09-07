@@ -47,7 +47,7 @@ internal synthetic sites (`AnnotationCapture`, `RecordAbstractReader`, `SchemaRe
 reason written beside them: the first two replay events the real stream already delivered, so checking again
 would report one author token twice, and the third reads a resolved schema value rather than document text.
 
-`TokenPolicyEventSource` is a decorator on the event source rather than a check inside the context, and the
+The token policy is applied by the stream rather than inside the context, and the
 reason is exactly-once: the context rewinds, and a probe context can be built over events already seen, so a
 check there would report one token twice. The underlying stream produces each token once, so the decorator
 needs no set of already-reported positions. `wrap` returns the source unchanged when the policy checks

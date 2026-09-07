@@ -280,12 +280,12 @@ public final class TsonTreeReader {
 
     /** Reads {@code source}'s whole document into a {@link TsonValue} tree, fail-fast -- validated against its {@code !!schema} if this reader is schema-aware and the document declares one, schemaless otherwise. */
     public TsonValue read(String source) {
-        return readRoot(new TsonDataStream(source, limits), false);
+        return readRoot(new TsonDataStream(source, limits, tokenPolicy, receiver), false);
     }
 
     /** {@link #read(String)} straight off a stream -- reads {@code source}'s bytes (UTF-8) incrementally, never buffering the whole document into a {@code String} first; {@code source} is not closed here. */
     public TsonValue read(InputStream source) {
-        return readRoot(new TsonDataStream(source, limits), false);
+        return readRoot(new TsonDataStream(source, limits, tokenPolicy, receiver), false);
     }
 
     /**
@@ -307,22 +307,22 @@ public final class TsonTreeReader {
      *         will not lex or parse, reported through this read's receiver rather than thrown past it
      */
     public TsonDocument readDocument(String source) {
-        return readDocument(new TsonDataStream(source, limits));
+        return readDocument(new TsonDataStream(source, limits, tokenPolicy, receiver));
     }
 
     /** {@link #readDocument(String)} straight off a stream; {@code source} is not closed here. */
     public TsonDocument readDocument(InputStream source) {
-        return readDocument(new TsonDataStream(source, limits));
+        return readDocument(new TsonDataStream(source, limits, tokenPolicy, receiver));
     }
 
     /** Like {@link #read(String)} but always schemaless -- reads the wire structure, even when the document declares a {@code !!schema}. (A schemaless reader's {@link #read} already does this.) */
     public TsonValue readWithoutSchema(String source) {
-        return readRoot(new TsonDataStream(source, limits), true);
+        return readRoot(new TsonDataStream(source, limits, tokenPolicy, receiver), true);
     }
 
     /** {@link #readWithoutSchema(String)} straight off a stream. */
     public TsonValue readWithoutSchema(InputStream source) {
-        return readRoot(new TsonDataStream(source, limits), true);
+        return readRoot(new TsonDataStream(source, limits, tokenPolicy, receiver), true);
     }
 
     /**
@@ -332,12 +332,12 @@ public final class TsonTreeReader {
      * type-ref the data does carry is read as part of the value, not used to select the type.
      */
     public TsonValue readAs(String source, String typeName) {
-        return readRootAs(new TsonDataStream(source, limits), typeName);
+        return readRootAs(new TsonDataStream(source, limits, tokenPolicy, receiver), typeName);
     }
 
     /** {@link #readAs(String, String)} straight off a stream. */
     public TsonValue readAs(InputStream source, String typeName) {
-        return readRootAs(new TsonDataStream(source, limits), typeName);
+        return readRootAs(new TsonDataStream(source, limits, tokenPolicy, receiver), typeName);
     }
 
     /**
@@ -359,7 +359,7 @@ public final class TsonTreeReader {
      */
     private TsonDocument readDocument(TsonDataStream stream) {
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, identifierPolicy);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, identifierPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             TsonValue root = (tree == null || start.schema().isEmpty())
                     ? schemaless.read(ctx)
@@ -374,7 +374,7 @@ public final class TsonTreeReader {
 
     private TsonValue readRoot(TsonDataStream stream, boolean ignoreSchema) {
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, identifierPolicy);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, identifierPolicy);
             DocumentStart start = (DocumentStart) ctx.next();
             TsonValue result = (ignoreSchema || tree == null || start.schema().isEmpty())
                     ? schemaless.read(ctx)
@@ -391,7 +391,7 @@ public final class TsonTreeReader {
             throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
         }
         try {
-            TsonReadContext ctx = TsonReadContext.of(stream, receiver, tokenPolicy, identifierPolicy);
+            TsonReadContext ctx = TsonReadContext.of(stream, receiver, identifierPolicy);
             ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
             TsonValue result = readAgainstSchema(schemaUri, ctx, typeName);
             requireDocumentEnd(ctx);

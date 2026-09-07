@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
@@ -124,13 +125,14 @@ class TokenPolicyTest {
         assertEquals(1, problems(reader, "{ note: \"" + CYR_A + "\" }").size());
     }
     /**
-     * <b>The policy is a required parameter, not a defaulted one.</b> {@code TsonReadContext.of} is where
-     * every read converges and is public API, so a default there would be a policy any caller could drop by
-     * saying nothing -- weakening with nothing left to grep for. Naming {@code unrestricted()} is a fine
-     * answer; not naming one is not an answer.
+     * <b>The name policy is a required parameter, not a defaulted one.</b> {@code TsonReadContext.of} is
+     * where every read converges and is public API, so a default there would be a policy any caller could
+     * drop by saying nothing -- weakening with nothing left to grep for. Naming {@code unrestricted()} is a
+     * fine answer; not naming one is not an answer. The two-argument form is the exception and states
+     * §8.2's own RECOMMENDED default rather than no policy at all.
      */
     @Test
-    void aReadContextCannotBeBuiltWithoutNamingAPolicy() {
+    void aReadContextCannotBeBuiltWithoutNamingANamePolicy() {
         NullPointerException e = assertThrows(NullPointerException.class, () -> TsonReadContext.of(
                 new io.ltr8.tson.compiler.stream.ListEventSource(List.of()),
                 new DiagnosticsCollector(), null));
@@ -138,14 +140,18 @@ class TokenPolicyTest {
     }
 
     /**
-     * And the policy really rides the context rather than the call site: a reader driven over a raw source
-     * through {@code of} is checked, which is what makes the low-level path unable to skip it silently.
+     * <b>The policy rides the stream, not the context.</b> A caller driving a raw source is checked when
+     * the source they built checks -- which is what makes the low-level path unable to skip it silently,
+     * and which is also why the context takes no token policy: it rewinds, where a stream produces each
+     * token exactly once.
      */
     @Test
-    void aRawContextHonoursThePolicyItWasBuiltWith() {
+    void aRawStreamHonoursThePolicyItWasBuiltWith() {
         DiagnosticsCollector collected = new DiagnosticsCollector();
-        TsonReadContext ctx = TsonReadContext.of(new TsonDataStream("{ note: \"" + CYR_A + "\" }"),
-                collected, UnicodePolicy.asciiOnly());
+        TsonReadContext ctx = TsonReadContext.of(
+                new TsonDataStream("{ note: \"" + CYR_A + "\" }", LimitsPolicy.defaults(),
+                        UnicodePolicy.asciiOnly(), collected),
+                collected);
         try {                                   // the raw context has no end-of-stream predicate; drain it
             while (true) {
                 ctx.next();
