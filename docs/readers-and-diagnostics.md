@@ -363,6 +363,28 @@ belief, over the bind path:
 
 ## Name hygiene on the read path ([TSON-DATA] §8.2)
 
+**A refused name draws no verdict beside its refusal.** Name hygiene runs inside `ctx.next()`, so a name
+§8.2 refused is reported before the reader has looked it up — and then the reader does not look it up:
+`RecordAbstractReader.readFields` and `SchemalessObjectReader.bindRecord` both checkpoint `ctx.reported()`
+across that one pull and skip their `UNRECOGNIZED_FIELD` when the delta is non-zero. Only one event is
+consumed between the two reads and nothing but the hygiene check reports during it, so the delta is exactly
+"this name was refused".
+
+The reason is not tidiness. A homoglyph of a declared name previously drew both the refusal *and* "unknown
+field 'pаssword' — the type declares (password)", which instructs the sender to add a field that is already
+there when the fix is one character. **A refused name was never read, so nothing downstream can hold a
+verdict about it** — reporting it unrecognised claims to have looked it up, which the processor declined to
+do. Both readers apply the rule because a document's verdict must not depend on which one read it.
+
+Two consequences, both deliberate. A name that is refused *and* genuinely undeclared yields only the
+refusal; the sender fixes the character and learns on the next round whether the field exists. And a
+`FIELD_REQUIRED` for the field the homoglyph was reaching for still stands, because it is true and useful —
+the pair reads coherently where the suppressed one contradicted it.
+
+**The look-alike rule is not reached by this** and is left alone: `CONFUSABLE_NAMES` is a property of a
+*set*, asked of a record's field names after the record is read, so there is no `next()` to checkpoint
+around — and it produces no comparable misinstruction.
+
 A Class 1 document carries two names — a type-ref name and an annotation name, the positions §7.4 marks
 `identifier` — and §8.2's restricted-character and restricted-script rules apply to both, **on by default**. They
 run in
