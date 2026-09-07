@@ -13,6 +13,7 @@ allprojects {
 val moduleDescriptions = mapOf(
     "tson" to "TSON front door: the Tson facade over the compiler's readers, writers and registries",
     "tson-compiler" to "TSON engine: lexer, both grammars, schema resolution, Class 2 compilation, readers, writers",
+    "tson-base" to "The diagnostic vocabulary and source positions every encoding and phase reports through",
     "tson-schema" to "TSON resolved-schema value model (schema.meta) plus the schema registry and identity algorithm",
     "tson-tree" to "TSON data-document tree model: TsonValue and its pure immutable node types",
     "tson-bind" to "TSON binding engine between data values and Java objects",

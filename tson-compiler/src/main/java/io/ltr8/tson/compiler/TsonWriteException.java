@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonReadException;
+
 /**
  * A failure while writing to TSON text -- from {@link TsonObjectWriter} (a Java object graph) or {@link
  * TsonTreeWriter} (a {@code TsonValue} tree) -- e.g. a value whose type the writer has no way to emit, or a

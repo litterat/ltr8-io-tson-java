@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.TsonReadException;
 import io.ltr8.tson.compiler.ForeignSchemas;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.TsonTypeReader;

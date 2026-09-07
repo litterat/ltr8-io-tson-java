@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 
 import org.junit.jupiter.api.Test;
@@ -86,7 +87,7 @@ class SchemaFailureTest {
             SchemaFailure failure = SchemaFailure.of(
                     new TsonSchemaFetchException("https://example.test/x.tn", reason, "refused", null));
 
-            assertEquals(Diagnostic.Code.of(reason), failure.code(), reason::name);
+            assertEquals(TsonDiagnostics.codeFor(reason), failure.code(), reason::name);
             assertFalse(failure.code().verdict(), reason::name);
         }
     }
@@ -96,7 +97,7 @@ class SchemaFailureTest {
     void everyReasonHasItsOwnCode() {
         assertEquals(TsonSchemaFetchException.Reason.values().length,
                 Arrays.stream(TsonSchemaFetchException.Reason.values())
-                        .map(Diagnostic.Code::of).distinct().count());
+                        .map(TsonDiagnostics::codeFor).distinct().count());
     }
 
     /** Every other branch states a code of its own, and none of them is a fetch code. */
@@ -105,7 +106,7 @@ class SchemaFailureTest {
         for (RuntimeException e : List.of(new TsonBindMismatchException("x"), new UnsupportedOperationException("x"),
                 new TsonSchemaValidationException("x"), new TsonContentHashMismatchException("x"))) {
             assertFalse(Arrays.stream(TsonSchemaFetchException.Reason.values())
-                    .map(Diagnostic.Code::of).toList().contains(SchemaFailure.of(e).code()), e::toString);
+                    .map(TsonDiagnostics::codeFor).toList().contains(SchemaFailure.of(e).code()), e::toString);
         }
     }
 

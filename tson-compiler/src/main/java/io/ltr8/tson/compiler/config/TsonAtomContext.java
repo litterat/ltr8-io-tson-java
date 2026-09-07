@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.config;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.base.SourcePosition;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;

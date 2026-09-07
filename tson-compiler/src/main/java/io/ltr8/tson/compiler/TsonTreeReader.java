@@ -1,5 +1,8 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import java.util.Objects;
 import io.ltr8.tson.compiler.reader.EventSkip;
 import io.ltr8.tson.compiler.reader.SchemalessTreeReader;
@@ -408,7 +411,7 @@ public final class TsonTreeReader {
      * base-syntax failure surfaces mid-read, after any earlier value-level problem has already been reported
      * -- which used to leave a collecting caller holding a populated collector <em>and</em> an exception,
      * with no way to tell that the two belonged to one document. Reporting it is also the only way the
-     * problem reaches a caller who asked for problems: {@code Diagnostic.ofBaseSyntaxError} is public
+     * problem reaches a caller who asked for problems: {@code TsonDiagnostics.ofBaseSyntaxError} is public
      * precisely because one of the three exception types is not nameable outside this module, and having
      * every caller invoke it was the library conceding the classification is required while making each of
      * them ask for it.
@@ -427,8 +430,8 @@ public final class TsonTreeReader {
      */
     private TsonValue readFailure(RuntimeException e) {
         receiver.report(e instanceof TsonLimitExceededException limit
-                ? Diagnostic.ofLimitExceeded(limit)
-                : Diagnostic.ofBaseSyntaxError(e));
+                ? TsonDiagnostics.ofLimitExceeded(limit)
+                : TsonDiagnostics.ofBaseSyntaxError(e));
         return null;
     }
 

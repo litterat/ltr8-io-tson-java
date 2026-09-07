@@ -2,8 +2,8 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.compiler.ForeignSchemas;
 import io.ltr8.tson.compiler.TestDocuments;
-import io.ltr8.tson.compiler.TsonReadException;
-import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.base.TsonReadException;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;

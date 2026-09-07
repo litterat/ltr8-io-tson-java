@@ -1,5 +1,8 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.TsonDiagnosticsCollector;
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -292,23 +295,23 @@ public final class Tson {
             // is wrong" is a verdict this call has no grounds for. Same root pointer as the rest -- what
             // differs is the code and the exception's own Reason, which say respectively that no schema was
             // obtained and whose doing that was.
-            problems.report(Diagnostic.ofSchemaUnavailable("", "", e, Optional.empty()));
+            problems.report(TsonDiagnostics.ofSchemaUnavailable("", "", e, Optional.empty()));
         } catch (TsonBindMismatchException e) {
             // A class bound to this schema's governing meta cannot work with it -- a Data body returning null
             // from references(), say. The schema may be perfectly good and this call cannot say either way,
             // so it reports the wiring mistake rather than letting a bare runtime exception past a caller who
             // asked for a list of problems, which would read as a fault in this library.
-            problems.report(Diagnostic.ofSchemaBindMismatch("", "", e, Optional.empty()));
+            problems.report(TsonDiagnostics.ofSchemaBindMismatch("", "", e, Optional.empty()));
         } catch (TsonSchemaValidationException e) {
             // Whatever the phases still raise rather than report: a document with no !!id, an !!import that
             // loaded and would not link, a !!meta that may not govern. Author errors about the document as
             // a whole, so they carry the root pointer rather than naming a declaration.
-            problems.report(Diagnostic.ofSchemaError("", "", e.getMessage(), Optional.empty()));
+            problems.report(TsonDiagnostics.ofSchemaError("", "", e.getMessage(), Optional.empty()));
         } catch (RuntimeException e) {
             // Base syntax is this document's problem; anything else is a fault in this library and rethrows
             // itself from here rather than being laundered into a false verdict. The schema-side factory,
             // because this document is a schema: the position belongs at the schema end, not the data end.
-            problems.report(Diagnostic.ofSchemaSyntaxError("", e));
+            problems.report(TsonDiagnostics.ofSchemaSyntaxError("", e));
         }
         return problems.diagnostics();
     }

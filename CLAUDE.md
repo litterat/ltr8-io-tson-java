@@ -212,6 +212,20 @@ Package group is `io.ltr8` (reverse-DNS identifies who *publishes* the artifact 
 implementation of the spec published under the `ltr8.io` banner, not *the* tson.io-blessed one). Every
 module has a real `module-info.java`; module names mirror each module's root exported package.
 
+- **`tson-base`** — `io.ltr8.tson.base`: `Diagnostic` (the record and its closed `Code` enum), the three
+  diagnostics receivers, `TsonReadException`, and `SourcePosition`. A **true pure leaf** — depends on
+  nothing, and nothing in it knows what a TSON document or a JSON one looks like. It is a module rather
+  than a package because [TSON-JSON] §9.4 makes the JSON encoding report in [TSON-DATA] §8.1's four
+  categories and add none of its own: the vocabulary is one vocabulary across both encodings *by
+  specification*, so leaving it in `tson-compiler` would make every other encoding depend on the TSON text
+  engine to say "this field is required", or mint a second vocabulary for one fact. **What deliberately
+  stayed behind is the classifying half**: `Diagnostic`'s ten `of*` factories all switch on an exception
+  type an encoding declares, so each encoding owns its own (`TsonDiagnostics` here, and the JSON stack's
+  own when it needs one) — which is also what closes the old "`ofBaseSyntaxError` cannot classify another
+  encoding's syntax failure" gap, since there is no longer one switch responsible for exceptions it cannot
+  name. `SourcePosition` moved here from `schema.meta` so the base need not require `tson-schema`; the
+  bonus is that any encoding's own position type can implement it and reach a `Diagnostic` with no
+  conversion.
 - **`tson-annotation`** — `@Typename`/`@Field`/`@Record`, the binding annotations, plus `Annotations`/
   `Annotation`, the wire-annotation carrier a bound class declares a component of. The carrier lives here
   rather than with the engine because it is the one module `tson-bind` (which analyses classes),
@@ -658,7 +672,7 @@ the directive.
 
 ### Diagnostics — `docs/readers-and-diagnostics.md`
 
-`Diagnostic` (root package) is one record for both data- and schema-side problems — the variation is
+`Diagnostic` (`tson-base`) is one record for both data- and schema-side problems — the variation is
 locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual`, four location
 components matching JSON Schema 2020-12 §12's output unit (`path`, `schemaId`+`schemaPointer`, plus
 `dataPosition`/`schemaPosition`) — and nothing else. **Every component is a location**; the one fact that is

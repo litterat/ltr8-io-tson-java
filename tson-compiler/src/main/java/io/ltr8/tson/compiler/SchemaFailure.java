@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonSchemaValidationException;
 
 
@@ -63,7 +64,7 @@ record SchemaFailure(Diagnostic.Code code, String expected) {
             // The contract exception of TsonSchemaSource.fetch, so this branch is every source's miss and
             // no source's bug: the reference named something this deployment could not obtain.
             case TsonSchemaFetchException fetch ->
-                    new SchemaFailure(Diagnostic.Code.of(fetch.reason()), UNAVAILABLE_EXPECTED);
+                    new SchemaFailure(TsonDiagnostics.codeFor(fetch.reason()), UNAVAILABLE_EXPECTED);
             case TsonSchemaValidationException ignored ->
                     new SchemaFailure(Diagnostic.Code.SCHEMA_ERROR, "a resolvable schema");
             // [TSON-DATA] §2.2.1's integrity failure: the bytes a source returned are not the bytes the

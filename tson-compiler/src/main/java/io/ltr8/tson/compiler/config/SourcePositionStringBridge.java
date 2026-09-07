@@ -2,7 +2,7 @@ package io.ltr8.tson.compiler.config;
 
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.tson.compiler.Position;
-import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.base.SourcePosition;
 
 /**
  * Bridge for {@link SourcePosition}, converting to/from a compact {@code "line:column:byteOffset"}

@@ -1,6 +1,7 @@
 package io.ltr8.tson.cli;
 
-import io.ltr8.tson.compiler.Diagnostic;
+import io.ltr8.tson.compiler.TsonDiagnostics;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonSchemaFetchException;
 import io.ltr8.tson.compiler.TsonUnicodeProcessorPolicy;
 import io.ltr8.tson.compiler.TsonLimitsPolicy;
@@ -137,7 +138,7 @@ class OutputFormatTest {
         CliDiagnostic read = CliDiagnostic.from(new Diagnostic(Optional.of(""), Optional.empty(), "",
                 Diagnostic.Code.VALIDATION_ERROR, "nope", "", "", Optional.empty(), Optional.empty()));
         CliDiagnostic schema = CliDiagnostic.from(
-                Diagnostic.ofSchemaError("example.test/s.tn", "", "cannot load !!import", Optional.empty()));
+                TsonDiagnostics.ofSchemaError("example.test/s.tn", "", "cannot load !!import", Optional.empty()));
 
         assertEquals(Optional.of(""), read.path(), "the data root, not an absence");
         assertEquals(Optional.empty(), read.schemaPointer(), "a read diagnostic has no schema end");

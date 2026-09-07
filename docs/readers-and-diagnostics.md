@@ -416,7 +416,14 @@ because §8.3 marks all three rules unstable across Unicode releases. Both are s
 that judged, rather than on each refusal.
 `PolicyRefusalTest`/`SchemaPolicyRefusalTest` pin the data and schema ends against each other.
 
-## Diagnostics (`Diagnostic`, root package)
+## Diagnostics
+
+**`Diagnostic` lives in `tson-base`, and its classifiers do not.** The record, its `Code` enum, the three
+receivers and `TsonReadException` are a module of their own, because [TSON-JSON] §9.4 makes a second
+encoding report in the same four categories — one vocabulary by specification, not by convenience. The ten
+`of*` factories that turn a thrown failure into a diagnostic stayed in `tson-compiler` as `TsonDiagnostics`,
+because every one of them switches on an exception type this engine declares. What is shared is the shape of
+an answer; classifying a failure is reading a document, and that is each encoding's own. (`Diagnostic`, root package)
 
 `Diagnostic` is the structured value every `TsonDiagnosticsReceiver` receives, identical shape whichever
 one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`FIELD_FIXED`/`TYPE_MISMATCH`/`WRONG_ARITY`/

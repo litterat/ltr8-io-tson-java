@@ -7,7 +7,7 @@ package io.ltr8.tson.compiler;
  * directive name outside the closed positional set or outside its placement (§3.3).
  *
  * <p><b>{@link #getMessage()} states what went wrong, never where.</b> The location is {@link
- * #position()}, which is what {@link Diagnostic#ofBaseSyntaxError} carries into {@code dataPosition}
+ * #position()}, which is what {@link TsonDiagnostics#ofBaseSyntaxError} carries into {@code dataPosition}
  * -- a message repeating it makes every renderer print the location twice, in two different
  * formats, and hands a machine consumer parsing {@code message} a second copy with no byte offset.
  * {@link #toString()} appends it, so a stack trace still says where without the diagnostic

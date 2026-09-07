@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.TsonDiagnosticsReceiver;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.FieldName;
 import io.ltr8.tson.compiler.stream.TokenEvent;
@@ -86,7 +87,7 @@ final class TokenPolicyEventSource implements TsonEventSource {
             // would allocate once per token on the read path. This runs for every token of every document.
             Optional<String> why = policy.violation(text);
             if (why.isPresent()) {
-                receiver.report(Diagnostic.ofRestrictedToken(text, why.get(), event.position()));
+                receiver.report(TsonDiagnostics.ofRestrictedToken(text, why.get(), event.position()));
             }
         }
         return event;

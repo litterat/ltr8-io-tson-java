@@ -1,8 +1,8 @@
 package io.ltr8.tson.cli;
 
 import io.ltr8.annotation.Field;
-import io.ltr8.tson.compiler.Diagnostic;
-import io.ltr8.tson.schema.meta.SourcePosition;
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.SourcePosition;
 
 import java.util.Optional;
 

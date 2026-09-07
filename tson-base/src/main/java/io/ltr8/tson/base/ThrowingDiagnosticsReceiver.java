@@ -1,4 +1,4 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
 /**
  * The fail-fast {@link TsonDiagnosticsReceiver}: the first reported problem becomes a {@link TsonReadException},
