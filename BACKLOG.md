@@ -113,6 +113,18 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
+- [ ] **The identifier policy reaches no JSON name.** `JsonStream` applies the token policy to every token
+  ([TSON-DATA] §8.2's second surface), and nothing applies the identifier policy at all — so a JSON member
+  name that reads alike, carries a restricted character or mixes scripts is admitted where the same name in
+  TSON text is refused, and the two encodings disagree about a rule §8.2 states once. The semantics to build:
+  **the identifier policy applies to a record's member names and not to a map's keys** — §4.1 makes the
+  position decide which a `{...}` is, so this cannot be answered where the name is read and has to wait for
+  the schema-directed decode to say what the position is — and **the token policy applies to every JSON
+  token and overrides the identifier policy where both reach one**, which is the rule the text encoding
+  already follows. A map key is data, not a name, which is why it is exempt and why a JSON-Schema conversion
+  does not hit a name rule on `additionalProperties`. The look-alike rule is a property of a *set*, so it
+  belongs where `SchemalessTreeReader` puts it on the text side: over one record's member names, once.
+
 - [ ] **No schema-directed decode — §5–§8.** The whole of what Part 3 actually specifies: atoms by their parsing
   contracts (§5), containers by their constructors (§6), JSON `null` as the absent sentinel (§7), and the
   discrimination predicate over the derived `disjoint` fact (§8). This is where `tson-json` gains its dependency on
@@ -227,6 +239,20 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   *where it is counted*: the ones that bound shape are per-container state the stream does not keep, where
   depth was a counter it already had, and the two aggregates (total values, foreign schemas) need their own
   counter since §9.1 is explicit that the total is not bounded by the parts.
+
+- [ ] **`TsonConfig` is a builder and a configuration value in one class, and only the value belongs in
+  `tson-base`.** `tson-base` holds what a deployment constrains this processor with — `base.policy` (what it
+  will admit and spend) beside `base.source` (where it will obtain a schema), siblings rather than one
+  nested in the other, because a `ProcessorPolicy` is a value the CLI renders in every envelope's `policy`
+  field and a `SchemaSource` has no rendering. What is missing is the type that collects them, so an
+  encoding other than TSON text can be handed one object rather than reassembling the set. `TsonConfig`
+  cannot become it as it stands: it imports `io.ltr8.tson.compiler.*`, `TsonCompiledMetaRegistry`,
+  `SchemaMetaNameBinder` and `TsonAtomContext`, and its `build()` resolves meta-kernel/meta.tn/core.tn and
+  returns a `Tson` — the compiler's assembly point, not a value. The work is the extraction: which of its
+  fields are constraints (the policies, the source, `requireContentHashPin`, `lenientBinding`) against which
+  are assembly (the registries, the bind context, the name binder), and whether the binding travels with the
+  constraints or stays behind. The name is free — `Config` in `io.ltr8.tson.base` — and `Tson.builder()`
+  keeps its shape either way, taking one where it takes several today.
 
 - [ ] **`scripts/restamp-bundled-schemas.sh` does not cover the spec's own §13.2 table.** The script moves
   every pin in the repo bottom-up — the three `spec/m/*.tn` headers, `TsonBundledSchemas`, `InitCommand`,
