@@ -4,6 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.tree.TsonValue;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.UnaryOperator;
 
@@ -103,6 +104,15 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
                     : new AtomTreeReader(AtomTypeReader.UNIT.create(name, definition, context), name,
                             AnnotationTypes.of(context));
 
+    /** The atom constructors meta-kernel.tn and meta.tn declare, in the order those documents declare them. */
+    private static final List<String> ATOM_CONSTRUCTORS = List.of(
+            // meta-kernel.tn
+            "integer_type", "text_type", "uri_type", "regex_type",
+            // meta.tn
+            "bytes_type", "float_type", "decimal_type", "rational_type", "date_type", "time_type",
+            "datetime_type", "duration_type", "period_type", "uuid_type", "complex_type", "mac_type",
+            "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type");
+
     private static Map<String, ValueReaderFactory> baseFactories(ValueReaderFactory record, ValueReaderFactory array,
             ValueReaderFactory map, ValueReaderFactory tuple, ValueReaderFactory enumFactory,
             ValueReaderFactory unitFactory, UnaryOperator<ValueReaderFactory> leaf,
@@ -111,10 +121,6 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
 
         // meta-kernel.tn
         factories.put("unit", unitFactory);
-        factories.put("integer_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("text_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("uri_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("regex_type", leaf.apply(AtomTypeReader.ATOM));
         factories.put("record", record);
         factories.put("array", array);
         factories.put("set_type", array);
@@ -124,25 +130,18 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         factories.put("choice", choice);
 
         // meta.tn
-        factories.put("bytes_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("float_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("decimal_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("rational_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("date_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("time_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("datetime_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("duration_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("period_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("uuid_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("complex_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("mac_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("email_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("ipv4_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("ipv6_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("cidr4_type", leaf.apply(AtomTypeReader.ATOM));
-        factories.put("cidr6_type", leaf.apply(AtomTypeReader.ATOM));
-
         factories.put("scoped", scoped);
+
+        // Every atom constructor routes to one factory, so what varies is the key and not the value:
+        // AtomTypeReader.ATOM asks AtomParsers which parser the resolved body wants, and that mapping is
+        // stated once, there. What the key set carries is the other fact -- *which constructors are atoms*
+        // -- which nothing else states: BuiltinTypeVocabulary is keyed by type name (`int32`) rather than
+        // constructor name (`integer_type`), and AtomParsers switches on the body's own class. Listing them
+        // is also what makes a constructor this library has never seen reach NOT_IMPLEMENTED (§2.2.2's
+        // extension point) instead of being guessed at from whatever body it happened to resolve to.
+        for (String atomConstructor : ATOM_CONSTRUCTORS) {
+            factories.put(atomConstructor, leaf.apply(AtomTypeReader.ATOM));
+        }
 
         // Collections.unmodifiableMap, not Map.copyOf -- preserves the LinkedHashMap's own insertion order
         // (Map.copyOf's own iteration order is unspecified), so the table reads at runtime as it does here.
