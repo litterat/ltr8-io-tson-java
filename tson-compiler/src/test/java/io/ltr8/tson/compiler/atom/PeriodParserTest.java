@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class PeriodParserTest {
 
     private static Period read(AtomType<Period> parser, String text) {
-        return parser.read(new TokenValue(text, TokenForm.UNQUOTED));
+        return parser.read(text);
     }
 
     private static Period read(String text) {

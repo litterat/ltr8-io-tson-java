@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.BytesType;
 
 import java.util.Base64;
@@ -44,8 +43,7 @@ public record BytesParser(BytesType constraints) implements AtomType<byte[]> {
     public static final String TYPENAME = "bytes";
 
     @Override
-    public byte[] read(TokenValue token) {
-        String text = token.text();
+    public byte[] read(String text) {
         byte[] value = switch (encoding()) {
             case BASE64 -> Base64Decoding.decode(text, Base64.getDecoder(), "base64");
             case BASE64URL -> Base64Decoding.decode(text, Base64.getUrlDecoder(), "base64url");

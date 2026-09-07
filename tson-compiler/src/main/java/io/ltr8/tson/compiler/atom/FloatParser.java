@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.base.NumberForm;
 import io.ltr8.tson.compiler.base.NumberGrammar;
 import io.ltr8.tson.compiler.base.NumberNarrowing;
@@ -54,15 +53,15 @@ public record FloatParser(FloatType constraints) implements AtomType<Number> {
     }
 
     @Override
-    public Number read(TokenValue token) {
+    public Number read(String text) {
         Class<?> natural = constraints.format() == FloatType.Format.BINARY32 ? Float.class : Double.class;
-        return (Number) read(token, natural);
+        return (Number) read(text, natural);
     }
 
     @Override
-    public Object read(TokenValue token, Class<?> target) {
-        double value = parseAtFormatPrecision(token.text());
-        validate(value, token.text());
+    public Object read(String text, Class<?> target) {
+        double value = parseAtFormatPrecision(text);
+        validate(value, text);
         return NumberNarrowing.narrowApproximate(value, target);
     }
 

@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.MacType;
 
 import java.util.regex.Pattern;
@@ -39,8 +38,7 @@ public record MacParser(MacType constraints) implements AtomType<String> {
             "[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}|[0-9A-Fa-f]{2}(?:-[0-9A-Fa-f]{2}){5}");
 
     @Override
-    public String read(TokenValue token) {
-        String text = token.text();
+    public String read(String text) {
         if (!EUI_48.matcher(text).matches()) {
             throw new AtomParseException("'" + text + "' is not a valid MAC address -- expected RFC 9542's EUI-48 "
                     + "form, six hex octets separated consistently by ':' or by '-' (§5.5)",

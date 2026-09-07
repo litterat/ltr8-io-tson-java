@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.base.NumberForm;
 import io.ltr8.tson.compiler.base.NumberForms;
 import io.ltr8.tson.compiler.base.NumberGrammar;
@@ -66,14 +65,14 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
     }
 
     @Override
-    public Number read(TokenValue token) {
+    public Number read(String text) {
         Class<?> hostType = constraints.size().map(IntegerParser::hostType).orElse(BigInteger.class);
-        return (Number) read(token, hostType);
+        return (Number) read(text, hostType);
     }
 
     @Override
-    public Object read(TokenValue token, Class<?> target) {
-        return NumberNarrowing.narrowIntegral(readBigInteger(token), target);
+    public Object read(String text, Class<?> target) {
+        return NumberNarrowing.narrowIntegral(readBigInteger(text), target);
     }
 
     /** Plain decimal digits -- no width-dependent formatting quirk the way {@code FloatParser} has. */
@@ -82,8 +81,7 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
         return value.toString();
     }
 
-    private BigInteger readBigInteger(TokenValue token) {
-        String text = token.text();
+    private BigInteger readBigInteger(String text) {
         NumberForm form = NumberGrammar.tryParse(text)
                 .filter(f -> f instanceof NumberForm.IntegerForm || f instanceof NumberForm.BasedIntegerForm)
                 .orElseThrow(() -> new AtomParseException(

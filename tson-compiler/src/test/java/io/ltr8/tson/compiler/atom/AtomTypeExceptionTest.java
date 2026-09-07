@@ -28,8 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class AtomTypeExceptionTest {
 
-    private static TokenValue token(String text) {
-        return new TokenValue(text, TokenForm.UNQUOTED);
+    private static String token(String text) {
+        return text;
     }
 
     private static AtomTypeException rejecting(AtomType<?> type, String text) {

@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import java.util.List;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.atom.InternetAddress;
 
@@ -63,8 +62,7 @@ public record Ipv4Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
     }
 
     @Override
-    public Inet4Address read(TokenValue token) {
-        String text = token.text();
+    public Inet4Address read(String text) {
         byte[] octets = tryParseOctets(text);
         if (octets == null) {
             throw new AtomParseException(

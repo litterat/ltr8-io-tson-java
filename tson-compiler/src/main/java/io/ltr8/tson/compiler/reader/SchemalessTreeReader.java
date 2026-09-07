@@ -245,7 +245,7 @@ public final class SchemalessTreeReader {
         Object value;
         if (atom.isPresent()) {
             try {
-                value = atom.get().read(tokenValue);
+                value = atom.get().read(tokenValue.text());
             } catch (AtomTypeException e) {
                 TypeRefCheck.violation(ctx, typeRef.orElseThrow(), e, token.text());
                 return new TsonAbsent(typeRef, annotations);

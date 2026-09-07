@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.DateTimeType;
 
 import java.time.OffsetDateTime;
@@ -39,8 +38,7 @@ public record DateTimeParser(DateTimeType constraints) implements AtomType<Offse
             "\\d{4}-\\d{2}-\\d{2}[Tt]\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([Zz]|[+-]\\d{2}:\\d{2})");
 
     @Override
-    public OffsetDateTime read(TokenValue token) {
-        String text = token.text();
+    public OffsetDateTime read(String text) {
         if (!DATE_TIME.matcher(text).matches()) {
             throw new AtomParseException("'" + text + "' is not a valid datetime -- expected RFC 3339 "
                     + "date-time, YYYY-MM-DDTHH:MM:SS[.fraction](Z|+HH:MM) (§5.4)", "an RFC 3339 date-time");

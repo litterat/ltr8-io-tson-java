@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class IdentifierParserTest {
 
     private static String read(String text) {
-        return IdentifierParser.INSTANCE.read(new TokenValue(text, TokenForm.UNQUOTED));
+        return IdentifierParser.INSTANCE.read(text);
     }
 
     private static String rejects(String text) {

@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class DurationParserTest {
 
     private static Duration read(AtomType<Duration> parser, String text) {
-        return parser.read(new TokenValue(text, TokenForm.UNQUOTED));
+        return parser.read(text);
     }
 
     private static Duration read(String text) {

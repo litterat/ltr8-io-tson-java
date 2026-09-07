@@ -13,8 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class Ipv6ParserTest {
 
-    private static TokenValue token(String text) {
-        return new TokenValue(text, TokenForm.UNQUOTED);
+    private static String token(String text) {
+        return text;
     }
 
     private static Inet6Address literal(String hex) throws UnknownHostException {

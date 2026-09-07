@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler.atom;
 
 import java.util.List;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 
@@ -32,8 +31,7 @@ public record Cidr4Parser(Cidr4Type constraints) implements AtomType<CidrNetwork
     public static final Cidr4Parser UNCONSTRAINED = new Cidr4Parser(Cidr4Type.UNCONSTRAINED);
 
     @Override
-    public CidrNetwork read(TokenValue token) {
-        String text = token.text();
+    public CidrNetwork read(String text) {
         CidrNetwork network = CidrNetwork.parse(text, 32);
         if (network == null) {
             CidrParsing.checkFamilyRange(text, 32);

@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class Cidr6ParserTest {
 
-    private static TokenValue token(String text) {
-        return new TokenValue(text, TokenForm.SINGLE_LINE_QUOTED);
+    private static String token(String text) {
+        return text;
     }
 
     private static Cidr6Parser withPrefixBounds(Integer min, Integer max) {

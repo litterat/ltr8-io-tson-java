@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.UuidType;
 
 import java.util.Optional;
@@ -47,8 +46,7 @@ public record UuidParser(UuidType constraints) implements AtomType<UUID> {
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
     @Override
-    public UUID read(TokenValue token) {
-        String text = token.text();
+    public UUID read(String text) {
         if (!UUID_TEXT.matcher(text).matches()) {
             throw new AtomParseException(
                     "'" + text + "' is not a valid UUID -- expected RFC 9562's 8-4-4-4-12 hex-and-hyphen form (§5.5)",

@@ -62,8 +62,38 @@ public final class HostAtoms {
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED));
 
+    /**
+     * The host classes of [TSON-JSON] §5.6's <b>string-content</b> families -- the ones whose wire form is a
+     * quoted string, so a reader with no type-ref to dispatch on may let the target class say what the
+     * string content means. The numeric families are deliberately absent: [TSON-DATA] §4.4 makes a quoted
+     * token a string, and §5.3/§5.4 read exact and approximate numerics from a number rather than a string,
+     * so letting {@code "123"} become a {@code BigInteger} because a field is declared one would overrule
+     * base type resolution with a class.
+     */
+    private static final Map<Class<?>, AtomType<?>> BY_STRING_CONTENT_HOST_TYPE = Map.ofEntries(
+            Map.entry(LocalDate.class, DateParser.UNCONSTRAINED),
+            Map.entry(OffsetTime.class, TimeParser.UNCONSTRAINED),
+            Map.entry(OffsetDateTime.class, DateTimeParser.UNCONSTRAINED),
+            Map.entry(Duration.class, DurationParser.UNCONSTRAINED),
+            Map.entry(Period.class, PeriodParser.UNCONSTRAINED),
+            Map.entry(UUID.class, UuidParser.UNCONSTRAINED),
+            Map.entry(URI.class, UriParser.UNCONSTRAINED),
+            Map.entry(byte[].class, BytesParser.BASE64),
+            Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
+            Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED));
+
     /** The built-in atom whose values are {@code hostType}, or empty where no built-in produces that class. */
     public static Optional<AtomType<?>> forHostType(Class<?> hostType) {
         return Optional.ofNullable(BY_HOST_TYPE.get(hostType));
+    }
+
+    /**
+     * The built-in atom whose values are {@code hostType} <b>and whose wire form is a string</b> (§5.6), or
+     * empty. What a reader dispatching on the target class rather than on a type-ref asks -- a schemaless
+     * TSON read of a quoted token, and every JSON read, where §4.1 makes the position's type decide and
+     * there is no type-ref to be had.
+     */
+    public static Optional<AtomType<?>> forStringContentHostType(Class<?> hostType) {
+        return Optional.ofNullable(BY_STRING_CONTENT_HOST_TYPE.get(hostType));
     }
 }

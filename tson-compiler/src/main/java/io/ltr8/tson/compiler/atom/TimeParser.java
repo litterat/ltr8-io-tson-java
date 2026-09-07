@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.TimeType;
 
 import java.time.OffsetTime;
@@ -46,8 +45,7 @@ public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
     private static final Pattern FULL_TIME = Pattern.compile("\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?([Zz]|[+-]\\d{2}:\\d{2})");
 
     @Override
-    public OffsetTime read(TokenValue token) {
-        String text = token.text();
+    public OffsetTime read(String text) {
         if (!FULL_TIME.matcher(text).matches()) {
             throw new AtomParseException(
                     "'" + text + "' is not a valid time -- expected RFC 3339 full-time, "

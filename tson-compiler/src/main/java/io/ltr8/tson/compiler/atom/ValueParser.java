@@ -31,7 +31,7 @@ import java.math.BigInteger;
  * {@code value}/{@code token}/{@code void} are "distinguished by name and prose-level parsing
  * contract, not by schema shape."
  */
-public final class ValueParser implements AtomType<Object> {
+public final class ValueParser implements TokenAtomType<Object> {
 
     public static final ValueParser INSTANCE = new ValueParser();
 
@@ -73,7 +73,7 @@ public final class ValueParser implements AtomType<Object> {
         if (target == null || AtomType.wrap(target).isInstance(natural) || narrowsTo(natural, target)) {
             return natural;
         }
-        return HostAtoms.forHostType(target).<Object>map(atom -> atom.read(token)).orElse(natural);
+        return HostAtoms.forHostType(target).<Object>map(atom -> atom.read(token.text())).orElse(natural);
     }
 
     /**
@@ -96,10 +96,15 @@ public final class ValueParser implements AtomType<Object> {
     }
 
     /** The {@code value} atom at a slot of known host type, for a caller that holds a reader rather than a token. */
-    public static AtomType<Object> at(Class<?> target) {
-        return new AtomType<Object>() {
+    public static TokenAtomType<Object> at(Class<?> target) {
+        return new TokenAtomType<Object>() {
             @Override
             public Object read(TokenValue token) {
+                return INSTANCE.read(token, target);
+            }
+
+            @Override
+            public Object read(TokenValue token, Class<?> ignored) {
                 return INSTANCE.read(token, target);
             }
 

@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.PeriodType;
 
 import java.math.BigInteger;
@@ -39,8 +38,7 @@ public record PeriodParser(PeriodType constraints) implements AtomType<Period> {
             Pattern.compile("(?<sign>-)?P(?:(?<years>\\d+)Y)?(?:(?<months>\\d+)M)?");
 
     @Override
-    public Period read(TokenValue token) {
-        String text = token.text();
+    public Period read(String text) {
         Matcher m = PERIOD.matcher(text);
         if (!m.matches()) {
             throw new AtomParseException("'" + text + "' is not a valid period -- expected P with a Y "

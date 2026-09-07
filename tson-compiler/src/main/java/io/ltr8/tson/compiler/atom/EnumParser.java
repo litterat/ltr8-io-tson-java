@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.schema.meta.EnumBody;
 
@@ -11,7 +10,7 @@ import java.util.List;
  * members: set<token>}. Holds an {@link EnumBody} -- the pure constraint values, unchanged by this
  * split -- rather than declaring those fields itself.
  *
- * <p><b>Matches on {@link TokenValue#text()} directly, never through {@link BaseTypeResolver}'s
+ * <p><b>Matches on the token's text directly, never through {@link BaseTypeResolver}'s
  * boolean/number/string identification.</b> This is the one thing that makes {@code boolean
  * => !enum [true false]} readable at all: routed through generic identification (as {@code
  * MetaKernelBootstrapResolver}'s own binding of the *schema* {@code !enum [true false]} instance necessarily
@@ -20,10 +19,10 @@ import java.util.List;
  * <String>} ever sees them -- a real, permanent limit of generic binding (see this repo's own
  * CLAUDE.md). This class exists specifically for callers -- {@code reader}'s
  * {@code EnumTypeParserFactory} chief among them -- that already know, from a schema position
- * rather than from identifying the token itself, that an enum match is what's wanted here: reading
- * {@link TokenValue#text()} straight off the token and checking it against {@link
- * EnumBody#members} directly never invokes identification at all, so the collision simply doesn't
- * arise. Matches by text only, regardless of {@link io.ltr8.tson.compiler.ast.TokenForm} -- the same
+ * rather than from identifying the token itself, that an enum match is what's wanted here: checking the
+ * token's text against {@link EnumBody#members} directly never invokes identification at all, so the
+ * collision simply doesn't arise. It matches by text alone and <b>cannot do otherwise</b> -- an
+ * {@link AtomType} is handed a {@code String} and never sees which form carried it, which is the same
  * form-agnostic behavior {@code MetaKernelBootstrapResolver}'s own hand-written enum converter already uses,
  * "correct for every enum member regardless of what it happens to look like".
  *
@@ -39,8 +38,7 @@ public record EnumParser(EnumBody constraints) implements AtomType<String> {
     }
 
     @Override
-    public String read(TokenValue token) {
-        String text = token.text();
+    public String read(String text) {
         if (!constraints.members().contains(text)) {
             throw new AtomValidationException(
                     "'" + text + "' is not a member of this enum -- expected one of " + constraints.members(),

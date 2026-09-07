@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.DateType;
 
 import java.time.LocalDate;
@@ -34,8 +33,7 @@ public record DateParser(DateType constraints) implements AtomType<LocalDate> {
     private static final Pattern FULL_DATE = Pattern.compile("\\d{4}-\\d{2}-\\d{2}");
 
     @Override
-    public LocalDate read(TokenValue token) {
-        String text = token.text();
+    public LocalDate read(String text) {
         if (!FULL_DATE.matcher(text).matches()) {
             throw new AtomParseException(
                     "'" + text + "' is not a valid date -- expected RFC 3339 full-date, YYYY-MM-DD (§5.4)",

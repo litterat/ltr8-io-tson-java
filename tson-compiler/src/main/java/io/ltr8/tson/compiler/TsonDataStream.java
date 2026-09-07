@@ -634,7 +634,7 @@ public final class TsonDataStream implements TsonEventSource {
         advance();
 
         try {
-            UriParser.UNCONSTRAINED.read(new TokenValue(arg.text(), TokenForm.SINGLE_LINE_QUOTED));
+            UriParser.UNCONSTRAINED.read(arg.text());
         } catch (AtomParseException e) {
             throw new ParseException(
                     "'!!" + expectedName + "' argument '" + arg.text() + "' is not a valid URI (§3.3)", arg.start());

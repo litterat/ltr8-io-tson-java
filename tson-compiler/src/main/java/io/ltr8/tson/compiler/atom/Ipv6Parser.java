@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.atom;
 
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import java.util.List;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.atom.CidrNetwork;
 import io.ltr8.tson.schema.atom.InternetAddress;
 
@@ -86,8 +85,7 @@ public record Ipv6Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
     private static final Pattern HEX_GROUP = Pattern.compile("[0-9a-fA-F]{1,4}");
 
     @Override
-    public Inet6Address read(TokenValue token) {
-        String text = token.text();
+    public Inet6Address read(String text) {
         byte[] bytes = InternetAddress.ipv6(text);
         if (bytes == null) {
             throw malformed(text);

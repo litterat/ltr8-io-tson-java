@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.base.ComplexForm;
 import io.ltr8.tson.compiler.base.NumberForm;
 import io.ltr8.tson.compiler.base.NumberForms;
@@ -37,8 +36,7 @@ public record ComplexParser() implements AtomType<Complex> {
     public static final ComplexParser UNCONSTRAINED = new ComplexParser();
 
     @Override
-    public Complex read(TokenValue token) {
-        String text = token.text();
+    public Complex read(String text) {
 
         Optional<ComplexForm> complexForm = NumberGrammar.tryComplex(text);
         if (complexForm.isPresent()) {

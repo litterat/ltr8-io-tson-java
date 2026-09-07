@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.DurationType;
 
 import java.math.BigDecimal;
@@ -92,8 +91,7 @@ public record DurationParser(DurationType constraints) implements AtomType<Durat
     private static final BigDecimal SECONDS_PER_MINUTE = BigDecimal.valueOf(60);
 
     @Override
-    public Duration read(TokenValue token) {
-        String text = token.text();
+    public Duration read(String text) {
         Matcher m = DURATION.matcher(text);
         if (!m.matches()) {
             throw new AtomParseException("'" + text + "' is not a valid duration -- expected the RFC 3339 "

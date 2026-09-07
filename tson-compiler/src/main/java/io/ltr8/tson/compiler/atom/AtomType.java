@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler.atom;
 
-import io.ltr8.tson.compiler.ast.TokenValue;
 
 /**
  * A built-in vocabulary atom's parsing contract (§5.2): "which tokens it accepts, and what host
@@ -38,10 +37,10 @@ import io.ltr8.tson.compiler.ast.TokenValue;
  */
 public interface AtomType<T> {
 
-    T read(TokenValue token) throws AtomParseException, AtomValidationException;
+    T read(String text) throws AtomParseException, AtomValidationException;
 
-    default Object read(TokenValue token, Class<?> target) throws AtomParseException, AtomValidationException {
-        T value = read(token);
+    default Object read(String text, Class<?> target) throws AtomParseException, AtomValidationException {
+        T value = read(text);
         if (!wrap(target).isInstance(value)) {
             throw new AtomValidationException("cannot represent " + value + " as " + target,
                     "a value representable as " + target.getSimpleName());
