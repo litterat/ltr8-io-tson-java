@@ -307,6 +307,7 @@ Three exported, layered the way the module reads a document, and the split is th
 | `io.ltr8.tson.json` | `Json`, `JsonObjectReader`, `JsonPosition`, and the exceptions every layer raises |
 | `io.ltr8.tson.json.tree` | `JsonValue` and its six node types, plus `JsonValueException` |
 | `io.ltr8.tson.json.stream` | `JsonEvent`, `JsonEventSource`, `JsonStream` |
+| `io.ltr8.tson.json.reader` | internal — the engines a reader is a facade over |
 | `io.ltr8.tson.json.atom` | internal — one JSON leaf into one host value, and where §5's per-family readers land |
 | `io.ltr8.tson.json.lexer` | internal — a consumer names a value, an event or a reader, never a token or a parser |
 
@@ -324,12 +325,32 @@ The rendering lives on `JsonValue.toDisplayString(indent)` rather than only on `
 quoting it needs is `tree`'s and package-private there. `Json.toDisplayString(value, indent)` is JEP 540's
 spelling of the same call and delegates.
 
-## Binding (`JsonObjectReader`)
+## Binding: a facade over an engine
 
 `JsonObjectReader` reads a document straight into a Java object, driven by the target class's own
-`tson-bind` descriptor and streaming the event source rather than a tree. It is the JSON peer of
-`tson-compiler`'s `SchemalessObjectReader`, and `tson-bind` is `tson-json`'s only dependency — a
-dependency-free engine that reads a class, so a JSON document binds with no TSON schema in sight.
+`tson-bind` descriptor and streaming the event source rather than a tree.
+
+**It is a facade over `DataClassObjectReader`**, which is what actually binds a value — the same split
+`TsonObjectReader` makes over `SchemalessObjectReader`, and for the same reason: **a front door owns the
+document** (entry points, framing, and the configuration a read is judged under) where **an engine owns one
+value at one descriptor and stops**. That is also where the schema-directed decode of §5–§8 arrives: a
+second engine under the same door rather than a second door.
+
+**The engine is named for both axes every reader in this family is named for** — what drives the read, and
+what it produces. A `DataClass` descriptor drives this one and an object comes out. That has to stay in the
+name or the family stops scaling: the eventual `JsonTreeReader` sits over a tree engine, and §5–§8's
+schema-directed decode is a third engine under the same facade, so a name encoding only "what drives it"
+would leave two readers sharing one.
+
+It deliberately does not copy `tson-compiler`'s `SchemalessObjectReader`. **The class *is* the schema
+there** — that class's own Javadoc says so of its own target, "in effect the schema the data must satisfy" —
+so "schemaless" describes the one thing such a reader is not short of. The word is accurate of a *tree*
+reader, which really is driven by nothing.
+
+**Frame-free is the property the split exists for**, and `DataClassObjectReaderTest` pins it: the engine binds
+a value and leaves the source where that value ended, so a caller positioned mid-document gets one value out
+of it. What refuses trailing content is neither the engine nor the facade but `JsonStream` — the pull past
+the root value is what raises it, and the facade's contribution is only to make that pull happen.
 
 Binding is JEP 540's other explicit non-goal, after streaming, and it is the one worth not inheriting: a
 library whose point is validated typed data has no business handing back a tree and calling it done.
