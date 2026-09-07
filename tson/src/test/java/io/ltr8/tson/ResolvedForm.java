@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -115,7 +115,7 @@ final class ResolvedForm {
      */
     static Map<String, TypeDefinition> ownEntries(Tson tson, String id) {
         var linked = tson.bindRegistry().core().resolveLinked(id);
-        String canonical = TsonCanonicalIdentity.canonicalize(id);
+        String canonical = CanonicalIdentity.canonicalize(id);
         Map<String, TypeDefinition> own = new LinkedHashMap<>();
         linked.schema().entries().forEach((name, definition) -> {
             if (linked.originOf(name).equals(canonical)) {
@@ -161,7 +161,7 @@ final class ResolvedForm {
     static Set<String> ourSynthetics(Tson tson, String id) {
         var linked = tson.bindRegistry().core().resolveLinked(id);
         var entries = linked.schema().entries();
-        String canonical = TsonCanonicalIdentity.canonicalize(id);
+        String canonical = CanonicalIdentity.canonicalize(id);
         Set<String> marked = new TreeSet<>();
         entries.forEach((name, definition) -> {
             if (linked.originOf(name).equals(canonical) && entries.getAnnotations(name).has("synthetic")) {

@@ -31,7 +31,7 @@ import io.ltr8.tson.compiler.ast.schema.TupleRef;
 import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
@@ -321,7 +321,7 @@ final class SchemaDesugarer {
     private SchemaMap.Declaration desugarOrReport(SchemaMap.Declaration declaration) {
         try {
             return declaration(declaration);
-        } catch (TsonSchemaValidationException | UnsupportedOperationException e) {
+        } catch (SchemaValidationException | UnsupportedOperationException e) {
             if (reporter == null) {
                 throw e;
             }
@@ -525,7 +525,7 @@ final class SchemaDesugarer {
         }
         List<String> parameters = typeParams(declaration.typeDef());
         if (parameters.isEmpty()) {
-            throw new TsonSchemaValidationException("'" + head + "' declares no type parameters, so '"
+            throw new SchemaValidationException("'" + head + "' declares no type parameters, so '"
                     + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
                     + "argument list");
         }
@@ -811,7 +811,7 @@ final class SchemaDesugarer {
      */
     private static void requireFieldNameUnseen(String name, Set<String> seen, String explanation) {
         if (!seen.add(name)) {
-            throw new TsonSchemaValidationException("field '" + name + "' is declared more than once -- "
+            throw new SchemaValidationException("field '" + name + "' is declared more than once -- "
                     + explanation + " (§5.11: a field name is unique across a record's plain fields and all "
                     + "its groups' members)");
         }
@@ -827,7 +827,7 @@ final class SchemaDesugarer {
      */
     private ScopedValue recordField(FieldDef field) {
         if (field.type().isEmpty()) {
-            throw new TsonSchemaValidationException("field '" + field.name() + "' states only a modifier and no "
+            throw new SchemaValidationException("field '" + field.name() + "' states only a modifier and no "
                     + "type-ref, but names no inherited field to take a type from -- a modifier-only entry is "
                     + "always a tightening, so it is only meaningful in a refinement or composition body, "
                     + "against a field the source declares (§5.7)");
@@ -860,7 +860,7 @@ final class SchemaDesugarer {
     private static List<RecordValue.Field> sizeFields(SizeSpec size, String shown) {
         return switch (size) {
             case SizeSpec.Min min when min.lower().equals("0") ->
-                    throw new TsonSchemaValidationException("'" + shown + "' pins a floor of zero, which every "
+                    throw new SchemaValidationException("'" + shown + "' pins a floor of zero, which every "
                             + "container already satisfies -- drop the size specifier for the unconstrained "
                             + "form (§5.3). The spelling is not merely redundant: identity is structural "
                             + "(§8.2), so it lands on an entry distinct from the unconstrained one that means "

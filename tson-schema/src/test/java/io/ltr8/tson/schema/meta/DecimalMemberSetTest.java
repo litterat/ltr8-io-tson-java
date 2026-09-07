@@ -1,6 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -54,7 +54,7 @@ class DecimalMemberSetTest {
     void aMemberThatIsNotANumberIsTheAuthorsError() {
         // meta.tn: "a member that does not parse as a decimal fails at schema load". `value` admitting
         // anything is a property of the slot, not a licence for what stands in it.
-        TsonSchemaValidationException refused = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException refused = assertThrows(SchemaValidationException.class,
                 () -> withMembers(BigInteger.ONE, "abc"));
         assertTrue(refused.getMessage().contains("'abc'"), refused.getMessage());
     }
@@ -64,11 +64,11 @@ class DecimalMemberSetTest {
         // meta.tn: "1 and 1.0 are one member and a duplicate rather than two". The `set` the facet is
         // declared as cannot see it -- its uniqueness rule runs on the decoded elements, where the two are a
         // BigInteger and a BigDecimal and nothing compares them.
-        TsonSchemaValidationException refused = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException refused = assertThrows(SchemaValidationException.class,
                 () -> withMembers(BigInteger.ONE, new BigDecimal("1.0")));
         assertTrue(refused.getMessage().contains("unique elements"), refused.getMessage());
 
-        assertThrows(TsonSchemaValidationException.class,
+        assertThrows(SchemaValidationException.class,
                 () -> withMembers(new BigDecimal("2.5"), new BigDecimal("2.50")));
     }
 

@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 
 import java.util.List;
 import java.util.Map;
@@ -35,7 +35,7 @@ class ConstructorLevelDisciplineTest {
                 {
                 %s }
                 """.formatted(meta, declarations);
-        return Tson.builder().schemaSource(TsonSchemaSource.ofMap(Map.of(ID, source))).build()
+        return Tson.builder().schemaSource(SchemaSource.ofMap(Map.of(ID, source))).build()
                 .validateSchema(source);
     }
 

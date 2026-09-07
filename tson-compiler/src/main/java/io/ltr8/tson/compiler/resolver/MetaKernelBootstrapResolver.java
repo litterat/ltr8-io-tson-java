@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonSchemaParser;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.EmptyBrace;
@@ -85,7 +85,7 @@ import java.util.Optional;
  * `build.gradle.kts` copies the file straight from the repo's own {@code spec/m/meta-kernel.tn}
  * snapshot into that module's own resources, not this one's), so the bootstrap works from a built
  * jar, not just a repo checkout. This class hard-codes that one real, bundled source deliberately,
- * per the lock-down above, rather than accepting a caller-supplied {@link TsonSchemaSource}.
+ * per the lock-down above, rather than accepting a caller-supplied {@link SchemaSource}.
  */
 public final class MetaKernelBootstrapResolver {
 

@@ -1,23 +1,20 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
-import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
 /**
- * Where a {@link TsonCompiledSchemaLoader} gets a schema document's own raw source text from, for a
+ * Where a {@code TsonCompiledSchemaLoader} gets a schema document's own raw source text from, for a
  * URI that isn't already registered/compiled and isn't meta-kernel's own pre-loaded bootstrap case --
  * the extension point for enforcing policy over what gets fetched from where (e.g. whitelisting/
  * blacklisting hosts, or disk-only resolution). A caller wanting a specific policy implements this
  * interface (e.g. checking {@code uri} against an allowed-host list before ever opening a
  * connection, or refusing any {@code http(s)} scheme outright and only reading from a local
  * classpath/filesystem location) and hands it to a {@code TsonCompiledMetaRegistry}'s own
- * {@code (TsonSchemaRegistry, DataBindContext, TsonSchemaSource)} constructor. Two implementations
- * ship: {@code TsonHttpSchemaSource} and {@code TsonFileSchemaSource}, both in the {@code tson}
+ * {@code (TsonSchemaRegistry, DataBindContext, SchemaSource)} constructor. Two implementations
+ * ship: {@code HttpSchemaSource} and {@code FileSchemaSource}, both in the {@code tson}
  * module, both denying by default.
  *
  * <p><b>{@link #registeredOnly()} is the default -- nothing is ever fetched.</b> Mirrors {@code
@@ -41,7 +38,7 @@ import java.util.Objects;
  * cannot catch, so the fix is to make the correct thing shorter than the wrong one.
  */
 @FunctionalInterface
-public interface TsonSchemaSource {
+public interface SchemaSource {
 
     /**
      * Returns {@code uri}'s own raw schema-document source text.
@@ -64,7 +61,7 @@ public interface TsonSchemaSource {
      * was looked for. A loader with no fetch capability configured refuses every reference it does not
      * already hold, whether or not anything anywhere could have served it, and no retry changes that.
      */
-    static TsonSchemaSource registeredOnly() {
+    static SchemaSource registeredOnly() {
         return uri -> {
             throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,
                     "it is not registered, and this loader has no fetch capability configured to load it "
@@ -92,14 +89,14 @@ public interface TsonSchemaSource {
      *
      * @param schemas identity to schema-document source text; keys must be legal identities (§2.2.1), and two
      *                that canonicalize alike are refused rather than silently collapsed
-     * @throws TsonSchemaValidationException if a key is not a legal canonical identity
+     * @throws SchemaValidationException if a key is not a legal canonical identity
      * @throws IllegalArgumentException      if two keys name one identity, or a document is {@code null}
      */
-    static TsonSchemaSource ofMap(Map<String, String> schemas) {
+    static SchemaSource ofMap(Map<String, String> schemas) {
         Map<String, String> byIdentity = new LinkedHashMap<>();
         schemas.forEach((reference, document) -> {
             Objects.requireNonNull(document, () -> "no schema document for '" + reference + "'");
-            String identity = TsonCanonicalIdentity.canonicalize(reference);
+            String identity = CanonicalIdentity.canonicalize(reference);
             String existing = byIdentity.put(identity, document);
             if (existing != null && !existing.equals(document)) {
                 throw new IllegalArgumentException("two schemas were supplied for the identity '" + identity
@@ -111,8 +108,8 @@ public interface TsonSchemaSource {
         return uri -> {
             String identity;
             try {
-                identity = TsonCanonicalIdentity.canonicalize(uri);
-            } catch (TsonSchemaValidationException e) {
+                identity = CanonicalIdentity.canonicalize(uri);
+            } catch (SchemaValidationException e) {
                 // Refused rather than reported as a miss: nothing was looked for, because there is no
                 // identity to look for. Wrapped so this source still fails the one way the contract permits.
                 throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,

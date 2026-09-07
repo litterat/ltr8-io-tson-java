@@ -1,8 +1,8 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.UnicodePolicy;
-import io.ltr8.tson.compiler.TsonSchemaSource;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import static java.lang.Character.UnicodeScript.CYRILLIC;
@@ -39,17 +39,17 @@ class IdentifierPolicyConfigTest {
     }
 
     private static void accepts(UnicodePolicy policy, String schema) {
-        TsonSchemaSource source = uri -> schema;
+        SchemaSource source = uri -> schema;
         Tson tson = (policy == null ? Tson.builder() : Tson.builder().identifierPolicy(policy))
                 .schemaSource(source).build();
         assertNotNull(tson.resolve(schema));
     }
 
     private static String refuses(UnicodePolicy policy, String schema) {
-        TsonSchemaSource source = uri -> schema;
+        SchemaSource source = uri -> schema;
         Tson tson = (policy == null ? Tson.builder() : Tson.builder().identifierPolicy(policy))
                 .schemaSource(source).build();
-        return assertThrows(TsonSchemaValidationException.class, () -> tson.resolve(schema)).getMessage();
+        return assertThrows(SchemaValidationException.class, () -> tson.resolve(schema)).getMessage();
     }
 
     /**

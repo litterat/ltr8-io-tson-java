@@ -32,7 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayNameGeneration(DisplayNameGenerator.ReplaceUnderscores.class)
 class JsonStreamTest {
 
-    /** Every event of a document, rendered one per entry -- {@code EndOfDocument} included, since pulling it is the point. */
+    /**
+     * Every event of a document, rendered one per entry -- {@code EndOfDocument} included, since pulling it is the point.
+     */
     private static List<String> events(String source) {
         List<String> rendered = new ArrayList<>();
         JsonStream stream = stream(source);

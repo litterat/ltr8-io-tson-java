@@ -3,7 +3,7 @@ package io.ltr8.tson.schema.meta;
 import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -140,7 +140,7 @@ public record DecimalType(
         for (Object element : (List<?>) written) {
             BigDecimal member = asDecimal(element);
             if (members.stream().anyMatch(seen -> seen.compareTo(member) == 0)) {
-                throw new TsonSchemaValidationException(
+                throw new SchemaValidationException(
                         "'members' requires unique elements, '" + member + "' appears more than once");
             }
             members.add(member);
@@ -158,8 +158,8 @@ public record DecimalType(
             case BigDecimal decimal -> decimal;
             case BigInteger integer -> new BigDecimal(integer);
             case Number number -> exact(number);
-            case null -> throw new TsonSchemaValidationException("'members' does not admit an absent member");
-            default -> throw new TsonSchemaValidationException("'members' admits only numbers -- '" + element
+            case null -> throw new SchemaValidationException("'members' does not admit an absent member");
+            default -> throw new SchemaValidationException("'members' admits only numbers -- '" + element
                     + "' is not one");
         };
     }
@@ -168,7 +168,7 @@ public record DecimalType(
         try {
             return new BigDecimal(number.toString());
         } catch (NumberFormatException e) {
-            throw new TsonSchemaValidationException("'members' admits only exact numbers -- '" + number
+            throw new SchemaValidationException("'members' admits only exact numbers -- '" + number
                     + "' is not one; !number, being exact, does not accept the special values (§5.6)");
         }
     }

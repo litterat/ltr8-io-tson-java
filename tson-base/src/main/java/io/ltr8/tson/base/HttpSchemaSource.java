@@ -1,7 +1,5 @@
-package io.ltr8.tson;
+package io.ltr8.tson.base;
 
-import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.compiler.TsonSchemaSource;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -19,8 +17,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A {@link TsonSchemaSource} that fetches a schema document over HTTP, under a host allow-list and hard caps
- * on size and time. {@link TsonFileSchemaSource} is its local sibling, and the two share {@link
+ * A {@link SchemaSource} that fetches a schema document over HTTP, under a host allow-list and hard caps
+ * on size and time. {@link FileSchemaSource} is its local sibling, and the two share {@link
  * SchemaReference} for what a reference is allowed to be.
  *
  * <h2>Identity is not location</h2>
@@ -71,7 +69,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * still needs external serialisation. {@link #preload} is the intended path: name the schemas at startup, on
  * one thread, and let request-time resolution find them already registered.
  */
-public final class TsonHttpSchemaSource implements TsonSchemaSource, AutoCloseable {
+public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
 
     /** A schema document larger than this is refused. Generous for a schema; small enough not to be a memory lever. */
     public static final int DEFAULT_MAX_DOCUMENT_BYTES = 1 << 20;
@@ -94,7 +92,7 @@ public final class TsonHttpSchemaSource implements TsonSchemaSource, AutoCloseab
     private final boolean ownsClient;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
 
-    private TsonHttpSchemaSource(Builder builder) {
+    private HttpSchemaSource(Builder builder) {
         this.hosts = Map.copyOf(builder.hosts);
         this.maxDocumentBytes = builder.maxDocumentBytes;
         this.timeout = builder.timeout;
@@ -133,7 +131,7 @@ public final class TsonHttpSchemaSource implements TsonSchemaSource, AutoCloseab
         //
         // (The loader is not re-entrant, so a recursive computeIfAbsent is not the hazard here: it fetches a
         // document, returns, and only then resolves and fetches its imports. Pinned by
-        // TsonHttpSchemaSourceTest.fetchIsNeverReenteredByATransitiveImport, because a loader that became
+        // HttpSchemaSourceTest.fetchIsNeverReenteredByATransitiveImport, because a loader that became
         // re-entrant would make computeIfAbsent unsafe as well as slow.)
         String cached = cache.get(target.canonical());
         if (cached != null) {
@@ -251,7 +249,7 @@ public final class TsonHttpSchemaSource implements TsonSchemaSource, AutoCloseab
         return new SchemaFetchException(reference, SchemaFetchException.Reason.TRANSPORT, message, cause);
     }
 
-    /** Builds a {@link TsonHttpSchemaSource}. Every default is the safe one; nothing is fetched until a host is allowed. */
+    /** Builds a {@link HttpSchemaSource}. Every default is the safe one; nothing is fetched until a host is allowed. */
     public static final class Builder {
 
         private final Map<String, URI> hosts = new LinkedHashMap<>();
@@ -353,8 +351,8 @@ public final class TsonHttpSchemaSource implements TsonSchemaSource, AutoCloseab
             return this;
         }
 
-        public TsonHttpSchemaSource build() {
-            return new TsonHttpSchemaSource(this);
+        public HttpSchemaSource build() {
+            return new HttpSchemaSource(this);
         }
     }
 }

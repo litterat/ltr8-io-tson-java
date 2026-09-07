@@ -3,6 +3,9 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.HttpSchemaSource;
+import io.ltr8.tson.base.FileSchemaSource;
 import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.compiler.*;
@@ -33,7 +36,7 @@ import java.util.Objects;
 public final class TsonConfig {
 
     private DataBindContext dataBindContext = TsonAtomContext.defaultContext();
-    private TsonSchemaSource schemaSource = TsonSchemaSource.registeredOnly();
+    private SchemaSource schemaSource = SchemaSource.registeredOnly();
     private DataNameBinder metaNameBinder;
     private UnicodePolicy identifierPolicy = UnicodePolicy.highlyRestrictive();
 
@@ -45,8 +48,8 @@ public final class TsonConfig {
     private String profile;
     private boolean dataBindContextSupplied;
     private boolean schemaSourceSupplied;
-    private TsonHttpSchemaSource.Builder httpSchemas;
-    private TsonFileSchemaSource.Builder fileSchemas;
+    private HttpSchemaSource.Builder httpSchemas;
+    private FileSchemaSource.Builder fileSchemas;
 
     TsonConfig() {
     }
@@ -56,14 +59,14 @@ public final class TsonConfig {
      * {@link Tson}'s loader to fetch a {@code !!schema}/{@code !!import}/{@code !!meta} target it
      * doesn't already have registered. The bundled meta-kernel/meta.tn/core.tn are always served
      * first, so this source only needs to know its own URIs; it is a fallback, never an override of
-     * the standard library. Defaults to {@link TsonSchemaSource#registeredOnly()} (nothing extra
+     * the standard library. Defaults to {@link SchemaSource#registeredOnly()} (nothing extra
      * fetchable).
      *
      * <p>{@link #httpSchemas} and {@link #fileSchemas} are the short forms of the two sources this library
      * ships, and are what most callers want; this is the general seam -- a source of your own, or the two
      * shipped ones composed, which is the one thing the short forms cannot express.
      */
-    public TsonConfig schemaSource(TsonSchemaSource schemaSource) {
+    public TsonConfig schemaSource(SchemaSource schemaSource) {
         if (httpSchemas != null || fileSchemas != null) {
             throw new IllegalStateException("supply either schemaSource or httpSchemas/fileSchemas, not both "
                     + "-- the short forms build a source, so passing one as well would silently discard it");
@@ -75,14 +78,14 @@ public final class TsonConfig {
 
     /**
      * Fetches schemas identified by any of {@code hosts} over {@code https} from that same host -- the short
-     * form of {@link TsonHttpSchemaSource}, which is where the policy is documented and which every default
+     * form of {@link HttpSchemaSource}, which is where the policy is documented and which every default
      * here comes from. Repeatable: each call adds hosts.
      *
      * <p><b>Deny by default is the property worth knowing.</b> A host not named here is not fetched, and a
      * host is matched exactly -- naming {@code example.com} permits nothing on a subdomain. In a server the
      * reference comes out of a request body, so this list is a security boundary rather than a convenience.
      *
-     * <p>Reach for {@link TsonHttpSchemaSource#builder()} and {@link #schemaSource} instead when you need a
+     * <p>Reach for {@link HttpSchemaSource#builder()} and {@link #schemaSource} instead when you need a
      * mirror or a non-default port ({@code mapHost}), different caps, a required {@code ?sha256=} pin, your
      * own {@link java.net.http.HttpClient} -- or the source itself, since a source built here is owned by the
      * {@link Tson} and there is no handle to {@code close()} it through.
@@ -90,7 +93,7 @@ public final class TsonConfig {
     public TsonConfig httpSchemas(String... hosts) {
         rejectMixedSchemaSources("httpSchemas");
         if (httpSchemas == null) {
-            httpSchemas = TsonHttpSchemaSource.builder();
+            httpSchemas = HttpSchemaSource.builder();
         }
         for (String host : hosts) {
             httpSchemas.allowHost(host);
@@ -100,7 +103,7 @@ public final class TsonConfig {
 
     /**
      * Serves schemas identified by {@code host} from {@code directory} -- the short form of
-     * {@link TsonFileSchemaSource}, which is where the policy is documented. Repeatable: each call maps
+     * {@link FileSchemaSource}, which is where the policy is documented. Repeatable: each call maps
      * another host.
      *
      * <p>Nothing outside {@code directory} is ever read, symlinks included, and no host but the ones named
@@ -108,13 +111,13 @@ public final class TsonConfig {
      * names a document independently of where it is stored, so {@code https://schemas.example.com/order-1.tn}
      * may perfectly well live in a directory.
      *
-     * <p>Reach for {@link TsonFileSchemaSource#builder()} and {@link #schemaSource} instead when you need
+     * <p>Reach for {@link FileSchemaSource#builder()} and {@link #schemaSource} instead when you need
      * different caps or a required {@code ?sha256=} pin.
      */
     public TsonConfig fileSchemas(String host, java.nio.file.Path directory) {
         rejectMixedSchemaSources("fileSchemas");
         if (fileSchemas == null) {
-            fileSchemas = TsonFileSchemaSource.builder();
+            fileSchemas = FileSchemaSource.builder();
         }
         fileSchemas.mapHost(host, directory);
         return this;
@@ -371,7 +374,7 @@ public final class TsonConfig {
                 : SchemaMetaNameBinder.contextExtendedWith(metaNameBinder);
         // The short forms are built here rather than at the call that named them, so that repeated calls
         // accumulate hosts into one source instead of each replacing the last.
-        TsonSchemaSource source = httpSchemas != null ? httpSchemas.build()
+        SchemaSource source = httpSchemas != null ? httpSchemas.build()
                 : fileSchemas != null ? fileSchemas.build() : schemaSource;
         TsonCompiledMetaRegistry core =
                 TsonCompiledMetaRegistry.withStandardLibrary(schemaContext, source, identifierPolicy);

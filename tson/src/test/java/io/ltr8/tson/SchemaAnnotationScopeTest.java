@@ -2,8 +2,8 @@ package io.ltr8.tson;
 
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.compiler.TsonSchemaSource;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import org.junit.jupiter.api.Test;
 
@@ -54,12 +54,12 @@ class SchemaAnnotationScopeTest {
         return Tson.builder().schemaSource(source()).build();
     }
 
-    private static TsonSchemaSource source() {
+    private static SchemaSource source() {
         return uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, LIB_ID)) {
+            if (CanonicalIdentity.sameIdentity(uri, LIB_ID)) {
                 return LIB;
             }
-            if (TsonCanonicalIdentity.sameIdentity(uri, META_HTTP_ID)) {
+            if (CanonicalIdentity.sameIdentity(uri, META_HTTP_ID)) {
                 return META_HTTP;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);

@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 
 import org.junit.jupiter.api.Test;
@@ -169,7 +169,7 @@ class BytesEncodingSelectorTest {
      */
     @Test
     void encodingCannotBeRefined() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.builder().build().resolve("""
                         !!id:"https://example.test/refine-encoding.tn"
                         !!meta:"https://tson.io/2026/35/m/meta.tn"

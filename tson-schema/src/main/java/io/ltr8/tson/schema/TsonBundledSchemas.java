@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema;
 
+import io.ltr8.tson.base.CanonicalIdentity;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -22,10 +23,10 @@ import java.util.Optional;
  * io.ltr8.tson.compiler.TsonCompiledMetaRegistry}, {@code MetaKernelBootstrapResolver},
  * {@code TsonSchemaLinker}'s own meta-kernel-governed check), since `tson-schema`
  * has no dependency on `tson-compiler` (only the reverse). {@link #fetch} deliberately doesn't
- * implement {@code io.ltr8.tson.compiler.TsonSchemaSource} -- that interface lives in
+ * implement {@code io.ltr8.tson.base.SchemaSource} -- that interface lives in
  * `tson-compiler`, a module this one has no dependency on -- but its shape (a single {@code
  * String fetch(String uri)} method) already matches that interface's own single abstract method
- * exactly, so a `tson-compiler`-side caller needing a real {@code TsonSchemaSource} instance passes
+ * exactly, so a `tson-compiler`-side caller needing a real {@code SchemaSource} instance passes
  * the method reference {@code TsonBundledSchemas::fetch} directly; no adapter class needed on either
  * side.
  */
@@ -65,9 +66,9 @@ public final class TsonBundledSchemas {
             CORE_ID, "/core.tn");
 
     private static final Map<String, String> DIGESTS = Map.of(
-            TsonCanonicalIdentity.canonicalize(META_KERNEL_ID), META_KERNEL_SHA256,
-            TsonCanonicalIdentity.canonicalize(META_ID), META_SHA256,
-            TsonCanonicalIdentity.canonicalize(CORE_ID), CORE_SHA256);
+            CanonicalIdentity.canonicalize(META_KERNEL_ID), META_KERNEL_SHA256,
+            CanonicalIdentity.canonicalize(META_ID), META_SHA256,
+            CanonicalIdentity.canonicalize(CORE_ID), CORE_SHA256);
 
     private TsonBundledSchemas() {
     }
@@ -78,7 +79,7 @@ public final class TsonBundledSchemas {
      * {@code ?sha256=}-pinned reference both find it.
      */
     public static Optional<String> declaredSha256(String uri) {
-        return Optional.ofNullable(DIGESTS.get(TsonCanonicalIdentity.canonicalize(uri)));
+        return Optional.ofNullable(DIGESTS.get(CanonicalIdentity.canonicalize(uri)));
     }
 
     /**

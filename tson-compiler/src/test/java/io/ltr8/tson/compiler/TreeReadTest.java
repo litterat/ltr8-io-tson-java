@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.tree.TsonValue;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
@@ -37,8 +38,8 @@ class TreeReadTest {
             """;
 
     private static TsonCompiledMetaRegistry core() {
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, SCHEMA_ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, SCHEMA_ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);

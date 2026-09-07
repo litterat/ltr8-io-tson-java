@@ -4,12 +4,12 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.MissingBindingException;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.consumer.Operation;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.consumer.Webhook;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.TypeKind;
 import io.ltr8.tson.schema.meta.TypeRef;
@@ -77,9 +77,9 @@ class MetaLayerConstructorThroughTsonTest {
 
     private static final Map<String, String> DOCUMENTS = Map.of(META_HTTP, META_HTTP_SCHEMA, API, API_SCHEMA);
 
-    private static final TsonSchemaSource SOURCE = uri -> {
+    private static final SchemaSource SOURCE = uri -> {
         for (Map.Entry<String, String> document : DOCUMENTS.entrySet()) {
-            if (TsonCanonicalIdentity.sameIdentity(uri, document.getKey())) {
+            if (CanonicalIdentity.sameIdentity(uri, document.getKey())) {
                 return document.getValue();
             }
         }

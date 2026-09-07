@@ -1,8 +1,10 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import org.junit.jupiter.api.Test;
 
@@ -75,15 +77,15 @@ class ReadPathConcurrencyTest {
 
     /**
      * The schema half: a data document's {@code !!schema} resolving for the first time. The loser used to
-     * get {@code TsonSchemaValidationException: a schema is already registered under '...'} out of
+     * get {@code SchemaValidationException: a schema is already registered under '...'} out of
      * {@code TsonSchemaRegistry.register}; it now takes the winner's entry, so every thread sees one
      * schema rather than the registry holding a second, equivalent one.
      */
     @Test
     void concurrentFirstResolutionOfOneSchemaYieldsOneSchema() throws Exception {
         for (int attempt = 0; attempt < ATTEMPTS; attempt++) {
-            TsonSchemaSource source = uri -> {
-                if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+            SchemaSource source = uri -> {
+                if (CanonicalIdentity.sameIdentity(uri, ID)) {
                     return SCHEMA;
                 }
                 throw new IllegalStateException("unexpected fetch: " + uri);

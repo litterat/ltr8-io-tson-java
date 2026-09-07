@@ -1,5 +1,8 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.HttpSchemaSource;
+import io.ltr8.tson.base.FileSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
@@ -8,7 +11,7 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 
 import java.io.ByteArrayInputStream;
@@ -62,10 +65,10 @@ import java.util.Optional;
  * operation => ~data & { ... }}), and {@link TsonConfig#metaNameBinder} adds the classes those bind to --
  * composed over the library's binder, so the mode and every kernel name stand.
  *
- * <p>Out of the box this serves only meta-kernel/meta.tn/core.tn: {@link TsonSchemaSource#registeredOnly()}
+ * <p>Out of the box this serves only meta-kernel/meta.tn/core.tn: {@link SchemaSource#registeredOnly()}
  * is the default source, so a schema governed by or importing anything else has to be registered first, or
- * reachable through a source configured on {@link TsonConfig} -- {@link TsonHttpSchemaSource} and {@link
- * TsonFileSchemaSource} ship, and both deny by default.
+ * reachable through a source configured on {@link TsonConfig} -- {@link HttpSchemaSource} and {@link
+ * FileSchemaSource} ship, and both deny by default.
  *
  * <p>{@link TsonObjectReader}/{@link TsonObjectWriter} live in {@code tson-compiler}'s own root
  * package, alongside the other read-side front doors -- {@code DefinitionResolver}, part of that
@@ -300,7 +303,7 @@ public final class Tson {
             // so it reports the wiring mistake rather than letting a bare runtime exception past a caller who
             // asked for a list of problems, which would read as a fault in this library.
             problems.report(TsonDiagnostics.ofSchemaBindMismatch("", "", e, Optional.empty()));
-        } catch (TsonSchemaValidationException e) {
+        } catch (SchemaValidationException e) {
             // Whatever the phases still raise rather than report: a document with no !!id, an !!import that
             // loaded and would not link, a !!meta that may not govern. Author errors about the document as
             // a whole, so they carry the root pointer rather than naming a declaration.

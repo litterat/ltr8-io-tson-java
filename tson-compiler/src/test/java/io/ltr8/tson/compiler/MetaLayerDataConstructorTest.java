@@ -1,14 +1,15 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.consumer.Operation;
 import io.ltr8.tson.compiler.consumer.Webhook;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
@@ -108,9 +109,9 @@ class MetaLayerDataConstructorTest {
     }
 
     private static TsonCompiledMetaRegistry core(DataBindContext context) {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             for (Map.Entry<String, String> document : DOCUMENTS.entrySet()) {
-                if (TsonCanonicalIdentity.sameIdentity(uri, document.getKey())) {
+                if (CanonicalIdentity.sameIdentity(uri, document.getKey())) {
                     return document.getValue();
                 }
             }
@@ -162,7 +163,7 @@ class MetaLayerDataConstructorTest {
      */
     @Test
     void aComponentOfATypeIsNotApplicable() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("component", "  bad => !record_field { name: x  type: text }"));
 
         assertTrue(thrown.getMessage().contains("not IS-A 'top'"), thrown.getMessage());
@@ -243,7 +244,7 @@ class MetaLayerDataConstructorTest {
 
     @Test
     void anUnknownFieldInThePayloadIsASchemaError() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("badfield", SEARCH.replace("path:", "pathh:")));
 
         assertTrue(thrown.getMessage().contains("unknown field 'pathh' on 'operation'"), thrown.getMessage());
@@ -251,7 +252,7 @@ class MetaLayerDataConstructorTest {
 
     @Test
     void aMissingRequiredFieldInThePayloadIsASchemaError() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("missing", SEARCH.replace("path: \"/search\"  ", "")));
 
         assertTrue(thrown.getMessage().contains("missing required field 'path'"), thrown.getMessage());
@@ -259,7 +260,7 @@ class MetaLayerDataConstructorTest {
 
     @Test
     void aWrongTypedValueInThePayloadIsASchemaError() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("badtype", SEARCH.replace("method: \"GET\"", "method: [1 2 3]")));
 
         assertTrue(thrown.getMessage().contains("expected a token for 'text'"), thrown.getMessage());
@@ -315,7 +316,7 @@ class MetaLayerDataConstructorTest {
     @Test
     void aTemplatedConstructorMintsAnIdentifierAndIsNotJudgedByNameHygiene() {
         for (String path : new String[] {"/x", "путь"}) {
-            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                     () -> linked("minted" + path.hashCode(), """
                             fetch    => <T> !operation {
                                 path: "%s"  method: "GET"  request: T  response: T
@@ -344,7 +345,7 @@ class MetaLayerDataConstructorTest {
     /** {@link Data#references()} reaches the linker, so a name that resolves to nothing is an author error. */
     @Test
     void aDanglingReferenceInsideAnOperationIsASchemaError() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> linked("dangling", SEARCH.replace("request: search_request", "request: no_such_type")));
 
         assertTrue(thrown.getMessage().contains("unresolved reference 'no_such_type'"), thrown.getMessage());
@@ -368,7 +369,7 @@ class MetaLayerDataConstructorTest {
                 new Position("mapvalue", "byName => {text => search}", "'byName' value_type"));
 
         for (Position position : positions) {
-            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                     () -> linked(position.label(), SEARCH + "\n  " + position.declaration()),
                     () -> "expected " + position.label() + " to be refused");
 
@@ -417,7 +418,7 @@ class MetaLayerDataConstructorTest {
                 new Reference("appliedWithWrongArity", "x => pair<text>", "pair"));
 
         for (Reference reference : references) {
-            TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                     () -> linked("scope" + reference.label(), SEARCH + "\n  " + reference.declaration()),
                     () -> "expected " + reference.label() + " to be refused");
 

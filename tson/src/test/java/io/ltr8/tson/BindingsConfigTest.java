@@ -3,7 +3,7 @@ package io.ltr8.tson;
 import io.ltr8.annotation.Profile;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.MissingBindingException;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 
 import java.util.Map;
@@ -49,7 +49,7 @@ class BindingsConfigTest {
         }
     }
 
-    private static final TsonSchemaSource SOURCE = uri -> SCHEMA;
+    private static final SchemaSource SOURCE = uri -> SCHEMA;
 
     /** The same schema without the field the profiled constructor omits. */
     private static final String SHORT_SCHEMA = """

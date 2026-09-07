@@ -55,7 +55,10 @@ public final class DataClassObjectReader {
 
     private final DataBindContext context;
 
-    /** Whether a member the target class does not declare is discarded rather than refused -- see {@code JsonObjectReader.ignoringUnknownMembers}. */
+    /**
+     * Whether a member the target class does not declare is discarded rather than refused -- see
+     * {@code JsonObjectReader.ignoringUnknownMembers} .
+     */
     private final boolean ignoreUnknownMembers;
 
     public DataClassObjectReader(DataBindContext context, boolean ignoreUnknownMembers) {

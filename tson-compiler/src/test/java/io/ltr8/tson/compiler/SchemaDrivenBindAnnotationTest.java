@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.annotation.Annotated;
 import io.ltr8.annotation.AnnotatedMap;
@@ -9,7 +10,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -74,8 +75,8 @@ class SchemaDrivenBindAnnotationTest {
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -174,8 +175,8 @@ class SchemaDrivenBindAnnotationTest {
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -221,8 +222,8 @@ class SchemaDrivenBindAnnotationTest {
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);

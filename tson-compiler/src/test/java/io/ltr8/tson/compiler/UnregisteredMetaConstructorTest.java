@@ -1,7 +1,8 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -47,9 +48,9 @@ class UnregisteredMetaConstructorTest {
     }
 
     private static TsonCompiledMetaRegistry core() {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             for (Map.Entry<String, String> document : DOCUMENTS.entrySet()) {
-                if (TsonCanonicalIdentity.sameIdentity(uri, document.getKey())) {
+                if (CanonicalIdentity.sameIdentity(uri, document.getKey())) {
                     return document.getValue();
                 }
             }

@@ -7,7 +7,7 @@ import io.ltr8.tson.compiler.TsonDiagnostics;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 import io.ltr8.tson.tree.TsonValue;
@@ -39,7 +39,7 @@ class TsonReadTest {
             """;
 
     private static Tson tsonWithPoint() {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;
             if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;
@@ -160,7 +160,7 @@ class TsonReadTest {
 
     /** A {@link Tson} whose one source refuses everything for {@code reason}. */
     private static Tson failing(SchemaFetchException.Reason reason) {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;
             if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;
@@ -184,7 +184,7 @@ class TsonReadTest {
     }
 
     private static Tson tsonWithPointBinding() {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;
             if (base.equals(POINT_ID)) {
                 return POINT_SCHEMA;

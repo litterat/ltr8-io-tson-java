@@ -12,7 +12,8 @@ package io.ltr8.tson.base;
  * {@code TsonDiagnostics.ofBaseSyntaxError}) rather than reporting a configured bound as a syntax
  * failure.
  *
- * <p><b>{@link #getMessage()} states what went wrong, never where</b> -- the same division {@code ParseException} makes, for the same reason: the location is {@link #position()}, and a message
+ * <p><b>{@link #getMessage()} states what went wrong, never where</b> -- the same division {@code ParseException} makes, for
+ * the same reason: the location is {@link #position()} , and a message
  * repeating it makes every renderer print it twice.
  */
 public final class LimitExceededException extends RuntimeException {

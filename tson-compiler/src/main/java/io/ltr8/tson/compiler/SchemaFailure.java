@@ -1,10 +1,11 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.ContentHashMismatchException;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 
 
 /**
@@ -24,7 +25,7 @@ import io.ltr8.tson.schema.TsonSchemaValidationException;
  * <p><b>Every branch is a positive verdict, and the default rethrows.</b> {@link
  * Diagnostic#ofBaseSyntaxError} classifies the same way and ends {@code default -> throw e}, on the rule
  * that a fault in this library propagates as itself; this holds to it. What makes that possible is {@link
- * TsonSchemaSource#fetch} naming the exception a source must throw for "cannot supply this" ({@link
+ * SchemaSource#fetch} naming the exception a source must throw for "cannot supply this" ({@link
  * SchemaFetchException}) -- without it, an unfetchable schema and a broken invariant are
  * indistinguishable by type here, and either every fault reads as a bad schema or every source that spells
  * a miss with an {@code IllegalStateException} crashes the read.
@@ -64,11 +65,11 @@ record SchemaFailure(Diagnostic.Code code, String expected) {
                     new SchemaFailure(Diagnostic.Code.BIND_MISMATCH, "a schema whose types the bound classes match");
             case UnsupportedOperationException ignored ->
                     new SchemaFailure(Diagnostic.Code.NOT_IMPLEMENTED, "a schema this library can compile");
-            // The contract exception of TsonSchemaSource.fetch, so this branch is every source's miss and
+            // The contract exception of SchemaSource.fetch, so this branch is every source's miss and
             // no source's bug: the reference named something this deployment could not obtain.
             case SchemaFetchException fetch ->
                     new SchemaFailure(Diagnostic.Code.of(fetch.reason()), UNAVAILABLE_EXPECTED);
-            case TsonSchemaValidationException ignored ->
+            case SchemaValidationException ignored ->
                     new SchemaFailure(Diagnostic.Code.SCHEMA_ERROR, "a resolvable schema");
             // [TSON-DATA] §2.2.1's integrity failure: the bytes a source returned are not the bytes the
             // reference pinned. A verdict on the reference, so it is coded like one -- and never a fault,

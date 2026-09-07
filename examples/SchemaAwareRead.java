@@ -30,7 +30,7 @@ void main() {
             }""";
 
     Tson tson = Tson.builder()
-            .schemaSource(TsonSchemaSource.ofMap(Map.of("https://example.com/2026/35/app/server-1.tn", schema)))
+            .schemaSource(SchemaSource.ofMap(Map.of("https://example.com/2026/35/app/server-1.tn", schema)))
             .build();
 
     // Self-describing: the document names its own schema and root type. No other arguments needed --

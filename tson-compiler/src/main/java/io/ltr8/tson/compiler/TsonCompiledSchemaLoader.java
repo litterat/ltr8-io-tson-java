@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 
@@ -24,7 +26,7 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
  * hand-written bootstrap, instead of trying (and failing) to resolve it the ordinary way.
  *
  * <p>Also the natural, single place to enforce policy over <i>what</i> gets resolved from <i>where</i>
- * (whitelisting/blacklisting hosts, disk-only resolution) -- see {@link TsonSchemaSource}, the pluggable
+ * (whitelisting/blacklisting hosts, disk-only resolution) -- see {@link SchemaSource}, the pluggable
  * hook the implementation ({@code TsonCompiledMetaRegistry}) defers to for exactly this, once a request
  * isn't already cached and isn't the meta-kernel bootstrap case.
  */
@@ -45,7 +47,7 @@ public interface TsonCompiledSchemaLoader {
      * Resolves {@code uri} to its compiled governing meta-schema -- for a document's own {@code !!meta}
      * target, which must be a meta-layer schema (its own {@code !!meta} is meta-kernel).
      *
-     * @throws io.ltr8.tson.schema.TsonSchemaValidationException if {@code uri} resolves but isn't a
+     * @throws io.ltr8.tson.base.SchemaValidationException if {@code uri} resolves but isn't a
      *                               meta-layer schema, so cannot govern another -- an authoring error, like
      *                               every other verdict on a schema's own soundness (in addition to whatever
      *                               {@link #resolveLinked} may throw)

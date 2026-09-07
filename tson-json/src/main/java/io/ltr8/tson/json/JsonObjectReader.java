@@ -38,7 +38,8 @@ import java.nio.charset.StandardCharsets;
  * of §5-§8 will arrive: a second engine under this same door rather than a second door.
  *
  * <p><b>Streams the events, never a tree.</b> Memory held is proportional to nesting depth rather than
- * to document size, and {@link io.ltr8.tson.json.stream.JsonStream}'s §10.1 bound refuses a document before this descends into
+ * to document size, and {@link io.ltr8.tson.json.stream.JsonStream} 's §10.1 bound refuses a document before this descends
+ * into
  * it.
  *
  * <p><b>Every problem goes through a {@link DiagnosticsReceiver}</b>, so this read's own receiver decides
@@ -91,7 +92,10 @@ public final class JsonObjectReader {
 
     private final DataBindContext context;
 
-    /** Whether a member the target class does not declare is discarded rather than refused -- see {@link #ignoringUnknownMembers}. */
+    /**
+     * Whether a member the target class does not declare is discarded rather than refused -- see
+     * {@link #ignoringUnknownMembers} .
+     */
     private final boolean ignoreUnknownMembers;
 
     /** What actually binds a value. Rebuilt per derived reader, since a derivation is a change to how it binds. */

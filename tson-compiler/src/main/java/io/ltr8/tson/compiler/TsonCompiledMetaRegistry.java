@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
@@ -8,11 +9,11 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.compiler.resolver.SchemaResolver;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -36,7 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * (compiled), {@link #resolveLinked} for an import or user schema (resolved only). Both, in order: a cache
  * hit; meta-kernel's own well-known identity, answered by its hand-written bootstrap and never cached (its
  * self-naming {@code !!meta} would recurse forever through the generic path, §1.5); otherwise fetch via the
- * configured {@link TsonSchemaSource}, parse, resolve via a fresh {@code SchemaResolver} bound to this same
+ * configured {@link SchemaSource}, parse, resolve via a fresh {@code SchemaResolver} bound to this same
  * loader (so the document's own {@code !!meta}/{@code !!import} resolve recursively, all the way down).
  * Content hashes are recorded and verified per identity along the way ([TSON-DATA] §2.2.1, [TSON-SCHEMA]
  * §10.2).
@@ -47,7 +48,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * registry empty, for a caller that populates it itself. Any schema governed by (or importing) the
  * bundled three then reuses what's already in {@link #get} rather than recompiling its chain.
  *
- * <p><b>Keyed by canonical identity</b> ({@link TsonCanonicalIdentity#canonicalize}, scheme and query
+ * <p><b>Keyed by canonical identity</b> ({@link CanonicalIdentity#canonicalize}, scheme and query
  * stripped), matching the paired {@link TsonSchemaRegistry}. So two differently-spelled-but-equivalent
  * URIs for one schema -- in particular a hash-pinned {@code ?sha256=} reference and a plain one -- find
  * the same entry, which is what lets a pinned reference resolve against an already-registered schema
@@ -69,11 +70,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader {
 
     private static final String META_KERNEL_IDENTITY =
-            TsonCanonicalIdentity.canonicalize(TsonBundledSchemas.META_KERNEL_ID);
+            CanonicalIdentity.canonicalize(TsonBundledSchemas.META_KERNEL_ID);
 
     private final TsonSchemaRegistry schemaRegistry;
     private final ValueReaderFactoryResolver resolver;
-    private final TsonSchemaSource source;
+    private final SchemaSource source;
     private final Map<String, TsonCompiledMetaSchema> compiled = new LinkedHashMap<>();
     // Content hash per canonical identity, recorded when an identity is first resolved. Every
     // hash-pinned reference to an identity is verified against it -- so conflicting pins for one
@@ -128,11 +129,11 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
 
     /** As above but sharing an existing {@link TsonSchemaRegistry}, still with no fetch capability. */
     public TsonCompiledMetaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context) {
-        this(schemaRegistry, context, TsonSchemaSource.registeredOnly());
+        this(schemaRegistry, context, SchemaSource.registeredOnly());
     }
 
     /** A fresh, empty {@link TsonSchemaRegistry} of its own, with a fetch {@code source}. */
-    public TsonCompiledMetaRegistry(DataBindContext context, TsonSchemaSource source) {
+    public TsonCompiledMetaRegistry(DataBindContext context, SchemaSource source) {
         this(new TsonSchemaRegistry(), context, source);
     }
 
@@ -142,11 +143,11 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      *     meta-schema declares), so it is taken as a {@link DataBindContext} and the bind-mode {@code
      *     ValueReaderFactoryResolver} is built from it here rather than accepted directly and possibly wrong.
      * @param source where {@link #loadMeta}/{@link #resolveLinked} fetch a not-yet-registered schema's
-     *     source text from -- {@link TsonSchemaSource#registeredOnly()} by default, so nothing is fetched
+     *     source text from -- {@link SchemaSource#registeredOnly()} by default, so nothing is fetched
      *     unless a caller opts in.
      */
     public TsonCompiledMetaRegistry(TsonSchemaRegistry schemaRegistry, DataBindContext context,
-                                      TsonSchemaSource source) {
+                                      SchemaSource source) {
         this.schemaRegistry = schemaRegistry;
         this.resolver = ValueReaderFactoryRegistry.bind(context);
         this.source = source;
@@ -182,12 +183,12 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * way to get a working registry; the plain constructors leave it empty (for a caller that populates
      * it itself, e.g. a test bootstrapping in isolation).
      */
-    public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source) {
+    public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source) {
         return withStandardLibrary(context, source, UnicodePolicy.highlyRestrictive());
     }
 
     /** The same, with {@link #identifierPolicy} chosen rather than defaulted. */
-    public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, TsonSchemaSource source,
+    public static TsonCompiledMetaRegistry withStandardLibrary(DataBindContext context, SchemaSource source,
                                                                UnicodePolicy identifierPolicy) {
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(context, source);
         registry.identifierPolicy = identifierPolicy;
@@ -224,7 +225,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      */
     private void registerBundled(String id) {
         String sourceText = TsonBundledSchemas.fetch(id);
-        recordAndVerify(sourceText, id, TsonCanonicalIdentity.canonicalize(id));
+        recordAndVerify(sourceText, id, CanonicalIdentity.canonicalize(id));
         TsonSchemaParser parser = new TsonSchemaParser(sourceText);
         SchemaDocument document = parser.parseSchemaDocument();
         TsonSchema resolved = new SchemaResolver(this).resolveSchema(document, parser.schemaPositions());
@@ -245,7 +246,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      */
     @Override
     public TsonCompiledMetaSchema loadMeta(String uri) {
-        String identity = TsonCanonicalIdentity.canonicalize(uri);
+        String identity = CanonicalIdentity.canonicalize(uri);
         Optional<TsonCompiledMetaSchema> cached = get(uri);
         if (cached.isPresent()) {
             // Already compiled: verify *this* reference's own pin against the identity's content hash. A
@@ -314,7 +315,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * behaviour of the other overload, which never returns {@code null}.
      */
     public TsonLinkedSchema resolveLinked(String uri, DiagnosticsReceiver receiver) {
-        return resolveLinked(uri, TsonCanonicalIdentity.canonicalize(uri), receiver);
+        return resolveLinked(uri, CanonicalIdentity.canonicalize(uri), receiver);
     }
 
     /**
@@ -354,7 +355,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * {@code !!import} that will not load or an ineligible {@code !!meta} -- what fails is the namespace
      * itself, and carrying on would report every reference into the unresolvable half as a second problem.
      */
-    private static TsonSchemaValidationException importCycle(Set<String> chain, String identity) {
+    private static SchemaValidationException importCycle(Set<String> chain, String identity) {
         StringBuilder path = new StringBuilder();
         boolean fromCycleStart = false;
         for (String link : chain) {
@@ -363,7 +364,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
                 path.append(link).append(" -> ");
             }
         }
-        return new TsonSchemaValidationException("'" + identity + "' is part of an import cycle ("
+        return new SchemaValidationException("'" + identity + "' is part of an import cycle ("
                 + path + identity + ") -- a schema cannot depend, directly or transitively, on one that "
                 + "depends on it, since neither can be resolved before the other ([TSON-DATA] §2.2.3). "
                 + "Break the cycle by moving what both need into a third schema they each import");
@@ -373,7 +374,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * The source's text for {@code uri}, with the one thing the contract cannot express in a type checked
      * here: a {@code null} return.
      *
-     * <p><b>{@link TsonSchemaSource} permits exactly one way to say "cannot supply this"</b>, a {@link
+     * <p><b>{@link SchemaSource} permits exactly one way to say "cannot supply this"</b>, a {@link
      * SchemaFetchException}, and that is what lets {@code SchemaFailure} tell an unavailable schema from
      * a fault by type. A {@code null} says it a second way that carries no {@link
      * SchemaFetchException.Reason} at all, so the deployment refusing a reference and the host that did
@@ -387,16 +388,16 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * make the wrong spelling work and hide every later one.
      *
      * <p>The trap this catches is {@code schemaSource(schemas::get)}, so the message names {@link
-     * TsonSchemaSource#ofMap} -- the thing that call meant.
+     * SchemaSource#ofMap} -- the thing that call meant.
      */
     private String fetch(String uri) {
         String sourceText = source.fetch(uri);
         if (sourceText == null) {
-            throw new IllegalStateException("the TsonSchemaSource " + source.getClass().getName()
+            throw new IllegalStateException("the SchemaSource " + source.getClass().getName()
                     + " returned null for '" + uri + "'. A source signals \"cannot supply this\" by throwing "
                     + "SchemaFetchException and nothing else, so that an unavailable schema can be told "
                     + "from a fault by type and carries a Reason saying which; null is neither. If this "
-                    + "source is a map lookup, TsonSchemaSource.ofMap(Map) is that lookup done to contract");
+                    + "source is a map lookup, SchemaSource.ofMap(Map) is that lookup done to contract");
         }
         return sourceText;
     }
@@ -481,7 +482,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      */
     private synchronized TsonCompiledMetaSchema compileAndCache(TsonLinkedSchema registered,
                                                                 TsonCompiledMetaSchema governingMeta) {
-        String identity = TsonCanonicalIdentity.canonicalize(registered.schema().id());
+        String identity = CanonicalIdentity.canonicalize(registered.schema().id());
         TsonCompiledMetaSchema existing = compiled.get(identity);
         if (existing != null) {
             return existing;
@@ -494,12 +495,12 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
 
     /**
      * The compiled governing meta-schema registered under {@code id}, if any -- matched by canonical
-     * identity ({@link TsonCanonicalIdentity#canonicalize}), so any spelling (pinned or plain) of a
+     * identity ({@link CanonicalIdentity#canonicalize}), so any spelling (pinned or plain) of a
      * registered schema's own {@code !!id} finds it. Only meta-layer schemas are ever stored here, so a
      * non-meta schema is never handed back where a governing meta is required.
      */
     public synchronized Optional<TsonCompiledMetaSchema> get(String id) {
-        return Optional.ofNullable(compiled.get(TsonCanonicalIdentity.canonicalize(id)));
+        return Optional.ofNullable(compiled.get(CanonicalIdentity.canonicalize(id)));
     }
 
     /**
@@ -507,7 +508,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * meta). Only such a schema compiles to a {@link TsonCompiledMetaSchema} and may govern others.
      */
     private static boolean isMetaLayer(TsonSchema schema) {
-        return TsonCanonicalIdentity.sameIdentity(schema.meta(), TsonBundledSchemas.META_KERNEL_ID);
+        return CanonicalIdentity.sameIdentity(schema.meta(), TsonBundledSchemas.META_KERNEL_ID);
     }
 
     /**
@@ -517,7 +518,7 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
      * !!id} at all; a plain reference to an id-less development artifact is allowed here (registration
      * requires an id separately).
      *
-     * <p>Both failures are {@link TsonSchemaValidationException}s, not library faults: the reference and the
+     * <p>Both failures are {@link SchemaValidationException}s, not library faults: the reference and the
      * document it names disagree, which is an authoring or publishing error whose verdict does not change
      * when this library improves. Same reasoning as {@link TsonSchemaLinker#notAMetaSchema} above, and what
      * lets {@code Tson.validateSchema} report them rather than rethrow.
@@ -525,15 +526,15 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private void crossCheckId(SchemaDocument document, String referenceUri, String identity) {
         if (document.id().isEmpty()) {
             if (TsonContentHash.declaredSha256(referenceUri).isPresent()) {
-                throw new TsonSchemaValidationException("the hash-pinned reference \"" + referenceUri
+                throw new SchemaValidationException("the hash-pinned reference \"" + referenceUri
                         + "\" resolved to a document with no !!id -- a hashed reference's target must carry one "
                         + "([TSON-DATA] §2.2.1)");
             }
             return;
         }
-        String embedded = TsonCanonicalIdentity.canonicalize(document.id().get());
+        String embedded = CanonicalIdentity.canonicalize(document.id().get());
         if (!embedded.equals(identity)) {
-            throw new TsonSchemaValidationException("identity mismatch: reference \"" + referenceUri
+            throw new SchemaValidationException("identity mismatch: reference \"" + referenceUri
                     + "\" (identity \""
                     + identity + "\") resolved to a document whose own !!id is \"" + document.id().get()
                     + "\" (identity \"" + embedded + "\") -- refusing content obtained under the wrong identity "

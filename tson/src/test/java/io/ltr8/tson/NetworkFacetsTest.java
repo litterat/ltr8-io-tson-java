@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 
 import org.junit.jupiter.api.Test;
 
@@ -116,7 +116,7 @@ class NetworkFacetsTest {
      */
     @Test
     void aMalformedNetworkInTheListIsRefusedAtSchemaLoad() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.builder().build().resolve("""
                         !!id:"https://example.test/bad-network.tn"
                         !!meta:"https://tson.io/2026/35/m/meta.tn"
@@ -135,7 +135,7 @@ class NetworkFacetsTest {
      */
     @Test
     void aWithinAndExcludingPairThatAdmitsNothingIsRefusedAtSchemaLoad() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.builder().build().resolve("""
                         !!id:"https://example.test/empty-network-pair.tn"
                         !!meta:"https://tson.io/2026/35/m/meta.tn"
@@ -153,7 +153,7 @@ class NetworkFacetsTest {
      */
     @Test
     void aNetworkFamilyPairEmptiedByItsPrefixBoundIsRefusedAtSchemaLoad() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.builder().build().resolve("""
                         !!id:"https://example.test/empty-network-bound.tn"
                         !!meta:"https://tson.io/2026/35/m/meta.tn"

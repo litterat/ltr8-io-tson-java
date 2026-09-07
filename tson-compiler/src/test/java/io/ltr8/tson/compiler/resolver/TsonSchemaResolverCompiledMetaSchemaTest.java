@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
@@ -11,10 +12,10 @@ import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.schema.TsonBundledSchemas;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.Unit;
 import org.junit.jupiter.api.Test;
@@ -116,8 +117,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
         // core's own !!meta now names meta.tn with a ?sha256= pin -- compare by identity.
-        assertEquals(TsonCanonicalIdentity.canonicalize(TsonBundledSchemas.META_ID),
-                TsonCanonicalIdentity.canonicalize(coreDocument.meta()));
+        assertEquals(CanonicalIdentity.canonicalize(TsonBundledSchemas.META_ID),
+                CanonicalIdentity.canonicalize(coreDocument.meta()));
 
         TsonCompiledMetaSchema compiledMeta = loader.loadMeta(coreDocument.meta());
 
@@ -147,8 +148,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
                 new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.META_ID)).parseSchemaDocument();
 
         // meta's own !!meta now names meta-kernel with a ?sha256= pin -- compare by identity.
-        assertEquals(TsonCanonicalIdentity.canonicalize(TsonBundledSchemas.META_KERNEL_ID),
-                TsonCanonicalIdentity.canonicalize(metaDocument.meta()));
+        assertEquals(CanonicalIdentity.canonicalize(TsonBundledSchemas.META_KERNEL_ID),
+                CanonicalIdentity.canonicalize(metaDocument.meta()));
 
         TsonCompiledMetaSchema compiledMetaKernel = loader.loadMeta(metaDocument.meta());
 
@@ -183,8 +184,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = registry;
         SchemaDocument coreDocument = new TsonSchemaParser(TsonBundledSchemas.fetch(TsonBundledSchemas.CORE_ID)).parseSchemaDocument();
 
-        // meta.tn isn't meta-kernel's own well-known bootstrap case, and the default TsonSchemaSource
-        // fetches nothing -- so this is exactly TsonSchemaSource.registeredOnly()'s own rejection.
+        // meta.tn isn't meta-kernel's own well-known bootstrap case, and the default SchemaSource
+        // fetches nothing -- so this is exactly SchemaSource.registeredOnly()'s own rejection.
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
                 () -> loader.loadMeta(coreDocument.meta()));
         assertEquals(SchemaFetchException.Reason.NOT_PERMITTED, thrown.reason());
@@ -223,7 +224,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT).parseSchemaDocument();
 
         // The default source fetches nothing, so what fails is obtaining !!meta, not resolving it -- and
-        // TsonSchemaSource.fetch names the type that says so.
+        // SchemaSource.fetch names the type that says so.
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
                 () -> resolver.resolveSchema(miniDocument));
         assertTrue(thrown.getMessage().contains("meta.tn"));
@@ -261,8 +262,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaDocument malformedIdDocument = new TsonSchemaParser(MINI_DOCUMENT_MALFORMED_ID).parseSchemaDocument();
 
         // "mini.tn" alone is a syntactically valid relative-reference URI, but has no scheme --
-        // TsonCanonicalIdentity.canonicalize's own rejection, surfaced here via TsonCanonicalIdentity.validate.
-        assertThrows(TsonSchemaValidationException.class, () -> resolver.resolveSchema(malformedIdDocument));
+        // CanonicalIdentity.canonicalize's own rejection, surfaced here via CanonicalIdentity.validate.
+        assertThrows(SchemaValidationException.class, () -> resolver.resolveSchema(malformedIdDocument));
     }
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
@@ -281,7 +282,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
         assertEquals(1, malformedImportDocument.imports().size());
         // "meta-kernel.tn" alone is a syntactically valid relative-reference URI, but has no scheme.
-        assertThrows(TsonSchemaValidationException.class, () -> resolver.resolveSchema(malformedImportDocument));
+        assertThrows(SchemaValidationException.class, () -> resolver.resolveSchema(malformedImportDocument));
     }
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
@@ -334,8 +335,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
         SchemaDocument miniDocument = new TsonSchemaParser(MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL).parseSchemaDocument();
 
-        TsonSchemaValidationException thrown = assertThrows(
-                TsonSchemaValidationException.class, () -> resolver.resolveSchema(miniDocument));
+        SchemaValidationException thrown = assertThrows(
+                SchemaValidationException.class, () -> resolver.resolveSchema(miniDocument));
         assertTrue(thrown.getMessage().contains("void"));
         assertTrue(thrown.getMessage().contains("!!import"));
     }

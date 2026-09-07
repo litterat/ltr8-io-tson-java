@@ -7,7 +7,7 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.DiagnosticsCollector;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
 
@@ -70,7 +70,7 @@ class BindStrictnessTest {
     }
 
     private static Tson tson(String schema, Class<?> bound, boolean lenient) {
-        TsonSchemaSource source = uri -> schema;
+        SchemaSource source = uri -> schema;
         DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
         TsonConfig config = Tson.builder().schemaSource(source).dataBindContext(
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build()));

@@ -78,7 +78,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
                           Optional<SourcePosition> dataPosition, Optional<SourcePosition> schemaPosition) {
 
     /**
-     * A document this processor's {@link LimitsPolicy} declined to read ([TSON-DATA] §9.1) -- {@code TsonDiagnostics.ofBaseSyntaxError}'s sibling, and deliberately not a case inside it.
+     * A document this processor's {@link LimitsPolicy} declined to read ([TSON-DATA] §9.1) --
+     * {@code TsonDiagnostics.ofBaseSyntaxError} 's sibling, and deliberately not a case inside it.
      *
      * <p><b>The one factory that lives on this record, because it is the one that classifies nothing.</b>
      * Its nine siblings each switch on an exception type an encoding declares, so they belong to that
@@ -208,7 +209,8 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * A script <em>combination</em> is the usual finding, and at {@code UnicodePolicy.Level.ASCII_ONLY}
      * a single-script name is refused with nothing mixed at all -- so the code names what the policy would
      * not admit rather than what the text did, and pairs with {@code RESTRICTED_CHARACTER} as the two halves
-     * of one identifier policy. It is also the one of the three a <em>value</em> can carry ({@code TsonDiagnostics.ofRestrictedToken}), a token having no identifier profile and no scope to be distinct within.
+     * of one identifier policy. It is also the one of the three a <em>value</em> can carry ({@code
+     * TsonDiagnostics.ofRestrictedToken}), a token having no identifier profile and no scope to be distinct within.
      *
      * <p><b>{@code NOT_IMPLEMENTED}, {@code BIND_MISMATCH} and the five {@code SCHEMA_*} fetch codes are
      * the members that are not a verdict on the document</b> ({@link Code#verdict}). Each says the thing it
@@ -223,7 +225,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      *       disagree ({@code BindMismatchException}, {@code MissingBindingException}): a wiring
      *       mistake, where the document may be perfectly valid and the message names one of that
      *       application's own classes.</li>
-     *   <li>the five {@code SCHEMA_*} codes -- everyone else. No configured {@code TsonSchemaSource} would
+     *   <li>the five {@code SCHEMA_*} codes -- everyone else. No configured {@code SchemaSource} would
      *       supply the schema the document names ({@code SchemaFetchException}). Nothing is wrong with
      *       the document, and nothing may be wrong with the schema either -- it was never obtained, so it
      *       was never read. Kept apart from {@code SCHEMA_ERROR} because that one is a verdict: the schema

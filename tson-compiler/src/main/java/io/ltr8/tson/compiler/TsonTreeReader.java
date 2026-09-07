@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.UnicodePolicy;
 
@@ -134,7 +135,7 @@ public final class TsonTreeReader {
      * This reader bound to the schema {@code schemaUri} names, for {@link #readAs} -- a new reader, leaving
      * this one unchanged, sharing its compiled-schema registry. The schema is resolved through the same
      * source and cache a self-describing document's own {@code !!schema} goes through, so it must already be
-     * registered (e.g. via {@code Tson#resolve}) or be servable by the configured {@code TsonSchemaSource}.
+     * registered (e.g. via {@code Tson#resolve}) or be servable by the configured {@code SchemaSource}.
      */
     public TsonTreeReader withSchema(String schemaUri) {
         if (tree == null) {

@@ -1,11 +1,12 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 
 import org.junit.jupiter.api.Test;
 
@@ -43,8 +44,8 @@ class FieldValueConformanceTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -54,8 +55,8 @@ class FieldValueConformanceTest {
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
-    private static TsonSchemaValidationException refused(String declarations) {
-        return assertThrows(TsonSchemaValidationException.class, () -> compile(declarations));
+    private static SchemaValidationException refused(String declarations) {
+        return assertThrows(SchemaValidationException.class, () -> compile(declarations));
     }
 
     /**
@@ -65,7 +66,7 @@ class FieldValueConformanceTest {
      */
     @Test
     void aDefaultThatIsNotAValueOfTheFieldsTypeIsRefused() {
-        TsonSchemaValidationException thrown = refused("rec => { first: int32 ~ \"nope\"  other: int32 }");
+        SchemaValidationException thrown = refused("rec => { first: int32 ~ \"nope\"  other: int32 }");
 
         assertTrue(thrown.getMessage().contains("field 'first'"), thrown.getMessage());
         assertTrue(thrown.getMessage().contains("declared 'int32'"), thrown.getMessage());
@@ -80,7 +81,7 @@ class FieldValueConformanceTest {
      */
     @Test
     void aDefaultIsCheckedThroughAReferenceChain() {
-        TsonSchemaValidationException thrown = refused("""
+        SchemaValidationException thrown = refused("""
                   small => !integer ^ { max: 100 }
                   hop   => small
                   alias => hop
@@ -103,7 +104,7 @@ class FieldValueConformanceTest {
     /** A fixed value is the same rule, and says "fixed value" rather than "default" so the author's own spelling is echoed. */
     @Test
     void aFixedValueThatIsNotAValueOfTheFieldsTypeIsRefused() {
-        TsonSchemaValidationException thrown = refused("rec => { first: int32 = \"nope\" }");
+        SchemaValidationException thrown = refused("rec => { first: int32 = \"nope\" }");
 
         assertTrue(thrown.getMessage().contains("fixed value"), thrown.getMessage());
     }
@@ -116,7 +117,7 @@ class FieldValueConformanceTest {
      */
     @Test
     void aDefaultOutsideTheTypesOwnConstraintsIsRefused() {
-        TsonSchemaValidationException thrown = refused("""
+        SchemaValidationException thrown = refused("""
                   small => !integer ^ { max: 100 }
                   rec   => { n: small ~ 500 }""");
 
@@ -131,7 +132,7 @@ class FieldValueConformanceTest {
      */
     @Test
     void aDefaultThatIsNotAMemberOfTheFieldsEnumIsRefused() {
-        TsonSchemaValidationException thrown = refused("""
+        SchemaValidationException thrown = refused("""
                   status => !enum [ PENDING SHIPPED ]
                   rec    => { s: status ~ CANCELLED }""");
 
@@ -189,7 +190,7 @@ class FieldValueConformanceTest {
     @Test
     void aContainerTypedFieldCannotCarryAValueAtAll() {
         for (String container : List.of("[text]", "{text => int32}", "[text, int32]")) {
-            TsonSchemaValidationException thrown = refused("""
+            SchemaValidationException thrown = refused("""
                       ns  => %s
                       rec => { xs: ns ~ oops }""".formatted(container));
 
@@ -213,14 +214,14 @@ class FieldValueConformanceTest {
      */
     @Test
     void aRecordOrChoiceTypedFieldIsRefusedEvenWhereAReadWouldAcceptTheToken() {
-        TsonSchemaValidationException positional = refused("""
+        SchemaValidationException positional = refused("""
                   point => { n: int32 }
                   rec   => { p: point ~ 3 }""");
         assertTrue(positional.getMessage().contains("which is a record"), positional.getMessage());
         assertTrue(positional.getMessage().contains("declare the field with a scalar type"),
                 positional.getMessage());
 
-        TsonSchemaValidationException variant = refused("""
+        SchemaValidationException variant = refused("""
                   ch  => ( int32 | text )
                   rec => { c: ch ~ oops }""");
         assertTrue(variant.getMessage().contains("which is a choice"), variant.getMessage());
@@ -234,7 +235,7 @@ class FieldValueConformanceTest {
      */
     @Test
     void voidIsNotAScalarAndCannotCarryAValue() {
-        TsonSchemaValidationException thrown = refused("rec => { v: void ~ anything }");
+        SchemaValidationException thrown = refused("rec => { v: void ~ anything }");
 
         assertTrue(thrown.getMessage().contains("the void type"), thrown.getMessage());
     }
@@ -256,8 +257,8 @@ class FieldValueConformanceTest {
                   b => { m: int32 = "also nope" }
                 }
                 """;
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);

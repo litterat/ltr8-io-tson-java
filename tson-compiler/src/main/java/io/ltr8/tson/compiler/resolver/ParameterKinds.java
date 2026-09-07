@@ -5,7 +5,7 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -91,7 +91,7 @@ final class ParameterKinds {
             Occurrences occurrences = new Occurrences(definition.parameters());
             try {
                 new Walk(occurrences, meta).body(HeldBody.of(held));
-            } catch (TsonSchemaValidationException e) {
+            } catch (SchemaValidationException e) {
                 if (declared.contains(name)) {
                     reporter.report(name, e);
                 }
@@ -119,7 +119,7 @@ final class ParameterKinds {
         Occurrences occurrences = new Occurrences(template.parameters());
         try {
             new Walk(occurrences, meta).body(HeldBody.of(held));
-        } catch (TsonSchemaValidationException e) {
+        } catch (SchemaValidationException e) {
             return Map.of();
         }
         return occurrences.conflict == null ? occurrences.kinds : Map.of();
@@ -128,7 +128,7 @@ final class ParameterKinds {
     /** Where a declaration whose parameters will not classify is reported, entry by entry. */
     @FunctionalInterface
     interface FailureReporter {
-        void report(String entryName, TsonSchemaValidationException error);
+        void report(String entryName, SchemaValidationException error);
     }
 
     // ── The fixed point ──────────────────────────────────────────────────────────────────────────
@@ -186,7 +186,7 @@ final class ParameterKinds {
         private final List<String> parameters;
         private final Map<String, Kind> kinds = new LinkedHashMap<>();
         private final List<Deferred> deferred = new ArrayList<>();
-        private TsonSchemaValidationException conflict;
+        private SchemaValidationException conflict;
 
         Occurrences(List<String> parameters) {
             this.parameters = parameters;
@@ -225,7 +225,7 @@ final class ParameterKinds {
                 return true;
             }
             if (previous != kind && conflict == null) {
-                conflict = new TsonSchemaValidationException("parameter '" + parameter + "' stands in both a "
+                conflict = new SchemaValidationException("parameter '" + parameter + "' stands in both a "
                         + "type position and a value position, so no argument can satisfy both -- §5.10 gives "
                         + "a parameter one kind, inferred from where it is used");
             }
@@ -291,7 +291,7 @@ final class ParameterKinds {
             } else if (type instanceof Atom) {
                 occurrences.observe(parameter, Kind.VALUE);
             } else {
-                throw new TsonSchemaValidationException("parameter '" + parameter + "' stands where '" + slot
+                throw new SchemaValidationException("parameter '" + parameter + "' stands where '" + slot
                         + "' is declared, which is neither a type reference nor a scalar -- §5.10 binds a "
                         + "value parameter to scalars only and a type parameter to references, so nothing "
                         + "could be applied here");

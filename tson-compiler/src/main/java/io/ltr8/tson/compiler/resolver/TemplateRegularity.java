@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeArgument;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -77,7 +77,7 @@ final class TemplateRegularity {
                 if (problem == null) {
                     continue;
                 }
-                TsonSchemaValidationException error = new TsonSchemaValidationException(problem);
+                SchemaValidationException error = new SchemaValidationException(problem);
                 if (reporter == null) {
                     throw error;
                 }
@@ -91,7 +91,7 @@ final class TemplateRegularity {
     /** Where an irregular recursive application is reported, per declaration. */
     @FunctionalInterface
     interface Reporter {
-        void reportIrregularRecursion(String declaration, TsonSchemaValidationException error);
+        void reportIrregularRecursion(String declaration, SchemaValidationException error);
     }
 
     /** One application written inside a template body: the head it applies and the arguments it applies to. */

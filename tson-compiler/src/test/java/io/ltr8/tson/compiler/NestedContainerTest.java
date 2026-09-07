@@ -1,8 +1,9 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.TupleBody;
@@ -59,8 +60,8 @@ class NestedContainerTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);

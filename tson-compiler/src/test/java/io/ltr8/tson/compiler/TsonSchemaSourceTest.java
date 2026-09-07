@@ -1,7 +1,8 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -12,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonSchemaSource}'s two shipped forms, and the trap {@link TsonSchemaSource#ofMap} exists to take
+ * {@link SchemaSource}'s two shipped forms, and the trap {@link SchemaSource#ofMap} exists to take
  * out of a caller's way.
  *
  * <p><b>A map is the natural first source and spells a miss the wrong way.</b> {@code schemaSource(map::get)}
@@ -21,14 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * wrong branch. The contract permits one way to say "cannot supply this", and {@code null} is not it; these
  * pin the correct form doing what that call meant.
  */
-class TsonSchemaSourceTest {
+class SchemaSourceTest {
 
     private static final String ID = "https://schemas.example.test/order-1.tn";
     private static final String SCHEMA = "!!id:\"" + ID + "\"\n{ order => { sku: text } }\n";
 
     @Test
     void ofMapServesWhatItWasGiven() {
-        assertEquals(SCHEMA, TsonSchemaSource.ofMap(Map.of(ID, SCHEMA)).fetch(ID));
+        assertEquals(SCHEMA, SchemaSource.ofMap(Map.of(ID, SCHEMA)).fetch(ID));
     }
 
     /**
@@ -39,7 +40,7 @@ class TsonSchemaSourceTest {
      */
     @Test
     void ofMapMatchesByIdentityRatherThanBySpelling() {
-        TsonSchemaSource source = TsonSchemaSource.ofMap(Map.of(ID, SCHEMA));
+        SchemaSource source = SchemaSource.ofMap(Map.of(ID, SCHEMA));
 
         assertEquals(SCHEMA, source.fetch(ID + "?sha256=" + "a".repeat(64)), "a pinned reference");
         assertEquals(SCHEMA, source.fetch("http://schemas.example.test/order-1.tn"), "the other scheme");
@@ -47,12 +48,12 @@ class TsonSchemaSourceTest {
 
     /**
      * A miss is {@code NOT_FOUND}, not {@code NOT_PERMITTED}: this source had somewhere to look and looked.
-     * {@link TsonSchemaSource#registeredOnly} is the other answer, for a loader with nowhere to look at all.
+     * {@link SchemaSource#registeredOnly} is the other answer, for a loader with nowhere to look at all.
      */
     @Test
     void ofMapReportsAMissAsNotFound() {
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
-                () -> TsonSchemaSource.ofMap(Map.of(ID, SCHEMA)).fetch("https://elsewhere.test/other-1.tn"));
+                () -> SchemaSource.ofMap(Map.of(ID, SCHEMA)).fetch("https://elsewhere.test/other-1.tn"));
 
         assertEquals(SchemaFetchException.Reason.NOT_FOUND, thrown.reason());
         assertEquals("https://elsewhere.test/other-1.tn", thrown.uri());
@@ -62,7 +63,7 @@ class TsonSchemaSourceTest {
     void registeredOnlyRefusesEverythingAsNotPermitted() {
         assertEquals(SchemaFetchException.Reason.NOT_PERMITTED,
                 assertThrows(SchemaFetchException.class,
-                        () -> TsonSchemaSource.registeredOnly().fetch(ID)).reason());
+                        () -> SchemaSource.registeredOnly().fetch(ID)).reason());
     }
 
     /**
@@ -72,7 +73,7 @@ class TsonSchemaSourceTest {
     @Test
     void ofMapRefusesAnIllegalIdentityWithoutBreakingTheContract() {
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
-                () -> TsonSchemaSource.ofMap(Map.of(ID, SCHEMA)).fetch("not-a-uri"));
+                () -> SchemaSource.ofMap(Map.of(ID, SCHEMA)).fetch("not-a-uri"));
 
         assertEquals(SchemaFetchException.Reason.NOT_PERMITTED, thrown.reason());
     }
@@ -80,8 +81,8 @@ class TsonSchemaSourceTest {
     /** A key that is not a legal identity fails where the map is built, not at the read that needed it. */
     @Test
     void ofMapRefusesAnIllegalKeyAtConstruction() {
-        assertThrows(TsonSchemaValidationException.class,
-                () -> TsonSchemaSource.ofMap(Map.of("schemas.example.test/no-scheme.tn", SCHEMA)));
+        assertThrows(SchemaValidationException.class,
+                () -> SchemaSource.ofMap(Map.of("schemas.example.test/no-scheme.tn", SCHEMA)));
     }
 
     /**
@@ -95,7 +96,7 @@ class TsonSchemaSourceTest {
         clashing.put("http://schemas.example.test/order-1.tn", SCHEMA + "\n");
 
         IllegalArgumentException thrown =
-                assertThrows(IllegalArgumentException.class, () -> TsonSchemaSource.ofMap(clashing));
+                assertThrows(IllegalArgumentException.class, () -> SchemaSource.ofMap(clashing));
         assertTrue(thrown.getMessage().contains("schemas.example.test/order-1.tn"), thrown::getMessage);
     }
 
@@ -106,7 +107,7 @@ class TsonSchemaSourceTest {
         repeated.put(ID, SCHEMA);
         repeated.put("http://schemas.example.test/order-1.tn", SCHEMA);
 
-        assertEquals(SCHEMA, TsonSchemaSource.ofMap(repeated).fetch(ID));
+        assertEquals(SCHEMA, SchemaSource.ofMap(repeated).fetch(ID));
     }
 
     /** Copied at construction, so a later mutation cannot change what a registry has already read from. */
@@ -114,7 +115,7 @@ class TsonSchemaSourceTest {
     void ofMapCopiesTheMap() {
         Map<String, String> mutable = new HashMap<>();
         mutable.put(ID, SCHEMA);
-        TsonSchemaSource source = TsonSchemaSource.ofMap(mutable);
+        SchemaSource source = SchemaSource.ofMap(mutable);
 
         mutable.clear();
 

@@ -150,7 +150,9 @@ public final class JsonLexer {
         };
     }
 
-    /** Every token of the document, as retainable snapshots -- a convenience for tests and small inputs, never the read path. */
+    /**
+     * Every token of the document, as retainable snapshots -- a convenience for tests and small inputs, never the read path.
+     */
     public List<JsonToken> tokenize() {
         List<JsonToken> tokens = new ArrayList<>();
         JsonTokenType type;
@@ -194,7 +196,9 @@ public final class JsonLexer {
         return byteOffset;
     }
 
-    /** The just-finished token's start, materialized -- for an error a caller raises against a token it has already taken. */
+    /**
+     * The just-finished token's start, materialized -- for an error a caller raises against a token it has already taken.
+     */
     public JsonPosition start() {
         return new JsonPosition(tokenStartLine, tokenStartColumn, tokenStartByteOffset);
     }
@@ -448,7 +452,10 @@ public final class JsonLexer {
         return finish(type, spelling);
     }
 
-    /** Records {@code text} as the just-lexed token's own; the end position needs no recording, being wherever the cursor now sits. */
+    /**
+     * Records {@code text} as the just-lexed token's own; the end position needs no recording, being wherever the cursor now
+     * sits.
+     */
     private JsonTokenType finish(JsonTokenType type, String text) {
         this.tokenText = text;
         return type;
@@ -626,7 +633,9 @@ public final class JsonLexer {
         return new ParseException(message, here());
     }
 
-    /** A code point named the way a reader would recognise it: as itself where it is printable, as U+XXXX where it is not. */
+    /**
+     * A code point named the way a reader would recognise it: as itself where it is printable, as U+XXXX where it is not.
+     */
     private static String describe(int codePoint) {
         return codePoint > 0x20 && codePoint != 0x7F
                 ? "'" + new String(Character.toChars(codePoint)) + "'"

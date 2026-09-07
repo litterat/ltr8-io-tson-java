@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -37,7 +37,7 @@ class SparseMemberSetTest {
             """;
 
     private static Tson tson() {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;
             if (base.equals(ID)) {
                 return SCHEMA;

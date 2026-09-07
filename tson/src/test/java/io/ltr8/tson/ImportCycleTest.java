@@ -1,8 +1,8 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.compiler.TsonSchemaSource;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaSource;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -45,9 +45,9 @@ class ImportCycleTest {
     }
 
     private Tson tson() {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             for (Map.Entry<String, String> document : documents.entrySet()) {
-                if (TsonCanonicalIdentity.sameIdentity(uri, document.getKey())) {
+                if (CanonicalIdentity.sameIdentity(uri, document.getKey())) {
                     return document.getValue();
                 }
             }
@@ -57,7 +57,7 @@ class ImportCycleTest {
     }
 
     private String rejected(String uri) {
-        return assertThrows(TsonSchemaValidationException.class, () -> tson().treeRegistry().get(uri))
+        return assertThrows(SchemaValidationException.class, () -> tson().treeRegistry().get(uri))
                 .getMessage();
     }
 

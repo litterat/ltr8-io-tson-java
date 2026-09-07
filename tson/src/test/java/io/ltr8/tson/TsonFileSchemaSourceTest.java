@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.FileSchemaSource;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.SchemaFetchException.Reason;
 import io.ltr8.tson.tree.TsonValue;
@@ -16,12 +17,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonFileSchemaSource} -- the local half of the pair, whose policy question is path traversal where
+ * {@link FileSchemaSource} -- the local half of the pair, whose policy question is path traversal where
  * its remote sibling's is SSRF. [TSON-DATA] §2.2.1 is what makes serving an {@code https://} identity from a
  * directory legitimate: identity names a document, location is separate, and a consumer "MAY fetch by
  * whichever scheme its policy allows".
  */
-class TsonFileSchemaSourceTest {
+class FileSchemaSourceTest {
 
     private static final String HOST = "schemas.example.test";
 
@@ -36,15 +37,15 @@ class TsonFileSchemaSourceTest {
                 """.formatted(HOST, path);
     }
 
-    private static TsonFileSchemaSource serving(Path directory) {
-        return TsonFileSchemaSource.builder().mapHost(HOST, directory).build();
+    private static FileSchemaSource serving(Path directory) {
+        return FileSchemaSource.builder().mapHost(HOST, directory).build();
     }
 
     private static String reference(String path) {
         return "https://" + HOST + path;
     }
 
-    private static SchemaFetchException refusal(TsonFileSchemaSource source, String uri) {
+    private static SchemaFetchException refusal(FileSchemaSource source, String uri) {
         return assertThrows(SchemaFetchException.class, () -> source.fetch(uri));
     }
 
@@ -58,7 +59,7 @@ class TsonFileSchemaSourceTest {
     /** Deny by default: a source with no mapping serves nothing, and says so rather than reading anything. */
     @Test
     void readsNothingUntilAHostIsMapped() {
-        TsonFileSchemaSource source = TsonFileSchemaSource.builder().build();
+        FileSchemaSource source = FileSchemaSource.builder().build();
 
         assertEquals(Reason.NOT_PERMITTED, refusal(source, reference("/order-1.tn")).reason());
     }
@@ -67,7 +68,7 @@ class TsonFileSchemaSourceTest {
     @Test
     void aHostIsMatchedExactlyNotBySuffix(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), schemaAt("/order-1.tn"));
-        TsonFileSchemaSource source = serving(dir);
+        FileSchemaSource source = serving(dir);
 
         assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://evil-" + HOST + "/order-1.tn").reason());
         assertEquals(Reason.NOT_PERMITTED, refusal(source, "https://sub." + HOST + "/order-1.tn").reason());
@@ -125,7 +126,7 @@ class TsonFileSchemaSourceTest {
     /** §2.2.1's rules on an identifying URI, shared with the HTTP source and refused before anything is opened. */
     @Test
     void refusesAReferenceThatIsNotALegalIdentity(@TempDir Path dir) {
-        TsonFileSchemaSource source = serving(dir);
+        FileSchemaSource source = serving(dir);
 
         for (String illegal : new String[] {
                 "https://" + HOST + ":8443/order-1.tn",       // a port
@@ -147,8 +148,8 @@ class TsonFileSchemaSourceTest {
     @Test
     void refusesADocumentLargerThanTheCap(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), schemaAt("/order-1.tn"));
-        TsonFileSchemaSource source =
-                TsonFileSchemaSource.builder().mapHost(HOST, dir).maxDocumentBytes(16).build();
+        FileSchemaSource source =
+                FileSchemaSource.builder().mapHost(HOST, dir).maxDocumentBytes(16).build();
 
         assertEquals(Reason.TOO_LARGE, refusal(source, reference("/order-1.tn")).reason());
     }
@@ -156,8 +157,8 @@ class TsonFileSchemaSourceTest {
     @Test
     void canRequireAContentHashPin(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), schemaAt("/order-1.tn"));
-        TsonFileSchemaSource source =
-                TsonFileSchemaSource.builder().mapHost(HOST, dir).requireContentHashPin(true).build();
+        FileSchemaSource source =
+                FileSchemaSource.builder().mapHost(HOST, dir).requireContentHashPin(true).build();
 
         assertEquals(Reason.NOT_PERMITTED, refusal(source, reference("/order-1.tn")).reason());
         assertEquals(schemaAt("/order-1.tn"), source.fetch(reference("/order-1.tn") + "?sha256=abc"));
@@ -167,7 +168,7 @@ class TsonFileSchemaSourceTest {
     @Test
     void cachesByIdentitySoAQueryStringCannotForceRereads(@TempDir Path dir) throws IOException {
         Path file = Files.writeString(dir.resolve("order-1.tn"), schemaAt("/order-1.tn"));
-        TsonFileSchemaSource source = serving(dir);
+        FileSchemaSource source = serving(dir);
 
         source.fetch(reference("/order-1.tn"));
         Files.delete(file);
@@ -187,7 +188,7 @@ class TsonFileSchemaSourceTest {
     @Test
     void preloadReadsEagerlyAndFailsLoudly(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), schemaAt("/order-1.tn"));
-        TsonFileSchemaSource source = serving(dir);
+        FileSchemaSource source = serving(dir);
 
         source.preload(reference("/order-1.tn"));
         assertTrue(source.isCached(reference("/order-1.tn")));
@@ -197,7 +198,7 @@ class TsonFileSchemaSourceTest {
     /** A mapping that cannot be satisfied is a startup mistake, and says so at build time. */
     @Test
     void refusesAMappingThatCannotBeSatisfied(@TempDir Path dir) {
-        TsonFileSchemaSource.Builder builder = TsonFileSchemaSource.builder();
+        FileSchemaSource.Builder builder = FileSchemaSource.builder();
 
         assertThrows(IllegalArgumentException.class, () -> builder.mapHost(HOST, dir.resolve("nope")));
         assertThrows(IllegalArgumentException.class, () -> builder.mapHost("has/slash", dir));
@@ -207,7 +208,7 @@ class TsonFileSchemaSourceTest {
     @Test
     void aDocumentNamingAFileBackedSchemaResolvesAndValidates(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), schemaAt("/order-1.tn"));
-        TsonFileSchemaSource source = serving(dir);
+        FileSchemaSource source = serving(dir);
         Tson tson = Tson.builder().schemaSource(source).build();
         tson.resolve(source.fetch(reference("/order-1.tn")));
 

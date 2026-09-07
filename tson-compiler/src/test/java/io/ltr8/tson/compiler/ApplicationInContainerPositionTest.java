@@ -1,10 +1,11 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.resolver.HeldBody;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -50,8 +51,8 @@ class ApplicationInContainerPositionTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -169,7 +170,7 @@ class ApplicationInContainerPositionTest {
      */
     @Test
     void theSpecsOwnTreeSpellingIsRejectedAsUninhabited() {
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> compile("""
                           tree => <T> { value: T  children: [tree<T>; 1..] }
                           use  => { t: tree<text> }"""));

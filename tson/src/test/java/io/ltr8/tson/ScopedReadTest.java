@@ -2,9 +2,9 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.TsonTreeWriter;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.tree.TsonScopedValue;
 import io.ltr8.tson.tree.TsonValue;
 
@@ -68,9 +68,9 @@ class ScopedReadTest {
                     }
                     """);
 
-    private static final TsonSchemaSource SOURCE = uri -> {
+    private static final SchemaSource SOURCE = uri -> {
         for (Map.Entry<String, String> document : SCHEMAS.entrySet()) {
-            if (TsonCanonicalIdentity.sameIdentity(uri, document.getKey())) {
+            if (CanonicalIdentity.sameIdentity(uri, document.getKey())) {
                 return document.getValue();
             }
         }

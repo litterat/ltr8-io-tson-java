@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -45,7 +45,7 @@ class BrokenSchemaDuringDataValidationTest {
             !point { x: 3  y: 4 }""";
 
     private static Tson tson() {
-        TsonSchemaSource source = uri -> {
+        SchemaSource source = uri -> {
             String base = uri.contains("?") ? uri.substring(0, uri.indexOf('?')) : uri;
             if (base.equals(ID)) {
                 return BROKEN_SCHEMA;
@@ -152,7 +152,7 @@ class BrokenSchemaDuringDataValidationTest {
 
     /**
      * <b>A source that fails any other way has a bug, and it surfaces as one.</b> {@code
-     * TsonSchemaSource.fetch} names {@link SchemaFetchException} for "cannot supply this", so anything
+     * SchemaSource.fetch} names {@link SchemaFetchException} for "cannot supply this", so anything
      * else out of a source is that source malfunctioning -- and reporting it as a diagnostic would tell the
      * caller their document is invalid on the strength of someone else's crash. {@code Tson.validate}'s
      * promise is that a bad *document* never throws; a bad *source* is not a document.

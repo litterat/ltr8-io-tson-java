@@ -6,10 +6,10 @@ import io.ltr8.tson.compiler.TestDocuments;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.compiler.config.TsonAtomContext;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
+import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -45,8 +45,8 @@ class MapBindReaderTest {
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);

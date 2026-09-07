@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -230,7 +230,7 @@ final class TemplateMaterialiser {
             }
             try {
                 entry.setValue(pass.rewrite(entry.getValue()));
-            } catch (TsonSchemaValidationException e) {
+            } catch (SchemaValidationException e) {
                 if (reporter == null) {
                     throw e;
                 }
@@ -255,7 +255,7 @@ final class TemplateMaterialiser {
     /** Where an application this pass cannot close is reported, entry by entry. */
     @FunctionalInterface
     interface MaterialisationFailureReporter {
-        void reportFailedApplication(String entryName, TsonSchemaValidationException error);
+        void reportFailedApplication(String entryName, SchemaValidationException error);
     }
 
     /**
@@ -343,19 +343,19 @@ final class TemplateMaterialiser {
         }
         List<String> parameters = template.parameters();
         if (parameters.isEmpty()) {
-            throw new TsonSchemaValidationException("'" + head + "' declares no type parameters, so '"
+            throw new SchemaValidationException("'" + head + "' declares no type parameters, so '"
                     + head + "<...>' applies arguments to something that takes none (§5.10); drop the "
                     + "argument list");
         }
         if (parameters.size() != arguments.size()) {
-            throw new TsonSchemaValidationException("'" + head + "' takes " + parameters.size()
+            throw new SchemaValidationException("'" + head + "' takes " + parameters.size()
                     + " type argument" + (parameters.size() == 1 ? "" : "s") + " " + parameters + ", but "
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
         arguments = byParameterKind(head, template, parameters, arguments);
         String name = DerivedName.ofApplication(head, arguments);
         if (aliasClosing.contains(name)) {
-            throw new TsonSchemaValidationException("'" + head + "<...>' is a reference template whose own "
+            throw new SchemaValidationException("'" + head + "<...>' is a reference template whose own "
                     + "body applies it again, so composing it never reaches a type with a body (§5.10). The "
                     + "chain begins " + chain() + ". A reference template must eventually name a declared "
                     + "type; recursion belongs in a record, tuple or choice body, where a field can carry it");
@@ -371,7 +371,7 @@ final class TemplateMaterialiser {
             closing.remove(name);
             // Named for the *outermost* head, which is the one the author wrote; the head in hand here is
             // whichever link happened to tip the depth over.
-            throw new TsonSchemaValidationException("'" + heads.get(0) + "<...>' does not close: "
+            throw new SchemaValidationException("'" + heads.get(0) + "<...>' does not close: "
                     + "materialising it needs more than " + MAX_CLOSING_DEPTH + " nested instantiations and "
                     + "each one differs from the last, so the arguments are growing rather than repeating and "
                     + "there is no finite set of types to build (§5.10). The chain begins " + chain()
@@ -581,7 +581,7 @@ final class TemplateMaterialiser {
         } catch (ReadException e) {
             // The bindings a template defers are checked here and nowhere else (§8.2): `<T, N> [T; N]` is a
             // fine declaration, and `vector<text, "two">` is where it stops being one.
-            throw new TsonSchemaValidationException("'" + head + "<...>' substitutes into a body that is not "
+            throw new SchemaValidationException("'" + head + "<...>' substitutes into a body that is not "
                     + "valid data for '" + target + "', the constructor's own constraint vocabulary -- "
                     + e.getMessage(), e);
         }

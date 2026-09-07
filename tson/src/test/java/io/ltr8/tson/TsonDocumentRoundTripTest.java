@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.tree.TsonDocument;
@@ -36,7 +36,7 @@ class TsonDocumentRoundTripTest {
             """.formatted(SCHEMA_URI);
 
     private static Tson tson() {
-        TsonSchemaSource source = uri -> SCHEMA;
+        SchemaSource source = uri -> SCHEMA;
         Tson tson = Tson.builder().schemaSource(source).build();
         tson.resolve(SCHEMA);
         return tson;

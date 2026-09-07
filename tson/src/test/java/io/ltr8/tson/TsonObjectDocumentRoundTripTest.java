@@ -4,7 +4,7 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.TsonObjectDocument;
 import io.ltr8.tson.compiler.TsonObjectWriter;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.compiler.TsonWriteException;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +44,7 @@ class TsonObjectDocumentRoundTripTest {
     }
 
     private static Tson tson() {
-        TsonSchemaSource source = uri -> SCHEMA;
+        SchemaSource source = uri -> SCHEMA;
         Tson tson = Tson.builder().schemaSource(source).bindings(Map.of("order", Order.class)).build();
         tson.resolve(SCHEMA);
         return tson;

@@ -1,11 +1,12 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.schema.TsonCanonicalIdentity;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -62,8 +63,8 @@ class ConfusableNameScopesTest {
                 %s
                 }
                 """.formatted(declarations);
-        TsonSchemaSource source = uri -> {
-            if (TsonCanonicalIdentity.sameIdentity(uri, ID)) {
+        SchemaSource source = uri -> {
+            if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return schema;
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
@@ -73,7 +74,7 @@ class ConfusableNameScopesTest {
     }
 
     private static String refused(String declarations) {
-        return assertThrows(TsonSchemaValidationException.class, () -> compile(declarations)).getMessage();
+        return assertThrows(SchemaValidationException.class, () -> compile(declarations)).getMessage();
     }
 
     /** The declared names of one schema — where a spoofed name changes which type a document validates against. */

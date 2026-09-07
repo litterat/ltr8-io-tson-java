@@ -36,7 +36,9 @@ public sealed interface JsonEvent
     /** Where the token that produced this event begins. */
     JsonPosition position();
 
-    /** <code>{</code> -- an object opens; zero or more {@link MemberName}-plus-value pairs follow, then {@link ObjectEnd}. */
+    /**
+     * <code>{</code> -- an object opens; zero or more {@link MemberName} -plus-value pairs follow, then {@link ObjectEnd} .
+     */
     record ObjectStart(JsonPosition position) implements JsonEvent {
     }
 

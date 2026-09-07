@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
-import io.ltr8.tson.schema.TsonSchemaValidationException;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 
@@ -40,14 +40,14 @@ class TsonTest {
     /**
      * The `!!import`-vs-`!!meta` confusion, end to end: core.tn is a type library, not a meta-schema, so it
      * can govern nothing. This is an authoring error in the schema, which is why it arrives as a {@link
-     * TsonSchemaValidationException} a caller can catch around {@code resolve} rather than as an unchecked
+     * SchemaValidationException} a caller can catch around {@code resolve} rather than as an unchecked
      * library-fault type — and why {@code tson validate} can tell it apart from a bug in this tool.
      */
     @Test
     void rejectsASchemaThatNamesATypeLibraryAsItsMeta() {
         Tson tson = Tson.builder().build();
 
-        TsonSchemaValidationException thrown = assertThrows(TsonSchemaValidationException.class,
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> tson.resolve("""
                         !!id:"https://example.test/oops.tn"
                         !!meta:"https://tson.io/2026/35/m/core.tn"

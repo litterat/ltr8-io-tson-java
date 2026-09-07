@@ -1,7 +1,8 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.HttpSchemaSource;
 import com.sun.net.httpserver.HttpServer;
-import io.ltr8.tson.compiler.TsonSchemaSource;
+import io.ltr8.tson.base.SchemaSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class TsonHttpSchemaSourceConcurrencyTest {
+class HttpSchemaSourceConcurrencyTest {
 
     private static final int THREADS = Math.max(8, Runtime.getRuntime().availableProcessors() * 2);
     private static final String HOST = "schemas.example.com";
@@ -75,8 +76,8 @@ class TsonHttpSchemaSourceConcurrencyTest {
         });
     }
 
-    private TsonHttpSchemaSource source() {
-        return TsonHttpSchemaSource.builder().mapHost(HOST, base).timeout(Duration.ofSeconds(5)).build();
+    private HttpSchemaSource source() {
+        return HttpSchemaSource.builder().mapHost(HOST, base).timeout(Duration.ofSeconds(5)).build();
     }
 
     /**
@@ -92,7 +93,7 @@ class TsonHttpSchemaSourceConcurrencyTest {
         CountDownLatch start = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(THREADS);
 
-        try (TsonHttpSchemaSource source = source();
+        try (HttpSchemaSource source = source();
              ExecutorService pool = Executors.newFixedThreadPool(THREADS)) {
             for (int i = 0; i < THREADS; i++) {
                 pool.submit(() -> {
@@ -130,7 +131,7 @@ class TsonHttpSchemaSourceConcurrencyTest {
         AtomicInteger depth = new AtomicInteger();
         AtomicInteger maxDepth = new AtomicInteger();
 
-        TsonSchemaSource counting = uri -> {
+        SchemaSource counting = uri -> {
             int current = depth.incrementAndGet();
             maxDepth.updateAndGet(seen -> Math.max(seen, current));
             try {
@@ -160,7 +161,7 @@ class TsonHttpSchemaSourceConcurrencyTest {
                 pool.submit(() -> {
                     // A Tson of its own per thread: resolution mutates a registry and is not concurrent-safe,
                     // which is the invariant this project states everywhere. What is shared here is the origin.
-                    try (TsonHttpSchemaSource source = source()) {
+                    try (HttpSchemaSource source = source()) {
                         start.await();
                         Tson tson = Tson.builder().schemaSource(source).build();
                         assertEquals(java.util.List.of(), tson.validateSchema(DERIVED));
