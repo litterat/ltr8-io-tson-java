@@ -1135,6 +1135,7 @@ No system Gradle — always use the wrapper:
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.resolver.DefinitionResolverTest"
 ./gradlew :tson-cli:installDist   # then tson-cli/build/install/tson/bin/tson validate ...
 ./gradlew :tson:allocationReport  # the allocation harness alone, numbers on stdout
+./gradlew :tson-base:test         # the shared vocabulary: diagnostics, policies, identity, schema sources
 ./gradlew :tson-json:test         # the JSON encoding's own stack
 ```
 

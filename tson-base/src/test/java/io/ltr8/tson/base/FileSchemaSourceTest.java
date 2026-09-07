@@ -1,9 +1,6 @@
-package io.ltr8.tson;
+package io.ltr8.tson.base;
 
-import io.ltr8.tson.base.FileSchemaSource;
-import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.SchemaFetchException.Reason;
-import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -202,23 +199,5 @@ class FileSchemaSourceTest {
 
         assertThrows(IllegalArgumentException.class, () -> builder.mapHost(HOST, dir.resolve("nope")));
         assertThrows(IllegalArgumentException.class, () -> builder.mapHost("has/slash", dir));
-    }
-
-    /** The whole arc: a document naming a schema by its https identity, served from disk, resolves and reads. */
-    @Test
-    void aDocumentNamingAFileBackedSchemaResolvesAndValidates(@TempDir Path dir) throws IOException {
-        Files.writeString(dir.resolve("order-1.tn"), schemaAt("/order-1.tn"));
-        FileSchemaSource source = serving(dir);
-        Tson tson = Tson.builder().schemaSource(source).build();
-        tson.resolve(source.fetch(reference("/order-1.tn")));
-
-        TsonValue order = tson.treeReader().read("""
-                !!schema:"%s"
-                !order { sku: "ABC-1"  quantity: 3 }""".formatted(reference("/order-1.tn")));
-
-        assertEquals("ABC-1", order.get("sku").asString().orElseThrow());
-        assertEquals(2, tson.validate("""
-                !!schema:"%s"
-                !order { }""".formatted(reference("/order-1.tn"))).size());
     }
 }

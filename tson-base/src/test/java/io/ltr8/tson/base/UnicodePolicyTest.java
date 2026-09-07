@@ -1,6 +1,5 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
-import io.ltr8.tson.base.UnicodePolicy;
 import org.junit.jupiter.api.Test;
 
 import static java.lang.Character.UnicodeScript.CYRILLIC;

@@ -1,14 +1,11 @@
-package io.ltr8.tson;
+package io.ltr8.tson.base;
 
-import io.ltr8.tson.base.HttpSchemaSource;
-import io.ltr8.tson.base.SchemaSource;
 import com.sun.net.httpserver.HttpServer;
-import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.SchemaFetchException.Reason;
-import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -16,6 +13,12 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -258,26 +261,42 @@ class HttpSchemaSourceTest {
     }
 
     /**
-     * The whole point, end to end: a document naming a schema over HTTP resolves, validates, and reads --
-     * with resolution done at startup, on this thread, which is what the threading note requires.
+     * Many threads first-fetching one identity at once. The cache is get-then-put rather than
+     * {@code computeIfAbsent}, so a race costs a duplicate fetch and nothing else -- every caller must still get
+     * the right document, and none may hang.
      */
     @Test
-    void aDocumentNamingAnHttpSchemaResolvesAndValidates() {
-        String schemaUri = reference("/order-1.tn");
+    @Timeout(120)
+    void concurrentFirstFetchesOfOneIdentityAllSucceed() throws Exception {
+        int threads = Math.max(8, Runtime.getRuntime().availableProcessors() * 2);
+        String reference = reference("/order-1.tn");
         serve("/order-1.tn", 200, schemaAt("/order-1.tn"));
-        try (HttpSchemaSource source = allowingThisServer().build()) {
-            Tson tson = Tson.builder().schemaSource(source).build();
-            tson.resolve(source.fetch(schemaUri));
+        Queue<Throwable> failures = new ConcurrentLinkedQueue<>();
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threads);
 
-            TsonValue order = tson.treeReader().read("""
-                    !!schema:"%s"
-                    !order { sku: "ABC-1"  quantity: 3 }""".formatted(schemaUri));
-            assertEquals("ABC-1", order.get("sku").asString().orElseThrow());
-
-            assertEquals(2, tson.validate("""
-                    !!schema:"%s"
-                    !order { }""".formatted(schemaUri)).size(), "both required fields are missing");
+        try (HttpSchemaSource source = allowingThisServer().timeout(Duration.ofSeconds(5)).build();
+             ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+            for (int i = 0; i < threads; i++) {
+                pool.submit(() -> {
+                    try {
+                        start.await();
+                        assertEquals(schemaAt("/order-1.tn"), source.fetch(reference));
+                    } catch (Throwable t) {
+                        failures.add(t);
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+            start.countDown();
+            assertTrue(done.await(60, TimeUnit.SECONDS), "threads did not finish -- a deadlock, most likely");
+            assertTrue(failures.isEmpty(), "failures: " + failures);
+            assertTrue(source.isCached(reference));
         }
+
+        assertTrue(requests.get() <= threads,
+                "a duplicate fetch is the accepted cost of not holding a lock across I/O; " + requests.get());
     }
 
     private static SchemaFetchException refusal(HttpSchemaSource source, String uri) {

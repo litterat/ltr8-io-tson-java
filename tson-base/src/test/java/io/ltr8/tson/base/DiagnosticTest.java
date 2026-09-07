@@ -1,6 +1,5 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
-import io.ltr8.tson.base.Diagnostic;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;

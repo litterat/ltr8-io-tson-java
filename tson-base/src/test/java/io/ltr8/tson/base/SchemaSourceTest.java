@@ -1,8 +1,5 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
-import io.ltr8.tson.base.SchemaSource;
-import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.base.SchemaValidationException;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;

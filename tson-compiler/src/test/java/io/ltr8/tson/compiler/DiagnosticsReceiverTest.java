@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ReadException;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

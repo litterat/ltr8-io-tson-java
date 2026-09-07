@@ -1,7 +1,5 @@
-package io.ltr8.tson.schema;
+package io.ltr8.tson.base;
 
-import io.ltr8.tson.base.SchemaValidationException;
-import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

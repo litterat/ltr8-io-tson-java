@@ -1,6 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.FileSchemaSource;
 import io.ltr8.tson.base.SchemaSource;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,24 @@ class SchemaSourceConfigTest {
         TsonValue order = tson.treeReader().read(DOCUMENT);
 
         assertEquals("ABC-1", order.get("sku").asString().orElseThrow());
+    }
+
+    /**
+     * The general seam carries the same arc with the source built rather than named -- the short form is a
+     * convenience over {@link TsonConfig#schemaSource}, not a second path into the loader.
+     */
+    @Test
+    void theGeneralSeamServesTheSameArcAsTheShortForm(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
+        FileSchemaSource source = FileSchemaSource.builder().mapHost(HOST, dir).build();
+
+        Tson tson = Tson.builder().schemaSource(source).build();
+        tson.resolve(source.fetch(SCHEMA_URI));
+
+        assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
+        assertEquals(2, tson.validate("""
+                !!schema:"%s"
+                !order { }""".formatted(SCHEMA_URI)).size(), "both required fields are missing");
     }
 
     /** Repeatable: each call maps another host into the one source, rather than replacing the last. */
