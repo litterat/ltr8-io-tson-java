@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -46,7 +47,7 @@ class TsonValidateSchemaTest {
             throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,
                     "not an allowed host", null);
         };
-        List<Diagnostic> problems = Tson.builder().schemaSource(refusing).build().validateSchema("""
+        List<Diagnostic> problems = Tson.builder().schemaAccess(SchemaAccess.of(refusing)).build().validateSchema("""
                 !!id:"https://example.test/importer.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!import:"https://example.test/nowhere.tn"
@@ -497,12 +498,12 @@ class TsonValidateSchemaTest {
                 { widget => { name: text } }
                 """;
         Tson tson = Tson.builder()
-                .schemaSource(uri -> {
+                .schemaAccess(SchemaAccess.of(uri -> {
                     if (uri.equals("https://example.test/fetched-as.tn")) {
                         return lib;
                     }
                     throw new IllegalStateException("no schema for " + uri);
-                })
+                }))
                 .build();
 
         List<Diagnostic> problems = tson.validateSchema("""

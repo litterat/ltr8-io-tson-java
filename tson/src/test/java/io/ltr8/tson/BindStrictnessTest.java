@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -72,7 +73,7 @@ class BindStrictnessTest {
     private static Tson tson(String schema, Class<?> bound, boolean lenient) {
         SchemaSource source = uri -> schema;
         DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
-        TsonConfig config = Tson.builder().schemaSource(source).dataBindContext(
+        TsonConfig config = Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBindContext(
                 TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build()));
         return (lenient ? config.lenientBinding() : config).build();
     }

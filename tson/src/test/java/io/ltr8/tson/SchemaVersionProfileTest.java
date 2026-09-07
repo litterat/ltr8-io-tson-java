@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.Profile;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -86,7 +87,7 @@ class SchemaVersionProfileTest {
         DataNameBinder binder = name -> "order".equals(name) ? Order.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
         DataBindContext context = TsonAtomContext.registerDefaults(
                 DataBindContext.builder().nameBinder(binder).profile(profile).build());
-        return Tson.builder().schemaSource(source).dataBindContext(context).build();
+        return Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBindContext(context).build();
     }
 
     private static final String V1_DOC = """

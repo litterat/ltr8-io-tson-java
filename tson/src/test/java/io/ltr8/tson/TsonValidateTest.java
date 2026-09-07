@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonContentHash;
 import io.ltr8.tson.base.Diagnostic;
@@ -38,7 +39,7 @@ class TsonValidateTest {
             throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
                     "this fixture serves only " + POINT_ID, null);
         };
-        return Tson.builder().schemaSource(source).build();
+        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
     }
 
     @Test
@@ -173,7 +174,7 @@ class TsonValidateTest {
         // file that references a different identity -- so the content doesn't own the identity it was
         // obtained under. Refuse it rather than resolve mismatched content.
         SchemaSource wrongIdSource = uri -> POINT_SCHEMA;   // ignores uri; always returns point-1.tn
-        Tson tson = Tson.builder().schemaSource(wrongIdSource).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(wrongIdSource)).build();
 
         List<Diagnostic> problems = tson.validate(
                 "!!schema:\"https://example.test/other-1.tn\"\n!point { x: 1  y: 2 }");
@@ -191,7 +192,7 @@ class TsonValidateTest {
         String tampered = POINT_SCHEMA.replace("int32", "int64");   // same !!id, different body -> different hash
         AtomicInteger calls = new AtomicInteger();
         SchemaSource flaky = uri -> calls.getAndIncrement() == 0 ? tampered : POINT_SCHEMA;
-        Tson tson = Tson.builder().schemaSource(flaky).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(flaky)).build();
 
         String pinnedData = "!!schema:\"" + POINT_ID + "?sha256=" + correctHash + "\"\n!point { x: 1  y: 2 }";
 
@@ -380,12 +381,12 @@ class TsonValidateTest {
                   reading => { pct: my_percentage }
                 }
                 """;
-        Tson tson = Tson.builder().schemaSource(uri -> {
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> {
             if (uri.equals(schemaId)) {
                 return schema;
             }
             throw new IllegalStateException("no schema for " + uri);
-        }).build();
+        })).build();
 
         Diagnostic problem = only(tson, "!!schema:\"" + schemaId + "\"\n!reading { pct: 500 }");
 
@@ -436,12 +437,12 @@ class TsonValidateTest {
                   order  => { status: status  label: label  when: date }
                 }
                 """;
-        Tson tson = Tson.builder().schemaSource(uri -> {
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> {
             if (uri.equals(schemaId)) {
                 return schema;
             }
             throw new IllegalStateException("no schema for " + uri);
-        }).build();
+        })).build();
 
         List<Diagnostic> problems = tson.validate("!!schema:\"" + schemaId + "\"\n"
                 + "!order { status: CANCELLED  label: toolong  when: nope }");

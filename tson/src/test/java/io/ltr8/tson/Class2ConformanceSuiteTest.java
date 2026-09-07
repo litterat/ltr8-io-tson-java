@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
@@ -92,7 +93,7 @@ class Class2ConformanceSuiteTest {
         // corpus publishes those under its own identity prefix rather than inventing a file convention.
         return Tson.builder()
                 .dataBindContext(SchemaMetaNameBinder.defaultContext())
-                .schemaSource(Class2ConformanceSuiteTest::fetchSuiteSchema)
+                .schemaAccess(SchemaAccess.of(Class2ConformanceSuiteTest::fetchSuiteSchema))
                 .build();
     }
 

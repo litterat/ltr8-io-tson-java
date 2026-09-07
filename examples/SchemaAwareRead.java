@@ -12,6 +12,7 @@
 /// schemaless read. It's the "hand me a document, work out whether a schema applies" entry point, the
 /// value-returning peer of `tson.validate`; `tson.objectReader().read(doc, YourClass.class)` is the
 /// object-binding twin (see ObjectBinding.java for the binding side).
+import io.ltr8.tson.base.source.SchemaAccess;
 import module io.ltr8.tson;
 
 import java.util.Map;
@@ -30,7 +31,7 @@ void main() {
             }""";
 
     Tson tson = Tson.builder()
-            .schemaSource(SchemaSource.ofMap(Map.of("https://example.com/2026/35/app/server-1.tn", schema)))
+            .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of("https://example.com/2026/35/app/server-1.tn", schema))))
             .build();
 
     // Self-describing: the document names its own schema and root type. No other arguments needed --

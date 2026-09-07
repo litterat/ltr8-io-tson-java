@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -78,7 +79,7 @@ class ScopedReadTest {
     };
 
     private static Tson tson() {
-        return Tson.builder().schemaSource(SOURCE).build();
+        return Tson.builder().schemaAccess(SchemaAccess.of(SOURCE)).build();
     }
 
     private static TsonValue read(String data) {
@@ -325,7 +326,7 @@ class ScopedReadTest {
      */
     @Test
     void bindModeReadsAPushedValueIntoTheClassTheForeignTypeNames() {
-        Tson tson = Tson.builder().schemaSource(SOURCE)
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SOURCE))
                 .bindings(Map.of("pinpoint", Pinpoint.class, "claim", Claim.class)).build();
 
         Pinpoint read = tson.objectReader().read("!!schema:\"" + HOST + "\"\n!pinpoint { one: "

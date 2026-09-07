@@ -2,6 +2,7 @@ package io.ltr8.tson.base.source;
 
 
 import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.policy.FetchPolicy;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,6 +13,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -63,23 +65,13 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class FileSchemaSource implements SchemaSource {
 
-    /** A schema document larger than this is refused. */
-    public static final int DEFAULT_MAX_DOCUMENT_BYTES = 1 << 20;
-
-    /** How many schema documents may be held. */
-    public static final int DEFAULT_MAX_CACHED_SCHEMAS = 128;
-
     private final Map<String, Path> hosts;
-    private final int maxDocumentBytes;
-    private final int maxCachedSchemas;
-    private final boolean requireContentHashPin;
+    private final FetchPolicy fetchPolicy;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
 
     private FileSchemaSource(Builder builder) {
         this.hosts = Map.copyOf(builder.hosts);
-        this.maxDocumentBytes = builder.maxDocumentBytes;
-        this.maxCachedSchemas = builder.maxCachedSchemas;
-        this.requireContentHashPin = builder.requireContentHashPin;
+        this.fetchPolicy = builder.fetchPolicy;
     }
 
     /** A source that reads nothing until a host is mapped to a directory. */
@@ -103,7 +95,7 @@ public final class FileSchemaSource implements SchemaSource {
             return cached;
         }
         String document = read(reference, locate(reference, permitted));
-        if (cache.size() < maxCachedSchemas) {
+        if (cache.size() < fetchPolicy.maxCachedSchemas()) {
             cache.put(permitted.canonical(), document);
         }
         return document;
@@ -145,7 +137,7 @@ public final class FileSchemaSource implements SchemaSource {
      * content cannot change under the same identity.
      */
     private Permitted policy(String reference) {
-        SchemaReference identity = SchemaReference.of(reference, requireContentHashPin);
+        SchemaReference identity = SchemaReference.of(reference, fetchPolicy.requireContentHashPin());
         Path directory = hosts.get(identity.host());
         if (directory == null) {
             throw SchemaReference.notPermitted(reference, hosts.isEmpty()
@@ -194,6 +186,7 @@ public final class FileSchemaSource implements SchemaSource {
 
     /** Reads {@code file}, enforcing the size cap against bytes read, and decodes it as UTF-8. */
     private String read(String reference, Path file) {
+        int maxDocumentBytes = fetchPolicy.maxDocumentBytes();
         try (InputStream in = Files.newInputStream(file)) {
             byte[] bytes = in.readNBytes(maxDocumentBytes + 1);
             if (bytes.length > maxDocumentBytes) {
@@ -215,9 +208,7 @@ public final class FileSchemaSource implements SchemaSource {
     public static final class Builder {
 
         private final Map<String, Path> hosts = new LinkedHashMap<>();
-        private int maxDocumentBytes = DEFAULT_MAX_DOCUMENT_BYTES;
-        private int maxCachedSchemas = DEFAULT_MAX_CACHED_SCHEMAS;
-        private boolean requireContentHashPin;
+        private FetchPolicy fetchPolicy = FetchPolicy.defaults();
 
         private Builder() {
         }
@@ -245,21 +236,34 @@ public final class FileSchemaSource implements SchemaSource {
             return this;
         }
 
-        /** The largest schema document that will be read. Defaults to {@link #DEFAULT_MAX_DOCUMENT_BYTES}. */
-        public Builder maxDocumentBytes(int maxDocumentBytes) {
-            if (maxDocumentBytes <= 0) {
-                throw new IllegalArgumentException("maxDocumentBytes must be positive");
-            }
-            this.maxDocumentBytes = maxDocumentBytes;
+        /**
+         * Everything this source will admit and spend obtaining a document, as the one value a deployment
+         * states. Defaults to {@link FetchPolicy#defaults()}.
+         *
+         * <p><b>This is the setter to reach for, and the three below are its components</b>, each deriving
+         * from what is already stated rather than replacing it. {@link HttpSchemaSource} takes the same
+         * value, so a deployment that moves a schema from one to the other moves its constraints unchanged.
+         */
+        public Builder fetchPolicy(FetchPolicy fetchPolicy) {
+            this.fetchPolicy = Objects.requireNonNull(fetchPolicy, "fetchPolicy");
             return this;
         }
 
-        /** How many documents may be cached. Defaults to {@link #DEFAULT_MAX_CACHED_SCHEMAS}. */
+        /**
+         * The largest schema document that will be read. Defaults to
+         * {@link FetchPolicy#DEFAULT_MAX_DOCUMENT_BYTES}; one component of {@link #fetchPolicy}.
+         */
+        public Builder maxDocumentBytes(int maxDocumentBytes) {
+            this.fetchPolicy = fetchPolicy.withMaxDocumentBytes(maxDocumentBytes);
+            return this;
+        }
+
+        /**
+         * How many documents may be cached. Defaults to {@link FetchPolicy#DEFAULT_MAX_CACHED_SCHEMAS}; one
+         * component of {@link #fetchPolicy}.
+         */
         public Builder maxCachedSchemas(int maxCachedSchemas) {
-            if (maxCachedSchemas < 0) {
-                throw new IllegalArgumentException("maxCachedSchemas must not be negative");
-            }
-            this.maxCachedSchemas = maxCachedSchemas;
+            this.fetchPolicy = fetchPolicy.withMaxCachedSchemas(maxCachedSchemas);
             return this;
         }
 
@@ -269,7 +273,7 @@ public final class FileSchemaSource implements SchemaSource {
          * control, and a deployment that pins everywhere should be able to say so uniformly.
          */
         public Builder requireContentHashPin(boolean requireContentHashPin) {
-            this.requireContentHashPin = requireContentHashPin;
+            this.fetchPolicy = fetchPolicy.withRequireContentHashPin(requireContentHashPin);
             return this;
         }
 

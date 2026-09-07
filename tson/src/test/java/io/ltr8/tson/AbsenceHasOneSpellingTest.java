@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -52,7 +53,7 @@ class AbsenceHasOneSpellingTest {
             }
             throw new IllegalStateException("no schema for " + uri);
         };
-        return Tson.builder().schemaSource(source).build();
+        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
     }
 
     private static TsonValue readPerson(String fields) {

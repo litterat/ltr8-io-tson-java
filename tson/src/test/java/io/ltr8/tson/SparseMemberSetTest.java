@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -45,7 +46,7 @@ class SparseMemberSetTest {
             throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
                     "this fixture serves only " + ID, null);
         };
-        return Tson.builder().schemaSource(source).build();
+        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
     }
 
     private static List<Diagnostic> validate(String body) {

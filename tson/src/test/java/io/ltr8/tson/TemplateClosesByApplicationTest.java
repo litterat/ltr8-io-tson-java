@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 
@@ -64,7 +65,7 @@ class TemplateClosesByApplicationTest {
     private static List<Diagnostic> metaProblems(String extraDeclarations) {
         String source = meta(extraDeclarations);
         Tson tson = Tson.builder()
-                .schemaSource(SchemaSource.ofMap(Map.of(META, source)))
+                .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, source))))
                 .build();
         return tson.validateSchema(source);
     }
@@ -76,7 +77,7 @@ class TemplateClosesByApplicationTest {
                 { %s }
                 """.formatted(body);
         Tson tson = Tson.builder()
-                .schemaSource(SchemaSource.ofMap(Map.of(META, META_SOURCE, USER, user)))
+                .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_SOURCE, USER, user))))
                 .build();
         return tson.validateSchema(user);
     }
@@ -85,7 +86,7 @@ class TemplateClosesByApplicationTest {
     @Test
     void theTemplatesThemselvesResolve() {
         Tson tson = Tson.builder()
-                .schemaSource(SchemaSource.ofMap(Map.of(META, META_SOURCE)))
+                .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_SOURCE))))
                 .build();
 
         assertEquals(List.of(), tson.validateSchema(META_SOURCE));

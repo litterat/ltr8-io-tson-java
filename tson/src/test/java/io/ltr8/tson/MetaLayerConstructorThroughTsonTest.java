@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
@@ -91,7 +92,7 @@ class MetaLayerConstructorThroughTsonTest {
             new DataNameBinder.DefaultDataNameBinder(Set.of("io.ltr8.tson.consumer"), Map.of());
 
     private static Tson tson() {
-        return Tson.builder().schemaSource(SOURCE).metaNameBinder(CONSUMER_NAMES).build();
+        return Tson.builder().schemaAccess(SchemaAccess.of(SOURCE)).metaNameBinder(CONSUMER_NAMES).build();
     }
 
     /**
@@ -148,7 +149,7 @@ class MetaLayerConstructorThroughTsonTest {
      */
     @Test
     void withoutTheBinderTheSameSchemaHasNoBoundClass() {
-        Tson unextended = Tson.builder().schemaSource(SOURCE).build();
+        Tson unextended = Tson.builder().schemaAccess(SchemaAccess.of(SOURCE)).build();
 
         MissingBindingException thrown =
                 assertThrows(MissingBindingException.class, () -> unextended.resolve(API_SCHEMA));

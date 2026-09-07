@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.CanonicalIdentity;
@@ -50,7 +51,7 @@ class ValueParamFixedFieldTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return Tson.builder().schemaSource(source).build();
+        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
     }
 
     /** The field of the entry {@code created} resolves to, following its alias hop to the instantiation. */
@@ -118,7 +119,7 @@ class ValueParamFixedFieldTest {
     void aMaterialisedValueParameterDefaultStaysADefault() {
         String schema = SCHEMA.replace("status: int32 = S", "status: int32 ~ S");
         SchemaSource source = uri -> schema;
-        Tson tson = Tson.builder().schemaSource(source).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
 
         RecordField materialised = statusOf(tson.resolve(schema), "created");
 
@@ -161,7 +162,7 @@ class ValueParamFixedFieldTest {
                 }
                 """;
         SchemaSource source = uri -> schema;
-        TsonLinkedSchema linked = Tson.builder().schemaSource(source).build().resolve(schema);
+        TsonLinkedSchema linked = Tson.builder().schemaAccess(SchemaAccess.of(source)).build().resolve(schema);
 
         for (String entry : List.of("a", "b", "c")) {
             RecordField status = statusOf(linked, entry);
@@ -200,7 +201,7 @@ class ValueParamFixedFieldTest {
                 }
                 """;
         SchemaSource source = uri -> schema;
-        TsonLinkedSchema linked = Tson.builder().schemaSource(source).build().resolve(schema);
+        TsonLinkedSchema linked = Tson.builder().schemaAccess(SchemaAccess.of(source)).build().resolve(schema);
 
         // The kernel field is gone, so the compile-time proof is that this resolves at all; what is worth
         // asserting beyond that is that each closure kept the value its argument supplied.

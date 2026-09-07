@@ -216,7 +216,7 @@ public final class Tson {
     /**
      * Validates a data document, working out on its own whether a schema applies. If the document
      * declares a {@code !!schema}, that URI selects the schema (resolved through this instance's own
-     * {@link TsonConfig#schemaSource} and compiled once, in tree mode) and the document's root type-ref
+     * {@link TsonConfig#schemaAccess} and compiled once, in tree mode) and the document's root type-ref
      * (e.g. {@code !person}) selects the type; with no {@code !!schema} it's validated schemalessly
      * (Class 1: base syntax, plus the built-in type vocabulary for whatever the wire tags).
      *

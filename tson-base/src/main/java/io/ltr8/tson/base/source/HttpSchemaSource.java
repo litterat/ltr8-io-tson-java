@@ -2,6 +2,7 @@ package io.ltr8.tson.base.source;
 
 
 import io.ltr8.tson.base.SchemaFetchException;
+import io.ltr8.tson.base.policy.FetchPolicy;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,6 +17,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -73,33 +75,23 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
 
-    /** A schema document larger than this is refused. Generous for a schema; small enough not to be a memory lever. */
-    public static final int DEFAULT_MAX_DOCUMENT_BYTES = 1 << 20;
-
-    /** How long one fetch may take, end to end. */
+    /** How long one fetch may take, end to end. The one bound that is this source's own -- see {@link FetchPolicy}. */
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(5);
-
-    /** How many schema documents may be held. */
-    public static final int DEFAULT_MAX_CACHED_SCHEMAS = 128;
 
     /** [TSON-DATA] §7.1's media type, offered first and not insisted on -- a plain file server has no idea of it. */
     private static final String ACCEPT = "application/tson, */*;q=0.1";
 
     private final Map<String, URI> hosts;
-    private final int maxDocumentBytes;
+    private final FetchPolicy fetchPolicy;
     private final Duration timeout;
-    private final int maxCachedSchemas;
-    private final boolean requireContentHashPin;
     private final HttpClient client;
     private final boolean ownsClient;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
 
     private HttpSchemaSource(Builder builder) {
         this.hosts = Map.copyOf(builder.hosts);
-        this.maxDocumentBytes = builder.maxDocumentBytes;
+        this.fetchPolicy = builder.fetchPolicy;
         this.timeout = builder.timeout;
-        this.maxCachedSchemas = builder.maxCachedSchemas;
-        this.requireContentHashPin = builder.requireContentHashPin;
         this.ownsClient = builder.client == null;
         this.client = builder.client != null ? builder.client
                 : HttpClient.newBuilder()
@@ -140,7 +132,7 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
             return cached;
         }
         String document = get(reference, target.location());
-        if (cache.size() < maxCachedSchemas) {
+        if (cache.size() < fetchPolicy.maxCachedSchemas()) {
             cache.put(target.canonical(), document);
         }
         return document;
@@ -186,7 +178,7 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
 
     /** Where this source will go for {@code reference}, or a policy failure. */
     private Target permitted(String reference) {
-        SchemaReference identity = SchemaReference.of(reference, requireContentHashPin);
+        SchemaReference identity = SchemaReference.of(reference, fetchPolicy.requireContentHashPin());
         URI base = hosts.get(identity.host());
         if (base == null) {
             throw SchemaReference.notPermitted(reference, hosts.isEmpty()
@@ -231,14 +223,15 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
     }
 
     /**
-     * Reads at most {@link #DEFAULT_MAX_DOCUMENT_BYTES}, or whatever the builder set. The cap is enforced
-     * against the bytes actually delivered, never against {@code Content-Length} -- the host controls that too.
+     * Reads at most {@link FetchPolicy#maxDocumentBytes}. The cap is enforced against the bytes actually
+     * delivered, never against {@code Content-Length} -- the host controls that too.
      */
     private byte[] readCapped(String reference, InputStream body) throws IOException {
+        int maxDocumentBytes = fetchPolicy.maxDocumentBytes();
         byte[] read = body.readNBytes(maxDocumentBytes + 1);
         if (read.length > maxDocumentBytes) {
             throw new SchemaFetchException(reference, SchemaFetchException.Reason.TOO_LARGE,
-                    "a schema document may be at most " + maxDocumentBytes + " bytes", null);
+                    "a schema document may be at most " + fetchPolicy.maxDocumentBytes() + " bytes", null);
         }
         return read;
     }
@@ -255,10 +248,8 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
     public static final class Builder {
 
         private final Map<String, URI> hosts = new LinkedHashMap<>();
-        private int maxDocumentBytes = DEFAULT_MAX_DOCUMENT_BYTES;
+        private FetchPolicy fetchPolicy = FetchPolicy.defaults();
         private Duration timeout = DEFAULT_TIMEOUT;
-        private int maxCachedSchemas = DEFAULT_MAX_CACHED_SCHEMAS;
-        private boolean requireContentHashPin;
         private HttpClient client;
 
         private Builder() {
@@ -306,12 +297,27 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
             return this;
         }
 
-        /** The largest schema document that will be read. Defaults to {@link #DEFAULT_MAX_DOCUMENT_BYTES}. */
+        /**
+         * Everything this source will admit and spend obtaining a document, as the one value a deployment
+         * states. Defaults to {@link FetchPolicy#defaults()}.
+         *
+         * <p><b>This is the setter to reach for, and the three below are its components</b>, each deriving
+         * from what is already stated rather than replacing it. {@link FileSchemaSource} takes the same
+         * value, so a deployment that moves a schema from one to the other moves its constraints unchanged.
+         * {@link #timeout} is not part of it -- it is this source's own, having no counterpart on a
+         * directory.
+         */
+        public Builder fetchPolicy(FetchPolicy fetchPolicy) {
+            this.fetchPolicy = Objects.requireNonNull(fetchPolicy, "fetchPolicy");
+            return this;
+        }
+
+        /**
+         * The largest schema document that will be read. Defaults to
+         * {@link FetchPolicy#DEFAULT_MAX_DOCUMENT_BYTES}; one component of {@link #fetchPolicy}.
+         */
         public Builder maxDocumentBytes(int maxDocumentBytes) {
-            if (maxDocumentBytes <= 0) {
-                throw new IllegalArgumentException("maxDocumentBytes must be positive");
-            }
-            this.maxDocumentBytes = maxDocumentBytes;
+            this.fetchPolicy = fetchPolicy.withMaxDocumentBytes(maxDocumentBytes);
             return this;
         }
 
@@ -324,12 +330,12 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
             return this;
         }
 
-        /** How many documents may be cached. Defaults to {@link #DEFAULT_MAX_CACHED_SCHEMAS}. */
+        /**
+         * How many documents may be cached. Defaults to {@link FetchPolicy#DEFAULT_MAX_CACHED_SCHEMAS}; one
+         * component of {@link #fetchPolicy}.
+         */
         public Builder maxCachedSchemas(int maxCachedSchemas) {
-            if (maxCachedSchemas < 0) {
-                throw new IllegalArgumentException("maxCachedSchemas must not be negative");
-            }
-            this.maxCachedSchemas = maxCachedSchemas;
+            this.fetchPolicy = fetchPolicy.withMaxCachedSchemas(maxCachedSchemas);
             return this;
         }
 
@@ -340,7 +346,7 @@ public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
          * fetched document against a hash the operator already published.
          */
         public Builder requireContentHashPin(boolean requireContentHashPin) {
-            this.requireContentHashPin = requireContentHashPin;
+            this.fetchPolicy = fetchPolicy.withRequireContentHashPin(requireContentHashPin);
             return this;
         }
 

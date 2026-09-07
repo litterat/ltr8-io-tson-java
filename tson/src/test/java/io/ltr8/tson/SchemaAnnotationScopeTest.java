@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.AnnotatedMap;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -51,7 +52,7 @@ class SchemaAnnotationScopeTest {
             """;
 
     private static Tson tson() {
-        return Tson.builder().schemaSource(source()).build();
+        return Tson.builder().schemaAccess(SchemaAccess.of(source())).build();
     }
 
     private static SchemaSource source() {

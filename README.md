@@ -377,15 +377,15 @@ below.
 Sections 1–4 make *you* choose the reader; this one lets the **document** choose. A schema-aware
 `TsonTreeReader` (or `TsonObjectReader`), obtained from a configured `Tson` facade rather than
 constructed directly, reads a document that declares its own `!!schema`, resolves that schema through
-your `TsonSchemaSource`, and validates against it — falling back to a schemaless read when the document
+your `SchemaAccess`, and validates against it — falling back to a schemaless read when the document
 declares none. It's the value-returning peer of `tson.validate`:
 
 ```java
 Tson tson = Tson.builder()
         // Schemas you already hold, keyed by identity. Not `schemas::get` -- a source says "I cannot
         // supply that" by throwing, where a map returns null, for whichever identity the document names.
-        .schemaSource(TsonSchemaSource.ofMap(                 // the `server` schema from §4
-                Map.of("https://example.com/2026/35/app/server-1.tn", schema)))
+        .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(     // the `server` schema from §4
+                Map.of("https://example.com/2026/35/app/server-1.tn", schema))))
         .build();
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
@@ -735,7 +735,7 @@ OK
 - **Schema selection** is entirely the data's own doing: its `!!schema` names the schema and its root
   type-ref (`!person`) names the type. The CLI itself does no URL *fetching* — schemas come from the files
   you list, and one it can't match is `SCHEMA_NOT_FOUND` (exit 69), not a verdict on your data. The
-  library has fetching sources (`TsonHttpSchemaSource`, `TsonFileSchemaSource`); wiring one into the CLI is
+  library has fetching sources (`HttpSchemaSource`, `FileSchemaSource`); wiring one into the CLI is
   separate.
 - **`--output`**: `text` (default, human-readable), `json` (for scripts/agents — the shape aligns with
   Pydantic's own `errors()`), or `tson` (the diagnostics rendered as a real, schema-validated TSON

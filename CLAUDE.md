@@ -248,11 +248,18 @@ module has a real `module-info.java`; module names mirror each module's root exp
   stayed on the record — its nine siblings switch on an encoding's own exception type where it classifies
   nothing at all.
   **`io.ltr8.tson.base.policy`** is what this processor will admit and spend — `ProcessorPolicy` and the two
-  it composes, `UnicodePolicy` (§8.2's levels) and `LimitsPolicy` (§9.1's bounds) — one package because a
-  deployment states one policy, and §8.2 requires a relaxation be code rather than ambient: this is where
-  that code points. **`io.ltr8.tson.base.source`** is where a schema comes from — `SchemaSource` and the two
+  it composes, `UnicodePolicy` (§8.2's levels) and `LimitsPolicy` (§9.1's bounds), plus `FetchPolicy`, the
+  same statement about *obtaining a schema* (document cap, cache cap, whether a `?sha256=` pin is required)
+  — one package because a deployment states one set of constraints, and §8.2 requires a relaxation be code
+  rather than ambient: this is where that code points. **`FetchPolicy` is `ProcessorPolicy`'s sibling, not
+  its component**: a `ProcessorPolicy` is threaded into every reader and every stream, none of which fetch,
+  so a fetch bound riding the read path would be carried everywhere and used nowhere. A fetch *timeout*
+  stays `HttpSchemaSource`'s own — a directory has none, and a component one implementation silently ignores
+  is what makes a shared policy value untrustworthy.
+  **`io.ltr8.tson.base.source`** is where a schema comes from — `SchemaSource` and the two
   implementations that ship, a directory and an HTTPS host allow-list, both denying by default, with
-  `SchemaReference` (§2.2.1's rules on what an identity may be) package-private among them. [TSON-JSON]
+  `SchemaReference` (§2.2.1's rules on what an identity may be) package-private among them, and
+  `SchemaAccess` collecting a source with the `FetchPolicy` governing it. [TSON-JSON]
   §10.4 names that as the restriction an application processing untrusted input sets, which makes it
   configuration like the policies rather than machinery like an encoding's reader.
   **`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
@@ -878,10 +885,16 @@ over the kernel's vocabulary, plus `TsonAtomContext.registerDefaults` — and ar
 facades sharing this instance's registries, so a schema compiles once per `Tson`.
 `validate(String|InputStream)` *is* `treeReader()` with a collecting receiver — returns `List<Diagnostic>`
 (empty = valid) and never throws for a bad input document (a library fault still throws, deliberately).
-**Two fetching schema sources ship** — `TsonHttpSchemaSource` (HTTPS, host allow-list) and
-`TsonFileSchemaSource` (a directory) — with `httpSchemas(…)`/`fileSchemas(host, dir)` as their one-call
-forms, repeatable and mutually exclusive with each other and with `schemaSource(…)`, the general seam.
-`TsonSchemaSource.ofMap(Map)` is the non-fetching third, for schemas a caller already holds: it exists
+**Where schemas come from is one value, `SchemaAccess`** — a `SchemaSource` plus the `FetchPolicy`
+governing it, which is where a deployment may obtain a schema and under what constraints.
+`TsonConfig.schemaAccess` is the only setter for it: the vocabulary for *stating* one lives on
+`SchemaAccess` and nowhere else, so there is one place to learn it and one place it can drift.
+`SchemaAccess.httpSchemas(hosts…)`/`fileSchemas(host, dir)` are the one-call forms of the two fetching
+sources that ship — `HttpSchemaSource` (HTTPS, host allow-list) and `FileSchemaSource` (a directory) —
+`SchemaAccess.of(source)` wraps one built elsewhere, and `SchemaAccess.builder()` is the general form,
+where the three are mutually exclusive and a `FetchPolicy` may not be stated beside a source it cannot
+reach into.
+`SchemaSource.ofMap(Map)` is the non-fetching third, for schemas a caller already holds: it exists
 because `schemaSource(schemas::get)` is the natural first source and returns `null` for the identity the
 *document* chose, which the contract does not permit — a `null` carries no `Reason`. That is refused where
 the loader calls a source (`IllegalStateException`, so it stays a fault and `SchemaFailure` rethrows it),
@@ -891,7 +904,7 @@ exactly, and share `SchemaReference` for §2.2.1's rules on what an identity may
 out of a document and in a server that means a request body: the HTTP one guards SSRF (no redirects ever, size
 capped against bytes delivered), the file one arbitrary reads (containment checked *after* `toRealPath`, so
 `..` and symlink escape fall together). Neither verifies the `?sha256=` pin or the fetched `!!id` — the loader
-does both; `requireContentHashPin` adds the one thing it cannot, that a pin be present. **`TsonSchemaSource`
+does both; `requireContentHashPin` adds the one thing it cannot, that a pin be present. **`SchemaSource`
 names its own failure exception** — a source says "cannot supply this" with `SchemaFetchException` and
 nothing else, which is what lets `SchemaFailure` classify every branch positively and rethrow a fault as
 itself; the exception lives in `tson-compiler` beside the interface, since the classification cannot see a
