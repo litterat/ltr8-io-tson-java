@@ -230,18 +230,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   The wrinkle worth deciding first: `spec/` is a cache this repo otherwise only reads, so writing into it is
   a small change to what the script is for — `--check` alone may be the honest scope.
 
-- [ ] **`time` and `datetime` compare by offset, where [TSON-SCHEMA] §5.5 makes them instants.** The
-  value-space clause settles the equality contract the series used to delegate without defining, and it decides
-  this family against what is running: a `datetime` is the instant on the UTC timeline and a `time` is the time
-  of day in UTC, so `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are **one value**, `-00:00` is `Z`,
-  and `23:30:00-02:00` is `01:30:00Z`. `ValueIdentity.of` falls through to Java equality for both, and
-  `OffsetDateTime.equals`/`OffsetTime.equals` compare the offset — so all three rules that delegate to value
-  identity are wrong here at once: a map admits both spellings as two keys (§2.6), a set admits both as two
-  elements (§7.5), and a `REQUIRED_FIXED` field written in another offset is rejected (§5.2). Ordering is
-  already right and needs nothing: both host types' `compareTo` compares the instant. The fix is one case each
-  in `ValueIdentity.of` — normalise to the instant before comparing — and it must not touch what a reader hands
-  back, since §5.5 has TSON text preserve the offset as written.
-
 - [ ] **`class2/schema/` carries no vector declaring a template, and the reason it could not is gone.**
   [TSON-SCHEMA] §8.1 now says an open entry is a `type_definition` like any other — `parameters` non-empty,
   `body` the held application in wire form under §5.10's one-spelling rule, typed by the kernel's `schema`

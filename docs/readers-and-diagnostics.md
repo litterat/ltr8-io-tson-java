@@ -86,7 +86,13 @@ is small and parsed once.)
   `bytes` field rejecting the only document it can accept. A `String` compares NFC, a `byte[]` as its octets,
   and a tree atom by its normalised value **beside its type-ref and annotations** — stripping those is §2.6's
   rule for a key, where the schema fixes the key type, and would merge `!cm 5` with `!inch 5` if it reached a
-  set. `Rendered` is the other half: `byte[]` inherits `Object.toString`, so a diagnostic naming one said
+  set. **A `datetime` and a `time` compare as instants**, §5.5 making the mandatory offset a spelling: an
+  `OffsetDateTime` reduces to its instant and an `OffsetTime` to its time of day in UTC, so
+  `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are one value and `23:30:00-02:00` is `01:30:00Z`.
+  Java's own `equals` compares the offset on both, a narrower relation than the value space, so all three
+  rules were wrong here at once; ordering needed nothing, `compareTo` already comparing the instant. §5.5 has
+  TSON text preserve the offset as written, so this is an identity and never what a reader hands back.
+  `Rendered` is the other half: `byte[]` inherits `Object.toString`, so a diagnostic naming one said
   `[B@6d06d69c` until these comparisons could reach a value at all.
 - **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody`
   carries an `ElementState` governing the value — `{K => V?}`, §5.3's own row and the `state` field the
