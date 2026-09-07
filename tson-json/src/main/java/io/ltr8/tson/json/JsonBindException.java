@@ -1,12 +1,14 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.ParseException;
+
 
 /**
  * A JSON document and the class it was read into disagree: a value of the wrong shape for the
  * component it lands in, a member the class requires and the document omits, a number the target type
  * cannot hold exactly, a member name stated twice.
  *
- * <p><b>Not a {@code JsonParseException}.</b> The document is well-formed JSON -- it parsed to get
+ * <p><b>Not a {@code ParseException}.</b> The document is well-formed JSON -- it parsed to get
  * here. What failed is the reading of it <em>at a typed position</em>, where the type is the target
  * class's own descriptor rather than a TSON schema's. Keeping the two apart in the type is what lets a
  * caller tell "this is not JSON" from "this is not my JSON".

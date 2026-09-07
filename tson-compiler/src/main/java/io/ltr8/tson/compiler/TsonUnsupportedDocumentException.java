@@ -1,6 +1,8 @@
 package io.ltr8.tson.compiler;
 
 
+import io.ltr8.tson.base.ParseException;
+
 /**
  * Thrown when a document's header contains {@code !!meta}, making it a TSON <em>schema</em>
  * document rather than a data document. A Class 1 (data-format-only) processor does not support
@@ -8,13 +10,13 @@ package io.ltr8.tson.compiler;
  * (§1.5: "A Class 1 processor rejects schema documents with a categorized diagnostic"; §8.1:
  * "MUST report the document as a TSON schema document that this processor does not support").
  *
- * <p>Deliberately not a {@link TsonParseException}: the input isn't malformed -- it may be a
+ * <p>Deliberately not a {@link ParseException}: the input isn't malformed -- it may be a
  * perfectly well-formed schema document per [TSON-SCHEMA] -- this processor simply doesn't
  * implement that layer.
  *
  * <p><b>{@link #getMessage()} states what went wrong, never where</b> -- {@link #position()} is the
  * location, and a {@code Diagnostic} built from this carries it structurally; see {@link
- * TsonParseException} for the full reasoning. {@link #toString()} appends it for a stack trace.
+ * ParseException} for the full reasoning. {@link #toString()} appends it for a stack trace.
  */
 public final class TsonUnsupportedDocumentException extends RuntimeException {
 

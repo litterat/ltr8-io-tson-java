@@ -1,6 +1,6 @@
 package io.ltr8.tson.json.lexer;
 
-import io.ltr8.tson.json.JsonParseException;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
 import org.junit.jupiter.api.DisplayNameGeneration;
 import org.junit.jupiter.api.DisplayNameGenerator;
@@ -44,8 +44,8 @@ class JsonLexerTest {
         return tokens.getFirst();
     }
 
-    private static JsonParseException refused(String source) {
-        return assertThrows(JsonParseException.class, () -> tokens(source));
+    private static ParseException refused(String source) {
+        return assertThrows(ParseException.class, () -> tokens(source));
     }
 
     @Nested
@@ -218,7 +218,7 @@ class JsonLexerTest {
 
         @Test
         void an_unterminated_string_reports_at_the_opening_quote() {
-            JsonParseException e = refused("{\"a\": \"unterminated}");
+            ParseException e = refused("{\"a\": \"unterminated}");
             assertTrue(e.getMessage().contains("ends inside a string"));
             assertEquals(new JsonPosition(1, 7, 6), e.position());
         }
@@ -248,7 +248,7 @@ class JsonLexerTest {
         void an_invalid_byte_sequence_is_an_error_rather_than_a_replacement_character() {
             // §3.1: "invalid byte sequences are lexer errors ... no replacement characters, no
             // continuation". A CharsetDecoder's default would turn this into content nobody wrote.
-            JsonParseException e = assertThrows(JsonParseException.class,
+            ParseException e = assertThrows(ParseException.class,
                     () -> tokens((byte) '"', (byte) 0xC3, (byte) 0x28, (byte) '"'));
             assertTrue(e.getMessage().contains("not valid UTF-8"));
             assertTrue(e.getMessage().contains("not a UTF-8 continuation byte"));
@@ -258,15 +258,15 @@ class JsonLexerTest {
         void the_classic_smuggling_forms_are_refused() {
             // An overlong encoding of '/', and a surrogate half encoded in UTF-8: two spellings of one
             // thing, one of which a validator upstream may never have seen.
-            assertTrue(assertThrows(JsonParseException.class,
+            assertTrue(assertThrows(ParseException.class,
                     () -> tokens((byte) 0xC0, (byte) 0xAF)).getMessage().contains("shortest form"));
-            assertTrue(assertThrows(JsonParseException.class,
+            assertTrue(assertThrows(ParseException.class,
                     () -> tokens((byte) 0xED, (byte) 0xA0, (byte) 0x80)).getMessage().contains("surrogate code point"));
         }
 
         @Test
         void a_truncated_sequence_at_end_of_input_is_refused() {
-            assertTrue(assertThrows(JsonParseException.class,
+            assertTrue(assertThrows(ParseException.class,
                     () -> tokens((byte) 0xE4, (byte) 0xB8)).getMessage().contains("ends in the middle"));
         }
 
@@ -276,7 +276,7 @@ class JsonLexerTest {
             byte[] withBadByte = new byte[source.length + 1];
             System.arraycopy(source, 0, withBadByte, 0, source.length);
             withBadByte[source.length] = (byte) 0xFF;
-            assertEquals(4, assertThrows(JsonParseException.class,
+            assertEquals(4, assertThrows(ParseException.class,
                     () -> tokens(withBadByte)).position().byteOffset());
         }
 
@@ -337,11 +337,13 @@ class JsonLexerTest {
 
         @Test
         void a_message_states_what_went_wrong_and_the_position_states_where() {
-            JsonParseException e = refused("[1, +2]");
+            ParseException e = refused("[1, +2]");
             assertTrue(e.getMessage().contains("'+'"));
             assertTrue(!e.getMessage().contains("line"), () -> "the message states where: " + e.getMessage());
             assertEquals(new JsonPosition(1, 5, 4), e.position());
-            assertTrue(e.toString().contains("line 1, position 5"));
+            // The shared ParseException spells line and column; JsonPosition keeps JEP 540's "position"
+            // wording for its own toString, which is where a consumer prints one directly.
+            assertTrue(e.toString().contains("line 1, column 5"));
         }
     }
 

@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.json.tree.JsonArray;
 import io.ltr8.tson.json.tree.JsonBoolean;
@@ -62,14 +63,14 @@ class JsonTest {
         void a_duplicate_member_name_is_refused_at_the_repeated_occurrence() {
             // §3.1, and JEP 540 for the same reason: an object whose meaning depends on which member a
             // reader kept is what §10.2 calls the canonical smuggling case.
-            JsonParseException e = assertThrows(JsonParseException.class, () -> Json.parse("{\"a\": 1, \"a\": 2}"));
+            ParseException e = assertThrows(ParseException.class, () -> Json.parse("{\"a\": 1, \"a\": 2}"));
             assertTrue(e.getMessage().contains("'a' is already a member"));
             assertEquals(new JsonPosition(1, 10, 9), e.position());
         }
 
         @Test
         void a_duplicate_is_judged_by_decoded_name_not_by_spelling() {
-            assertThrows(JsonParseException.class, () -> Json.parse("{\"ab\": 1, \"\\u0061b\": 2}"));
+            assertThrows(ParseException.class, () -> Json.parse("{\"ab\": 1, \"\\u0061b\": 2}"));
         }
 
         @Test
@@ -79,7 +80,7 @@ class JsonTest {
 
         @Test
         void the_stream_is_drained_so_trailing_content_is_refused() {
-            assertTrue(assertThrows(JsonParseException.class, () -> Json.parse("[1] 2"))
+            assertTrue(assertThrows(ParseException.class, () -> Json.parse("[1] 2"))
                     .getMessage().contains("this one is complete"));
         }
 
@@ -87,7 +88,7 @@ class JsonTest {
         void bytes_and_a_string_parse_alike_and_bytes_are_where_the_utf8_rules_bite() {
             String source = "{\"\u00E9\": [1, true, null]}";
             assertEquals(Json.parse(source), Json.parse(new ByteArrayInputStream(source.getBytes(UTF_8))));
-            assertTrue(assertThrows(JsonParseException.class,
+            assertTrue(assertThrows(ParseException.class,
                     () -> Json.parse(new ByteArrayInputStream(new byte[]{'"', (byte) 0xC3, '"'})))
                     .getMessage().contains("not valid UTF-8"));
         }
@@ -128,7 +129,7 @@ class JsonTest {
             // It keeps the output well-formed UTF-8. The value is still one §3.1 refuses on the way back
             // in, and refusing it there is where the spec puts the rule.
             assertEquals("\"\\ud83d\"", new JsonString("\uD83D").toString());
-            assertThrows(JsonParseException.class, () -> Json.parse(new JsonString("\uD83D").toString()));
+            assertThrows(ParseException.class, () -> Json.parse(new JsonString("\uD83D").toString()));
         }
 
         @Test

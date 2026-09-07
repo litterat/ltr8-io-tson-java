@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.AnnotationEnd;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
@@ -139,7 +140,7 @@ class TsonDataStreamTest {
     @Test
     void unexpectedContentAfterRootValueIsParseError() {
         TsonDataStream stream = new TsonDataStream("Alice Bob");
-        assertThrows(TsonParseException.class, () -> {
+        assertThrows(ParseException.class, () -> {
             while (stream.hasNext()) {
                 stream.next();
             }
@@ -205,8 +206,8 @@ class TsonDataStreamTest {
     void aTrailingCommaInARecordIsOrdinaryAndAStrayOneIsNot() {
         assertEquals(List.of("DocumentStart(|)", "RecordStart", "FieldName(x)", "Token(1,UNQUOTED)",
                 "RecordEnd", "DocumentEnd"), shape("{ x: 1, }"));
-        assertThrows(TsonParseException.class, () -> shape("{ x: 1, , y: 2 }"));
-        assertThrows(TsonParseException.class, () -> shape("{ , x: 1 }"));
+        assertThrows(ParseException.class, () -> shape("{ x: 1, , y: 2 }"));
+        assertThrows(ParseException.class, () -> shape("{ , x: 1 }"));
     }
 
     /**
@@ -216,7 +217,7 @@ class TsonDataStreamTest {
      */
     @Test
     void aMismatchNamesTheConstructAndCarriesItStructurally() {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> shape("{ a: 1  b 2 }"));
+        ParseException thrown = assertThrows(ParseException.class, () -> shape("{ a: 1  b 2 }"));
         assertEquals("expected a record field's ':', found '2'", thrown.getMessage());
         assertEquals("a record field's ':'", thrown.expected());
         assertEquals("'2'", thrown.actual());
@@ -226,23 +227,23 @@ class TsonDataStreamTest {
     void contentAfterTheDocumentsValueIsAParseErrorFromTheStreamItself() {
         // RootFrame rejects it before ever emitting DocumentEnd, so no reader has to police trailing
         // content on top -- a whole-document read reaching DocumentEnd has already been guaranteed it.
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> shape("{ a: 1 } junk"));
+        ParseException thrown = assertThrows(ParseException.class, () -> shape("{ a: 1 } junk"));
         assertTrue(thrown.getMessage().contains("unexpected content after the document's value"), thrown::getMessage);
     }
 
     @Test
     void zeroWidthSeparationBetweenFieldsIsParseError() {
-        assertThrows(TsonParseException.class, () -> shape("{ a: \"x\"b: \"y\" }"));
+        assertThrows(ParseException.class, () -> shape("{ a: \"x\"b: \"y\" }"));
     }
 
     @Test
     void annotatedValueAsAttemptedFieldNameIsParseError() {
-        assertThrows(TsonParseException.class, () -> shape("{ @deprecated x: 1 }"));
+        assertThrows(ParseException.class, () -> shape("{ @deprecated x: 1 }"));
     }
 
     @Test
     void typedValueAsAttemptedFieldNameIsParseError() {
-        assertThrows(TsonParseException.class, () -> shape("{ !string x: 1 }"));
+        assertThrows(ParseException.class, () -> shape("{ !string x: 1 }"));
     }
 
     // ── Maps ─────────────────────────────────────────────────────────────
@@ -272,7 +273,7 @@ class TsonDataStreamTest {
     void aTrailingCommaInAMapIsOrdinaryAndAStrayOneIsNot() {
         assertEquals(List.of("DocumentStart(|)", "MapStart", "Token(a,UNQUOTED)", "MapArrow",
                 "Token(1,UNQUOTED)", "MapEnd", "DocumentEnd"), shape("{ a => 1, }"));
-        assertThrows(TsonParseException.class, () -> shape("{ a => 1, , b => 2 }"));
+        assertThrows(ParseException.class, () -> shape("{ a => 1, , b => 2 }"));
     }
 
     // ── The {} record/map lookahead heuristic: one token settles it for @ ! { [ _ ───
@@ -367,13 +368,13 @@ class TsonDataStreamTest {
     void aTrailingCommaInAnArrayIsOrdinaryAndAStrayOneIsNot() {
         assertEquals(List.of("DocumentStart(|)", "ArrayStart", "Token(1,UNQUOTED)", "Token(2,UNQUOTED)",
                 "Token(3,UNQUOTED)", "ArrayEnd", "DocumentEnd"), shape("[1, 2, 3,]"));
-        assertThrows(TsonParseException.class, () -> shape("[1, , 2]"));
-        assertThrows(TsonParseException.class, () -> shape("[, 1]"));
+        assertThrows(ParseException.class, () -> shape("[1, , 2]"));
+        assertThrows(ParseException.class, () -> shape("[, 1]"));
     }
 
     @Test
     void zeroWidthSeparationInArrayIsParseError() {
-        assertThrows(TsonParseException.class, () -> shape("[{a:1}{b:2}]"));
+        assertThrows(ParseException.class, () -> shape("[{a:1}{b:2}]"));
     }
 
     @Test
@@ -389,19 +390,19 @@ class TsonDataStreamTest {
     @Test
     void unterminatedArrayIsParseErrorNotHang() {
         assertTimeoutPreemptively(Duration.ofSeconds(2),
-                () -> assertThrows(TsonParseException.class, () -> shape("[1, 2, 3")));
+                () -> assertThrows(ParseException.class, () -> shape("[1, 2, 3")));
     }
 
     @Test
     void unterminatedRecordIsParseErrorNotHang() {
         assertTimeoutPreemptively(Duration.ofSeconds(2),
-                () -> assertThrows(TsonParseException.class, () -> shape("{ x: 1")));
+                () -> assertThrows(ParseException.class, () -> shape("{ x: 1")));
     }
 
     @Test
     void unterminatedNestedStructureIsParseErrorNotHang() {
         assertTimeoutPreemptively(Duration.ofSeconds(2),
-                () -> assertThrows(TsonParseException.class, () -> shape("{ x: [1 2")));
+                () -> assertThrows(ParseException.class, () -> shape("{ x: [1 2")));
     }
 
     // ── Type annotations (§3.2) ──────────────────────────────────────────
@@ -422,12 +423,12 @@ class TsonDataStreamTest {
 
     @Test
     void typeAnnotationMissingSpaceBeforeQuotedTokenIsParseError() {
-        assertThrows(TsonParseException.class, () -> shape("!int32\"5\""));
+        assertThrows(ParseException.class, () -> shape("!int32\"5\""));
     }
 
     @Test
     void bangNotAdjacentToTypeNameIsParseError() {
-        assertThrows(TsonParseException.class, () -> shape("! person Alice"));
+        assertThrows(ParseException.class, () -> shape("! person Alice"));
     }
 
     // ── Annotations (§3.1) ───────────────────────────────────────────────

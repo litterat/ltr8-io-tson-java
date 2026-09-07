@@ -9,7 +9,7 @@ import io.ltr8.tson.compiler.Position;
  *
  * <p><b>{@link #getMessage()} states what went wrong, never where</b> -- {@link #position()} is the
  * location, and a {@code Diagnostic} built from this carries it structurally; see {@code
- * TsonParseException} for the full reasoning. {@link #toString()} appends it for a stack trace.
+ * ParseException} for the full reasoning. {@link #toString()} appends it for a stack trace.
  */
 public final class LexException extends RuntimeException {
 

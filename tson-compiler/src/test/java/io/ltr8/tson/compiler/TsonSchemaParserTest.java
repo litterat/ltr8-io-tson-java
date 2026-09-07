@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.schema.ArrayRef;
 import io.ltr8.tson.compiler.ast.schema.AtomRefinement;
@@ -100,13 +101,13 @@ class TsonSchemaParserTest {
 
     @Test
     void missingMetaIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("{ a => text }"));
+        assertThrows(ParseException.class, () -> parse("{ a => text }"));
     }
 
     @Test
     void schemaDirectiveInHeaderIsAParseError() {
         // !!schema belongs to data documents, not schema documents (§2.2).
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!schema:"https://example.com/x.tn"
                 { a => text }"""));
@@ -116,7 +117,7 @@ class TsonSchemaParserTest {
 
     @Test
     void emptySchemaMapIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 {}"""));
     }
@@ -334,7 +335,7 @@ class TsonSchemaParserTest {
      */
     @Test
     void aMapArrowInARecordBodyNamesTheConstructRatherThanTheToken() {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { config => base ^ {text => text} }"""));
         assertTrue(thrown.getMessage().contains("'=>' begins a map type only where a type is expected"),
@@ -344,7 +345,7 @@ class TsonSchemaParserTest {
     /** A map <em>type</em> has one key type and one value type; the data grammar's multi-entry habit is named. */
     @Test
     void aSecondMapEntryIsNamedAsTheSingleEntryRuleRatherThanAnUnexpectedToken() {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { m => {text => integer  integer => text} }"""));
         assertTrue(thrown.getMessage().contains("a map type is a single 'key => value' entry"),
@@ -354,7 +355,7 @@ class TsonSchemaParserTest {
     /** At a type-ref position the two brace meanings are distinguished by name: a bare record must be declared. */
     @Test
     void aBareRecordAtATypeRefPositionDistinguishesTheTwoBraceMeanings() {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { holder => { inner: {name: text} } }"""));
         assertTrue(thrown.getMessage().contains("opens the map sugar"), thrown.getMessage());
@@ -369,7 +370,7 @@ class TsonSchemaParserTest {
      */
     @Test
     void aQuestionMarkOnAMapKeyIsAParseError() {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { m => {pair<text>? => integer} }"""));
         assertTrue(thrown.getMessage().contains("not permitted on a map type's key"), thrown.getMessage());
@@ -392,7 +393,7 @@ class TsonSchemaParserTest {
     /** And §12.3's adjacency rule applies there like anywhere else. */
     @Test
     void aDetachedQuestionMarkOnAMapValueIsAParseError() {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { m => {text => integer ?} }"""));
         assertTrue(thrown.getMessage().contains("immediately adjacent"), thrown.getMessage());
@@ -407,7 +408,7 @@ class TsonSchemaParserTest {
      */
     @Test
     void aQuestionMarkOnAPlainMapKeyIsAnsweredByTheBraceDispatch() {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { m => {text? => integer} }"""));
         assertTrue(thrown.getMessage().contains("a record field's ':'"), thrown.getMessage());
@@ -492,7 +493,7 @@ class TsonSchemaParserTest {
 
     @Test
     void groupWithOneMemberIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { a => { ( x: text ) } }"""));
     }
@@ -510,14 +511,14 @@ class TsonSchemaParserTest {
 
     @Test
     void choiceWithOneVariantIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { a => (text) }"""));
     }
 
     @Test
     void bareTypeRefFollowedByBraceIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { a => text { x: text } }"""));
     }
@@ -573,7 +574,7 @@ class TsonSchemaParserTest {
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { a => [text, integer,] }"""));
 
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { a => [text, , integer] }"""));
     }
@@ -640,7 +641,7 @@ class TsonSchemaParserTest {
             "t => !integer ^ !integer_type { min: 1 }",   // a second, competing type-ref on the payload
             "t => !integer ^ @doc:\"d\" { min: 1 }"})     // an annotation layer on the payload
     void anAtomRefinementBodyMustBeABracedRecord(String declaration) {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { %s }""".formatted(declaration)));
         assertTrue(thrown.getMessage().contains("'{'"), thrown.getMessage());
@@ -675,7 +676,7 @@ class TsonSchemaParserTest {
     /** {@code atom-refinement} keeps its unparameterised form -- refining an atom instance binds nothing. */
     @Test
     void aParameterizedAtomRefinementIsAParseError() {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { t => <N> !integer ^ { min: N } }"""));
         assertTrue(thrown.getMessage().contains("'^' takes no type parameters"), thrown.getMessage());
@@ -685,7 +686,7 @@ class TsonSchemaParserTest {
 
     @Test
     void numericDeclarationNameIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { 42 => text }"""));
     }
@@ -700,7 +701,7 @@ class TsonSchemaParserTest {
     @ValueSource(strings = {"42x", "-foo", ".foo", "+foo"})
     @ParameterizedTest
     void aDeclarationNameOutsideTheIdentifierProfileIsAParseError(String name) {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { %s => text }""".formatted(name)));
         assertTrue(thrown.getMessage().contains("cannot start an identifier"), thrown.getMessage());
@@ -713,7 +714,7 @@ class TsonSchemaParserTest {
      */
     @Test
     void aDeclarationNameContainingADotIsAParseError() {
-        TsonParseException thrown = assertThrows(TsonParseException.class, () -> parse("""
+        ParseException thrown = assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { x.y => text }"""));
         assertTrue(thrown.getMessage().contains("cannot appear in an identifier"), thrown.getMessage());
@@ -727,7 +728,7 @@ class TsonSchemaParserTest {
      */
     @Test
     void aLeadingUnderscoreDeclarationNameIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { _id => text }"""));
     }
@@ -735,7 +736,7 @@ class TsonSchemaParserTest {
     /** A type parameter is a name through the same {@code param_name} role, and reaches the same check. */
     @Test
     void aTypeParameterOutsideTheIdentifierProfileIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { box => <9t> { v: 9t } }"""));
     }
@@ -743,7 +744,7 @@ class TsonSchemaParserTest {
     /** And so is the constructor head of an atom refinement or instance, which names a type. */
     @Test
     void aConstructorHeadOutsideTheIdentifierProfileIsAParseError() {
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { t => !9integer { min: 1 } }"""));
     }
@@ -838,7 +839,7 @@ class TsonSchemaParserTest {
 
     @Test
     void aMismatchNamesTheConstructThePositionAdmitsAndNotTheTokenClass() {
-        TsonParseException e = assertThrows(TsonParseException.class, () -> declOf("a => { x: }"));
+        ParseException e = assertThrows(ParseException.class, () -> declOf("a => { x: }"));
         assertEquals("expected a type reference, found '}'", e.getMessage());
         assertEquals("a type reference", e.expected());
         assertEquals("'}'", e.actual());
@@ -846,13 +847,13 @@ class TsonSchemaParserTest {
 
     @Test
     void aQuotedTokenIsDescribedAsOneSinceItsTextAloneDoesNotSaySo() {
-        TsonParseException e = assertThrows(TsonParseException.class, () -> declOf("a => \"text\""));
+        ParseException e = assertThrows(ParseException.class, () -> declOf("a => \"text\""));
         assertEquals("expected a type reference, found the quoted token 'text'", e.getMessage());
     }
 
     @Test
     void anInlineAtomRefinementNamesTheFixRatherThanTheTokenItTrippedOn() {
-        TsonParseException e = assertThrows(TsonParseException.class,
+        ParseException e = assertThrows(ParseException.class,
                 () -> declOf("order => { quantity: !integer ^ { min: 1 } }"));
         assertTrue(e.getMessage().startsWith("an atom refinement or constructor application is not permitted "
                 + "at a type-ref position (§5.3)"), e::getMessage);
@@ -861,7 +862,7 @@ class TsonSchemaParserTest {
 
     @Test
     void aRuleViolationCarriesNoExpectedActualPairToInvent() {
-        TsonParseException e = assertThrows(TsonParseException.class, () -> declOf("a => { x: text ? }"));
+        ParseException e = assertThrows(ParseException.class, () -> declOf("a => { x: text ? }"));
         assertEquals("", e.expected());
         assertEquals("", e.actual());
     }
@@ -976,7 +977,7 @@ class TsonSchemaParserTest {
 
     @Test
     void aMissingReceiverIsStillFailFast() {
-        assertThrows(TsonParseException.class, () -> parse("""
+        assertThrows(ParseException.class, () -> parse("""
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 {
                   broken => { x: }
@@ -988,7 +989,7 @@ class TsonSchemaParserTest {
     @Test
     void aMalformedHeaderStillThrowsBecauseThereIsNothingToResynchroniseOn() {
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
-        assertThrows(TsonParseException.class,
+        assertThrows(ParseException.class,
                 () -> new TsonSchemaParser("{ a => text }").parseSchemaDocument(problems));
     }
 

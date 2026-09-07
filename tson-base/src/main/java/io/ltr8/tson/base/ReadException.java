@@ -23,7 +23,7 @@ public final class ReadException extends RuntimeException {
 
     /**
      * Appends where in the data the problem is, when the diagnostic locates it -- so a stack trace says
-     * where without {@link #getMessage()} inheriting it, the same division {@code TsonParseException} makes
+     * where without {@link #getMessage()} inheriting it, the same division {@code ParseException} makes
      * for a base-syntax failure. That matters most for the failures that <em>are</em> base-syntax ones: they
      * reach a fail-fast caller through this type now, and a trace that stopped saying where would be the one
      * thing lost in the trip through the receiver.

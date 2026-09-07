@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.ast.AbsentValue;
@@ -790,7 +791,7 @@ class ConformanceSuiteTest {
         String category = fieldText(outcomePayload(sidecar), "category");
         return switch (category) {
             case "lexer" -> LexException.class;
-            case "parser" -> TsonParseException.class;
+            case "parser" -> ParseException.class;
             case "resolver" -> AtomParseException.class;
             case "validation" -> AtomValidationException.class;
             default -> throw new AssertionError("unknown §8.1 category: " + category);

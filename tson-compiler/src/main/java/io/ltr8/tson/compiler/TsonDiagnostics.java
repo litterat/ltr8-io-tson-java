@@ -8,7 +8,7 @@ import java.util.Optional;
  * Turns a thrown failure into a {@link Diagnostic} -- the TSON text encoding's own classifiers.
  *
  * <p><b>Why these are not on {@code Diagnostic} itself.</b> Every method here switches on an exception
- * type this engine declares: {@code TsonParseException}, {@code LexException}, {@code
+ * type this engine declares: {@code ParseException}, {@code LexException}, {@code
  * TsonUnsupportedDocumentException}, {@code LimitExceededException}, {@code
  * SchemaFetchException}. A {@code Diagnostic} is the shape of an answer and is shared by every
  * encoding ([TSON-JSON] §9.4 reports in the same four categories and adds none); <em>classifying</em> a
@@ -59,7 +59,7 @@ public final class TsonDiagnostics {
         String expected = "well-formed TSON";
         String actual = "a base-syntax error";
         switch (e) {
-            case TsonParseException p -> {
+            case ParseException p -> {
                 position = p.position();
                 // A parse failure that named a construct carries the pair itself; one that stated a rule
                 // (an adjacency violation, a missing separator) has no substitution to describe.
@@ -118,7 +118,7 @@ public final class TsonDiagnostics {
      *                    malformed header, an unterminated map -- which makes the pointer a <em>present</em>
      *                    {@code ""}, RFC 6901's own spelling of "the whole document"
      */
-    public static Diagnostic ofSchemaSyntaxError(String schemaId, String declaration, TsonParseException e) {
+    public static Diagnostic ofSchemaSyntaxError(String schemaId, String declaration, ParseException e) {
         return new Diagnostic(Optional.empty(), Optional.of(declaration.isEmpty() ? "" : "/" + declaration),
                 schemaId, Diagnostic.Code.VALIDATION_ERROR, e.getMessage(),
                 e.expected().isEmpty() ? "well-formed TSON" : e.expected(),
@@ -127,7 +127,7 @@ public final class TsonDiagnostics {
     }
 
     /**
-     * {@link #ofSchemaSyntaxError(String, String, TsonParseException)} over the three ways a *schema* document
+     * {@link #ofSchemaSyntaxError(String, String, ParseException)} over the three ways a *schema* document
      * can fail before any declaration resolves, classified exactly as {@link #ofBaseSyntaxError} classifies
      * them and rethrowing anything else for the same reason. Lives here for the same reason too: {@code
      * LexException} is in the unexported {@code lexer} package, so a caller in another module cannot catch it.
@@ -135,7 +135,7 @@ public final class TsonDiagnostics {
     public static Diagnostic ofSchemaSyntaxError(String schemaId, RuntimeException e) {
         SourcePosition position;
         switch (e) {
-            case TsonParseException p -> {
+            case ParseException p -> {
                 return ofSchemaSyntaxError(schemaId, "", p);
             }
             case io.ltr8.tson.compiler.lexer.LexException l -> position = l.position();

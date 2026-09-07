@@ -36,7 +36,7 @@ import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
  *
  * <p><b>Unchecked failures only, deliberately</b> -- every exception this whole read/parse stack
  * throws is a {@link RuntimeException} (the lexer's own {@code LexException}, {@code
- * TsonParseException}, {@code TsonSchemaValidationException}, and so on); the one checked exception
+ * ParseException}, {@code TsonSchemaValidationException}, and so on); the one checked exception
  * anywhere in this codebase, {@code tson-bind}'s own {@code DataBindException}, is confined to
  * compile/bind-time setup and never reaches a {@link #read} call. A checked exception here would
  * also propagate through every functional interface this reader composes through ({@link

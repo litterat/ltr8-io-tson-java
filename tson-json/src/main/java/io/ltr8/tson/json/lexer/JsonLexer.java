@@ -1,6 +1,6 @@
 package io.ltr8.tson.json.lexer;
 
-import io.ltr8.tson.json.JsonParseException;
+import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
 
 import java.io.ByteArrayInputStream;
@@ -41,7 +41,7 @@ import java.util.List;
  * silently.
  *
  * <p>Not thread-safe; single-use over one source stream. Errors are thrown immediately
- * ({@link JsonParseException}), fail-fast, as the TSON lexer under the other encoding is.
+ * ({@link ParseException}), fail-fast, as the TSON lexer under the other encoding is.
  */
 public final class JsonLexer {
 
@@ -615,19 +615,19 @@ public final class JsonLexer {
      * The byte offset is the offending sequence's own first byte, exactly. Line and column name the
      * cursor, which is at most one code point behind it.
      */
-    private JsonParseException malformed(int sequenceStart, String detail) {
-        return new JsonParseException("the document is not valid UTF-8: " + detail,
+    private ParseException malformed(int sequenceStart, String detail) {
+        return new ParseException("the document is not valid UTF-8: " + detail,
                 new JsonPosition(line, col, sequenceStart));
     }
 
     /** Anchored to the token's own start -- for a malformed token discovered anywhere within it. */
-    private JsonParseException errorAtTokenStart(String message) {
-        return new JsonParseException(message, start());
+    private ParseException errorAtTokenStart(String message) {
+        return new ParseException(message, start());
     }
 
     /** Anchored to the live cursor -- for the offending character itself, where that is what a caller needs pointed at. */
-    private JsonParseException errorHere(String message) {
-        return new JsonParseException(message, here());
+    private ParseException errorHere(String message) {
+        return new ParseException(message, here());
     }
 
     /** A code point named the way a reader would recognise it: as itself where it is printable, as U+XXXX where it is not. */

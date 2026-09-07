@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.base.ParseException;
 
 /**
  * A source position: 1-based line, 1-based column (counted in Unicode code
@@ -9,7 +10,7 @@ import io.ltr8.tson.base.SourcePosition;
  * stripped), as required for error reports by §8.1.
  *
  * <p>Lives in the root package, not {@code lexer} where it's actually produced -- {@link
- * TsonParseException}/{@link TsonUnsupportedDocumentException} carry one in their own public
+ * ParseException}/{@link TsonUnsupportedDocumentException} carry one in their own public
  * {@code position()} accessor, and the root package is this module's real, exported front door
  * ({@link TsonDataParser}/{@link TsonSchemaParser}/{@link TsonTypeReader}); {@code lexer} itself
  * (the scanner, its tokens) is internal machinery a consumer never names directly.
