@@ -1,5 +1,8 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.ReadException;
+import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.LimitsPolicy;
 import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.base.ParseException;
@@ -65,14 +68,37 @@ class JsonTest {
         void a_duplicate_member_name_is_refused_at_the_repeated_occurrence() {
             // §3.1, and JEP 540 for the same reason: an object whose meaning depends on which member a
             // reader kept is what §10.2 calls the canonical smuggling case.
-            ParseException e = assertThrows(ParseException.class, () -> Json.parse("{\"a\": 1, \"a\": 2}"));
-            assertTrue(e.getMessage().contains("'a' is already a member"));
-            assertEquals(new JsonPosition(1, 10, 9), e.position());
+            //
+            // A DUPLICATE_FIELD diagnostic rather than a ParseException, because the grammar accepts the
+            // document -- §3.1 puts a repeat in the categories that follow the position's type, not in the
+            // parse category. JEP 540 calls it a parse error for want of anywhere else to put it; this has
+            // somewhere, and the default receiver still throws at the first.
+            Diagnostic d = assertThrows(ReadException.class,
+                    () -> Json.parse("{\"a\": 1, \"a\": 2}")).diagnostic();
+            assertEquals(Diagnostic.Code.DUPLICATE_FIELD, d.code());
+            assertTrue(d.message().contains("'a' is already a member"));
+            assertEquals("/a", d.path().orElseThrow());
+        }
+
+        @Test
+        void a_collecting_tree_read_finds_every_duplicate_and_still_hands_back_the_tree() {
+            // The reason the rule moved off ParseException. Tree mode keeps what it built, where a bound
+            // read hands back nothing: a JsonObject has somewhere to put a partial answer.
+            DiagnosticsCollector problems = new DiagnosticsCollector();
+            JsonValue tree = JsonTreeReader.standard().withDiagnostics(problems)
+                    .read("{\"a\": 1, \"a\": 2, \"b\": 3, \"b\": 4}");
+            assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD, Diagnostic.Code.DUPLICATE_FIELD),
+                    problems.diagnostics().stream().map(Diagnostic::code).toList());
+            assertEquals(List.of("/a", "/b"),
+                    problems.diagnostics().stream().map(d -> d.path().orElseThrow()).toList());
+            // Last value wins, which is what a reader that carries on has to do with the earlier one.
+            assertEquals(2, tree.get("a").asInt());
+            assertEquals(4, tree.get("b").asInt());
         }
 
         @Test
         void a_duplicate_is_judged_by_decoded_name_not_by_spelling() {
-            assertThrows(ParseException.class, () -> Json.parse("{\"ab\": 1, \"\\u0061b\": 2}"));
+            assertThrows(ReadException.class, () -> Json.parse("{\"ab\": 1, \"\\u0061b\": 2}"));
         }
 
         @Test

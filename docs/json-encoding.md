@@ -320,10 +320,10 @@ Three exported, layered the way the module reads a document, and the split is th
 
 | Package | Holds |
 |---|---|
-| `io.ltr8.tson.json` | `Json`, `JsonObjectReader`, `JsonPosition`, and the exceptions every layer raises |
+| `io.ltr8.tson.json` | `Json` (the front door), `JsonTreeReader`, `JsonObjectReader`, `JsonPosition` |
 | `io.ltr8.tson.json.tree` | `JsonValue` and its six node types, plus `JsonValueException` |
 | `io.ltr8.tson.json.stream` | `JsonEvent`, `JsonEventSource`, `JsonStream` |
-| `io.ltr8.tson.json.reader` | internal — the engines a reader is a facade over |
+| `io.ltr8.tson.json.reader` | internal — `SchemalessTreeReader`, `DataClassObjectReader`, `JsonReadContext` |
 | `io.ltr8.tson.json.atom` | internal — one JSON leaf into one host value, and where §5's per-family readers land |
 | `io.ltr8.tson.json.lexer` | internal — a consumer names a value, an event or a reader, never a token or a parser |
 
@@ -340,6 +340,38 @@ has nowhere else to go.
 The rendering lives on `JsonValue.toDisplayString(indent)` rather than only on `Json`, because the string
 quoting it needs is `tree`'s and package-private there. `Json.toDisplayString(value, indent)` is JEP 540's
 spelling of the same call and delegates.
+
+## The front door and its two readers
+
+`Json` is the configuration a read is judged under — the `ProcessorPolicy`, the binding, and where problems
+go — and hands out the two readers that apply it: `treeReader()` producing a `JsonValue`, `objectReader()`
+producing a bound Java object. That is the shape `Tson` takes over `TsonTreeReader`/`TsonObjectReader`. It
+holds no schema registry because there is nothing yet to register; §5–§8's decode is where one arrives, and
+this is where it will live.
+
+**JEP 540's entry points stay static on it** — `Json.parse(text)`, `Json.toDisplayString(value)` — over a
+default configuration. They are the zero-ceremony path the API is named for, and what a consumer moving from
+`jdk.incubator.json` will type. A caller needing a policy, a receiver or a binding builds an instance.
+
+`Json` used to reduce events into a tree itself, which put an **engine in a front door's name** and left the
+stack with no tree *facade* at all — a tree read could not be given a receiver, a policy or a path where a
+bound read could. The reduction is `SchemalessTreeReader`'s now, under `JsonTreeReader`, and the two readers
+are peers.
+
+**The tree engine is the one place `Schemaless` is the right word.** `DataClassObjectReader` is driven by the
+target class, which is in effect its schema; the tree reader is driven by nothing at all, so the name is
+accurate here where it would have been wrong there. Both are named for what drives them and what they
+produce.
+
+**§3.1's duplicate-member rule became a diagnostic** in the move: `DUPLICATE_FIELD` with an RFC 6901 pointer,
+reported rather than thrown, so a collecting read finds every repeat in one pass and a fail-fast one still
+stops at the first. That is more faithful to §3.1 than the `ParseException` it replaced — the grammar accepts
+the document, and §3.1 puts a repeat in the categories that follow the position's type rather than in the
+parse category. JEP 540 calls it a parse error for want of anywhere else to put it; this has somewhere.
+
+**A collecting tree read hands back the tree**, where a bound read hands back nothing: a `JsonObject` has
+somewhere to put a partial answer and a Java record does not. Same asymmetry `tson-compiler` draws between
+its own two readers.
 
 ## Binding: a facade over an engine
 
