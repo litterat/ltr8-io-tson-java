@@ -1,10 +1,12 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
-import io.ltr8.tson.base.LimitsPolicy;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.json.tree.JsonArray;
 import io.ltr8.tson.json.tree.JsonBoolean;
@@ -14,7 +16,9 @@ import io.ltr8.tson.json.tree.JsonObject;
 import io.ltr8.tson.json.tree.JsonString;
 import io.ltr8.tson.json.tree.JsonValue;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,12 +53,12 @@ public final class Json {
 
     /** @throws ParseException if the document is not JSON within §3.1's profile */
     public static JsonValue parse(String source) {
-        return parse(new JsonStream(source));
+        return parse(source, ProcessorPolicy.defaults());
     }
 
     /** @throws ParseException if the document is not JSON within §3.1's profile */
-    public static JsonValue parse(String source, LimitsPolicy limits) {
-        return parse(new JsonStream(source, limits));
+    public static JsonValue parse(String source, ProcessorPolicy policy) {
+        return parse(utf8(source), policy);
     }
 
     /**
@@ -62,12 +66,14 @@ public final class Json {
      * than replaced, and every position carries a real byte offset. {@code source} is not closed here.
      */
     public static JsonValue parse(InputStream source) {
-        return parse(new JsonStream(source));
+        return parse(source, ProcessorPolicy.defaults());
     }
 
-    /** {@link #parse(InputStream)} under a nesting bound other than {@link LimitsPolicy#DEFAULT_MAX_DEPTH the processor's default}. */
-    public static JsonValue parse(InputStream source, LimitsPolicy limits) {
-        return parse(new JsonStream(source, limits));
+    /** {@link #parse(InputStream)} under {@code policy} rather than the processor's defaults. */
+    public static JsonValue parse(InputStream source, ProcessorPolicy policy) {
+        // throwing(): this entry point has no receiver of its own and raises for everything else it
+        // refuses, so a token the policy declines raises too rather than vanishing.
+        return parse(new JsonStream(source, policy, DiagnosticsReceiver.throwing()));
     }
 
     /**
@@ -133,6 +139,18 @@ public final class Json {
             }
             elements.add(readValue(events, event));
         }
+    }
+
+    /**
+     * A string as the bytes this encoding actually reads.
+     *
+     * <p>§3.1 makes the document UTF-8, so the lexer takes bytes and nothing below this offers a
+     * {@code String} entry point. Re-encoding belongs here, at the front door a caller holding a string
+     * comes through, rather than at every layer under it -- one place, so the byte offsets a diagnostic
+     * carries mean the same thing whichever entry point produced them.
+     */
+    private static InputStream utf8(String source) {
+        return new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8));
     }
 
     // ── Rendering ────────────────────────────────────────────────────────

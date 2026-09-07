@@ -3,11 +3,9 @@ package io.ltr8.tson.json.lexer;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,6 +20,12 @@ import java.util.List;
  * UTF-8, invalid byte sequences are an error rather than a U+FFFD substitution, and every error
  * report carries a byte offset ([TSON-DATA] §8.1) that only the byte layer can count honestly. A
  * decoder handed characters has already lost all three.
+ *
+ * <p><b>Bytes only.</b> There is no {@code String} entry point, and JEP 540's {@code Json.parse(String)}
+ * is where that convenience belongs rather than here: §3.1 makes the document UTF-8, so a decoder handed
+ * characters has already lost the malformed-sequence rule and the byte offset §8.1 requires. A caller who
+ * holds a string is one {@code getBytes(UTF_8)} away, and doing it at the front door means one place
+ * re-encodes rather than every layer offering to.
  *
  * <p>At most one code point of lookahead beyond the cursor is buffered -- no JSON token needs more --
  * so memory held is bounded regardless of document size.
@@ -91,14 +95,6 @@ public final class JsonLexer {
         stripLeadingBom();
     }
 
-    /**
-     * Over an already-decoded string, for a caller who holds one -- JEP 540's own entry shape. The
-     * string is encoded back to UTF-8 so that byte offsets mean what §8.1 says they mean; a caller with
-     * bytes should hand over the bytes.
-     */
-    public JsonLexer(String source) {
-        this(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)));
-    }
 
     private static final int BOM = 0xFEFF;
 

@@ -8,7 +8,9 @@ import io.ltr8.tson.base.ProcessorPolicy;
 import io.ltr8.tson.json.reader.DataClassObjectReader;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 
 /**
@@ -113,37 +115,18 @@ public final class JsonObjectReader {
         this.engine = new DataClassObjectReader(context, ignoreUnknownMembers);
     }
 
-    /**
-     * This reader applying {@code policy} to every token a document carries -- its strings, its numbers and
-     * its member names ([TSON-DATA] §8.2's "Values", reached into this encoding by [TSON-JSON] §9.4).
-     *
-     * <p>Defaults to {@code unrestricted()}: a value is data and may legitimately be anything, so §8.2
-     * scans none of it until a deployment says otherwise -- and §8.2 requires that saying so be code rather
-     * than ambient, which is what this method is. The peer of {@code TsonObjectReader.withTokenPolicy}, and
-     * the policy rides the <em>stream</em> this reader builds, since that is what produces each token
-     * exactly once.
-     */
-    public JsonObjectReader withTokenPolicy(UnicodePolicy tokenPolicy) {
-        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy.withTokenPolicy(tokenPolicy));
-    }
+
 
     /**
-     * This reader under {@code limits} -- a new reader, leaving this one unchanged.
+     * This reader under {@code policy} -- a new reader, leaving this one unchanged.
      *
-     * <p>[TSON-JSON] §10.1 makes JSON's bounds [TSON-DATA] §9.1's policy "in JSON clothing, and the same
-     * policy applies with the same defaults", and §9.1 requires the bounds be configurable in code rather
-     * than from the ambient environment. The peer of {@code TsonObjectReader.withLimits}, and what replaced
-     * a per-call {@code maxDepth}: a bound is the reader's, not one read's.
-     */
-    public JsonObjectReader withLimits(LimitsPolicy limits) {
-        return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy.withLimits(limits));
-    }
-
-    /**
-     * This reader under {@code policy} whole -- what a caller holding a processor's own policy says in one
-     * call, rather than the derivations that each change one component of it. The peer of
-     * {@code TsonObjectReader.withProcessorPolicy}, and how a {@code Tson} front door will hand this reader
-     * the same policy its TSON readers carry.
+     * <p><b>The only policy derivation here, deliberately.</b> {@code ProcessorPolicy} already carries
+     * {@code withIdentifierPolicy}/{@code withTokenPolicy}/{@code withLimits}, so a caller changing one
+     * component says {@code r.withProcessorPolicy(r.processorPolicy().withTokenPolicy(p))} -- one method on
+     * the reader and the component derivations where the components live, rather than three more that only
+     * forward. The TSON facades carry all four for history; a new surface need not.
+     *
+     * <p>It is also how a {@code Tson} front door hands this reader the same policy its TSON readers carry.
      */
     public JsonObjectReader withProcessorPolicy(ProcessorPolicy policy) {
         return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy);
@@ -154,10 +137,6 @@ public final class JsonObjectReader {
         return policy;
     }
 
-    /** {@link #processorPolicy()}'s {@code limits} component, in one call. */
-    public LimitsPolicy limitsPolicy() {
-        return policy.limits();
-    }
 
     /**
      * This reader routing its problems to {@code receiver} -- a new reader, leaving this one unchanged.
@@ -206,7 +185,9 @@ public final class JsonObjectReader {
     // ── Reading ──────────────────────────────────────────────────────────
 
     public <T> T read(String source, Class<T> type) {
-        return read(new JsonStream(source, policy, receiver), type);
+        // §3.1 makes the document UTF-8 and the lexer takes bytes; a string is re-encoded here, at the
+        // front door, rather than by a convenience on every layer beneath.
+        return read(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)), type);
     }
 
 

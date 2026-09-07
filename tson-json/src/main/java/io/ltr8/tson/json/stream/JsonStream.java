@@ -104,23 +104,9 @@ public final class JsonStream implements JsonEventSource {
         DONE
     }
 
-    public JsonStream(InputStream source) {
-        this(new JsonLexer(source), LimitsPolicy.DEFAULT_MAX_DEPTH);
-    }
 
-    /** Under {@code limits} alone, for a caller with no receiver to report a token refusal to. */
-    public JsonStream(InputStream source, LimitsPolicy limits) {
-        this(new JsonLexer(source), limits.maxDepth());
-    }
 
-    /** {@link #JsonStream(InputStream, LimitsPolicy)} over a string. */
-    public JsonStream(String source, LimitsPolicy limits) {
-        this(new JsonLexer(source), limits.maxDepth());
-    }
 
-    public JsonStream(String source) {
-        this(new JsonLexer(source), LimitsPolicy.DEFAULT_MAX_DEPTH);
-    }
 
     /**
      * A stream reading under {@code policy}: its limits bound what this will spend (§10.1), and its token
@@ -143,26 +129,27 @@ public final class JsonStream implements JsonEventSource {
      *
      * <p>At {@code unrestricted()} -- the default, and every ordinary read -- it is a field read and a
      * branch.
+     *
+     * <p><b>The only constructor.</b> A stream reads under a policy and reports through a receiver; both
+     * are always true, so neither is defaulted here. A caller with nothing particular to say forms
+     * {@code ProcessorPolicy.defaults()} and {@code DiagnosticsReceiver.throwing()} where they can be seen,
+     * rather than picking them up from an overload that hides which defaults it chose.
      */
     public JsonStream(InputStream source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
-        this(new JsonLexer(source), policy.limits().maxDepth());
+        this(new JsonLexer(source), policy.limits());
         this.tokenPolicy = policy.tokenPolicy();
         this.tokenPolicyReceiver = receiver;
     }
 
-    /** {@link #JsonStream(InputStream, ProcessorPolicy, DiagnosticsReceiver)} over a string. */
-    public JsonStream(String source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
-        this(new JsonLexer(source), policy.limits().maxDepth());
-        this.tokenPolicy = policy.tokenPolicy();
-        this.tokenPolicyReceiver = receiver;
-    }
 
-    private JsonStream(JsonLexer lexer, int maxDepth) {
-        if (maxDepth < 1) {
-            throw new IllegalArgumentException("maxDepth must be at least 1, not " + maxDepth);
-        }
+    /**
+     * The one real constructor. The bound is read off the policy rather than taken as a number, so there is
+     * no way to hand this stream a depth that no {@code LimitsPolicy} would have accepted -- that record
+     * refuses a bound below one, and it refuses it once for every encoding.
+     */
+    private JsonStream(JsonLexer lexer, LimitsPolicy limits) {
         this.lexer = lexer;
-        this.maxDepth = maxDepth;
+        this.maxDepth = limits.maxDepth();
     }
 
     // ── The event source ─────────────────────────────────────────────────

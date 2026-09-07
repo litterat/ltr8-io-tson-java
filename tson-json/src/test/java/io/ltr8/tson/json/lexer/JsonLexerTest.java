@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class JsonLexerTest {
 
     private static List<JsonToken> tokens(String source) {
-        return new JsonLexer(source).tokenize();
+        return new JsonLexer(utf8(source)).tokenize();
     }
 
     private static List<JsonToken> tokens(byte... source) {
@@ -352,7 +352,7 @@ class JsonLexerTest {
 
         @Test
         void end_of_input_repeats() {
-            JsonLexer lexer = new JsonLexer("1");
+            JsonLexer lexer = new JsonLexer(utf8("1"));
             assertEquals(JsonTokenType.NUMBER, lexer.nextToken());
             assertEquals(JsonTokenType.EOF, lexer.nextToken());
             assertEquals(JsonTokenType.EOF, lexer.nextToken());
@@ -360,7 +360,7 @@ class JsonLexerTest {
 
         @Test
         void the_accessors_describe_whichever_token_was_produced_last() {
-            JsonLexer lexer = new JsonLexer("  \"ab\"");
+            JsonLexer lexer = new JsonLexer(utf8("  \"ab\""));
             assertEquals(JsonTokenType.STRING, lexer.nextToken());
             assertEquals("ab", lexer.text());
             assertEquals(3, lexer.startColumn());
@@ -383,5 +383,10 @@ class JsonLexerTest {
             String source = "\"" + "x".repeat(4096) + "\"";
             assertEquals(4096, only(source).text().length());
         }
+    }
+
+    /** §3.1 makes the document UTF-8 and the lexer takes bytes; a test holding a string says so here. */
+    private static java.io.InputStream utf8(String source) {
+        return new java.io.ByteArrayInputStream(source.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 }
