@@ -11,7 +11,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.atom.IdentifierParser;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.lexer.LexException;
@@ -554,10 +554,9 @@ public final class TsonDataStream implements TsonEventSource {
      * not read would put an allocation per name into a document's steady-state cost.
      */
     private void requireIdentifier(Token name, String role) {
-        try {
-            IdentifierParser.validate(name.text());
-        } catch (AtomTypeException e) {
-            throw new ParseException("invalid " + role + " -- " + e.getMessage(), name.start());
+        Optional<String> violation = IdentifierProfile.validate(name.text());
+        if (violation.isPresent()) {
+            throw new ParseException("invalid " + role + " -- " + violation.get(), name.start());
         }
     }
 
@@ -715,17 +714,16 @@ public final class TsonDataStream implements TsonEventSource {
      * quoted form is not an escape hatch from the profile, only from the lexical accidents of the unquoted one.
      *
      * <p><b>Normalised before it is matched, which is the one thing the profile does not decide here.</b>
-     * {@code IdentifierParser} requires NFC as a <em>form</em> and would refuse a decomposed name outright, but
+     * {@code IdentifierProfile} requires NFC as a <em>form</em> and would refuse a decomposed name outright, but
      * §2.5 gives a field name its identity by NFC-normalised comparison -- a decomposed spelling is the same
      * name, not a different one, and the corpus says so by making the pair a duplicate-field error. The lexer
      * already normalises the unquoted spelling, so refusing the form here would make the quoted spelling the
      * stricter of the two, which is the asymmetry this rule exists to remove.
      */
     private void requireFieldName(Token name) {
-        try {
-            IdentifierParser.validate(Nfc.of(name.text()));
-        } catch (AtomTypeException e) {
-            throw new ParseException("invalid field name -- " + e.getMessage()
+        Optional<String> violation = IdentifierProfile.validate(Nfc.of(name.text()));
+        if (violation.isPresent()) {
+            throw new ParseException("invalid field name -- " + violation.get()
                     + ". A record's fields are names a schema can declare; a key that is not a name belongs in "
                     + "a map, written '{ key => value }'", name.start());
         }

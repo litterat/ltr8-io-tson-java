@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import io.ltr8.tson.atom.IdentifierParser;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
@@ -332,7 +332,7 @@ class MetaLayerDataConstructorTest {
             // the *refusal* disappear whether or not the name is well formed.
             Matcher minted = Pattern.compile("names '([^']+)'").matcher(thrown.getMessage());
             assertTrue(minted.find(), thrown::getMessage);
-            assertDoesNotThrow(() -> IdentifierParser.validate(minted.group(1)),
+            assertTrue(IdentifierProfile.validate(minted.group(1)).isEmpty(),
                     () -> "§8.2: an internal name is a valid identifier -- got '" + minted.group(1) + "'");
             assertTrue(minted.group(1).chars().allMatch(c -> c < 0x80),
                     () -> "and ASCII, which is what lets §8.2's walk judge it: '" + minted.group(1) + "'");

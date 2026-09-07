@@ -706,7 +706,7 @@ class TsonSchemaParserTest {
     }
 
     /**
-     * The dot is <em>reserved</em> rather than spent (see {@code IdentifierParser}): it is the near-universal
+     * The dot is <em>reserved</em> rather than spent (see {@code IdentifierProfile}): it is the near-universal
      * identifier separator, so admitting it into a name now would foreclose using it as one later. It fails as a
      * continue character, where the cases above fail at Start.
      */

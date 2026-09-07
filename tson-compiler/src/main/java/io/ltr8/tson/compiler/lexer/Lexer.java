@@ -347,7 +347,7 @@ public final class Lexer {
      *
      * <p><b>The token layer follows the property; the name layer applies the contextual rule.</b> A joiner is
      * a token character, so an unquoted <em>value</em> may contain one and its content is its own. Whether a
-     * joiner may appear in a <em>name</em> is a different question, and {@code IdentifierParser} answers it
+     * joiner may appear in a <em>name</em> is a different question, and {@code IdentifierProfile} answers it
      * with UTS #39 §3.1.1.1 (§7.7 rule 2) -- permitted where it has a shaping effect, refused where it is
      * invisible. The split is what makes a blanket exclusion unnecessary: one would forbid Persian
      * {@code کتاب<ZWNJ>ها} and still let {@code "ad<ZWNJ>min"} reach a name through a quoted spelling, which

@@ -337,8 +337,8 @@ vocabulary — by three exceptions and three codes, and had holes at exactly the
 reached: an enum member and a group's member labels were checked for reading alike and for script mixing,
 and never for a restricted character, invisibly. A scope list
 can be reviewed; three call sites cannot. What stays at the reading positions is §7.7's grammar
-(`IdentifierParser.validate`), which is validity, is stable across Unicode versions, and really is a parse
-error; `IdentifierParser.hygiene` returns the restricted-character rule's verdict rather than throwing,
+(`IdentifierProfile.validate`), which is validity, is stable across Unicode versions, and really is a parse
+error; `IdentifierProfile.hygiene` returns the restricted-character rule's verdict rather than throwing,
 because a refusal is not
 one.
 

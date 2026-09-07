@@ -1,12 +1,8 @@
-package io.ltr8.tson.compiler.lexer;
+package io.ltr8.tson.base.unicode;
 
-import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
-import io.ltr8.tson.atom.AtomParseException;
-import io.ltr8.tson.atom.IdentifierParser;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -25,12 +21,16 @@ class JoiningControlsTest {
         return new String(codePoints, 0, codePoints.length);
     }
 
+    /** {@code identifier} itself where §7.7 admits it -- so an assertion reads as an equality. */
     private static String parse(String identifier) {
-        return IdentifierParser.INSTANCE.read(identifier);
+        assertTrue(IdentifierProfile.validate(identifier).isEmpty(),
+                () -> "should accept: " + IdentifierProfile.validate(identifier).orElse(""));
+        return identifier;
     }
 
     private static String refused(String identifier) {
-        return assertThrows(AtomParseException.class, () -> parse(identifier)).getMessage();
+        return IdentifierProfile.validate(identifier)
+                .orElseGet(() -> fail("should refuse: " + identifier));
     }
 
     // ---- A1: ZWNJ breaking a cursive connection -------------------------------------------------------

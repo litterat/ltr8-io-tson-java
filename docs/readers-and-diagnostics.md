@@ -443,7 +443,7 @@ that another processor at another Unicode version may accept the same document.
 
 **The restricted-character rule is gated on the level, as the restricted-script rule is.** §8.2's
 Unrestricted "drops the
-profile too", taking that rule with it, so `appliesIdentifierProfile()` guards the `IdentifierParser.hygiene`
+profile too", taking that rule with it, so `appliesIdentifierProfile()` guards the `IdentifierProfile.hygiene`
 call at both walks — the read context's and the linker's. Every other level keeps the profile, the
 restricted-script rule gating itself inside `violation()`.
 

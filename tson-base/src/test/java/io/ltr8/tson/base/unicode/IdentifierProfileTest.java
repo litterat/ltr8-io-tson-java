@@ -1,26 +1,33 @@
-package io.ltr8.tson.atom;
+package io.ltr8.tson.base.unicode;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The {@code identifier} contract (issue #231): {@code Start = XID_Start}, {@code Continue = XID_Continue ∪
- * { - }}, in NFC. This replaced a parser that returned {@code token.text()} unvalidated, so every rejection
- * below is a name the kernel accepted until now at every naming position it types.
+ * [TSON-DATA] §7.7's identifier profile: {@code Start = XID_Start}, {@code Continue = XID_Continue ∪ { - }},
+ * in NFC. It types every naming position in the series, so a name this admits is one a type, a field, a
+ * parameter or an enum member may carry.
+ *
+ * <p>The profile <b>reports</b> a violation rather than throwing one -- what a violation becomes is the
+ * caller's, a parse error from the lexer and a diagnostic from the linker -- so the assertions here are over
+ * {@link IdentifierProfile#validate}'s own answer.
  *
  * <p><b>No literal invisible character appears in this source</b>; each is built from its code point.
  */
-class IdentifierParserTest {
+class IdentifierProfileTest {
 
+    /** {@code text} itself when the profile admits it, so an assertion reads as an equality. */
     private static String read(String text) {
-        return IdentifierParser.INSTANCE.read(text);
+        assertTrue(IdentifierProfile.validate(text).isEmpty(),
+                () -> "should accept: " + text + " -- " + IdentifierProfile.validate(text).orElse(""));
+        return text;
     }
 
     private static String rejects(String text) {
-        return assertThrows(AtomParseException.class, () -> read(text), () -> "should reject: " + text)
-                .getMessage();
+        return IdentifierProfile.validate(text)
+                .orElseGet(() -> fail("should reject: " + text));
     }
 
     @Test
@@ -66,7 +73,7 @@ class IdentifierParserTest {
      * Obsolete and technical characters, which XID admits and the General Security Profile does not -- and
      * which are <b>refused, not rejected</b>. [TSON-DATA] §8.2 makes {@code Identifier_Status} a policy
      * rule whose failure MUST NOT be reported in any of §8.1's four categories, so the grammar accepts
-     * such a name (it is a well-formed identifier) and {@link IdentifierParser#hygiene} is what declines it.
+     * such a name (it is a well-formed identifier) and {@link IdentifierProfile#hygiene} is what declines it.
      *
      * <p>Nothing here applies the policy. Every position that reads a name applies the grammar and only the
      * grammar; §8.2's name-hygiene rules run once per layer over the scopes §8.2 and [TSON-SCHEMA] §11.4 define --
@@ -77,8 +84,9 @@ class IdentifierParserTest {
         for (int cp : new int[] {0x07E8, 0xA610, 0x1B6B}) {
             String text = "ab" + new String(Character.toChars(cp)) + "c";
             String label = "U+%04X".formatted(cp);
-            assertEquals(text, IdentifierParser.validate(text), () -> label + " is a well-formed identifier");
-            assertTrue(IdentifierParser.hygiene(text).orElseThrow(() -> new AssertionError(label))
+            assertTrue(IdentifierProfile.validate(text).isEmpty(),
+                    () -> label + " is a well-formed identifier");
+            assertTrue(IdentifierProfile.hygiene(text).orElseThrow(() -> new AssertionError(label))
                     .contains("Identifier_Status=Restricted"), () -> label);
             // And read() -- the atom-parser path -- is the grammar too, so a restricted name reaches the
             // scope walk that refuses it rather than dying here as a malformed one.
@@ -91,7 +99,7 @@ class IdentifierParserTest {
     void aJoinerOutsideItsContextIsAGrammarFailureNotARefusal() {
         String text = "ab" + new String(Character.toChars(0x200C)) + "cd";
         assertTrue(rejects(text).contains("join control outside the contexts"));
-        assertTrue(IdentifierParser.hygiene(text).isEmpty(),
+        assertTrue(IdentifierProfile.hygiene(text).isEmpty(),
                 "the restricted-character rule does not judge a joiner");
     }
 
@@ -128,10 +136,5 @@ class IdentifierParserTest {
     void aJoinerInLatinIsRefusedBecauseNoContextAdmitsItThere() {
         String zwnj = "ab" + new String(Character.toChars(0x200C)) + "c";
         assertTrue(rejects(zwnj).contains("§3.1.1.1"), rejects(zwnj));
-    }
-
-    @Test
-    void writeIsTheIdentity() {
-        assertEquals("anything", IdentifierParser.INSTANCE.write("anything"));
     }
 }

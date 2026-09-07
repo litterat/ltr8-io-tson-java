@@ -30,7 +30,7 @@ import java.util.Arrays;
  * </ul>
  *
  * <p><b>Both of §3.1.1.1's global conditions apply to the matched sequence, not to the identifier.</b> The
- * script restriction is checked here, over each matched span. Normalization is not: {@code IdentifierParser}
+ * script restriction is checked here, over each matched span. Normalization is not: {@code IdentifierProfile}
  * rejects an identifier that is not NFC before consulting this class at all, so every sequence reaching here
  * is already NFC and a second check could not fail.
  *

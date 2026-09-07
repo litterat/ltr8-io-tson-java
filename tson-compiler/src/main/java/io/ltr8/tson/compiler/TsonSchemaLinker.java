@@ -14,7 +14,7 @@ import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.atom.IdentifierParser;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.base.unicode.ConfusableNames;
 import io.ltr8.tson.compiler.reader.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
@@ -292,7 +292,7 @@ public final class TsonSchemaLinker {
         // code, since the
         // two want different fixes -- change the character, against rename or relax the policy.
         if (identifiers.appliesIdentifierProfile()) {
-            IdentifierParser.hygiene(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
+            IdentifierProfile.hygiene(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
                     Diagnostic.Code.RESTRICTED_CHARACTER, prefix + "'" + name + "': " + why));
         }
         identifiers.violation(name).ifPresent(why -> refuse(receiver, schema, entry, definition,
