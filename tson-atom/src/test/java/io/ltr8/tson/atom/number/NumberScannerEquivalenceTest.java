@@ -1,9 +1,5 @@
-package io.ltr8.tson.compiler.base;
+package io.ltr8.tson.atom.number;
 
-import io.ltr8.tson.atom.number.ComplexForm;
-import io.ltr8.tson.atom.number.NumberForm;
-import io.ltr8.tson.atom.number.NumberGrammar;
-import io.ltr8.tson.atom.number.RationalForm;
 
 import org.junit.jupiter.api.Test;
 
