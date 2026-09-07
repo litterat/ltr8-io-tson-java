@@ -764,18 +764,22 @@ reference to a dropped declaration on top of the real error. Namespace-level fai
 `!!import`, ineligible `!!meta`, `!!id` cross-check) still throw even with a receiver. Compilation, and the
 lexer under everything, are still fail-fast.
 
-**`ProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2
-policies (`identifierPolicy`, `tokenPolicy`, under `TsonConfig`'s own names — level, whole-name or
-per-segment unit, and any `permitting` relaxations) plus
-the UCD version and §9.1's limits, reachable as `Tson.processorPolicy()`, either facade's `processorPolicy()` (read off the
-reader that judged, since a derived reader is where the two can differ), and `tson policy` on the command
-line. It is what makes a §8.2 divergence explainable: the same bytes may be refused here and accepted
-elsewhere, and the reason is in neither the document nor the schema. It is deliberately **not** a diagnostic
-component — the fact is constant for a run, so a per-refusal copy is N copies of one string; it arrives only
-on failure, where what a sender needs is the rule *before* it writes; and a version says what refused you
-where a level says what would be accepted. That last is why the standalone surface matters more than the
-envelope one: a generator that reads the policy first never writes the name that would be refused, which is
-the round trip the format exists to avoid. §8.2 requires exactly this shape, naming the two policies
+**`ProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2 policies
+(`identifierPolicy`, `tokenPolicy`, under `TsonConfig`'s own names — level, whole-name or per-segment unit, and any
+`permitting` relaxations) plus the UCD version and §9.1's limits, reachable as `Tson.processorPolicy()`, either facade's
+`processorPolicy()` (read off the reader that judged, since a derived reader is where the two can differ), and `tson policy`
+on the command line. **It is also configured once**: `TsonConfig.processorPolicy` takes the whole value, the three named
+setters derive one component each from what is already stated, and `Tson` holds the result — so the report is an accessor
+rather than a reassembly, and `Json.withProcessorPolicy` takes the same value, one policy serving both encodings. **The value
+holds its own invariant**: a token policy may not be per-segment (`_` and `-` are word separators in a name and ordinary
+characters in a value, so segmenting one admits UTS #39's own `Toys-Я-Us`), and the compact constructor is what refuses it,
+so no assembly route — setter, wither, or a value a caller composes — is a way around a rule the others apply. It is what
+makes a §8.2 divergence explainable: the same bytes may be refused here and accepted elsewhere, and the reason is in neither
+the document nor the schema. It is deliberately **not** a diagnostic component — the fact is constant for a run, so a
+per-refusal copy is N copies of one string; it arrives only on failure, where what a sender needs is the rule *before* it
+writes; and a version says what refused you where a level says what would be accepted. That last is why the standalone
+surface matters more than the envelope one: a generator that reads the policy first never writes the name that would be
+refused, which is the round trip the format exists to avoid. §8.2 requires exactly this shape, naming the two policies
 (`identifier policy`, `token policy`) so two implementations reporting them agree on what they are called.
 
 **`LimitsPolicy` is §9.1's half of the same statement, and it is a component of it.** What this

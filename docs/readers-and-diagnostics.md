@@ -540,6 +540,24 @@ grew the matching three so a reader's derivation is one call rather than a rebui
 the whole-value form, and what `Tson.objectReader()`/`treeReader()` now use — they chained all three before,
 which was three chances to state two and forget the third.
 
+**The front door states it the same way.** `TsonConfig.processorPolicy` takes the whole value and is the
+setter to reach for; `identifierPolicy`/`tokenPolicy`/`limits` are its components, each deriving from
+whatever is already stated rather than replacing it, so a piecewise configuration and a composed one reach
+the same processor and neither clobbers the other. `Tson` holds the one value, so `Tson.processorPolicy()`
+is an accessor: the identifier half is handed to the schema registry at construction because the linker
+judges declared names, and that is a use of the policy rather than a second home for it. A policy
+reassembled on demand from components living in three places is one a caller can state and a report can
+contradict. It is also what lets one policy configure both encodings — `Json.withProcessorPolicy` takes this
+same value, and a deployment stating its constraints twice has two places to get them wrong.
+
+**A token policy is never per-segment, and `ProcessorPolicy` is what refuses one.** `_` and `-` are word
+separators by convention in a name and ordinary characters in a value, so segmenting a value admits UTS
+#39's own `Toys-Я-Us` — the spoof a strict token policy exists to refuse. That is a property of what a token
+policy can *mean*, not of any one way of stating one, so the compact constructor holds it and every route
+that assembles a policy passes through there: the named setters, the withers, and a value a caller composes
+itself. A check on each setter instead is a check every new route has to remember, and one route that
+forgets accepts what all the others refuse.
+
 **It carries three settings, not two.** The identifier policy, the token policy and the limits, plus the UCD
 version the first two were computed against. The limits sat beside it while it was named
 `ProcessorPolicy` — correctly, since a nesting bound has no business inside a *Unicode* policy —

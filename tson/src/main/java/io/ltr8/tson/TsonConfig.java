@@ -7,6 +7,7 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.source.HttpSchemaSource;
 import io.ltr8.tson.base.source.FileSchemaSource;
 import io.ltr8.tson.base.policy.LimitsPolicy;
+import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -22,7 +23,8 @@ import java.util.Objects;
  * directly. {@link #schemaSource} fetches user schemas beyond the bundled standard library;
  * {@link #bindings}/{@link #profile} say which Java classes the schema's types bind to and, where a class
  * offers several shapes, which one ({@link #dataBindContext} is the long form of the same thing, and the two
- * are mutually exclusive); {@link #metaNameBinder} binds a governing meta's own constructors; and
+ * are mutually exclusive); {@link #metaNameBinder} binds a governing meta's own constructors;
+ * {@link #processorPolicy} states what this processor will admit as a name and spend on a document; and
  * {@link #lenientBinding} lets a class hold fewer fields than its schema declares. {@link #build()}
  * constructs a {@link TsonCompiledMetaRegistry} and has it
  * load the bundled meta-kernel/meta.tn/core.tn standard library, then wraps it as a {@link Tson}.
@@ -38,11 +40,7 @@ public final class TsonConfig {
     private DataBindContext dataBindContext = TsonAtomContext.defaultContext();
     private SchemaSource schemaSource = SchemaSource.registeredOnly();
     private DataNameBinder metaNameBinder;
-    private UnicodePolicy identifierPolicy = UnicodePolicy.highlyRestrictive();
-
-    private UnicodePolicy tokenPolicy = UnicodePolicy.unrestricted();
-
-    private LimitsPolicy limits = LimitsPolicy.defaults();
+    private ProcessorPolicy policy = ProcessorPolicy.defaults();
     private boolean strictBinding = true;
     private Map<String, Class<?>> bindings;
     private String profile;
@@ -231,6 +229,31 @@ public final class TsonConfig {
     }
 
     /**
+     * Everything about a read that is in neither the document nor the schema -- the two [TSON-DATA] §8.2
+     * Unicode surfaces and §9.1's resource bounds -- as the one value a deployment states. Defaults to
+     * {@link ProcessorPolicy#defaults()}.
+     *
+     * <p><b>This is the setter to reach for, and the three below are its components.</b> A deployment's
+     * constraints are one decision made in one place -- typically a platform library handing an application
+     * a policy it does not assemble itself -- so the primary form takes the whole value and
+     * {@link #identifierPolicy}/{@link #tokenPolicy}/{@link #limits} fold into it. That is also what lets
+     * one policy configure both encodings: {@code Json.withProcessorPolicy} takes this same value, and a
+     * deployment that states its constraints twice has two places to get them wrong.
+     *
+     * <p>Reported back by {@link Tson#processorPolicy()}, by each reader, and by {@code tson policy}.
+     *
+     * <p><b>In code on purpose.</b> A security policy read from the environment is ambient authority: a CI
+     * config, a container image or a dependency calling {@code setenv} would change it with no diff and
+     * nothing in review, it would be invisible at the call site, and it would be process-global, so a
+     * library embedding this one could not hold its own. A method call is greppable, diffable and scoped to
+     * the instance that holds it.
+     */
+    public TsonConfig processorPolicy(ProcessorPolicy policy) {
+        this.policy = Objects.requireNonNull(policy, "policy");
+        return this;
+    }
+
+    /**
      * The UTS #39 §5.2 restriction level applied to every name a schema declares -- type names, record field
      * names, parameter names and enum members -- [TSON-DATA] §8.2's restricted-script rule, over the schema-layer
      * scopes [TSON-SCHEMA] §11.4 names.
@@ -254,14 +277,11 @@ public final class TsonConfig {
      * drops that too — §5.2's own level 6, which takes {@code Identifier_Status} with it and which §5.2
      * describes as a diagnostic tool.
      *
-     * <p><b>This is a code path on purpose.</b> A security policy read from the environment is ambient
-     * authority: a CI config, a container image or a dependency calling {@code setenv} would change it with
-     * no diff and nothing in review, it would be invisible at the call site, and it would be process-global,
-     * so a library embedding this one could not hold its own. A method call is greppable, diffable and
-     * scoped to the instance that holds it.
+     * <p>One component of {@link #processorPolicy}, which is where a deployment stating all three at once
+     * says so.
      */
-    public TsonConfig identifierPolicy(UnicodePolicy policy) {
-        this.identifierPolicy = Objects.requireNonNull(policy, "policy");
+    public TsonConfig identifierPolicy(UnicodePolicy identifierPolicy) {
+        this.policy = policy.withIdentifierPolicy(Objects.requireNonNull(identifierPolicy, "identifierPolicy"));
         return this;
     }
 
@@ -295,17 +315,16 @@ public final class TsonConfig {
      * <p>{@link UnicodePolicy.Level#MINIMALLY_RESTRICTIVE} and {@link UnicodePolicy.Level#UNRESTRICTED}
      * collapse here: §5.2 says so directly, a token that is not a name having no identifier profile to drop.
      *
-     * @throws IllegalArgumentException if {@code policy} is per-segment -- {@code _} and {@code -} are word
-     *         separators by convention in a name and ordinary characters in a value, so segmenting one admits
-     *         UTS #39's own {@code Toys-Я-Us}, the spoof a strict token policy exists to refuse
+     * <p>One component of {@link #processorPolicy}, which is where a deployment stating all three at once
+     * says so.
+     *
+     * @throws IllegalArgumentException if {@code tokenPolicy} is per-segment -- {@code _} and {@code -} are
+     *         word separators by convention in a name and ordinary characters in a value, so segmenting one
+     *         admits UTS #39's own {@code Toys-Я-Us}, the spoof a strict token policy exists to refuse.
+     *         {@link ProcessorPolicy} enforces it, so every route to a policy refuses it alike
      */
-    public TsonConfig tokenPolicy(UnicodePolicy policy) {
-        Objects.requireNonNull(policy, "policy");
-        if (policy.isPerSegment()) {
-            throw new IllegalArgumentException("a token policy cannot be per-segment: '_' and '-' are ordinary "
-                    + "characters in a value, not word separators -- use the whole-text policy instead");
-        }
-        this.tokenPolicy = policy;
+    public TsonConfig tokenPolicy(UnicodePolicy tokenPolicy) {
+        this.policy = policy.withTokenPolicy(Objects.requireNonNull(tokenPolicy, "tokenPolicy"));
         return this;
     }
 
@@ -313,18 +332,21 @@ public final class TsonConfig {
      * The [TSON-DATA] §9.1 resource limits every read off this instance applies -- {@link
      * LimitsPolicy#defaults()} unless this says otherwise.
      *
-     * <p><b>In code, for {@link #identifierPolicy}'s reason.</b> §9.1 requires the bounds be configurable;
+     * <p><b>In code, for {@link #processorPolicy}'s reason.</b> §9.1 requires the bounds be configurable;
      * taking them from the ambient environment instead would let a deployment's behaviour change without any
      * statement of it in the deployment, which is the property that makes a refusal explainable. A caller
      * that raises the depth is choosing to spend more Java stack on one document, and {@link
      * LimitsPolicy#withMaxDepth} says what the ceiling on that choice actually is.
+     *
+     * <p>One component of {@link #processorPolicy}, which is where a deployment stating all three at once
+     * says so.
      *
      * <p>Reported back by {@link Tson#limitsPolicy()} and by each reader ({@link
      * io.ltr8.tson.compiler.TsonTreeReader#limitsPolicy()}), which is where a derived reader's own {@code
      * withLimits} shows.
      */
     public TsonConfig limits(LimitsPolicy limits) {
-        this.limits = Objects.requireNonNull(limits, "limits");
+        this.policy = policy.withLimits(Objects.requireNonNull(limits, "limits"));
         return this;
     }
 
@@ -376,9 +398,9 @@ public final class TsonConfig {
         // accumulate hosts into one source instead of each replacing the last.
         SchemaSource source = httpSchemas != null ? httpSchemas.build()
                 : fileSchemas != null ? fileSchemas.build() : schemaSource;
-        TsonCompiledMetaRegistry core =
-                TsonCompiledMetaRegistry.withStandardLibrary(schemaContext, source, identifierPolicy);
-        return new Tson(core, dataBindContext, strictBinding, tokenPolicy, limits);
+        TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
+                schemaContext, source, policy.identifierPolicy());
+        return new Tson(core, dataBindContext, strictBinding, policy);
     }
 
     /**
