@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.SourcePosition;
 
 /**
  * A compiler error (§8.1): structural mismatches -- unclosed brackets, adjacency violations,
@@ -13,6 +14,13 @@ package io.ltr8.tson.compiler;
  * {@link #toString()} appends it, so a stack trace still says where without the diagnostic
  * inheriting it.
  *
+ * <p><b>The location is a {@link SourcePosition}, not this module's {@code Position}.</b> "This document
+ * is not well-formed in its encoding" is one fact that every encoding states, and the three coordinates a
+ * report points at are all any consumer of one needs -- so the exception names the interface and each
+ * encoding constructs it with its own record ({@code Position} here, {@code JsonPosition} in
+ * {@code tson-json}), which both implement. {@code LimitExceededException} carries its location the same
+ * way and for the same reason.
+ *
  * <p><b>{@link #expected()}/{@link #actual()} are the machine-readable half of the same failure</b>,
  * carried so a diagnostic built from this exception has a structured account and not only a
  * sentence -- the same division of labour {@code AtomTypeException} makes for value errors, and the
@@ -25,22 +33,22 @@ public final class TsonParseException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
-    private final transient Position position;
+    private final transient SourcePosition position;
     private final String expected;
     private final String actual;
 
-    public TsonParseException(String message, Position position) {
+    public TsonParseException(String message, SourcePosition position) {
         this(message, "", "", position);
     }
 
-    public TsonParseException(String message, String expected, String actual, Position position) {
+    public TsonParseException(String message, String expected, String actual, SourcePosition position) {
         super(message);
         this.position = position;
         this.expected = expected;
         this.actual = actual;
     }
 
-    public Position position() {
+    public SourcePosition position() {
         return position;
     }
 
