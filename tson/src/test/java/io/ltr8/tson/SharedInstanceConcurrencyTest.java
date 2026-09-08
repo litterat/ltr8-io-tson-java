@@ -113,7 +113,8 @@ class SharedInstanceConcurrencyTest {
                 assertTrue(tson.validate(DOCUMENT).isEmpty(), "the valid document is valid on every thread");
                 List<Diagnostic> problems = tson.validate(invalid);
                 worst = Math.max(worst, problems.size());
-                assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
+                // `"thirty"` is not an integer form at all, so §8.1 files it as a resolver error.
+                assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, problems.getFirst().code());
             }
             return worst;
         });

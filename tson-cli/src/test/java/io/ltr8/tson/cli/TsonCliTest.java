@@ -203,7 +203,7 @@ class TsonCliTest {
             captureStderr(() -> {
                 String out = captureStdout(() -> assertEquals(69, TsonCli.run(args), run::toString));
                 assertTrue(out.contains("SCHEMA_NOT_FOUND"), () -> run + " -> " + out);
-                assertTrue(out.contains("ATOM_CONSTRAINT_VIOLATION"),
+                assertTrue(out.contains("ATOM_FORM_INVALID"),
                         () -> "the ordinary error still got its verdict: " + run + " -> " + out);
             });
         }

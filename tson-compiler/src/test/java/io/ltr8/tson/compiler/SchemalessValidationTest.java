@@ -71,10 +71,10 @@ class SchemalessValidationTest {
     }
 
     @Test
-    void aBadBuiltinAtomIsAnAtomConstraintViolationWithAPath() {
+    void aBadBuiltinAtomIsRefusedByItsOwnFamilyWithAPath() {
         List<Diagnostic> diagnostics = validate("{ id: !uuid nope  count: !int32 twelve }");
         assertEquals(2, diagnostics.size(), diagnostics.toString());
-        assertTrue(diagnostics.stream().allMatch(d -> d.code() == Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION), diagnostics.toString());
+        assertTrue(diagnostics.stream().allMatch(d -> d.code() == Diagnostic.Code.ATOM_FORM_INVALID), diagnostics.toString());
         assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals(Optional.of("/id"))), diagnostics.toString());
         assertTrue(diagnostics.stream().anyMatch(d -> d.path().equals(Optional.of("/count"))), diagnostics.toString());
         assertTrue(diagnostics.stream().allMatch(d -> d.dataPosition().isPresent()), diagnostics.toString());
@@ -127,7 +127,7 @@ class SchemalessValidationTest {
     void aBadAtomInsideAnAnnotationValueIsReported() {
         List<Diagnostic> diagnostics = validate("{ a: @since:!date nope 1 }");
         assertEquals(1, diagnostics.size(), diagnostics.toString());
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, diagnostics.getFirst().code());
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, diagnostics.getFirst().code());
     }
 
     @Test

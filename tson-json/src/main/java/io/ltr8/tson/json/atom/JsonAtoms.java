@@ -2,6 +2,7 @@ package io.ltr8.tson.json.atom;
 
 import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
+import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.HostAtoms;
@@ -175,31 +176,18 @@ public final class JsonAtoms {
     }
 
     /**
-     * §5.1's contract boundary: the family parses, and this only carries a refusal across.
+     * §5.1's contract boundary: the family parses, and this only carries its refusal across.
      *
-     * <p>A rejection reports the atom's own {@code expected} -- the constraint that failed, from
-     * {@link AtomTypeException}'s six-shape vocabulary -- rather than the target's Java name, which the
-     * message and the diagnostic's own path already carry.
+     * <p>Which code a refusal carries is {@link AtomRefusal}'s and not this reader's -- §8.1 files a
+     * contract rejection and a range violation in different categories, and a copy of that mapping here is
+     * how this encoding and the text one come to disagree about the same token.
      */
     private static Object content(JsonReadContext ctx, AtomType<?> family, String value, Class<?> target) {
         try {
             return family.read(value, target);
-        } catch (AtomTypeException e) {
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), e.expected(), value);
-            return null;
-        } catch (ArithmeticException e) {
-            // The family accepted the value and the target cannot hold it exactly -- reachable only where
-            // the target is narrower than the atom guarantees, which for this index it never is, and kept
-            // because NumberNarrowing's contract says so rather than because a caller has been found.
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
-                    "%s does not fit in %s".formatted(value, target.getSimpleName()),
-                    "a value that fits " + target.getSimpleName(), value);
-            return null;
-        } catch (IllegalArgumentException e) {
-            // The family produced its own host value and the target cannot represent it at all -- a class
-            // declaring a component the vocabulary does not read to, which is a bind problem, not a verdict.
-            ctx.report(Diagnostic.Code.BIND_MISMATCH,
-                    "cannot bind '%s' to %s".formatted(value, target.getSimpleName()), target.getSimpleName(), value);
+        } catch (RuntimeException e) {
+            AtomRefusal refusal = AtomRefusal.of(e, value, target);
+            ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
             return null;
         }
     }

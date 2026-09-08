@@ -573,7 +573,7 @@ name policy yet.
 
 Codes come from the same closed vocabulary the TSON readers use — §9.4 adds no category of its own — so
 `TYPE_MISMATCH`, `FIELD_REQUIRED`, `UNRECOGNIZED_FIELD`, `DUPLICATE_FIELD`, `DUPLICATE_MAP_KEY`,
-`WRONG_ARITY`, `ATOM_CONSTRAINT_VIOLATION`, `UNKNOWN_TYPE_REF` for a union with no selector, and
+`WRONG_ARITY`, `ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`, `UNKNOWN_TYPE_REF` for a union with no selector, and
 **`BIND_MISMATCH`** for a class this context cannot analyse or cannot receive a JSON object's keys into.
 That last one is deliberately **not a verdict**: nothing about the document is being asserted by it, which
 is what a caller routing on `Code.verdict()` needs to be able to tell.

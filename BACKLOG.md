@@ -188,19 +188,6 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   does not hit a name rule on `additionalProperties`. The look-alike rule is a property of a *set*, so it
   belongs where `SchemalessTreeReader` puts it on the text side: over one record's member names, once.
 
-- [ ] **The atom-refusal-to-diagnostic translation exists twice, and the two disagree about a category.**
-  `SchemalessObjectReader.bindBuiltin` and `JsonAtoms.content` each catch an `AtomTypeException` plus the
-  `ArithmeticException`/`IllegalArgumentException` that `NumberNarrowing` throws, and turn the three into a
-  `Diagnostic`. `AtomTypeException` is `tson-atom`'s own and neither encoding's, which is the one case the
-  per-encoding classification rule under `Diagnostic` does not cover — its `of*` factories switch on an
-  exception an encoding declares — so a helper beside the exceptions in `tson-atom`, which already requires
-  `tson-base`, would serve both. What makes it more than tidiness: both sites collapse `AtomParseException`
-  (contract rejection → resolver error) and `AtomValidationException` (→ validation error) into one
-  `ATOM_CONSTRAINT_VIOLATION`, where §5.1 and [TSON-DATA] §8.1 keep the two categories apart and the
-  `class2` corpus asserts which. The exception hierarchy is sealed to exactly those two so a caller can
-  switch rather than string-sniff, and nothing does. Fix the collapse once, in the shared translator, or the
-  two encodings will drift on which category a refusal carries.
-
 - [ ] **No schema-directed decode — §5–§8.** The whole of what Part 3 actually specifies: atoms by their parsing
   contracts (§5), containers by their constructors (§6), JSON `null` as the absent sentinel (§7), and the
   discrimination predicate over the derived `disjoint` fact (§8). This is where `tson-json` gains its dependency on

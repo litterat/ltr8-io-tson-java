@@ -265,10 +265,14 @@ class JsonObjectReaderTest {
             assertTrue(form.message().contains("only integer and based-integer forms are accepted"),
                     form.message());
             assertEquals("an integer or based-integer form", form.expected());
+            assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, form.code());
 
             Diagnostic range = refused("{\"name\": \"a\", \"age\": 2147483648}", Person.class);
             assertTrue(range.message().contains("out of range for a signed 32-bit integer"), range.message());
             assertEquals(">= -2147483648 and <= 2147483647", range.expected());
+            // §8.1 files the two apart -- the first is a resolver error, this one a validation error -- and
+            // the code is what carries that, since both sentences are equally about "the atom said no".
+            assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, range.code());
         }
 
         @Test
@@ -380,7 +384,9 @@ class JsonObjectReaderTest {
                      "lasting": "PT1S", "where": "a", "from": "192.0.2.1", "payload": "AQID"}
                     """, Contents.class);
 
-            assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, refusal.code());
+            // §8.1's resolver error, not the validation one beside it: `1-2-3-4-5` is not of the family's
+            // form at all, where a value the family parses and then refuses is the constraint code.
+            assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, refusal.code());
             assertEquals("/id", refusal.path().orElseThrow());
             // The constraint that failed, standing alone -- AtomTypeException's own vocabulary, not the
             // target's Java name, which `message` and `path` already carry.

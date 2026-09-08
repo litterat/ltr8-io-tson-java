@@ -115,7 +115,8 @@ admit UTS #39's own `Toys-Я-Us`.
 - **A schemaless read checks its type-refs, and `TypeRefCheck` (in `reader`) states the rules once** for
   both engines. Given `!X` on a value: (1) `X` **is** a `BuiltinTypeVocabulary` name → it must sit on a
   token (`TYPE_MISMATCH` otherwise) and that token must satisfy the atom
-  (`ATOM_CONSTRAINT_VIOLATION`); (2) `X` **names the target** being bound → accepted, object-binding
+  (`ATOM_FORM_INVALID` for a token of the wrong form, `ATOM_CONSTRAINT_VIOLATION` for a value out of
+  range); (2) `X` **names the target** being bound → accepted, object-binding
   only, a tree read having no target; (3) otherwise it links to nothing → `UNKNOWN_TYPE_REF`.
   **Rule 3 is a reader policy, not a parsing one** — the parse step still preserves every marker per §5.1;
   what a reader *type-checking* a value does with one it can't link is the layer above, where a

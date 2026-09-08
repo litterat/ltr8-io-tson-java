@@ -72,6 +72,8 @@ class ValidateCommandTest {
                 assertEquals(1, ValidateCommand.run(inputs(schema, data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
         assertTrue(output.contains("[FIELD_REQUIRED]"), output);
+        // `99999999999999` parses as an integer and is then out of int32's range -- a validation error,
+        // where the bad *form* beside it in `plainDataWithABadBuiltinAtomIsInvalidSchemalessly` is a resolver one.
         assertTrue(output.contains("[ATOM_CONSTRAINT_VIOLATION]"), output);
         assertTrue(output.contains("/a"), output);
         assertTrue(output.contains("/b"), output);
@@ -200,7 +202,9 @@ class ValidateCommandTest {
         String output = captureStdout(() ->
                 assertEquals(1, ValidateCommand.run(inputs(data), OutputFormat.TEXT, PolicyOptions.DEFAULTS)));
 
-        assertTrue(output.contains("[ATOM_CONSTRAINT_VIOLATION]"), output);
+        // `twelve` is no integer form at all, so the atom's grammar refuses it -- §8.1's resolver error,
+        // where the out-of-range value in `aFileWithMultipleProblemsReportsEveryOneOfThem` is a validation one.
+        assertTrue(output.contains("[ATOM_FORM_INVALID]"), output);
     }
 
     // --- infra ---
