@@ -29,4 +29,5 @@ module io.ltr8.tson.json {
 
     requires transitive io.ltr8.bind;
     requires transitive io.ltr8.tson.base;
+    requires transitive io.ltr8.tson.atom;
 }

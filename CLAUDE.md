@@ -318,16 +318,17 @@ module has a real `module-info.java`; module names mirror each module's root exp
   which families a reader binds, and what they read to, is a property of the type system and not of the encoding that carried
   them. Three packages, split by who touches them: `io.ltr8.tson.atom` is what a caller names — `AtomType`, the two indices
   over it (`BuiltinTypeVocabulary` by name, `HostAtoms` by host class), `AtomParsers` from a resolved body, `VocabularyAtoms`
-  for the write direction, and the exceptions a refusal arrives as; `io.ltr8.tson.atom.number` is §4's number production and
-  the narrowing over it, exported because base type resolution stays with the text encoding and reads it;
-  `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on the same terms as `tson-compiler`'s
-  own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its constraint record), `tson-base` and `tson-regex`.
-  **What deliberately stayed behind is everything that depends on *how* a token was written**: `AtomType` takes a `String`,
-  and the two atoms needing the lexical form — the kernel's `value`, whose §4.4 rule is that a quoted token is a
-  string, and
-  `Token`, which records the spelling §8's resolved form carries — stay in `tson-compiler` with `TokenValue` and
-  `BaseTypeResolver`. That those two are exactly where the encodings legitimately differ is no coincidence: JSON has no token
-  forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
+  for the write direction, the exceptions a refusal arrives as, and `TsonAtomContext`, which registers the host values those
+  families read to with a bind context -- what makes a class with a `UUID` component bind the same under both encodings;
+  `io.ltr8.tson.atom.number` is §4's number production and the narrowing over it, exported because base type resolution stays
+  with the text encoding and reads it; `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on
+  the same terms as `tson-compiler`'s own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its constraint
+  record), `tson-bind` (`TsonAtomContext` registers with one), `tson-base` and `tson-regex`. **What deliberately stayed
+  behind is everything that depends on *how* a token was written**: `AtomType` takes a `String`, and the two atoms needing
+  the lexical form — the kernel's `value`, whose §4.4 rule is that a quoted token is a string, and `Token`, which records the
+  spelling §8's resolved form carries — stay in `tson-compiler` with `TokenValue` and `BaseTypeResolver`. That those two are
+  exactly where the encodings legitimately differ is no coincidence: JSON has no token forms and reads a `value` position by
+  [TSON-JSON] §5.7's own rule.
 - **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonValue` and its
   pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
   true leaf: depends on **nothing** (not even `tson-annotation` — the nodes aren't bind targets, they're

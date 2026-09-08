@@ -7,7 +7,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.atom.TsonAtomContext;
 
 import java.io.IOException;
 import java.io.InputStream;

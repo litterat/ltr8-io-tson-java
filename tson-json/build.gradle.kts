@@ -16,6 +16,12 @@ dependencies {
     api(project(":tson-base"))
     api(project(":tson-bind"))
 
+    // The atom vocabulary -- TsonAtomContext, so this encoding's default reader binds the host types the
+    // built-in families read to exactly as the TSON text one does. [TSON-JSON] §5.1 is why that is right
+    // rather than convenient: a string's content is handed to the atom's own parser exactly as a TSON
+    // quoted token's text would be. §5-§8's schema-directed decode needs the rest of it.
+    api(project(":tson-atom"))
+
     // `io.ltr8.bind` requires it transitively, so the module path needs it here even though nothing in
     // this module names one of its types directly -- `tson-bind` declares it `implementation`, which does
     // not propagate. `tson-compiler` carries the same line for the same reason.

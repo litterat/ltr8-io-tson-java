@@ -10,7 +10,7 @@ import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.atom.TsonAtomContext;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;

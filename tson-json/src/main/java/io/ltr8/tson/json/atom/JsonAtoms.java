@@ -30,10 +30,17 @@ import java.math.BigInteger;
  * contract (§5.4).
  *
  * <p><b>A bridged atom binds its serial type, then crosses.</b> {@code DataClassAtom.dataClass()} is the
- * type on the wire and {@code typeClass()} the one the class wants -- so a {@code UUID} component is
- * read as the {@code String} its bridge declares and handed to {@code toObject}. Every atom
- * {@code TsonAtomContext.registerDefaults} registers is string-bridged, so this covers the temporal,
- * network and identifier families without naming one of them.
+ * type on the wire and {@code typeClass()} the one the class wants, so a bridged component is read as the
+ * type its bridge declares and handed to {@code toObject}. That is how {@code tson-bind}'s own bridges --
+ * an enum's, a {@code Pattern}'s -- are covered without naming one of them.
+ *
+ * <p><b>It does not yet cover the atom host types.</b> {@code TsonAtomContext} registers {@code UUID}, the
+ * temporal, network and identifier families as atoms so that {@code tson-bind} treats them as scalars rather
+ * than taking them apart structurally -- but with no bridge, so nothing here converts a string into one and
+ * {@link #fromString} reports a mismatch. Under a schema that is right, the position's own atom parser
+ * producing the host value ([TSON-JSON] §5.1); with no schema it is a gap, and the same gap the TSON text
+ * encoding has -- {@code new TsonObjectReader().read(text, WithAUuid.class)} fails the same way.
+ * {@code BACKLOG.md}'s "Binding" section carries the shared conversion that would close it on both.
  *
  * <p><b>There is no enum rule here, and that is not an omission.</b> {@code tson-bind} binds every plain
  * Java enum through {@code EnumStringBridge}, so an enum component arrives as a {@code String} atom whose

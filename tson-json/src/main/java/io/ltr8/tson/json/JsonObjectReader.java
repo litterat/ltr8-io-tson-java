@@ -1,6 +1,7 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.atom.TsonAtomContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.reader.DataClassObjectReader;
@@ -135,6 +136,14 @@ public final class JsonObjectReader {
     }
 
     /** Everything this reader will admit and spend, for a caller stating it beside a read's diagnostics. */
+    /**
+     * The bind context this reader binds through -- {@link TsonAtomContext#defaultContext()} unless a caller
+     * supplied one. {@code TsonObjectReader}'s counterpart on the other encoding.
+     */
+    public DataBindContext dataBindContext() {
+        return context;
+    }
+
     public ProcessorPolicy processorPolicy() {
         return policy;
     }
@@ -159,12 +168,16 @@ public final class JsonObjectReader {
     }
 
     /**
-     * Over a default context, which binds records, arrays, maps, tuples and the primitive and boxed
-     * atoms. A caller wanting TSON's atom vocabulary ({@code UUID}, the temporal families) builds a
-     * context registering them and uses {@link #using}.
+     * Over {@link TsonAtomContext#defaultContext()} -- records, arrays, maps, tuples, the primitive and
+     * boxed atoms, and the host types the built-in atom families read to ({@code UUID}, the temporal,
+     * network and identifier families).
+     *
+     * <p><b>The same vocabulary the TSON text reader starts from</b>, per [TSON-JSON] §5.1: a consumer must
+     * not have to discover that one front door treats their {@code UUID} component as a scalar and the
+     * other takes it apart.
      */
     public static JsonObjectReader standard() {
-        return new JsonObjectReader(DataBindContext.builder().build(), false, DiagnosticsReceiver.throwing(),
+        return new JsonObjectReader(TsonAtomContext.defaultContext(), false, DiagnosticsReceiver.throwing(),
                 ProcessorPolicy.defaults());
     }
 

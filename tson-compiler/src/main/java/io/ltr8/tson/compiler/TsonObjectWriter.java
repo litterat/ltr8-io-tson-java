@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.atom.VocabularyAtoms;
 import io.ltr8.annotation.Transparent;
 import io.ltr8.annotation.Typename;
@@ -19,7 +20,7 @@ import io.ltr8.bind.DataClassRecord;
 import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.ast.DataValue;
-import io.ltr8.tson.compiler.config.TsonAtomContext;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
@@ -62,7 +63,7 @@ public final class TsonObjectWriter {
     }
 
     public TsonObjectWriter() {
-        this(TsonAtomContext.defaultContext());
+        this(ResolverBindContext.defaultContext());
     }
 
     private TsonObjectWriter(DataBindContext context, TsonDocumentHeader header, Optional<String> rootTypeName) {

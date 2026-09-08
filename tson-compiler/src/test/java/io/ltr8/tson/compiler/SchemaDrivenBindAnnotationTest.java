@@ -9,7 +9,7 @@ import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.atom.TsonAtomContext;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
 

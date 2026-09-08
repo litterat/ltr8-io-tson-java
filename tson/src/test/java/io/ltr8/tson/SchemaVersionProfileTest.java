@@ -7,7 +7,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.compiler.config.TsonAtomContext;
+import io.ltr8.tson.atom.TsonAtomContext;
 import io.ltr8.tson.base.CanonicalIdentity;
 
 import org.junit.jupiter.api.Test;
