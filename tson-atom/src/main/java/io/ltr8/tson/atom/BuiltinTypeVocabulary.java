@@ -1,5 +1,6 @@
 package io.ltr8.tson.atom;
 
+import io.ltr8.tson.atom.parser.BooleanParser;
 import io.ltr8.tson.atom.parser.BytesParser;
 import io.ltr8.tson.atom.parser.Cidr4Parser;
 import io.ltr8.tson.atom.parser.Cidr6Parser;
@@ -57,6 +58,13 @@ import java.util.Optional;
  * §5.5), which reuse those two address grammars for the address half of a network. And with {@code mac_type}
  * ({@code mac}, §5.5, EUI-48 per RFC 9542).
  *
+ * <p><b>{@code boolean} is seeded too, and §5's table does not list it</b> -- a second departure, and
+ * {@code SPEC-FEEDBACK.md} #8 argues it is an oversight: {@code boolean} is meta-kernel's own
+ * {@code !enum [true false]}, [TSON-DATA] §4.2 gives its two tokens special status, and every other type a
+ * schemaless document can name is here. Without it {@code !boolean true} is an unresolvable annotation
+ * where {@code !int32 1} resolves, and a {@code boolean}-typed position has no family to read it -- which
+ * is the same hole from the two directions §5 and §4.2 approach it from.
+ *
  * <p><b>{@code email} is seeded too, which §5.5's table does not list</b> -- a known departure, the same
  * §5.5's own row, beside {@code uuid}/{@code ipv4}/{@code mac} in the "Network Types" group and with the
  * identical shape core.tn gives it -- and the RFC 5322 pin is scoped there to the {@code dot-atom "@"
@@ -92,6 +100,7 @@ public final class BuiltinTypeVocabulary {
         types.put(RationalParser.TYPENAME, RationalParser.UNCONSTRAINED);
         types.put(ComplexParser.TYPENAME, ComplexParser.UNCONSTRAINED);
 
+        types.put(BooleanParser.TYPENAME, BooleanParser.INSTANCE);
         types.put(TextParser.TYPENAME, TextParser.UNCONSTRAINED);
         types.put(UuidParser.TYPENAME, UuidParser.UNCONSTRAINED);
 

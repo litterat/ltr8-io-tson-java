@@ -27,6 +27,15 @@ back to the family that produces it, which is what a reader with no type-ref dis
 fourth — a body→parser table restating `AtomParsers` entry for entry — and the two had already drifted, so a
 `period`-typed field's `~` default was reported as "not a scalar type" while `duration` beside it worked.
 
+`HostAtoms` is itself three maps over one question, split by **what may reach the position**.
+`forStringContentHostType` and `forNumberContentHostType` are [TSON-JSON] §5's per-family *kinds*, since
+JSON's grammar tells a string from a number and §5's table admits one or the other per family;
+`forTypedPosition` is the union plus `text` and `boolean`, for TSON, where a typed position never consults
+the form and `12` and `"12"` are one `int32` ([TSON-SCHEMA] §4.2). One question, two encodings, and the split
+is the encodings' rather than the vocabulary's. `forHostType` is the fourth and answers something else: what
+a `value`-typed slot meant, where §7.4's bootstrap ordering leaves the position's own type as the only
+evidence.
+
 ## Lexer (`tson-compiler/.../lexer/`)
 
 `Lexer` is a single hand-written scanner producing `Token`s, driven off `nextToken()` (never a
@@ -208,6 +217,20 @@ Key points:
 `BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (boolean → number → string,
 §4.5) for untyped tokens. `NumberGrammar.tryParse` recognizes the `number` production (§7.6).
 
+**What counts as untyped is narrower than "no `!!schema`", and that is a deliberate reading.** §4.1 divides
+the world into schemaless documents and documents under a schema, and a third case falls between them: a
+document with no `!!schema` read *into a Java class*. Nothing in the document types the position and the
+target does. This implementation treats that as a **typed** position — the class already fixes the shape of
+every record and array under it, and fixing the leaf too is what makes `{ i: "12" }` read as `12` at an
+`int`, exactly as it does at a schema's `int32`. So §4 is reached only where nothing types the position at
+all: a **tree** read (`TsonValue`, and `JsonValue` beside it), and the handful of targets no built-in family
+names — `char`, an opaque `Object`, a host type outside §5's vocabulary. `SPEC-FEEDBACK.md` #7 carries the
+argument and the suggested wording, since §4.1 speaks of documents and has no term for a position typed by a
+host type; [TSON-JSON] §4.1 and §5.7 already answer the identical question the same way for JSON, which is
+the strongest evidence the rule generalises. `HostAtoms.forTypedPosition` is the lookup, and
+`ClassTypedPositionTest` asserts every case against the schema declaring the same types, so the schema is the
+oracle rather than a literal in a test.
+
 - **Identification is separate from binding to a host numeric type.** `NumberGrammar` decides which of the
   four grammar alternatives matches and extracts structural pieces into `NumberForm` — it does **not**
   convert to `long`/`double`/`BigInteger`/`BigDecimal`. The spec leaves that mapping to the implementation
@@ -260,6 +283,17 @@ Key points:
 `AtomType<T>` is a built-in atom's parsing contract (§5.2): `read(TokenValue)` (its natural host value),
 `read(TokenValue, Class<?>)` (narrow to a caller target), `write(T)`. `BuiltinTypeVocabulary` is the
 fixed, closed name→`AtomType` table (§5).
+
+**`boolean` is in that table and §5's own is missing it** (`SPEC-FEEDBACK.md` #8, a second departure beside
+`email`). `boolean` is meta-kernel's `!enum [true false]` and §4.2 gives its two tokens special status in
+base type resolution — so the notation privileges them and then offers no name for the type they inhabit,
+which shows from both sides: `!boolean true` was an unresolvable annotation where `!int32 1` resolves, and a
+`boolean`-typed position had no family to read the token. `BooleanParser` is the one statement of what
+`boolean` reads, and the compiled reader stack asks the vocabulary for it rather than keeping a second
+(`AtomTypeReader.ENUM_OBJECT_MODE`); a token that is neither member is the enum miss it is —
+`ATOM_CONSTRAINT_VIOLATION`, matching every other enum, where the reader it replaced said `TYPE_MISMATCH`.
+It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recovers a boolean from an unquoted
+`true`, so a writer annotating every one with `!boolean` would be restating what the token already says.
 
 - **Each constructor splits into two classes across two modules:** a pure constraint-*values* record in
   `io.ltr8.tson.schema.meta` (`IntegerType`, `TextType`, `RegexType`, `DateType`, …, matching the kernel's

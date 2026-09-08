@@ -277,14 +277,17 @@ public final class SchemalessObjectReader {
             }
         }
 
-        // No type-ref to dispatch on, so the target class is the schema -- [TSON-JSON] §4.1's
-        // schema-directed reading with the class standing in for it. Restricted to §5.6's string-content
-        // families: §4.4 makes a quoted token a string, and the numeric families must keep base resolution.
-        Optional<AtomType<?>> byHostType = HostAtoms.forStringContentHostType(dataClass.dataClass());
+        // No type-ref, so the target class is what types this position, and the family it names reads the
+        // token -- the same answer a schema declaring that type would give, form included (`12` and `"12"`
+        // are one int32). See HostAtoms.forTypedPosition, and SPEC-FEEDBACK.md #7 for why a class-typed
+        // position is not [TSON-DATA] §4.1's schemaless one.
+        Optional<AtomType<?>> byHostType = HostAtoms.forTypedPosition(dataClass.dataClass());
         if (byHostType.isPresent()) {
             return bindBuiltin(ctx, byHostType.get(), tokenValue, dataClass.dataClass());
         }
 
+        // Nothing types this position after all: no family produces the target class, so §4's resolution is
+        // what the token gets -- `char`, `Object`, and any host type the vocabulary does not name.
         return bindBaseValue(ctx, BaseTypeResolver.resolve(tokenValue), dataClass.dataClass());
     }
 

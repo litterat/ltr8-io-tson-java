@@ -668,7 +668,9 @@ class TsonObjectReaderTest {
         DiagnosticsCollector problems = new DiagnosticsCollector();
 
         assertNull(mapper.withDiagnostics(problems).read("{ x: 1  y: nope }", Point.class));
-        assertEquals(List.of(Diagnostic.Code.TYPE_MISMATCH),
+        // `int32`'s own contract refuses `nope`, the class having typed the position -- the same verdict a
+        // schema declaring `y: int32` gives, and §8.1's resolver error rather than a bind failure.
+        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID),
                 problems.diagnostics().stream().map(Diagnostic::code).toList());
     }
 

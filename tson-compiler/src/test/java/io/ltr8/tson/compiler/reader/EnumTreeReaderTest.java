@@ -30,7 +30,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * MetaKernelBootstrapResolver}-resolved {@link io.ltr8.tson.schema.meta.EnumBody} -- not a
  * hand-built stand-in -- as the field type of a small local record, then reads real TSON data
  * source text through the real compiled reader. Object-binding mode's own contrasting
- * behavior (real {@code Boolean} values, via {@link BooleanReader}) is covered separately, in
+ * behavior (real {@code Boolean} values, via the vocabulary's own {@code BooleanParser}) is covered
+ * separately, in
  * {@link RecordBindReaderTest}/{@code DefinitionResolverTest}.
  */
 class EnumTreeReaderTest {

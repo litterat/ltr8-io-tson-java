@@ -12,8 +12,8 @@ revision closes.** It is an input to the next revision's adjudication, so its nu
 that revision's change log will answer against — a stable index of the open set, not an archive of
 everything ever raised.
 
-**Revision 35 closed thirty-two of the thirty-six open against Revision 34, then four more raised against
-Revision 35 itself**, and #1–#4 below are what survives. The closed entries are gone: the
+**Revision 35 closed thirty-two of the thirty-six open against Revision 34**, and #1–#4 below are what
+survives; #5 onward were raised against Revision 35 itself. The closed entries are gone: the
 spec now carries their rules, and that is where the answer belongs — the JSON-superset cluster (`null`, the
 escape table, field names as identifiers, the trailing comma, and the four decisions kept with better
 reasons), the `scoped` constructor, the `bytes` value space, the temporal split and its exclusive bounds,
@@ -499,3 +499,111 @@ collection — would refuse ordinary JSON under a rule that exists only where na
 One consequence worth stating alongside it: a JSON document read with **no** schema binding is outside this
 document (§3.4) and applies neither policy. Its member names are data, not names, and there is no declaration
 for them to be look-alikes of.
+
+
+## 7. §4.1 has no term for a position typed by a host type, so a binding processor has no rule to follow
+
+**Documents:** [TSON-DATA] §4.1, §4.2, §4.4; [TSON-SCHEMA] §4.2; [TSON-JSON] §4.1, §5.7.
+**Kind:** underspecification — a real and common processing mode the section's dichotomy does not name.
+
+§4.1 divides the world in two:
+
+> Base type resolution applies **only in schemaless documents** — a document whose header carries no
+> `!!schema` (§2.2) — and only to a token that carries no built-in type annotation... Under a schema it does
+> not apply at all: every value is typed by its position or by its tag, each declared atom type owns its own
+> parsing contract, and there is no third way to read a token.
+
+The division is over **documents**, and the third case is over **readers**: a processor reading a document
+that carries no `!!schema` **into a declared host type** — a Java class, a Go struct, a Rust type. Nothing in
+the document types the position and something else does. §4.1 has no term for it, so a processor either
+applies §4 (the document has no schema) or treats the target as typing the position (the position *is*
+typed), and the two give different answers for the same bytes.
+
+**The answers differ on ordinary data, not on corner cases.** At a target declaring a 32-bit integer:
+
+| document | §4 applied | target types the position |
+|---|---|---|
+| `{ i: 1.0 }` | float, then a narrowing failure | `int32` rejects a float form — a resolver error (§8.1) |
+| `{ i: "12" }` | string, then a bind failure | `12`, since a typed position does not consult the form |
+| `{ s: 12 }` at a text target | number, then a bind failure | `"12"`, the token's own content |
+| `{ d: ".nan" }` at a float target | string, then a bind failure | `NaN` |
+
+**Every row's right-hand column is what a schema declaring those same types already produces**, which is the
+argument for it: a processor that reads `box => { i: int32 }` one way and a `Box` class with an `int` field
+another way has two readings of one shape, and the difference is invisible to whoever wrote the document.
+The left column also makes the *diagnostic* worse — a bind failure names a host type the sender has never
+heard of, where the family's own refusal names the constraint they broke.
+
+**This is not the same as letting a target override the document.** A type-ref still wins (§4.1's own
+"a built-in annotation overrides base resolution"), and a target that names no built-in family — `char`, an
+opaque object, a host type outside §5's vocabulary — still leaves the position untyped and still gets §4.
+What changes is only the case where the target names a family the spec already defines.
+
+**Where §4 then genuinely applies is a tree read**: a processor producing a document-shaped value with no
+target at all — this implementation's `TsonValue`, and the `JsonValue` beside it — is the case §4.1
+describes, and the only one left once binding is accounted for. That is a better statement of §4's scope than
+"schemaless document", because it is about whether anything types the position rather than about what the
+header says.
+
+**[TSON-JSON] already had to answer this and answered it the same way**, which is the strongest evidence the
+rule generalises: §4.1 there makes the position decide, and §5.7 says the decode "needs none of base type
+resolution because JSON's grammar has already done the classifying". A JSON document carries no `!!schema`
+either. If the JSON encoding's answer is that the position types the value, the text encoding's answer for
+the identical processing mode should not be the opposite.
+
+**The interpretation this implementation has taken** is that a position typed by a host type is a typed
+position: `HostAtoms.forTypedPosition` maps a target class to the family it names, `SchemalessObjectReader`
+reads through it, and base type resolution is reached only where no family names the target.
+`ClassTypedPositionTest` asserts every row above against the schema that declares the same types, so the
+schema is the oracle rather than a literal.
+
+**Suggested resolution.** Restate §4.1's applicability over what types the position rather than over the
+header, roughly:
+
+> Base type resolution applies to a token that carries no built-in type annotation, at a position **nothing
+> types** — that is, in a document with no `!!schema` being read into no declared type, as when a processor
+> produces a document-shaped value. Where the position is typed — by a schema, by a tag, or by a declared
+> host type a processor is reading into — the type's own parsing contract reads the token and this section
+> does not apply.
+
+The sentence about `true`/`false` (§4.2) and the quoted-token rule (§4.4) follow it unchanged: both are
+statements about base type resolution, so both stop at a typed position, which §4.2 already says of a schema
+("Under a schema neither token is special").
+
+
+## 8. `boolean` is missing from §5's built-in type vocabulary
+
+**Documents:** [TSON-DATA] §5, §5.6, §4.2; [TSON-SCHEMA] §4.1.
+**Kind:** error — an omission from a table the section states is complete.
+
+§5's vocabulary is the schemaless way to say what a token means, and §4.1 calls it closed: "A Class 1 value
+is one of three things — an untyped token, a token carrying a built-in annotation from §5's vocabulary, or a
+container." Every type core.tn declares over an atom has a row: the integer ladder, `number`,
+`float32`/`float64`, `rational`, `complex`, `text`, `uuid`, `bytes`, the temporal families, the network
+families, `uri`, `regex`. **`boolean` has none.**
+
+It is not an atom-family omission by accident of grouping. `boolean` is meta-kernel's own
+`!enum [true false]`, and [TSON-DATA] §4.2 gives its two tokens special status *in base type resolution* —
+matched ahead of the number grammar, and load-bearing for [TSON-SCHEMA] §5.4's derived `disjoint` fact. So
+the notation privileges the two tokens and then offers no way to name the type they inhabit.
+
+**Two things follow, and they are the same hole from opposite sides.** `!boolean true` is an unresolvable
+annotation where `!int32 1` resolves — an author asserting the boolean case, as §5.5 says the vocabulary
+exists to let them, has no name to assert it with. And a processor reading into a declared boolean host type
+(#7) has no family to read the token, so the one type whose two tokens the notation names specially is the
+one type a typed position cannot ask for.
+
+**The interpretation this implementation has taken** is that the omission is an oversight: `boolean` is
+registered in the built-in vocabulary, reading `true`/`false` to a host boolean and refusing anything else as
+the enum-member violation it is (a validation error, as every other enum's member set gives). The two tokens
+are case-sensitive and lowercase-only, per §4.2. A typed position does not consult the form, so `!boolean
+"true"` and `!boolean true` are one value — §4.2's special status being a base-resolution rule, which a typed
+position never reaches.
+
+**Suggested resolution.** Add `boolean` to §5's table, in the same row group as `text`, with the parsing
+contract "the tokens `true` and `false`, case-sensitive; any other token is a validation error". If the
+omission is instead deliberate — on the ground that base type resolution already recovers a boolean from an
+unquoted `true`, so the annotation is never *needed* — then §5 should say so, because the same argument
+would remove `text` (§4.4 already recovers a string) and §5.5 explicitly keeps that one: the annotation
+exists to **assert** the case where it is in doubt, which is exactly what a quoted `"true"` at a boolean
+position is.
