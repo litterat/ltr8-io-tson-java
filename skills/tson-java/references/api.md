@@ -58,7 +58,6 @@ public final class TsonConfig {
 
     public TsonConfig identifierPolicy(UnicodePolicy policy);  // declared names
     public TsonConfig tokenPolicy(UnicodePolicy policy);       // every token a read pulls
-    public TsonConfig lenientBinding();
 
     public Tson build();
 }

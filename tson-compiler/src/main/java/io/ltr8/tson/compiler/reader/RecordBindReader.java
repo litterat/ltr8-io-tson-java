@@ -78,7 +78,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * BindMismatchException}. The lenient reading still reports what it drops (below); what it does not
      * do is refuse to start.
      */
-    private final boolean strict;
 
     /**
      * The component receiving this value's own wire annotations (§3.1), if the bound class declares one.
@@ -100,7 +99,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     public RecordBindReader(String name, String displayName, RecordBody body, DataClassRecord descriptor,
                              TsonTypeReaderResolver resolver, ValueReaderContext context,
                              SchemaLocation schemaLocation,
-                             AnnotationTypes annotationTypes, boolean strict) {
+                             AnnotationTypes annotationTypes) {
         super(name, displayName, body, tokenAware(name, descriptor.fields(),
                 descriptor.annotationsCarrier().orElse(null), resolver, context, schemaLocation), schemaLocation);
         this.descriptor = descriptor;
@@ -108,7 +107,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         this.annotationTypes = annotationTypes;
         this.ownAnnotationTypes = annotationsCarrier == null ? annotationTypes.discarding() : annotationTypes;
         this.targetField = new DataClassField[fields.size()];
-        this.strict = strict;
         List<String> mismatches = new ArrayList<>();
         for (int i = 0; i < fields.size(); i++) {
             CompiledField field = fields.get(i);
@@ -125,7 +123,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 // worse trade -- an optional field is exactly the one that works in development and fails
                 // the first time a caller sends it, which is the bug this check exists to prevent. One rule
                 // for every field beats two that differ on when the developer finds out.
-                if (strict && !isFixed(field.schema().state())) {
+                if (!isFixed(field.schema().state())) {
                     mismatches.add("no component for field '" + field.schema().name() + "'");
                 }
                 continue;
@@ -146,7 +144,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 precomputedValue[i] = narrow(precomputedValue[i], target.type());
             }
         }
-        if (strict) {
+        {
             Set<String> unbound = unboundComponents(descriptor.typeClass());
             for (DataClassField classField : descriptor.fields()) {
                 if (classField != annotationsCarrier && !boundByAField(classField)
@@ -159,8 +157,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             if (!mismatches.isEmpty()) {
                 throw new BindMismatchException("'" + displayName + "' and "
                         + descriptor.typeClass().getName() + " do not agree: " + String.join("; ", mismatches)
-                        + ". Bind the class the schema describes, or read leniently "
-                        + "(TsonConfig.lenientBinding) if dropping this is deliberate");
+                        + ". Bind the class the schema describes -- a class that means to read one version of a "
+                        + "schema while another is current declares a @Profile constructor for it, which says "
+                        + "which fields it takes rather than dropping whatever it does not name");
             }
         }
     }
@@ -479,12 +478,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         private final DataBindContext context;
 
         /** Whether a schema field with nowhere to go fails the compile -- see {@link BindMismatchException}. */
-        private final boolean strict;
-
-        public Factory(DataBindContext context, boolean strict) {
+    
+        public Factory(DataBindContext context) {
             this.context = context;
-            this.strict = strict;
-        }
+            }
 
         @Override
         public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
@@ -504,7 +501,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 }
                 return new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition), body,
                         requireRecord(name, dataClass), resolver, context,
-                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context), strict);
+                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
             }
 
             if (dataClass instanceof DataClassUnion union) {
@@ -524,7 +521,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             if (dataClass instanceof DataClassRecord record) {
                 RecordBindReader ownParser = new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition),
                         body, record, resolver, context,
-                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context), strict);
+                        context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
                 return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver);
             }
 

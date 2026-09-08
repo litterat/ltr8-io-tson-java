@@ -20,8 +20,8 @@ import java.util.Objects;
 /**
  * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
  * directly. {@link #schemaAccess} says where user schemas beyond the bundled standard library come from;
- * {@link #dataBindContext} says which Java classes the schema's types bind to and
- * {@link #lenientBinding} whether they must account for every field; {@link #metaNameBinder} binds a governing meta's own constructors;
+ * {@link #dataBindContext} says which Java classes the schema's types bind to;
+ * {@link #metaNameBinder} binds a governing meta's own constructors;
  * {@link #processorPolicy} states what this processor will admit as a name and spend on a document; and
  * {@link #build()}
  * constructs a {@link TsonCompiledMetaRegistry} and has it
@@ -36,7 +36,6 @@ import java.util.Objects;
 public final class TsonConfig {
 
     private DataBindContext dataBindContext = AtomContext.defaultContext();
-    private boolean strictBinding = true;
     private SchemaAccess schemaAccess = SchemaAccess.registeredOnly();
     private DataNameBinder metaNameBinder;
     private ProcessorPolicy policy = ProcessorPolicy.defaults();
@@ -95,36 +94,6 @@ public final class TsonConfig {
      */
     public TsonConfig dataBindContext(DataBindContext dataBindContext) {
         this.dataBindContext = Objects.requireNonNull(dataBindContext, "dataBindContext");
-        return this;
-    }
-
-    /**
-     * Lets a bound class hold fewer fields than the schema declares, silently -- off by default.
-     *
-     * <p>By default the two must agree, and a mismatch is a {@link BindMismatchException} when the schema is
-     * compiled in bind mode, which is startup for anything compiling its schemas once. <b>That is why this
-     * is configuration and not a reader derivation</b>: the check compares a compiled schema against a
-     * class, so a reader derived afterwards has no answer left to give. Which field a <em>document</em> may
-     * carry beyond its class is the different question {@code TsonObjectReader.ignoringUnknownFields} asks,
-     * per reader, at read time.
-     *
-     * <p>The strict default is the asymmetry between the two ways of being wrong: a strict reader that is
-     * wrong says so at startup, in one message naming both sides, and is fixed in minutes; a lenient one
-     * that is wrong drops a value from every document and surfaces much later as a field that mysteriously
-     * holds its default.
-     *
-     * <p>Leniency is a real position and not merely an escape hatch -- versioned evolution, where a v1
-     * consumer deliberately reads a v2 document and means to ignore what it does not know. This is where
-     * that intention is written down, and it is the only path on which a field is dropped at all, every
-     * other mismatch being settled before a document exists. It is silent by necessity: reporting abandons
-     * the construction, so a lenient reader that reported would hand back nothing for exactly the documents
-     * it exists to accept.
-     *
-     * <p>The narrower alternative is {@code @Unbound} on the one component that is the class's own business
-     * rather than the wire's.
-     */
-    public TsonConfig lenientBinding() {
-        this.strictBinding = false;
         return this;
     }
 
@@ -284,6 +253,6 @@ public final class TsonConfig {
         SchemaSource source = schemaAccess.source();
         TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
                 schemaContext, source, policy.identifierPolicy());
-        return new Tson(core, dataBindContext, strictBinding, policy);
+        return new Tson(core, dataBindContext, policy);
     }
 }

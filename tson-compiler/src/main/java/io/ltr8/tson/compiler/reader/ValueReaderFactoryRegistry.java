@@ -62,21 +62,14 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
         return factory;
     }
 
-    public static ValueReaderFactoryRegistry bind(DataBindContext context) {
-        return bind(context, true);
-    }
-
     /**
-     * {@link #bind(DataBindContext)} with the schema-to-class agreement check made optional. Strict is the
-     * default and lenient is the opt-out, because the two failures are not symmetric: a strict reader that is
-     * wrong says so at startup, in one message, next to both names; a lenient one that is wrong drops a value
-     * on every document and shows up much later as a field holding its default. Leniency is a real position
-     * -- versioned evolution, where a v1 consumer deliberately reads a v2 document -- but it is a decision
-     * worth writing down at the place that makes it.
+     * Object-binding mode. Every record reader checks its schema against the class bound to it as it is
+     * built, so a disagreement is a {@code BindMismatchException} at compile rather than a value quietly
+     * lost on every read.
      */
-    public static ValueReaderFactoryRegistry bind(DataBindContext context, boolean strict) {
+    public static ValueReaderFactoryRegistry bind(DataBindContext context) {
         return new ValueReaderFactoryRegistry(baseFactories(
-                new RecordBindReader.Factory(context, strict), new ArrayBindReader.Factory(context),
+                new RecordBindReader.Factory(context), new ArrayBindReader.Factory(context),
                 new MapBindReader.Factory(context), new TupleBindReader.Factory(context),
                 AtomTypeReader.ENUM_OBJECT_MODE, AtomTypeReader.UNIT, UnaryOperator.identity(),
                 ChoiceReader.FACTORY, ScopedReader.BIND));
