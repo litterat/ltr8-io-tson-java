@@ -2,6 +2,7 @@ package io.ltr8.tson;
 import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
+import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -21,6 +22,7 @@ import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -184,6 +186,74 @@ class BindStrictnessTest {
         Diagnostic problem = problems.diagnostics().getFirst();
         assertEquals(Diagnostic.Code.BIND_MISMATCH, problem.code());
         assertTrue(problem.message().contains("no component for field 'currency'"), problem.message());
+    }
+
+    // ── An atom field against a component that binds structurally ────────
+
+    private static final String MONEY_SCHEMA = """
+            !!id:"https://example.test/order-2.tn"
+            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!import:"https://tson.io/2026/35/m/core.tn"
+            {
+              money => text
+              order => { sku: text  quantity: int32  currency: money }
+            }
+            """;
+
+    /** A consumer's own type that nothing registers as an atom, so it binds as the record it is. */
+    public record Money(String amount) {
+    }
+
+    public record OrderPriced(String sku, int quantity, Money currency) {
+    }
+
+    public static class MoneyBridge implements DataBridge<String, Money> {
+        @Override
+        public String toData(Money m) {
+            return m.amount();
+        }
+
+        @Override
+        public Money toObject(String s) {
+            return new Money(s);
+        }
+    }
+
+    private static Tson moneyTson(boolean registered) {
+        SchemaSource source = uri -> MONEY_SCHEMA;
+        DataNameBinder binder = name -> "order".equals(name) ? OrderPriced.class
+                : SchemaMetaNameBinder.INSTANCE.resolve(name);
+        DataBindContext.Builder builder = DataBindContext.builder().nameBinder(binder)
+                .registerAtoms(AtomContext.hostTypes());
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
+                .withDataBindContext((registered ? builder.registerAtom(Money.class, new MoneyBridge())
+                        : builder).build()));
+    }
+
+    /**
+     * No decoded value fills a record, so this is knowable without a document -- and it is the shape a
+     * consumer's own host type takes when nothing has registered it. It used to compile clean and throw a
+     * bare {@code ClassCastException} out of the constructor on the first read.
+     */
+    @Test
+    void anAtomFieldAgainstAStructuralComponentFailsAtCompile() {
+        BindMismatchException thrown = assertThrows(BindMismatchException.class,
+                () -> moneyTson(false).bindRegistry().get(ID));
+
+        assertTrue(thrown.getMessage().contains("field 'currency' is an atom"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains(Money.class.getName()), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("registerAtom"), "the message names a way to say it");
+    }
+
+    /** Registering it is exactly what the message asks for, and it is then an ordinary read. */
+    @Test
+    void registeringTheTypeAsAnAtomSettlesIt() {
+        Tson tson = moneyTson(true);
+        assertNotNull(tson.bindRegistry().get(ID));
+        OrderPriced order = tson.objectReader().read("""
+                !!schema:"https://example.test/order-2.tn"
+                !order { sku: "A"  quantity: 1  currency: "12.34" }""", OrderPriced.class);
+        assertEquals(new Money("12.34"), order.currency());
     }
 
     /** Tree mode is unaffected: it binds no class, so it has nothing to disagree with. */
