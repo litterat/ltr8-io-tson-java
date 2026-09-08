@@ -545,8 +545,12 @@ that fits byte", which is the JVM's account of the same fact and not the schema'
 
 **The mapping from a Java type to a family is an interpretation**, stated once in `HostAtoms` as the inverse
 of `IntegerParser.hostType`: `byte`→`int8` … `long`→`int64`, `BigInteger`→`integer`, `float`/`double`→
-`float32`/`float64`, `BigDecimal`→`number`. Nothing says a Java `int` means `int32` rather than an `integer`
-bounded to 32 bits — the two admit the same values — and the first is the one worth committing to because it
+`float32`/`float64`, `BigDecimal`→`number` — **each primitive keyed beside its box**, since a component
+declared `Integer` and one declared `int` are one position as far as a document is concerned, and a hole in
+one half of a pair stays invisible until a caller happens to declare the other. `java.lang.Number` is
+deliberately absent and is refused a layer earlier, by `tson-bind`: it is abstract and names no family, so
+there is nothing for the index to answer with. Nothing says a Java `int` means `int32` rather than an
+`integer` bounded to 32 bits — the two admit the same values — and the first is the one worth committing to because it
 makes this read a preview of the schema-directed one: an `int` component reaches the reader an `int32` field
 would. **The text encoding does not consult that index and must not**: [TSON-DATA] §4 makes base type
 resolution normative for an untyped token there, so the token is classified first and the target is a

@@ -66,6 +66,12 @@ class JsonObjectReaderTest {
     public record Narrow(byte b, short s, float f) {
     }
 
+    public record Primitives(byte b, short s, int i, long l, float f, double d) {
+    }
+
+    public record Boxed(Byte b, Short s, Integer i, Long l, Float f, Double d) {
+    }
+
     public record Approximate(double d, float f) {
     }
 
@@ -283,6 +289,25 @@ class JsonObjectReaderTest {
 
             assertEquals(new Narrow((byte) -128, (short) 32767, 1.5f),
                     READER.read("{\"b\": -128, \"s\": 32767, \"f\": 1.5}", Narrow.class));
+        }
+
+        @Test
+        void a_box_reads_as_its_primitive_does() {
+            // A component declared `Integer` and one declared `int` are one position as far as a document
+            // is concerned, so both halves of every pair are in the index -- a hole in one is invisible
+            // until a caller happens to declare the other. `HostAtomsTest` pins the index itself; this is
+            // the same claim at the reader, which is where a caller would meet it.
+            String source = "{\"b\": 1, \"s\": 2, \"i\": 3, \"l\": 4, \"f\": 5.5, \"d\": 6.5}";
+
+            assertEquals(new Primitives((byte) 1, (short) 2, 3, 4L, 5.5f, 6.5),
+                    READER.read(source, Primitives.class));
+            assertEquals(new Boxed((byte) 1, (short) 2, 3, 4L, 5.5f, 6.5),
+                    READER.read(source, Boxed.class));
+
+            // And the family's own verdict reaches both alike -- int8's range, not the box's.
+            assertEquals(">= -128 and <= 127",
+                    refused("{\"b\": 200, \"s\": 2, \"i\": 3, \"l\": 4, \"f\": 5.5, \"d\": 6.5}",
+                            Boxed.class).expected());
         }
 
         @Test
