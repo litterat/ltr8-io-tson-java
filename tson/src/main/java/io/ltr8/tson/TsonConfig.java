@@ -14,7 +14,6 @@ import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
-
 import java.util.Map;
 import java.util.Objects;
 

@@ -1,11 +1,9 @@
 package io.ltr8.tson.compiler.consumer;
 
 import io.ltr8.bind.DataNameBinder;
-
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.schema.meta.Data;
 import io.ltr8.tson.schema.meta.TypeRef;
-
 import java.util.List;
 
 /**

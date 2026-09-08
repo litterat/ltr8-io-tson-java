@@ -4,7 +4,6 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
@@ -13,13 +12,10 @@ import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.tree.TsonScopedValue;
 import io.ltr8.tson.tree.TsonValue;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.Map;
-
 import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;

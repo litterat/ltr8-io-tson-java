@@ -1,6 +1,5 @@
 package io.ltr8.tson;
 
-
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Typename;
@@ -12,12 +11,9 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
-
 import java.util.List;
 import java.util.Map;
-
 import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;

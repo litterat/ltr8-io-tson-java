@@ -1,6 +1,5 @@
 package io.ltr8.tson;
 
-
 import io.ltr8.annotation.Tuple;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -13,10 +12,8 @@ import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.tree.TsonTuple;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
-
 import java.math.BigInteger;
 import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;

@@ -1,6 +1,5 @@
 package io.ltr8.tson;
 
-
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
@@ -17,7 +16,6 @@ import io.ltr8.tson.suite.Vectors;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -28,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.stream.Stream;
-
 import static io.ltr8.tson.suite.Sidecar.fieldText;
 import static io.ltr8.tson.suite.Sidecar.fieldTextArray;
 import static io.ltr8.tson.suite.Sidecar.hasField;
