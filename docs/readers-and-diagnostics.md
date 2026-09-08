@@ -133,6 +133,17 @@ is small and parsed once.)
   that chose to look there. Narrower uses of the same `ctx.reported()` idiom are unrelated and stay put:
   `MapAbstractReader`/`SchemalessObjectReader` asking whether one key bound, `verifyFixed` asking whether one
   token decoded, `AnnotationCapture`'s throwaway probe context — each brackets a single child read.
+- **A bound component's own bridge is applied where the field is wired, not where the value is read**
+  (`ElementBridging.wrap`, from `RecordBindReader`'s field loop and from the array and map readers). A
+  schema-driven read is exactly the path that does not go through `tson-bind`'s binder, which is what
+  applies a bridge as it collects a record's constructor arguments — `RecordBindReader` fills its own
+  argument array from the compiled field readers, and a collection appends elements through an access
+  bridge that converts nothing. So both wrap, and a consumer's `registerAtom(Money.class, bridge)` or
+  `@Transparent` wrapper binds the same under a schema as without one. The wrapper is identity where the
+  target carries no bridge, so both callers wrap unconditionally. **What is still not checked is the
+  component that carries no bridge and cannot meet its family** — that is knowable at compile and belongs
+  with the field-set agreement check; `BACKLOG.md` carries it, `AtomBoundClassUnderSchemaTest` states the
+  boundary.
 - **Every reader stamps its own schema position** first thing (`ctx.at(value).withSchemaPosition(...)`) so
   a diagnostic from inside an atom carries *that atom's* declared position. A record field never mentioned
   by the data can only be noticed after the record is consumed, so its `FIELD_REQUIRED` reports against

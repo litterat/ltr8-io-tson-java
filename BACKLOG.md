@@ -86,24 +86,27 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **A bound class cannot say it stands for an atom, once a schema is governing.** Registering a bridge
-  works on the schemaless path — `DataBindContext.Builder.registerAtom(Money.class, moneyBridge)` makes
-  `Money` a `DataClassAtom` whose `dataClass()` is `String`, and both encodings apply the bridge after
-  reading the wire type. Under a schema neither does: `AtomTypeReader.read` returns the *family's* natural
-  host value and never looks at the bound component's `DataClassAtom` or its bridge, so a schema declaring
-  `money => text` against an `Invoice(Money total)` fails with a bare
-  `ClassCastException: Cannot cast java.lang.String to Money` — escaping the read unwrapped, so it is neither
-  a diagnostic nor a classified exception. It compiles clean because the bind-mode check compares field
-  *sets* and not host types, which is the second half of the fix: the disagreement should be a
-  `BindMismatchException` at compile, where every other schema/class disagreement already lands, rather than
-  a fault on the first read. **The read-side seam exists and is one case wide**:
-  `RecordBindReader.rebindValueIfNeeded` over `AtomTypeReader.overAtom` is exactly "let the bound component
-  pick the atom", restricted to the `value` escape hatch — generalising it to any bridged atom component
-  whose `dataClass()` is what the family produces is the change, and its own Javadoc already names
-  `rebindContainerIfNeeded` as the sibling it runs beside. **The write direction has no surface at all**:
-  `TsonObjectWriter` holds a private `VocabularyAtoms.defaults()` copy, whose Javadoc says it is mutable and
-  per-writer "so a caller wanting to extend the vocabulary with their own `AtomType` has an actual map to
-  add to" — and no caller can hand one in, so a custom atom cannot round-trip even once reading works.
+- [ ] **The bind-mode check compares field sets, not host types.** A component whose host type cannot meet
+  its field's family — an `Invoice(Money total)` against `money => text` where nothing registers `Money` as
+  an atom — compiles clean and throws a bare `ClassCastException` from the constructor on the first read,
+  escaping unwrapped so it is neither a diagnostic nor a classified exception. Both halves are fixed before
+  any document exists: the field's type resolves to a family with a known host value, and the component's
+  `DataClass` either carries a bridge that meets it or does not. So it belongs with the rest of the
+  agreement check as a `BindMismatchException` at compile, where every other schema/class disagreement
+  lands, rather than as a read-time diagnostic that fires for a defect knowable at startup.
+  `AtomBoundClassUnderSchemaTest` covers the cases that do bind and states this as its own boundary.
+
+- [ ] **A `value` slot's rebind asks by the declared component class.** `RecordBindReader.rebindValueIfNeeded`
+  passes `DataClassField.type()` to `ValueParser.at`, where the schemaless readers pass the bridge's
+  `dataClass()` — so the rebind finds no family for a bridged component and the slot falls back to §4
+  resolution. The field's own bridge crosses what that produces, which covers a bridge over a §4 host type
+  and leaves one whose wire type is not what §4 resolves to. Passing the data class is the change.
+
+- [ ] **A custom atom cannot round-trip, because the write direction has no surface.** `TsonObjectWriter`
+  holds a private `VocabularyAtoms.defaults()` copy, whose Javadoc says it is mutable and per-writer "so a
+  caller wanting to extend the vocabulary with their own `AtomType` has an actual map to add to" — and no
+  caller can hand one in. Reading now works for a bridged or `@Transparent` component under a schema, so
+  this is the half that stops the pair being usable.
 
 - [ ] **A host class two families share cannot be dispatched by class alone.**
   `HostAtoms.forStringContentHostType` maps a target class back to the family that parses it, and both

@@ -135,6 +135,10 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             if (target.dataClass() instanceof DataClassAnnotated boxed) {
                 rebound = boxing(rebound, boxed, annotationTypes);
             }
+            // The component's own bridge, applied here because this reader builds its constructor arguments
+            // itself -- tson-bind's binder, which collects a record's arguments through their bridges, is
+            // exactly the step a schema-driven read replaces. Same wrapper a container's elements take.
+            rebound = ElementBridging.wrap(rebound, target.dataClass());
             if (rebound != field.parser()) {
                 field = new CompiledField(field.schema(), rebound);
                 fields.set(i, field);
