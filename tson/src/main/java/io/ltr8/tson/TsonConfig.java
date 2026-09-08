@@ -1,6 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.base.bind.DataBinding;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -13,6 +14,7 @@ import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.tson.base.bind.DataBinding;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 
 import java.util.Map;
@@ -21,15 +23,14 @@ import java.util.Objects;
 /**
  * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
  * directly. {@link #schemaAccess} says where user schemas beyond the bundled standard library come from;
- * {@link #bindings}/{@link #profile} say which Java classes the schema's types bind to and, where a class
- * offers several shapes, which one ({@link #dataBindContext} is the long form of the same thing, and the two
- * are mutually exclusive); {@link #metaNameBinder} binds a governing meta's own constructors;
+ * {@link #dataBinding} says which Java classes the schema's types bind to and how strictly they must
+ * agree; {@link #metaNameBinder} binds a governing meta's own constructors;
  * {@link #processorPolicy} states what this processor will admit as a name and spend on a document; and
- * {@link #lenientBinding} lets a class hold fewer fields than its schema declares. {@link #build()}
+ * {@link #build()}
  * constructs a {@link TsonCompiledMetaRegistry} and has it
  * load the bundled meta-kernel/meta.tn/core.tn standard library, then wraps it as a {@link Tson}.
  *
- * <p>The two binding options are deliberately separate and never merged. {@link #dataBindContext} binds
+ * <p>The two binding options are deliberately separate and never merged. {@link #dataBinding} binds
  * <em>data</em> ({@code order} -> {@code Order}); {@link #metaNameBinder} binds a governing meta's own
  * <em>vocabulary</em> ({@code operation} -> {@code Operation}). One name means different things on the two
  * sides, so one namespace holding both would collide the first time a schema type and a meta-layer
@@ -37,14 +38,10 @@ import java.util.Objects;
  */
 public final class TsonConfig {
 
-    private DataBindContext dataBindContext = AtomContext.defaultContext();
+    private DataBinding dataBinding = DataBinding.standard();
     private SchemaAccess schemaAccess = SchemaAccess.registeredOnly();
     private DataNameBinder metaNameBinder;
     private ProcessorPolicy policy = ProcessorPolicy.defaults();
-    private boolean strictBinding = true;
-    private Map<String, Class<?>> bindings;
-    private String profile;
-    private boolean dataBindContextSupplied;
 
     TsonConfig() {
     }
@@ -76,73 +73,25 @@ public final class TsonConfig {
     }
 
     /**
-     * The {@link DataBindContext} the built {@link Tson}'s own {@link Tson#objectReader()}/{@link
-     * Tson#objectWriter()} bind against -- defaults to {@link AtomContext#defaultContext()}, the
-     * same default {@link TsonObjectReader}'s/{@link TsonObjectWriter}'s own no-arg constructors use.
-     * Unrelated to (and never overrides) the object-binding-mode context {@link #build()} always uses
-     * internally to resolve the standard library itself -- see {@link Tson}'s own Javadoc for why that
-     * one's mode is fixed, and {@link #metaNameBinder} for the one thing about it a consumer may extend.
+     * What the built {@link Tson}'s own {@link Tson#objectReader()}/{@link Tson#objectWriter()} bind
+     * through, and how strictly -- defaults to {@link DataBinding#standard()}.
      *
-     * <p><b>A context's configuration is fixed once it is built</b>, so a context handed here cannot acquire
-     * a binding later: {@code registerAtom} is {@link DataBindContext.Builder}'s and closes at
-     * {@code build()}. What stays concurrent is the descriptor cache, where two threads resolving one class
-     * both do the work and one answer wins -- duplicated work on a race, never duplicated state.
-     */
-    public TsonConfig dataBindContext(DataBindContext dataBindContext) {
-        this.dataBindContext = dataBindContext;
-        this.dataBindContextSupplied = true;
-        return this;
-    }
-
-    /**
-     * The schema types this application binds, as {@code name -> class} -- the short way to say what
-     * {@link #dataBindContext} says the long way.
+     * <p>The vocabulary for building one is {@code tson-bind}'s and {@link DataBinding}'s rather than this
+     * class's, so there is one place to learn it and one place it can drift:
      *
      * <pre>{@code
-     * Tson.builder().schemaAccess(SchemaAccess.of(source)).bindings(Map.of("order", Order.class)).build();
+     * DataBinding.of(DataBindContext.builder()
+     *         .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class)))
+     *         .registerAtoms(AtomContext.hostTypes())
+     *         .build())
      * }</pre>
      *
-     * <p><b>It exists because the long way has three steps and two of them are invisible.</b> A caller who
-     * builds only a {@link DataNameBinder} gets atoms unbound ({@code AtomContext.registerDefaults} is
-     * the step nothing reminds you of), and a caller who maps their own names without chaining loses the
-     * kernel's vocabulary for the schema types that need it. This does all three.
-     *
-     * <p><b>A name outside the map is an error naming the map</b>, not a class-not-found from whatever was
-     * consulted last. The map is this application's statement of what it binds, so a name missing from it is
-     * a gap in that statement and the message says as much -- the kernel's own account is kept as the cause.
-     *
-     * <p>Binds the <em>data</em> a schema describes. A governing meta's own vocabulary is
-     * {@link #metaNameBinder}, deliberately a separate namespace: one holding both would collide the first
-     * time a schema type and a meta-layer constructor shared a name. Note also that this direction is for
-     * <em>reading</em> -- writing resolves a value's type name from its class's own {@code @Typename}, so a
-     * class mapped here without one reads but cannot be written.
-     *
-     * @throws IllegalStateException from {@link #build()} if {@link #dataBindContext} was also supplied --
-     *                               a context is built or given, not both
+     * <p>Unrelated to (and never overriding) the object-binding-mode context {@link #build()} always uses
+     * internally to resolve the standard library itself -- see {@link Tson}'s own Javadoc for why that one's
+     * mode is fixed, and {@link #metaNameBinder} for the one thing about it a consumer may extend.
      */
-    public TsonConfig bindings(Map<String, Class<?>> bindings) {
-        this.bindings = Map.copyOf(bindings);
-        return this;
-    }
-
-    /**
-     * The binding profile for the context {@link #bindings} builds -- selecting among a class's
-     * {@code @Profile} constructors, so one class can serve several versions of a schema.
-     *
-     * <p>A {@link Tson} is one profile: a server speaking two versions builds one per version, each with its
-     * own profile, and routes a document to the right one. Nothing here derives the profile from the schema a
-     * document names; that mapping is the application's, and it is the one thing the application knows better
-     * than this library.
-     *
-     * <p>Pointing a profile at the wrong version does not bind quietly -- the constructor it selects is
-     * checked against that schema's fields, and a disagreement is a {@code BindMismatchException}.
-     *
-     * @throws IllegalStateException from {@link #build()} if {@link #dataBindContext} was also supplied --
-     *                               a profile is fixed when a context is built, so it cannot apply to one
-     *                               that arrives already built
-     */
-    public TsonConfig profile(String profile) {
-        this.profile = Objects.requireNonNull(profile, "profile");
+    public TsonConfig dataBinding(DataBinding dataBinding) {
+        this.dataBinding = Objects.requireNonNull(dataBinding, "dataBinding");
         return this;
     }
 
@@ -158,7 +107,7 @@ public final class TsonConfig {
      * names and gives up nothing -- in particular not the object-binding mode the standard library must be
      * compiled in (see {@link Tson}), which is what {@code build()} fixes and this does not touch.
      *
-     * <p>Distinct from {@link #dataBindContext}, which binds the <em>data</em> a schema describes; this
+     * <p>Distinct from {@link #dataBinding}, which binds the <em>data</em> a schema describes; this
      * binds the <em>schema vocabulary</em> a meta describes. A consumer with both supplies both.
      */
     public TsonConfig metaNameBinder(DataNameBinder metaNameBinder) {
@@ -288,40 +237,7 @@ public final class TsonConfig {
         return this;
     }
 
-    /**
-     * Lets a bound class hold fewer fields than the schema declares, silently -- off by default.
-     *
-     * <p>By default the two must agree, and a mismatch is a {@link
-     * BindMismatchException} when the schema is compiled in bind mode, which is
-     * startup for anything compiling its schemas once. That default is the asymmetry between the two ways of
-     * being wrong: a strict reader that is wrong says so at startup, in one message naming both sides, and
-     * is fixed in minutes; a lenient one that is wrong drops a value from every document and surfaces much
-     * later as a field that mysteriously holds its default.
-     *
-     * <p>Leniency is a real position, not just an escape hatch -- versioned evolution, where a v1 consumer
-     * deliberately reads a v2 document and means to ignore what it does not know. This is where that
-     * intention gets written down -- and it is the only path on which a field is dropped at all, every
-     * mismatch otherwise being settled before a document exists. It is silent by necessity: reporting
-     * abandons the construction ({@code ConstructionGuard}), so a lenient reader that reported would hand
-     * back {@code null} for exactly the documents it exists to accept.
-     *
-     * <p>The narrower alternative to reaching for this is {@code @Unbound} on the one component that is the
-     * class's own business rather than the wire's.
-     */
-    public TsonConfig lenientBinding() {
-        this.strictBinding = false;
-        return this;
-    }
-
     public Tson build() {
-        if (dataBindContextSupplied && (bindings != null || profile != null)) {
-            throw new IllegalStateException("supply dataBindContext, or bindings/profile which build one for "
-                    + "you -- not both. A profile is fixed when a context is built, so it cannot be applied to "
-                    + "one that arrives already built");
-        }
-        if (bindings != null || profile != null) {
-            dataBindContext = boundContext();
-        }
         // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
         // bundled meta-kernel/meta/core, and the access's source is consulted only for other URIs. It
         // compiles the standard library in object-binding mode -- the only mode that can (a DOM reader
@@ -335,32 +251,6 @@ public final class TsonConfig {
         SchemaSource source = schemaAccess.source();
         TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
                 schemaContext, source, policy.identifierPolicy());
-        return new Tson(core, dataBindContext, strictBinding, policy);
-    }
-
-    /**
-     * The {@link DataBindContext} {@link #bindings}/{@link #profile} describe: the map as a {@link
-     * DataNameBinder}, chained over the kernel's own vocabulary rather than replacing it, with this
-     * library's atom registrations applied.
-     *
-     * <p>The chain is a backstop, not the main path -- a map-only binder resolves an ordinary user schema
-     * perfectly well, the kernel's names being resolved through the resolution core's own context. It earns
-     * its keep where a schema names a kernel or meta record type. That is also why the <em>map</em> authors
-     * the failure: the last binder consulted is the backstop, and letting it speak would report a missing
-     * line of this application's configuration as "not kernel vocabulary".
-     */
-    private DataBindContext boundContext() {
-        // The map answers first and the kernel's own vocabulary backs it, so a schema naming `record` or
-        // `enum` still resolves and a consumer cannot lose those by supplying a map. `orElse` also settles
-        // which binder authors the failure: the map's, because a name neither knows is a missing line of
-        // this application's configuration rather than a fact about kernel vocabulary.
-        DataNameBinder binder = DataNameBinder.ofMap(bindings == null ? Map.of() : bindings)
-                .orElse(SchemaMetaNameBinder.INSTANCE);
-        DataBindContext.Builder builder = DataBindContext.builder().nameBinder(binder)
-                .registerAtoms(AtomContext.hostTypes());
-        if (profile != null) {
-            builder.profile(profile);
-        }
-        return builder.build();
+        return new Tson(core, dataBinding, policy);
     }
 }

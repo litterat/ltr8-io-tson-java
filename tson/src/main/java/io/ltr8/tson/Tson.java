@@ -5,6 +5,7 @@ import io.ltr8.tson.base.source.FileSchemaSource;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.*;
+import io.ltr8.tson.base.bind.DataBinding;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
@@ -77,7 +78,7 @@ import java.util.Optional;
  * module's own resolution engine, has a real, current dependency on {@link TsonObjectWriter}
  * (atom-refinement merging), so they can't move to a module that depends *on* {@code tson-compiler}
  * without a cycle. {@link #objectReader()}/{@link #objectWriter()} bind them to this instance's own
- * {@link #dataBindContext()} (configurable via {@link TsonConfig#dataBindContext}), so a caller gets
+ * {@link #dataBindContext()} (configurable via {@link TsonConfig#dataBinding}), so a caller gets
  * one consistent binding configuration without having to wire it up twice.
  */
 public final class Tson {
@@ -95,13 +96,12 @@ public final class Tson {
      */
     private final ProcessorPolicy policy;
 
-    Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext, boolean strictBinding,
-         ProcessorPolicy policy) {
+    Tson(TsonCompiledMetaRegistry core, DataBinding binding, ProcessorPolicy policy) {
         this.policy = policy;
         this.core = core;
-        this.dataBindContext = dataBindContext;
+        this.dataBindContext = binding.context();
         this.tree = TsonCompiledSchemaRegistry.tree(core);
-        this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext, strictBinding);
+        this.bind = TsonCompiledSchemaRegistry.bind(core, binding);
     }
 
     /** A fresh {@link TsonConfig} -- {@link TsonConfig#build()} bootstraps meta-kernel/meta.tn/core.tn and returns the resulting {@link Tson}. */
@@ -178,7 +178,8 @@ public final class Tson {
         return policy.limits();
     }
 
-    /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/{@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBindContext} to customize it. */
+    /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/
+            {@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBinding} to customize it. */
     public DataBindContext dataBindContext() {
         return dataBindContext;
     }

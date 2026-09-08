@@ -418,6 +418,22 @@ tson.resolve(schemaText);                      // registers the schema by its ow
 TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
 ```
 
+- **`DataBinding` is the context and the strictness, as one value.** A registry compiles readers from a
+  schema and a context together, checking them against each other as it goes — `bind(core, binding)` — so a
+  context with no strictness stated has an unstated one and a strictness with no context governs nothing.
+  The same pair-that-travels-together test `SchemaAccess` passes, and the reason it is `DataBinding` rather
+  than a `*Policy`: a `ProcessorPolicy` is a denial rule over documents, meaningful with no schema and no
+  class in hand, where this answers which classes the application brought and what it wants done when they
+  disagree with its schemas. Configuration, not policy.
+  - **`ignoringUnknownFields` is deliberately not part of it**, and the reason is not taste. The agreement
+    check runs when a schema is *compiled*, so `strict` cannot be a reader derivation — there is no answer
+    left to give by then. Nothing is compiled against the unknown-field rule, so it stays one, and one
+    endpoint may be lenient about a later version's extra fields while another beside it is strict.
+  - **`TsonConfig` lost `bindings`/`profile` to it.** Both were shorthand for a `DataBindContext` the caller
+    could build directly once `DataNameBinder.ofMap` and `orElse` existed — the map over the kernel's own
+    vocabulary, which is all `bindings` ever added. One vocabulary for building a binding, in the module
+    that owns binding.
+
 - **A `DataBindContext`'s configuration closes when it is built.** `registerAtom` is a
   `DataBindContext.Builder` method, applied once inside the constructor on the thread that builds. It used
   to be a method on the built context, which made two hazards possible and one of them was real: a

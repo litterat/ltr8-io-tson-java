@@ -1,5 +1,7 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.bind.DataBinding;
+
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -63,7 +65,7 @@ class BindMismatchClassificationTest {
     private static Tson tson() {
         return Tson.builder()
                 .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META_X, META_SCHEMA))))
-                .dataBindContext(SchemaMetaNameBinder.defaultContext())
+                .dataBinding(DataBinding.of(SchemaMetaNameBinder.defaultContext()))
                 .build();
     }
 

@@ -8,6 +8,7 @@ import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.tson.base.bind.DataBinding;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,7 +53,7 @@ final class DiagnosticsSchema {
     static TsonCompiledSchema compiled() {
         DataBindContext context =
                 DataBindContext.builder().nameBinder(BINDER).registerAtoms(AtomContext.hostTypes()).build();
-        Tson tson = Tson.builder().dataBindContext(context).build();
+        Tson tson = Tson.builder().dataBinding(DataBinding.of(context)).build();
         return tson.bindRegistry().compile(tson.resolve(readResource("/diagnostics.tn")));
     }
 

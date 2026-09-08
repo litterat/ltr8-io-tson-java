@@ -1,5 +1,11 @@
 package io.ltr8.tson.perf;
 
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.tson.base.bind.DataBinding;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
+
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.Tson;
@@ -91,7 +97,10 @@ class AllocationHarnessTest {
 
         SchemaSource source = uri -> SCHEMA;
         tson = Tson.builder().schemaAccess(SchemaAccess.of(source))
-                .bindings(Map.of("order", Order.class, "line", Line.class))
+                .dataBinding(DataBinding.of(DataBindContext.builder()
+                        .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "line", Line.class))
+                                .orElse(SchemaMetaNameBinder.INSTANCE))
+                        .registerAtoms(AtomContext.hostTypes()).build()))
                 .build();
         reader = tson.objectReader();
 

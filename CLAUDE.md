@@ -906,39 +906,15 @@ two arguments where the tree writer's takes one.
 ### Front door: `Tson`/`TsonConfig` (`tson` module) — `docs/facades-and-tree.md`
 
 `Tson.builder().build()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
-`bindings(Map)`/`profile(String)` are the short form of the bind context — the map as a name binder chained
-over the kernel's vocabulary, plus `AtomContext.hostTypes()` — and are mutually exclusive with
-`dataBindContext`, a profile being fixed when a context is built.
-`resolve(schemaText)` registers a schema by its own `!!id` (no mode — resolution is always bind-anchored);
-`treeRegistry()`/`bindRegistry()` pick the read mode; `objectReader()`/`treeReader()` return schema-aware
-facades sharing this instance's registries, so a schema compiles once per `Tson`.
-`validate(String|InputStream)` *is* `treeReader()` with a collecting receiver — returns `List<Diagnostic>`
-(empty = valid) and never throws for a bad input document (a library fault still throws, deliberately).
-**Where schemas come from is one value, `SchemaAccess`** — a `SchemaSource` plus the `FetchPolicy`
-governing it, which is where a deployment may obtain a schema and under what constraints.
-`TsonConfig.schemaAccess` is the only setter for it: the vocabulary for *stating* one lives on
-`SchemaAccess` and nowhere else, so there is one place to learn it and one place it can drift.
-`SchemaAccess.httpSchemas(hosts…)`/`fileSchemas(host, dir)` are the one-call forms of the two fetching
-sources that ship — `HttpSchemaSource` (HTTPS, host allow-list) and `FileSchemaSource` (a directory) —
-`SchemaAccess.of(source)` wraps one built elsewhere, and `SchemaAccess.builder()` is the general form,
-where the three are mutually exclusive and a `FetchPolicy` may not be stated beside a source it cannot
-reach into.
-`SchemaSource.ofMap(Map)` is the non-fetching third, for schemas a caller already holds: it exists
-because `schemaSource(schemas::get)` is the natural first source and returns `null` for the identity the
-*document* chose, which the contract does not permit — a `null` carries no `Reason`. That is refused where
-the loader calls a source (`IllegalStateException`, so it stays a fault and `SchemaFailure` rethrows it),
-and `ofMap` is the same lookup done right: a miss is `NOT_FOUND`, and matching is by canonical identity, so
-a `?sha256=`-pinned reference finds the unpinned entry. Both **deny by default**, match a host
-exactly, and share `SchemaReference` for §2.2.1's rules on what an identity may be, since the reference comes
-out of a document and in a server that means a request body: the HTTP one guards SSRF (no redirects ever, size
-capped against bytes delivered), the file one arbitrary reads (containment checked *after* `toRealPath`, so
-`..` and symlink escape fall together). Neither verifies the `?sha256=` pin or the fetched `!!id` — the loader
-does both; `requireContentHashPin` adds the one thing it cannot, that a pin be present. **`SchemaSource`
-names its own failure exception** — a source says "cannot supply this" with `SchemaFetchException` and
-nothing else, which is what lets `SchemaFailure` classify every branch positively and rethrow a fault as
-itself; the exception lives in `tson-compiler` beside the interface, since the classification cannot see a
-type declared in `tson`. A schema no source would supply is one of the five `SCHEMA_*` codes, never
-`SCHEMA_ERROR`: it was never read, so nothing about it has been judged.
+`dataBinding(DataBinding)` says what a consumer's data binds to and how strictly — a `DataBindContext`
+and the schema-to-class agreement check, one value because they are two arguments to one compile.
+**The vocabulary for building one is `tson-bind`'s, not `TsonConfig`'s**: `DataNameBinder.ofMap(map)`
+over `DataBindContext.builder().registerAtoms(AtomContext.hostTypes())`, with `orElse` composing a
+caller's names over the kernel's own. `DataBinding.lenient()` is where a class may hold fewer fields
+than its schema declares. **What is not part of it is `ignoringUnknownFields`**, which stays a reader
+derivation: nothing is compiled against it, so one endpoint may be lenient about a later version's
+extra fields while another beside it is strict, where the agreement check runs at compile and a reader
+derived afterwards has no answer left to give.
 
 ```java
 Tson tson = Tson.builder().build();
