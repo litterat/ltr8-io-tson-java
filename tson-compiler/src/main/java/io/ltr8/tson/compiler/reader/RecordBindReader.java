@@ -160,7 +160,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 throw new BindMismatchException("'" + displayName + "' and "
                         + descriptor.typeClass().getName() + " do not agree: " + String.join("; ", mismatches)
                         + ". Bind the class the schema describes, or read leniently "
-                        + "(TsonConfig.lenientBinding) if dropping this is deliberate");
+                        + "(DataBinding.lenient) if dropping this is deliberate");
             }
         }
     }

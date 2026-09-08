@@ -115,7 +115,7 @@ class BindStrictnessTest {
 
     /**
      * {@code @Unbound} is that way, and it is per component rather than per read -- the narrow answer where
-     * {@link TsonConfig#lenientBinding} is the broad one. An {@code Optional} component arrives empty rather
+     * {@link io.ltr8.tson.base.bind.DataBinding#lenient} is the broad one. An {@code Optional} component arrives empty rather
      * than null, the bind engine wrapping it as it does any other.
      */
     @Test

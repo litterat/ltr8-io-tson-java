@@ -972,7 +972,7 @@ error* category, so this is the same layer, not a new one.
     - **Strict is the default because the two ways of being wrong are not symmetric.** A strict reader that
       is wrong says so at startup, once, naming both sides; a lenient one that is wrong drops a value from
       every document and surfaces later as a field mysteriously holding its default.
-      `TsonConfig.lenientBinding` is the opt-out, the one path on which a field is dropped at all, and it is
+      `DataBinding.lenient()` is the opt-out, the one path on which a field is dropped at all, and it is
       **silent**: reporting abandons the construction
       (`ConstructionGuard`), so a lenient reader that reported would return `null` for exactly the documents
       it exists to accept — and a diagnostic the guard is told to ignore is a severity axis under another
