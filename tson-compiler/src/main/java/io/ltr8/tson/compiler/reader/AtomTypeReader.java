@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomRefusal;
+import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -51,17 +52,24 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
 
     /**
-     * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean}
-     * ({@link BooleanReader}), every other enum instance its member text. Dispatch is keyed on the
-     * declaration's own name, the same mechanism {@link #UNIT} uses for {@code value}/{@code token}/{@code
-     * void}, and the one case {@link #ATOM} cannot serve -- an enum body maps to one parser, and this name
-     * alone wants a reader that is not an atom at all. (Tree mode then wraps the result in a
-     * {@code TsonAtom} -- see {@link ValueReaderFactoryRegistry}.)
+     * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean},
+     * every other enum instance its member text. Dispatch is keyed on the declaration's own name, the same
+     * mechanism {@link #UNIT} uses for {@code value}/{@code token}/{@code void}, and the one case
+     * {@link #ATOM} cannot serve -- an enum body maps to {@link io.ltr8.tson.atom.parser.EnumParser}, which
+     * hands back the member's own text, and this one name wants the host value its two members stand for.
+     * (Tree mode then wraps the result in a {@code TsonAtom} -- see {@link ValueReaderFactoryRegistry}.)
+     *
+     * <p><b>The parser is the vocabulary's own</b>, asked for by name through {@link
+     * BuiltinTypeVocabulary} -- {@code atom.parser} is unexported, and an index is how a caller reaches one.
+     * So {@code boolean} reads to the same host value with a schema and without one, and a token that is
+     * neither member is refused as the enum miss it is: {@code ATOM_CONSTRAINT_VIOLATION}, the code every
+     * other enum reports, where the hand-rolled reader this replaced said {@code TYPE_MISMATCH}.
      */
-    static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, context) ->
-            "boolean".equals(name)
-                    ? new BooleanReader(context.locationOf(name, definition))
-                    : ATOM.create(name, definition, context);
+    static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, context) -> "boolean".equals(name)
+            ? AtomTypeReader.of(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
+                    () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
+                    context.locationOf(name, definition))
+            : ATOM.create(name, definition, context);
     /**
      * {@code unit}'s three real instances -- {@code value}/{@code token}/{@code void} -- all resolve to the
      * identical empty body, so, per the kernel's own doc ("distinguished by name and prose-level parsing

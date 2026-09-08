@@ -27,7 +27,8 @@ import java.util.function.UnaryOperator;
  * {@code record}.
  *
  * <p><b>{@code enum}</b> uses {@link AtomTypeReader#ENUM_OBJECT_MODE} in both {@link #tree} and {@link
- * #bind} (dispatching {@code boolean} to a real {@code Boolean} via {@link BooleanReader}, every other
+ * #bind} (dispatching {@code boolean} to a real {@code Boolean} via the vocabulary's own
+ * {@code BooleanParser}, every other
  * member name through the ordinary path) -- so {@code boolean} reads a genuine {@code Boolean}, not the
  * text {@code "true"}/{@code "false"}. Tree mode additionally wraps every leaf in a {@code TsonAtom}.
  *

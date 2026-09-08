@@ -27,10 +27,11 @@ import java.util.List;
  * form-agnostic behavior {@code MetaKernelBootstrapResolver}'s own hand-written enum converter already uses,
  * "correct for every enum member regardless of what it happens to look like".
  *
- * <p>Not part of Part 1's published built-in vocabulary (§5) -- like {@link TextParser}, never
- * registered in {@link BuiltinTypeVocabulary} and has no {@code TYPENAME} constant. {@code enum} is
- * a Part 2 schema constructor, not a schemaless annotation a Class 1 processor would ever resolve
- * on its own.
+ * <p><b>Not registered in {@link BuiltinTypeVocabulary} and has no {@code TYPENAME}</b>: {@code enum} is a
+ * Part 2 schema constructor rather than a name a schemaless document could write, since the members are the
+ * author's. Its two published <em>instances</em> are registered -- {@link BooleanParser} under
+ * {@code boolean}, which reads the host values its members stand for rather than their text, and that is
+ * the one case this class deliberately does not serve.
  */
 public record EnumParser(EnumBody constraints) implements AtomType<String> {
 

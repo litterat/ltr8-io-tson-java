@@ -1,5 +1,6 @@
 package io.ltr8.tson.atom;
 
+import io.ltr8.tson.atom.parser.BooleanParser;
 import io.ltr8.tson.atom.parser.BytesParser;
 import io.ltr8.tson.atom.parser.ComplexParser;
 import io.ltr8.tson.atom.parser.DateParser;
@@ -12,6 +13,7 @@ import io.ltr8.tson.atom.parser.Ipv4Parser;
 import io.ltr8.tson.atom.parser.Ipv6Parser;
 import io.ltr8.tson.atom.parser.PeriodParser;
 import io.ltr8.tson.atom.parser.RationalParser;
+import io.ltr8.tson.atom.parser.TextParser;
 import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
@@ -28,6 +30,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.OffsetTime;
 import java.time.Period;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -148,6 +151,48 @@ public final class HostAtoms {
      */
     public static Optional<AtomType<?>> forNumberContentHostType(Class<?> hostType) {
         return Optional.ofNullable(BY_NUMBER_CONTENT_HOST_TYPE.get(hostType));
+    }
+
+    /**
+     * The family a position <b>typed by a host class</b> names -- whatever form the token took.
+     *
+     * <p><b>This is the whole vocabulary keyed by target</b>, string families and numeric alike, plus
+     * {@code text} for {@code String} and {@code boolean} for the two boolean types. Its two siblings above
+     * are split by [TSON-JSON] §5's per-family <em>kinds</em>, because JSON's grammar tells a string from a
+     * number and §5's table admits one or the other per family. TSON's does not: at a typed position a token
+     * is a token, [TSON-SCHEMA] §4.2 giving every value "typed by its position or by its tag" and
+     * {@link AtomType} reading text rather than a token -- so {@code 12} and {@code "12"} are one
+     * {@code int32}, and {@code .nan} and {@code ".nan"} one {@code float64}. One index, because the target
+     * is the only question.
+     *
+     * <p><b>What a reader asks when the class is what types the position</b> -- an object-binding read of a
+     * document with no {@code !!schema}, where the target class fixes the shape of every record, array and
+     * atom under it. [TSON-DATA] §4.1's base type resolution is for a position nothing types, which after
+     * this is exactly tree mode; {@code SPEC-FEEDBACK.md} #7 carries why, since §4.1 speaks of documents and
+     * has no term for a position a host type has typed.
+     *
+     * <p><b>What is deliberately absent</b> is every class no single family names: {@code char} and
+     * {@code Object} (no family at all), {@code CidrNetwork} (both {@code cidr4} and {@code cidr6} produce
+     * one), and {@code Rational}/{@code Complex}, which bind structurally rather than as atoms. A caller
+     * falls back to base type resolution for those, which is what it did for everything before.
+     */
+    private static final Map<Class<?>, AtomType<?>> BY_TYPED_POSITION = typedPositions();
+
+    private static Map<Class<?>, AtomType<?>> typedPositions() {
+        Map<Class<?>, AtomType<?>> atoms = new HashMap<>(BY_STRING_CONTENT_HOST_TYPE);
+        atoms.putAll(BY_NUMBER_CONTENT_HOST_TYPE);
+        atoms.put(String.class, TextParser.UNCONSTRAINED);
+        atoms.put(boolean.class, BooleanParser.INSTANCE);
+        atoms.put(Boolean.class, BooleanParser.INSTANCE);
+        return Map.copyOf(atoms);
+    }
+
+    /**
+     * The built-in atom that reads {@code hostType} at a position typed by it, or empty where no single
+     * family does -- see {@link #BY_TYPED_POSITION}.
+     */
+    public static Optional<AtomType<?>> forTypedPosition(Class<?> hostType) {
+        return Optional.ofNullable(BY_TYPED_POSITION.get(hostType));
     }
 
     /** The built-in atom whose values are {@code hostType}, or empty where no built-in produces that class. */
