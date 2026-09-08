@@ -125,6 +125,37 @@ declared on those terms and neither has a consumer, because TSON text tags its c
 never flattens — so it cannot exercise `@discriminator` or `@rest` at all. A JSON front end is what puts that half of
 §6 under test, and is expected to move both: a directive with no consumer has never had its shape checked against one.
 
+- [ ] **Nothing writes JSON.** `tson-json` is three readers and no writer — `Json.parse`, `JsonTreeReader`,
+  `JsonObjectReader` — where the text side has `TsonObjectWriter`, `TsonTreeWriter` and `TsonDataEmitter`
+  under them. The escape half already exists and nothing composes it: `JsonText` is RFC 8259 string quoting,
+  package-private, and its own Javadoc calls itself "the only place this module writes a string". §5's
+  per-family table states an **encode** column beside the decode one, §9.2 is a processor contract in its own
+  right, and §9.3's round-trip guarantees cannot be asserted at all with one direction built — so §5.3's
+  digits-and-scale promise (`199.90` encodes as `199.90`, not `199.9`) is currently half-tested: the scale
+  survives into a `BigDecimal` and nothing checks it comes back out. What the shape should be is settled by
+  the read side rather than open: the tree and object writers are the mirror of the two readers, `JsonText`
+  is the leaf, and `VocabularyAtoms`' keying on the *declared* host class rather than the value's runtime
+  class is the rule to carry over — `litterat-json`'s `JsonMapper.writeAtom` dispatches on
+  `object instanceof Number`, which is how a `long` and a `BigInteger` come to be written by the same branch
+  and neither is written by its family. One walk serves both directions there, in one class; whether that is
+  worth copying is the one real design question here.
+
+- [ ] **The JSON record reader rebuilds its name index on every record value.**
+  `DataClassObjectReader.bindRecord` allocates a `HashMap<String, Integer>` over `target.fields()` for each
+  object it reads, and that map is a pure function of the `DataClassRecord` — a document holding ten
+  thousand records builds ten thousand identical maps. The text side has no such cost because the work lands
+  at compile: `RecordAbstractReader.fieldIndex` is a `final` map built in the constructor, once per entry.
+  JSON has no compile step, so it landed per read instead and nothing noticed. The engine is one per
+  `JsonObjectReader`, built in that class's own constructor and shared across every read it serves,
+  which is where the memo belongs —
+  `litterat-json`'s `JsonMapper` already cached exactly this (`fieldMaps`/`componentMap`), on a bare
+  `HashMap` field, which is the one part not to copy: a shared reader must stay safe under concurrent reads,
+  so the memo wants the settle-a-race treatment the compiled registries already use. Worth deciding the
+  sibling allocation in the same pass: the `HashSet<String>` tracking §3.1's repeated members is genuinely
+  per-value, but for a record of a handful of fields a scan of the filled slots beats hashing. **Size it
+  before changing it** — `AllocationHarnessTest` measures the TSON bind path and there is no JSON
+  counterpart, so the first move is a harness that says what a JSON read costs and where.
+
 - [ ] **A JSON document cannot name the schema that governs it, so the front door and the CLI need a surface that
   does.** `!!schema` is TSON text syntax (`SPEC-FEEDBACK.md` #2, open): a JSON body has no in-band channel, so
   `Tson.validate(text)` and `tson validate`'s auto-classification — both of which read a header to decide what a
