@@ -63,6 +63,12 @@ class JsonObjectReaderTest {
     public record Numbers(int i, long l, double d, BigInteger big, BigDecimal exact) {
     }
 
+    public record Narrow(byte b, short s, float f) {
+    }
+
+    public record Approximate(double d, float f) {
+    }
+
     public record Required(@Field(required = true) String name) {
     }
 
@@ -246,10 +252,17 @@ class JsonObjectReaderTest {
         @Test
         void a_narrowing_that_would_lose_is_an_error_rather_than_a_round() {
             // §3.1: "an implementation that cannot represent the digits MUST error, never round silently".
-            assertTrue(refused("{\"name\": \"a\", \"age\": 1.5}", Person.class).message()
-                    .contains("1.5 is not exactly representable as int"));
-            assertTrue(refused("{\"name\": \"a\", \"age\": 2147483648}", Person.class).message()
-                    .contains("not exactly representable as int"));
+            // The two are refused for different reasons and say so: `1.5` is not an integer at all (§5.3's
+            // contract rejection, exactly as the token `1.5` is in text), where `2147483648` is an integer
+            // outside int32's range. Narrowing one BigDecimal made both "not exactly representable".
+            Diagnostic form = refused("{\"name\": \"a\", \"age\": 1.5}", Person.class);
+            assertTrue(form.message().contains("only integer and based-integer forms are accepted"),
+                    form.message());
+            assertEquals("an integer or based-integer form", form.expected());
+
+            Diagnostic range = refused("{\"name\": \"a\", \"age\": 2147483648}", Person.class);
+            assertTrue(range.message().contains("out of range for a signed 32-bit integer"), range.message());
+            assertEquals(">= -2147483648 and <= 2147483647", range.expected());
         }
 
         @Test
@@ -258,6 +271,40 @@ class JsonObjectReaderTest {
             assertEquals(0.1, READER.read(
                     "{\"i\":0,\"l\":0,\"d\":0.1000000000000000055511151231257827,\"big\":0,\"exact\":0}",
                     Numbers.class).d());
+        }
+
+        @Test
+        void a_number_is_read_by_the_family_its_target_names() {
+            // §4.1: the target picks the parser. `int` is int32's contract, `byte` is int8's -- so the
+            // bound reported is the atom's own and not the JVM's account of what fits.
+            Diagnostic refusal = refused("{\"b\": 200, \"s\": 1, \"f\": 1}", Narrow.class);
+            assertEquals(">= -128 and <= 127", refusal.expected());
+            assertTrue(refusal.message().contains("signed 8-bit integer"), refusal.message());
+
+            assertEquals(new Narrow((byte) -128, (short) 32767, 1.5f),
+                    READER.read("{\"b\": -128, \"s\": 32767, \"f\": 1.5}", Narrow.class));
+        }
+
+        @Test
+        void an_approximate_position_admits_the_special_values_as_strings() {
+            // §5.4: the two infinities and NaN have no JSON number spelling and encode as strings holding
+            // [TSON-DATA] §7.6's own productions -- so the same parser reads both kinds, and no third
+            // spelling of infinity enters the series. `"NaN"` is not one of them.
+            assertEquals(new Approximate(Double.NaN, Float.NEGATIVE_INFINITY),
+                    READER.read("{\"d\": \".nan\", \"f\": \"-.inf\"}", Approximate.class));
+            assertEquals(new Approximate(Double.POSITIVE_INFINITY, 0.0f),
+                    READER.read("{\"d\": \".inf\", \"f\": 0}", Approximate.class));
+
+            assertTrue(refused("{\"d\": \"NaN\", \"f\": 0}", Approximate.class).message()
+                    .contains("integer, float, hex-float, or special-value"));
+        }
+
+        @Test
+        void an_exact_position_admits_no_string_at_all() {
+            // The string concession is §5.4's and the approximate families' alone -- §5.3's tier encodes as
+            // JSON numbers, so a digit string at an `int` is the wrong form and not a number to parse.
+            assertTrue(refused("{\"name\": \"a\", \"age\": \"36\"}", Person.class).message()
+                    .contains("a string cannot be read into int"));
         }
 
         @Test

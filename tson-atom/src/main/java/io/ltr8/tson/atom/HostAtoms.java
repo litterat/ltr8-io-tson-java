@@ -6,6 +6,7 @@ import io.ltr8.tson.atom.parser.DateParser;
 import io.ltr8.tson.atom.parser.DateTimeParser;
 import io.ltr8.tson.atom.parser.DecimalParser;
 import io.ltr8.tson.atom.parser.DurationParser;
+import io.ltr8.tson.atom.parser.FloatParser;
 import io.ltr8.tson.atom.parser.IntegerParser;
 import io.ltr8.tson.atom.parser.Ipv4Parser;
 import io.ltr8.tson.atom.parser.Ipv6Parser;
@@ -16,6 +17,7 @@ import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
 import io.ltr8.tson.base.atom.Complex;
 import io.ltr8.tson.base.atom.Rational;
+import io.ltr8.tson.schema.meta.IntegerSize;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.net.Inet4Address;
@@ -94,6 +96,52 @@ public final class HostAtoms {
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
             Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED));
+
+    /**
+     * The host classes of the <b>numeric</b> families -- the exact tier ([TSON-JSON] §5.3) and the
+     * approximate one (§5.4) -- keyed on the Java type a value is wanted as, primitives beside their boxes.
+     *
+     * <p><b>The inverse of {@code IntegerParser.hostType}</b>, which already answers the forward direction:
+     * given an atom, the narrowest Java type that holds it. Stating the reverse is what lets a reader with
+     * no type-ref read a number by the contract of the family its target names rather than by narrowing a
+     * host value the encoding chose -- so {@code 1.0} at an {@code int} is {@code int32}'s contract
+     * rejecting a float form, which §5.3 requires, and not a {@code BigDecimal} being asked whether it
+     * happens to be integral.
+     *
+     * <p><b>It is an interpretation, and this is the one worth committing to.</b> Nothing says a Java
+     * {@code int} means {@code int32} rather than an {@code integer} bounded to 32 bits; the two admit the
+     * same values, and the first is what makes a schemaless read a preview of the schema-directed one -- an
+     * {@code int} component reaches the reader the same {@code int32} field would.
+     */
+    private static final Map<Class<?>, AtomType<?>> BY_NUMBER_CONTENT_HOST_TYPE = Map.ofEntries(
+            Map.entry(byte.class, integer(8)), Map.entry(Byte.class, integer(8)),
+            Map.entry(short.class, integer(16)), Map.entry(Short.class, integer(16)),
+            Map.entry(int.class, integer(32)), Map.entry(Integer.class, integer(32)),
+            Map.entry(long.class, integer(64)), Map.entry(Long.class, integer(64)),
+            Map.entry(BigInteger.class, IntegerParser.UNCONSTRAINED),
+            Map.entry(float.class, FloatParser.FLOAT32), Map.entry(Float.class, FloatParser.FLOAT32),
+            Map.entry(double.class, FloatParser.FLOAT64), Map.entry(Double.class, FloatParser.FLOAT64),
+            Map.entry(BigDecimal.class, DecimalParser.UNCONSTRAINED));
+
+    /** {@code core.tn}'s own {@code int<bits> => !integer ^ { size: { bits: <bits> signed: true } } }. */
+    private static AtomType<?> integer(int bits) {
+        return new IntegerParser(new IntegerSize(bits, true));
+    }
+
+    /**
+     * The built-in atom that reads {@code hostType} from a <b>number</b>, or empty where no numeric family
+     * produces that class.
+     *
+     * <p>What an encoding whose kinds already do the classifying asks -- [TSON-JSON] §4.1 makes the
+     * position's type decide and §5.7 says outright that its decode "needs none of base type resolution".
+     * <b>The text encoding does not ask</b>, and must not: [TSON-DATA] §4 makes base type resolution
+     * normative for an untyped token there, so the token is classified first and the target is a narrowing
+     * question afterwards ({@code AtomBinder}). Both readings are right for their own encoding, which is why
+     * this is a separate index rather than a widening of {@link #forStringContentHostType}.
+     */
+    public static Optional<AtomType<?>> forNumberContentHostType(Class<?> hostType) {
+        return Optional.ofNullable(BY_NUMBER_CONTENT_HOST_TYPE.get(hostType));
+    }
 
     /** The built-in atom whose values are {@code hostType}, or empty where no built-in produces that class. */
     public static Optional<AtomType<?>> forHostType(Class<?> hostType) {

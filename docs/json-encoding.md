@@ -518,17 +518,40 @@ wrapping. `float`/`double` are the exception and are meant to be — rounding on
 approximate families' own contract (§5.4). An enum needs no rule here at all: `tson-bind` bridges every
 plain Java enum through `EnumStringBridge`, so one arrives as a bridged `String` atom.
 
-**The numeric families do not reach their own parsers yet, and a string family does** — the asymmetry is
-current, not settled. A JSON number is identified and then narrowed against the target's Java type, where a
-string is handed to the family the target names. §4.1 asks for the second everywhere: there is no untyped
-position in this encoding and no base type resolution under it (§5.7 says so outright), so the target picks
-the parser and the JSON kind decides only whether the content is admitted at all. Two divergences follow
-from the half not yet done: `1.0` at an `int` binds as `1` where §5.3 makes it a contract rejection — the
-text encoding already refuses the same thing, base resolution having classified the token first — and a
-`".nan"` at a `double` is refused where §5.4 admits exactly the string special-value forms at an approximate
-position. That second case is also why the fix is a restructure rather than another index lookup: a float
-position admits two JSON kinds through one parser, which a switch on the leaf kind cannot express.
-`BACKLOG.md`'s "JSON encoding" section carries it.
+**The target picks the parser; the JSON kind decides only whether the content is admitted.** That is §4.1
+read literally — there is no untyped position in this encoding and no base type resolution under it, §5.7
+saying so outright — and it is why `bindTo` dispatches on the target and guards on the leaf kind, rather
+than the other way round. `HostAtoms` supplies both halves: `forNumberContentHostType` for §5.3's exact tier
+and §5.4's approximate one, `forStringContentHostType` for §5.6's families. The two indices are disjoint,
+and a test says so — a family reading from a number must not be reachable from a string, which is what would
+let `"123"` become a `BigInteger` because a field is declared one.
+
+**The dispatch order is load-bearing, and §5.4 is why.** An approximate position admits a JSON number *and*
+a JSON string: the two infinities and NaN have no JSON number spelling and travel as `".inf"`, `"-.inf"`,
+`".nan"` — [TSON-DATA] §7.6's own productions, so one parser reads both kinds and no third spelling of
+infinity enters the series. A switch on the leaf kind cannot express one family serving two kinds; a switch
+on the target can, and both branches reach one call. Which families are approximate is *this encoding's*
+question rather than the vocabulary's, so it is answered by the two Java types §5.4 names and not by asking
+an `AtomType` about JSON kinds it should know nothing about.
+
+What the routing buys over narrowing a host value the encoding chose is visible in the refusals. `1.5` and
+`2147483648` at an `int` used to be one message — "not exactly representable" — because one `BigDecimal` was
+asked both questions. They are now two: the first is not an integer *form* at all (§5.3's contract
+rejection, exactly as the token `1.5` is in text, which the TSON side already got right through
+`NumberNarrowing`), the second is an integer outside `int32`'s range. `200` at a `byte` reports
+`>= -128 and <= 127` — `int8`'s own bound, from `AtomTypeException`'s vocabulary — where it reported "a value
+that fits byte", which is the JVM's account of the same fact and not the schema's. And a refinement's
+`allow_nan` or `multiple_of` now has somewhere to be honoured when the schema-directed decode lands.
+
+**The mapping from a Java type to a family is an interpretation**, stated once in `HostAtoms` as the inverse
+of `IntegerParser.hostType`: `byte`→`int8` … `long`→`int64`, `BigInteger`→`integer`, `float`/`double`→
+`float32`/`float64`, `BigDecimal`→`number`. Nothing says a Java `int` means `int32` rather than an `integer`
+bounded to 32 bits — the two admit the same values — and the first is the one worth committing to because it
+makes this read a preview of the schema-directed one: an `int` component reaches the reader an `int32` field
+would. **The text encoding does not consult that index and must not**: [TSON-DATA] §4 makes base type
+resolution normative for an untyped token there, so the token is classified first and the target is a
+narrowing question afterwards. Both readings are right for their own encoding, which is why there are two
+indices rather than one widened.
 
 **Every problem goes through a `DiagnosticsReceiver`**, so a read's own receiver decides its fate exactly
 as it does for the TSON readers: `throwing()` — the default — raises `ReadException` at the first, and

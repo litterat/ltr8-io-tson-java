@@ -86,6 +86,25 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
+- [ ] **A bound class cannot say it stands for an atom, once a schema is governing.** Registering a bridge
+  works on the schemaless path — `DataBindContext.Builder.registerAtom(Money.class, moneyBridge)` makes
+  `Money` a `DataClassAtom` whose `dataClass()` is `String`, and both encodings apply the bridge after
+  reading the wire type. Under a schema neither does: `AtomTypeReader.read` returns the *family's* natural
+  host value and never looks at the bound component's `DataClassAtom` or its bridge, so a schema declaring
+  `money => text` against an `Invoice(Money total)` fails with a bare
+  `ClassCastException: Cannot cast java.lang.String to Money` — escaping the read unwrapped, so it is neither
+  a diagnostic nor a classified exception. It compiles clean because the bind-mode check compares field
+  *sets* and not host types, which is the second half of the fix: the disagreement should be a
+  `BindMismatchException` at compile, where every other schema/class disagreement already lands, rather than
+  a fault on the first read. **The read-side seam exists and is one case wide**:
+  `RecordBindReader.rebindValueIfNeeded` over `AtomTypeReader.overAtom` is exactly "let the bound component
+  pick the atom", restricted to the `value` escape hatch — generalising it to any bridged atom component
+  whose `dataClass()` is what the family produces is the change, and its own Javadoc already names
+  `rebindContainerIfNeeded` as the sibling it runs beside. **The write direction has no surface at all**:
+  `TsonObjectWriter` holds a private `VocabularyAtoms.defaults()` copy, whose Javadoc says it is mutable and
+  per-writer "so a caller wanting to extend the vocabulary with their own `AtomType` has an actual map to
+  add to" — and no caller can hand one in, so a custom atom cannot round-trip even once reading works.
+
 - [ ] **A host class two families share cannot be dispatched by class alone.**
   `HostAtoms.forStringContentHostType` maps a target class back to the family that parses it, and both
   encodings' schemaless readers consult it — but it is not total over what `AtomContext` registers, because
@@ -138,39 +157,18 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   does not hit a name rule on `additionalProperties`. The look-alike rule is a property of a *set*, so it
   belongs where `SchemalessTreeReader` puts it on the text side: over one record's member names, once.
 
-- [ ] **The JSON numeric families are identified and narrowed, not read by their own parsers.** A JSON
-  number reaches `JsonAtoms.fromNumber`, which switches on the target's Java type and narrows through one
-  `BigDecimal`; a string reaches the family the target names (§5.1). §4.1 asks for the second in both
-  places — there is no untyped position in this encoding and no base type resolution under it, §5.7 saying
-  so outright — so the rule is **the target picks the parser and the JSON kind decides only whether the
-  content is admitted**. Two divergences ride on the half not done: `1.0` at an `int` binds as `1` where
-  §5.3 makes it a contract rejection (the text encoding already refuses it, base resolution having
-  classified the token first), and `".nan"` at a `double` is refused where §5.4 admits exactly the
-  special-value forms at an approximate position. What it needs: a reverse index in `tson-atom` beside the
-  two already there — `byte`→`int8` … `long`→`int64`, `BigInteger`→`integer`, `float`/`double`→
-  `float32`/`float64`, `BigDecimal`→`number`, the inverse of `IntegerParser.hostType` — and `bindTo`
-  restructured so the **target** is the outer dispatch and the leaf kind the inner guard, since §5.4's
-  approximate position admits a number *and* a string through one parser and a switch on the kind cannot
-  express that. It belongs in `tson-atom` on the module's own terms: the vocabulary is the type system's,
-  not an encoding's. The mapping is an interpretation — nothing says a Java `int` means `int32` rather than
-  a bounded `integer` — and it is the right one because it makes this read a preview of the schema-directed
-  one (`int` component ≡ `int32` field) rather than a second arithmetic. Two things fall out for free once
-  it lands: the atom's own `expected` reaches the diagnostic (`>= -128 and <= 127` rather than "a value
-  that fits byte"), and `allow_nan`/`allow_infinity` have somewhere to be honoured.
-
-- [ ] **The atom-refusal-to-diagnostic translation is about to exist twice.** `SchemalessObjectReader
-  .bindBuiltin` and `JsonAtoms.content` both catch an `AtomTypeException` and turn it into a
-  `Diagnostic`, and the text side additionally sorts the `ArithmeticException`/`IllegalArgumentException`
-  that `NumberNarrowing` throws — which is the subtle half, and the half the JSON side will need as soon as
-  the numeric families route through their parsers. `AtomTypeException` is `tson-atom`'s own and neither
-  encoding's, which is the one case the per-encoding classification rule under `Diagnostic` does not cover
-  (its `of*` factories switch on an exception an encoding declares); a helper beside the exceptions in
-  `tson-atom`, which already requires `tson-base`, would serve both. Worth doing *with* the entry above
-  rather than before it: the ladder is only half written until the numeric families are in it. Related, and
-  the reason it matters beyond tidiness: both encodings currently collapse `AtomParseException` (contract
-  rejection → resolver error) and `AtomValidationException` (→ validation error) into one
-  `ATOM_CONSTRAINT_VIOLATION`, where §5.1 and §8.1 keep the two categories apart and the `class2` corpus
-  asserts which. If that is worth fixing it is worth fixing once, in the shared translator.
+- [ ] **The atom-refusal-to-diagnostic translation exists twice, and the two disagree about a category.**
+  `SchemalessObjectReader.bindBuiltin` and `JsonAtoms.content` each catch an `AtomTypeException` plus the
+  `ArithmeticException`/`IllegalArgumentException` that `NumberNarrowing` throws, and turn the three into a
+  `Diagnostic`. `AtomTypeException` is `tson-atom`'s own and neither encoding's, which is the one case the
+  per-encoding classification rule under `Diagnostic` does not cover — its `of*` factories switch on an
+  exception an encoding declares — so a helper beside the exceptions in `tson-atom`, which already requires
+  `tson-base`, would serve both. What makes it more than tidiness: both sites collapse `AtomParseException`
+  (contract rejection → resolver error) and `AtomValidationException` (→ validation error) into one
+  `ATOM_CONSTRAINT_VIOLATION`, where §5.1 and [TSON-DATA] §8.1 keep the two categories apart and the
+  `class2` corpus asserts which. The exception hierarchy is sealed to exactly those two so a caller can
+  switch rather than string-sniff, and nothing does. Fix the collapse once, in the shared translator, or the
+  two encodings will drift on which category a refusal carries.
 
 - [ ] **No schema-directed decode — §5–§8.** The whole of what Part 3 actually specifies: atoms by their parsing
   contracts (§5), containers by their constructors (§6), JSON `null` as the absent sentinel (§7), and the
