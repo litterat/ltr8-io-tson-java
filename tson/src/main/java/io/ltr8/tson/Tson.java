@@ -94,13 +94,12 @@ public final class Tson {
      */
     private final ProcessorPolicy policy;
 
-    Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext, boolean strictBinding,
-         ProcessorPolicy policy) {
+    Tson(TsonCompiledMetaRegistry core, DataBindContext dataBindContext, ProcessorPolicy policy) {
         this.policy = policy;
         this.core = core;
         this.dataBindContext = dataBindContext;
         this.tree = TsonCompiledSchemaRegistry.tree(core);
-        this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext, strictBinding);
+        this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext);
     }
 
     /** A fresh {@link TsonConfig} -- {@link TsonConfig#build()} bootstraps meta-kernel/meta.tn/core.tn and returns the resulting {@link Tson}. */

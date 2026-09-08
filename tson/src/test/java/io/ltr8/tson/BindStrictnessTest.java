@@ -67,13 +67,13 @@ class BindStrictnessTest {
     public record OrderTraced(String sku, int quantity, String currency, @Unbound Optional<String> trace) {
     }
 
-    private static Tson tson(String schema, Class<?> bound, boolean lenient) {
+    private static Tson tson(String schema, Class<?> bound) {
         SchemaSource source = uri -> schema;
         DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
-        TsonConfig config = Tson.builder().schemaAccess(SchemaAccess.of(source))
+        return Tson.builder().schemaAccess(SchemaAccess.of(source))
                 .dataBindContext(DataBindContext.builder().nameBinder(binder)
-                        .registerAtoms(AtomContext.hostTypes()).build());
-        return (lenient ? config.lenientBinding() : config).build();
+                        .registerAtoms(AtomContext.hostTypes()).build())
+                .build();
     }
 
     private static Object read(Tson tson, Class<?> bound, DiagnosticsReceiver receiver) {
@@ -86,7 +86,7 @@ class BindStrictnessTest {
      */
     @Test
     void aRequiredFieldTheClassCannotHoldFailsAtCompile() {
-        Tson tson = tson(SCHEMA, OrderV1.class, false);
+        Tson tson = tson(SCHEMA, OrderV1.class);
 
         BindMismatchException thrown = assertThrows(BindMismatchException.class,
                 () -> tson.bindRegistry().get(ID));
@@ -98,7 +98,7 @@ class BindStrictnessTest {
     /** And the converse: a component no field fills would be constructed null on every document. */
     @Test
     void aComponentNoFieldFillsFailsAtCompileToo() {
-        Tson tson = tson(SCHEMA, OrderV3.class, false);
+        Tson tson = tson(SCHEMA, OrderV3.class);
 
         BindMismatchException thrown = assertThrows(BindMismatchException.class,
                 () -> tson.bindRegistry().get(ID));
@@ -108,13 +108,13 @@ class BindStrictnessTest {
     }
 
     /**
-     * {@code @Unbound} is that way, and it is per component rather than per read -- the narrow answer where
-     * {@link TsonConfig#lenientBinding} is the broad one. An {@code Optional} component arrives empty rather
-     * than null, the bind engine wrapping it as it does any other.
+     * {@code @Unbound} is that way, and it is <b>per component</b>: the class names which one it owns, where
+     * a blanket "accept fewer fields" would say only how many. An {@code Optional} component arrives empty
+     * rather than null, the bind engine wrapping it as it does any other.
      */
     @Test
     void anUnboundComponentIsTheClassesOwnBusiness() {
-        Object value = read(tson(SCHEMA, OrderTraced.class, false), OrderTraced.class,
+        Object value = read(tson(SCHEMA, OrderTraced.class), OrderTraced.class,
                 DiagnosticsReceiver.throwing());
 
         assertEquals(new OrderTraced("A", 1, "AUD", Optional.empty()), value);
@@ -146,7 +146,7 @@ class BindStrictnessTest {
         // And it still constructs: the class's own component arrives as the engine's absent value, not as a
         // hole in the array, which is what keeps the read side of `@Unbound` unchanged.
         assertEquals(new OrderTraced("A", 1, "AUD", Optional.empty()),
-                read(tson(SCHEMA, OrderTraced.class, false), OrderTraced.class,
+                read(tson(SCHEMA, OrderTraced.class), OrderTraced.class,
                         DiagnosticsReceiver.throwing()));
     }
 
@@ -158,29 +158,12 @@ class BindStrictnessTest {
      */
     @Test
     void anOptionalFieldTheClassCannotHoldFailsAtCompileToo() {
-        Tson tson = tson(OPTIONAL_SCHEMA, OrderV1.class, false);
+        Tson tson = tson(OPTIONAL_SCHEMA, OrderV1.class);
 
         BindMismatchException thrown = assertThrows(BindMismatchException.class,
                 () -> tson.bindRegistry().get(ID));
 
         assertTrue(thrown.getMessage().contains("no component for field 'currency'"), thrown.getMessage());
-    }
-
-    /**
-     * Leniency is the opt-out, and it is silent -- not a shortcut but the only coherent reading. Reporting
-     * abandons the construction ({@code ConstructionGuard}: bind mode never builds out of a document it has
-     * reported on), so a lenient reader that reported would hand back {@code null} for exactly the documents
-     * it exists to accept; and a diagnostic the guard is told to ignore is a severity axis under another
-     * name. It is the one path on which a field is dropped at all, now that every mismatch is settled before
-     * a document exists.
-     */
-    @Test
-    void lenientBindingDropsTheFieldSilently() {
-        Tson tson = tson(SCHEMA, OrderV1.class, true);
-        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
-
-        assertEquals(new OrderV1("A", 1), read(tson, OrderV1.class, problems));
-        assertEquals(List.of(), problems.diagnostics());
     }
 
     /**
@@ -192,7 +175,7 @@ class BindStrictnessTest {
      */
     @Test
     void aMismatchMetDuringAReadIsCodedAsOneRatherThanAsABadSchema() {
-        Tson tson = tson(SCHEMA, OrderV1.class, false);
+        Tson tson = tson(SCHEMA, OrderV1.class);
         DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
 
         assertNull(read(tson, OrderV1.class, problems));
@@ -206,7 +189,7 @@ class BindStrictnessTest {
     /** Tree mode is unaffected: it binds no class, so it has nothing to disagree with. */
     @Test
     void treeModeKeepsEveryFieldWhateverTheBindingSays() {
-        assertEquals("AUD", tson(SCHEMA, OrderV1.class, false).treeReader().read(DOC)
+        assertEquals("AUD", tson(SCHEMA, OrderV1.class).treeReader().read(DOC)
                 .get("currency").asString().orElseThrow());
     }
 }

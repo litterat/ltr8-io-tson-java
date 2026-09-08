@@ -140,7 +140,6 @@ throws `TsonSchemaValidationException` ("a schema is already registered under �
 `TsonConfig` (what `Tson.builder()` returns) carries: `schemaAccess(…)`,
 `bindings(Map<String, Class<?>>)` / `profile(name)` / `dataBindContext(…)`, `metaNameBinder(…)`,
 `processorPolicy(…)` (or its `identifierPolicy(…)` / `tokenPolicy(…)` / `limits(…)` components), and
-`lenientBinding()`.
 
 Where schemas come from is one value, `SchemaAccess` — the source plus the `FetchPolicy` governing it.
 `SchemaAccess.httpSchemas(hosts…)` / `SchemaAccess.fileSchemas(host, dir)` are the one-call forms,
@@ -198,7 +197,8 @@ reflectively from another module. Under a schema, name the class for a schema ty
 Any non-FIXED field with no component, or a component no field fills, raises
 `BindMismatchException`; optional fields are *not* exempt, since those are the ones that work in
 development and fail on the first caller who sends them. `@Unbound` marks a component as the class's
-own; `TsonConfig.lenientBinding()` opts out wholesale and is silent. The full annotation set and the
+own, and a `@Profile` constructor states the shape a class takes for one version of a schema. There is
+no wholesale opt-out. The full annotation set and the
 atom→Java type table are in `references/bindings.md`.
 
 ## Writing

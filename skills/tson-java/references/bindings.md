@@ -104,8 +104,9 @@ component.
 Checked at **bind-mode compile** — startup, not first read — raising `BindMismatchException`:
 
 > `'order' and Wrong do not agree: no component for field 'placed'; no component for field 'total'.
-> Bind the class the schema describes, or read leniently (TsonConfig.lenientBinding) if dropping this
-> is deliberate`
+> Bind the class the schema describes -- a class that means to read one version of a schema while
+> another is current declares a @Profile constructor for it, which says which fields it takes rather
+> than dropping whatever it does not name`
 
 Any non-FIXED field with no component, or a component no field fills, is refused. **Optional fields are
 not exempt** — those are precisely the ones that work in development and fail on the first caller who
@@ -114,7 +115,6 @@ sends them. A FIXED field is exempt, the schema settling its value.
 - `@Unbound` on a component marks it as the class's own — a source position kept for diagnostics, a
   cache, anything derived — so binding leaves it alone instead of reporting a mismatch. Without it, a
   component no schema field fills reaches the constructor as `null` however careful the class is.
-- `TsonConfig.lenientBinding()` opts out wholesale, and is silent.
 - `MissingBindingException` (a subclass) covers a schema type with **no** class at all, and is
   deferred to the first read of that type — a schema legitimately declares types a consumer never binds.
 

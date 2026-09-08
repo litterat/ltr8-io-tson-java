@@ -177,7 +177,9 @@ bind-mode compile — startup, not first read; its subclass `MissingBindingExcep
 a consumer never binds). Any non-FIXED field with no component, or a component no
 field fills, is refused — optional fields included, since those are the ones that work in development and
 fail on the first caller who sends them. A FIXED field is exempt, the schema settling its value. `@Unbound` marks a component as the
-class's own, `DataBinding.lenient()` opts out wholesale and is silent. Reaching a read as a diagnostic
+class's own, **There is no wholesale opt-out**, and that is deliberate: accepting fewer fields without
+saying *which* is the defect §7.2 refuses on the wire, and a class that means to read one version of a
+schema while another is current declares a `@Profile` constructor for it. Reaching a read as a diagnostic
 instead (a schema compiled on demand), it keeps its own code, `Diagnostic.Code.BIND_MISMATCH` — a
 misconfiguration in the reading application is no more a verdict on the document than a gap is.
 `docs/readers-and-diagnostics.md` has the why.
@@ -906,8 +908,7 @@ two arguments where the tree writer's takes one.
 ### Front door: `Tson`/`TsonConfig` (`tson` module) — `docs/facades-and-tree.md`
 
 `Tson.builder().build()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
-`dataBindContext(DataBindContext)` says which Java classes the schema's types bind to, and
-`lenientBinding()` whether a class must account for every field its schema declares. **The vocabulary
+`dataBindContext(DataBindContext)` says which Java classes the schema's types bind to. **The vocabulary
 for building a context is `tson-bind`'s, not `TsonConfig`'s** — `DataNameBinder.ofMap(map)` over
 `DataBindContext.builder().registerAtoms(AtomContext.hostTypes())`, with `orElse` composing a caller's
 names over the kernel's own — so `bindings`/`profile` are gone from the front door rather than
