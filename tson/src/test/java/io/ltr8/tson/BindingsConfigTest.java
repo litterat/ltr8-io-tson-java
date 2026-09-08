@@ -1,16 +1,15 @@
 package io.ltr8.tson;
 
+import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.Profile;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.bind.AtomContext;
-
 import java.util.Map;
-
 import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -63,10 +62,22 @@ class BindingsConfigTest {
             }
             """;
 
+    /** The binding these tests configure: a map over the kernel's vocabulary, with the atoms registered. */
+    private static DataBindContext binding(Map<String, Class<?>> names, String profile) {
+        DataBindContext.Builder builder = DataBindContext.builder()
+                .nameBinder(DataNameBinder.ofMap(names).orElse(SchemaMetaNameBinder.INSTANCE))
+                .registerAtoms(AtomContext.hostTypes());
+        if (profile != null) {
+            builder.profile(profile);
+        }
+        return builder.build();
+    }
+
     /** The whole configuration, in one call each. The {@code datetime} field also pins that atoms are bound. */
     @Test
     void bindingsIsTheWholeConfiguration() {
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SOURCE)).bindings(Map.of("order", Order.class)).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SOURCE))
+                .dataBindContext(binding(Map.of("order", Order.class), null)).build();
 
         Order order = tson.objectReader().read(DOC, Order.class);
 
@@ -79,7 +90,7 @@ class BindingsConfigTest {
     @Test
     void anUnmappedNameNamesTheMap() {
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> SHORT_SCHEMA.replace("order =>", "invoice =>")))
-                .bindings(Map.of("order", Order.class)).build();
+                .dataBindContext(binding(Map.of("order", Order.class), null)).build();
 
         MissingBindingException thrown = assertThrows(MissingBindingException.class,
                 () -> tson.objectReader().read("""
@@ -101,7 +112,7 @@ class BindingsConfigTest {
     @Test
     void profileReachesTheBinder() {
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> SHORT_SCHEMA))
-                .bindings(Map.of("order", Order.class)).profile("orders-1").build();
+                .dataBindContext(binding(Map.of("order", Order.class), "orders-1")).build();
 
         Order order = tson.objectReader().read("""
                 !!schema:"https://example.test/orders.tn"
@@ -109,20 +120,6 @@ class BindingsConfigTest {
 
         assertEquals(java.time.OffsetDateTime.parse("2000-01-01T00:00:00Z"), order.when(),
                 "the profiled constructor's own default");
-    }
-
-    /** A context is built or given, never both -- a profile cannot apply to one that arrives already built. */
-    @Test
-    void aSuppliedContextAndBindingsAreMutuallyExclusive() {
-        DataBindContext context = AtomContext.defaultContext();
-
-        IllegalStateException thrown = assertThrows(IllegalStateException.class,
-                () -> Tson.builder().dataBindContext(context).bindings(Map.of("order", Order.class)).build());
-
-        assertTrue(thrown.getMessage().contains("not both"), thrown.getMessage());
-        assertTrue(assertThrows(IllegalStateException.class,
-                () -> Tson.builder().dataBindContext(context).profile("orders-1").build())
-                .getMessage().contains("not both"));
     }
 
     /**
@@ -136,7 +133,8 @@ class BindingsConfigTest {
      */
     @Test
     void aMissingBindingIsAMisconfigurationNotAGap() {
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> SHORT_SCHEMA)).bindings(Map.of()).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> SHORT_SCHEMA))
+                .dataBindContext(binding(Map.of(), null)).build();
 
         MissingBindingException thrown = assertThrows(MissingBindingException.class,
                 () -> tson.objectReader().read("""

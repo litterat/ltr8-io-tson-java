@@ -418,6 +418,20 @@ tson.resolve(schemaText);                      // registers the schema by its ow
 TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
 ```
 
+- **Strictness is configuration; the unknown-field rule is a reader derivation.** Both read as "how strict",
+  and they differ in when the question can be answered. The schema-to-class agreement check runs inside a
+  record reader's *constructor*, which the compile calls — so `lenientBinding` is fixed when a `Tson` builds
+  its bind registry, and a reader derived afterwards has no answer left to give; varying it per reader would
+  mean a second compiled-schema registry. `ignoringUnknownFields` is a flag consulted per value as a
+  document is read, nothing is compiled against it, and one endpoint may be lenient about a later version's
+  extra fields while another beside it is strict. Same word, different kind of thing.
+  - **`bindings`/`profile` are gone from `TsonConfig`.** Both were shorthand for building a
+    `DataBindContext`, and `profile` duplicated `DataBindContext.Builder.profile` outright. Once
+    `DataNameBinder.ofMap` and `orElse` existed a caller builds the same context directly — the map over the
+    kernel's own vocabulary is all `bindings` ever added — so the vocabulary for building a binding lives in
+    the module that owns binding. `dataBindContextSupplied` went with them: it existed only to police those
+    setters against each other.
+
 - **A `DataBindContext`'s configuration closes when it is built.** `registerAtom` is a
   `DataBindContext.Builder` method, applied once inside the constructor on the thread that builds. It used
   to be a method on the built context, which made two hazards possible and one of them was real: a

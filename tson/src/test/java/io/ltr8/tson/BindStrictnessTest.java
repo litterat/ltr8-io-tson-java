@@ -11,16 +11,13 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
-
 import java.util.List;
 import java.util.Optional;
-
 import io.ltr8.bind.DataClassField;
 import io.ltr8.bind.DataClassRecord;
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import java.util.Arrays;
 import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -73,8 +70,9 @@ class BindStrictnessTest {
     private static Tson tson(String schema, Class<?> bound, boolean lenient) {
         SchemaSource source = uri -> schema;
         DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
-        TsonConfig config = Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBindContext(
-                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build());
+        TsonConfig config = Tson.builder().schemaAccess(SchemaAccess.of(source))
+                .dataBindContext(DataBindContext.builder().nameBinder(binder)
+                        .registerAtoms(AtomContext.hostTypes()).build());
         return (lenient ? config.lenientBinding() : config).build();
     }
 

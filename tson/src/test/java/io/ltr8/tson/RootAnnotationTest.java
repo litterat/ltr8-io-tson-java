@@ -9,11 +9,8 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.tree.TsonValue;
-
 import java.util.List;
-
 import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -111,7 +108,8 @@ class RootAnnotationTest {
 
         DataNameBinder binder = name -> "api".equals(name) ? Api.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
-                .dataBindContext(DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build())
+                .dataBindContext(DataBindContext.builder().nameBinder(binder)
+                        .registerAtoms(AtomContext.hostTypes()).build())
                 .build();
 
         Api api = tson.objectReader().read(document, Api.class);

@@ -11,12 +11,9 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
-
 import java.util.List;
 import java.util.Map;
-
 import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -71,7 +68,8 @@ class AnnotationValidationTest {
                 "shape", Shape.class, "circle", Circle.class, "holder", Holder.class);
         DataNameBinder binder = n -> names.containsKey(n) ? names.get(n) : SchemaMetaNameBinder.INSTANCE.resolve(n);
         return Tson.builder().schemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
-                .dataBindContext(DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build())
+                .dataBindContext(DataBindContext.builder().nameBinder(binder)
+                        .registerAtoms(AtomContext.hostTypes()).build())
                 .build();
     }
 

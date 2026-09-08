@@ -1,5 +1,9 @@
 package io.ltr8.tson;
 
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
@@ -8,13 +12,10 @@ import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.tree.TsonScopedValue;
 import io.ltr8.tson.tree.TsonValue;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.Map;
-
 import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -327,7 +328,11 @@ class ScopedReadTest {
     @Test
     void bindModeReadsAPushedValueIntoTheClassTheForeignTypeNames() {
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SOURCE))
-                .bindings(Map.of("pinpoint", Pinpoint.class, "claim", Claim.class)).build();
+                .dataBindContext(DataBindContext.builder()
+                        .nameBinder(DataNameBinder.ofMap(Map.of("pinpoint", Pinpoint.class, "claim", Claim.class))
+                                .orElse(SchemaMetaNameBinder.INSTANCE))
+                        .registerAtoms(AtomContext.hostTypes()).build())
+                .build();
 
         Pinpoint read = tson.objectReader().read("!!schema:\"" + HOST + "\"\n!pinpoint { one: "
                 + "!!schema:\"" + CLAIM + "\" !claim { id: CLM-1  amount: 450 } }", Pinpoint.class);

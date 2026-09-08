@@ -15,7 +15,6 @@ import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.tree.TsonValue;
-
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -178,7 +177,8 @@ public final class Tson {
         return policy.limits();
     }
 
-    /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/{@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBindContext} to customize it. */
+    /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/
+            {@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBindContext} to customize it. */
     public DataBindContext dataBindContext() {
         return dataBindContext;
     }

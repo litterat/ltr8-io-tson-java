@@ -1,5 +1,9 @@
 package io.ltr8.tson;
 
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.annotation.Typename;
@@ -8,10 +12,8 @@ import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonWriteException;
 import org.junit.jupiter.api.Test;
-
 import java.util.Map;
 import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -46,7 +48,12 @@ class TsonObjectDocumentRoundTripTest {
 
     private static Tson tson() {
         SchemaSource source = uri -> SCHEMA;
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source)).bindings(Map.of("order", Order.class)).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source))
+                .dataBindContext(DataBindContext.builder()
+                        .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class))
+                                .orElse(SchemaMetaNameBinder.INSTANCE))
+                        .registerAtoms(AtomContext.hostTypes()).build())
+                .build();
         tson.resolve(SCHEMA);
         return tson;
     }

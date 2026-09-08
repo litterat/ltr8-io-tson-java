@@ -1,5 +1,9 @@
 package io.ltr8.tson.perf;
 
+import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.Tson;
@@ -10,14 +14,12 @@ import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
 import java.lang.ref.WeakReference;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -91,7 +93,10 @@ class AllocationHarnessTest {
 
         SchemaSource source = uri -> SCHEMA;
         tson = Tson.builder().schemaAccess(SchemaAccess.of(source))
-                .bindings(Map.of("order", Order.class, "line", Line.class))
+                .dataBindContext(DataBindContext.builder()
+                        .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "line", Line.class))
+                                .orElse(SchemaMetaNameBinder.INSTANCE))
+                        .registerAtoms(AtomContext.hostTypes()).build())
                 .build();
         reader = tson.objectReader();
 

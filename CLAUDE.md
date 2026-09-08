@@ -177,7 +177,7 @@ bind-mode compile — startup, not first read; its subclass `MissingBindingExcep
 a consumer never binds). Any non-FIXED field with no component, or a component no
 field fills, is refused — optional fields included, since those are the ones that work in development and
 fail on the first caller who sends them. A FIXED field is exempt, the schema settling its value. `@Unbound` marks a component as the
-class's own, `TsonConfig.lenientBinding` opts out wholesale and is silent. Reaching a read as a diagnostic
+class's own, `DataBinding.lenient()` opts out wholesale and is silent. Reaching a read as a diagnostic
 instead (a schema compiled on demand), it keeps its own code, `Diagnostic.Code.BIND_MISMATCH` — a
 misconfiguration in the reading application is no more a verdict on the document than a gap is.
 `docs/readers-and-diagnostics.md` has the why.
@@ -906,39 +906,15 @@ two arguments where the tree writer's takes one.
 ### Front door: `Tson`/`TsonConfig` (`tson` module) — `docs/facades-and-tree.md`
 
 `Tson.builder().build()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
-`bindings(Map)`/`profile(String)` are the short form of the bind context — the map as a name binder chained
-over the kernel's vocabulary, plus `AtomContext.hostTypes()` — and are mutually exclusive with
-`dataBindContext`, a profile being fixed when a context is built.
-`resolve(schemaText)` registers a schema by its own `!!id` (no mode — resolution is always bind-anchored);
-`treeRegistry()`/`bindRegistry()` pick the read mode; `objectReader()`/`treeReader()` return schema-aware
-facades sharing this instance's registries, so a schema compiles once per `Tson`.
-`validate(String|InputStream)` *is* `treeReader()` with a collecting receiver — returns `List<Diagnostic>`
-(empty = valid) and never throws for a bad input document (a library fault still throws, deliberately).
-**Where schemas come from is one value, `SchemaAccess`** — a `SchemaSource` plus the `FetchPolicy`
-governing it, which is where a deployment may obtain a schema and under what constraints.
-`TsonConfig.schemaAccess` is the only setter for it: the vocabulary for *stating* one lives on
-`SchemaAccess` and nowhere else, so there is one place to learn it and one place it can drift.
-`SchemaAccess.httpSchemas(hosts…)`/`fileSchemas(host, dir)` are the one-call forms of the two fetching
-sources that ship — `HttpSchemaSource` (HTTPS, host allow-list) and `FileSchemaSource` (a directory) —
-`SchemaAccess.of(source)` wraps one built elsewhere, and `SchemaAccess.builder()` is the general form,
-where the three are mutually exclusive and a `FetchPolicy` may not be stated beside a source it cannot
-reach into.
-`SchemaSource.ofMap(Map)` is the non-fetching third, for schemas a caller already holds: it exists
-because `schemaSource(schemas::get)` is the natural first source and returns `null` for the identity the
-*document* chose, which the contract does not permit — a `null` carries no `Reason`. That is refused where
-the loader calls a source (`IllegalStateException`, so it stays a fault and `SchemaFailure` rethrows it),
-and `ofMap` is the same lookup done right: a miss is `NOT_FOUND`, and matching is by canonical identity, so
-a `?sha256=`-pinned reference finds the unpinned entry. Both **deny by default**, match a host
-exactly, and share `SchemaReference` for §2.2.1's rules on what an identity may be, since the reference comes
-out of a document and in a server that means a request body: the HTTP one guards SSRF (no redirects ever, size
-capped against bytes delivered), the file one arbitrary reads (containment checked *after* `toRealPath`, so
-`..` and symlink escape fall together). Neither verifies the `?sha256=` pin or the fetched `!!id` — the loader
-does both; `requireContentHashPin` adds the one thing it cannot, that a pin be present. **`SchemaSource`
-names its own failure exception** — a source says "cannot supply this" with `SchemaFetchException` and
-nothing else, which is what lets `SchemaFailure` classify every branch positively and rethrow a fault as
-itself; the exception lives in `tson-compiler` beside the interface, since the classification cannot see a
-type declared in `tson`. A schema no source would supply is one of the five `SCHEMA_*` codes, never
-`SCHEMA_ERROR`: it was never read, so nothing about it has been judged.
+`dataBindContext(DataBindContext)` says which Java classes the schema's types bind to, and
+`lenientBinding()` whether a class must account for every field its schema declares. **The vocabulary
+for building a context is `tson-bind`'s, not `TsonConfig`'s** — `DataNameBinder.ofMap(map)` over
+`DataBindContext.builder().registerAtoms(AtomContext.hostTypes())`, with `orElse` composing a caller's
+names over the kernel's own — so `bindings`/`profile` are gone from the front door rather than
+restating it. **Strictness is configuration and not a reader derivation**, which is a fact about when
+the check can run rather than a preference: it compares a *compiled* schema against a class, so a
+reader derived afterwards has no answer left to give. Which field a *document* may carry beyond its
+class is the different question `ignoringUnknownFields` asks, per reader, at read time.
 
 ```java
 Tson tson = Tson.builder().build();
