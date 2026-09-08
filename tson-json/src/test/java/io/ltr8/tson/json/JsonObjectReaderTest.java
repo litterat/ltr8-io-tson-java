@@ -17,10 +17,17 @@ import org.junit.jupiter.api.Test;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.net.Inet4Address;
+import java.net.URI;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -50,10 +57,18 @@ class JsonObjectReaderTest {
     public record Scores(Map<String, Integer> byName) {
     }
 
+    public record Diary(Map<LocalDate, Integer> byDate) {
+    }
+
     public record Numbers(int i, long l, double d, BigInteger big, BigDecimal exact) {
     }
 
     public record Required(@Field(required = true) String name) {
+    }
+
+    /** One component per §5.6 string-content family this vocabulary binds a host type for. */
+    public record Contents(UUID id, LocalDate on, OffsetDateTime at, Duration lasting, URI where,
+                           Inet4Address from, byte[] payload) {
     }
 
     public record Annotated(String name, Annotations annotations) {
@@ -259,6 +274,77 @@ class JsonObjectReaderTest {
         void a_boolean_target_takes_a_boolean_and_not_its_spelling() {
             assertTrue(refused("{\"colour\": \"RED\", \"filled\": \"true\"}", Painted.class).message()
                     .contains("cannot be read into boolean"));
+        }
+
+        @Test
+        void a_string_content_family_is_read_by_its_own_parser() {
+            // §5.1: the string's content is handed to the atom's own parser exactly as a TSON quoted
+            // token's text would be. The target class says which parser, there being no type-ref (§4.1).
+            Contents bound = READER.read("""
+                    {"id": "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09",
+                     "on": "2026-01-02",
+                     "at": "2026-01-02T10:00:00+01:00",
+                     "lasting": "PT36H",
+                     "where": "https://example.org/a",
+                     "from": "192.0.2.1",
+                     "payload": "AQID"}
+                    """, Contents.class);
+
+            assertEquals(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09"), bound.id());
+            assertEquals(LocalDate.of(2026, 1, 2), bound.on());
+            assertEquals(OffsetDateTime.parse("2026-01-02T10:00:00+01:00"), bound.at());
+            assertEquals(Duration.ofHours(36), bound.lasting());
+            assertEquals(URI.create("https://example.org/a"), bound.where());
+            assertEquals("192.0.2.1", bound.from().getHostAddress());
+            assertArrayEquals(new byte[] {1, 2, 3}, bound.payload());
+        }
+
+        @Test
+        void the_family_refuses_content_the_host_class_alone_would_take() {
+            // UUID.fromString accepts "1-2-3-4-5"; UuidParser's own shape check does not, and it is the
+            // parser that runs -- which is the whole of what §5.1 buys over a host-type constructor.
+            Diagnostic refusal = refused("""
+                    {"id": "1-2-3-4-5", "on": "2026-01-02", "at": "2026-01-02T10:00:00Z",
+                     "lasting": "PT1S", "where": "a", "from": "192.0.2.1", "payload": "AQID"}
+                    """, Contents.class);
+
+            assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, refusal.code());
+            assertEquals("/id", refusal.path().orElseThrow());
+            // The constraint that failed, standing alone -- AtomTypeException's own vocabulary, not the
+            // target's Java name, which `message` and `path` already carry.
+            assertEquals("a UUID", refusal.expected());
+        }
+
+        @Test
+        void both_encodings_read_one_vocabulary() {
+            // §5.1 makes the family's contract the encoding's only atom rule, so the same content at the
+            // same host type must land on the same value whichever encoding carried it. The TSON side of
+            // this pair is TsonObjectReaderTest; what is asserted here is that JSON reaches the parser at
+            // all, which it did not before -- a `UUID` component was a TYPE_MISMATCH.
+            assertEquals(UUID.fromString("9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09"), READER.read("""
+                    {"id": "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09", "on": "2026-01-02",
+                     "at": "2026-01-02T10:00:00Z", "lasting": "PT1S", "where": "a",
+                     "from": "192.0.2.1", "payload": "AQID"}
+                    """, Contents.class).id());
+        }
+
+        @Test
+        void a_number_at_a_string_content_position_is_the_wrong_form() {
+            // §5's per-family table admits a string at these positions and nothing else; a kind the family
+            // does not admit is a wrong-form validation error, not an invitation to stringify.
+            assertTrue(refused("""
+                    {"id": 1, "on": "2026-01-02", "at": "2026-01-02T10:00:00Z", "lasting": "PT1S",
+                     "where": "a", "from": "192.0.2.1", "payload": "AQID"}
+                    """, Contents.class).message().contains("cannot be read into UUID"));
+        }
+
+        @Test
+        void a_map_key_reaches_the_same_parser_as_a_member_value() {
+            // §6.5 reads a member name by the key type's own contract rather than taking it as text, and
+            // the key path runs through the same JsonAtoms.bind -- so a keyed family binds there too.
+            assertEquals(LocalDate.of(2026, 1, 2), READER
+                    .read("{\"byDate\": {\"2026-01-02\": 1}}", Diary.class)
+                    .byDate().keySet().iterator().next());
         }
     }
 

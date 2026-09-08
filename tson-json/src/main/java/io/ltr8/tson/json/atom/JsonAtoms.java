@@ -1,13 +1,17 @@
 package io.ltr8.tson.json.atom;
 
 import io.ltr8.bind.DataClassAtom;
-import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.bind.DataClassBridge;
+import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomTypeException;
+import io.ltr8.tson.atom.HostAtoms;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.reader.JsonReadContext;
 import io.ltr8.tson.json.stream.JsonEvent;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.Optional;
 
 /**
  * One JSON leaf into one host value, at a {@link DataClassAtom} position.
@@ -34,13 +38,20 @@ import java.math.BigInteger;
  * type its bridge declares and handed to {@code toObject}. That is how {@code tson-bind}'s own bridges --
  * an enum's, a {@code Pattern}'s -- are covered without naming one of them.
  *
- * <p><b>It does not yet cover the atom host types.</b> {@code AtomContext} registers {@code UUID}, the
- * temporal, network and identifier families as atoms so that {@code tson-bind} treats them as scalars rather
- * than taking them apart structurally -- but with no bridge, so nothing here converts a string into one and
- * {@link #fromString} reports a mismatch. Under a schema that is right, the position's own atom parser
- * producing the host value ([TSON-JSON] §5.1); with no schema it is a gap, and the same gap the TSON text
- * encoding has -- {@code new TsonObjectReader().read(text, WithAUuid.class)} fails the same way.
- * {@code BACKLOG.md}'s "Binding" section carries the shared conversion that would close it on both.
+ * <p><b>A string-content family is read by its own parser</b> (§5.1): the string's content is handed to the
+ * atom's parser exactly as a TSON quoted token's text would be, and the target class picks which parser,
+ * there being no type-ref to name one. {@link HostAtoms#forStringContentHostType} is that lookup, and it is
+ * the same index {@code SchemalessObjectReader} consults on the text side when no type-ref supplies a name
+ * -- one vocabulary, so a {@code UUID} component reads alike whichever encoding carried it. It is restricted
+ * to §5.6's string-content families on purpose: the numeric families read from a JSON number and not from a
+ * string, and letting {@code "123"} become a {@code BigInteger} because a field is declared one would let a
+ * class overrule the encoding's own kinds.
+ *
+ * <p><b>The numeric families do not go through their parsers yet</b>, and the difference shows: a number is
+ * identified and then narrowed here rather than read by the contract of the family the target names, so
+ * {@code 1.0} at an {@code int} binds as {@code 1} where §5.3 makes it a contract rejection, and {@code
+ * ".nan"} at a {@code double} is refused where §5.4 admits it. {@code BACKLOG.md}'s "JSON encoding" section
+ * carries the reverse index that closes it.
  *
  * <p><b>There is no enum rule here, and that is not an omission.</b> {@code tson-bind} binds every plain
  * Java enum through {@code EnumStringBridge}, so an enum component arrives as a {@code String} atom whose
@@ -104,7 +115,33 @@ public final class JsonAtoms {
             }
             return value.charAt(0);
         }
+        Optional<AtomType<?>> family = HostAtoms.forStringContentHostType(target);
+        if (family.isPresent()) {
+            return content(ctx, family.get(), value, target);
+        }
         return mismatch(ctx, "a string", target);
+    }
+
+    /**
+     * §5.1's contract boundary: the family parses, and this only carries a refusal across.
+     *
+     * <p>A rejection reports the atom's own {@code expected} -- the constraint that failed, from
+     * {@link AtomTypeException}'s six-shape vocabulary -- rather than the target's Java name, which the
+     * message and the diagnostic's own path already carry.
+     */
+    private static Object content(JsonReadContext ctx, AtomType<?> family, String value, Class<?> target) {
+        try {
+            return family.read(value, target);
+        } catch (AtomTypeException e) {
+            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), e.expected(), value);
+            return null;
+        } catch (IllegalArgumentException e) {
+            // The family produced its own host value and the target cannot hold it -- a class declaring a
+            // component the vocabulary does not read to, which is a bind problem and not a verdict.
+            ctx.report(Diagnostic.Code.BIND_MISMATCH,
+                    "cannot bind '%s' to %s".formatted(value, target.getSimpleName()), target.getSimpleName(), value);
+            return null;
+        }
     }
 
     private static Object fromNumber(JsonReadContext ctx, String literal, Class<?> target) {

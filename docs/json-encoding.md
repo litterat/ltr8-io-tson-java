@@ -51,10 +51,20 @@ as a scalar and the other takes it apart.
 
 What the registration buys is that `tson-bind` treats each host type as a **scalar** — `CidrNetwork` is a
 Java record and would otherwise bind as `{ prefix: … prefixLength: … }`, refusing the scalar `cidr4`/`cidr6`
-actually carry. What it does **not** buy is the string-to-host-value conversion: none of these registrations
-carries a bridge, so a schemaless bind of a `UUID` component fails — on *both* encodings alike, which is the
-honest statement of it. `BACKLOG.md`'s "Binding" section carries the shared conversion that would close it,
-and `HostAtoms.forStringContentHostType` is the index it would go through.
+actually carry. None of these registrations carries a bridge, so the string-to-host-value conversion is not
+the registration's: it is the **family's**, and `HostAtoms.forStringContentHostType` is how a reader with no
+type-ref reaches it. `JsonAtoms.fromString` asks that index, as `SchemalessObjectReader` does on the text
+side, so `"9f1c8e2a-…"` at a `UUID` component is `UuidParser`'s to accept or refuse under either encoding —
+which is what §5.1 means by the string rule being the whole interface.
+
+The index is deliberately **not total over the registered host types**, and the two exclusions are the same
+fact from different directions. `mac`, `email` and `regex` read to `String`, so a `String` component cannot
+say which of them (or `text`) it meant; `CidrNetwork` is produced by *both* `cidr4` and `cidr6`. In each case
+the host class does not determine the family, and picking one would be a guess — a position wanting those
+needs a schema to say so, which is what §5–§8's decode is for. The numeric families are excluded on a
+different ground and one that matters more here: they read from a JSON **number**, so admitting them to a
+*string*-content index would let a class declaring `BigInteger` turn `"123"` into one and overrule the
+encoding's own kinds.
 
 `SourcePosition`'s bridge could not travel: it names `tson-compiler`'s own `Position`, so that engine keeps
 it in `config.ResolverBindContext`, applied on top of the shared list. The split is by what needs it — the
@@ -507,6 +517,18 @@ runs off one `BigDecimal`, so `1.5` and `2147483648` both fail at an `int` rathe
 wrapping. `float`/`double` are the exception and are meant to be — rounding onto the binary grid is the
 approximate families' own contract (§5.4). An enum needs no rule here at all: `tson-bind` bridges every
 plain Java enum through `EnumStringBridge`, so one arrives as a bridged `String` atom.
+
+**The numeric families do not reach their own parsers yet, and a string family does** — the asymmetry is
+current, not settled. A JSON number is identified and then narrowed against the target's Java type, where a
+string is handed to the family the target names. §4.1 asks for the second everywhere: there is no untyped
+position in this encoding and no base type resolution under it (§5.7 says so outright), so the target picks
+the parser and the JSON kind decides only whether the content is admitted at all. Two divergences follow
+from the half not yet done: `1.0` at an `int` binds as `1` where §5.3 makes it a contract rejection — the
+text encoding already refuses the same thing, base resolution having classified the token first — and a
+`".nan"` at a `double` is refused where §5.4 admits exactly the string special-value forms at an approximate
+position. That second case is also why the fix is a restructure rather than another index lookup: a float
+position admits two JSON kinds through one parser, which a switch on the leaf kind cannot express.
+`BACKLOG.md`'s "JSON encoding" section carries it.
 
 **Every problem goes through a `DiagnosticsReceiver`**, so a read's own receiver decides its fate exactly
 as it does for the TSON readers: `throwing()` — the default — raises `ReadException` at the first, and

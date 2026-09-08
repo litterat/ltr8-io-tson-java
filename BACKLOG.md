@@ -86,18 +86,16 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **A schemaless bind cannot convert an atom host type, on either encoding.** `TsonAtomContext`
-  registers `UUID`, the temporal, network and identifier families as atoms so `tson-bind` treats them as
-  scalars rather than taking them apart structurally — but with no bridge, so nothing converts the string on
-  the wire into one. Under a schema that is right: the position's own atom parser produces the host value
-  ([TSON-DATA] §5, [TSON-JSON] §5.1). With no schema both encodings fail alike —
-  `new TsonObjectReader().read("{ id: \"3f25…\" }", WithAUuid.class)` and
-  `Json.standard().objectReader().read(…)` both report that a string cannot become a `UUID` — so a consumer
-  whose class has a `UUID` component must have a schema, and nothing says so at the point of failure. The
-  machinery is already there and keyed the right way: `HostAtoms.forStringContentHostType` maps the host
-  class back to the family that parses it, and `SchemalessObjectReader` already consults it when no type-ref
-  supplies a name. What is left is the JSON side (`JsonAtoms.fromString` asking the same index) and deciding
-  whether the text side's remaining families follow.
+- [ ] **A host class two families share cannot be dispatched by class alone.**
+  `HostAtoms.forStringContentHostType` maps a target class back to the family that parses it, and both
+  encodings' schemaless readers consult it — but it is not total over what `AtomContext` registers, because
+  two families can produce one class. `mac`, `email` and `regex` all read to `String`, so a `String` component
+  cannot say which it meant (or whether it meant `text`); `CidrNetwork` is produced by both `cidr4` and
+  `cidr6`. Today those components bind as their host class does — a `String` stays a string, a
+  `CidrNetwork` is refused — and the content is never checked. Under a schema this is answered outright by
+  the position's own type, so the question is whether a schemaless read wants a second channel to name the
+  family (an annotation on the component, say) or whether "these families need a schema" is the honest
+  answer. Nothing says so at the point of failure either way, which is the part that is actionable now.
 
 ## JSON encoding
 
@@ -139,6 +137,40 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   already follows. A map key is data, not a name, which is why it is exempt and why a JSON-Schema conversion
   does not hit a name rule on `additionalProperties`. The look-alike rule is a property of a *set*, so it
   belongs where `SchemalessTreeReader` puts it on the text side: over one record's member names, once.
+
+- [ ] **The JSON numeric families are identified and narrowed, not read by their own parsers.** A JSON
+  number reaches `JsonAtoms.fromNumber`, which switches on the target's Java type and narrows through one
+  `BigDecimal`; a string reaches the family the target names (§5.1). §4.1 asks for the second in both
+  places — there is no untyped position in this encoding and no base type resolution under it, §5.7 saying
+  so outright — so the rule is **the target picks the parser and the JSON kind decides only whether the
+  content is admitted**. Two divergences ride on the half not done: `1.0` at an `int` binds as `1` where
+  §5.3 makes it a contract rejection (the text encoding already refuses it, base resolution having
+  classified the token first), and `".nan"` at a `double` is refused where §5.4 admits exactly the
+  special-value forms at an approximate position. What it needs: a reverse index in `tson-atom` beside the
+  two already there — `byte`→`int8` … `long`→`int64`, `BigInteger`→`integer`, `float`/`double`→
+  `float32`/`float64`, `BigDecimal`→`number`, the inverse of `IntegerParser.hostType` — and `bindTo`
+  restructured so the **target** is the outer dispatch and the leaf kind the inner guard, since §5.4's
+  approximate position admits a number *and* a string through one parser and a switch on the kind cannot
+  express that. It belongs in `tson-atom` on the module's own terms: the vocabulary is the type system's,
+  not an encoding's. The mapping is an interpretation — nothing says a Java `int` means `int32` rather than
+  a bounded `integer` — and it is the right one because it makes this read a preview of the schema-directed
+  one (`int` component ≡ `int32` field) rather than a second arithmetic. Two things fall out for free once
+  it lands: the atom's own `expected` reaches the diagnostic (`>= -128 and <= 127` rather than "a value
+  that fits byte"), and `allow_nan`/`allow_infinity` have somewhere to be honoured.
+
+- [ ] **The atom-refusal-to-diagnostic translation is about to exist twice.** `SchemalessObjectReader
+  .bindBuiltin` and `JsonAtoms.content` both catch an `AtomTypeException` and turn it into a
+  `Diagnostic`, and the text side additionally sorts the `ArithmeticException`/`IllegalArgumentException`
+  that `NumberNarrowing` throws — which is the subtle half, and the half the JSON side will need as soon as
+  the numeric families route through their parsers. `AtomTypeException` is `tson-atom`'s own and neither
+  encoding's, which is the one case the per-encoding classification rule under `Diagnostic` does not cover
+  (its `of*` factories switch on an exception an encoding declares); a helper beside the exceptions in
+  `tson-atom`, which already requires `tson-base`, would serve both. Worth doing *with* the entry above
+  rather than before it: the ladder is only half written until the numeric families are in it. Related, and
+  the reason it matters beyond tidiness: both encodings currently collapse `AtomParseException` (contract
+  rejection → resolver error) and `AtomValidationException` (→ validation error) into one
+  `ATOM_CONSTRAINT_VIOLATION`, where §5.1 and §8.1 keep the two categories apart and the `class2` corpus
+  asserts which. If that is worth fixing it is worth fixing once, in the shared translator.
 
 - [ ] **No schema-directed decode — §5–§8.** The whole of what Part 3 actually specifies: atoms by their parsing
   contracts (§5), containers by their constructors (§6), JSON `null` as the absent sentinel (§7), and the
