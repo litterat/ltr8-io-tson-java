@@ -1,4 +1,4 @@
-package io.ltr8.tson.schema.atom;
+package io.ltr8.tson.base.atom;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;

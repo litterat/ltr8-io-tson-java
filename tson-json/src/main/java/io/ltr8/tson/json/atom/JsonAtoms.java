@@ -34,7 +34,7 @@ import java.math.BigInteger;
  * type its bridge declares and handed to {@code toObject}. That is how {@code tson-bind}'s own bridges --
  * an enum's, a {@code Pattern}'s -- are covered without naming one of them.
  *
- * <p><b>It does not yet cover the atom host types.</b> {@code TsonAtomContext} registers {@code UUID}, the
+ * <p><b>It does not yet cover the atom host types.</b> {@code AtomContext} registers {@code UUID}, the
  * temporal, network and identifier families as atoms so that {@code tson-bind} treats them as scalars rather
  * than taking them apart structurally -- but with no bridge, so nothing here converts a string into one and
  * {@link #fromString} reports a mismatch. Under a schema that is right, the position's own atom parser

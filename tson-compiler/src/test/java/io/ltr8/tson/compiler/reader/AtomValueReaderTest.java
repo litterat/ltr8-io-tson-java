@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.TsonSchemaCompiler;
 import io.ltr8.tson.compiler.resolver.MetaKernelBootstrapResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
-import io.ltr8.tson.schema.atom.Rational;
+import io.ltr8.tson.base.atom.Rational;
 import io.ltr8.tson.schema.meta.BytesType;
 import io.ltr8.tson.schema.meta.DateTimeType;
 import io.ltr8.tson.schema.meta.DateType;

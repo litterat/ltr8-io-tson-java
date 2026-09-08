@@ -16,11 +16,6 @@ dependencies {
 
     // TSON pins its `regex` atom to I-Regexp (RFC 9485), so RegexParser validates through the native
     // engine rather than through java.util.regex, which is a laxer superset.
-    // TsonAtomContext registers this vocabulary's host types with a bind context, so a class with a UUID
-    // or LocalDate component binds the same under every encoding. `api` because a caller reaching it names
-    // DataBindContext at the call site.
-    api(project(":tson-bind"))
-
     implementation(project(":tson-regex"))
 
     testImplementation(platform("org.junit:junit-bom:6.0.3"))

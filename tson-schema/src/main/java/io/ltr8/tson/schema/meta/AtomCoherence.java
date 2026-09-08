@@ -1,6 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
-import io.ltr8.tson.schema.atom.CidrNetwork;
+import io.ltr8.tson.base.atom.CidrNetwork;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -147,7 +147,7 @@ final class AtomCoherence {
      *
      * <p>The facets are typed {@code [value]} (meta.tn cannot name a network instance -- core declares those,
      * and core imports meta), so they arrive as text and the family that owns the rule is the only place that
-     * can judge them. {@link io.ltr8.tson.schema.atom.CidrNetwork#parse} is the grammar, and it refuses a
+     * can judge them. {@link io.ltr8.tson.base.atom.CidrNetwork#parse} is the grammar, and it refuses a
      * malformed address, a prefix outside the family range, and nonzero host bits alike.
      */
     static void checkNetworks(List<String> out, String facet, List<String> entries, int familyBits) {

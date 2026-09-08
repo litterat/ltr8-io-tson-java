@@ -6,7 +6,7 @@ import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.atom.number.RationalForm;
-import io.ltr8.tson.schema.atom.Rational;
+import io.ltr8.tson.base.atom.Rational;
 import io.ltr8.tson.schema.meta.RationalType;
 import java.math.BigInteger;
 import java.util.Optional;

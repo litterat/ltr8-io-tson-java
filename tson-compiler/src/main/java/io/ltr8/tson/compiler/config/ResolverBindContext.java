@@ -2,21 +2,23 @@ package io.ltr8.tson.compiler.config;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.schema.meta.Token;
+import io.ltr8.tson.schema.meta.Token;
 
 /**
- * {@link TsonAtomContext}'s vocabulary plus the one registration that cannot live beside it.
+ * {@link AtomContext}'s vocabulary plus the two registrations that cannot live beside it -- what binding
+ * <b>this library's own resolved schema model</b> needs on top of what a consumer's classes need.
  *
- * <p>{@link SourcePosition} is bridged by {@link SourcePositionStringBridge}, which names this module's own
- * {@code Position} -- the only concrete implementation there is -- so the bridge cannot travel to
- * {@code tson-atom} with the rest and this engine applies it on top. It is needed wherever a
- * {@code schema.meta.TypeDefinition} is itself bound, which is schema resolution and the resolved-form
- * round trip, and nowhere a consumer's data goes.
+ * <p>Neither could travel, and for the same kind of reason: {@link Token} is {@code tson-schema}'s, and
+ * {@link SourcePosition}'s bridge names this module's own {@code Position}, the only concrete
+ * implementation there is. Both are needed wherever a {@code schema.meta.TypeDefinition} is itself bound --
+ * schema resolution and the resolved-form round trip -- and nowhere a consumer's data goes: a user schema's
+ * {@code !!meta} chain does not contribute the kernel's {@code value}, so no field a consumer declares can
+ * be typed by the escape hatch {@code Token} carries.
  *
- * <p>So the split is by what needs it rather than by module convenience: the shared list is what a
- * consumer's classes bind, and this is what binding <em>this library's own schema model</em> additionally
- * needs.
+ * <p>So the split is by what needs it rather than by module convenience.
  */
 public final class ResolverBindContext {
 
@@ -30,8 +32,9 @@ public final class ResolverBindContext {
 
     /** {@code context} with the atom vocabulary and the {@code SourcePosition} bridge applied. */
     public static DataBindContext registerDefaults(DataBindContext context) {
-        TsonAtomContext.registerDefaults(context);
+        AtomContext.registerDefaults(context);
         try {
+            context.registerAtom(Token.class);
             context.registerAtom(SourcePosition.class, new SourcePositionStringBridge());
         } catch (DataBindException e) {
             throw new IllegalStateException("failed to register the SourcePosition bridge on a context", e);

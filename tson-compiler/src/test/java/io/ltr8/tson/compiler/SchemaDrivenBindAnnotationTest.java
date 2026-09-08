@@ -9,7 +9,7 @@ import io.ltr8.annotation.Annotations;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
 
@@ -74,7 +74,7 @@ class SchemaDrivenBindAnnotationTest {
                 ? widgetClass
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
@@ -174,7 +174,7 @@ class SchemaDrivenBindAnnotationTest {
                 ? Catalogue.class
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
@@ -221,7 +221,7 @@ class SchemaDrivenBindAnnotationTest {
                 ? bound
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;

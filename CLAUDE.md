@@ -262,6 +262,15 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `SchemaAccess` collecting a source with the `FetchPolicy` governing it. [TSON-JSON]
   §10.4 names that as the restriction an application processing untrusted input sets, which makes it
   configuration like the policies rather than machinery like an encoding's reader.
+  **`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to — `Rational`, `Complex`,
+  `CidrNetwork`, `InternetAddress` — the question a consumer arrives with rather than part of §8's model, and
+  pure values depending on nothing. **`io.ltr8.tson.base.bind`** is what a deployment binds with:
+  `AtomContext` registers those host values, and the JDK ones beside them, with a `DataBindContext`, so a
+  class binds the same under every encoding ([TSON-JSON] §5.1). **That is why this module requires
+  `tson-bind`, and why doing so costs it nothing**: `tson-bind` is a general engine that binds a `DataValue`
+  to a Java object and has never heard of a schema — system-library standing, like the `java.net.http` this
+  module already rests on. The property that matters is unchanged: nothing here knows what a TSON document or
+  a JSON one looks like.
   **`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
   `IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — and the
   UTS #39 rules over them, read by two engines and knowing nothing about either format. `UnicodePolicy` is
@@ -293,15 +302,12 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `DataValue`), which is what lets a held template body be written at all.
 - **`tson-schema`** — `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
   records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
-  deliberately open branch, `Data`, which a consumer's own class implements — see below), plus
-  `io.ltr8.tson.schema.atom` — the three **host value types** the built-in atoms read to (`Rational`,
-  `Complex`), which is the question a consumer arrives with (*what do I get back from
-  `!rational`?*) and not part of §8's model. Two of them are in this module because `schema.meta` needs
-  them structurally — `RationalType`'s `min`/`max`/`multiple_of` are `Rational` values — and `Complex` is
-  here because splitting the three by whether the schema model happens to reuse one as a facet value is a
-  distinction a consumer can neither see nor predict. The parsing half stays in `tson-compiler`'s unexported
-  `atom` package, the same split `schema.meta.IntegerType` and `compiler.atom.IntegerParser` already make.
-  Plus the schema
+  deliberately open branch, `Data`, which a consumer's own class implements — see below). **The host value
+  types are not here**: `Rational`, `Complex`, `CidrNetwork` and `InternetAddress` are `base.atom`'s, because
+  *what do I get back from `!rational`?* is a question about the type system rather than about §8's model,
+  and they depend on nothing. `schema.meta` reads them structurally — `RationalType`'s
+  `min`/`max`/`multiple_of` are `Rational` values — which is what used to hold them here, and is a pull from
+  above rather than a reason to live above. Plus the schema
   registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`/`TsonCanonicalIdentity`) and
   `TsonBundledSchemas`. **The linker is not here** — it is an engine, not a value model, so
   `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the pipeline; what
@@ -318,17 +324,15 @@ module has a real `module-info.java`; module names mirror each module's root exp
   which families a reader binds, and what they read to, is a property of the type system and not of the encoding that carried
   them. Three packages, split by who touches them: `io.ltr8.tson.atom` is what a caller names — `AtomType`, the two indices
   over it (`BuiltinTypeVocabulary` by name, `HostAtoms` by host class), `AtomParsers` from a resolved body, `VocabularyAtoms`
-  for the write direction, the exceptions a refusal arrives as, and `TsonAtomContext`, which registers the host values those
-  families read to with a bind context -- what makes a class with a `UUID` component bind the same under both encodings;
-  `io.ltr8.tson.atom.number` is §4's number production and the narrowing over it, exported because base type resolution stays
-  with the text encoding and reads it; `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on
-  the same terms as `tson-compiler`'s own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its constraint
-  record), `tson-bind` (`TsonAtomContext` registers with one), `tson-base` and `tson-regex`. **What deliberately stayed
-  behind is everything that depends on *how* a token was written**: `AtomType` takes a `String`, and the two atoms needing
-  the lexical form — the kernel's `value`, whose §4.4 rule is that a quoted token is a string, and `Token`, which records the
-  spelling §8's resolved form carries — stay in `tson-compiler` with `TokenValue` and `BaseTypeResolver`. That those two are
-  exactly where the encodings legitimately differ is no coincidence: JSON has no token forms and reads a `value` position by
-  [TSON-JSON] §5.7's own rule.
+  for the write direction, and the exceptions a refusal arrives as; `io.ltr8.tson.atom.number` is §4's number production and
+  the narrowing over it, exported because base type resolution stays with the text encoding and reads it;
+  `io.ltr8.tson.atom.parser` is the 23 family implementations and is **unexported**, on the same terms as `tson-compiler`'s
+  own `lexer` and `reader`. Depends on `tson-schema` (a parser holds its constraint record), `tson-base` and `tson-regex`.
+  **What deliberately stayed behind is everything that depends on *how* a token was written**: `AtomType` takes a `String`,
+  and the two atoms needing the lexical form — the kernel's `value`, whose §4.4 rule is that a quoted token is a string, and
+  `Token`, which records the spelling §8's resolved form carries — stay in `tson-compiler` with `TokenValue` and
+  `BaseTypeResolver`. That those two are exactly where the encodings legitimately differ is no coincidence: JSON has no token
+  forms and reads a `value` position by [TSON-JSON] §5.7's own rule.
 - **`tson-tree`** — **only** `io.ltr8.tson.tree` (the data-document *value* model — `TsonValue` and its
   pure immutable node types, structure-preserving and query-ergonomic, the read output of tree mode). A
   true leaf: depends on **nothing** (not even `tson-annotation` — the nodes aren't bind targets, they're
@@ -903,7 +907,7 @@ two arguments where the tree writer's takes one.
 
 `Tson.builder().build()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
 `bindings(Map)`/`profile(String)` are the short form of the bind context — the map as a name binder chained
-over the kernel's vocabulary, plus `TsonAtomContext.registerDefaults` — and are mutually exclusive with
+over the kernel's vocabulary, plus `AtomContext.registerDefaults` — and are mutually exclusive with
 `dataBindContext`, a profile being fixed when a context is built.
 `resolve(schemaText)` registers a schema by its own `!!id` (no mode — resolution is always bind-anchored);
 `treeRegistry()`/`bindRegistry()` pick the read mode; `objectReader()`/`treeReader()` return schema-aware
@@ -1285,7 +1289,7 @@ compatibility).
   host-bits-zero rules on top. All four network families apply `within`/`excluding` and judge the pair
   for emptiness at schema load — exactly, prefix-tree cover being counting rather than searching, with a
   network family's prefix bounds folded in, both halves stated by §5.5 — and **`cidr4`/`cidr6`
-  read to `schema.atom.CidrNetwork`** rather than to text — the address grammars and the network value live
+  read to `base.atom.CidrNetwork`** rather than to text — the address grammars and the network value live
   in `tson-schema` so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries
   without the linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its siblings**, and its format check is
   the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted local parts, domain literals or

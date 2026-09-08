@@ -10,7 +10,7 @@ import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 
 import java.util.List;
 import java.util.Map;
@@ -71,7 +71,7 @@ class AnnotationValidationTest {
                 "shape", Shape.class, "circle", Circle.class, "holder", Holder.class);
         DataNameBinder binder = n -> names.containsKey(n) ? names.get(n) : SchemaMetaNameBinder.INSTANCE.resolve(n);
         return Tson.builder().schemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
-                .dataBindContext(TsonAtomContext.registerDefaults(
+                .dataBindContext(AtomContext.registerDefaults(
                         DataBindContext.builder().nameBinder(binder).build()))
                 .build();
     }

@@ -4,14 +4,14 @@ import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import java.util.List;
-import io.ltr8.tson.schema.atom.CidrNetwork;
+import io.ltr8.tson.base.atom.CidrNetwork;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 
 /**
  * Parses and validates against meta.tn's {@code cidr4_type} constructor (§5.5's {@code cidr4} atom, RFC
  * 4632): an IPv4 address, {@code /}, and a prefix length of 0-32.
  *
- * <p><b>Host type is {@link CidrNetwork}</b>, a value type in {@code schema.atom} beside {@code Rational}.
+ * <p><b>Host type is {@link CidrNetwork}</b>, a value type in {@code base.atom} beside {@code Rational}.
  * The grammar and the family-range and host-bits rules live on it, so a network is a value here rather than
  * the text that carried it -- which is what lets {@code within} and {@code excluding} be judged by the family
  * that declares them rather than by a check bolted onto the resolver.

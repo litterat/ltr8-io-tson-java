@@ -1,4 +1,4 @@
-package io.ltr8.tson.schema.atom;
+package io.ltr8.tson.base.atom;
 
 import java.util.Arrays;
 import java.util.List;

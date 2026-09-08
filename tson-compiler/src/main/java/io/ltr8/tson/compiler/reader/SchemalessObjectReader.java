@@ -27,7 +27,7 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.atom.number.BaseValue;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayEnd;
 import io.ltr8.tson.compiler.stream.ArrayStart;
@@ -111,7 +111,7 @@ public final class SchemalessObjectReader {
     }
 
     public SchemalessObjectReader() {
-        this(TsonAtomContext.defaultContext());
+        this(AtomContext.defaultContext());
     }
 
     private SchemalessObjectReader(DataBindContext context, boolean preserveUnknownTypeRefs,

@@ -5,8 +5,8 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.schema.meta.Ipv6Type;
 import java.util.List;
-import io.ltr8.tson.schema.atom.CidrNetwork;
-import io.ltr8.tson.schema.atom.InternetAddress;
+import io.ltr8.tson.base.atom.CidrNetwork;
+import io.ltr8.tson.base.atom.InternetAddress;
 import java.net.Inet6Address;
 import java.net.UnknownHostException;
 import java.util.regex.Pattern;
@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * 4291 §2.2 grammar itself -- the 8-group preferred form, at most one {@code ::} run-of-zeros
  * compression, and an optional dotted-quad tail validated against the same strict grammar a bare IPv4
  * address gets -- and builds the address from raw bytes via {@code InetAddress.getByAddress(byte[])}, never a
- * JDK text compiler. The grammar itself lives in {@link io.ltr8.tson.schema.atom.InternetAddress}, so that
+ * JDK text compiler. The grammar itself lives in {@link io.ltr8.tson.base.atom.InternetAddress}, so that
  * the families that must judge a {@code within} entry can reach it; this class is the reader over it.
  *
  * <p>Zone identifiers ({@code %eth0}) need no special-case rejection: {@code %} simply isn't in
