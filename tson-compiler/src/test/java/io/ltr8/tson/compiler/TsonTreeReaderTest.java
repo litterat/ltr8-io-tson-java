@@ -142,11 +142,11 @@ class TsonTreeReaderTest {
     }
 
     @Test
-    void aTokenTheBuiltInAtomRejectsIsAConstraintViolation() {
+    void aTokenTheBuiltInAtomsGrammarRejectsIsAFormError() {
         List<Diagnostic> problems = problemsIn("{ a: !uuid nope }");
 
         assertEquals(1, problems.size());
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.get(0).code());
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, problems.get(0).code());
         assertEquals(Optional.of("/a"), problems.get(0).path());
         assertTrue(problems.get(0).dataPosition().isPresent());
     }
@@ -155,7 +155,7 @@ class TsonTreeReaderTest {
     @Test
     void aRejectedTokenThrowsUnderTheDefaultReceiver() {
         ReadException thrown = assertThrows(ReadException.class, () -> STRICT.read("{ a: !uuid nope }"));
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, thrown.diagnostic().code());
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, thrown.diagnostic().code());
     }
 
     /** The failed leaf keeps its place and its wire type-ref; only its value is gone. */
@@ -187,7 +187,7 @@ class TsonTreeReaderTest {
     /** An annotation's value is a data-value (§3.1), so the same rules reach inside it. */
     @Test
     void anAnnotationsOwnValueIsCheckedToo() {
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problemsIn("@since:!date nope 1").get(0).code());
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, problemsIn("@since:!date nope 1").get(0).code());
     }
 
     @Test

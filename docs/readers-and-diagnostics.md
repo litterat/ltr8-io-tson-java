@@ -464,7 +464,8 @@ an answer; classifying a failure is reading a document, and that is each encodin
 
 `Diagnostic` is the structured value every `DiagnosticsReceiver` receives, identical shape whichever
 one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`FIELD_FIXED`/`TYPE_MISMATCH`/`WRONG_ARITY`/
-`UNKNOWN_TYPE_REF`/`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD`/`DUPLICATE_MAP_KEY`/`DUPLICATE_FIELD`
+`UNKNOWN_TYPE_REF`/`ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD`/
+`DUPLICATE_MAP_KEY`/`DUPLICATE_FIELD`
 from readers;
 `SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for infrastructure-level failures, plus
 `NOT_IMPLEMENTED`/`BIND_MISMATCH` and the five `SCHEMA_*` fetch codes — the members that are not a verdict
@@ -747,11 +748,30 @@ the offending token.
 
 A read with no schema behind it carries none of the three.
 
-An atom's `AtomTypeException` is caught in `AtomTypeReader` and mapped to
-`ATOM_CONSTRAINT_VIOLATION` — `AtomType`'s own signature is untouched, since it's shared with the
-schemaless binder which has no read context. That code means exactly "the atom rejected this token" and
-nothing finer; routing `AtomValidationException`'s own varieties apart is out of scope for now, as are
-per-field schema positions. (Message synthesis from code + params is not a gap but a decision -- see below.)
+**An atom refuses in two categories, and carries two codes.** [TSON-DATA] §5.2 splits the refusal — "a token
+the atom's grammar rejects is a parse error; a parsed value violating the atom's range is a validation
+error" — and §8.1 files the halves apart, a contract rejection being a *resolver* error ("the structural
+parser has already accepted the document before an atom contract is consulted, so contract failures resolve,
+they do not parse") where a range violation is a *validation* error. So `ATOM_FORM_INVALID` is what an
+`AtomParseException` becomes and `ATOM_CONSTRAINT_VIOLATION` what an `AtomValidationException` does. One code
+for both put a resolver error in the validation category, which is not something a consumer could correct
+for: the two messages are equally "the atom said no", and the code is the only thing carrying which rule
+fired.
+
+**`AtomRefusal` is where that mapping lives, and it is the one place.** `AtomType`'s own signature is
+untouched — it is shared with two schemaless binders that have no read context, and with the JSON stack,
+none of which can be handed a `Diagnostic`. What `AtomRefusal` carries is the four non-locational components
+(code, message, `expected`, `actual`); the reader adds the location, since only it has one. It lives in
+`tson-atom` rather than on `Diagnostic` for the reason the rest of the classifying half stayed with each
+encoding: `Diagnostic`'s ten `of*` factories each switch on an exception an *encoding* declares, and
+`AtomTypeException` is the vocabulary's own and neither encoding's — so a factory for it on `Diagnostic`
+would make the base depend on the vocabulary, while a copy per reader is how two encodings come to disagree
+about one token. They already had: before the merge, a target that cannot represent a family's value was a
+bind problem on one path and a type mismatch on the other, and nothing said which was right. Four readers go
+through it now — `AtomTypeReader`, `TypeRefCheck`, `SchemalessObjectReader` and the JSON stack's
+`JsonAtoms` — and `AtomTypeException` is sealed to exactly two subtypes, so the switch is exhaustive rather
+than a guess. Per-field schema positions are a separate matter, below. (Message synthesis from code + params
+is not a gap but a decision — see below.)
 
 **A broken FIXED field is `FIELD_FIXED`, not an atom code.** `field: type = value` (§5.2) is a field-state
 rule, so a value contradicting it has satisfied its atom's grammar and every facet — it is simply not the

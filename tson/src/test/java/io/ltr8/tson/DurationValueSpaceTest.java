@@ -62,7 +62,10 @@ class DurationValueSpaceTest {
         assertEquals(List.of(), fixture.read("!box { d: PT9223372036.854775807S }"));
         assertEquals(List.of(), fixture.read("!box { d: -PT9223372036.854775807S }"));
 
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+        // The two ends are refused by different rules and carry different codes, which §8.1 requires:
+        // a tenth fractional digit is outside the grammar (a resolver error, ATOM_FORM_INVALID), where
+        // P400000D parses and is then too long (a validation error).
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID,
                 fixture.read("!box { d: PT0.0000000001S }").getFirst().code());
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
                 fixture.read("!box { d: P400000D }").getFirst().code());

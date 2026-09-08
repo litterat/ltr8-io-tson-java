@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
+import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.ArrayStart;
@@ -61,12 +62,15 @@ final class TypeRefCheck {
 
 /**
      * A token the built-in atom named by {@code name} rejected -- both {@code AtomTypeException} subtypes land
-     * here. {@code expected} is the atom's own account of the constraint that failed, not the atom's name: see
+     * here, and {@link AtomRefusal} is what tells them apart: §8.1 files a contract rejection as a resolver
+     * error and a range violation as a validation one. No target is in play at this call -- the check is
+     * that the token satisfies the atom the author named, with no class on the other side of it. {@code expected} is the atom's own account of the constraint that failed, not the atom's name: see
      * {@link AtomTypeException} for the vocabulary, and {@link io.ltr8.tson.compiler.reader.AtomTypeReader} for
      * why naming the type there is a loss.
      */
     static void violation(TsonReadContext ctx, String name, AtomTypeException e, String text) {
-        ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), e.expected(), text);
+        AtomRefusal refusal = AtomRefusal.of(e, text, Object.class);
+        ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
     }
 
     /**

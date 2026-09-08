@@ -51,10 +51,20 @@ as a scalar and the other takes it apart.
 
 What the registration buys is that `tson-bind` treats each host type as a **scalar** — `CidrNetwork` is a
 Java record and would otherwise bind as `{ prefix: … prefixLength: … }`, refusing the scalar `cidr4`/`cidr6`
-actually carry. What it does **not** buy is the string-to-host-value conversion: none of these registrations
-carries a bridge, so a schemaless bind of a `UUID` component fails — on *both* encodings alike, which is the
-honest statement of it. `BACKLOG.md`'s "Binding" section carries the shared conversion that would close it,
-and `HostAtoms.forStringContentHostType` is the index it would go through.
+actually carry. None of these registrations carries a bridge, so the string-to-host-value conversion is not
+the registration's: it is the **family's**, and `HostAtoms.forStringContentHostType` is how a reader with no
+type-ref reaches it. `JsonAtoms.fromString` asks that index, as `SchemalessObjectReader` does on the text
+side, so `"9f1c8e2a-…"` at a `UUID` component is `UuidParser`'s to accept or refuse under either encoding —
+which is what §5.1 means by the string rule being the whole interface.
+
+The index is deliberately **not total over the registered host types**, and the two exclusions are the same
+fact from different directions. `mac`, `email` and `regex` read to `String`, so a `String` component cannot
+say which of them (or `text`) it meant; `CidrNetwork` is produced by *both* `cidr4` and `cidr6`. In each case
+the host class does not determine the family, and picking one would be a guess — a position wanting those
+needs a schema to say so, which is what §5–§8's decode is for. The numeric families are excluded on a
+different ground and one that matters more here: they read from a JSON **number**, so admitting them to a
+*string*-content index would let a class declaring `BigInteger` turn `"123"` into one and overrule the
+encoding's own kinds.
 
 `SourcePosition`'s bridge could not travel: it names `tson-compiler`'s own `Position`, so that engine keeps
 it in `config.ResolverBindContext`, applied on top of the shared list. The split is by what needs it — the
@@ -508,6 +518,45 @@ wrapping. `float`/`double` are the exception and are meant to be — rounding on
 approximate families' own contract (§5.4). An enum needs no rule here at all: `tson-bind` bridges every
 plain Java enum through `EnumStringBridge`, so one arrives as a bridged `String` atom.
 
+**The target picks the parser; the JSON kind decides only whether the content is admitted.** That is §4.1
+read literally — there is no untyped position in this encoding and no base type resolution under it, §5.7
+saying so outright — and it is why `bindTo` dispatches on the target and guards on the leaf kind, rather
+than the other way round. `HostAtoms` supplies both halves: `forNumberContentHostType` for §5.3's exact tier
+and §5.4's approximate one, `forStringContentHostType` for §5.6's families. The two indices are disjoint,
+and a test says so — a family reading from a number must not be reachable from a string, which is what would
+let `"123"` become a `BigInteger` because a field is declared one.
+
+**The dispatch order is load-bearing, and §5.4 is why.** An approximate position admits a JSON number *and*
+a JSON string: the two infinities and NaN have no JSON number spelling and travel as `".inf"`, `"-.inf"`,
+`".nan"` — [TSON-DATA] §7.6's own productions, so one parser reads both kinds and no third spelling of
+infinity enters the series. A switch on the leaf kind cannot express one family serving two kinds; a switch
+on the target can, and both branches reach one call. Which families are approximate is *this encoding's*
+question rather than the vocabulary's, so it is answered by the two Java types §5.4 names and not by asking
+an `AtomType` about JSON kinds it should know nothing about.
+
+What the routing buys over narrowing a host value the encoding chose is visible in the refusals. `1.5` and
+`2147483648` at an `int` used to be one message — "not exactly representable" — because one `BigDecimal` was
+asked both questions. They are now two: the first is not an integer *form* at all (§5.3's contract
+rejection, exactly as the token `1.5` is in text, which the TSON side already got right through
+`NumberNarrowing`), the second is an integer outside `int32`'s range. `200` at a `byte` reports
+`>= -128 and <= 127` — `int8`'s own bound, from `AtomTypeException`'s vocabulary — where it reported "a value
+that fits byte", which is the JVM's account of the same fact and not the schema's. And a refinement's
+`allow_nan` or `multiple_of` now has somewhere to be honoured when the schema-directed decode lands.
+
+**The mapping from a Java type to a family is an interpretation**, stated once in `HostAtoms` as the inverse
+of `IntegerParser.hostType`: `byte`→`int8` … `long`→`int64`, `BigInteger`→`integer`, `float`/`double`→
+`float32`/`float64`, `BigDecimal`→`number` — **each primitive keyed beside its box**, since a component
+declared `Integer` and one declared `int` are one position as far as a document is concerned, and a hole in
+one half of a pair stays invisible until a caller happens to declare the other. `java.lang.Number` is
+deliberately absent and is refused a layer earlier, by `tson-bind`: it is abstract and names no family, so
+there is nothing for the index to answer with. Nothing says a Java `int` means `int32` rather than an
+`integer` bounded to 32 bits — the two admit the same values — and the first is the one worth committing to because it
+makes this read a preview of the schema-directed one: an `int` component reaches the reader an `int32` field
+would. **The text encoding does not consult that index and must not**: [TSON-DATA] §4 makes base type
+resolution normative for an untyped token there, so the token is classified first and the target is a
+narrowing question afterwards. Both readings are right for their own encoding, which is why there are two
+indices rather than one widened.
+
 **Every problem goes through a `DiagnosticsReceiver`**, so a read's own receiver decides its fate exactly
 as it does for the TSON readers: `throwing()` — the default — raises `ReadException` at the first, and
 `withDiagnostics(DiagnosticsCollector)` gathers every problem in one pass and still returns. **One pass
@@ -524,7 +573,7 @@ name policy yet.
 
 Codes come from the same closed vocabulary the TSON readers use — §9.4 adds no category of its own — so
 `TYPE_MISMATCH`, `FIELD_REQUIRED`, `UNRECOGNIZED_FIELD`, `DUPLICATE_FIELD`, `DUPLICATE_MAP_KEY`,
-`WRONG_ARITY`, `ATOM_CONSTRAINT_VIOLATION`, `UNKNOWN_TYPE_REF` for a union with no selector, and
+`WRONG_ARITY`, `ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`, `UNKNOWN_TYPE_REF` for a union with no selector, and
 **`BIND_MISMATCH`** for a class this context cannot analyse or cannot receive a JSON object's keys into.
 That last one is deliberately **not a verdict**: nothing about the document is being asserted by it, which
 is what a caller routing on `Code.verdict()` needs to be able to tell.

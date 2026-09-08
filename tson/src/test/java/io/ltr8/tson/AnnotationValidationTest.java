@@ -108,11 +108,13 @@ class AnnotationValidationTest {
     /** And the value, not just the name: {@code @T:v} means v satisfies T, wherever v ends up. */
     @Test
     void aValueTheAnnotationsTypeRejectsIsReportedWhoeverReadsIt() {
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+        // ATOM_FORM_INVALID and not the constraint code: `not-an-int` never becomes an integer, so this
+        // is the atom's grammar refusing the token -- §8.1's resolver error, not a range violation.
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID,
                 only(tson().validate(document("@level:\"not-an-int\"", "plain"))).code());
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID,
                 only(binding(document("@level:\"not-an-int\"", "carrier"), Carrier.class)).code());
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID,
                 only(binding(document("@level:\"not-an-int\"", "plain"), Plain.class)).code());
     }
 

@@ -91,7 +91,7 @@ class MultiErrorCollectionTest {
         assertEquals(lineOf(dataSource, "200"), outOfRangeTag.dataPosition().orElseThrow().line());
 
         Diagnostic badElement = byPath.get("/items/1");
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, badElement.code());
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, badElement.code());
         assertEquals(lineOf(dataSource, "hello"), badElement.dataPosition().orElseThrow().line());
 
         // Collecting mode kept reading despite every failure -- the record itself still comes back as

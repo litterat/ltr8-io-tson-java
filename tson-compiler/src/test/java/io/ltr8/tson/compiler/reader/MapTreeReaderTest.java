@@ -225,7 +225,7 @@ class MapTreeReaderTest {
 
         compiled.get("scores").read(TestDocuments.document("{ \"a\" => 1  \"b\" => 2 }", problems));
 
-        assertEquals(List.of(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
+        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID, Diagnostic.Code.ATOM_FORM_INVALID),
                 problems.diagnostics().stream().map(Diagnostic::code).toList(),
                 problems.diagnostics().toString());
     }

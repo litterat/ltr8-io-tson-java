@@ -208,7 +208,7 @@ class TsonValidateTest {
 
         List<Diagnostic> problems = tson.validate("{ n: !int32 twelve }");
         assertEquals(1, problems.size(), problems.toString());
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, problems.getFirst().code());
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, problems.getFirst().code());
     }
 
     /**
@@ -493,7 +493,7 @@ class TsonValidateTest {
     void aSchemalessDocumentsTypeRefsAreCheckedWhereverTheyAreWritten() {
         Tson tson = tsonWithPoint();
 
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, only(tson, "{ a: !uuid nope }").code());
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID, only(tson, "{ a: !uuid nope }").code());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, only(tson, "!uuid { a: 1 }").code());
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, only(tson, "!date [1 2]").code());
         assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, only(tson, "{ a: !nosuchtype 1 }").code());
@@ -505,7 +505,7 @@ class TsonValidateTest {
     /** An annotation's value is a data-value (§3.1), so validation reaches inside it. */
     @Test
     void anAnnotationsOwnValueIsValidatedToo() {
-        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
+        assertEquals(Diagnostic.Code.ATOM_FORM_INVALID,
                 only(tsonWithPoint(), "{ a: @since:!date nope 1 }").code());
     }
 
@@ -514,6 +514,12 @@ class TsonValidateTest {
     void everyProblemInOneDocumentIsCollected() {
         List<Diagnostic> problems = tsonWithPoint().validate("{ a: !uuid nope  b: !nosuchtype 1  c: !int8 999 }");
         assertEquals(3, problems.size(), problems.toString());
+        // Three problems and three codes: a token no UUID grammar accepts, a name nothing declares, and a
+        // value int8 parses and then refuses. §8.1 files the first two as resolver errors and the last as a
+        // validation error, and the code is what a consumer routes on rather than the sentence.
+        assertEquals(List.of(Diagnostic.Code.ATOM_FORM_INVALID, Diagnostic.Code.UNKNOWN_TYPE_REF,
+                        Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION),
+                problems.stream().map(Diagnostic::code).toList(), problems.toString());
     }
 
     /** The sole diagnostic {@code source} produces -- asserts there is exactly one, then hands it over. */

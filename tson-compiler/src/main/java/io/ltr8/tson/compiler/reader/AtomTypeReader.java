@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomParsers;
+import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -164,8 +165,11 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
             }
             return delegate.read(tokenValue.text());
         } catch (AtomTypeException ex) {
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
-                    "'" + name + "': " + ex.getMessage(), ex.expected(), token.text());
+            // The entry's own name leads the sentence -- see `name` above -- and AtomRefusal decides the
+            // code: §8.1 files a contract rejection apart from a range violation, and this reader is not a
+            // second opinion about which is which.
+            AtomRefusal refusal = AtomRefusal.of(ex, token.text(), Object.class).named(name);
+            ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
             return null;
         }
     }

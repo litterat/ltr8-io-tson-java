@@ -86,18 +86,35 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **A schemaless bind cannot convert an atom host type, on either encoding.** `TsonAtomContext`
-  registers `UUID`, the temporal, network and identifier families as atoms so `tson-bind` treats them as
-  scalars rather than taking them apart structurally — but with no bridge, so nothing converts the string on
-  the wire into one. Under a schema that is right: the position's own atom parser produces the host value
-  ([TSON-DATA] §5, [TSON-JSON] §5.1). With no schema both encodings fail alike —
-  `new TsonObjectReader().read("{ id: \"3f25…\" }", WithAUuid.class)` and
-  `Json.standard().objectReader().read(…)` both report that a string cannot become a `UUID` — so a consumer
-  whose class has a `UUID` component must have a schema, and nothing says so at the point of failure. The
-  machinery is already there and keyed the right way: `HostAtoms.forStringContentHostType` maps the host
-  class back to the family that parses it, and `SchemalessObjectReader` already consults it when no type-ref
-  supplies a name. What is left is the JSON side (`JsonAtoms.fromString` asking the same index) and deciding
-  whether the text side's remaining families follow.
+- [ ] **A bound class cannot say it stands for an atom, once a schema is governing.** Registering a bridge
+  works on the schemaless path — `DataBindContext.Builder.registerAtom(Money.class, moneyBridge)` makes
+  `Money` a `DataClassAtom` whose `dataClass()` is `String`, and both encodings apply the bridge after
+  reading the wire type. Under a schema neither does: `AtomTypeReader.read` returns the *family's* natural
+  host value and never looks at the bound component's `DataClassAtom` or its bridge, so a schema declaring
+  `money => text` against an `Invoice(Money total)` fails with a bare
+  `ClassCastException: Cannot cast java.lang.String to Money` — escaping the read unwrapped, so it is neither
+  a diagnostic nor a classified exception. It compiles clean because the bind-mode check compares field
+  *sets* and not host types, which is the second half of the fix: the disagreement should be a
+  `BindMismatchException` at compile, where every other schema/class disagreement already lands, rather than
+  a fault on the first read. **The read-side seam exists and is one case wide**:
+  `RecordBindReader.rebindValueIfNeeded` over `AtomTypeReader.overAtom` is exactly "let the bound component
+  pick the atom", restricted to the `value` escape hatch — generalising it to any bridged atom component
+  whose `dataClass()` is what the family produces is the change, and its own Javadoc already names
+  `rebindContainerIfNeeded` as the sibling it runs beside. **The write direction has no surface at all**:
+  `TsonObjectWriter` holds a private `VocabularyAtoms.defaults()` copy, whose Javadoc says it is mutable and
+  per-writer "so a caller wanting to extend the vocabulary with their own `AtomType` has an actual map to
+  add to" — and no caller can hand one in, so a custom atom cannot round-trip even once reading works.
+
+- [ ] **A host class two families share cannot be dispatched by class alone.**
+  `HostAtoms.forStringContentHostType` maps a target class back to the family that parses it, and both
+  encodings' schemaless readers consult it — but it is not total over what `AtomContext` registers, because
+  two families can produce one class. `mac`, `email` and `regex` all read to `String`, so a `String` component
+  cannot say which it meant (or whether it meant `text`); `CidrNetwork` is produced by both `cidr4` and
+  `cidr6`. Today those components bind as their host class does — a `String` stays a string, a
+  `CidrNetwork` is refused — and the content is never checked. Under a schema this is answered outright by
+  the position's own type, so the question is whether a schemaless read wants a second channel to name the
+  family (an annotation on the component, say) or whether "these families need a schema" is the honest
+  answer. Nothing says so at the point of failure either way, which is the part that is actionable now.
 
 ## JSON encoding
 
@@ -107,6 +124,37 @@ in its class, and a document in a directed encoding may not be readable without 
 declared on those terms and neither has a consumer, because TSON text tags its choice variants with `!variant` and
 never flattens — so it cannot exercise `@discriminator` or `@rest` at all. A JSON front end is what puts that half of
 §6 under test, and is expected to move both: a directive with no consumer has never had its shape checked against one.
+
+- [ ] **Nothing writes JSON.** `tson-json` is three readers and no writer — `Json.parse`, `JsonTreeReader`,
+  `JsonObjectReader` — where the text side has `TsonObjectWriter`, `TsonTreeWriter` and `TsonDataEmitter`
+  under them. The escape half already exists and nothing composes it: `JsonText` is RFC 8259 string quoting,
+  package-private, and its own Javadoc calls itself "the only place this module writes a string". §5's
+  per-family table states an **encode** column beside the decode one, §9.2 is a processor contract in its own
+  right, and §9.3's round-trip guarantees cannot be asserted at all with one direction built — so §5.3's
+  digits-and-scale promise (`199.90` encodes as `199.90`, not `199.9`) is currently half-tested: the scale
+  survives into a `BigDecimal` and nothing checks it comes back out. What the shape should be is settled by
+  the read side rather than open: the tree and object writers are the mirror of the two readers, `JsonText`
+  is the leaf, and `VocabularyAtoms`' keying on the *declared* host class rather than the value's runtime
+  class is the rule to carry over — `litterat-json`'s `JsonMapper.writeAtom` dispatches on
+  `object instanceof Number`, which is how a `long` and a `BigInteger` come to be written by the same branch
+  and neither is written by its family. One walk serves both directions there, in one class; whether that is
+  worth copying is the one real design question here.
+
+- [ ] **The JSON record reader rebuilds its name index on every record value.**
+  `DataClassObjectReader.bindRecord` allocates a `HashMap<String, Integer>` over `target.fields()` for each
+  object it reads, and that map is a pure function of the `DataClassRecord` — a document holding ten
+  thousand records builds ten thousand identical maps. The text side has no such cost because the work lands
+  at compile: `RecordAbstractReader.fieldIndex` is a `final` map built in the constructor, once per entry.
+  JSON has no compile step, so it landed per read instead and nothing noticed. The engine is one per
+  `JsonObjectReader`, built in that class's own constructor and shared across every read it serves,
+  which is where the memo belongs —
+  `litterat-json`'s `JsonMapper` already cached exactly this (`fieldMaps`/`componentMap`), on a bare
+  `HashMap` field, which is the one part not to copy: a shared reader must stay safe under concurrent reads,
+  so the memo wants the settle-a-race treatment the compiled registries already use. Worth deciding the
+  sibling allocation in the same pass: the `HashSet<String>` tracking §3.1's repeated members is genuinely
+  per-value, but for a record of a handful of fields a scan of the filled slots beats hashing. **Size it
+  before changing it** — `AllocationHarnessTest` measures the TSON bind path and there is no JSON
+  counterpart, so the first move is a harness that says what a JSON read costs and where.
 
 - [ ] **A JSON document cannot name the schema that governs it, so the front door and the CLI need a surface that
   does.** `!!schema` is TSON text syntax (`SPEC-FEEDBACK.md` #2, open): a JSON body has no in-band channel, so

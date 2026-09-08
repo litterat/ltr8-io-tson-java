@@ -186,10 +186,15 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
      * and none is coming: §8.1 states that a conforming processor has one severity and that nothing
      * normative is satisfied, relaxed, or deferred by an advisory notice.
      *
-     * <p>Every {@code AtomTypeException} maps to the single {@code
-     * ATOM_CONSTRAINT_VIOLATION} code, since {@code AtomValidationException} itself doesn't yet carry a
-     * structured code to route on -- so that member means "the atom rejected this token", nothing finer.
-     * Routing its varieties apart is tracked in {@code BACKLOG.md}.
+     * <p><b>An atom rejects a token in two categories, so it carries two codes.</b> [TSON-DATA] §5.2 splits
+     * the refusal -- "a token the atom's grammar rejects is a parse error; a parsed value violating the
+     * atom's range is a validation error" -- and §8.1 files the halves apart: a token a parsing contract
+     * rejects is a <em>resolver</em> error ("contract failures resolve, they do not parse"), where a range
+     * violation is a <em>validation</em> error. {@code ATOM_FORM_INVALID} is the first and {@code
+     * ATOM_CONSTRAINT_VIOLATION} the second, matching {@code AtomTypeException}'s own two subtypes, which
+     * are sealed to exactly those two so a caller can switch rather than sniff a message. One code for both
+     * put a resolver error in the validation category, which §8.1 does not allow and the conformance corpus
+     * asserts against. {@code AtomRefusal} is the one place the mapping is made; no reader repeats it.
      * {@code SCHEMA_ERROR}/{@code UNKNOWN_TYPE}/{@code VALIDATION_ERROR} are infrastructure-level
      * fallbacks a caller (e.g. {@code tson-cli}) uses for a failure that happens outside any single
      * {@code TsonReadContext} read at all -- the schema itself failed to load, a requested type name
@@ -240,6 +245,7 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
         TYPE_MISMATCH,
         WRONG_ARITY,
         UNKNOWN_TYPE_REF,
+        ATOM_FORM_INVALID,
         ATOM_CONSTRAINT_VIOLATION,
         UNRECOGNIZED_FIELD,
         DUPLICATE_MAP_KEY,

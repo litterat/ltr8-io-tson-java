@@ -21,6 +21,7 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.HostAtoms;
 import io.ltr8.tson.atom.AtomTypeException;
@@ -299,20 +300,17 @@ public final class SchemalessObjectReader {
     /**
      * A rejection reports the atom's own {@code expected} -- the constraint that failed, not the type-ref the
      * author wrote, which the diagnostic's {@code path} and the document itself already say.
+     *
+     * <p>Which code it carries is {@link AtomRefusal}'s: §8.1 files a contract rejection as a resolver error
+     * and a range violation as a validation one, and that mapping is stated once for both encodings rather
+     * than copied into each reader that catches an {@code AtomTypeException}.
      */
     private Object bindBuiltin(TsonReadContext ctx, AtomType<?> atomType, TokenValue token, Class<?> target) {
         try {
             return atomType.read(token.text(), target);
-        } catch (AtomTypeException e) {
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, e.getMessage(), e.expected(), token.text());
-            return null;
-        } catch (ArithmeticException e) {
-            ctx.report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, token.text() + " does not fit in " + target,
-                    "a value that fits " + target, token.text());
-            return null;
-        } catch (IllegalArgumentException e) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "cannot bind '" + token.text() + "' to " + target,
-                    String.valueOf(target), token.text());
+        } catch (RuntimeException e) {
+            AtomRefusal refusal = AtomRefusal.of(e, token.text(), target);
+            ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
             return null;
         }
     }
