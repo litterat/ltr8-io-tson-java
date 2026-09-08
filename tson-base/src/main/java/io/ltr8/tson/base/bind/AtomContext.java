@@ -1,7 +1,6 @@
 package io.ltr8.tson.base.bind;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.base.atom.CidrNetwork;
 
 import java.net.Inet4Address;
@@ -12,6 +11,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.OffsetTime;
 import java.time.Period;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -51,32 +51,33 @@ public final class AtomContext {
     private AtomContext() {
     }
 
-    /** A fresh context carrying the atom vocabulary and nothing else. */
+    /**
+     * A fresh context carrying the atom vocabulary and nothing else.
+     *
+     * <p>A caller who needs the builder for something else -- a {@code DataNameBinder}, a profile -- adds
+     * the vocabulary to their own chain instead, which reads in the order it happens:
+     *
+     * <pre>{@code
+     * DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build()
+     * }</pre>
+     */
     public static DataBindContext defaultContext() {
-        return registerDefaults(DataBindContext.builder().build());
+        return DataBindContext.builder().registerAtoms(HOST_TYPES).build();
     }
 
     /**
-     * Applies the atom vocabulary to an already-built {@code context} and returns it -- for a caller who
-     * needed a {@link DataBindContext.Builder} to set something {@link #defaultContext()} does not expose,
-     * typically a {@code DataNameBinder}, and still wants these registrations without restating them.
+     * The host types this vocabulary binds as atoms -- what a consumer's class may declare a component of
+     * and have read as one scalar. Exposed so a caller checking that a context carries the vocabulary
+     * asserts against the list itself rather than against a second copy of it, which is how the two come to
+     * disagree.
      */
-    public static DataBindContext registerDefaults(DataBindContext context) {
-        try {
-            context.registerAtom(UUID.class);
-            context.registerAtom(byte[].class);
-            context.registerAtom(LocalDate.class);
-            context.registerAtom(OffsetTime.class);
-            context.registerAtom(OffsetDateTime.class);
-            context.registerAtom(Duration.class);
-            context.registerAtom(Period.class);
-            context.registerAtom(URI.class);
-            context.registerAtom(Inet4Address.class);
-            context.registerAtom(Inet6Address.class);
-            context.registerAtom(CidrNetwork.class);
-        } catch (DataBindException e) {
-            throw new IllegalStateException("failed to register default atom types on a fresh DataBindContext", e);
-        }
-        return context;
+    public static List<Class<?>> hostTypes() {
+        return HOST_TYPES;
     }
+
+    private static final List<Class<?>> HOST_TYPES = List.of(
+            UUID.class, byte[].class,
+            LocalDate.class, OffsetTime.class, OffsetDateTime.class, Duration.class, Period.class,
+            URI.class,
+            Inet4Address.class, Inet6Address.class, CidrNetwork.class);
 }

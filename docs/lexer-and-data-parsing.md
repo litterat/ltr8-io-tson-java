@@ -296,7 +296,7 @@ fixed, closed name→`AtomType` table (§5).
   authored spelling, which is what it means for the value to be the octets. `mac` and `email` keep `String`
   for the reason the CIDR pair no longer does: nothing about their text decomposes into a value a schema
   compares. `CidrNetwork` is a Java record and is registered as an **atom**
-  (`AtomContext.registerDefaults`), or tson-bind's record auto-detection would expect
+  (`AtomContext.hostTypes()`), or tson-bind's record auto-detection would expect
   `{ prefix: … prefixLength: … }` on the wire where one token stands.
 - **The exact tiers' sparse `members` set is a facet, and its identity is [TSON-DATA] §4.3's.** `integer`
   and `number` carry a member set (§5.6) for a value set that is neither a contiguous range nor an

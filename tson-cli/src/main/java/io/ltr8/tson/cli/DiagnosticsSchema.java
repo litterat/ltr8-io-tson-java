@@ -51,7 +51,7 @@ final class DiagnosticsSchema {
 
     static TsonCompiledSchema compiled() {
         DataBindContext context =
-                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(BINDER).build());
+                DataBindContext.builder().nameBinder(BINDER).registerAtoms(AtomContext.hostTypes()).build();
         Tson tson = Tson.builder().dataBindContext(context).build();
         return tson.bindRegistry().compile(tson.resolve(readResource("/diagnostics.tn")));
     }

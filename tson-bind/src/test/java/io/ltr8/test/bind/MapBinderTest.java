@@ -43,7 +43,7 @@ public class MapBinderTest {
 
 	@BeforeEach
 	public void setup() {
-		context = DataBindContext.builder().build();
+		context = DataBindContext.builder().registerAtom(UUID.class).build();
 	}
 
 	private DataClassMap resolveValuesField() throws Throwable {
@@ -139,8 +139,6 @@ public class MapBinderTest {
 		// UUID isn't registered by a bare DataBindContext (that's a TsonObjectReader-specific default,
 		// deliberately kept out of tson-bind itself) -- register it here the same way
 		// SimpleArrayTest does for its own UUID-keyed case.
-		context.registerAtom(UUID.class);
-
 		DataClassRecord descriptor = (DataClassRecord) context.getDescriptor(UuidKeyedMapHolder.class);
 		DataClassMap mapClass = (DataClassMap) descriptor.fields()[0].dataClass();
 

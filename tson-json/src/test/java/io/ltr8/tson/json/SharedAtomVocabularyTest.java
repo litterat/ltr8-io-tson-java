@@ -6,13 +6,7 @@ import io.ltr8.bind.DataClassAtom;
 import io.ltr8.tson.base.bind.AtomContext;
 import org.junit.jupiter.api.Test;
 
-import java.net.Inet4Address;
-import java.net.URI;
-import java.time.Duration;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -34,10 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  */
 class SharedAtomVocabularyTest {
 
-    /** Types registered as atoms rather than left to structural auto-detection. */
-    private static final List<Class<?>> ATOM_HOST_TYPES = List.of(
-            UUID.class, byte[].class, LocalDate.class, OffsetDateTime.class, Duration.class,
-            URI.class, Inet4Address.class);
+    /**
+     * The vocabulary itself, not a copy of it -- a second list here would pass while the two drifted, which
+     * is the failure this test exists to catch.
+     */
+    private static final List<Class<?>> ATOM_HOST_TYPES = AtomContext.hostTypes();
 
     @Test
     void theJsonFrontDoorStartsFromTheSharedVocabulary() throws DataBindException {

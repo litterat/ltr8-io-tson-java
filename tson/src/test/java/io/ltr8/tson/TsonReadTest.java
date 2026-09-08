@@ -192,7 +192,8 @@ class TsonReadTest {
             throw new IllegalStateException("no schema for " + uri);
         };
         DataNameBinder binder = name -> "point".equals(name) ? Point.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
-        DataBindContext context = AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+        DataBindContext context = DataBindContext.builder().nameBinder(binder)
+                .registerAtoms(AtomContext.hostTypes()).build();
         return Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBindContext(context).build();
     }
 

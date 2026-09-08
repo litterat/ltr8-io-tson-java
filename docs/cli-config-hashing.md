@@ -220,7 +220,7 @@ working binding environment. **Two distinct default contexts, differing by exact
 - `AtomContext.defaultContext()` — the library's built-in atom registrations (`UUID`/`byte[]`/
   `LocalDate`/`OffsetTime`/`OffsetDateTime`/`URI`/`Inet4Address`/`Inet6Address`/`SourcePosition`), **no
   name binder**. The consumer/schemaless default (`Tson.dataBindContext`, `objectReader`/`objectWriter`,
-  and the base a consumer layers their own binder onto). `registerDefaults(builder)` applies the same atom
+  and the base a consumer layers their own binder onto). `registerAtoms(AtomContext.hostTypes())` adds the same atom
   list to any builder, so the list lives in one place.
 - `SchemaMetaNameBinder.defaultContext()` — those same atoms **plus** a `DataNameBinder` scoped to the
   `io.ltr8.tson.schema.meta` namespace. The library's *internal* object-binding-mode resolution context

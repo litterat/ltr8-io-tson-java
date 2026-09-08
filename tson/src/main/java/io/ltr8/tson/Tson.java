@@ -49,7 +49,7 @@ import java.util.Optional;
  * this instance's registry, and registering one identity explicitly twice is an error however many threads
  * are involved -- so two threads resolving the same schema is a race one of them loses, not a way to warm a
  * cache. Resolve every schema the process needs at startup, then read; a {@link
- * io.ltr8.bind.DataBindContext} must likewise not be mutated once reads are running through it. The design
+ * io.ltr8.bind.DataBindContext} needs no such care: its configuration closes when it is built. The design
  * note {@code docs/linking-and-compilation.md} has the mechanics, and {@code ReadPathConcurrencyTest} pins
  * the read-path half.
  *

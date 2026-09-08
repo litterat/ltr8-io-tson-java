@@ -39,20 +39,15 @@ public class UUIDBridgeTest {
 
 	@BeforeEach
 	public void setup() {
-		context = DataBindContext.builder().build();
+		context = DataBindContext.builder().registerAtom(UUID.class, new UUIDBridge()).build();
 	}
 
 	@Test
 	public void checkDescriptor() throws Throwable {
-		context.registerAtom(UUID.class, new UUIDBridge());
-
 	}
 
 	@Test
 	public void testToArray() throws Throwable {
-
-		context.registerAtom(UUID.class, new UUIDBridge());
-
 		// project to an array.
 		ArrayMapper arrayMap = new ArrayMapper(context);
 		Object[] values = arrayMap.toArray(test);
@@ -71,9 +66,6 @@ public class UUIDBridgeTest {
 
 	@Test
 	public void testToMap() throws Throwable {
-
-		context.registerAtom(UUID.class, new UUIDBridge());
-
 		MapMapper mapMapper = new MapMapper(context);
 		Map<String, Object> map = mapMapper.toMap(test);
 

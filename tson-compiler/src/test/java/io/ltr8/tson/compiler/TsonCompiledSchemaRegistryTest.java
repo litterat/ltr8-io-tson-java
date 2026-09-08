@@ -68,7 +68,8 @@ class TsonCompiledSchemaRegistryTest {
 
     @Test
     void bindRegistryReadsAUserSchemaToBoundObjects() {
-        DataBindContext context = AtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
+        DataBindContext context = DataBindContext.builder().nameBinder(MANUAL_BINDER)
+                .registerAtoms(AtomContext.hostTypes()).build();
         TsonCompiledSchemaRegistry bind = TsonCompiledSchemaRegistry.bind(core(), context);
         Object value = bind.get(SCHEMA_ID).get("my_record").read(TestDocuments.document(DATA));
         assertEquals(new MyRecord(7), value);
@@ -78,7 +79,8 @@ class TsonCompiledSchemaRegistryTest {
     void oneCoreBacksBothModes() {
         TsonCompiledMetaRegistry core = core();
         TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core);
-        DataBindContext context = AtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
+        DataBindContext context = DataBindContext.builder().nameBinder(MANUAL_BINDER)
+                .registerAtoms(AtomContext.hostTypes()).build();
         TsonCompiledSchemaRegistry bind = TsonCompiledSchemaRegistry.bind(core, context);
 
         Object treeValue = tree.get(SCHEMA_ID).get("my_record").read(TestDocuments.document(DATA));
@@ -123,7 +125,8 @@ class TsonCompiledSchemaRegistryTest {
 
     @Test
     void anObjectReaderKeepsItsRegistryToo() {
-        DataBindContext context = AtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
+        DataBindContext context = DataBindContext.builder().nameBinder(MANUAL_BINDER)
+                .registerAtoms(AtomContext.hostTypes()).build();
         TsonCompiledSchemaRegistry bind = TsonCompiledSchemaRegistry.bind(core(), context);
 
         assertSame(bind, new TsonObjectReader(bind, context).compiledSchemas());
@@ -137,7 +140,8 @@ class TsonCompiledSchemaRegistryTest {
     @Test
     void aReaderRejectsARegistryOfTheWrongMode() {
         TsonCompiledMetaRegistry core = core();
-        DataBindContext context = AtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
+        DataBindContext context = DataBindContext.builder().nameBinder(MANUAL_BINDER)
+                .registerAtoms(AtomContext.hostTypes()).build();
         TsonCompiledSchemaRegistry tree = TsonCompiledSchemaRegistry.tree(core);
         TsonCompiledSchemaRegistry bind = TsonCompiledSchemaRegistry.bind(core, context);
 

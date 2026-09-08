@@ -907,7 +907,7 @@ two arguments where the tree writer's takes one.
 
 `Tson.builder().build()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
 `bindings(Map)`/`profile(String)` are the short form of the bind context — the map as a name binder chained
-over the kernel's vocabulary, plus `AtomContext.registerDefaults` — and are mutually exclusive with
+over the kernel's vocabulary, plus `AtomContext.hostTypes()` — and are mutually exclusive with
 `dataBindContext`, a profile being fixed when a context is built.
 `resolve(schemaText)` registers a schema by its own `!!id` (no mode — resolution is always bind-anchored);
 `treeRegistry()`/`bindRegistry()` pick the read mode; `objectReader()`/`treeReader()` return schema-aware
@@ -1330,7 +1330,9 @@ compatibility).
   `TsonConfig` themselves** rather than only in the design notes — a consumer reads the front door, not
   `docs/`, and that guarantee is what decides between one instance and one per request
   (`SharedInstanceConcurrencyTest` pins it at that surface). What is still open is everything *outside* a
-  read: registering schemas concurrently, and mutating a `DataBindContext` after use.
+  read: registering schemas concurrently. **Mutating a `DataBindContext` after use is no longer one** —
+  registration is `DataBindContext.Builder`'s and closes when the context is built, so the API cannot
+  express a registration arriving after `getDescriptor` has handed out a descriptor for that class.
 - **§9.1's resource limits** — the policy exists (`LimitsPolicy`, above) and bounds **nesting depth** at
   §9.1's own default of 64. §9.1 now states the whole set as one table with a default each — eleven more on
   the document side — and [TSON-SCHEMA] §11.5 adds five on the schema side under the same policy and the same

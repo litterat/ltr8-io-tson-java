@@ -418,6 +418,27 @@ tson.resolve(schemaText);                      // registers the schema by its ow
 TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
 ```
 
+- **A `DataBindContext`'s configuration closes when it is built.** `registerAtom` is a
+  `DataBindContext.Builder` method, applied once inside the constructor on the thread that builds. It used
+  to be a method on the built context, which made two hazards possible and one of them was real: a
+  registration racing another (fixed with `putIfAbsent`, then guarded by a concurrency test), and a
+  registration arriving after `getDescriptor` had already handed out a descriptor for that class, which no
+  check can undo. Both are gone rather than guarded — the API cannot express the call — which is what closes
+  `BACKLOG.md`'s standing question about mutating a context after use. What is still a race, and still
+  tested, is memoization: `getDescriptor` resolving one class on two threads does the work twice and
+  `putIfAbsent` settles which answer everyone sees. Duplicated work, never duplicated state.
+  - **`registerAtoms(List)` and `AtomContext.hostTypes()` are why this reads well.** The vocabulary is a
+    named list rather than a chain of eleven calls, so a caller adds it to their own builder in the order
+    things happen — `DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())` —
+    instead of wrapping their builder in a helper that returns it. And a test asserting a context carries
+    the vocabulary asserts against that list rather than a second copy of it.
+  - **`DataNameBinder.ofMap` and `orElse`** are the same shape one layer along. `ofMap` is the map lookup
+    done to contract, where `map::get` returns `null` for whichever name the *document* chose and a `null`
+    carries no account of why — `SchemaSource.ofMap`'s own reason. `orElse` composes a caller's names over
+    the kernel's vocabulary and settles which binder authors the failure: the caller's, because a name
+    neither knows is a missing line of *their* configuration, where "not kernel vocabulary" is the
+    backstop's answer and no help at all.
+
 - **Two schema sources ship, and `SchemaAccess` carries the short form of each.** `HttpSchemaSource`
   fetches over HTTPS under a host allow-list; `FileSchemaSource` reads from a directory.
   `SchemaAccess.httpSchemas(…)` and `SchemaAccess.fileSchemas(host, dir)` are the one-call forms, with
@@ -539,7 +560,7 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
 - **`bindings(Map)`/`profile(String)` are the short form of `dataBindContext`**, and mutually exclusive with
   it (a profile is fixed when a context is built, so it cannot apply to one that arrives already built). The
   map becomes a `DataNameBinder` chained over `SchemaMetaNameBinder.INSTANCE` with
-  `AtomContext.registerDefaults` applied — the last being the step nothing reminds a caller of, and the
+  `AtomContext.hostTypes()` registered — the last being the step nothing reminds a caller of, and the
   reason the convenience earns its place. **The map authors the failure**: a name outside it reports
   `bindings(...) maps [...]` with the kernel's own account as the cause, because the chain is a backstop and
   letting the backstop speak reports a missing line of the caller's configuration as "not kernel vocabulary".

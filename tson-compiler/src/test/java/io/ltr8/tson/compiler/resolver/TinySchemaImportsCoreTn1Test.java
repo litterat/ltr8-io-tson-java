@@ -75,7 +75,8 @@ class TinySchemaImportsCoreTn1Test {
     @Test
     void aTinySchemaThatImportsCoreTn1RegistersAndCompilesCleanly() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-        DataBindContext context = AtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
+        DataBindContext context = DataBindContext.builder().nameBinder(MANUAL_BINDER)
+                .registerAtoms(AtomContext.hostTypes()).build();
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(schemaRegistry, context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 
