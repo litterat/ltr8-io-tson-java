@@ -906,15 +906,15 @@ two arguments where the tree writer's takes one.
 ### Front door: `Tson`/`TsonConfig` (`tson` module) — `docs/facades-and-tree.md`
 
 `Tson.builder().build()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
-`dataBinding(DataBinding)` says what a consumer's data binds to and how strictly — a `DataBindContext`
-and the schema-to-class agreement check, one value because they are two arguments to one compile.
-**The vocabulary for building one is `tson-bind`'s, not `TsonConfig`'s**: `DataNameBinder.ofMap(map)`
-over `DataBindContext.builder().registerAtoms(AtomContext.hostTypes())`, with `orElse` composing a
-caller's names over the kernel's own. `DataBinding.lenient()` is where a class may hold fewer fields
-than its schema declares. **What is not part of it is `ignoringUnknownFields`**, which stays a reader
-derivation: nothing is compiled against it, so one endpoint may be lenient about a later version's
-extra fields while another beside it is strict, where the agreement check runs at compile and a reader
-derived afterwards has no answer left to give.
+`dataBindContext(DataBindContext)` says which Java classes the schema's types bind to, and
+`lenientBinding()` whether a class must account for every field its schema declares. **The vocabulary
+for building a context is `tson-bind`'s, not `TsonConfig`'s** — `DataNameBinder.ofMap(map)` over
+`DataBindContext.builder().registerAtoms(AtomContext.hostTypes())`, with `orElse` composing a caller's
+names over the kernel's own — so `bindings`/`profile` are gone from the front door rather than
+restating it. **Strictness is configuration and not a reader derivation**, which is a fact about when
+the check can run rather than a preference: it compares a *compiled* schema against a class, so a
+reader derived afterwards has no answer left to give. Which field a *document* may carry beyond its
+class is the different question `ignoringUnknownFields` asks, per reader, at read time.
 
 ```java
 Tson tson = Tson.builder().build();

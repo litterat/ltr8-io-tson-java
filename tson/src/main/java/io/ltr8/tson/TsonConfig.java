@@ -1,7 +1,6 @@
 package io.ltr8.tson;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.base.bind.DataBinding;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -14,7 +13,6 @@ import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.bind.AtomContext;
-import io.ltr8.tson.base.bind.DataBinding;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 
 import java.util.Map;
@@ -23,14 +21,14 @@ import java.util.Objects;
 /**
  * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
  * directly. {@link #schemaAccess} says where user schemas beyond the bundled standard library come from;
- * {@link #dataBinding} says which Java classes the schema's types bind to and how strictly they must
- * agree; {@link #metaNameBinder} binds a governing meta's own constructors;
+ * {@link #dataBindContext} says which Java classes the schema's types bind to and
+ * {@link #lenientBinding} whether they must account for every field; {@link #metaNameBinder} binds a governing meta's own constructors;
  * {@link #processorPolicy} states what this processor will admit as a name and spend on a document; and
  * {@link #build()}
  * constructs a {@link TsonCompiledMetaRegistry} and has it
  * load the bundled meta-kernel/meta.tn/core.tn standard library, then wraps it as a {@link Tson}.
  *
- * <p>The two binding options are deliberately separate and never merged. {@link #dataBinding} binds
+ * <p>The two binding options are deliberately separate and never merged. {@link #dataBindContext} binds
  * <em>data</em> ({@code order} -> {@code Order}); {@link #metaNameBinder} binds a governing meta's own
  * <em>vocabulary</em> ({@code operation} -> {@code Operation}). One name means different things on the two
  * sides, so one namespace holding both would collide the first time a schema type and a meta-layer
@@ -38,7 +36,8 @@ import java.util.Objects;
  */
 public final class TsonConfig {
 
-    private DataBinding dataBinding = DataBinding.standard();
+    private DataBindContext dataBindContext = AtomContext.defaultContext();
+    private boolean strictBinding = true;
     private SchemaAccess schemaAccess = SchemaAccess.registeredOnly();
     private DataNameBinder metaNameBinder;
     private ProcessorPolicy policy = ProcessorPolicy.defaults();
@@ -73,25 +72,60 @@ public final class TsonConfig {
     }
 
     /**
-     * What the built {@link Tson}'s own {@link Tson#objectReader()}/{@link Tson#objectWriter()} bind
-     * through, and how strictly -- defaults to {@link DataBinding#standard()}.
+     * The {@link DataBindContext} the built {@link Tson}'s own {@link Tson#objectReader()}/{@link
+     * Tson#objectWriter()} bind against -- defaults to {@link AtomContext#defaultContext()}.
      *
-     * <p>The vocabulary for building one is {@code tson-bind}'s and {@link DataBinding}'s rather than this
-     * class's, so there is one place to learn it and one place it can drift:
+     * <p><b>The vocabulary for building one is {@code tson-bind}'s, not this class's</b>, so there is one
+     * place to learn it and one place it can drift:
      *
      * <pre>{@code
-     * DataBinding.of(DataBindContext.builder()
-     *         .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class)))
+     * DataBindContext.builder()
+     *         .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class)).orElse(kernelVocabulary))
      *         .registerAtoms(AtomContext.hostTypes())
-     *         .build())
+     *         .build()
      * }</pre>
+     *
+     * <p><b>A context's configuration is fixed once it is built</b>, so a context handed here cannot acquire
+     * a binding later: {@code registerAtom} is {@link DataBindContext.Builder}'s and closes at
+     * {@code build()}. What stays concurrent is the descriptor cache, where two threads resolving one class
+     * both do the work and one answer wins -- duplicated work on a race, never duplicated state.
      *
      * <p>Unrelated to (and never overriding) the object-binding-mode context {@link #build()} always uses
      * internally to resolve the standard library itself -- see {@link Tson}'s own Javadoc for why that one's
      * mode is fixed, and {@link #metaNameBinder} for the one thing about it a consumer may extend.
      */
-    public TsonConfig dataBinding(DataBinding dataBinding) {
-        this.dataBinding = Objects.requireNonNull(dataBinding, "dataBinding");
+    public TsonConfig dataBindContext(DataBindContext dataBindContext) {
+        this.dataBindContext = Objects.requireNonNull(dataBindContext, "dataBindContext");
+        return this;
+    }
+
+    /**
+     * Lets a bound class hold fewer fields than the schema declares, silently -- off by default.
+     *
+     * <p>By default the two must agree, and a mismatch is a {@link BindMismatchException} when the schema is
+     * compiled in bind mode, which is startup for anything compiling its schemas once. <b>That is why this
+     * is configuration and not a reader derivation</b>: the check compares a compiled schema against a
+     * class, so a reader derived afterwards has no answer left to give. Which field a <em>document</em> may
+     * carry beyond its class is the different question {@code TsonObjectReader.ignoringUnknownFields} asks,
+     * per reader, at read time.
+     *
+     * <p>The strict default is the asymmetry between the two ways of being wrong: a strict reader that is
+     * wrong says so at startup, in one message naming both sides, and is fixed in minutes; a lenient one
+     * that is wrong drops a value from every document and surfaces much later as a field that mysteriously
+     * holds its default.
+     *
+     * <p>Leniency is a real position and not merely an escape hatch -- versioned evolution, where a v1
+     * consumer deliberately reads a v2 document and means to ignore what it does not know. This is where
+     * that intention is written down, and it is the only path on which a field is dropped at all, every
+     * other mismatch being settled before a document exists. It is silent by necessity: reporting abandons
+     * the construction, so a lenient reader that reported would hand back nothing for exactly the documents
+     * it exists to accept.
+     *
+     * <p>The narrower alternative is {@code @Unbound} on the one component that is the class's own business
+     * rather than the wire's.
+     */
+    public TsonConfig lenientBinding() {
+        this.strictBinding = false;
         return this;
     }
 
@@ -107,7 +141,7 @@ public final class TsonConfig {
      * names and gives up nothing -- in particular not the object-binding mode the standard library must be
      * compiled in (see {@link Tson}), which is what {@code build()} fixes and this does not touch.
      *
-     * <p>Distinct from {@link #dataBinding}, which binds the <em>data</em> a schema describes; this
+     * <p>Distinct from {@link #dataBindContext}, which binds the <em>data</em> a schema describes; this
      * binds the <em>schema vocabulary</em> a meta describes. A consumer with both supplies both.
      */
     public TsonConfig metaNameBinder(DataNameBinder metaNameBinder) {
@@ -251,6 +285,6 @@ public final class TsonConfig {
         SchemaSource source = schemaAccess.source();
         TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
                 schemaContext, source, policy.identifierPolicy());
-        return new Tson(core, dataBinding, policy);
+        return new Tson(core, dataBindContext, strictBinding, policy);
     }
 }

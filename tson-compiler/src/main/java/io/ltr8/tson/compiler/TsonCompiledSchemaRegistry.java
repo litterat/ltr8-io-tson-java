@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.base.bind.DataBinding;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.compiler.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.base.CanonicalIdentity;
@@ -76,16 +75,7 @@ public final class TsonCompiledSchemaRegistry {
      * that mapping.
      */
     public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBindContext context) {
-        return bind(core, DataBinding.of(context));
-    }
-
-    /**
-     * Compiles in object-binding mode under {@code binding} -- the context to bind through and whether a
-     * class must account for every field its schema declares, which are one value because the compile checks
-     * them against each other.
-     */
-    public static TsonCompiledSchemaRegistry bind(TsonCompiledMetaRegistry core, DataBinding binding) {
-        return bind(core, binding.context(), binding.strict());
+        return bind(core, context, true);
     }
 
     /**

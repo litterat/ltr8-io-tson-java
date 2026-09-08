@@ -1,6 +1,5 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.bind.DataBinding;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -94,7 +93,7 @@ class Class2ConformanceSuiteTest {
         // `!!import` a fixture: the link layer's §2.2.3 vectors need a second schema document, and the
         // corpus publishes those under its own identity prefix rather than inventing a file convention.
         return Tson.builder()
-                .dataBinding(DataBinding.of(SchemaMetaNameBinder.defaultContext()))
+                .dataBindContext(SchemaMetaNameBinder.defaultContext())
                 .schemaAccess(SchemaAccess.of(Class2ConformanceSuiteTest::fetchSuiteSchema))
                 .build();
     }

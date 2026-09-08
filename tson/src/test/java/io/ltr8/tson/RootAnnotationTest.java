@@ -1,6 +1,5 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.bind.DataBinding;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.Annotations;
@@ -113,8 +112,8 @@ class RootAnnotationTest {
 
         DataNameBinder binder = name -> "api".equals(name) ? Api.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
-                .dataBinding(DataBinding.of(DataBindContext.builder().nameBinder(binder)
-                        .registerAtoms(AtomContext.hostTypes()).build()))
+                .dataBindContext(DataBindContext.builder().nameBinder(binder)
+                        .registerAtoms(AtomContext.hostTypes()).build())
                 .build();
 
         Api api = tson.objectReader().read(document, Api.class);

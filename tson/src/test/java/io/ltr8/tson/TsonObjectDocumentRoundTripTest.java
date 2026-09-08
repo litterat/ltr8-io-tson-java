@@ -3,7 +3,6 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
-import io.ltr8.tson.base.bind.DataBinding;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -52,9 +51,12 @@ class TsonObjectDocumentRoundTripTest {
 
     private static Tson tson() {
         SchemaSource source = uri -> SCHEMA;
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBinding(DataBinding.of(DataBindContext.builder()
-                        .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class)).orElse(SchemaMetaNameBinder.INSTANCE))
-                        .registerAtoms(AtomContext.hostTypes()).build())).build();
+        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source))
+                .dataBindContext(DataBindContext.builder()
+                        .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class))
+                                .orElse(SchemaMetaNameBinder.INSTANCE))
+                        .registerAtoms(AtomContext.hostTypes()).build())
+                .build();
         tson.resolve(SCHEMA);
         return tson;
     }

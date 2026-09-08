@@ -1,6 +1,5 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.bind.DataBinding;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.bind.DataBindContext;
@@ -196,7 +195,7 @@ class TsonReadTest {
         DataNameBinder binder = name -> "point".equals(name) ? Point.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
         DataBindContext context = DataBindContext.builder().nameBinder(binder)
                 .registerAtoms(AtomContext.hostTypes()).build();
-        return Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBinding(DataBinding.of(context)).build();
+        return Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBindContext(context).build();
     }
 
     @Test

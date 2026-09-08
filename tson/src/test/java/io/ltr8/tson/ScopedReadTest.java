@@ -3,7 +3,6 @@ package io.ltr8.tson;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
-import io.ltr8.tson.base.bind.DataBinding;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -333,10 +332,11 @@ class ScopedReadTest {
     @Test
     void bindModeReadsAPushedValueIntoTheClassTheForeignTypeNames() {
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SOURCE))
-                .dataBinding(DataBinding.of(DataBindContext.builder()
+                .dataBindContext(DataBindContext.builder()
                         .nameBinder(DataNameBinder.ofMap(Map.of("pinpoint", Pinpoint.class, "claim", Claim.class))
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
-                        .registerAtoms(AtomContext.hostTypes()).build())).build();
+                        .registerAtoms(AtomContext.hostTypes()).build())
+                .build();
 
         Pinpoint read = tson.objectReader().read("!!schema:\"" + HOST + "\"\n!pinpoint { one: "
                 + "!!schema:\"" + CLAIM + "\" !claim { id: CLM-1  amount: 450 } }", Pinpoint.class);

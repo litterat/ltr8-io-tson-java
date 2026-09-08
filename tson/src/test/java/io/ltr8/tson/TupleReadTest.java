@@ -1,6 +1,5 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.bind.DataBinding;
 
 import io.ltr8.annotation.Tuple;
 import io.ltr8.bind.DataBindContext;
@@ -172,7 +171,7 @@ class TupleReadTest {
         DataNameBinder binder = name -> "pair".equals(name) ? Pair.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
         DataBindContext context =
                 DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
-        return Tson.builder().dataBinding(DataBinding.of(context)).build();
+        return Tson.builder().dataBindContext(context).build();
     }
 
     /** The same schema through {@code TupleBindReader}: a real, positionally-bound Java object, not a node. */

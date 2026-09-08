@@ -1,6 +1,5 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.bind.DataBinding;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.Unbound;
@@ -75,11 +74,10 @@ class BindStrictnessTest {
     private static Tson tson(String schema, Class<?> bound, boolean lenient) {
         SchemaSource source = uri -> schema;
         DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
-        DataBinding binding = DataBinding.of(DataBindContext.builder().nameBinder(binder)
-                .registerAtoms(AtomContext.hostTypes()).build());
-        return Tson.builder().schemaAccess(SchemaAccess.of(source))
-                .dataBinding(lenient ? binding.lenient() : binding)
-                .build();
+        TsonConfig config = Tson.builder().schemaAccess(SchemaAccess.of(source))
+                .dataBindContext(DataBindContext.builder().nameBinder(binder)
+                        .registerAtoms(AtomContext.hostTypes()).build());
+        return (lenient ? config.lenientBinding() : config).build();
     }
 
     private static Object read(Tson tson, Class<?> bound, DiagnosticsReceiver receiver) {
@@ -115,7 +113,7 @@ class BindStrictnessTest {
 
     /**
      * {@code @Unbound} is that way, and it is per component rather than per read -- the narrow answer where
-     * {@link io.ltr8.tson.base.bind.DataBinding#lenient} is the broad one. An {@code Optional} component arrives empty rather
+     * {@link TsonConfig#lenientBinding} is the broad one. An {@code Optional} component arrives empty rather
      * than null, the bind engine wrapping it as it does any other.
      */
     @Test

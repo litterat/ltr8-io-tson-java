@@ -1,7 +1,6 @@
 package io.ltr8.tson;
 
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.base.bind.DataBinding;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -68,21 +67,21 @@ class BindingsConfigTest {
             """;
 
     /** The binding these tests configure: a map over the kernel's vocabulary, with the atoms registered. */
-    private static DataBinding binding(Map<String, Class<?>> names, String profile) {
+    private static DataBindContext binding(Map<String, Class<?>> names, String profile) {
         DataBindContext.Builder builder = DataBindContext.builder()
                 .nameBinder(DataNameBinder.ofMap(names).orElse(SchemaMetaNameBinder.INSTANCE))
                 .registerAtoms(AtomContext.hostTypes());
         if (profile != null) {
             builder.profile(profile);
         }
-        return DataBinding.of(builder.build());
+        return builder.build();
     }
 
     /** The whole configuration, in one call each. The {@code datetime} field also pins that atoms are bound. */
     @Test
     void bindingsIsTheWholeConfiguration() {
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SOURCE))
-                .dataBinding(binding(Map.of("order", Order.class), null)).build();
+                .dataBindContext(binding(Map.of("order", Order.class), null)).build();
 
         Order order = tson.objectReader().read(DOC, Order.class);
 
@@ -95,7 +94,7 @@ class BindingsConfigTest {
     @Test
     void anUnmappedNameNamesTheMap() {
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> SHORT_SCHEMA.replace("order =>", "invoice =>")))
-                .dataBinding(binding(Map.of("order", Order.class), null)).build();
+                .dataBindContext(binding(Map.of("order", Order.class), null)).build();
 
         MissingBindingException thrown = assertThrows(MissingBindingException.class,
                 () -> tson.objectReader().read("""
@@ -117,7 +116,7 @@ class BindingsConfigTest {
     @Test
     void profileReachesTheBinder() {
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> SHORT_SCHEMA))
-                .dataBinding(binding(Map.of("order", Order.class), "orders-1")).build();
+                .dataBindContext(binding(Map.of("order", Order.class), "orders-1")).build();
 
         Order order = tson.objectReader().read("""
                 !!schema:"https://example.test/orders.tn"
@@ -139,7 +138,7 @@ class BindingsConfigTest {
     @Test
     void aMissingBindingIsAMisconfigurationNotAGap() {
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> SHORT_SCHEMA))
-                .dataBinding(binding(Map.of(), null)).build();
+                .dataBindContext(binding(Map.of(), null)).build();
 
         MissingBindingException thrown = assertThrows(MissingBindingException.class,
                 () -> tson.objectReader().read("""
