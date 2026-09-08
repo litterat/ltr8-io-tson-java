@@ -1,4 +1,5 @@
 package io.ltr8.tson.compiler.reader;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Unbound;

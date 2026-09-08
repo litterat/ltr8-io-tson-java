@@ -59,7 +59,7 @@ values. `scripts/restamp-bundled-schemas.sh` does the digest half — every pin 
 order, plus the getting-started example, which pins meta and core and so has a digest of its own that moves
 with them; `--check` reports staleness and writes nothing. **The digests are not a test-only concern**: the
 library verifies the packaged bytes against `TsonBundledSchemas`' held digest on every load, so one stale
-constant fails `Tson.builder().build()` and with it most of the suite. Restamping after each edit is what
+constant fails `Tson.standard()` and with it most of the suite. Restamping after each edit is what
 lets a schema change land across several commits with the integrity checks left on.
 
 **The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
@@ -264,6 +264,11 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `SchemaAccess` collecting a source with the `FetchPolicy` governing it. [TSON-JSON]
   §10.4 names that as the restriction an application processing untrusted input sets, which makes it
   configuration like the policies rather than machinery like an encoding's reader.
+  **`TsonConfig` sits at the root**, beside the values it holds: one immutable value naming what a
+  deployment states -- the policy, the schema access, the bind context, and the one seam into the meta
+  vocabulary -- with every setting returning a new instance, so a configuration may be handed out and
+  derived from without the holder losing what they stated. Construction is not here and cannot be: it names
+  the compiler's registry, which is why `Tson.of(config)` lives with the engine.
   **`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to — `Rational`, `Complex`,
   `CidrNetwork`, `InternetAddress` — the question a consumer arrives with rather than part of §8's model, and
   pure values depending on nothing. **`io.ltr8.tson.base.bind`** is what a deployment binds with:
@@ -358,9 +363,12 @@ module has a real `module-info.java`; module names mirror each module's root exp
   config/wiring. Everything here is tightly coupled to the shared lexer/token-stream machinery, so it's
   one module. Root package `io.ltr8.tson.compiler`; exports the packages with real cross-module callers
   and keeps `reader`/`atom`/`base`/`lexer` internal.
-- **`tson`** — the small front-door module (`Tson`/`TsonConfig`) over `tson-compiler`, the way Retrofit
-  sits on OkHttp. Declares `tson-compiler`/`tson-schema`/`tson-bind`/`tson-tree` as `api` so a caller sees
-  the real classes underneath.
+- **`tson`** — the front door, and now **one class**: `Tson`, over `tson-compiler`, the way Retrofit sits on
+  OkHttp. Declares `tson-compiler`/`tson-schema`/`tson-bind`/`tson-tree` as `api` so a caller sees the real
+  classes underneath. **`TsonConfig` is not here** — a configuration is a value stating what a deployment
+  chose, so it sits in `tson-base` with the values it holds and is shared by every encoding; what cannot
+  follow it is construction, which names the compiler's own registry. Hence `Tson.of(config)`, and
+  `Tson.standard()` for the unconfigured case.
 - **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree and readers. A
   separate stack rather than a front end over `tson-compiler`'s `TsonEventSource` — see "Not yet implemented"
   for the two disagreements that decide it. The **tree model follows [JEP 540](https://openjdk.org/jeps/540)**
@@ -907,7 +915,7 @@ two arguments where the tree writer's takes one.
 
 ### Front door: `Tson`/`TsonConfig` (`tson` module) — `docs/facades-and-tree.md`
 
-`Tson.builder().build()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
+`Tson.standard()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
 `dataBindContext(DataBindContext)` says which Java classes the schema's types bind to. **The vocabulary
 for building a context is `tson-bind`'s, not `TsonConfig`'s** — `DataNameBinder.ofMap(map)` over
 `DataBindContext.builder().registerAtoms(AtomContext.hostTypes())`, with `orElse` composing a caller's
@@ -918,7 +926,7 @@ reader derived afterwards has no answer left to give. Which field a *document* m
 class is the different question `ignoringUnknownFields` asks, per reader, at read time.
 
 ```java
-Tson tson = Tson.builder().build();
+Tson tson = Tson.standard();
 tson.resolve(schemaText);                      // registers the schema by its own !!id
 TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
 ```

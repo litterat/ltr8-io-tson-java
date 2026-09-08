@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.Unbound;
@@ -70,10 +71,9 @@ class BindStrictnessTest {
     private static Tson tson(String schema, Class<?> bound) {
         SchemaSource source = uri -> schema;
         DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
-        return Tson.builder().schemaAccess(SchemaAccess.of(source))
-                .dataBindContext(DataBindContext.builder().nameBinder(binder)
-                        .registerAtoms(AtomContext.hostTypes()).build())
-                .build();
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
+                .withDataBindContext(DataBindContext.builder().nameBinder(binder)
+                        .registerAtoms(AtomContext.hostTypes()).build()));
     }
 
     private static Object read(Tson tson, Class<?> bound, DiagnosticsReceiver receiver) {

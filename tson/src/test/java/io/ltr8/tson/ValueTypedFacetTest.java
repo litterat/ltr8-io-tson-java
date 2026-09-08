@@ -38,7 +38,7 @@ class ValueTypedFacetTest {
     }
 
     private static List<Diagnostic> loading(String declarations) {
-        return Tson.builder().build().validateSchema(schemaDeclaring(declarations));
+        return Tson.standard().validateSchema(schemaDeclaring(declarations));
     }
 
     // ── every family's bound binds ───────────────────────────────────────
@@ -59,13 +59,13 @@ class ValueTypedFacetTest {
     void aBoundThatLoadsAlsoRefusesADocument() {
         // The point of the fix, and the half a resolution test cannot show: the bound reaches the compiled
         // reader and decides a read. `multiple_of` ignores sign, so the magnitude is what is tested.
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         String schema = schemaDeclaring("""
                 slot => !duration ^ { min: PT30M  max: PT2H  multiple_of: PT15M }
                   box => { d: slot }""");
         // A fresh instance for the load check: validateSchema registers what it validated, and resolve
         // refuses a second registration under one identity.
-        assertEquals(List.of(), Tson.builder().build().validateSchema(schema));
+        assertEquals(List.of(), Tson.standard().validateSchema(schema));
         tson.resolve(schema);
         String id = schema.split("\"")[1];
 
@@ -82,7 +82,7 @@ class ValueTypedFacetTest {
     void oneValueWrittenTwoWaysIsOneBound() {
         // The bound compares the value and never the token (§5.5), which is only testable now that a bound
         // binds at all: PT1H30M and PT90M are the same duration and the same ceiling.
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         String schema = schemaDeclaring("""
                 slot => !duration ^ { max: PT1H30M }
                   box => { d: slot }""");

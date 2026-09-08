@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
@@ -43,7 +44,7 @@ class TsonTest {
      */
     @Test
     void rejectsASchemaThatNamesATypeLibraryAsItsMeta() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> tson.resolve("""
@@ -59,7 +60,7 @@ class TsonTest {
 
     @Test
     void resolvesAndCompilesATinySchemaThatImportsCoreTn1() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
 
         TsonLinkedSchema linked = tson.resolve(TINY_DOCUMENT);
         // Merged view: the two local declarations, plus core.tn's own 51 imported entries --
@@ -90,7 +91,7 @@ class TsonTest {
      */
     @Test
     void resolvingKeepsEachDeclarationsOwnSourcePosition() {
-        TsonLinkedSchema linked = Tson.builder().build().resolve(TINY_DOCUMENT);
+        TsonLinkedSchema linked = Tson.standard().resolve(TINY_DOCUMENT);
 
         // Declared on lines 5 and 6 of TINY_DOCUMENT (1-based, counting the three header lines and `{`).
         assertEquals(5, linked.schema().entries().get("my_int").position().orElseThrow().line());
@@ -100,7 +101,7 @@ class TsonTest {
     /** An imported entry keeps its *own* schema's position, not one relative to the importer. */
     @Test
     void anImportedEntryKeepsThePositionItsOwnSchemaGaveIt() {
-        TsonLinkedSchema linked = Tson.builder().build().resolve(TINY_DOCUMENT);
+        TsonLinkedSchema linked = Tson.standard().resolve(TINY_DOCUMENT);
 
         // int32 comes from core.tn, which declares it far below this three-line document could reach.
         int int32Line = linked.schema().entries().get("int32").position().orElseThrow().line();
@@ -109,7 +110,7 @@ class TsonTest {
 
     @Test
     void resolveThenCompileThroughTheTreeRegistry() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
 
         TsonCompiledSchema compiled = tson.treeRegistry().compile(tson.resolve(TINY_DOCUMENT));
 
@@ -119,7 +120,7 @@ class TsonTest {
 
     @Test
     void theStandardLibraryItselfIsReachableThroughTheLoader() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
 
         TsonCompiledMetaSchema meta = tson.loader().loadMeta(TsonBundledSchemas.META_ID);
 
@@ -129,14 +130,14 @@ class TsonTest {
     @Test
     void objectReaderAndWriterAreBoundToTheConfiguredDataBindContext() {
         DataBindContext context = DataBindContext.builder().build();
-        Tson tson = Tson.builder().dataBindContext(context).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withDataBindContext(context));
 
         assertSame(context, tson.dataBindContext());
     }
 
     @Test
     void objectReaderIsUsableWithTheDefaultDataBindContext() throws Exception {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         assertNotNull(tson.dataBindContext());
 
         TsonObjectReader reader = tson.objectReader();

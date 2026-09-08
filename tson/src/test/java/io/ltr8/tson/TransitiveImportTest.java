@@ -58,7 +58,7 @@ class TransitiveImportTest {
      */
     @Test
     void aSchemaMayImportTwoSchemasThatBothImportCore() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leaf("https://example.test/a-1.tn", "alpha"));
         tson.resolve(leaf("https://example.test/b-1.tn", "beta"));
 
@@ -79,7 +79,7 @@ class TransitiveImportTest {
     /** The same diamond with core.tn named explicitly too -- a third route to the same entries, still one set. */
     @Test
     void aSchemaMayImportCoreAlongsideTwoSchemasThatAlsoImportIt() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leaf("https://example.test/a-2.tn", "alpha"));
         tson.resolve(leaf("https://example.test/b-2.tn", "beta"));
 
@@ -104,7 +104,7 @@ class TransitiveImportTest {
      */
     @Test
     void aNameReachedThroughAnImportsOwnImportIsInScope() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leaf("https://example.test/a-3.tn", "alpha"));
 
         List<Diagnostic> problems = tson.validateSchema("""
@@ -123,7 +123,7 @@ class TransitiveImportTest {
     /** Listing one schema twice is redundant, not a collision with itself. */
     @Test
     void oneSchemaNamedTwiceIsRedundantNotACollision() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/dup-1.tn"
@@ -148,7 +148,7 @@ class TransitiveImportTest {
      */
     @Test
     void twoDifferentSchemasDeclaringOneNameCollideEvenWhenReachedTransitively() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leaf("https://example.test/shared-32.tn", "widget"));
         tson.resolve(leaf("https://example.test/shared-33.tn", "widget"));
         tson.resolve(derived("https://example.test/p-1.tn", "https://example.test/shared-32.tn", "panel"));
@@ -180,7 +180,7 @@ class TransitiveImportTest {
      */
     @Test
     void aLocalDeclarationMayNotShadowANameReachedThroughAnImportsOwnImport() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leaf("https://example.test/a-4.tn", "alpha"));
 
         List<Diagnostic> problems = tson.validateSchema("""
@@ -200,7 +200,7 @@ class TransitiveImportTest {
     /** The importer's own new material still resolves normally -- the control. */
     @Test
     void anImportsOwnDeclarationsAreInScope() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leaf("https://example.test/a-5.tn", "alpha"));
 
         List<Diagnostic> problems = tson.validateSchema("""
@@ -218,7 +218,7 @@ class TransitiveImportTest {
     /** The fail-fast {@link Tson#resolve} path is governed by the same rule, not only the collecting one. */
     @Test
     void theFailFastResolvePathAcceptsTheDiamondToo() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leaf("https://example.test/a-6.tn", "alpha"));
         tson.resolve(leaf("https://example.test/b-6.tn", "beta"));
 
@@ -259,7 +259,7 @@ class TransitiveImportTest {
      */
     @Test
     void aPinnedAndAnUnpinnedRouteToOneSchemaUnifyAndTheImporterNeedsNeither() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leafPinningCore("https://example.test/a-pin.tn", "alpha"));
         tson.resolve(leaf("https://example.test/b-nopin.tn", "beta"));
 
@@ -280,7 +280,7 @@ class TransitiveImportTest {
     /** Importing core.tn unpinned is fine where a peer pins it -- the importer chooses its own spelling. */
     @Test
     void theImporterMayNameCoreUnpinnedWhereItsPeerPinsIt() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leafPinningCore("https://example.test/a-pin-2.tn", "alpha"));
 
         List<Diagnostic> problems = tson.validateSchema("""
@@ -299,7 +299,7 @@ class TransitiveImportTest {
     /** And the reverse: the importer may pin where its peer does not. */
     @Test
     void theImporterMayPinCoreWhereItsPeerDoesNot() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leaf("https://example.test/b-nopin-2.tn", "beta"));
 
         List<Diagnostic> problems = tson.validateSchema("""
@@ -321,7 +321,7 @@ class TransitiveImportTest {
      */
     @Test
     void aPinThatDisagreesWithTheContentIsStillRejected() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(leaf("https://example.test/b-nopin-3.tn", "beta"));
 
         String wrongPin = "0".repeat(64);

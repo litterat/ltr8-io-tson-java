@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.HttpSchemaSource;
@@ -93,7 +94,7 @@ class HttpSchemaSourceThroughTsonTest {
     void aDocumentNamingAnHttpSchemaResolvesAndValidates() {
         String schemaUri = "https://" + HOST + "/2026/35/app/order-1.tn";
         try (HttpSchemaSource source = source()) {
-            Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
+            Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
             tson.resolve(source.fetch(schemaUri));
 
             TsonValue order = tson.treeReader().read("""
@@ -131,7 +132,7 @@ class HttpSchemaSourceThroughTsonTest {
             }
         };
 
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(counting)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(counting)));
         tson.resolve(DERIVED);
 
         assertTrue(maxDepth.get() > 0, "the import must actually have been fetched");
@@ -153,7 +154,7 @@ class HttpSchemaSourceThroughTsonTest {
                     // which is the invariant this project states everywhere. What is shared here is the origin.
                     try (HttpSchemaSource source = source()) {
                         start.await();
-                        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
+                        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
                         assertEquals(java.util.List.of(), tson.validateSchema(DERIVED));
                     } catch (Throwable t) {
                         failures.add(t);

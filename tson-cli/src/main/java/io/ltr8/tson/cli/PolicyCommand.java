@@ -1,4 +1,5 @@
 package io.ltr8.tson.cli;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.Tson;
 
@@ -32,7 +33,7 @@ final class PolicyCommand {
     static int run(OutputFormat format, PolicyOptions policies) {
         // Through a real Tson rather than from the flags directly: this prints what a read would actually be
         // judged under, which is the question, and the two would only ever agree by inspection otherwise.
-        Tson tson = policies.applyTo(Tson.builder()).build();
+        Tson tson = Tson.of(policies.applyTo(TsonConfig.defaults()));
         System.out.println(format.render(CliPolicy.from(tson.processorPolicy())));
         return 0;
     }

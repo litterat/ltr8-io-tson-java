@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -33,7 +34,7 @@ class SchemaPolicyRefusalTest {
     }
 
     private static List<Diagnostic> refusals(String declarations) {
-        List<Diagnostic> problems = Tson.builder().build().validateSchema("""
+        List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/refusal.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!import:"https://tson.io/2026/35/m/core.tn"
@@ -107,7 +108,7 @@ class SchemaPolicyRefusalTest {
      */
     @Test
     void theInstanceStatesThePolicyThatRefusedTheName() {
-        Tson tson = Tson.builder().identifierPolicy(UnicodePolicy.asciiOnly()).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withIdentifierPolicy(UnicodePolicy.asciiOnly()));
 
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, tson.validateSchema("""
                 !!id:"https://example.test/refusal-policy.tn"
@@ -134,13 +135,12 @@ class SchemaPolicyRefusalTest {
         String document = "!p" + CYR_A + "y 1";
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT, Diagnostic.Code.UNKNOWN_TYPE_REF),
-                Tson.builder().build().validate(document).stream().map(Diagnostic::code).toList(),
+                Tson.standard().validate(document).stream().map(Diagnostic::code).toList(),
                 "the default policy refuses a mixed-script type-ref");
 
-        List<Diagnostic> relaxed = Tson.builder()
-                .identifierPolicy(UnicodePolicy.highlyRestrictive()
-                        .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC))
-                .build()
+        List<Diagnostic> relaxed = Tson.of(TsonConfig.defaults()
+                        .withIdentifierPolicy(UnicodePolicy.highlyRestrictive()
+                                .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC)))
                 .validate(document);
 
         assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),

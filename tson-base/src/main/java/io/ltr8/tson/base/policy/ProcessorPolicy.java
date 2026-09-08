@@ -1,4 +1,5 @@
 package io.ltr8.tson.base.policy;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 

@@ -1,4 +1,5 @@
 package io.ltr8.tson.compiler.reader;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;

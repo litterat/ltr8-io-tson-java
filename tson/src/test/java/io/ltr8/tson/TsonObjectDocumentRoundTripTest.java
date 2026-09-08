@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -48,12 +49,11 @@ class TsonObjectDocumentRoundTripTest {
 
     private static Tson tson() {
         SchemaSource source = uri -> SCHEMA;
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source))
-                .dataBindContext(DataBindContext.builder()
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
+                .withDataBindContext(DataBindContext.builder()
                         .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class))
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
-                        .registerAtoms(AtomContext.hostTypes()).build())
-                .build();
+                        .registerAtoms(AtomContext.hostTypes()).build()));
         tson.resolve(SCHEMA);
         return tson;
     }

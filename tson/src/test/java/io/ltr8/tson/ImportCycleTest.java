@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -54,7 +55,7 @@ class ImportCycleTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
     }
 
     private String rejected(String uri) {

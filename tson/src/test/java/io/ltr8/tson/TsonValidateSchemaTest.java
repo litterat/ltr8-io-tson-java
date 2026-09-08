@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
@@ -30,7 +31,7 @@ class TsonValidateSchemaTest {
             """;
 
     private static List<Diagnostic> check(String body) {
-        return Tson.builder().build().validateSchema(HEADER + body);
+        return Tson.standard().validateSchema(HEADER + body);
     }
 
     /**
@@ -47,7 +48,7 @@ class TsonValidateSchemaTest {
             throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,
                     "not an allowed host", null);
         };
-        List<Diagnostic> problems = Tson.builder().schemaAccess(SchemaAccess.of(refusing)).build().validateSchema("""
+        List<Diagnostic> problems = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(refusing))).validateSchema("""
                 !!id:"https://example.test/importer.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!import:"https://example.test/nowhere.tn"
@@ -418,7 +419,7 @@ class TsonValidateSchemaTest {
     /** Never throws for a bad input document -- malformed syntax comes back as a diagnostic like anything else. */
     @Test
     void malformedSyntaxIsADiagnosticNotAnException() {
-        List<Diagnostic> problems = Tson.builder().build().validateSchema(HEADER + "{ oops => ");
+        List<Diagnostic> problems = Tson.standard().validateSchema(HEADER + "{ oops => ");
 
         assertFalse(problems.isEmpty());
     }
@@ -473,7 +474,7 @@ class TsonValidateSchemaTest {
     /** A document-level problem carries RFC 6901's root pointer rather than naming a declaration. */
     @Test
     void anUnloadableImportIsReportedAgainstTheDocument() {
-        List<Diagnostic> problems = Tson.builder().build().validateSchema("""
+        List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/bad-import.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!import:"https://example.test/nothing-here.tn"
@@ -497,14 +498,13 @@ class TsonValidateSchemaTest {
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { widget => { name: text } }
                 """;
-        Tson tson = Tson.builder()
-                .schemaAccess(SchemaAccess.of(uri -> {
+        Tson tson = Tson.of(TsonConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(uri -> {
                     if (uri.equals("https://example.test/fetched-as.tn")) {
                         return lib;
                     }
                     throw new IllegalStateException("no schema for " + uri);
-                }))
-                .build();
+                })));
 
         List<Diagnostic> problems = tson.validateSchema("""
                 !!id:"https://example.test/mismatched-import.tn"
@@ -521,7 +521,7 @@ class TsonValidateSchemaTest {
     /** A schema that failed is not registered, so a later call can't find a half-resolved entry from it. */
     @Test
     void aFailedSchemaIsNotRegistered() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
 
         assertFalse(tson.validateSchema(HEADER + "{ widens => !uint8 ^ { min: -10 } }").isEmpty());
         assertTrue(tson.schemaRegistry().get("https://example.test/validate-schema-test.tn").isEmpty());

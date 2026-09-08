@@ -28,7 +28,7 @@ class BundledSchemaPinTest {
 
     @Test
     void aCorrectlyPinnedReferenceToEachBundledSchemaVerifies() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         assertDoesNotThrow(() -> {
             // meta-kernel and meta.tn are governing metas (loadMeta); core.tn is a non-meta import (resolveLinked).
             tson.loader().loadMeta(TsonBundledSchemas.META_KERNEL_ID + "?sha256=" + TsonBundledSchemas.META_KERNEL_SHA256);
@@ -39,7 +39,7 @@ class BundledSchemaPinTest {
 
     @Test
     void aWrongPinToABundledSchemaIsRejected() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         assertThrows(ContentHashMismatchException.class, () ->
                 tson.loader().resolveLinked(TsonBundledSchemas.CORE_ID + "?sha256=" + "a".repeat(64)));
     }
@@ -53,7 +53,7 @@ class BundledSchemaPinTest {
      */
     @Test
     void aWrongPinIsRejectedEvenOnceTheSchemaIsCompiledAndCached() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         String pinned = TsonBundledSchemas.CORE_ID + "?sha256=" + TsonBundledSchemas.CORE_SHA256;
 
         assertDoesNotThrow(() -> tson.treeRegistry().get(pinned));   // compiles, and caches by identity

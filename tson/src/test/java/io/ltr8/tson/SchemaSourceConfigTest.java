@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.TsonConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.FileSchemaSource;
@@ -48,7 +49,7 @@ class SchemaSourceConfigTest {
     void fileSchemasServesADocumentEndToEnd(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
 
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.fileSchemas(HOST, dir)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.fileSchemas(HOST, dir)));
         TsonValue order = tson.treeReader().read(DOCUMENT);
 
         assertEquals("ABC-1", order.get("sku").asString().orElseThrow());
@@ -63,7 +64,7 @@ class SchemaSourceConfigTest {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
         FileSchemaSource source = FileSchemaSource.builder().mapHost(HOST, dir).build();
 
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
         tson.resolve(source.fetch(SCHEMA_URI));
 
         assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
@@ -85,12 +86,11 @@ class SchemaSourceConfigTest {
         String otherUri = "https://other.example.test/thing-1.tn";
         Files.writeString(second.resolve("thing-1.tn"), SCHEMA.replace(SCHEMA_URI, otherUri));
 
-        Tson tson = Tson.builder()
-                .schemaAccess(SchemaAccess.builder()
+        Tson tson = Tson.of(TsonConfig.defaults()
+                .withSchemaAccess(SchemaAccess.builder()
                         .fileSchemas(HOST, first)
                         .fileSchemas("other.example.test", second)
-                        .build())
-                .build();
+                        .build()));
 
         assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
         assertEquals(List.of(), tson.validate(DOCUMENT.replace(SCHEMA_URI, otherUri)));
@@ -100,7 +100,7 @@ class SchemaSourceConfigTest {
     @Test
     void anUnnamedHostIsNotServed(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.fileSchemas("elsewhere.example.test", dir)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.fileSchemas("elsewhere.example.test", dir)));
 
         assertTrue(tson.validate(DOCUMENT).stream()
                 .anyMatch(d -> d.message().contains("is not one of")), () -> tson.validate(DOCUMENT).toString());
@@ -109,7 +109,7 @@ class SchemaSourceConfigTest {
     /** `httpSchemas` allows a host without fetching anything, so this needs no server to be worth asserting. */
     @Test
     void httpSchemasAllowsOnlyTheHostsItNames() {
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.httpSchemas("allowed.example.test")).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.httpSchemas("allowed.example.test")));
 
         assertTrue(tson.validate("""
                 !!schema:"https://denied.example.test/order-1.tn"
@@ -125,7 +125,7 @@ class SchemaSourceConfigTest {
     /** The short form for a caller who already has the text: no host, no directory, no fetching. */
     @Test
     void ofMapServesADocumentEndToEnd() {
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA)))).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA)))));
 
         assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
     }
@@ -137,7 +137,7 @@ class SchemaSourceConfigTest {
      */
     @Test
     void ofMapReportsASchemaItDoesNotHoldAsUnavailable() {
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA)))).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(SCHEMA_URI, SCHEMA)))));
 
         List<Diagnostic> problems = tson.validate(UNPUBLISHED);
 
@@ -159,7 +159,7 @@ class SchemaSourceConfigTest {
     @Test
     void aSourceReturningNullSaysSoRatherThanFailingDeeperIn() {
         Map<String, String> schemas = Map.of(SCHEMA_URI, SCHEMA);
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(schemas::get)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(schemas::get)));
 
         IllegalStateException thrown =
                 assertThrows(IllegalStateException.class, () -> tson.treeReader().read(UNPUBLISHED));
@@ -177,7 +177,7 @@ class SchemaSourceConfigTest {
     @Test
     void aSourceReturningNullIsAFaultEvenWhenCollecting() {
         Map<String, String> schemas = Map.of(SCHEMA_URI, SCHEMA);
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(schemas::get)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(schemas::get)));
 
         assertThrows(IllegalStateException.class, () -> tson.validate(UNPUBLISHED));
     }

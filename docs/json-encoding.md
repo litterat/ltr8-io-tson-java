@@ -4,11 +4,46 @@ Design notes for `tson-json` — the implementation of [TSON-JSON] (`spec/tson-p
 encoding of the TSON schema system. Current form only; history lives in git. `CLAUDE.md` holds the
 one-paragraph orientation; this file holds the detail.
 
+## One configuration, two front doors
+
+`Json.standard()` and `Json.of(TsonConfig)` are the whole construction surface, and they are `Tson`'s to the
+letter:
+
+| | TSON text | JSON |
+|---|---|---|
+| unconfigured | `Tson.standard()` | `Json.standard()` |
+| configured | `Tson.of(config)` | `Json.of(config)` |
+| readers | `treeReader()` / `objectReader()` | `treeReader()` / `objectReader()` |
+| what it holds | `processorPolicy()` / `dataBindContext()` | `processorPolicy()` / `dataBindContext()` |
+
+**The same `TsonConfig` value.** What a deployment states about reading TSON — what it will admit and spend,
+where it may obtain a schema, which Java classes its types bind to — is one statement, and stating it twice
+is two places for it to differ. That is why the configuration is a value in `tson-base` and construction is
+not: `Tson.of` names the compiler's own registry and could never live there, but nothing about the
+*settings* is an encoding's.
+
+Not every setting reaches this encoding yet. The schema access waits on §5–§8's schema-directed decode,
+which is the point at which a JSON document has a schema to obtain at all. Holding the whole value now is
+what stops that arriving as another setter and the two front doors drifting again.
+
+**What was removed to get here** was three methods that each said something the config already said:
+`Json.using(context)`, `Json.withProcessorPolicy(policy)`, and `Json.withDiagnostics(receiver)`. The first
+two are `of(config.withDataBindContext(…))` and `of(config.withProcessorPolicy(…))`. The third was an
+asymmetry rather than a duplicate: `Tson` has no such method because a receiver belongs to a **read**, not
+to a deployment — two endpoints of one application legitimately differ on where problems go, and both
+encodings' readers carry `withDiagnostics` for exactly that.
+
+**What stays different is deliberate.** `Json` keeps the static `parse`/`toDisplayString` that JEP 540
+defines, because a consumer arriving from the JDK's API should find it; they are the schemaless door, where
+an instance is the configured one. `Tson` keeps `resolve`, `validate` and the registries, because JSON has
+no schema documents of its own — §3.4 binds out of band — so it will gain a way to *name* a schema, never a
+way to author one.
+
 ## One atom vocabulary, both encodings
 
 `AtomContext` lives in `tson-atom`, beside `HostAtoms` — the index from the same host classes back to
 the family that produces each — and both front doors' defaults start from it: `Json.standard()`,
-`JsonObjectReader.standard()`, `Tson.builder()`. [TSON-JSON] §5.1 is why that is right rather than merely
+`JsonObjectReader.standard()`, `Tson.standard()`. [TSON-JSON] §5.1 is why that is right rather than merely
 tidy: a string's content is handed to the atom's own parser exactly as a TSON quoted token's text would be,
 so *which* families a reader can bind is a property of the type system and not of the encoding that carried
 them. A consumer whose class has a `UUID` component must not have to discover that one front door treats it

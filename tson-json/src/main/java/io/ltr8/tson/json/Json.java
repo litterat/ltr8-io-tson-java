@@ -4,11 +4,13 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
+import io.ltr8.tson.base.TsonConfig;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.tree.JsonValue;
 
 import java.io.InputStream;
+import java.util.Objects;
 
 /**
  * The front door of the JSON stack: the configuration a read is judged under, and the two readers that
@@ -32,70 +34,66 @@ import java.io.InputStream;
  */
 public final class Json {
 
-    private final DataBindContext bindContext;
-    private final ProcessorPolicy policy;
-    private final DiagnosticsReceiver receiver;
+    private final TsonConfig config;
 
-    private Json(DataBindContext bindContext, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
-        this.bindContext = bindContext;
-        this.policy = policy;
-        this.receiver = receiver;
+    private Json(TsonConfig config) {
+        this.config = config;
     }
 
     // ── The front door ───────────────────────────────────────────────────
 
     /**
-     * Over the default bind context and the processor's default policy, raising what it refuses.
+     * The unconfigured environment: the default bind vocabulary and the default policy.
+     * {@code Tson.standard()} is the TSON text front door's counterpart, and the two answer alike.
      *
-     * <p>The context is {@link AtomContext#defaultContext()} -- the same vocabulary the TSON text front
+     * <p>The bind context is {@link AtomContext#defaultContext()} -- the same vocabulary the other front
      * door starts from, so a class binds the same under both encodings. [TSON-JSON] §5.1 is why that is
      * right rather than merely convenient: a string's content is handed to the atom's own parser exactly as
      * a TSON quoted token's text would be, which makes the vocabulary the type system's rather than either
      * encoding's.
      */
     public static Json standard() {
-        return new Json(AtomContext.defaultContext(), ProcessorPolicy.defaults(),
-                DiagnosticsReceiver.throwing());
+        return of(TsonConfig.defaults());
     }
 
-    /** Over a caller's own bind context -- one per binding profile, descriptors cached inside it. */
-    public static Json using(DataBindContext bindContext) {
-        return new Json(bindContext, ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing());
-    }
-
-    /** This configuration under {@code policy} -- a new instance, leaving this one unchanged. */
-    public Json withProcessorPolicy(ProcessorPolicy policy) {
-        return new Json(bindContext, policy, receiver);
-    }
-
-    /** This configuration routing its problems to {@code receiver} -- a new instance, leaving this one unchanged. */
-    public Json withDiagnostics(DiagnosticsReceiver receiver) {
-        return new Json(bindContext, policy, receiver);
-    }
-
-    /** Everything a read off this instance will admit and spend. */
     /**
-     * The bind context every {@link #objectReader()} from this instance binds through --
-     * {@link AtomContext#defaultContext()} unless {@link #using} supplied one.
+     * This encoding under {@code config} -- <b>the same configuration value the TSON text front door takes</b>.
+     *
+     * <p>That is the point of it living in {@code tson-base}: what a deployment states about reading TSON --
+     * what it will admit and spend, where it may obtain a schema, which Java classes its types bind to -- is
+     * one statement, and stating it twice is two places for it to differ. A deployment reading both
+     * encodings builds one {@code TsonConfig} and hands it to both.
+     *
+     * <p>Not every setting reaches this encoding yet: the schema access waits on [TSON-JSON] §5-§8's
+     * schema-directed decode, which is the point at which a JSON document has a schema to obtain at all.
+     * Holding the whole value now is what stops that arriving as another setter.
+     */
+    public static Json of(TsonConfig config) {
+        return new Json(Objects.requireNonNull(config, "config"));
+    }
+
+    /**
+     * The bind context every {@link #objectReader()} from this instance binds through.
      * {@code Tson.dataBindContext()} is the TSON front door's counterpart, and the two answer with the same
      * kind of value on purpose.
      */
     public DataBindContext dataBindContext() {
-        return bindContext;
+        return config.dataBindContext();
     }
 
+    /** Everything a read off this instance will admit and spend. */
     public ProcessorPolicy processorPolicy() {
-        return policy;
+        return config.processorPolicy();
     }
 
     /** A reader producing a {@link JsonValue} tree, carrying this instance's policy and receiver. */
     public JsonTreeReader treeReader() {
-        return JsonTreeReader.standard().withProcessorPolicy(policy).withDiagnostics(receiver);
+        return JsonTreeReader.standard().withProcessorPolicy(config.processorPolicy());
     }
 
     /** A reader producing a bound Java object, carrying this instance's binding, policy and receiver. */
     public JsonObjectReader objectReader() {
-        return JsonObjectReader.using(bindContext).withProcessorPolicy(policy).withDiagnostics(receiver);
+        return JsonObjectReader.using(config.dataBindContext()).withProcessorPolicy(config.processorPolicy());
     }
 
     // ── JEP 540's entry points ───────────────────────────────────────────

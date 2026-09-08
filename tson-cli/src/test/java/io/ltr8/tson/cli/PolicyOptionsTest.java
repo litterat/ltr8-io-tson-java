@@ -1,4 +1,5 @@
 package io.ltr8.tson.cli;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -41,7 +42,7 @@ class PolicyOptionsTest {
      */
     @Test
     void theRestatedDefaultsMatchTheOnesTsonActuallyApplies() {
-        var tson = Tson.builder().build();
+        var tson = Tson.standard();
         var applied = tson.processorPolicy();
 
         assertEquals(applied.identifierPolicy().level(), PolicyOptions.DEFAULTS.identifierPolicy().level());

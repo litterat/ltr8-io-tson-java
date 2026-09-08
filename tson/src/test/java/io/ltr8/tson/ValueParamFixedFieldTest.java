@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
@@ -51,7 +52,7 @@ class ValueParamFixedFieldTest {
             }
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
-        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
     }
 
     /** The field of the entry {@code created} resolves to, following its alias hop to the instantiation. */
@@ -119,7 +120,7 @@ class ValueParamFixedFieldTest {
     void aMaterialisedValueParameterDefaultStaysADefault() {
         String schema = SCHEMA.replace("status: int32 = S", "status: int32 ~ S");
         SchemaSource source = uri -> schema;
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
 
         RecordField materialised = statusOf(tson.resolve(schema), "created");
 
@@ -162,7 +163,7 @@ class ValueParamFixedFieldTest {
                 }
                 """;
         SchemaSource source = uri -> schema;
-        TsonLinkedSchema linked = Tson.builder().schemaAccess(SchemaAccess.of(source)).build().resolve(schema);
+        TsonLinkedSchema linked = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))).resolve(schema);
 
         for (String entry : List.of("a", "b", "c")) {
             RecordField status = statusOf(linked, entry);
@@ -201,7 +202,7 @@ class ValueParamFixedFieldTest {
                 }
                 """;
         SchemaSource source = uri -> schema;
-        TsonLinkedSchema linked = Tson.builder().schemaAccess(SchemaAccess.of(source)).build().resolve(schema);
+        TsonLinkedSchema linked = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))).resolve(schema);
 
         // The kernel field is gone, so the compile-time proof is that this resolves at all; what is worth
         // asserting beyond that is that each closure kept the value its argument supplied.

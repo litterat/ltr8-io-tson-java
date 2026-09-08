@@ -81,7 +81,7 @@ class SharedInstanceConcurrencyTest {
      */
     @Test
     void concurrentReadsThroughOneInstanceAllSucceedAndAgree() throws Exception {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(SCHEMA);
 
         List<String> perThread = inParallel(() -> {
@@ -103,7 +103,7 @@ class SharedInstanceConcurrencyTest {
      */
     @Test
     void concurrentValidationThroughOneInstanceKeepsEachCallersDiagnosticsToItself() throws Exception {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(SCHEMA);
         String invalid = DOCUMENT.replace("age: 36", "age: \"thirty\"");
 
@@ -133,7 +133,7 @@ class SharedInstanceConcurrencyTest {
      */
     @Test
     void registeringOneIdentityTwiceIsAnErrorAndIsNotAWayToWarmACache() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(SCHEMA);
 
         SchemaValidationException thrown =

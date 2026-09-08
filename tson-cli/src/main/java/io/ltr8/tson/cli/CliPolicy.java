@@ -1,4 +1,5 @@
 package io.ltr8.tson.cli;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.tson.base.policy.ProcessorPolicy;

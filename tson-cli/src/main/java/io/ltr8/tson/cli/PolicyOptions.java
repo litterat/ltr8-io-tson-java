@@ -1,6 +1,6 @@
 package io.ltr8.tson.cli;
 
-import io.ltr8.tson.TsonConfig;
+import io.ltr8.tson.base.TsonConfig;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -48,7 +48,7 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
 
     /** This run's policies on a fresh {@link TsonConfig}. */
     TsonConfig applyTo(TsonConfig config) {
-        return config.processorPolicy(ProcessorPolicy.of(identifierPolicy, tokenPolicy, limits));
+        return config.withProcessorPolicy(ProcessorPolicy.of(identifierPolicy, tokenPolicy, limits));
     }
 
     /**

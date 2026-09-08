@@ -70,7 +70,7 @@ class BytesEncodingSelectorTest {
     private static final byte[] DEADBEEF = HexFormat.of().parseHex("deadbeef");
 
     private static Tson tson() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(SCHEMA);
         return tson;
     }
@@ -135,7 +135,7 @@ class BytesEncodingSelectorTest {
     /** Two types differing only in alphabet are two types, which is what a reader of either needs. */
     @Test
     void twoAlphabetsAreTwoTypes() {
-        var entries = Tson.builder().build().resolve(SCHEMA).schema().entries();
+        var entries = Tson.standard().resolve(SCHEMA).schema().entries();
         assertNotEquals(entries.get("hexdigest").body(), entries.get("b32").body());
     }
 
@@ -170,7 +170,7 @@ class BytesEncodingSelectorTest {
     @Test
     void encodingCannotBeRefined() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> Tson.builder().build().resolve("""
+                () -> Tson.standard().resolve("""
                         !!id:"https://example.test/refine-encoding.tn"
                         !!meta:"https://tson.io/2026/35/m/meta.tn"
                         !!import:"https://tson.io/2026/35/m/core.tn"
@@ -185,7 +185,7 @@ class BytesEncodingSelectorTest {
     @Test
     void refiningForLengthKeepsTheSourcesAlphabet() {
         String id = "https://example.test/refine-length.tn";
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"%s"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"

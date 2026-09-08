@@ -46,7 +46,7 @@ class ValueIdentityTest {
             """;
 
     private static Tson tson() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(SCHEMA);
         return tson;
     }

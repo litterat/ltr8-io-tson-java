@@ -55,15 +55,17 @@ An integer's host type is the **narrowest** that holds its declared range, so `i
 one compiles, and the first read of one reports `NOT_IMPLEMENTED`.
 
 `TsonAtomContext.registerDefaults(context)` is the step that registers these on a `DataBindContext`, and
-it is the one nothing reminds you of when building a context by hand. `TsonConfig.bindings(Map)` does it
+it is the one nothing reminds you of when building a context by hand. `AtomContext.hostTypes()` is it
 for you.
 
 ## Naming the classes for a schema's types
 
 ```java
-Tson tson = Tson.builder()
-        .bindings(Map.of("order", Order.class, "customer", Customer.class))
-        .build();
+Tson tson = Tson.of(TsonConfig.defaults()
+        .withDataBindContext(DataBindContext.builder()
+                .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "customer", Customer.class)))
+                .registerAtoms(AtomContext.hostTypes())
+                .build()));
 ```
 
 `bindings(Map)` is the short form of the long way, whose three steps include two that are invisible: a
@@ -140,7 +142,9 @@ public record Order(String sku, int quantity, String currency) {
     public Order(String sku, int quantity) { this(sku, quantity, "AUD"); }
 }
 
-Tson v3 = Tson.builder().bindings(…).profile("api-3").build();
+Tson v3 = Tson.of(TsonConfig.defaults().withDataBindContext(
+        DataBindContext.builder().nameBinder(…).profile("api-3")
+                .registerAtoms(AtomContext.hostTypes()).build()));
 ```
 
 A `Tson` is one profile: a server speaking two schema versions builds one instance per version and

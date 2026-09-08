@@ -1,46 +1,81 @@
-package io.ltr8.tson;
+package io.ltr8.tson.base;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.base.policy.FetchPolicy;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.BindMismatchException;
-import io.ltr8.tson.compiler.*;
-import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.bind.AtomContext;
-import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
-import java.util.Map;
 import java.util.Objects;
 
 /**
- * Configures and builds a {@link Tson} -- reached via {@link Tson#builder()}, never constructed
- * directly. {@link #schemaAccess} says where user schemas beyond the bundled standard library come from;
- * {@link #dataBindContext} says which Java classes the schema's types bind to;
- * {@link #metaNameBinder} binds a governing meta's own constructors;
- * {@link #processorPolicy} states what this processor will admit as a name and spend on a document; and
- * {@link #build()}
- * constructs a {@link TsonCompiledMetaRegistry} and has it
- * load the bundled meta-kernel/meta.tn/core.tn standard library, then wraps it as a {@link Tson}.
+ * What a deployment states about reading TSON, as one immutable value -- and <b>the same value whichever
+ * encoding reads it</b>.
  *
- * <p>The two binding options are deliberately separate and never merged. {@link #dataBindContext} binds
- * <em>data</em> ({@code order} -> {@code Order}); {@link #metaNameBinder} binds a governing meta's own
- * <em>vocabulary</em> ({@code operation} -> {@code Operation}). One name means different things on the two
- * sides, so one namespace holding both would collide the first time a schema type and a meta-layer
- * constructor shared a name.
+ * <p>Three questions, each answered by a value of its own:
+ *
+ * <ul>
+ *   <li>{@link #withProcessorPolicy} -- what this processor will <b>admit and spend</b>: [TSON-DATA] §8.2's
+ *       two Unicode surfaces and §9.1's resource bounds. A denial rule over documents, meaningful with no
+ *       schema and no Java class in hand.</li>
+ *   <li>{@link #withSchemaAccess} -- where it may <b>obtain a schema</b>, and under what constraints. Deny
+ *       by default: nothing beyond the bundled standard library is fetchable until this says so.</li>
+ *   <li>{@link #withDataBindContext} -- which <b>Java classes</b> the schema's types bind to.</li>
+ * </ul>
+ *
+ * <p>{@link #withMetaNameBinder} is a fourth setting but not a fourth question: it is one seam into a
+ * context the consumer never holds. {@code withDataBindContext} binds the <em>data</em> a schema describes
+ * ({@code order} -> {@code Order}); this adds names to the binding of a governing meta's own
+ * <em>vocabulary</em> ({@code operation} -> {@code Operation}), which the library otherwise builds itself.
+ * One name means different things on the two sides, so one namespace holding both would collide the first
+ * time a schema type and a meta-layer constructor shared a name.
+ *
+ * <p><b>It lives here, and construction does not.</b> A configuration is a value: it names what a
+ * deployment chose and knows nothing about how a processor is assembled from it. Building one names the
+ * compiler's own registry and so belongs with the engine -- {@code Tson.of(config)} -- which is what lets
+ * this be shared rather than duplicated per encoding. Every setting returns a new instance, so a
+ * configuration may be handed out, kept, and derived from without the holder losing what they stated.
+ *
+ * <p><b>What is deliberately not here</b> is anything a reader can decide for itself. Which schema a read
+ * validates against, where its diagnostics go, whether an undeclared field is discarded -- all of those are
+ * per-reader derivations, because two endpoints of one application legitimately differ on them.
  */
 public final class TsonConfig {
 
-    private DataBindContext dataBindContext = AtomContext.defaultContext();
-    private SchemaAccess schemaAccess = SchemaAccess.registeredOnly();
-    private DataNameBinder metaNameBinder;
-    private ProcessorPolicy policy = ProcessorPolicy.defaults();
+    private final DataBindContext dataBindContext;
+    private final SchemaAccess schemaAccess;
+    private final DataNameBinder metaNameBinder;
+    private final ProcessorPolicy policy;
 
-    TsonConfig() {
+    TsonConfig(DataBindContext dataBindContext, SchemaAccess schemaAccess, ProcessorPolicy policy, DataNameBinder metaNameBinder) {
+        this.dataBindContext = dataBindContext;
+        this.schemaAccess = schemaAccess;
+        this.policy = policy;
+        this.metaNameBinder = metaNameBinder;
+    }
+
+    public static TsonConfig defaults() {
+        return new TsonConfig( AtomContext.defaultContext(), SchemaAccess.registeredOnly(), ProcessorPolicy.defaults(), null);
+    }
+
+    public SchemaAccess schemaAccess() {
+        return schemaAccess;
+    }
+
+    public DataBindContext dataBindContext() {
+        return dataBindContext;
+    }
+
+    public DataNameBinder metaNameBinder() {
+        return metaNameBinder;
+    }
+
+    public ProcessorPolicy processorPolicy() {
+        return policy;
     }
 
     /**
@@ -57,21 +92,20 @@ public final class TsonConfig {
      * to be stated twice.
      *
      * <pre>{@code
-     * Tson.builder().schemaAccess(SchemaAccess.fileSchemas("schemas.example.com", dir)).build();
+     * TsonConfig.defaults().withSchemaAccess(SchemaAccess.fileSchemas("schemas.example.com", dir));
      * }</pre>
      *
-     * <p>It is the schema half of what a deployment constrains, {@link #processorPolicy} being the reading
+     * <p>It is the schema half of what a deployment constrains, {@link #withProcessorPolicy} being the reading
      * half. Two values because they are consumed by different subsystems: a reader applies one and fetches
      * nothing, the loader applies the other and reads no documents.
      */
-    public TsonConfig schemaAccess(SchemaAccess schemaAccess) {
-        this.schemaAccess = Objects.requireNonNull(schemaAccess, "schemaAccess");
-        return this;
+    public TsonConfig withSchemaAccess(SchemaAccess schemaAccess) {
+        return new TsonConfig(this.dataBindContext, Objects.requireNonNull(schemaAccess, "schemaAccess"), this.policy, this.metaNameBinder);
     }
 
     /**
-     * The {@link DataBindContext} the built {@link Tson}'s own {@link Tson#objectReader()}/{@link
-     * Tson#objectWriter()} bind against -- defaults to {@link AtomContext#defaultContext()}.
+     * The {@link DataBindContext} a processor built from this configuration binds its object readers and
+     * writers against -- defaults to {@link AtomContext#defaultContext()}.
      *
      * <p><b>The vocabulary for building one is {@code tson-bind}'s, not this class's</b>, so there is one
      * place to learn it and one place it can drift:
@@ -88,13 +122,12 @@ public final class TsonConfig {
      * {@code build()}. What stays concurrent is the descriptor cache, where two threads resolving one class
      * both do the work and one answer wins -- duplicated work on a race, never duplicated state.
      *
-     * <p>Unrelated to (and never overriding) the object-binding-mode context {@link #build()} always uses
-     * internally to resolve the standard library itself -- see {@link Tson}'s own Javadoc for why that one's
+     * <p>Unrelated to (and never overriding) the object-binding-mode context construction always uses
+     * internally to resolve the standard library itself -- see {@code Tson}'s own Javadoc for why that one's
      * mode is fixed, and {@link #metaNameBinder} for the one thing about it a consumer may extend.
      */
-    public TsonConfig dataBindContext(DataBindContext dataBindContext) {
-        this.dataBindContext = Objects.requireNonNull(dataBindContext, "dataBindContext");
-        return this;
+    public TsonConfig withDataBindContext(DataBindContext dataBindContext) {
+        return new TsonConfig(Objects.requireNonNull(dataBindContext, "dataBindContext"), this.schemaAccess, this.policy, this.metaNameBinder);
     }
 
     /**
@@ -103,18 +136,16 @@ public final class TsonConfig {
      * consumer's own {@code @Typename("operation")} class. Defaults to unset: the kernel's own vocabulary
      * alone, which is every schema governed by the bundled meta.tn.
      *
-     * <p><b>Composed over the library's own binder, never replacing it</b> ({@link
-     * SchemaMetaNameBinder#contextExtendedWith}): {@code record}/{@code enum}/{@code integer_type} and the
+     * <p><b>Composed over the library's own binder, never replacing it</b> ({@code SchemaMetaNameBinder.contextExtendedWith}): {@code record}/{@code enum}/{@code integer_type} and the
      * rest resolve first, and this binder answers only for a name the kernel does not declare. So it adds
      * names and gives up nothing -- in particular not the object-binding mode the standard library must be
-     * compiled in (see {@link Tson}), which is what {@code build()} fixes and this does not touch.
+     * compiled in (see {@code Tson}), which construction fixes and this does not touch.
      *
      * <p>Distinct from {@link #dataBindContext}, which binds the <em>data</em> a schema describes; this
      * binds the <em>schema vocabulary</em> a meta describes. A consumer with both supplies both.
      */
-    public TsonConfig metaNameBinder(DataNameBinder metaNameBinder) {
-        this.metaNameBinder = Objects.requireNonNull(metaNameBinder, "metaNameBinder");
-        return this;
+    public TsonConfig withMetaNameBinder(DataNameBinder metaNameBinder) {
+        return new TsonConfig(this.dataBindContext, this.schemaAccess, this.policy, Objects.requireNonNull(metaNameBinder, "metaNameBinder"));
     }
 
     /**
@@ -125,11 +156,11 @@ public final class TsonConfig {
      * <p><b>This is the setter to reach for, and the three below are its components.</b> A deployment's
      * constraints are one decision made in one place -- typically a platform library handing an application
      * a policy it does not assemble itself -- so the primary form takes the whole value and
-     * {@link #identifierPolicy}/{@link #tokenPolicy}/{@link #limits} fold into it. That is also what lets
+     * {@link #withIdentifierPolicy}/{@link #withTokenPolicy}/{@link #withLimits} fold into it. That is also what lets
      * one policy configure both encodings: {@code Json.withProcessorPolicy} takes this same value, and a
      * deployment that states its constraints twice has two places to get them wrong.
      *
-     * <p>Reported back by {@link Tson#processorPolicy()}, by each reader, and by {@code tson policy}.
+     * <p>Reported back by {@code Tson.processorPolicy()}, by each reader, and by {@code tson policy}.
      *
      * <p><b>In code on purpose.</b> A security policy read from the environment is ambient authority: a CI
      * config, a container image or a dependency calling {@code setenv} would change it with no diff and
@@ -137,9 +168,8 @@ public final class TsonConfig {
      * library embedding this one could not hold its own. A method call is greppable, diffable and scoped to
      * the instance that holds it.
      */
-    public TsonConfig processorPolicy(ProcessorPolicy policy) {
-        this.policy = Objects.requireNonNull(policy, "policy");
-        return this;
+    public TsonConfig withProcessorPolicy(ProcessorPolicy policy) {
+        return new TsonConfig(this.dataBindContext, this.schemaAccess, Objects.requireNonNull(policy, "policy"), this.metaNameBinder);
     }
 
     /**
@@ -166,17 +196,16 @@ public final class TsonConfig {
      * drops that too — §5.2's own level 6, which takes {@code Identifier_Status} with it and which §5.2
      * describes as a diagnostic tool.
      *
-     * <p>One component of {@link #processorPolicy}, which is where a deployment stating all three at once
+     * <p>One component of {@link #withProcessorPolicy}, which is where a deployment stating all three at once
      * says so.
      */
-    public TsonConfig identifierPolicy(UnicodePolicy identifierPolicy) {
-        this.policy = policy.withIdentifierPolicy(Objects.requireNonNull(identifierPolicy, "identifierPolicy"));
-        return this;
+    public TsonConfig withIdentifierPolicy(UnicodePolicy identifierPolicy) {
+        return new TsonConfig(this.dataBindContext, this.schemaAccess,  policy.withIdentifierPolicy(Objects.requireNonNull(identifierPolicy, "identifierPolicy")), this.metaNameBinder);
     }
 
     /**
      * UTS #39 §5.2 over <b>every token a read pulls off the stream</b>, values included
-     * ([TSON-DATA] §8.2's "Values") -- {@link #identifierPolicy}'s peer on the other surface.
+     * ([TSON-DATA] §8.2's "Values") -- {@link #withIdentifierPolicy}'s peer on the other surface.
      * Defaults to {@link UnicodePolicy#unrestricted()}, which checks nothing.
      *
      * <p><b>The default is the opposite of the identifier default, for the same reason in each case.</b> A
@@ -192,7 +221,7 @@ public final class TsonConfig {
      * <p><b>A name is a token, so this also constrains names, and that is deliberate.</b> The check runs
      * before anything knows which tokens are names, so a token policy stricter than the identifier policy
      * subsumes it -- {@code tokenPolicy(asciiOnly())} has made this instance's identifiers ASCII-only too,
-     * whatever {@link #identifierPolicy} says. The setter is named for the surface it acts on rather than
+     * whatever {@link #withIdentifierPolicy} says. The setter is named for the surface it acts on rather than
      * for the values it mostly affects, so that consequence is visible where it is configured.
      *
      * <p>The restriction level is the only rule available here, where for names it was the second
@@ -204,7 +233,7 @@ public final class TsonConfig {
      * <p>{@link UnicodePolicy.Level#MINIMALLY_RESTRICTIVE} and {@link UnicodePolicy.Level#UNRESTRICTED}
      * collapse here: §5.2 says so directly, a token that is not a name having no identifier profile to drop.
      *
-     * <p>One component of {@link #processorPolicy}, which is where a deployment stating all three at once
+     * <p>One component of {@link #withProcessorPolicy}, which is where a deployment stating all three at once
      * says so.
      *
      * @throws IllegalArgumentException if {@code tokenPolicy} is per-segment -- {@code _} and {@code -} are
@@ -212,47 +241,29 @@ public final class TsonConfig {
      *         admits UTS #39's own {@code Toys-Я-Us}, the spoof a strict token policy exists to refuse.
      *         {@link ProcessorPolicy} enforces it, so every route to a policy refuses it alike
      */
-    public TsonConfig tokenPolicy(UnicodePolicy tokenPolicy) {
-        this.policy = policy.withTokenPolicy(Objects.requireNonNull(tokenPolicy, "tokenPolicy"));
-        return this;
+    public TsonConfig withTokenPolicy(UnicodePolicy tokenPolicy) {
+        return new TsonConfig(this.dataBindContext, this.schemaAccess,  policy.withTokenPolicy(Objects.requireNonNull(tokenPolicy, "tokenPolicy")), this.metaNameBinder);
     }
 
     /**
      * The [TSON-DATA] §9.1 resource limits every read off this instance applies -- {@link
      * LimitsPolicy#defaults()} unless this says otherwise.
      *
-     * <p><b>In code, for {@link #processorPolicy}'s reason.</b> §9.1 requires the bounds be configurable;
+     * <p><b>In code, for {@link #withProcessorPolicy}'s reason.</b> §9.1 requires the bounds be configurable;
      * taking them from the ambient environment instead would let a deployment's behaviour change without any
      * statement of it in the deployment, which is the property that makes a refusal explainable. A caller
      * that raises the depth is choosing to spend more Java stack on one document, and {@link
      * LimitsPolicy#withMaxDepth} says what the ceiling on that choice actually is.
      *
-     * <p>One component of {@link #processorPolicy}, which is where a deployment stating all three at once
+     * <p>One component of {@link #withProcessorPolicy}, which is where a deployment stating all three at once
      * says so.
      *
-     * <p>Reported back by {@link Tson#limitsPolicy()} and by each reader ({@link
-     * io.ltr8.tson.compiler.TsonTreeReader#limitsPolicy()}), which is where a derived reader's own {@code
-     * withLimits} shows.
+     * <p>Reported back by {@code Tson.limitsPolicy()} and by each reader
+     * ({@code TsonTreeReader.limitsPolicy()}), which is where a derived reader's own {@code withLimits}
+     * shows.
      */
-    public TsonConfig limits(LimitsPolicy limits) {
-        this.policy = policy.withLimits(Objects.requireNonNull(limits, "limits"));
-        return this;
+    public TsonConfig withLimits(LimitsPolicy limits) {
+        return new TsonConfig(this.dataBindContext, this.schemaAccess,  policy.withLimits(Objects.requireNonNull(limits, "limits")), this.metaNameBinder);
     }
 
-    public Tson build() {
-        // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
-        // bundled meta-kernel/meta/core, and the access's source is consulted only for other URIs. It
-        // compiles the standard library in object-binding mode -- the only mode that can (a DOM reader
-        // can't resolve the !enum/!integer instances a meta-schema declares), which is why it takes the
-        // bind context rather than a resolver that might be the wrong mode. The *mode* is what is fixed
-        // here; which names that binder knows is metaNameBinder's to extend. Tson builds the per-mode read
-        // registries (DOM and object-binding, the latter bound to dataBindContext) over this one core.
-        DataBindContext schemaContext = metaNameBinder == null
-                ? SchemaMetaNameBinder.defaultContext()
-                : SchemaMetaNameBinder.contextExtendedWith(metaNameBinder);
-        SchemaSource source = schemaAccess.source();
-        TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
-                schemaContext, source, policy.identifierPolicy());
-        return new Tson(core, dataBindContext, policy);
-    }
 }
