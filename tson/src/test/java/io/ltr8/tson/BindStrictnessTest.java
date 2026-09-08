@@ -10,7 +10,7 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 
 import java.util.List;
 import java.util.Optional;
@@ -74,7 +74,7 @@ class BindStrictnessTest {
         SchemaSource source = uri -> schema;
         DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
         TsonConfig config = Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBindContext(
-                TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build()));
+                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build()));
         return (lenient ? config.lenientBinding() : config).build();
     }
 

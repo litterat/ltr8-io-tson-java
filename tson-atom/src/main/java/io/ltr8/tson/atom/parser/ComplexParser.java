@@ -6,7 +6,7 @@ import io.ltr8.tson.atom.number.ComplexForm;
 import io.ltr8.tson.atom.number.NumberForm;
 import io.ltr8.tson.atom.number.NumberForms;
 import io.ltr8.tson.atom.number.NumberGrammar;
-import io.ltr8.tson.schema.atom.Complex;
+import io.ltr8.tson.base.atom.Complex;
 import java.math.BigDecimal;
 import java.util.Optional;
 

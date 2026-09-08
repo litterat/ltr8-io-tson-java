@@ -61,7 +61,7 @@ public record Cidr4Type(String spec, @Field("min_prefix") Optional<Integer> minP
      * a refinement excluding {@code 10.1.0.0/16} where its source excluded {@code 10.0.0.0/8} is refused even
      * though it narrows. That is the conservative direction, and what a stated relation would replace;
      * [TSON-SCHEMA] §5.7 gives the facet kinds their rules and leaves these two lists compared by entry. The
-     * containment arithmetic itself exists, in {@code schema.atom.CidrNetwork}.
+     * containment arithmetic itself exists, in {@code base.atom.CidrNetwork}.
      */
     @Override
     public List<String> constraintsCheck(Atom refined) {

@@ -12,7 +12,7 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.policy.UnicodePolicy;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaRegistry;
 
 import java.util.Map;
@@ -37,7 +37,7 @@ import java.util.Objects;
  */
 public final class TsonConfig {
 
-    private DataBindContext dataBindContext = TsonAtomContext.defaultContext();
+    private DataBindContext dataBindContext = AtomContext.defaultContext();
     private SchemaAccess schemaAccess = SchemaAccess.registeredOnly();
     private DataNameBinder metaNameBinder;
     private ProcessorPolicy policy = ProcessorPolicy.defaults();
@@ -77,7 +77,7 @@ public final class TsonConfig {
 
     /**
      * The {@link DataBindContext} the built {@link Tson}'s own {@link Tson#objectReader()}/{@link
-     * Tson#objectWriter()} bind against -- defaults to {@link TsonAtomContext#defaultContext()}, the
+     * Tson#objectWriter()} bind against -- defaults to {@link AtomContext#defaultContext()}, the
      * same default {@link TsonObjectReader}'s/{@link TsonObjectWriter}'s own no-arg constructors use.
      * Unrelated to (and never overrides) the object-binding-mode context {@link #build()} always uses
      * internally to resolve the standard library itself -- see {@link Tson}'s own Javadoc for why that
@@ -102,7 +102,7 @@ public final class TsonConfig {
      * }</pre>
      *
      * <p><b>It exists because the long way has three steps and two of them are invisible.</b> A caller who
-     * builds only a {@link DataNameBinder} gets atoms unbound ({@code TsonAtomContext.registerDefaults} is
+     * builds only a {@link DataNameBinder} gets atoms unbound ({@code AtomContext.registerDefaults} is
      * the step nothing reminds you of), and a caller who maps their own names without chaining loses the
      * kernel's vocabulary for the schema types that need it. This does all three.
      *
@@ -367,6 +367,6 @@ public final class TsonConfig {
         if (profile != null) {
             builder.profile(profile);
         }
-        return TsonAtomContext.registerDefaults(builder.build());
+        return AtomContext.registerDefaults(builder.build());
     }
 }

@@ -213,11 +213,11 @@ the two, ordered so the gap catch comes first.
 
 ## Configuration package (`tson-compiler/.../config/`)
 
-Holds `TsonAtomContext`, `SchemaMetaNameBinder`, `SourcePositionStringBridge` — how a caller configures a
+Holds `AtomContext`, `SchemaMetaNameBinder`, `SourcePositionStringBridge` — how a caller configures a
 working binding environment. **Two distinct default contexts, differing by exactly the name binder** (a
 `DataNameBinder` is fixed at `DataBindContext` construction and can't be added later):
 
-- `TsonAtomContext.defaultContext()` — the library's built-in atom registrations (`UUID`/`byte[]`/
+- `AtomContext.defaultContext()` — the library's built-in atom registrations (`UUID`/`byte[]`/
   `LocalDate`/`OffsetTime`/`OffsetDateTime`/`URI`/`Inet4Address`/`Inet6Address`/`SourcePosition`), **no
   name binder**. The consumer/schemaless default (`Tson.dataBindContext`, `objectReader`/`objectWriter`,
   and the base a consumer layers their own binder onto). `registerDefaults(builder)` applies the same atom

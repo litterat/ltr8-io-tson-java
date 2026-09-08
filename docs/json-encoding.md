@@ -6,7 +6,7 @@ one-paragraph orientation; this file holds the detail.
 
 ## One atom vocabulary, both encodings
 
-`TsonAtomContext` lives in `tson-atom`, beside `HostAtoms` — the index from the same host classes back to
+`AtomContext` lives in `tson-atom`, beside `HostAtoms` — the index from the same host classes back to
 the family that produces each — and both front doors' defaults start from it: `Json.standard()`,
 `JsonObjectReader.standard()`, `Tson.builder()`. [TSON-JSON] §5.1 is why that is right rather than merely
 tidy: a string's content is handed to the atom's own parser exactly as a TSON quoted token's text would be,

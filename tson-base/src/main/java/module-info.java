@@ -2,7 +2,7 @@
  * What every encoding and every phase of this library reports through, and what a deployment constrains it
  * with.
  *
- * <p>A leaf: it requires nothing of this project. Four packages, and <b>the root names none of them</b> --
+ * <p>Six packages, and <b>the root names none of them</b> --
  * every dependency runs inward, so a subpackage may be read on its own and the vocabulary at the centre
  * stays free of the machinery around it.
  *
@@ -15,6 +15,8 @@
  *   <li>{@code io.ltr8.tson.base.policy} -- what this processor will admit and spend.
  *   <li>{@code io.ltr8.tson.base.source} -- where it will obtain a schema.
  *   <li>{@code io.ltr8.tson.base.unicode} -- the UCD tables the engines read.
+ *   <li>{@code io.ltr8.tson.base.atom} -- the host values the built-in atoms read to.
+ *   <li>{@code io.ltr8.tson.base.bind} -- what a deployment binds with.
  * </ul>
  *
  * <p><b>The exceptions stay at the root rather than following their subject</b>, which is what keeps the
@@ -33,8 +35,15 @@
  * <p><b>And what a deployment constrains.</b> The two Unicode policies and the limits say what this
  * processor will admit and spend; {@code SchemaSource} and its two implementations say what it will
  * <em>fetch</em>, which [TSON-JSON] §10.4 names as the restriction an application processing untrusted
- * input sets. They are the same kind of statement -- a constraint this deployment chose, which another may
- * choose differently -- and a schema is identified and obtained the same way whichever encoding named it.
+ * input sets; {@code AtomContext} says what it <em>binds</em> with. They are the same kind of statement --
+ * a constraint this deployment chose, which another may choose differently -- and none of them depends on
+ * which encoding carried the document.
+ *
+ * <p><b>The two engines it rests on are system libraries, not layers above it.</b> {@code java.net.http}
+ * and {@code io.ltr8.bind} are both general and both know nothing of TSON -- {@code tson-bind} binds a
+ * {@code DataValue} to a Java object and has never heard of a schema. Depending on them is the same kind of
+ * thing as depending on the JDK, which is why it does not make this module a layer in the stack: nothing
+ * here knows what a TSON document or a JSON one looks like, and that is the property that matters.
  *
  * <p><b>What deliberately stayed behind.</b> {@code Diagnostic}'s classifying factories -- the ones that
  * turn a thrown exception into a diagnostic -- switch on an encoding's own exception types, so each
@@ -42,9 +51,14 @@
  * an answer, never the reading of a document.
  */
 module io.ltr8.tson.base {
-    // The platform's HTTP client, for HttpSchemaSource. A JDK module rather than a dependency: base still
-    // requires nothing of this project, and a consumer resolving it resolves what the JDK already ships.
+    // The platform's HTTP client, for HttpSchemaSource. A consumer resolving this module resolves what the
+    // JDK already ships.
     requires transitive java.net.http;
+
+    // A dependency-free binding engine that knows nothing about TSON -- system-library standing, like
+    // java.net.http above and tson-regex elsewhere. What this module adds is the TSON-side configuration:
+    // which host types bind as atoms, and (in time) the rest of what a deployment states about binding.
+    requires transitive io.ltr8.bind;
 
     exports io.ltr8.tson.base;
 
@@ -78,4 +92,18 @@ module io.ltr8.tson.base {
      * what an identifier is. Pure Unicode -- nothing here knows what a TSON document looks like.
      */
     exports io.ltr8.tson.base.unicode;
+
+    /**
+     * The host values the built-in atoms read to -- {@code Rational}, {@code Complex}, {@code CidrNetwork},
+     * {@code InternetAddress}. The question a consumer arrives with (<em>what do I get back from
+     * {@code !rational}?</em>) rather than part of the resolved-schema model, and pure values depending on
+     * nothing, which is why they sit at the centre rather than in whichever module first needed one.
+     */
+    exports io.ltr8.tson.base.atom;
+
+    /**
+     * What a deployment binds with. {@code AtomContext} registers {@code base.atom}'s host values, and the
+     * JDK ones beside them, with a {@code DataBindContext}, so a class binds the same under every encoding.
+     */
+    exports io.ltr8.tson.base.bind;
 }

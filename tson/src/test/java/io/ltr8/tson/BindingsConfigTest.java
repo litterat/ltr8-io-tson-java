@@ -5,7 +5,7 @@ import io.ltr8.annotation.Profile;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 
 import java.util.Map;
 
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * place it configures everything else.
  *
  * <p>What it replaces was four lines with two invisible steps in them: a {@code DataNameBinder} over the
- * caller's own names, chained rather than replacing, wrapped in {@code TsonAtomContext.registerDefaults}.
+ * caller's own names, chained rather than replacing, wrapped in {@code AtomContext.registerDefaults}.
  * Miss the last and atoms are unbound; every test in this repo repeated the incantation, one third of it
  * unnecessary.
  */
@@ -107,7 +107,7 @@ class BindingsConfigTest {
     /** A context is built or given, never both -- a profile cannot apply to one that arrives already built. */
     @Test
     void aSuppliedContextAndBindingsAreMutuallyExclusive() {
-        DataBindContext context = TsonAtomContext.defaultContext();
+        DataBindContext context = AtomContext.defaultContext();
 
         IllegalStateException thrown = assertThrows(IllegalStateException.class,
                 () -> Tson.builder().dataBindContext(context).bindings(Map.of("order", Order.class)).build());

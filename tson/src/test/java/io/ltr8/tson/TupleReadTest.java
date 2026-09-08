@@ -8,7 +8,7 @@ import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.tree.TsonTuple;
 import io.ltr8.tson.tree.TsonValue;
 import org.junit.jupiter.api.Test;
@@ -169,7 +169,7 @@ class TupleReadTest {
     private static Tson tsonBindingPair() {
         DataNameBinder binder = name -> "pair".equals(name) ? Pair.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
         DataBindContext context =
-                TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
         return Tson.builder().dataBindContext(context).build();
     }
 

@@ -39,7 +39,7 @@ public record Ipv4Type(String spec, List<String> within, List<String> excluding)
      * strictly smaller network than the source's is refused here even though it narrows. That is the
      * conservative direction -- it refuses a legal refinement rather than admitting an illegal one -- and it
      * is what a stated relation would replace. The containment arithmetic to decide it properly does exist
-     * now ({@code schema.atom.CidrNetwork}); what is missing is the spec rule saying which way a set facet
+     * now ({@code base.atom.CidrNetwork}); what is missing is the spec rule saying which way a set facet
      * narrows, which [TSON-SCHEMA] §5.7 requires.
      */
     @Override

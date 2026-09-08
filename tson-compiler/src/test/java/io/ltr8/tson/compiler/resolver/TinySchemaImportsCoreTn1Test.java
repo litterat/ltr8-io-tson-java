@@ -10,7 +10,7 @@ import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.compiler.TsonSchemaLinker;
@@ -75,7 +75,7 @@ class TinySchemaImportsCoreTn1Test {
     @Test
     void aTinySchemaThatImportsCoreTn1RegistersAndCompilesCleanly() {
         TsonSchemaRegistry schemaRegistry = new TsonSchemaRegistry();
-        DataBindContext context = TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
+        DataBindContext context = AtomContext.registerDefaults(DataBindContext.builder().nameBinder(MANUAL_BINDER).build());
         TsonCompiledMetaRegistry registry = new TsonCompiledMetaRegistry(schemaRegistry, context, TsonBundledSchemas::fetch);
         TsonCompiledSchemaLoader loader = registry;
 

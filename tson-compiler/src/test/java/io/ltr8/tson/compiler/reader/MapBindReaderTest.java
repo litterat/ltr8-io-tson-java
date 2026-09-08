@@ -8,7 +8,7 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonCompiledSchemaRegistry;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.CanonicalIdentity;
 import org.junit.jupiter.api.Test;
 
@@ -44,7 +44,7 @@ class MapBindReaderTest {
                 ? Catalogue.class
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                TsonAtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;

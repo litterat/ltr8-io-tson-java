@@ -1,7 +1,7 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.reader.DataClassObjectReader;
@@ -137,7 +137,7 @@ public final class JsonObjectReader {
 
     /** Everything this reader will admit and spend, for a caller stating it beside a read's diagnostics. */
     /**
-     * The bind context this reader binds through -- {@link TsonAtomContext#defaultContext()} unless a caller
+     * The bind context this reader binds through -- {@link AtomContext#defaultContext()} unless a caller
      * supplied one. {@code TsonObjectReader}'s counterpart on the other encoding.
      */
     public DataBindContext dataBindContext() {
@@ -168,7 +168,7 @@ public final class JsonObjectReader {
     }
 
     /**
-     * Over {@link TsonAtomContext#defaultContext()} -- records, arrays, maps, tuples, the primitive and
+     * Over {@link AtomContext#defaultContext()} -- records, arrays, maps, tuples, the primitive and
      * boxed atoms, and the host types the built-in atom families read to ({@code UUID}, the temporal,
      * network and identifier families).
      *
@@ -177,7 +177,7 @@ public final class JsonObjectReader {
      * other takes it apart.
      */
     public static JsonObjectReader standard() {
-        return new JsonObjectReader(TsonAtomContext.defaultContext(), false, DiagnosticsReceiver.throwing(),
+        return new JsonObjectReader(AtomContext.defaultContext(), false, DiagnosticsReceiver.throwing(),
                 ProcessorPolicy.defaults());
     }
 

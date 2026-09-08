@@ -7,7 +7,7 @@ import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.compiler.reader.EventSkip;
 import io.ltr8.tson.compiler.reader.SchemalessObjectReader;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
@@ -121,9 +121,9 @@ public final class TsonObjectReader {
                 ProcessorPolicy.defaults());
     }
 
-    /** Schemaless, over {@link TsonAtomContext#defaultContext()}. */
+    /** Schemaless, over {@link AtomContext#defaultContext()}. */
     public TsonObjectReader() {
-        this(TsonAtomContext.defaultContext());
+        this(AtomContext.defaultContext());
     }
 
     /** Shares {@code bind} and {@code schemaless} rather than rebuilding them -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */

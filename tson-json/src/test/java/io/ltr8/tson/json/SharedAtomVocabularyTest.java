@@ -3,7 +3,7 @@ package io.ltr8.tson.json;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassAtom;
-import io.ltr8.tson.atom.TsonAtomContext;
+import io.ltr8.tson.base.bind.AtomContext;
 import org.junit.jupiter.api.Test;
 
 import java.net.Inet4Address;
@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  *
  * <p>[TSON-JSON] §5.1 hands a string's content to the atom's own parser exactly as a TSON quoted token's
  * text would be, so which host types the built-in families read to is a property of the type system and not
- * of the encoding that carried them. {@link TsonAtomContext} therefore lives in {@code tson-atom} beside
+ * of the encoding that carried them. {@link AtomContext} therefore lives in {@code tson-atom} beside
  * {@code HostAtoms}, the index from these same classes back to the family that produces each -- and this
  * pins that the JSON front door starts from it rather than from a bare context.
  *
@@ -62,7 +62,7 @@ class SharedAtomVocabularyTest {
     /** A caller's own context still wins -- the default is a starting point, not an override. */
     @Test
     void aSuppliedContextIsUsedAsGiven() {
-        DataBindContext own = TsonAtomContext.defaultContext();
+        DataBindContext own = AtomContext.defaultContext();
 
         assertSame(own, Json.using(own).dataBindContext());
         assertSame(own, JsonObjectReader.using(own).dataBindContext());
