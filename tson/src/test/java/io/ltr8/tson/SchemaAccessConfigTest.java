@@ -1,6 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.TsonConfig;
 import io.ltr8.tson.base.policy.FetchPolicy;
 import io.ltr8.tson.base.source.FileSchemaSource;
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -17,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * {@link TsonConfig#schemaAccess} -- where a {@link Tson} may obtain a schema, and under what constraints.
  *
- * <p>{@link TsonConfig#processorPolicy}'s sibling: the same kind of statement, reaching a different
+ * <p>{@link TsonConfig#withProcessorPolicy}'s sibling: the same kind of statement, reaching a different
  * subsystem. What is pinned here is the front door's half -- that an access reaches the loader and that the
  * {@link FetchPolicy} inside it governs what the loader obtains. How an access is *assembled*, and which
  * combinations are refused, is {@link SchemaAccess}'s own and is pinned by {@code SchemaAccessTest}: the
@@ -46,7 +47,7 @@ class SchemaAccessConfigTest {
     void anAccessReachesTheLoader(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
 
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.fileSchemas(HOST, dir)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.fileSchemas(HOST, dir)));
 
         assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
     }
@@ -55,7 +56,7 @@ class SchemaAccessConfigTest {
     @Test
     void theDefaultAccessFetchesNothing() {
         assertEquals(List.of(Diagnostic.Code.SCHEMA_NOT_PERMITTED),
-                Tson.builder().build().validate(DOCUMENT).stream().map(Diagnostic::code).toList());
+                Tson.standard().validate(DOCUMENT).stream().map(Diagnostic::code).toList());
     }
 
     /**
@@ -70,12 +71,11 @@ class SchemaAccessConfigTest {
     void theCapInsideAnAccessGovernsTheLoader(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
 
-        Tson tson = Tson.builder()
-                .schemaAccess(SchemaAccess.builder()
+        Tson tson = Tson.of(TsonConfig.defaults()
+                .withSchemaAccess(SchemaAccess.builder()
                         .fetchPolicy(FetchPolicy.defaults().withMaxDocumentBytes(16))
                         .fileSchemas(HOST, dir)
-                        .build())
-                .build();
+                        .build()));
         List<Diagnostic> problems = tson.validate(DOCUMENT);
 
         assertEquals(List.of(Diagnostic.Code.SCHEMA_TOO_LARGE),
@@ -89,12 +89,11 @@ class SchemaAccessConfigTest {
     void thePinRequirementInsideAnAccessGovernsTheLoader(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
 
-        Tson tson = Tson.builder()
-                .schemaAccess(SchemaAccess.builder()
+        Tson tson = Tson.of(TsonConfig.defaults()
+                .withSchemaAccess(SchemaAccess.builder()
                         .fetchPolicy(FetchPolicy.defaults().withRequireContentHashPin(true))
                         .fileSchemas(HOST, dir)
-                        .build())
-                .build();
+                        .build()));
 
         assertEquals(List.of(Diagnostic.Code.SCHEMA_NOT_PERMITTED),
                 tson.validate(DOCUMENT).stream().map(Diagnostic::code).toList());
@@ -105,9 +104,8 @@ class SchemaAccessConfigTest {
     void aSourceOfYourOwnReachesTheLoader(@TempDir Path dir) throws IOException {
         Files.writeString(dir.resolve("order-1.tn"), SCHEMA);
 
-        Tson tson = Tson.builder()
-                .schemaAccess(SchemaAccess.of(FileSchemaSource.builder().mapHost(HOST, dir).build()))
-                .build();
+        Tson tson = Tson.of(TsonConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(FileSchemaSource.builder().mapHost(HOST, dir).build())));
 
         assertEquals("ABC-1", tson.treeReader().read(DOCUMENT).get("sku").asString().orElseThrow());
     }

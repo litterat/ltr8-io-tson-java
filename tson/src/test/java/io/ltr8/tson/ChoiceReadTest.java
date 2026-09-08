@@ -42,7 +42,7 @@ class ChoiceReadTest {
                     inline: (text | boolean)
                   }
                 }""".formatted(contact);
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         return tson.treeRegistry().compile(tson.resolve(schema)).get("person");
     }
 

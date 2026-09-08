@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.SchemaFetchException;
@@ -37,7 +38,7 @@ class TsonValidateTest {
             throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
                     "this fixture serves only " + POINT_ID, null);
         };
-        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
     }
 
     @Test
@@ -172,7 +173,7 @@ class TsonValidateTest {
         // file that references a different identity -- so the content doesn't own the identity it was
         // obtained under. Refuse it rather than resolve mismatched content.
         SchemaSource wrongIdSource = uri -> POINT_SCHEMA;   // ignores uri; always returns point-1.tn
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(wrongIdSource)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(wrongIdSource)));
 
         List<Diagnostic> problems = tson.validate(
                 "!!schema:\"https://example.test/other-1.tn\"\n!point { x: 1  y: 2 }");
@@ -190,7 +191,7 @@ class TsonValidateTest {
         String tampered = POINT_SCHEMA.replace("int32", "int64");   // same !!id, different body -> different hash
         AtomicInteger calls = new AtomicInteger();
         SchemaSource flaky = uri -> calls.getAndIncrement() == 0 ? tampered : POINT_SCHEMA;
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(flaky)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(flaky)));
 
         String pinnedData = "!!schema:\"" + POINT_ID + "?sha256=" + correctHash + "\"\n!point { x: 1  y: 2 }";
 
@@ -263,7 +264,7 @@ class TsonValidateTest {
      */
     @Test
     void aNestedRecordsFieldExtendsThePointerAndReanchorsThePosition() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/nested-1.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
@@ -309,7 +310,7 @@ class TsonValidateTest {
      */
     @Test
     void anInjectedEntryIsLocatedByTheFieldThatDesugaredIntoIt() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/tags-1.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
@@ -379,12 +380,12 @@ class TsonValidateTest {
                   reading => { pct: my_percentage }
                 }
                 """;
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> {
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(uri -> {
             if (uri.equals(schemaId)) {
                 return schema;
             }
             throw new IllegalStateException("no schema for " + uri);
-        })).build();
+        })));
 
         Diagnostic problem = only(tson, "!!schema:\"" + schemaId + "\"\n!reading { pct: 500 }");
 
@@ -435,12 +436,12 @@ class TsonValidateTest {
                   order  => { status: status  label: label  when: date }
                 }
                 """;
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> {
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(uri -> {
             if (uri.equals(schemaId)) {
                 return schema;
             }
             throw new IllegalStateException("no schema for " + uri);
-        })).build();
+        })));
 
         List<Diagnostic> problems = tson.validate("!!schema:\"" + schemaId + "\"\n"
                 + "!order { status: CANCELLED  label: toolong  when: nope }");

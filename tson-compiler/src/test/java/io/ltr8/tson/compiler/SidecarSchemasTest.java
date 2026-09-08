@@ -1,4 +1,5 @@
 package io.ltr8.tson.compiler;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;

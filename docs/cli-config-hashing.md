@@ -174,7 +174,7 @@ writes the document that would be refused.
 **The three commands that judge a document take the policy flags** — `validate`, `compile`, `policy`, not
 `hash`/`init-example` — the §8.2 ones and `--max-depth`. `PolicyOptions` consumes them off the argument list before each subcommand's own loop
 runs, so those loops still see only `--output` and their positionals; the pair then goes into one
-`Tson.builder()` per run, which is what makes a schema's declared names and a data document's names answer to
+`Tson` per run, which is what makes a schema's declared names and a data document's names answer to
 one setting. §8.2 asks that a relaxation not be *silent*, and a flag written into a CI file satisfies that
 where the environment variable it warns about would not — the point of the rule is ambient authority, not the
 existence of configuration. Giving the CLI no way to configure this at all was the worse failure: it told the

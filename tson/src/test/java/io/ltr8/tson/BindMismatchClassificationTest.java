@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
@@ -58,10 +59,9 @@ class BindMismatchClassificationTest {
             """;
 
     private static Tson tson() {
-        return Tson.builder()
-                .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META_X, META_SCHEMA))))
-                .dataBindContext(SchemaMetaNameBinder.defaultContext())
-                .build();
+        return Tson.of(TsonConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META_X, META_SCHEMA))))
+                .withDataBindContext(SchemaMetaNameBinder.defaultContext()));
     }
 
     private static Diagnostic only(String document) {

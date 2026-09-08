@@ -1,6 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.TsonConfig;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -12,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * {@link TsonConfig#processorPolicy} -- the whole of what a deployment constrains this processor with,
+ * {@link TsonConfig#withProcessorPolicy} -- the whole of what a deployment constrains this processor with,
  * stated as the one value {@link Tson#processorPolicy()} reports and {@code Json.withProcessorPolicy} takes.
  *
  * <p>The three component setters fold into it rather than standing beside it, so what is pinned here is
@@ -32,7 +33,7 @@ class ProcessorPolicyConfigTest {
 
     @Test
     void theWholePolicyRoundTripsThroughTheInstance() {
-        assertEquals(TIGHTENED, Tson.builder().processorPolicy(TIGHTENED).build().processorPolicy());
+        assertEquals(TIGHTENED, Tson.of(TsonConfig.defaults().withProcessorPolicy(TIGHTENED)).processorPolicy());
     }
 
     /**
@@ -42,11 +43,10 @@ class ProcessorPolicyConfigTest {
      */
     @Test
     void theComponentSettersReachTheSameValue() {
-        Tson piecewise = Tson.builder()
-                .identifierPolicy(TIGHTENED.identifierPolicy())
-                .tokenPolicy(TIGHTENED.tokenPolicy())
-                .limits(TIGHTENED.limits())
-                .build();
+        Tson piecewise = Tson.of(TsonConfig.defaults()
+                .withIdentifierPolicy(TIGHTENED.identifierPolicy())
+                .withTokenPolicy(TIGHTENED.tokenPolicy())
+                .withLimits(TIGHTENED.limits()));
 
         assertEquals(TIGHTENED, piecewise.processorPolicy());
     }
@@ -59,10 +59,9 @@ class ProcessorPolicyConfigTest {
      */
     @Test
     void statingOneComponentLeavesTheOthersAlone() {
-        ProcessorPolicy stated = Tson.builder()
-                .limits(LimitsPolicy.defaults().withMaxDepth(8))
-                .identifierPolicy(UnicodePolicy.asciiOnly())
-                .build()
+        ProcessorPolicy stated = Tson.of(TsonConfig.defaults()
+                        .withLimits(LimitsPolicy.defaults().withMaxDepth(8))
+                        .withIdentifierPolicy(UnicodePolicy.asciiOnly()))
                 .processorPolicy();
 
         assertEquals(8, stated.limits().maxDepth(), "the limit stated first survives the policy stated after it");
@@ -74,10 +73,9 @@ class ProcessorPolicyConfigTest {
     /** A component stated after the whole policy refines it; the policy is not a floor the components clear. */
     @Test
     void aComponentStatedAfterTheWholePolicyRefinesIt() {
-        ProcessorPolicy stated = Tson.builder()
-                .processorPolicy(TIGHTENED)
-                .limits(LimitsPolicy.defaults())
-                .build()
+        ProcessorPolicy stated = Tson.of(TsonConfig.defaults()
+                        .withProcessorPolicy(TIGHTENED)
+                        .withLimits(LimitsPolicy.defaults()))
                 .processorPolicy();
 
         assertEquals(TIGHTENED.withLimits(LimitsPolicy.defaults()), stated);
@@ -91,7 +89,7 @@ class ProcessorPolicyConfigTest {
      */
     @Test
     void theIdentifierHalfOfAWholePolicyReachesTheLinker() {
-        List<Diagnostic> refused = Tson.builder().processorPolicy(TIGHTENED).build().validateSchema("""
+        List<Diagnostic> refused = Tson.of(TsonConfig.defaults().withProcessorPolicy(TIGHTENED)).validateSchema("""
                 !!id:"https://example.test/whole-policy.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!import:"https://tson.io/2026/35/m/core.tn"
@@ -105,9 +103,8 @@ class ProcessorPolicyConfigTest {
     /** And the limits half reaches a read, the other component that has to travel past the report. */
     @Test
     void theLimitsHalfOfAWholePolicyReachesARead() {
-        Tson tson = Tson.builder()
-                .processorPolicy(ProcessorPolicy.defaults().withLimits(LimitsPolicy.defaults().withMaxDepth(3)))
-                .build();
+        Tson tson = Tson.of(TsonConfig.defaults()
+                .withProcessorPolicy(ProcessorPolicy.defaults().withLimits(LimitsPolicy.defaults().withMaxDepth(3))));
 
         assertEquals(LimitsPolicy.defaults().withMaxDepth(3), tson.limitsPolicy());
         assertEquals(List.of(Diagnostic.Code.LIMIT_EXCEEDED),
@@ -123,8 +120,8 @@ class ProcessorPolicyConfigTest {
     void aPerSegmentTokenPolicyIsRefusedWhicheverSetterCarriesIt() {
         UnicodePolicy perSegment = UnicodePolicy.highlyRestrictive().perSegment();
 
-        assertThrows(IllegalArgumentException.class, () -> Tson.builder().tokenPolicy(perSegment));
+        assertThrows(IllegalArgumentException.class, () -> TsonConfig.defaults().withTokenPolicy(perSegment));
         assertThrows(IllegalArgumentException.class,
-                () -> Tson.builder().processorPolicy(ProcessorPolicy.defaults().withTokenPolicy(perSegment)));
+                () -> TsonConfig.defaults().withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(perSegment)));
     }
 }

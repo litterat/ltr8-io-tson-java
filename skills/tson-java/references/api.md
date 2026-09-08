@@ -34,7 +34,7 @@ public final class Tson {
 }
 ```
 
-`Tson.builder().build()` bootstraps meta-kernel / meta.tn / core.tn and returns an immutable instance.
+`Tson.standard()` bootstraps meta-kernel / meta.tn / core.tn and returns an immutable instance.
 Resolution is **always bind-anchored** (meta instances bind to `schema.meta.Top`), so `resolve` takes no
 mode; only the final compile picks one, which is why **the read mode is which registry you hold**.
 

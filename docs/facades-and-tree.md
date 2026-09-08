@@ -409,11 +409,11 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
 
 ## Front door: `Tson`/`TsonConfig` (`tson` module)
 
-A small module over `tson-compiler`, the consumer entry point. `Tson.builder().build()` bootstraps
+A small module over `tson-compiler`, the consumer entry point. `Tson.standard()` bootstraps
 meta-kernel/meta.tn/core.tn into a governed environment and returns an immutable `Tson`.
 
 ```java
-Tson tson = Tson.builder().build();
+Tson tson = Tson.standard();
 tson.resolve(schemaText);                      // registers the schema by its own !!id
 TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
 ```

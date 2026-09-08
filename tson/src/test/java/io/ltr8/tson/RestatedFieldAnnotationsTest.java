@@ -74,7 +74,7 @@ class RestatedFieldAnnotationsTest {
             """.formatted(ID);
 
     private static RecordField field(String type, String name) {
-        TsonLinkedSchema linked = Tson.builder().build().resolve(SCHEMA);
+        TsonLinkedSchema linked = Tson.standard().resolve(SCHEMA);
         RecordBody body = (RecordBody) linked.schema().entries().get(type).body();
         return body.fields().stream().filter(f -> f.name().equals(name)).findFirst().orElseThrow();
     }

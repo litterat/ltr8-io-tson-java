@@ -39,7 +39,7 @@ class RefusedNameDrawsNoVerdictTest {
             """;
 
     private static List<Diagnostic.Code> codes(String fieldName) {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(SCHEMA);
         return tson.validate("""
                 !!schema:"https://example.test/accounts.tn"

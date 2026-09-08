@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
@@ -42,7 +43,7 @@ class ApplicabilityIsIsATopTest {
                 {
                 %s }
                 """.formatted(declarations);
-        return Tson.builder().schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))).build()
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
                 .validateSchema(source);
     }
 
@@ -82,7 +83,7 @@ class ApplicabilityIsIsATopTest {
                   applied => open<int32>
                 }
                 """;
-        var entries = Tson.builder().schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))).build()
+        var entries = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
                 .resolve(source).schema().entries();
 
         for (String name : List.of("bare", "closed", "applied")) {
@@ -125,10 +126,9 @@ class ApplicabilityIsIsATopTest {
                     !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
                     { tags => !%s { element_type: identifier } }
                     """.formatted(head);
-            List<Diagnostic> problems = Tson.builder()
-                    .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(
-                            "https://example.test/m.tn", meta, "https://example.test/u.tn", user))))
-                    .build().validateSchema(user);
+            List<Diagnostic> problems = Tson.of(TsonConfig.defaults()
+                    .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(
+                            "https://example.test/m.tn", meta, "https://example.test/u.tn", user))))).validateSchema(user);
 
             assertEquals(List.of(), problems, () -> "!" + head + " { ... }: " + problems);
         }

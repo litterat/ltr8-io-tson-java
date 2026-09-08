@@ -43,7 +43,7 @@ must match the library's own revision.
 ## Workflow
 
 1. **Decide whether you need a schema at all.** Reading one document with no schema is one
-   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.builder().build()` bootstraps
+   constructor and one call — `new TsonTreeReader().read(text)`. `Tson.standard()` bootstraps
    meta-kernel/meta.tn/core.tn and is what you need only once a *schema* is in play.
 2. **Pick the reader from the matrix below** — the two questions are *what drives the interpretation*
    (the wire alone, your Java class, or a TSON schema) and *what you want out* (a `TsonValue` tree, or
@@ -91,7 +91,7 @@ import io.ltr8.tson.base.*;        // Diagnostic, the receivers, the policies
 import io.ltr8.tson.compiler.*;    // the readers, writers, registries
 import io.ltr8.tson.tree.TsonValue;
 
-Tson tson = Tson.builder().build();   // bootstraps meta-kernel, meta.tn and core.tn
+Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn and core.tn
 
 String schema = """
         !!id:"https://example.com/2026/35/app/order-1.tn"
@@ -137,7 +137,7 @@ resolves the schema the document names and picks the type from its own root `!or
 `resolve` and `validateSchema` **both register**, so calling one after the other on the same text
 throws `TsonSchemaValidationException` ("a schema is already registered under …"). Pick one.
 
-`TsonConfig` (what `Tson.builder()` returns) carries: `schemaAccess(…)`,
+`TsonConfig` (a value in `tson-base`, handed to `Tson.of`) carries: `schemaAccess(…)`,
 `bindings(Map<String, Class<?>>)` / `profile(name)` / `dataBindContext(…)`, `metaNameBinder(…)`,
 `processorPolicy(…)` (or its `identifierPolicy(…)` / `tokenPolicy(…)` / `limits(…)` components), and
 
@@ -190,7 +190,7 @@ Server server = new TsonObjectReader().read("""
 Records, `Map<K, V>`, `List<E>`, tuples, plain enums, sealed-interface unions and the whole built-in
 vocabulary bind with no custom code — **the target class must be `public`**, since the library binds it
 reflectively from another module. Under a schema, name the class for a schema type with
-`TsonConfig.bindings(Map.of("order", Order.class))` and read with
+`DataNameBinder.ofMap(Map.of("order", Order.class))` on the bind context, and read with
 `tson.objectReader().withSchema(uri).readAs(source, "order", Order.class)`.
 
 **A schema and its bound class must agree**, checked at bind-mode compile — startup, not first read.
@@ -360,10 +360,9 @@ generating and the disagreement never costs a round trip.
 Two policies, defaulting opposite ways for the same reason in each case:
 
 ```java
-Tson tson = Tson.builder()
-        .identifierPolicy(UnicodePolicy.highlyRestrictive().perSegment())  // names
-        .tokenPolicy(UnicodePolicy.unrestricted())                         // values
-        .build();
+Tson tson = Tson.of(TsonConfig.defaults()
+        .withIdentifierPolicy(UnicodePolicy.highlyRestrictive().perSegment())  // names
+        .withTokenPolicy(UnicodePolicy.unrestricted()));                       // values
 ```
 
 `identifierPolicy` governs **names** — declared names, field names, type-refs, annotation names — and

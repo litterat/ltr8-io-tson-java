@@ -3,6 +3,7 @@ package io.ltr8.tson.json;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClassAtom;
+import io.ltr8.tson.base.TsonConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import org.junit.jupiter.api.Test;
 
@@ -59,7 +60,7 @@ class SharedAtomVocabularyTest {
     void aSuppliedContextIsUsedAsGiven() {
         DataBindContext own = AtomContext.defaultContext();
 
-        assertSame(own, Json.using(own).dataBindContext());
+        assertSame(own, Json.of(TsonConfig.defaults().withDataBindContext(own)).dataBindContext());
         assertSame(own, JsonObjectReader.using(own).dataBindContext());
     }
 }

@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.HttpSchemaSource;
 import io.ltr8.tson.base.source.FileSchemaSource;
@@ -10,6 +11,7 @@ import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
+import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
@@ -26,7 +28,7 @@ import java.util.Optional;
  * mechanical surface (lexer, both grammars, resolution, linking-adjacent validation, compilation,
  * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
  * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
- * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #builder()}, which
+ * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #of(TsonConfig)}, which
  * bootstraps meta-kernel/meta.tn/core.tn into a fresh, governed environment:
  *
  * <pre>{@code
@@ -87,7 +89,7 @@ public final class Tson {
     private final DataBindContext dataBindContext;
 
     /**
-     * What this instance will admit as a name and spend on a document -- {@link TsonConfig#processorPolicy},
+     * What this instance will admit as a name and spend on a document -- {@link TsonConfig#withProcessorPolicy},
      * held whole rather than as its three components. The core is handed the identifier half at
      * construction, since the linker judges declared names; this stays the one statement of the policy, so
      * reporting it is an accessor rather than a reassembly of values living in three places.
@@ -102,9 +104,37 @@ public final class Tson {
         this.bind = TsonCompiledSchemaRegistry.bind(core, dataBindContext);
     }
 
-    /** A fresh {@link TsonConfig} -- {@link TsonConfig#build()} bootstraps meta-kernel/meta.tn/core.tn and returns the resulting {@link Tson}. */
-    public static TsonConfig builder() {
-        return new TsonConfig();
+    /**
+     * Bootstraps meta-kernel/meta.tn/core.tn under {@code config} and returns the governed environment.
+     *
+     * <p>The configuration is a value and lives in {@code tson-base}, so the same one configures every
+     * encoding; what cannot live there is this method, which names the compiler's own registry. That split
+     * is the whole of why construction is here and settings are there.
+     */
+    /**
+     * The unconfigured environment: the bundled standard library, nothing else fetchable, and the default
+     * policy. {@code Json.standard()} is the other encoding's counterpart, and the two answer alike on
+     * purpose -- a caller who needs no configuration should not have to name a configuration to say so.
+     */
+    public static Tson standard() {
+        return of(TsonConfig.defaults());
+    }
+
+    public static Tson of(TsonConfig config) {
+        // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
+        // bundled meta-kernel/meta/core, and the access's source is consulted only for other URIs. It
+        // compiles the standard library in object-binding mode -- the only mode that can (a DOM reader
+        // can't resolve the !enum/!integer instances a meta-schema declares), which is why it takes the
+        // bind context rather than a resolver that might be the wrong mode. The *mode* is what is fixed
+        // here; which names that binder knows is metaNameBinder's to extend. Tson builds the per-mode read
+        // registries (DOM and object-binding, the latter bound to dataBindContext) over this one core.
+        DataBindContext schemaContext = config.metaNameBinder() == null
+                ? SchemaMetaNameBinder.defaultContext()
+                : SchemaMetaNameBinder.contextExtendedWith(config.metaNameBinder());
+        SchemaSource source = config.schemaAccess().source();
+        TsonCompiledMetaRegistry core = TsonCompiledMetaRegistry.withStandardLibrary(
+                schemaContext, source, config.processorPolicy().identifierPolicy());
+        return new Tson(core, config.dataBindContext(), config.processorPolicy());
     }
 
     /**
@@ -113,7 +143,7 @@ public final class Tson {
      * schemaless when it declares none. Built over {@link #bindRegistry()}, so every reader from this
      * instance shares one compiled-schema cache: a schema is compiled once here, not once per reader.
      *
-     * <p><b>Both [TSON-DATA] §8.2 policies come from this instance</b>, {@link TsonConfig#identifierPolicy}
+     * <p><b>Both [TSON-DATA] §8.2 policies come from this instance</b>, {@link TsonConfig#withIdentifierPolicy}
      * included -- a reader built here judges the names in a document under the same policy the linker judged
      * the schema's declared names under. They are one processor, and {@link #processorPolicy()} reports one
      * answer for it, which is only true if one answer is what both ends use.
@@ -147,9 +177,9 @@ public final class Tson {
 
     /**
      * Everything this instance will admit and spend -- [TSON-DATA] §8.2's two Unicode policies
-     * ({@link TsonConfig#identifierPolicy} over declared names, {@link TsonConfig#tokenPolicy} over token
+     * ({@link TsonConfig#withIdentifierPolicy} over declared names, {@link TsonConfig#withTokenPolicy} over token
      * values), the Unicode data version they are computed against, and §9.1's resource limits
-     * ({@link TsonConfig#limits}) -- under the names that configured them.
+     * ({@link TsonConfig#withLimits}) -- under the names that configured them.
      *
      * <p><b>What a run or a response states beside its diagnostics</b>, and what a deployment can publish
      * with no document in hand at all. §8.2's rules read data the UCD does not freeze and are applied at a
@@ -163,7 +193,7 @@ public final class Tson {
     }
 
     /**
-     * The [TSON-DATA] §9.1 resource limits this instance applies -- {@link TsonConfig#limits}, and
+     * The [TSON-DATA] §9.1 resource limits this instance applies -- {@link TsonConfig#withLimits}, and
      * {@link #processorPolicy()}'s {@code limits} component in one call.
      *
      * <p>A limit is the reading deployment's own choice, so the same bytes may be read here and refused

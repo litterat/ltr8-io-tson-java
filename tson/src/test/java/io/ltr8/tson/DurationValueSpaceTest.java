@@ -43,13 +43,13 @@ class DurationValueSpaceTest {
 
     private static Fixture governing(String declarations) {
         String schema = schemaDeclaring(declarations);
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(schema);
         return new Fixture(tson, schema.split("\"")[1]);
     }
 
     private static List<Diagnostic> loading(String declarations) {
-        return Tson.builder().build().validateSchema(schemaDeclaring(declarations));
+        return Tson.standard().validateSchema(schemaDeclaring(declarations));
     }
 
     // ── the two ends, through a document ─────────────────────────────────

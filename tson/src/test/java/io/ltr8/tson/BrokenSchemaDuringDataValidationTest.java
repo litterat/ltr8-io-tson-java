@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
@@ -53,7 +54,7 @@ class BrokenSchemaDuringDataValidationTest {
             }
             throw new IllegalStateException("no schema for " + uri);
         };
-        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
     }
 
     /**
@@ -73,7 +74,7 @@ class BrokenSchemaDuringDataValidationTest {
                   second => { q: !int32 ^ { min: 1 } }
                 }
                 """;
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> unparseable)).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(uri -> unparseable)));
 
         List<Diagnostic> problems = tson.validate(DATA);
 
@@ -139,12 +140,11 @@ class BrokenSchemaDuringDataValidationTest {
     /** A schema that cannot be reached at all is still one problem -- there is nothing to enumerate. */
     @Test
     void anUnreachableSchemaIsStillASingleDiagnostic() {
-        List<Diagnostic> problems = Tson.builder()
-                .schemaAccess(SchemaAccess.of(uri -> {
-                    throw new SchemaFetchException(uri, SchemaFetchException.Reason.TRANSPORT,
-                            "nothing here", null);
-                }))
-                .build()
+        List<Diagnostic> problems = Tson.of(TsonConfig.defaults()
+                        .withSchemaAccess(SchemaAccess.of(uri -> {
+                            throw new SchemaFetchException(uri, SchemaFetchException.Reason.TRANSPORT,
+                                    "nothing here", null);
+                        })))
                 .validate(DATA);
 
         assertEquals(1, problems.size());
@@ -161,9 +161,9 @@ class BrokenSchemaDuringDataValidationTest {
     @Test
     void aSourceFailingAnyOtherWayIsAFaultAndNotAVerdict() {
         IllegalStateException fault = new IllegalStateException("the cache is in an impossible state");
-        Tson tson = Tson.builder().schemaAccess(SchemaAccess.of(uri -> {
+        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(uri -> {
             throw fault;
-        })).build();
+        })));
 
         assertSame(fault, assertThrows(IllegalStateException.class, () -> tson.validate(DATA)));
     }

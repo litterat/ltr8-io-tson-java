@@ -31,7 +31,7 @@ class AliasedArgumentIdentityTest {
     private static final String ID = "https://example.test/argument-identity.tn";
 
     private static TsonLinkedSchema resolve() {
-        return Tson.builder().build().resolve("""
+        return Tson.standard().resolve("""
                 !!id:"%s"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!import:"https://tson.io/2026/35/m/core.tn"

@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.TsonConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -30,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A consumer's own meta-layer constructor, reached through the front door. {@code
  * MetaLayerDataConstructorTest} pins the mechanism itself against a hand-built {@code
- * TsonCompiledMetaRegistry}; this pins that a caller gets it from {@link Tson#builder()} without giving up
+ * TsonCompiledMetaRegistry}; this pins that a caller gets it from {@link Tson#defaults()} without giving up
  * the reader, the writer or the per-mode registries that come with a {@link Tson}.
  *
  * <p>{@link TsonConfig#metaNameBinder} is the whole difference. It is composed over {@link
@@ -92,7 +93,7 @@ class MetaLayerConstructorThroughTsonTest {
             new DataNameBinder.DefaultDataNameBinder(Set.of("io.ltr8.tson.consumer"), Map.of());
 
     private static Tson tson() {
-        return Tson.builder().schemaAccess(SchemaAccess.of(SOURCE)).metaNameBinder(CONSUMER_NAMES).build();
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)).withMetaNameBinder(CONSUMER_NAMES));
     }
 
     /**
@@ -128,7 +129,7 @@ class MetaLayerConstructorThroughTsonTest {
 
     /** The point of the whole exercise: the resolved body <em>is</em> the consumer's own class. */
     @Test
-    void aConsumersMetaLayerConstructorBindsThroughTheBuilder() {
+    void aConsumersMetaLayerConstructorBindsThroughTheDefaults() {
         TsonLinkedSchema linked = tson().resolve(API_SCHEMA);
 
         Operation search = assertInstanceOf(Operation.class, linked.schema().entries().get("search").body());
@@ -149,7 +150,7 @@ class MetaLayerConstructorThroughTsonTest {
      */
     @Test
     void withoutTheBinderTheSameSchemaHasNoBoundClass() {
-        Tson unextended = Tson.builder().schemaAccess(SchemaAccess.of(SOURCE)).build();
+        Tson unextended = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)));
 
         MissingBindingException thrown =
                 assertThrows(MissingBindingException.class, () -> unextended.resolve(API_SCHEMA));

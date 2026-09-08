@@ -1,4 +1,5 @@
 package io.ltr8.tson.cli;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
@@ -29,7 +30,7 @@ final class CompileCommand {
      *         library ({@link TsonCli#exitCodeFor})
      */
     static int run(Path schemaFile, OutputFormat format, PolicyOptions policies) {
-        Tson tson = policies.applyTo(Tson.builder()).build();
+        Tson tson = Tson.of(policies.applyTo(TsonConfig.defaults()));
         // Read off the Tson that judged, not rebuilt from a default: a schema's declared names face
         // [TSON-DATA] §8.2 at link time, so this run can refuse one, and a refusal is only interpretable
         // beside the policy that produced it.

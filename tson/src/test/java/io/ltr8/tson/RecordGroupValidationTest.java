@@ -28,7 +28,7 @@ class RecordGroupValidationTest {
                     ( email: text | phone: text )
                   }
                 }""";
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         return tson.treeRegistry().compile(tson.resolve(schema)).get("contact");
     }
 

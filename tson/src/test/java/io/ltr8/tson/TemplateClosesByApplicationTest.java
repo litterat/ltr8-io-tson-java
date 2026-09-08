@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
@@ -64,9 +65,8 @@ class TemplateClosesByApplicationTest {
      */
     private static List<Diagnostic> metaProblems(String extraDeclarations) {
         String source = meta(extraDeclarations);
-        Tson tson = Tson.builder()
-                .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, source))))
-                .build();
+        Tson tson = Tson.of(TsonConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, source)))));
         return tson.validateSchema(source);
     }
 
@@ -76,18 +76,16 @@ class TemplateClosesByApplicationTest {
                 !!meta:"https://example.test/m.tn"
                 { %s }
                 """.formatted(body);
-        Tson tson = Tson.builder()
-                .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_SOURCE, USER, user))))
-                .build();
+        Tson tson = Tson.of(TsonConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_SOURCE, USER, user)))));
         return tson.validateSchema(user);
     }
 
     /** The meta-schema itself is fine: declaring a template is not the mistake, applying one wrongly is. */
     @Test
     void theTemplatesThemselvesResolve() {
-        Tson tson = Tson.builder()
-                .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_SOURCE))))
-                .build();
+        Tson tson = Tson.of(TsonConfig.defaults()
+                .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(META, META_SOURCE)))));
 
         assertEquals(List.of(), tson.validateSchema(META_SOURCE));
     }

@@ -340,7 +340,7 @@ registers the schema by its `!!id`; `withSchema` points a reader at it; `readAs`
 ```java
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.tree.TsonValue;
-Tson tson = Tson.builder().build();
+Tson tson = Tson.standard();
 
 String schema = """
         !!id:"https://example.com/2026/35/app/server-1.tn"
@@ -381,12 +381,11 @@ your `SchemaAccess`, and validates against it — falling back to a schemaless r
 declares none. It's the value-returning peer of `tson.validate`:
 
 ```java
-Tson tson = Tson.builder()
+Tson tson = Tson.of(TsonConfig.defaults()
         // Schemas you already hold, keyed by identity. Not `schemas::get` -- a source says "I cannot
         // supply that" by throwing, where a map returns null, for whichever identity the document names.
-        .schemaAccess(SchemaAccess.of(SchemaSource.ofMap(     // the `server` schema from §4
-                Map.of("https://example.com/2026/35/app/server-1.tn", schema))))
-        .build();
+        .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(   // the `server` schema from §4
+                Map.of("https://example.com/2026/35/app/server-1.tn", schema)))));
 
 // Self-describing: it names its own schema and root type — no other arguments needed.
 TsonValue server = tson.treeReader().read("""
@@ -540,7 +539,7 @@ vocabulary — parse → resolve → link → register → compile → read:
    against one of its own types — the schema-validating reader (Class 2) that the schemaless
    `TsonObjectReader`/`TsonDataParser` don't attempt on their own.
 
-`Tson.builder().build()` wires all of this together for the standard library and hands you a `Tson`
+`Tson.standard()` wires all of this together for the standard library and hands you a `Tson`
 whose `resolve`/`compile` run the pipeline for you (as shown in the [reader table](#reading-and-writing-tson-choosing-an-entry-point)'s
 schema example) — so you rarely touch the individual stages directly. Under the hood, resolving and
 linking a schema both need its own *governing* schema already compiled, to resolve constructor names

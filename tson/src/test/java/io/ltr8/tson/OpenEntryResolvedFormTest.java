@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -42,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OpenEntryResolvedFormTest {
 
     private static Tson tson() {
-        return Tson.builder().build();
+        return Tson.standard();
     }
 
     /**
@@ -51,7 +52,7 @@ class OpenEntryResolvedFormTest {
      * visible as a value rather than as a clean verdict.
      */
     private static Tson metaBoundTson() {
-        return Tson.builder().dataBindContext(SchemaMetaNameBinder.defaultContext()).build();
+        return Tson.of(TsonConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
     }
 
     /** {@code spec/m}, found by walking up rather than assumed relative to a working directory. */

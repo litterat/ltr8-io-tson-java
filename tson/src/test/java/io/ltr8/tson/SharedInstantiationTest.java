@@ -35,7 +35,7 @@ class SharedInstantiationTest {
      */
     @Test
     void anInstantiationAnImportAlreadyClosedUnifiesWithTheLocalOne() {
-        assertDoesNotThrow(() -> Tson.builder().build().resolve("""
+        assertDoesNotThrow(() -> Tson.standard().resolve("""
                 !!id:"https://example.test/shared-instantiation.tn"
                 !!meta:"%s"
                 !!import:"%s"
@@ -48,7 +48,7 @@ class SharedInstantiationTest {
     /** The same shape one layer down, through core.tn's own {@code set} template. */
     @Test
     void aConsumerClosingATemplateItsImportExportsLinks() {
-        assertDoesNotThrow(() -> Tson.builder().build().resolve("""
+        assertDoesNotThrow(() -> Tson.standard().resolve("""
                 !!id:"https://example.test/shared-instantiation-core.tn"
                 !!meta:"%s"
                 !!import:"%s"
@@ -63,7 +63,7 @@ class SharedInstantiationTest {
     @Test
     void aLocalDeclarationShadowingAnImportedNameStillCollides() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> Tson.builder().build().resolve("""
+                () -> Tson.standard().resolve("""
                         !!id:"https://example.test/shadowing.tn"
                         !!meta:"%s"
                         !!import:"%s"

@@ -42,7 +42,7 @@ class NetworkFacetsTest {
             """.formatted(ID);
 
     private static List<Diagnostic> read(String field, String value) {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve(SCHEMA);
         return tson.validate("!!schema:\"" + ID + "\"\n!holder { " + field + ": \"" + value + "\" }");
     }
@@ -117,7 +117,7 @@ class NetworkFacetsTest {
     @Test
     void aMalformedNetworkInTheListIsRefusedAtSchemaLoad() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> Tson.builder().build().resolve("""
+                () -> Tson.standard().resolve("""
                         !!id:"https://example.test/bad-network.tn"
                         !!meta:"https://tson.io/2026/35/m/meta.tn"
                         !!import:"https://tson.io/2026/35/m/core.tn"
@@ -136,7 +136,7 @@ class NetworkFacetsTest {
     @Test
     void aWithinAndExcludingPairThatAdmitsNothingIsRefusedAtSchemaLoad() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> Tson.builder().build().resolve("""
+                () -> Tson.standard().resolve("""
                         !!id:"https://example.test/empty-network-pair.tn"
                         !!meta:"https://tson.io/2026/35/m/meta.tn"
                         !!import:"https://tson.io/2026/35/m/core.tn"
@@ -154,7 +154,7 @@ class NetworkFacetsTest {
     @Test
     void aNetworkFamilyPairEmptiedByItsPrefixBoundIsRefusedAtSchemaLoad() {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                () -> Tson.builder().build().resolve("""
+                () -> Tson.standard().resolve("""
                         !!id:"https://example.test/empty-network-bound.tn"
                         !!meta:"https://tson.io/2026/35/m/meta.tn"
                         !!import:"https://tson.io/2026/35/m/core.tn"
@@ -168,7 +168,7 @@ class NetworkFacetsTest {
     /** The same body with the ceiling lifted past the largest surviving block loads and reads. */
     @Test
     void liftingTheCeilingPastTheSurvivingBlockLoadsTheSameBody() {
-        Tson tson = Tson.builder().build();
+        Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/inhabited-network-bound.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"

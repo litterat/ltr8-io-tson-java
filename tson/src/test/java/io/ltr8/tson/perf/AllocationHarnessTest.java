@@ -1,4 +1,5 @@
 package io.ltr8.tson.perf;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -92,12 +93,11 @@ class AllocationHarnessTest {
         assumeTrue(AllocationProbe.supported(), "needs HotSpot's per-thread allocation counter");
 
         SchemaSource source = uri -> SCHEMA;
-        tson = Tson.builder().schemaAccess(SchemaAccess.of(source))
-                .dataBindContext(DataBindContext.builder()
+        tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
+                .withDataBindContext(DataBindContext.builder()
                         .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "line", Line.class))
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
-                        .registerAtoms(AtomContext.hostTypes()).build())
-                .build();
+                        .registerAtoms(AtomContext.hostTypes()).build()));
         reader = tson.objectReader();
 
         // Everything a first read builds -- the compiled schema, the reader graph, the bind descriptors --

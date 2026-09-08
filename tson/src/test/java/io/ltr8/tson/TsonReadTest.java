@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.bind.DataBindContext;
@@ -45,7 +46,7 @@ class TsonReadTest {
             throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_FOUND,
                     "this fixture serves only " + POINT_ID, null);
         };
-        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
     }
 
     private static long asLong(TsonValue node) {
@@ -165,7 +166,7 @@ class TsonReadTest {
             }
             throw new SchemaFetchException(uri, reason, "refused for the test", null);
         };
-        return Tson.builder().schemaAccess(SchemaAccess.of(source)).build();
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
     }
 
     @Test
@@ -192,7 +193,7 @@ class TsonReadTest {
         DataNameBinder binder = name -> "point".equals(name) ? Point.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
         DataBindContext context = DataBindContext.builder().nameBinder(binder)
                 .registerAtoms(AtomContext.hostTypes()).build();
-        return Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBindContext(context).build();
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)).withDataBindContext(context));
     }
 
     @Test

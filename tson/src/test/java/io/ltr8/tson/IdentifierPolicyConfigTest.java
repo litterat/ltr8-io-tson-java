@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.TsonConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -13,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonConfig#identifierPolicy} end to end: the level reaches the linker, and each rung of the ladder
+ * {@link TsonConfig#withIdentifierPolicy} end to end: the level reaches the linker, and each rung of the ladder
  * changes what a schema may declare ([TSON-DATA] §8.2's restricted-script rule, [TSON-SCHEMA] §11.4's scopes).
  *
  * <p>Mixed-script names are built from code points rather than typed — the subject is spellings that look
@@ -41,15 +42,15 @@ class IdentifierPolicyConfigTest {
 
     private static void accepts(UnicodePolicy policy, String schema) {
         SchemaSource source = uri -> schema;
-        Tson tson = (policy == null ? Tson.builder() : Tson.builder().identifierPolicy(policy))
-                .schemaAccess(SchemaAccess.of(source)).build();
+        Tson tson = Tson.of((policy == null ? TsonConfig.defaults() : TsonConfig.defaults().withIdentifierPolicy(policy))
+                .withSchemaAccess(SchemaAccess.of(source)));
         assertNotNull(tson.resolve(schema));
     }
 
     private static String refuses(UnicodePolicy policy, String schema) {
         SchemaSource source = uri -> schema;
-        Tson tson = (policy == null ? Tson.builder() : Tson.builder().identifierPolicy(policy))
-                .schemaAccess(SchemaAccess.of(source)).build();
+        Tson tson = Tson.of((policy == null ? TsonConfig.defaults() : TsonConfig.defaults().withIdentifierPolicy(policy))
+                .withSchemaAccess(SchemaAccess.of(source)));
         return assertThrows(SchemaValidationException.class, () -> tson.resolve(schema)).getMessage();
     }
 

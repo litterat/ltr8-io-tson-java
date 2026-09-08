@@ -1,4 +1,5 @@
 package io.ltr8.tson.cli;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -52,7 +53,7 @@ final class DiagnosticsSchema {
     static TsonCompiledSchema compiled() {
         DataBindContext context =
                 DataBindContext.builder().nameBinder(BINDER).registerAtoms(AtomContext.hostTypes()).build();
-        Tson tson = Tson.builder().dataBindContext(context).build();
+        Tson tson = Tson.of(TsonConfig.defaults().withDataBindContext(context));
         return tson.bindRegistry().compile(tson.resolve(readResource("/diagnostics.tn")));
     }
 

@@ -6,7 +6,7 @@
 ///   ./gradlew :tson:modules
 ///   java --module-path tson/build/modules --add-modules io.ltr8.tson examples/SchemaValidation.java
 ///
-/// `Tson.builder().build()` bootstraps the standard library (meta-kernel/meta.tn/core.tn); `resolve`
+/// `Tson.standard()` bootstraps the standard library (meta-kernel/meta.tn/core.tn); `resolve`
 /// registers a schema under its own `!!id`. This data isn't self-describing, so the reader is told which
 /// schema and type apply -- `withSchema(uri).readAs(source, type)`. Tree mode returns an immutable,
 /// queryable TsonValue -- no Java class involved, the TSON schema is the source of truth -- that preserves
@@ -14,7 +14,7 @@
 import module io.ltr8.tson;
 
 void main() {
-    Tson tson = Tson.builder().build();
+    Tson tson = Tson.standard();
 
     String schema = """
             !!id:"https://example.com/2026/35/app/server-1.tn"

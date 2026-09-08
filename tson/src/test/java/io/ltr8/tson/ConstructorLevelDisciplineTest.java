@@ -1,4 +1,5 @@
 package io.ltr8.tson;
+import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
@@ -36,7 +37,7 @@ class ConstructorLevelDisciplineTest {
                 {
                 %s }
                 """.formatted(meta, declarations);
-        return Tson.builder().schemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))).build()
+        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
                 .validateSchema(source);
     }
 
@@ -73,7 +74,7 @@ class ConstructorLevelDisciplineTest {
                   composed => c & { extra: identifier }
                 }
                 """;
-        var entries = Tson.builder().build().resolve(source).schema().entries();
+        var entries = Tson.standard().resolve(source).schema().entries();
 
         assertTrue(entries.get("c").supertypes().contains("top"), "the base-kind composition");
         assertTrue(entries.get("composed").supertypes().contains("top"), "and everything deriving from it");
