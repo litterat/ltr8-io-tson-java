@@ -67,8 +67,7 @@ class DispatchedAnnotationTest {
         Map<String, Class<?>> names = Map.of("shape", Shape.class, "circle", Circle.class, "holder", Holder.class);
         DataNameBinder binder = n -> names.containsKey(n) ? names.get(n) : SchemaMetaNameBinder.INSTANCE.resolve(n);
         return Tson.builder().schemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
-                .dataBindContext(AtomContext.registerDefaults(
-                        DataBindContext.builder().nameBinder(binder).build()))
+                .dataBindContext(DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build())
                 .build();
     }
 

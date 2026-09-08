@@ -111,8 +111,7 @@ class RootAnnotationTest {
 
         DataNameBinder binder = name -> "api".equals(name) ? Api.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
         Tson tson = Tson.builder().schemaAccess(SchemaAccess.of((SchemaSource) uri -> SCHEMA))
-                .dataBindContext(AtomContext.registerDefaults(
-                        DataBindContext.builder().nameBinder(binder).build()))
+                .dataBindContext(DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build())
                 .build();
 
         Api api = tson.objectReader().read(document, Api.class);

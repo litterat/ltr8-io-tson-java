@@ -74,7 +74,7 @@ class SchemaDrivenBindAnnotationTest {
                 ? widgetClass
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
@@ -174,7 +174,7 @@ class SchemaDrivenBindAnnotationTest {
                 ? Catalogue.class
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;
@@ -221,7 +221,7 @@ class SchemaDrivenBindAnnotationTest {
                 ? bound
                 : SchemaMetaNameBinder.INSTANCE.resolve(schemaTypeName);
         DataBindContext context =
-                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
         SchemaSource source = uri -> {
             if (CanonicalIdentity.sameIdentity(uri, ID)) {
                 return SCHEMA;

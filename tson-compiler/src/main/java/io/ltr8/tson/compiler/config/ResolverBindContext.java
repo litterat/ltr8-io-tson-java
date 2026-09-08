@@ -1,7 +1,6 @@
 package io.ltr8.tson.compiler.config;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Token;
@@ -25,20 +24,15 @@ public final class ResolverBindContext {
     private ResolverBindContext() {
     }
 
-    /** A fresh context carrying the atom vocabulary and the {@code SourcePosition} bridge. */
+    /** A fresh context carrying the atom vocabulary and the schema model's own two registrations. */
     public static DataBindContext defaultContext() {
-        return registerDefaults(DataBindContext.builder().build());
+        return registerDefaults(DataBindContext.builder()).build();
     }
 
-    /** {@code context} with the atom vocabulary and the {@code SourcePosition} bridge applied. */
-    public static DataBindContext registerDefaults(DataBindContext context) {
-        AtomContext.registerDefaults(context);
-        try {
-            context.registerAtom(Token.class);
-            context.registerAtom(SourcePosition.class, new SourcePositionStringBridge());
-        } catch (DataBindException e) {
-            throw new IllegalStateException("failed to register the SourcePosition bridge on a context", e);
-        }
-        return context;
+    /** {@code builder} with the atom vocabulary and the schema model's own two registrations added. */
+    public static DataBindContext.Builder registerDefaults(DataBindContext.Builder builder) {
+        return builder.registerAtoms(AtomContext.hostTypes())
+                .registerAtom(Token.class)
+                .registerAtom(SourcePosition.class, new SourcePositionStringBridge());
     }
 }

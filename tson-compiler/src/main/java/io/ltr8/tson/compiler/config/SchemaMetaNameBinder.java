@@ -124,6 +124,6 @@ public final class SchemaMetaNameBinder {
     }
 
     private static DataBindContext context(DataNameBinder binder) {
-        return ResolverBindContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+        return ResolverBindContext.registerDefaults(DataBindContext.builder().nameBinder(binder)).build();
     }
 }

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -85,9 +86,15 @@ class BindingsConfigTest {
                         !!schema:"https://example.test/orders.tn"
                         !invoice { sku: "A"  quantity: 1 }""", Order.class));
 
-        assertTrue(thrown.getMessage().contains("bindings(...) maps [order]"),
-                "the caller's own configuration leads: " + thrown.getMessage());
+        // The map's own account leads and names what it does hold, so the reader sees the line missing
+        // from their configuration rather than "not kernel vocabulary", which is the backstop's answer and
+        // no help at all. The wording is the map binder's; what is pinned is which binder authors it.
+        assertTrue(thrown.getMessage().contains("[order]"),
+                "the caller's own configuration leads, naming what the map holds: " + thrown.getMessage());
         assertTrue(thrown.getMessage().contains("invoice"), thrown.getMessage());
+        assertFalse(thrown.getMessage().contains("kernel"),
+                "the backstop's answer is the cause, not the message -- 'not kernel vocabulary' is no help "
+                        + "to someone who forgot a line of their own map: " + thrown.getMessage());
     }
 
     /** {@code profile} reaches the binder, so the shorter constructor is chosen and the schema checked against it. */

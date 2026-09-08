@@ -85,8 +85,8 @@ class SchemaVersionProfileTest {
             throw new IllegalStateException("unexpected fetch: " + uri);
         };
         DataNameBinder binder = name -> "order".equals(name) ? Order.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
-        DataBindContext context = AtomContext.registerDefaults(
-                DataBindContext.builder().nameBinder(binder).profile(profile).build());
+        DataBindContext context = DataBindContext.builder().nameBinder(binder).profile(profile)
+                .registerAtoms(AtomContext.hostTypes()).build();
         return Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBindContext(context).build();
     }
 

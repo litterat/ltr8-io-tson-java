@@ -74,7 +74,7 @@ class BindStrictnessTest {
         SchemaSource source = uri -> schema;
         DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
         TsonConfig config = Tson.builder().schemaAccess(SchemaAccess.of(source)).dataBindContext(
-                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build()));
+                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build());
         return (lenient ? config.lenientBinding() : config).build();
     }
 

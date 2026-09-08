@@ -24,9 +24,12 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -68,7 +71,43 @@ public class DataBindContext {
 
 		DataNameBinder nameBinder = null;
 
+		final List<Registration> atoms = new ArrayList<>();
+
+		/** One accumulated {@link #registerAtom} call, applied when the context is constructed. */
+		record Registration(Class<?> targetClass, DataBridge<?, ?> bridge) {
+		}
+
 		public Builder() {
+		}
+
+		/**
+		 * Binds {@code targetClass} as an <b>atom</b> -- one scalar on the wire -- rather than letting it be
+		 * taken apart structurally. What a class whose values have no useful parts needs: a {@code UUID} is
+		 * not a record of its bits, and a Java record whose values are one token would otherwise be written
+		 * as its components.
+		 */
+		public Builder registerAtom(Class<?> targetClass) {
+			atoms.add(new Registration(targetClass, null));
+			return this;
+		}
+
+		/**
+		 * Binds {@code targetClass} as an atom whose wire form is the type {@code bridge} converts to and
+		 * from -- for a class the engine cannot read directly, where the bridge names the crossing.
+		 */
+		public Builder registerAtom(Class<?> targetClass, DataBridge<?, ?> bridge) {
+			atoms.add(new Registration(targetClass, Objects.requireNonNull(bridge, "bridge")));
+			return this;
+		}
+
+		/**
+		 * {@link #registerAtom(Class)} for each of {@code atomTypes}, in order -- for a caller whose atom
+		 * vocabulary is a list it holds rather than a chain it writes. A named list reads as the vocabulary
+		 * it is and can be asserted against; eleven chained calls read as eleven decisions.
+		 */
+		public Builder registerAtoms(List<Class<?>> atomTypes) {
+			atomTypes.forEach(this::registerAtom);
+			return this;
 		}
 
 		public Builder allowAny() {
@@ -155,6 +194,16 @@ public class DataBindContext {
 			registerAtom(Void.class);
 			registerAtom(String.class);
 			registerAtom(Date.class);
+
+			// The builder's own, after the primitives, so a caller registering one of those gets the
+			// "already registered" error rather than silently shadowing it.
+			for (Builder.Registration atom : builder.atoms) {
+				if (atom.bridge() == null) {
+					registerAtom(atom.targetClass());
+				} else {
+					registerAtom(atom.targetClass(), atom.bridge());
+				}
+			}
 
 		} catch (DataBindException e) {
 			throw new IllegalArgumentException(e);
@@ -297,11 +346,18 @@ public class DataBindContext {
 	}
 
 
-	public void registerAtom(Class<?> targetClass) throws DataBindException {
+	/**
+	 * <b>Registration is the builder's, not this context's.</b> A context's configuration is fixed once it is
+	 * built: descriptors are handed out and cached from the moment the first read runs, so a registration
+	 * arriving afterwards either loses a race with a descriptor already given out or silently changes what a
+	 * later read produces. Both of these are called only from the constructor, applying the primitives and
+	 * then whatever {@link Builder#registerAtom} accumulated.
+	 */
+	private void registerAtom(Class<?> targetClass) throws DataBindException {
 		register(targetClass, new DataClassAtom(targetClass));
 	}
 
-	public DataClassAtom registerAtom(Class<?> targetClass, DataBridge<?, ?> bridge) throws DataBindException {
+	private DataClassAtom registerAtom(Class<?> targetClass, DataBridge<?, ?> bridge) throws DataBindException {
 		checkExists(targetClass);
 
 		Class<?> bridgeClass = bridge.getClass();

@@ -1084,8 +1084,8 @@ class TsonObjectReaderTest {
 
     @Test
     void durationBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
-        DataBindContext context = DataBindContext.builder().build();
-        context.registerAtom(UserDuration.class, new UserDurationBridge());
+        DataBindContext context = DataBindContext.builder()
+                .registerAtom(UserDuration.class, new UserDurationBridge()).build();
         TsonObjectReader bridgedMapper = new TsonObjectReader(context);
 
         UserDurationHolder h = bridgedMapper.read("{ value: !duration PT4H5M6S }", UserDurationHolder.class);
@@ -1160,8 +1160,8 @@ class TsonObjectReaderTest {
 
     @Test
     void rationalBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
-        DataBindContext context = DataBindContext.builder().build();
-        context.registerAtom(UserFraction.class, new UserFractionBridge());
+        DataBindContext context = DataBindContext.builder()
+                .registerAtom(UserFraction.class, new UserFractionBridge()).build();
         TsonObjectReader bridgedMapper = new TsonObjectReader(context);
 
         UserFractionHolder h = bridgedMapper.read("{ value: !rational \"2/3\" }", UserFractionHolder.class);
@@ -1199,8 +1199,7 @@ class TsonObjectReaderTest {
 
     @Test
     void complexBindsToAThirdPartyTypeViaRegisteredDataBridge() throws DataBindException {
-        DataBindContext context = DataBindContext.builder().build();
-        context.registerAtom(UserComplex.class, new UserComplexBridge());
+        DataBindContext context = DataBindContext.builder().registerAtom(UserComplex.class, new UserComplexBridge()).build();
         TsonObjectReader bridgedMapper = new TsonObjectReader(context);
 
         UserComplexHolder h = bridgedMapper.read("{ value: !complex 3+4i }", UserComplexHolder.class);

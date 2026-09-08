@@ -40,19 +40,15 @@ public class PatternStringBridgeTest {
 
 	@BeforeEach
 	public void setup() {
-		context = DataBindContext.builder().build();
+		context = DataBindContext.builder().registerAtom(Pattern.class, new PatternStringBridge()).build();
 	}
 
 	@Test
 	public void checkDescriptor() throws Throwable {
-		context.registerAtom(Pattern.class, new PatternStringBridge());
 	}
 
 	@Test
 	public void testToArray() throws Throwable {
-
-		context.registerAtom(Pattern.class, new PatternStringBridge());
-
 		// project to an array.
 		ArrayMapper arrayMap = new ArrayMapper(context);
 		Object[] values = arrayMap.toArray(test);
@@ -71,9 +67,6 @@ public class PatternStringBridgeTest {
 
 	@Test
 	public void testToMap() throws Throwable {
-
-		context.registerAtom(Pattern.class, new PatternStringBridge());
-
 		MapMapper mapMapper = new MapMapper(context);
 		Map<String, Object> map = mapMapper.toMap(test);
 

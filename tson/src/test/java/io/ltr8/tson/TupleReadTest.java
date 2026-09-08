@@ -169,7 +169,7 @@ class TupleReadTest {
     private static Tson tsonBindingPair() {
         DataNameBinder binder = name -> "pair".equals(name) ? Pair.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
         DataBindContext context =
-                AtomContext.registerDefaults(DataBindContext.builder().nameBinder(binder).build());
+                DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes()).build();
         return Tson.builder().dataBindContext(context).build();
     }
 

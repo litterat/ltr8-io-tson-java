@@ -43,7 +43,7 @@ public class SimpleArrayTest {
 
 	@BeforeEach
 	public void setup() {
-		context = DataBindContext.builder().build();
+		context = DataBindContext.builder().registerAtom(UUID.class, new UUIDBridge()).build();
 	}
 
 	@Test
@@ -67,9 +67,6 @@ public class SimpleArrayTest {
 
 	@Test
 	public void testToMap() throws Throwable {
-
-		context.registerAtom(UUID.class, new UUIDBridge());
-
 		MapMapper mapMapper = new MapMapper(context);
 		Map<String, Object> map = mapMapper.toMap(test);
 		Assertions.assertNotNull(map);

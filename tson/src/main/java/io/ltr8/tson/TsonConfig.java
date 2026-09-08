@@ -83,9 +83,10 @@ public final class TsonConfig {
      * internally to resolve the standard library itself -- see {@link Tson}'s own Javadoc for why that
      * one's mode is fixed, and {@link #metaNameBinder} for the one thing about it a consumer may extend.
      *
-     * <p><b>A context handed here must not be mutated once reads are running through it.</b> Its descriptor
-     * cache is concurrent and the first concurrent bind of one class is safe, but adding bindings to a live
-     * context is outside what the read path guarantees -- wire it up before the first read, as with schemas.
+     * <p><b>A context's configuration is fixed once it is built</b>, so a context handed here cannot acquire
+     * a binding later: {@code registerAtom} is {@link DataBindContext.Builder}'s and closes at
+     * {@code build()}. What stays concurrent is the descriptor cache, where two threads resolving one class
+     * both do the work and one answer wins -- duplicated work on a race, never duplicated state.
      */
     public TsonConfig dataBindContext(DataBindContext dataBindContext) {
         this.dataBindContext = dataBindContext;
@@ -349,24 +350,17 @@ public final class TsonConfig {
      * line of this application's configuration as "not kernel vocabulary".
      */
     private DataBindContext boundContext() {
-        Map<String, Class<?>> mapped = bindings == null ? Map.of() : bindings;
-        DataNameBinder binder = name -> {
-            Class<?> bound = mapped.get(name);
-            if (bound != null) {
-                return bound;
-            }
-            try {
-                return SchemaMetaNameBinder.INSTANCE.resolve(name);
-            } catch (DataBindException notKernelVocabulary) {
-                throw new DataBindException("'" + name + "' is not bound: bindings(...) maps "
-                        + mapped.keySet() + ", and it is not the kernel's own vocabulary either",
-                        notKernelVocabulary);
-            }
-        };
-        DataBindContext.Builder builder = DataBindContext.builder().nameBinder(binder);
+        // The map answers first and the kernel's own vocabulary backs it, so a schema naming `record` or
+        // `enum` still resolves and a consumer cannot lose those by supplying a map. `orElse` also settles
+        // which binder authors the failure: the map's, because a name neither knows is a missing line of
+        // this application's configuration rather than a fact about kernel vocabulary.
+        DataNameBinder binder = DataNameBinder.ofMap(bindings == null ? Map.of() : bindings)
+                .orElse(SchemaMetaNameBinder.INSTANCE);
+        DataBindContext.Builder builder = DataBindContext.builder().nameBinder(binder)
+                .registerAtoms(AtomContext.hostTypes());
         if (profile != null) {
             builder.profile(profile);
         }
-        return AtomContext.registerDefaults(builder.build());
+        return builder.build();
     }
 }

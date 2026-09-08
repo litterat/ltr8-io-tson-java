@@ -204,8 +204,8 @@ class TsonObjectWriterTest {
 
     @Test
     void writeRationalComplexDurationRoundTripThroughDataBridges() throws DataBindException {
-        DataBindContext fractionContext = DataBindContext.builder().build();
-        fractionContext.registerAtom(UserFraction.class, new UserFractionBridge());
+        DataBindContext fractionContext = DataBindContext.builder()
+                .registerAtom(UserFraction.class, new UserFractionBridge()).build();
         TsonObjectReader fractionReader = new TsonObjectReader(fractionContext);
         TsonObjectWriter fractionWriter = new TsonObjectWriter(fractionContext);
         UserFractionHolder fraction = fractionReader.read("{ value: !rational \"2/3\" }", UserFractionHolder.class);
@@ -213,8 +213,8 @@ class TsonObjectWriterTest {
         assertEquals("{ value: !rational \"2/3\" }", fractionTson);
         assertEquals(fraction, fractionReader.read(fractionTson, UserFractionHolder.class));
 
-        DataBindContext complexContext = DataBindContext.builder().build();
-        complexContext.registerAtom(UserComplex.class, new UserComplexBridge());
+        DataBindContext complexContext = DataBindContext.builder()
+                .registerAtom(UserComplex.class, new UserComplexBridge()).build();
         TsonObjectReader complexReader = new TsonObjectReader(complexContext);
         TsonObjectWriter complexWriter = new TsonObjectWriter(complexContext);
         UserComplexHolder complex = complexReader.read("{ value: !complex 3+4i }", UserComplexHolder.class);
@@ -222,8 +222,8 @@ class TsonObjectWriterTest {
         // Double.toString()'s own canonical form -- "3.0", not "3" -- for a whole-number double.
         assertEquals("{ value: !complex \"3.0+4.0i\" }", complexWriter.toTson(complex));
 
-        DataBindContext durationContext = DataBindContext.builder().build();
-        durationContext.registerAtom(UserDuration.class, new UserDurationBridge());
+        DataBindContext durationContext = DataBindContext.builder()
+                .registerAtom(UserDuration.class, new UserDurationBridge()).build();
         TsonObjectReader durationReader = new TsonObjectReader(durationContext);
         TsonObjectWriter durationWriter = new TsonObjectWriter(durationContext);
         UserDurationHolder duration =
