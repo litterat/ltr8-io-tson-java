@@ -6,6 +6,7 @@ import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import java.util.List;
+import io.ltr8.tson.base.atom.CidrInet4Network;
 import io.ltr8.tson.base.atom.CidrNetwork;
 import io.ltr8.tson.schema.meta.Cidr4Type;
 
@@ -13,7 +14,7 @@ import io.ltr8.tson.schema.meta.Cidr4Type;
  * Parses and validates against meta.tn's {@code cidr4_type} constructor (§5.5's {@code cidr4} atom, RFC
  * 4632): an IPv4 address, {@code /}, and a prefix length of 0-32.
  *
- * <p><b>Host type is {@link CidrNetwork}</b>, a value type in {@code base.atom} beside {@code Rational}.
+ * <p><b>Host type is {@link CidrInet4Network}</b>, a value type in {@code base.atom} beside {@code Rational}.
  * The grammar and the family-range and host-bits rules live on it, so a network is a value here rather than
  * the text that carried it -- which is what lets {@code within} and {@code excluding} be judged by the family
  * that declares them rather than by a check bolted onto the resolver.
@@ -27,7 +28,7 @@ import io.ltr8.tson.schema.meta.Cidr4Type;
  * all. Whether a declared bound itself falls inside the family range is a coherence rule and is not checked
  * here; an out-of-range one is inert either way, the family range being enforced regardless.
  */
-public record Cidr4Parser(Cidr4Type constraints) implements AtomTypeParser<CidrNetwork> {
+public record Cidr4Parser(Cidr4Type constraints) implements AtomTypeParser<CidrInet4Network> {
 
     /** §5.5's built-in annotation name -- {@code !cidr4}. */
     public static final String TYPENAME = "cidr4";
@@ -36,8 +37,8 @@ public record Cidr4Parser(Cidr4Type constraints) implements AtomTypeParser<CidrN
     public static final Cidr4Parser UNCONSTRAINED = new Cidr4Parser(Cidr4Type.UNCONSTRAINED);
 
     @Override
-    public CidrNetwork read(String text) {
-        CidrNetwork network = CidrNetwork.parse(text, 32);
+    public CidrInet4Network read(String text) {
+        CidrInet4Network network = CidrInet4Network.parse(text);
         if (network == null) {
             CidrParsing.checkFamilyRange(text, 32);
             throw malformed(text);
@@ -64,7 +65,7 @@ public record Cidr4Parser(Cidr4Type constraints) implements AtomTypeParser<CidrN
      * checked to be a network at schema load ({@code Cidr4Type.coherenceCheck}), so a null from {@code parse}
      * is unreachable rather than an author error.
      */
-    private void checkNetworks(String text, CidrNetwork value) {
+    private void checkNetworks(String text, CidrInet4Network value) {
         List<String> within = constraints.within();
         if (!within.isEmpty() && within.stream()
                 .noneMatch(entry -> subnetOf(entry, value))) {
@@ -78,18 +79,18 @@ public record Cidr4Parser(Cidr4Type constraints) implements AtomTypeParser<CidrN
         }
     }
 
-    private static boolean subnetOf(String entry, CidrNetwork value) {
-        CidrNetwork network = CidrNetwork.parse(entry, 32);
+    private static boolean subnetOf(String entry, CidrInet4Network value) {
+        CidrInet4Network network = CidrInet4Network.parse(entry);
         return network != null && network.contains(value);
     }
 
-    private static boolean overlaps(String entry, CidrNetwork value) {
-        CidrNetwork network = CidrNetwork.parse(entry, 32);
+    private static boolean overlaps(String entry, CidrInet4Network value) {
+        CidrInet4Network network = CidrInet4Network.parse(entry);
         return network != null && network.overlaps(value);
     }
 
     @Override
-    public String write(CidrNetwork value) {
+    public String write(CidrInet4Network value) {
         return value.text();
     }
 
@@ -106,7 +107,7 @@ public record Cidr4Parser(Cidr4Type constraints) implements AtomTypeParser<CidrN
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(CidrNetwork.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(CidrInet4Network.class, target);
     }
 
 }

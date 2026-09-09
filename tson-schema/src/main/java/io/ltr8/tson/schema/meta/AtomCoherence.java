@@ -199,7 +199,7 @@ final class AtomCoherence {
             return; // a malformed entry is checkNetworks' to report, and there is nothing to judge under it
         }
         if (permitted.isEmpty()) {
-            permitted = List.of(new CidrNetwork(new byte[familyBits / 8], 0)); // no `within` permits everything
+            permitted = List.of(CidrNetwork.all(familyBits)); // no `within` permits everything
         }
         // The shortest surviving block is the most permissive one, so it is the only one worth testing: any
         // value has to sit inside some survivor, and a longer survivor bounds the prefix length harder.

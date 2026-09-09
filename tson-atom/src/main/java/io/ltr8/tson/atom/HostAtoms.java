@@ -2,6 +2,8 @@ package io.ltr8.tson.atom;
 
 import io.ltr8.tson.atom.parser.BooleanParser;
 import io.ltr8.tson.atom.parser.BytesParser;
+import io.ltr8.tson.atom.parser.Cidr4Parser;
+import io.ltr8.tson.atom.parser.Cidr6Parser;
 import io.ltr8.tson.atom.parser.ComplexParser;
 import io.ltr8.tson.atom.parser.DateParser;
 import io.ltr8.tson.atom.parser.DateTimeParser;
@@ -17,6 +19,8 @@ import io.ltr8.tson.atom.parser.TextParser;
 import io.ltr8.tson.atom.parser.TimeParser;
 import io.ltr8.tson.atom.parser.UriParser;
 import io.ltr8.tson.atom.parser.UuidParser;
+import io.ltr8.tson.base.atom.CidrInet4Network;
+import io.ltr8.tson.base.atom.CidrInet6Network;
 import io.ltr8.tson.base.atom.Complex;
 import io.ltr8.tson.base.atom.Rational;
 import io.ltr8.tson.schema.meta.IntegerSize;
@@ -78,7 +82,9 @@ public final class HostAtoms {
             Map.entry(URI.class, UriParser.UNCONSTRAINED),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
-            Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED));
+            Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
+            Map.entry(CidrInet4Network.class, Cidr4Parser.UNCONSTRAINED),
+            Map.entry(CidrInet6Network.class, Cidr6Parser.UNCONSTRAINED));
 
     /**
      * The host classes of [TSON-JSON] §5.6's <b>string-content</b> families -- the ones whose wire form is a
@@ -98,7 +104,9 @@ public final class HostAtoms {
             Map.entry(URI.class, UriParser.UNCONSTRAINED),
             Map.entry(byte[].class, BytesParser.BASE64),
             Map.entry(Inet4Address.class, Ipv4Parser.UNCONSTRAINED),
-            Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED));
+            Map.entry(Inet6Address.class, Ipv6Parser.UNCONSTRAINED),
+            Map.entry(CidrInet4Network.class, Cidr4Parser.UNCONSTRAINED),
+            Map.entry(CidrInet6Network.class, Cidr6Parser.UNCONSTRAINED));
 
     /**
      * The host classes of the <b>numeric</b> families -- the exact tier ([TSON-JSON] §5.3) and the
@@ -172,24 +180,25 @@ public final class HostAtoms {
      * has no term for a position a host type has typed.
      *
      * <p><b>What is deliberately absent</b> is every class no single family names: {@code char} and
-     * {@code Object} (no family at all), {@code CidrNetwork} (both {@code cidr4} and {@code cidr6} produce
-     * one), and {@code Rational}/{@code Complex}, which bind structurally rather than as atoms. A caller
-     * falls back to base type resolution for those, which is what it did for everything before.
+     * {@code Object} (no family at all), the sealed {@code CidrNetwork} supertype (both {@code cidr4} and
+     * {@code cidr6} produce a member of it), and {@code Rational}/{@code Complex}, which bind structurally
+     * rather than as atoms. A caller falls back to base type resolution for those, which is what it did for
+     * everything before.
      *
      * <p><b>An ambiguity here is answered by a schema, and by nothing else this index could carry.</b> The
-     * inverse exists only where one family produces a class, and two places it does not: {@code mac},
-     * {@code email}, {@code regex} and {@code text} all read to {@code String}, and {@code cidr4}/{@code cidr6}
-     * both read to {@code CidrNetwork}. Giving a component a second channel to name its family -- an
-     * annotation, say -- would be a parallel type system for exactly the question a schema already answers at
-     * the position, and it would answer it only for a reader that had been told, where a schema answers it for
-     * every reader of the document.
+     * inverse exists only where one family produces a class, and {@code mac}, {@code email}, {@code regex}
+     * and {@code text} all read to {@code String}. Giving a component a second channel to name its family --
+     * an annotation, say -- would be a parallel type system for exactly the question a schema already answers
+     * at the position, and it would answer it only for a reader that had been told, where a schema answers it
+     * for every reader of the document. So {@code String} keeps the one defensible default: a {@code String}
+     * component nearly always means a string, so it maps to {@code text} and the other three families are not
+     * reachable without a schema -- a consumer who wants a MAC checked declares the field under a schema, or
+     * declares a type of their own over a bridge.
      *
-     * <p>So the two are left as they are, and they fail differently because only one has a defensible default.
-     * {@code String} has one: a {@code String} component nearly always means a string, so it maps to
-     * {@code text} and the other three families are simply not reachable without a schema -- a consumer who
-     * wants a MAC checked declares the field under a schema, or declares a type of their own over a bridge.
-     * {@code CidrNetwork} has none, so it is absent and a component declaring one is refused; naming
-     * {@code Inet4Address} or {@code Inet6Address} instead is unambiguous and works today.
+     * <p><b>The CIDR families had no such default and needed none</b>: nothing recommends {@code cidr4} over
+     * {@code cidr6}, so rather than leave a class that answers neither, each has a host type of its own
+     * ({@code CidrInet4Network}, {@code CidrInet6Network}) exactly as the address families do. A component
+     * naming the sealed supertype is genuinely ambiguous and binds as a union, which is what it is.
      */
     private static final Map<Class<?>, AtomType<?>> BY_TYPED_POSITION = typedPositions();
 

@@ -1,35 +1,45 @@
 package io.ltr8.tson.base.atom;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
 /**
- * A CIDR network -- the host type {@code cidr4} and {@code cidr6} read to, and the value {@code within} and
+ * A CIDR network -- what {@code cidr4} and {@code cidr6} read to, and the value {@code within} and
  * {@code excluding} are judged in.
+ *
+ * <p><b>A family each, because a host type is how a component names what it wants.</b> A schemaless read has
+ * no schema to say which family a position holds, so it asks which built-in produces the class the component
+ * declares ({@code HostAtoms}) -- and a class two families produce answers nothing. {@link CidrInet4Network}
+ * and {@link CidrInet6Network} are one family each, so a component naming either is read the way an
+ * {@code Inet4Address} component already is. Naming this interface instead is honestly ambiguous and is
+ * refused as such: a sealed type with two members binds as a union, which wants a type annotation in the
+ * document, or a bridge registered against it.
  *
  * <p><b>A value type, like {@link Rational}.</b> Two spellings of one network are one value: equality is over
  * the prefix octets and the prefix length, never over the text that carried them. That is what lets a schema
- * compare the networks a facet names without caring how they were written.
+ * compare the networks a facet names without caring how they were written. Two networks of <em>different</em>
+ * families are never equal, and now cannot be compared by accident either.
  *
  * <p><b>Containment needs no interval arithmetic.</b> CIDR blocks are nodes of a prefix tree, so two are
  * nested or disjoint and never partially overlapping -- which is why {@link #overlaps} is exactly "one
  * contains the other". And the comparisons are over the prefix bits of two equal-length octet arrays, so
  * IPv4's four bytes and IPv6's sixteen need one implementation: only the length differs, and it arrives with
- * the value.
+ * the value. That implementation is {@code CidrBits}, which both members delegate to over their own octets.
  *
  * <p><b>Host bits are a separate question</b> ({@link #hostBitsAreZero}). {@code 10.1.0.0/8} parses -- it is
  * well-formed text naming an address and a prefix -- and fails §5.5's rule that a network's every bit past the
  * prefix is zero. Keeping the two apart is what lets a caller report a malformed token and a violated
  * constraint differently, which is the distinction a reader's two exception types exist for.
  */
-public record CidrNetwork(byte[] prefix, int prefixLength) {
+public sealed interface CidrNetwork permits CidrInet4Network, CidrInet6Network {
 
-    private static final int MAX_PREFIX_DIGITS = 3;
+    /** This network's prefix octets -- four for IPv4, sixteen for IPv6. A copy; the value is immutable. */
+    byte[] prefix();
 
-    public CidrNetwork {
-        prefix = prefix.clone();
-    }
+    /** How many leading bits of {@link #prefix()} the network fixes. */
+    int prefixLength();
+
+    /** The family's address width in bits -- 32 or 128, and what a prefix length is bounded by. */
+    int familyBits();
 
     /**
      * {@code text} as a network of the family {@code familyBits} names (32 or 128), or {@code null} where it
@@ -42,49 +52,40 @@ public record CidrNetwork(byte[] prefix, int prefixLength) {
      * <p>Null-returning rather than throwing so each caller names what it was reading: a reader refuses a
      * value, a coherence check refuses a facet entry, and the two want different words.
      */
-    public static CidrNetwork parse(String text, int familyBits) {
+    static CidrNetwork parse(String text, int familyBits) {
         int slash = text.indexOf('/');
         if (slash < 0 || text.indexOf('/', slash + 1) >= 0) {
             return null;
         }
-        int prefixLength = prefixLength(text.substring(slash + 1));
+        int prefixLength = CidrBits.prefixLength(text.substring(slash + 1));
         if (prefixLength < 0 || prefixLength > familyBits) {
             return null;
         }
         String address = text.substring(0, slash);
         byte[] octets = familyBits == 32 ? InternetAddress.ipv4(address) : InternetAddress.ipv6(address);
-        if (octets == null) {
-            return null;
-        }
-        return new CidrNetwork(octets, prefixLength);
+        return octets == null ? null : of(octets, prefixLength);
+    }
+
+    /** The member of this family whose width {@code prefix} has -- four octets or sixteen. */
+    static CidrNetwork of(byte[] prefix, int prefixLength) {
+        return prefix.length == 4
+                ? new CidrInet4Network(prefix, prefixLength)
+                : new CidrInet6Network(prefix, prefixLength);
+    }
+
+    /** The whole of the family {@code familyBits} names -- a zero prefix of length zero. */
+    static CidrNetwork all(int familyBits) {
+        return of(new byte[familyBits / 8], 0);
     }
 
     /** Whether {@code address} lies inside this network -- its leading {@link #prefixLength} bits match. */
-    public boolean contains(byte[] address) {
-        if (address.length != prefix.length) {
-            return false;
-        }
-        int wholeBytes = prefixLength / 8;
-        for (int i = 0; i < wholeBytes; i++) {
-            if (address[i] != prefix[i]) {
-                return false;
-            }
-        }
-        int remainingBits = prefixLength % 8;
-        if (remainingBits == 0) {
-            return true;
-        }
-        int mask = (0xFF << (8 - remainingBits)) & 0xFF;
-        return (address[wholeBytes] & mask) == (prefix[wholeBytes] & mask);
-    }
+    boolean contains(byte[] address);
 
     /**
      * Whether {@code other} lies wholly inside this network -- it is at least as specific, a longer or equal
-     * prefix, and its own prefix address falls inside.
+     * prefix, and its own prefix address falls inside. A network of the other family never is.
      */
-    public boolean contains(CidrNetwork other) {
-        return other.prefixLength >= prefixLength && contains(other.prefix);
-    }
+    boolean contains(CidrNetwork other);
 
     /**
      * This network's two children in the prefix tree -- the same addresses, split at one more bit. RFC 4632's
@@ -94,88 +95,19 @@ public record CidrNetwork(byte[] prefix, int prefixLength) {
      *
      * @throws IllegalStateException if this network is a single address, which has no halves
      */
-    public List<CidrNetwork> halves() {
-        if (prefixLength >= prefix.length * 8) {
-            throw new IllegalStateException(
-                    "a /" + prefixLength + " network is a single address and has no halves");
-        }
-        byte[] upper = prefix.clone();
-        upper[prefixLength / 8] |= (byte) (0x80 >> (prefixLength % 8));
-        return List.of(new CidrNetwork(prefix, prefixLength + 1), new CidrNetwork(upper, prefixLength + 1));
-    }
+    List<CidrNetwork> halves();
 
     /** Whether the two share any address, which for prefix-tree nodes means one contains the other. */
-    public boolean overlaps(CidrNetwork other) {
+    default boolean overlaps(CidrNetwork other) {
         return contains(other) || other.contains(this);
     }
 
     /** This network in CIDR text -- the family's address form, a {@code /}, and the prefix length. */
-    public String text() {
-        String address = prefix.length == 4 ? InternetAddress.ipv4Text(prefix) : InternetAddress.ipv6Text(prefix);
-        return address + "/" + prefixLength;
-    }
-
-    @Override
-    public String toString() {
-        return text();
-    }
-
-    /** Value equality over the octets, which an array component would otherwise give by identity. */
-    @Override
-    public boolean equals(Object other) {
-        return other instanceof CidrNetwork network
-                && prefixLength == network.prefixLength
-                && Arrays.equals(prefix, network.prefix);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(Arrays.hashCode(prefix), prefixLength);
-    }
-
-    @Override
-    public byte[] prefix() {
-        return prefix.clone();
-    }
-
-    /**
-     * The decimal prefix length after the {@code /}, or {@code -1} if the text is not one. Leading zeros are
-     * rejected for the same reason a {@code dec-octet} rejects them: {@code /8} and {@code /08} would
-     * otherwise be two spellings of one network, which is the confusable-input class strictness shuts down.
-     */
-    private static int prefixLength(String text) {
-        if (text.isEmpty() || text.length() > MAX_PREFIX_DIGITS) {
-            return -1;
-        }
-        if (text.length() > 1 && text.charAt(0) == '0') {
-            return -1;
-        }
-        int value = 0;
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c < '0' || c > '9') {
-                return -1;
-            }
-            value = value * 10 + (c - '0');
-        }
-        return value;
-    }
+    String text();
 
     /**
      * §5.5's network rule: every bit past the prefix is zero, since the value denotes a block rather than an
-     * address inside one. Bit-at-a-time rather than byte-masked -- at most 128 iterations, and no boundary
-     * case to get wrong.
+     * address inside one.
      */
-    public boolean hostBitsAreZero() {
-        return hostBitsAreZero(prefix, prefixLength);
-    }
-
-    private static boolean hostBitsAreZero(byte[] address, int prefixLength) {
-        for (int bit = prefixLength; bit < address.length * 8; bit++) {
-            if ((address[bit / 8] & (0x80 >> (bit % 8))) != 0) {
-                return false;
-            }
-        }
-        return true;
-    }
+    boolean hostBitsAreZero();
 }

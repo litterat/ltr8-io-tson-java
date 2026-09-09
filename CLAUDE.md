@@ -270,7 +270,8 @@ module has a real `module-info.java`; module names mirror each module's root exp
   derived from without the holder losing what they stated. Construction is not here and cannot be: it names
   the compiler's registry, which is why `Tson.of(config)` lives with the engine.
   **`io.ltr8.tson.base.atom`** is the host values the built-in atoms read to — `Rational`, `Complex`,
-  `CidrNetwork`, `InternetAddress` — the question a consumer arrives with rather than part of §8's model, and
+  `CidrInet4Network`/`CidrInet6Network`, `InternetAddress` — the question a consumer arrives with rather than
+  part of §8's model, and
   pure values depending on nothing. **`io.ltr8.tson.base.bind`** is what a deployment binds with:
   `AtomContext` registers those host values, and the JDK ones beside them, with a `DataBindContext`, so a
   class binds the same under every encoding ([TSON-JSON] §5.1). **That is why this module requires
@@ -310,7 +311,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
 - **`tson-schema`** — `io.ltr8.tson.schema.meta` (the resolved-schema *value* model — pure
   records/sealed interfaces/enums, §8's `TypeDefinition` et al.; `Top` is sealed except for its one
   deliberately open branch, `Data`, which a consumer's own class implements — see below). **The host value
-  types are not here**: `Rational`, `Complex`, `CidrNetwork` and `InternetAddress` are `base.atom`'s, because
+  types are not here**: `Rational`, `Complex`, the `CidrNetwork` pair and `InternetAddress` are `base.atom`'s, because
   *what do I get back from `!rational`?* is a question about the type system rather than about §8's model,
   and they depend on nothing. `schema.meta` reads them structurally — `RationalType`'s
   `min`/`max`/`multiple_of` are `Rational` values — which is what used to hold them here, and is a pull from
@@ -1282,8 +1283,10 @@ compatibility).
   parsers, the CIDR pair reusing the two address grammars and validating §5.5's family-range and
   host-bits-zero rules on top. All four network families apply `within`/`excluding` and judge the pair
   for emptiness at schema load — exactly, prefix-tree cover being counting rather than searching, with a
-  network family's prefix bounds folded in, both halves stated by §5.5 — and **`cidr4`/`cidr6`
-  read to `base.atom.CidrNetwork`** rather than to text — the address grammars and the network value live
+  network family's prefix bounds folded in, both halves stated by §5.5 — and **`cidr4`/`cidr6` read to a host
+  type each** (`base.atom.CidrInet4Network`/`CidrInet6Network`, members of a sealed `CidrNetwork` sharing one
+  implementation of the prefix arithmetic) rather than to text, a class two families produce being one
+  `HostAtoms` can carry no entry for — the address grammars and the network value live
   in `tson-schema` so that each family's `coherenceCheck` can judge its own `[value]`-typed facet entries
   without the linker or the resolver holding a rule of one family's. **`email` is a built-in of §5.5 like its siblings**, and its format check is
   the subset §5.5 pins: the `dot-atom "@" dot-atom` core, without quoted local parts, domain literals or
