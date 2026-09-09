@@ -681,44 +681,71 @@ public final class SchemalessObjectReader {
     }
 
     /**
-     * Four passes, and which of them can resolve the <em>name to a class</em> rather than test the name
-     * against each listed member is what tells them apart -- because a non-sealed union's member list is
-     * not the whole of its membership. {@link DataClassUnion#isMemberType} admits an implementation of an
-     * open member and registers it, but it takes a {@code Class}, and a read holds only a name.
+     * <b>Resolve the name to a class, then ask whether the union admits it.</b> That is the shape, and it
+     * matters because a non-sealed union's listed members are not the whole of its membership:
+     * {@link DataClassUnion#isMemberType} admits and registers an implementation of an open member, but it
+     * takes a {@code Class} where a read holds a name. A scan of the listed members can only ever find what
+     * is already listed.
      *
      * <ol>
-     * <li><b>A member's {@code @Typename}.</b> A scan, and inherently: there is no reverse index from an
-     *     annotation's value to the class carrying it, so a name the author invented is findable only by
-     *     asking each member what it calls itself. It therefore reaches listed members only -- the one
-     *     limit here that is a property of Java and not of this method.
-     * <li><b>The built-in vocabulary.</b> Also a scan, and complete anyway: every built-in host type is a
-     *     final class ({@code UUID}, {@code Inet4Address}, {@code CidrInet4Network}), so it can never be an
-     *     unlisted implementation of an open member. Asking which listed member the family reads is the
-     *     whole of the question.
-     * <li><b>A member's simple class name</b>, the convenience that lets {@code !circle} find a
-     *     {@code Circle} that is already listed.
-     * <li><b>The context's own {@link io.ltr8.bind.DataNameBinder}</b>, which is the one pass that resolves
-     *     a name to a class outright -- and so the only one that can reach an implementation of an open
-     *     member that nothing has analysed yet. Last, so that a listed member always wins and no name
-     *     resolving today resolves differently.
+     * <li><b>The built-in vocabulary</b>, which is closed and the format's own, so it answers before any
+     *     binder a deployment configures -- the order {@link #bindAtom} takes. Its answer is which listed
+     *     member the family reads, and that is complete rather than a shortcut: every built-in host type is
+     *     a final class ({@code UUID}, {@code Inet4Address}, {@code CidrInet4Network}), so it can never be
+     *     an unlisted implementation of an open member.
+     * <li><b>The context's own {@link io.ltr8.bind.DataNameBinder}</b> -- the one pass that resolves a name
+     *     to a class outright, and so the only one that reaches a member nothing has registered yet. Where
+     *     it is configured it is the authority on what a name means, the standing
+     *     {@code VariantBindReader.isMember} already gives it: a name that is not the class's own is
+     *     recorded nowhere else. A miss falls through rather than failing.
      * </ol>
+     *
+     * <p><b>The scans behind those cover the opposite gap, not a smaller one.</b> Discovery reaches a member
+     * that is not listed; a scan reaches a listed member whose name no binder resolves -- and that is every
+     * member in an unconfigured context, since {@code DefaultDataNameBinder} searches configured packages
+     * and {@code DataBindContext.Builder} defaults that set to empty. So {@code !circle} finding a
+     * {@code Circle} is the scan's doing and not the binder's. It is also every {@code @Typename}, which the
+     * binder mangles to a class name that does not exist ({@code sq} to {@code Sq}), and every casing the
+     * mangle does not produce, the scan being case-insensitive where {@code Class.forName} is not.
+     *
+     * <p><b>Only one union shape has unlisted members at all</b> ({@code DefaultUnionBinder}): a sealed type
+     * lists its permitted subclasses and {@code @Union({...})} lists its argument, both complete at
+     * analysis. It is {@code @Union} with no value on a non-sealed type that starts empty and grows, so
+     * discovery is narrow -- and it is also the only shape that had the ordering bug it fixes.
+     *
+     * <p><b>What neither route reaches</b> is a member that is unlisted <em>and</em> named something no
+     * binder resolves -- a {@code @Typename} on an implementation of an open member that nothing has
+     * registered. There is no reverse index from an annotation's value to the class carrying it, so such a
+     * name is findable only by asking a class that nothing has yet named. Closing it would take a classpath
+     * scan; a deployment that wants those reachable configures the binder, which is what makes them
+     * discoverable in the first place.
+     *
+     * <p><b>Two scans rather than one</b>, so that a member's declared {@code @Typename} beats another
+     * member's incidental class name where both claim the wire name -- an explicit declaration is the one
+     * the author meant. Collapsing them does not merely reorder that case: {@code TypeRefCheck#names} is
+     * case-insensitive and matches an un-annotated {@code Foo} against {@code !foo}, so one loop would
+     * answer {@code Foo} for both spellings and leave a {@code @Typename("foo")} sibling unaddressable.
      */
     private Class<?> resolveUnionMember(DataClassUnion dataClass, String typeName) {
+        Optional<AtomType<?>> family = BuiltinTypeVocabulary.lookup(typeName);
+        if (family.isPresent()) {
+            return memberReadBy(dataClass, family.get());
+        }
+        Class<?> discovered = discoveredMember(dataClass, typeName);
+        if (discovered != null) {
+            return discovered;
+        }
         for (Class<?> member : dataClass.memberTypes()) {
             if (TypeRefCheck.declares(member, typeName)) {
                 return member;
             }
-        }
-        Optional<AtomType<?>> family = BuiltinTypeVocabulary.lookup(typeName);
-        if (family.isPresent()) {
-            return memberReadBy(dataClass, family.get());
         }
         for (Class<?> member : dataClass.memberTypes()) {
             if (TypeRefCheck.names(member, typeName)) {
                 return member;
             }
         }
-        return discoveredMember(dataClass, typeName);
+        return null;
     }
 
     /**
