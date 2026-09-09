@@ -137,12 +137,16 @@ is small and parsed once.)
   through `AtomTypeReader.overAtom` from `RecordBindReader`'s field loop — the same seam a `value` slot's own
   specialisation takes). The answer is a reader for that class or nothing at all, so a read carries no target
   and a component the family cannot fill is a `BindMismatchException` at compile rather than a cast failing in
-  a constructor. **The default binds nothing and refuses nothing** — a family that has not stated its targets
-  is judged at the read as before, which is what lets this live on an interface a consumer may implement. The
-  question is the **wire** class, never the declared one: a bridged component is reached by whatever its bridge
-  takes. Two positions are excluded because something already specialised them: a `value` slot, whose atom is
-  chosen from that same class, and a form-sensitive one (`Token`), where handing the family decoded text would
-  lose the spelling that was the point of claiming it.
+  a constructor. **Every family answers and there is no default**: one that admitted whatever it was handed
+  would give the check nothing to work with, so the vocabulary states its targets and the check is definite
+  across all of it. The three answers are `natural` (the value reaches the target unchanged), `asWrittenText`
+  (a wire form that is text, so a component may keep the spelling the family validated — the `uri` rule, which
+  every string-content family shares) and `bound`/`converting` (the reading is converted; the numeric families,
+  which narrow from the token's text). A numeric family offers no text target: a number's wire form is a
+  number, so its spelling would be a different reading rather than the same value. Two positions are excluded
+  because something already specialised them — a `value` slot, whose atom is chosen from that same class, and a
+  form-sensitive one (`Token`), where handing the family decoded text would lose the spelling that was the
+  point of claiming it.
 - **A bound component's own bridge is applied where the field is wired, not where the value is read**
   (`ElementBridging.wrap`, from `RecordBindReader`'s field loop and from the array and map readers). A
   schema-driven read is exactly the path that does not go through `tson-bind`'s binder, which is what
