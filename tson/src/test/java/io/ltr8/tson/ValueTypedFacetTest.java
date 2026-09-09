@@ -99,9 +99,9 @@ class ValueTypedFacetTest {
 
     @Test
     void aBoundTheAtomRefusesIsASchemaErrorNotAGap() {
-        // The classification test: the verdict on `min: "abc"` does not change when this library improves,
-        // so it must not arrive as NOT_IMPLEMENTED -- which is what the cast failure used to produce, and
-        // what told an author their correct reading of the spec was this library's fault.
+        // The classification test: the verdict on `min: "abc"` does not change when this library improves, so
+        // it must not arrive as NOT_IMPLEMENTED -- which would tell an author that their correct reading of
+        // the spec was this library's fault.
         for (String bad : List.of("t => !number ^ { min: \"abc\" }",
                                   "t => !duration ^ { min: P1Y }",
                                   "t => !date ^ { min: \"not-a-date\" }")) {
@@ -120,7 +120,7 @@ class ValueTypedFacetTest {
         assertTrue(reported.message().contains("a month is a period"), reported.message());
     }
 
-    // ── additive: nothing that read before reads differently ─────────────
+    // ── the natural reading wins wherever it fits ────────────────────────
 
     @Test
     void aNumericBoundKeepsEverySpellingItAlreadyAdmitted() {

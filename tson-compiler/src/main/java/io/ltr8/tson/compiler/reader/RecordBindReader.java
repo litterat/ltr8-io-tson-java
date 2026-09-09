@@ -49,17 +49,14 @@ import java.util.Set;
  * RecordTreeReader} leaves those as that class computed them, a plain {@code Map} having no target to
  * decode toward.
  *
- * <p><b>No separate "already filled" tracker is needed at all</b> -- unlike this class's own
- * pre-streaming design, which relied on backward iteration plus an {@code arguments[...] != null}/
- * {@code boolean[] unboundFilled} check to implement "first occurrence found is genuinely the last
- * in source order." {@link RecordAbstractReader#readFields}'s own forward, single-pass, overwrite-
- * on-duplicate design (see its own Javadoc) already gets §2.5's "last value wins" for free -- this
- * class's own {@link FieldSink} just assigns into {@code arguments[target.index()]} unconditionally
- * every time {@code sink} runs, and the {@code boolean[]} {@link RecordAbstractReader#readFields}
- * itself returns is reused directly as the "does this field still need its own required-or-default
- * handling" signal for the second pass -- covering an unbound field (no {@code arguments} slot to
- * write into at all) the same way it covers a bound one, with no separate array for that case
- * anymore either.
+ * <p><b>No separate "already filled" tracker is needed at all.</b>
+ * {@link RecordAbstractReader#readFields}'s forward, single-pass, overwrite-on-duplicate design (see its own
+ * Javadoc) gets §2.5's "last value wins" for free, so this class's {@link FieldSink} assigns into
+ * {@code arguments[target.index()]} unconditionally every time {@code sink} runs, and the {@code boolean[]}
+ * {@link RecordAbstractReader#readFields} returns is reused directly as the "does this field still need its
+ * own required-or-default handling" signal for the second pass -- covering an unbound field (no
+ * {@code arguments} slot to write into at all) the same way it covers a bound one, with no separate array
+ * for that case.
  *
  * <p>Three disagreements between the schema and the class are refused here
  * ({@code BindMismatchException}): a non-FIXED field with no component, a component no field fills, and an

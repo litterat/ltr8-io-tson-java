@@ -410,8 +410,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      *
      * <p>Per subclass because the two modes can represent different things. A tree has a node for it
      * ({@code TsonAbsent}), so it keeps [TSON-DATA] §2.9's distinction between a field written {@code _} and
-     * one never written -- which an array element and a tuple slot already keep, leaving the record the one
-     * container of the four that dropped it. A bound object has no third state between {@code null} and a
+     * one never written -- which an array element and a tuple slot keep too, the record being the one
+     * container of the four that would otherwise lose it. A bound object has no third state between {@code null} and a
      * component that was never set, so bind mode answers {@code null} and the two collapse there; that is a
      * limit of the target, not a reading of §2.9, and it is why this is a subclass's answer rather than one
      * shared here.

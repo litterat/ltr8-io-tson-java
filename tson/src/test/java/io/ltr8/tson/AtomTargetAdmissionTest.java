@@ -23,11 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A family binds the target its component wants, where the reader is built.
  *
- * <p>An atom position under a schema used to be read with no target in hand: the family produced its own
- * natural host value and the constructor discovered any disagreement by failing its cast, unclassified and
- * past a collecting receiver. {@code AtomType.boundTo} is the seam -- this family reading into a given
- * class, or empty where no value of it ever reaches one -- and it is asked once, where the field is wired,
- * so a read carries no target at all and a disagreement is reported before any document exists.
+ * <p>{@code AtomType.boundTo} is the seam -- this family reading into a given class, or empty where no
+ * value of it ever reaches one. It is asked once, where the field is wired, so a read carries no target at
+ * all and a component the family cannot fill is reported before any document exists rather than by a cast
+ * failing inside a constructor, unclassified and past a collecting receiver.
  *
  * <p><b>The wire class, never the declared one.</b> A bridged component is reached by whatever its bridge
  * takes, so that is what the family has to produce; asking about the declared class would refuse every
@@ -147,9 +146,8 @@ class AtomTargetAdmissionTest {
     private static final String FIXED_SCHEMA = "  t => { spec: uri = \"https://x.test/v1\" }";
 
     /**
-     * A FIXED value is the schema's, not the document's, but it still has to reach the component the way a
-     * written one would -- through the family bound to that component. It used to be decoded with no target
-     * in hand and adapted afterwards by a table of conversions in the reader.
+     * A FIXED value is the schema's, not the document's, but it still reaches the component the way a
+     * written one does -- through the family bound to that component.
      */
     @Test
     void aFixedValueReachesTheComponentThroughTheFamily() {
@@ -177,10 +175,9 @@ class AtomTargetAdmissionTest {
     }
 
     /**
-     * The case that separates the two routes. A FIXED {@code uuid} at a {@code String} component is a
-     * conversion only the family knows -- there was never a {@code UUID -> String} rule beside the
-     * {@code URI} one, so a table gets this wrong for every family whose row nobody wrote, while asking the
-     * family gets it right for all of them at once. That is the whole argument against the table.
+     * A FIXED {@code uuid} at a {@code String} component: a conversion only the family knows, and the case
+     * that separates asking it from consulting a table of conversions, which answers for the families
+     * someone listed and silently fails the rest.
      */
     @Test
     void aFixedValueConvertsForAFamilyNoTableEverListed() {
@@ -190,10 +187,10 @@ class AtomTargetAdmissionTest {
     }
 
     /**
-     * Whether the document stated a FIXED value decides nothing about what the field holds (§5.2), so both
-     * routes must hand over the same object. They did not: an omitted field got the precomputed value and a
-     * stated one got the raw pre-rebind value the comparison had just used, which for a {@code uuid} at a
-     * {@code String} component is a {@code UUID} where the other route gives text.
+     * Whether the document stated a FIXED value decides nothing about what the field holds (§5.2), so an
+     * omitted one and a stated one hand over the same object. A {@code uuid} at a {@code String} component
+     * is where the two would part: the contradiction check decodes the written token on its own pre-rebind
+     * terms, and that value is not what the field holds.
      */
     @Test
     void aStatedFixedValueMatchesWhatOmittingItWouldHaveGiven() {
@@ -222,7 +219,7 @@ class AtomTargetAdmissionTest {
                 .read(doc("!t { n: 5 }"), IntAsInt.class).n());
     }
 
-    /** And widens, which the constructor used to refuse after the fact. */
+    /** And widens: the family reaches a target wider than its own natural type. */
     @Test
     void anIntegerFamilyAlsoReachesAWiderTarget() {
         assertEquals(BigInteger.valueOf(5), tson("  t => { n: int32 }", IntAsBig.class).objectReader()
