@@ -22,7 +22,7 @@ is small and parsed once.)
   `DiagnosticsCollector`, and a caller's own `void report(Diagnostic)` can stream them anywhere. No
   reader branches on which. A reader needing to know whether its children complained asks `reported()` — a
   count, so it works for a receiver that keeps no list (the `int before = ctx.reported()` checkpoint idiom
-  in `RecordBindReader`/`TupleBindReader`/`SchemalessObjectReader`/`AnnotationCapture`).
+  in `RecordBindReader`/`TupleBindReader`/`DataClassObjectReader`/`AnnotationCapture`).
     - **One event of lookahead, plus a rewind for the case that is not enough.**
       `TsonReadContext.lookingAhead(ctx, fn)` runs `fn` against the cursor and then puts back every event it
       consumed, so whatever reads next sees an untouched stream. `peek()` answers "what is here"; this
@@ -131,7 +131,7 @@ is small and parsed once.)
   array/map (a collection tolerates a `null` child where a constructor doesn't). **The mark goes after the
   framing, before the fields**, so a container type-ref's `UNKNOWN_TYPE_REF` belongs to the enclosing read
   that chose to look there. Narrower uses of the same `ctx.reported()` idiom are unrelated and stay put:
-  `MapAbstractReader`/`SchemalessObjectReader` asking whether one key bound, `verifyFixed` asking whether one
+  `MapAbstractReader`/`DataClassObjectReader` asking whether one key bound, `verifyFixed` asking whether one
   token decoded, `AnnotationCapture`'s throwaway probe context — each brackets a single child read.
 - **A family binds the target its component wants, where the reader is built** (`AtomType.boundTo`, reached
   through `AtomTypeReader.overAtom` from `RecordBindReader`'s field loop — the same seam a `value` slot's own
@@ -167,7 +167,7 @@ is small and parsed once.)
   finds every stray name and the value still comes back whole. The diagnostic carries the type's real field
   names in schema order (message *and* `expected`) — the information that turns a retry into a one-shot
   fix. **Not configurable**: §7.2 makes closure a MUST wherever a schema is in scope and exempts only
-  schemaless records, which are read by `SchemalessObjectReader`/`SchemalessTreeReader` and never reach
+  schemaless records, which are read by `DataClassObjectReader`/`SchemalessTreeReader` and never reach
   this code. **The same rule polices schema authoring**, through the same line: a constructor body is bound
   by replaying it through the governing meta's compiled reader, so `!integer ^ { minimum: 1 }` (JSON
   Schema's spelling of `min`) is rejected instead of compiling clean and constraining nothing — §7.2's "a
@@ -180,7 +180,7 @@ is small and parsed once.)
   both MUST NOT, with the diagnostic at the repeated occurrence, which leaves no shadowed-occurrence
   question — the repeat *is* the error, so whether its value was going to be used decides nothing.
   **The same rules hold on the schemaless path** (`SchemalessTreeReader`/
-  `SchemalessObjectReader`), these being Part 1 rules a document violates with or without a schema; a
+  `DataClassObjectReader`), these being Part 1 rules a document violates with or without a schema; a
   verdict that turned on whether a schema was in scope would be the interoperability failure §2.5's MUST
   NOT exists to prevent. In the schemaless object reader the seen-set is keyed on the *written* name, not the
   target-class slot, so a repeat of a name the class doesn't declare still counts.
@@ -270,7 +270,7 @@ is small and parsed once.)
   only until a collecting receiver is handed the same document, at which point the value it declined is still
   pending and the enclosing frame's next pull sees it. At the document boundary that pull is
   `requireDocumentEnd`, whose belt-and-braces `IllegalStateException` then fires on ordinary caller input —
-  which is how `SchemalessObjectReader`'s unbindable-target report (a target class `tson-bind` cannot produce
+  which is how `DataClassObjectReader`'s unbindable-target report (a target class `tson-bind` cannot produce
   a descriptor for) reached a caller as an internal-invariant exception with the diagnostics they asked for
   lost inside it. Where the skip goes is a per-caller question, not `descriptorFor`'s: `read` has taken
   nothing and skips a whole `dataValue`, while `bindUnion` has already consumed the framing to find the
@@ -405,7 +405,7 @@ and every ordinary read — the check is a field read and a branch.
 
 **A refused name draws no verdict beside its refusal.** Name hygiene runs inside `ctx.next()`, so a name
 §8.2 refused is reported before the reader has looked it up — and then the reader does not look it up:
-`RecordAbstractReader.readFields` and `SchemalessObjectReader.bindRecord` both checkpoint `ctx.reported()`
+`RecordAbstractReader.readFields` and `DataClassObjectReader.bindRecord` both checkpoint `ctx.reported()`
 across that one pull and skip their `UNRECOGNIZED_FIELD` when the delta is non-zero. Only one event is
 consumed between the two reads and nothing but the hygiene check reports during it, so the delta is exactly
 "this name was refused".
@@ -793,7 +793,7 @@ encoding: `Diagnostic`'s ten `of*` factories each switch on an exception an *enc
 would make the base depend on the vocabulary, while a copy per reader is how two encodings come to disagree
 about one token. They already had: before the merge, a target that cannot represent a family's value was a
 bind problem on one path and a type mismatch on the other, and nothing said which was right. Four readers go
-through it now — `AtomTypeReader`, `TypeRefCheck`, `SchemalessObjectReader` and the JSON stack's
+through it now — `AtomTypeReader`, `TypeRefCheck`, `DataClassObjectReader` and the JSON stack's
 `JsonAtoms` — and `AtomTypeException` is sealed to exactly two subtypes, so the switch is exhaustive rather
 than a guess. Per-field schema positions are a separate matter, below. (Message synthesis from code + params
 is not a gap but a decision — see below.)
@@ -810,7 +810,7 @@ every differing document get rejected.
 
 **`expected` carries the constraint that failed, never the type's name.** `AtomTypeException` holds an
 `expected` alongside its message, filled at each throw site from the facet that rejected the value, and all
-three atom report sites (`AtomTypeReader`, `TypeRefCheck.violation`, `SchemalessObjectReader.bindBuiltin`)
+three atom report sites (`AtomTypeReader`, `TypeRefCheck.violation`, `DataClassObjectReader.bindBuiltin`)
 pass it straight through. Naming the type there — the old `a value satisfying quantity_t` against a message
 reading `'99999' is greater than the maximum 100` — made the structured half carry strictly *less* than the
 prose, so a consumer wanting the bound had to regex the sentence. That exception's own Javadoc fixes the

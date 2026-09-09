@@ -25,7 +25,6 @@ import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.HostAtoms;
-import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.base.BaseTypeResolver;
 import io.ltr8.tson.atom.number.BaseValue;
@@ -97,7 +96,7 @@ import java.util.Set;
  * required field is a {@code FIELD_REQUIRED} problem. Duplicate field names resolve last-value-wins
  * (§2.5) by overwriting as they stream, the same as {@link TsonTypeReader}'s own record readers.
  */
-public final class SchemalessObjectReader {
+public final class DataClassObjectReader {
 
     private final DataBindContext context;
 
@@ -107,16 +106,16 @@ public final class SchemalessObjectReader {
     /** Whether a field the target class does not declare is discarded rather than reported -- see {@link #ignoringUnknownFields}. */
     private final boolean ignoreUnknownFields;
 
-    public SchemalessObjectReader(DataBindContext context) {
+    public DataClassObjectReader(DataBindContext context) {
         this(context, false, false);
     }
 
-    public SchemalessObjectReader() {
+    public DataClassObjectReader() {
         this(AtomContext.defaultContext());
     }
 
-    private SchemalessObjectReader(DataBindContext context, boolean preserveUnknownTypeRefs,
-                                   boolean ignoreUnknownFields) {
+    private DataClassObjectReader(DataBindContext context, boolean preserveUnknownTypeRefs,
+                                  boolean ignoreUnknownFields) {
         this.context = context;
         this.preserveUnknownTypeRefs = preserveUnknownTypeRefs;
         this.ignoreUnknownFields = ignoreUnknownFields;
@@ -126,8 +125,8 @@ public final class SchemalessObjectReader {
      * A reader that ignores a type-ref linking to nothing instead of reporting it -- §5.1's uninterpreted
      * marker, for a caller who wants forward-compatible passthrough. Built-in names are still checked.
      */
-    public static SchemalessObjectReader preserving(DataBindContext context) {
-        return new SchemalessObjectReader(context, true, false);
+    public static DataClassObjectReader preserving(DataBindContext context) {
+        return new DataClassObjectReader(context, true, false);
     }
 
     /**
@@ -137,8 +136,8 @@ public final class SchemalessObjectReader {
      * default; this is for a caller who really is reading a document wider than the class they are binding
      * it to, and has decided that the parts they cannot see do not change the parts they can.
      */
-    public SchemalessObjectReader ignoringUnknownFields() {
-        return new SchemalessObjectReader(context, preserveUnknownTypeRefs, true);
+    public DataClassObjectReader ignoringUnknownFields() {
+        return new DataClassObjectReader(context, preserveUnknownTypeRefs, true);
     }
 
     // ── Entry points ─────────────────────────────────────────────────────

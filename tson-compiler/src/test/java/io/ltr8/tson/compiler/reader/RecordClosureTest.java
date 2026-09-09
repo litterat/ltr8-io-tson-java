@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@link RecordAbstractReader#readFields} is the single site and the two subclasses inherit it.
  *
  * <p>The rule's exemption ("Schemaless records have no closure rule") needs no flag: a schemaless read goes
- * through {@code SchemalessObjectReader}/{@code SchemalessTreeReader}, which never reach this class.
+ * through {@code DataClassObjectReader}/{@code SchemalessTreeReader}, which never reach this class.
  * {@code SchemalessValidationTest} pins that from the other side.
  */
 class RecordClosureTest {

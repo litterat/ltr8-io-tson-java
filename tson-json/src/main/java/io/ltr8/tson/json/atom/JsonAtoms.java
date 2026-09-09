@@ -46,7 +46,7 @@ import java.util.Optional;
  * <p><b>A string-content family is read by its own parser</b> (§5.1): the string's content is handed to the
  * atom's parser exactly as a TSON quoted token's text would be, and the target class picks which parser,
  * there being no type-ref to name one. {@link HostAtoms#forStringContentHostType} is that lookup, and it is
- * the same index {@code SchemalessObjectReader} consults on the text side when no type-ref supplies a name
+ * the same index {@code DataClassObjectReader} consults on the text side when no type-ref supplies a name
  * -- one vocabulary, so a {@code UUID} component reads alike whichever encoding carried it. It is restricted
  * to §5.6's string-content families on purpose: the numeric families read from a JSON number and not from a
  * string, and letting {@code "123"} become a {@code BigInteger} because a field is declared one would let a

@@ -6,7 +6,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
  * <b>Object-binding mode is all-or-nothing:</b> a value whose read reported anything is not assembled, and
  * binds to {@code null} instead. Shared by every bind-mode reader that builds something -- {@link
  * RecordBindReader}, {@link TupleBindReader}, {@link ArrayBindReader}, {@link MapBindReader} and {@link
- * SchemalessObjectReader}'s own four -- so the policy has one statement rather than nine, and one place to
+ * DataClassObjectReader}'s own four -- so the policy has one statement rather than nine, and one place to
  * change if it ever moves. {@code TsonObjectReader} applies the same rule once more at the document boundary,
  * for the root value's own framing, which no enclosing read brackets.
  *
@@ -38,7 +38,7 @@ import io.ltr8.tson.compiler.TsonReadContext;
  * saying the same thing, since a shape mismatch abandons the value on its own without consulting the counter.
  *
  * <p>Narrower uses of the same {@code ctx.reported()} idiom elsewhere in this package are unrelated to this
- * policy and stay where they are: {@code MapAbstractReader}/{@code SchemalessObjectReader} ask whether one
+ * policy and stay where they are: {@code MapAbstractReader}/{@code DataClassObjectReader} ask whether one
  * key bound before treating it as a stated key, {@code RecordAbstractReader.verifyFixed} asks whether one
  * token decoded before comparing it to a FIXED value, and {@code AnnotationCapture} probes through a
  * throwaway context. Each brackets a single child read and means exactly what it says.

@@ -25,13 +25,13 @@ import java.nio.charset.StandardCharsets;
  *
  * <p>Binding is JEP 540's other explicit non-goal, after streaming, and it is the one worth not
  * inheriting: a library whose point is validated typed data has no business handing back a tree and
- * calling it done. This is the JSON peer of {@code tson-compiler}'s {@code SchemalessObjectReader},
- * which does the same job against the TSON event stream, and it sits beside {@link Json} for the
+ * calling it done. The engine under it is the JSON peer of {@code tson-compiler}'s reader of the same
+ * name, which does the same job against the TSON event stream, and it sits beside {@link Json} for the
  * same reason {@code TsonObjectReader} sits beside {@code Tson}: a reader is a front door, not a
  * layer of one.
  *
  * <p><b>A facade over {@link DataClassObjectReader}</b>, which is what actually binds a value. The split is
- * the one {@code TsonObjectReader} makes over {@code SchemalessObjectReader}, and for the same reason: a
+ * the one {@code TsonObjectReader} makes over {@code DataClassObjectReader}, and for the same reason: a
  * front door owns the document -- entry points, framing, and the configuration a read is judged under --
  * where the engine owns one value at one descriptor and stops. It is also where the schema-directed decode
  * of §5-§8 will arrive: a second engine under this same door rather than a second door.
@@ -79,7 +79,7 @@ import java.nio.charset.StandardCharsets;
  *
  * JSON null is bound the way §7 binds it, as far as a class can express §7: a component the class marks
  * required refuses it, one that does not takes {@code null}. That is the same treatment
- * {@code SchemalessObjectReader} gives the absent sentinel {@code _}, which is the point — §7 makes the
+ * {@code tson-compiler}'s reader of that name gives the absent sentinel {@code _} — §7 makes the
  * two spellings one concept, and a bound object has no third state to tell "omitted" from "present and
  * null" (the asymmetry {@code TsonAbsent} exists for on the tree side). An omitted member and a null
  * member are therefore indistinguishable in the result, which §6.1.2 says outright.

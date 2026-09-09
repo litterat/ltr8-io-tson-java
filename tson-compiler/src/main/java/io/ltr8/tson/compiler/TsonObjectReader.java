@@ -8,8 +8,8 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.tson.compiler.reader.DataClassObjectReader;
 import io.ltr8.tson.compiler.reader.EventSkip;
-import io.ltr8.tson.compiler.reader.SchemalessObjectReader;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.compiler.stream.TsonEvent;
@@ -34,7 +34,7 @@ import java.util.Optional;
  * #readWithoutSchema} forces the schemaless path on a schema-aware reader (bind a self-describing document
  * without validating it -- e.g. when its schema is unavailable and the class is the intended contract).
  *
- * <p>Either way the class-driven binding itself is done by {@link SchemalessObjectReader}, driven by the
+ * <p>Either way the class-driven binding itself is done by {@link DataClassObjectReader}, driven by the
  * target class's own {@code tson-bind} {@link DataClass} descriptor: it streams events off a {@link
  * TsonReadContext} (never materializing a whole {@code DataValue} tree first, so a large document need not
  * be buffered before binding begins), reports through that context's one error model, and has no positional
@@ -58,7 +58,7 @@ import java.util.Optional;
 public final class TsonObjectReader {
 
     private final DataBindContext dataBindContext;
-    private final SchemalessObjectReader schemaless;
+    private final DataClassObjectReader schemaless;
 
     /** The bind-mode compiled-schema registry a schema-aware reader validates through, or {@code null} for a schemaless reader (any {@code !!schema} is then ignored). */
     private final TsonCompiledSchemaRegistry bind;
@@ -92,7 +92,7 @@ public final class TsonObjectReader {
      *         TsonValue}s rather than the bound objects this reader hands back
      */
     public TsonObjectReader(TsonCompiledSchemaRegistry bind, DataBindContext dataBindContext) {
-        this(dataBindContext, new SchemalessObjectReader(dataBindContext),
+        this(dataBindContext, new DataClassObjectReader(dataBindContext),
                 requireBindMode(bind), DiagnosticsReceiver.throwing(), null,
                 ProcessorPolicy.defaults());
     }
@@ -117,7 +117,7 @@ public final class TsonObjectReader {
 
     /** Schemaless -- binds to the target class alone, ignoring any {@code !!schema} the document declares. */
     public TsonObjectReader(DataBindContext context) {
-        this(context, new SchemalessObjectReader(context), null, DiagnosticsReceiver.throwing(), null,
+        this(context, new DataClassObjectReader(context), null, DiagnosticsReceiver.throwing(), null,
                 ProcessorPolicy.defaults());
     }
 
@@ -127,7 +127,7 @@ public final class TsonObjectReader {
     }
 
     /** Shares {@code bind} and {@code schemaless} rather than rebuilding them -- a derived reader must keep the original's compiled-schema cache, not start an empty one. */
-    private TsonObjectReader(DataBindContext dataBindContext, SchemalessObjectReader schemaless,
+    private TsonObjectReader(DataBindContext dataBindContext, DataClassObjectReader schemaless,
                              TsonCompiledSchemaRegistry bind, DiagnosticsReceiver receiver, String schemaUri,
                              ProcessorPolicy policy) {
         this.dataBindContext = dataBindContext;
@@ -225,7 +225,7 @@ public final class TsonObjectReader {
      * so {@code !uuid nope} remains a problem. Affects the schemaless path only.
      */
     public TsonObjectReader preservingUnknownTypeRefs() {
-        return new TsonObjectReader(dataBindContext, SchemalessObjectReader.preserving(dataBindContext),
+        return new TsonObjectReader(dataBindContext, DataClassObjectReader.preserving(dataBindContext),
                 bind, receiver, schemaUri, policy);
     }
 

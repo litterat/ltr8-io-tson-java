@@ -64,7 +64,7 @@ import java.util.stream.Collectors;
  * compiled field list is an {@code UNRECOGNIZED_FIELD} violation, reported and then discarded unread via
  * {@link EventSkip}, which keeps the stream correctly positioned. Closure is a MUST wherever a schema is in
  * scope and is not configurable; §7.2 exempts only schemaless records, and those are read by
- * {@code SchemalessObjectReader}/{@code SchemalessTreeReader}, which never reach this class. The rule
+ * {@code DataClassObjectReader}/{@code SchemalessTreeReader}, which never reach this class. The rule
  * reaches the <em>schema</em> path too, through the same code: a constructor body ({@code !integer ^ { min:
  * 1 }}) is bound by replaying it through the governing meta's own compiled reader, so a hallucinated facet
  * (§5.5's vocabulary does not include JSON Schema's {@code minimum}) is caught here rather than silently

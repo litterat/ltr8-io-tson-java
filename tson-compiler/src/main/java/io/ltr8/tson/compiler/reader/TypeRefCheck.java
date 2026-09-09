@@ -14,7 +14,7 @@ import io.ltr8.tson.compiler.stream.TsonEvent;
 
 /**
  * The wire type-ref rules a <b>schemaless</b> read applies, and the one wording each produces -- shared by
- * {@link SchemalessTreeReader} and {@link SchemalessObjectReader} so the two report a given problem
+ * {@link SchemalessTreeReader} and {@link DataClassObjectReader} so the two report a given problem
  * identically. A schema-driven read never comes here: it resolves a type-ref against its compiled schema.
  *
  * <p>Given {@code !X} on a value being read with no schema in scope:
@@ -76,7 +76,7 @@ final class TypeRefCheck {
     /**
      * Whether {@code target} answers to the wire name {@code name} -- its {@link Typename} exactly, else its
      * simple class name case-insensitively, so {@code !point} links to a Java {@code Point} without every
-     * fixture being annotated. The same match {@code SchemalessObjectReader.bindUnion} applies to a union's
+     * fixture being annotated. The same match {@code DataClassObjectReader.bindUnion} applies to a union's
      * members, so a member and a directly-bound target are recognized by one rule.
      */
     static boolean names(Class<?> target, String name) {

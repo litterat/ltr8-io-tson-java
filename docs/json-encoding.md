@@ -53,7 +53,7 @@ What the registration buys is that `tson-bind` treats each host type as a **scal
 Java record and would otherwise bind as `{ prefix: … prefixLength: … }`, refusing the scalar `cidr4`/`cidr6`
 actually carry. None of these registrations carries a bridge, so the string-to-host-value conversion is not
 the registration's: it is the **family's**, and `HostAtoms.forStringContentHostType` is how a reader with no
-type-ref reaches it. `JsonAtoms.fromString` asks that index, as `SchemalessObjectReader` does on the text
+type-ref reaches it. `JsonAtoms.fromString` asks that index, as `DataClassObjectReader` does on the text
 side, so `"9f1c8e2a-…"` at a `UUID` component is `UuidParser`'s to accept or refuse under either encoding —
 which is what §5.1 means by the string rule being the whole interface.
 
@@ -448,21 +448,22 @@ its own two readers.
 `tson-bind` descriptor and streaming the event source rather than a tree.
 
 **It is a facade over `DataClassObjectReader`**, which is what actually binds a value — the same split
-`TsonObjectReader` makes over `SchemalessObjectReader`, and for the same reason: **a front door owns the
-document** (entry points, framing, and the configuration a read is judged under) where **an engine owns one
-value at one descriptor and stops**. That is also where the schema-directed decode of §5–§8 arrives: a
-second engine under the same door rather than a second door.
+`TsonObjectReader` makes over the reader of that name in `tson-compiler`, and for the same reason: **a front
+door owns the document** (entry points, framing, and the configuration a read is judged under) where **an
+engine owns one value at one descriptor and stops**. That is also where the schema-directed decode of §5–§8
+arrives: a second engine under the same door rather than a second door.
 
 **The engine is named for both axes every reader in this family is named for** — what drives the read, and
 what it produces. A `DataClass` descriptor drives this one and an object comes out. That has to stay in the
-name or the family stops scaling: the eventual `JsonTreeReader` sits over a tree engine, and §5–§8's
+name or the family stops scaling: `JsonTreeReader` sits over a tree engine, and §5–§8's
 schema-directed decode is a third engine under the same facade, so a name encoding only "what drives it"
 would leave two readers sharing one.
 
-It deliberately does not copy `tson-compiler`'s `SchemalessObjectReader`. **The class *is* the schema
-there** — that class's own Javadoc says so of its own target, "in effect the schema the data must satisfy" —
-so "schemaless" describes the one thing such a reader is not short of. The word is accurate of a *tree*
-reader, which really is driven by nothing.
+`tson-compiler`'s engine carries the same name, because it is the same engine against the other encoding's
+events. Neither is "schemaless": **the class *is* the schema** — that engine's own Javadoc says so of its own
+target, "in effect the schema the data must satisfy" — so the word describes the one thing such a reader is
+not short of. It stays accurate of a *tree* reader, which really is driven by nothing, and both encodings
+keep `SchemalessTreeReader` on that basis.
 
 **Frame-free is the property the split exists for**, and `DataClassObjectReaderTest` pins it: the engine binds
 a value and leaves the source where that value ended, so a caller positioned mid-document gets one value out
@@ -486,7 +487,7 @@ Three rules are §7-shaped, as far as a Java class can express §7:
   `@Field(required = true)`.
 - **JSON null anywhere else is the absence**, which a bound object spells `null`, having no third state —
   so an omitted member and a null member are indistinguishable in the result, which §6.1.2 says outright.
-  It is the same treatment `SchemalessObjectReader` gives `_`, which is the point: §7 makes the two
+  It is the same treatment `DataClassObjectReader` gives `_`, which is the point: §7 makes the two
   spellings one concept.
 - **An `Annotations` carrier is filled empty**, §4.3 giving the JSON wire no annotation channel. Nothing
   is dropped; there was nothing to drop.
@@ -497,7 +498,7 @@ change what the members this class does read mean** — a `currency` beside an `
 `quantity`, an `encoding` beside a `payload`. A reader that drops it has not read a subset of the document;
 it has read a different document and cannot tell. The class is the schema here, and a closed reading is
 what makes that claim mean anything — it is also what [TSON-SCHEMA] §7.2 already says of a record under a
-real schema, so the two paths agree, and `SchemalessObjectReader` applies the same rule on the TSON side.
+real schema, so the two paths agree, and `DataClassObjectReader` applies the same rule on the TSON side.
 `ignoringUnknownMembers()` is the opt-out, deliberately the derived reader: the safe reading is the one
 nobody has to know to ask for.
 
