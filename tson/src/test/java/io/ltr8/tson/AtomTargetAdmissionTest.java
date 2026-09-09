@@ -189,6 +189,22 @@ class AtomTargetAdmissionTest {
         assertEquals("f81d4fae-7dec-11d0-a765-00a0c91e6bf6", t.id());
     }
 
+    /**
+     * Whether the document stated a FIXED value decides nothing about what the field holds (§5.2), so both
+     * routes must hand over the same object. They did not: an omitted field got the precomputed value and a
+     * stated one got the raw pre-rebind value the comparison had just used, which for a {@code uuid} at a
+     * {@code String} component is a {@code UUID} where the other route gives text.
+     */
+    @Test
+    void aStatedFixedValueMatchesWhatOmittingItWouldHaveGiven() {
+        String schema = "  t => { id: uuid = \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }";
+        FixedUuid omitted = tson(schema, FixedUuid.class).objectReader().read(doc("!t {}"), FixedUuid.class);
+        FixedUuid stated = tson(schema, FixedUuid.class).objectReader()
+                .read(doc("!t { id: \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }"), FixedUuid.class);
+        assertEquals(omitted, stated);
+        assertEquals("f81d4fae-7dec-11d0-a765-00a0c91e6bf6", stated.id());
+    }
+
     // ── what a family that states nothing still does ─────────────────────
 
     public record IntAsInt(int n) {

@@ -86,14 +86,12 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **`RecordBindReader.narrow` is down to two conversions and both have an owner.** Not a general step
-  any more: what reaches it is a value decoded by a parser that did not know the field's target.
-  `verifyFixed` is one — a stated FIXED value is decoded by the *pre-rebind* parser on purpose, so the
-  document's token and the schema's are compared on identical terms — and a `value`-typed slot is the other,
-  where `ValueParser.at` narrows toward the component's class and stops short of a widening. Closing either
-  means giving that path the bound reader without losing what it decodes on purpose. An instrumented run of
-  the suite is what says it is those two and nothing else, so the same run is how to check a third has not
-  appeared.
+- [ ] **`RecordBindReader.narrow` is one conversion for one caller.** A `value`-typed slot is all that
+  reaches it: `ValueParser.at` narrows toward the component's own class and stops where the remaining step is
+  a widening, so an integral bound at a `BigDecimal` facet still needs finishing. Closing it means giving a
+  `value` slot the same treatment an atom position gets — the slot already picks its atom from the
+  component's class, so what is missing is the widening, not the dispatch. An instrumented run of the suite
+  is what says it is that one shape, and is how to check another has not appeared.
 
 - [ ] **A schemaless bind and a JSON read are not in the allocation harness.** Both ask `AtomType.boundTo`
   per value where a schema-driven read asks once, so both allocate an `Optional` (and a `BoundAtom` where the

@@ -453,27 +453,20 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     }
 
     /**
-     * Adapts a value decoded by a parser that did not know this field's target, which after binding is two
-     * positions and no longer a general step.
+     * The one adaptation a bound reader cannot make for itself: a {@code value}-typed slot, whose atom is
+     * chosen from the component's own class ({@code ValueParser.at}) and which narrows toward it but stops
+     * where the remaining step is a widening -- an integral bound at a {@code BigDecimal} facet is the case
+     * (a {@code value} facet's own tests are what fail without this).
      *
-     * <p>{@code verifyFixed} is one: a stated FIXED value is decoded by the field's <em>pre-rebind</em>
-     * parser on purpose, so that the document's token and the schema's own are compared on identical terms
-     * ({@code FixedCheck}), which leaves the value it produces needing the adaptation the bound reader would
-     * otherwise have made. A {@code value}-typed slot is the other: {@code ValueParser.at} narrows toward the
-     * component's own class and stops where the remaining step is a widening.
-     *
-     * <p>Two conversions cover both, and the pair is measured rather than assumed -- an instrumented run of
-     * the whole suite reaches {@link NumberNarrowing} for an integral value and {@link java.net.URI} to
-     * {@link String}, and nothing else. The {@code enum} and decimal cases this also carried are gone: a
-     * bridged enum component is crossed by {@code ElementBridging} where the field is wired, and no read in
-     * the suite ever reached the decimal one.
-     */
-    private static Object narrow(Object raw, Class<?> target) {
+     * <p><b>It was four conversions and is one, and the reduction was measured rather than argued.</b>
+     * Instrumenting it over the whole suite found the decimal rule never firing at all, and the enum rule
+     * firing thirty thousand times with every one on the FIXED path -- {@code ElementBridging} having
+     * already made the read-path case dead. Deciding a FIXED value with the field's own bound parser took
+     * the rest, the {@code URI} conversion included. What is left has one caller and one shape, which is
+     * what a general step looks like once the special cases have owners.
+     */    private static Object narrow(Object raw, Class<?> target) {
         if (raw instanceof BigInteger bi && target != BigInteger.class) {
             return NumberNarrowing.narrowIntegral(bi, target);
-        }
-        if (raw instanceof java.net.URI uri && target == String.class) {
-            return uri.toString();
         }
         return raw;
     }

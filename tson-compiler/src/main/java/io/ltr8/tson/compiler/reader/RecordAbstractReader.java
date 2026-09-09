@@ -513,9 +513,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     Rendered.value(check.value()), Rendered.value(written));
             return;
         }
-        // The raw value, not the narrowed precomputed one -- every other field reaches the sink raw and is
-        // narrowed there, and this one must not be narrowed twice.
-        sink.accept(schemaIndex, check.value());
+        // The precomputed value, which is the same one an omitted FIXED field gets -- whether the document
+        // stated it decides nothing about what the field holds (§5.2), so the two routes must not hand over
+        // different objects. Each mode's own: bind mode's was decoded by the field's bound parser and tree
+        // mode's is the natural value it never narrows. `check` keeps the pre-rebind pair for the comparison
+        // above and for that alone, so the written token and the schema's are still judged on one footing.
+        sink.accept(schemaIndex, precomputedValue[schemaIndex]);
     }
 
     /**
