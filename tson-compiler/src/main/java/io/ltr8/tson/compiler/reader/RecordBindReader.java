@@ -1,5 +1,4 @@
 package io.ltr8.tson.compiler.reader;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Unbound;
@@ -58,10 +57,10 @@ import java.util.Set;
  * {@code arguments} slot to write into at all) the same way it covers a bound one, with no separate array
  * for that case.
  *
- * <p>Three disagreements between the schema and the class are refused here
- * ({@code BindMismatchException}): a non-FIXED field with no component, a component no field fills, and an
- * atom field whose component binds structurally. Whether two <em>atoms</em> can meet is not checked --
- * {@code AtomType} exposes no host class to check it with; {@code BACKLOG.md} carries it.
+ * <p>Four disagreements between the schema and the class are refused here
+ * ({@code BindMismatchException}): a non-FIXED field with no component, a component no field fills, an
+ * atom field whose component binds structurally, and an atom field whose family cannot produce the class
+ * its component binds.
  *
  * <p>Everything shared with {@link RecordTreeReader} -- the compiled field list, the name lookup,
  * confirming a record-shaped value, precomputing default/fixed values -- lives on {@link
@@ -73,13 +72,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
     private final DataClassRecord descriptor;
     private final DataClassField[] targetField;
-
-    /**
-     * Whether a schema field with nowhere to go is an error. Fixed when the reader is built, because that is
-     * when the question is answerable and when the answer is cheap to act on -- see {@link
-     * BindMismatchException}. The lenient reading still reports what it drops (below); what it does not
-     * do is refuse to start.
-     */
 
     /**
      * The component receiving this value's own wire annotations (§3.1), if the bound class declares one.
@@ -477,8 +469,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             return field.parser();
         }
         // The field's own name, for the same reason the container rebind takes it: the entry here is `value`,
-        // which names the escape hatch and not the constraint the author wrote.
-        return atom.overAtom(field.schema().name(), ValueParser.at(target.type()));
+        // which names the escape hatch and not the constraint the author wrote. The wire class, never the
+        // declared one, on the same terms as the ordinary atom branch above.
+        return atom.overAtom(field.schema().name(), ValueParser.at(boundAs(target).dataClass()));
     }
 
     /**
@@ -512,11 +505,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
         private final DataBindContext context;
 
-        /** Whether a schema field with nowhere to go fails the compile -- see {@link BindMismatchException}. */
-    
         public Factory(DataBindContext context) {
             this.context = context;
-            }
+        }
 
         @Override
         public TsonTypeReader<?> create(String name, TypeDefinition typeDefinition, ValueReaderContext context) {
@@ -578,7 +569,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             if (!(dataClass instanceof DataClassUnion union) || body.groups().size() != 1) {
                 return null;
             }
-            FieldGroup group = body.groups().get(0);
+            FieldGroup group = body.groups().getFirst();
             if (group.state() != ElementState.REQUIRED
                     || group.members().size() != body.fields().size()
                     || union.memberTypes().length != body.fields().size()) {

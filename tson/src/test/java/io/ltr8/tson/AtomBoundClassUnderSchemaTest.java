@@ -37,17 +37,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * and a container -- {@code RecordBindReader} over {@code ElementBridging}, the wrapper an array's and a
  * map's elements already take for the identical reason.
  *
- * <p>Without it the {@code String} that {@code text} produces reached a slot typed for the consumer's class
- * and failed the constructor's cast, which was bad in three compounding ways: not caught at compile, though
- * both halves are fixed before any document exists; not a diagnostic, so a collecting receiver saw nothing
- * and the exception escaped past it; and not classified, a bare {@link ClassCastException} carrying no code,
- * no location and no pointer.
- *
- * <p><b>What still is not checked</b> is a component with no bridge at all, whose host type simply cannot
- * meet the family's. That is knowable when the schema is compiled -- the field's type resolves to a family
- * with a known host type, and the component either carries a bridge that meets it or does not -- so it
- * belongs with the rest of the bind-mode agreement check rather than here; {@code BACKLOG.md}'s "Binding"
- * section carries it.
+ * <p>A value the family refuses at such a position is an ordinary located diagnostic rather than the
+ * constructor's own cast: the refusal happens in the field's reader, which has a position to name.
  */
 class AtomBoundClassUnderSchemaTest {
 
@@ -88,6 +79,22 @@ class AtomBoundClassUnderSchemaTest {
     }
 
     public record BridgedInvoice(Money total) {
+    }
+
+    /** A consumer's own type whose wire form is a {@link UUID} -- a host type [TSON-DATA] §4 never produces. */
+    public record Ticket(UUID id) {
+    }
+
+    public static class TicketBridge implements DataBridge<UUID, Ticket> {
+        @Override
+        public UUID toData(Ticket t) {
+            return t.id();
+        }
+
+        @Override
+        public Ticket toObject(UUID id) {
+            return new Ticket(id);
+        }
     }
 
     // ── Route 2: @Transparent, the same idea with no bridge to write ─────
@@ -198,11 +205,15 @@ class AtomBoundClassUnderSchemaTest {
     public record MoneyHolder(Money slot) {
     }
 
+    public record TicketHolder(Ticket slot) {
+    }
+
     private static Tson valueTson(Class<?> bound) {
         DataNameBinder binder = name -> "holder".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
         return tson(VALUE_SCHEMA, DataBindContext.builder().nameBinder(binder)
                 .registerAtoms(AtomContext.hostTypes())
-                .registerAtom(Money.class, new MoneyBridge()).build());
+                .registerAtom(Money.class, new MoneyBridge())
+                .registerAtom(Ticket.class, new TicketBridge()).build());
     }
 
     /**
@@ -225,16 +236,25 @@ class AtomBoundClassUnderSchemaTest {
         assertTrue(e.getMessage().contains("slot"), "names the field: " + e.getMessage());
     }
 
-    /**
-     * A bridged component reaches a {@code value} slot as well. The rebind itself does not find it -- it
-     * asks by the <em>declared</em> component class, which no family produces -- so the slot falls back to
-     * §4 resolution and the field's own bridge crosses the {@code String} that produces. A bridge whose wire
-     * type is not what §4 resolves to is the case that still needs the rebind to ask by data class.
-     */
+    /** A bridged component reaches a {@code value} slot too: the rebind asks by the class the bridge takes. */
     @Test
     void aValueSlotReachesABridgedComponentThroughTheFieldsOwnBridge() {
         MoneyHolder holder = valueTson(MoneyHolder.class).objectReader()
                 .read(VALUE_DOC.formatted("12.34"), MoneyHolder.class);
         assertEquals(new Money("12.34"), holder.slot());
+    }
+
+    /**
+     * The wire class is what picks the family, and only a bridge crossing something §4 does not resolve to
+     * can show it: {@code Money}'s is {@code String}, which §4 produces anyway, so the slot would read the
+     * same either way. {@code Ticket}'s is a {@link UUID}, so asking by the declared component class finds no
+     * family, leaves §4's string, and hands the bridge a value it cannot take.
+     */
+    @Test
+    void aValueSlotAsksByTheClassTheBridgeTakesRatherThanTheOneTheComponentDeclares() {
+        UUID id = UUID.fromString("f81d4fae-7dec-11d0-a765-00a0c91e6bf6");
+        TicketHolder holder = valueTson(TicketHolder.class).objectReader()
+                .read(VALUE_DOC.formatted(id), TicketHolder.class);
+        assertEquals(new Ticket(id), holder.slot());
     }
 }
