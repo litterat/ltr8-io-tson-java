@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import java.util.Optional;
+
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -155,8 +157,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     }
 
     /**
-     * This position reading into {@code wire}, or {@code null} where the family produces nothing that
-     * reaches it (§5.2). The family binds the target once, here, so a read carries no target and the
+     * This position reading into {@code wire}, or empty where the family produces nothing that reaches it
+     * (§5.2). The family binds the target once, here, so a read carries no target and the
      * disagreement is a compile-time one -- see {@link AtomType#boundTo}.
      *
      * <p><b>The name is kept, where {@link #overAtom}'s caller replaces it.</b> Binding a target changes
@@ -164,8 +166,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * it came from -- {@code type_name}, not the field that happens to hold one. A {@code value} slot is the
      * case that does rename, its entry naming the escape hatch rather than anything in the schema.
      */
-    TsonTypeReader<?> boundTo(Class<?> wire) {
-        return delegate.boundTo(wire).<TsonTypeReader<?>>map(bound -> overAtom(name, bound)).orElse(null);
+    Optional<TsonTypeReader<?>> boundTo(Class<?> wire) {
+        return delegate.boundTo(wire).map(bound -> overAtom(name, bound));
     }
 
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {

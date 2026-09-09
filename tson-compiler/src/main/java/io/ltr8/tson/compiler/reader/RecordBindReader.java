@@ -36,6 +36,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -152,12 +153,12 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 // The wire class, never the declared one: a bridged component is reached by whatever its
                 // bridge takes, and it is that the family has to produce.
                 Class<?> wire = bound.dataClass();
-                TsonTypeReader<?> atTarget = boundTo(rebound, wire);
-                if (atTarget == null) {
+                Optional<TsonTypeReader<?>> atTarget = boundTo(rebound, wire);
+                if (atTarget.isEmpty()) {
                     mismatches.add("field '" + field.schema().name() + "' cannot produce " + wire.getName()
                             + ", which is what component '" + target.name() + "' binds");
                 } else {
-                    rebound = atTarget;
+                    rebound = atTarget.get();
                 }
             } else if (atomPosition) {
                 mismatches.add("field '" + field.schema().name() + "' is an atom, and component '"
@@ -216,17 +217,18 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     }
 
     /**
-     * This field's reader bound to {@code wire}, or {@code null} where the family refuses it. Looks through
-     * a §7.2 subsumption guard as every question about a field's reader does, and reaches the atom through
-     * {@link AtomTypeReader#overAtom} -- the same seam a {@code value} slot's own specialisation takes.
+     * This field's reader bound to {@code wire}, or empty where the family refuses it -- the refusal stays a
+     * value the whole way up, because this caller collects several before raising one
+     * {@code BindMismatchException} that names them all. Looks through a §7.2 subsumption guard as every
+     * question about a field's reader does, and reaches the atom through {@link AtomTypeReader#overAtom} --
+     * the same seam a {@code value} slot's own specialisation takes.
      */
-    private static TsonTypeReader<?> boundTo(TsonTypeReader<?> parser, Class<?> wire) {
+    private static Optional<TsonTypeReader<?>> boundTo(TsonTypeReader<?> parser, Class<?> wire) {
         if (parser instanceof VariantSchemaReader guard) {
-            TsonTypeReader<?> inner = boundTo(guard.wrapped(), wire);
-            return inner == null ? null : guard.rewrap(inner);
+            return boundTo(guard.wrapped(), wire).map(guard::rewrap);
         }
         if (!(parser instanceof AtomTypeReader<?> atom)) {
-            return parser;
+            return Optional.of(parser);
         }
         return atom.boundTo(wire);
     }
