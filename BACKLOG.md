@@ -91,12 +91,6 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
   reading converts) on a path nothing measures — `whereAReadsBytesGo` covers the event stream, a schemaless
   *tree* read, and the two schema-driven reads. Escape analysis plausibly removes it; nothing here says so.
 
-- [ ] **A `value` slot's rebind asks by the declared component class.** `RecordBindReader.rebindValueIfNeeded`
-  passes `DataClassField.type()` to `ValueParser.at`, where the schemaless readers pass the bridge's
-  `dataClass()` — so the rebind finds no family for a bridged component and the slot falls back to §4
-  resolution. The field's own bridge crosses what that produces, which covers a bridge over a §4 host type
-  and leaves one whose wire type is not what §4 resolves to. Passing the data class is the change.
-
 - [ ] **A custom atom cannot round-trip, because the write direction has no surface.** `TsonObjectWriter`
   holds a private `VocabularyAtoms.defaults()` copy, whose Javadoc says it is mutable and per-writer "so a
   caller wanting to extend the vocabulary with their own `AtomType` has an actual map to add to" — and no

@@ -352,7 +352,10 @@ It stays out of `VocabularyAtoms` on `text`'s own terms: base resolution recover
   UUID. `ValueParser.read(token, target)` asks `HostAtoms` which built-in produces the position's own host
   type and re-reads the token under it; `RecordBindReader.rebindValueIfNeeded` is where a field's reader is
   swapped for one, beside `rebindContainerIfNeeded` and `tokenAware`, which specialise the same slot on the
-  same evidence. **Additive by construction**: a value the component can already hold, or that the caller's
+  same evidence. **The host type is the class a component's bridge takes, never the one it declares** — a
+  registered atom or a `@Transparent` wrapper is reached through its wire type, so the family is chosen by
+  what the bridge can be handed, the same class the ordinary atom branch binds against. **Additive by
+  construction**: a value the component can already hold, or that the caller's
   own numeric narrowing reaches, is returned untouched, so `!number ^ { min: 0x10 }` stays the integer 16
   rather than being re-read under `number`, whose grammar admits no based-integer form. Only a token the
   position could not have held under any narrowing reaches the atom — which is also what turns
