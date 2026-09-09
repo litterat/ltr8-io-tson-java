@@ -42,12 +42,12 @@ import java.util.stream.Collectors;
  * constructor arguments) and stays there, along with anything specific to only one of them (object
  * mode's own target-type narrowing, for instance).
  *
- * <p>{@link #precomputedValue} is stored raw here -- the natural host value {@code readSchemaDefault}
- * produces, with no narrowing applied. {@link RecordBindReader} overwrites its own entries in place,
- * once, right after calling this class's own constructor, narrowing each one to its bound field's
- * target type; {@link RecordTreeReader} leaves them exactly as this class computed them. A field's
- * {@code FixedCheck} keeps the pre-rebind parser for exactly that reason: a written token has to be
- * decoded the same way the schema's own value was, or comparing them would compare across the narrowing.
+ * <p>{@link #precomputedValue} is the natural host value {@code readSchemaDefault} produces here, before
+ * any field knows its target. {@link RecordBindReader} decodes its own entries again, once, right after
+ * calling this class's constructor, through each field's now-bound parser -- so a FIXED value arrives the
+ * way a written one would; {@link RecordTreeReader} leaves them exactly as this class computed them. A
+ * field's {@code FixedCheck} keeps the pre-rebind parser and value for exactly that reason: the written
+ * token and the schema's own have to be decoded the same way, or comparing them would compare across that.
  *
  * <p><b>Forward, single-pass, and a repeated field name is a validation error</b> ({@code
  * DUPLICATE_FIELD}): {@link #readFields} consumes {@code FieldName} events strictly in stream order,
@@ -410,8 +410,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      *
      * <p>Per subclass because the two modes can represent different things. A tree has a node for it
      * ({@code TsonAbsent}), so it keeps [TSON-DATA] §2.9's distinction between a field written {@code _} and
-     * one never written -- which an array element and a tuple slot already keep, leaving the record the one
-     * container of the four that dropped it. A bound object has no third state between {@code null} and a
+     * one never written -- which an array element and a tuple slot keep too, the record being the one
+     * container of the four that would otherwise lose it. A bound object has no third state between {@code null} and a
      * component that was never set, so bind mode answers {@code null} and the two collapse there; that is a
      * limit of the target, not a reading of §2.9, and it is why this is a subclass's answer rather than one
      * shared here.
@@ -513,9 +513,12 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
                     Rendered.value(check.value()), Rendered.value(written));
             return;
         }
-        // The raw value, not the narrowed precomputed one -- every other field reaches the sink raw and is
-        // narrowed there, and this one must not be narrowed twice.
-        sink.accept(schemaIndex, check.value());
+        // The precomputed value, which is the same one an omitted FIXED field gets -- whether the document
+        // stated it decides nothing about what the field holds (§5.2), so the two routes must not hand over
+        // different objects. Each mode's own: bind mode's was decoded by the field's bound parser and tree
+        // mode's is the natural value it never narrows. `check` keeps the pre-rebind pair for the comparison
+        // above and for that alone, so the written token and the schema's are still judged on one footing.
+        sink.accept(schemaIndex, precomputedValue[schemaIndex]);
     }
 
     /**

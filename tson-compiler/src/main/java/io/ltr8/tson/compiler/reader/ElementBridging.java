@@ -16,9 +16,8 @@ import io.ltr8.tson.compiler.TsonTypeReader;
  * <p>The two failures differ only in when they are noticed. An enum element reaches a {@code
  * List<SomeEnum>} as the {@code String} the enum reader produced -- that compiles (erasure) and reads back
  * wrong, the list heap-polluted, with the <em>writer</em> the first thing to complain. A record field fails
- * at once, in the constructor's own cast, naming a class the document never mentioned; that is what a
- * consumer's bridged or {@code @Transparent} atom used to hit at every schema-governed read while binding
- * correctly without a schema.
+ * at once, in the constructor's own cast, naming a class the document never mentioned -- which is what a
+ * consumer's bridged or {@code @Transparent} atom meets at every schema-governed read without this.
  *
  * <p>Returns {@code reader} unchanged when the target carries no bridge, which is the common case, so a
  * caller can wrap unconditionally -- the same shape as {@link AnnotationBoxing#wrap}, and applied at the

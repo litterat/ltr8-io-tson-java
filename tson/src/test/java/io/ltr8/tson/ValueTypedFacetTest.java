@@ -99,9 +99,9 @@ class ValueTypedFacetTest {
 
     @Test
     void aBoundTheAtomRefusesIsASchemaErrorNotAGap() {
-        // The classification test: the verdict on `min: "abc"` does not change when this library improves,
-        // so it must not arrive as NOT_IMPLEMENTED -- which is what the cast failure used to produce, and
-        // what told an author their correct reading of the spec was this library's fault.
+        // The classification test: the verdict on `min: "abc"` does not change when this library improves, so
+        // it must not arrive as NOT_IMPLEMENTED -- which would tell an author that their correct reading of
+        // the spec was this library's fault.
         for (String bad : List.of("t => !number ^ { min: \"abc\" }",
                                   "t => !duration ^ { min: P1Y }",
                                   "t => !date ^ { min: \"not-a-date\" }")) {
@@ -120,20 +120,22 @@ class ValueTypedFacetTest {
         assertTrue(reported.message().contains("a month is a period"), reported.message());
     }
 
-    // ── additive: nothing that read before reads differently ─────────────
+    // ── the natural reading wins wherever it fits ────────────────────────
 
     @Test
     void aNumericBoundKeepsEverySpellingItAlreadyAdmitted() {
-        // `decimal_type`'s bounds worked already, through the caller's own numeric narrowing, and a based
-        // integer is the case that would have broken had the token simply been re-read under `number`, whose
-        // own grammar admits no based-integer form (§5.6). The rebind is reached only by a value the
-        // component could not have held under any narrowing.
+        // Every one of these is an integer token at a slot whose component holds a `BigDecimal`, so the
+        // widening is what makes them load -- and it is the slot's own: `ValueParser.at` chose the target,
+        // so it is what reaches it. A based integer is the case that would have broken had the token simply
+        // been re-read under `number`, whose own grammar admits no based-integer form (§5.6); the atom is
+        // reached only by a value no narrowing gets to.
         assertEquals(List.of(), loading("t => !number ^ { min: 1  max: 10 }"));
         assertEquals(List.of(), loading("t => !number ^ { min: 0x10 }"));
         assertEquals(List.of(), loading("t => !number ^ { min: 1.5  multiple_of: 0.05 }"));
         assertEquals(List.of(), loading("t => !float64 ^ { min: 1  max: 2.5 }"));
         assertEquals(List.of(), loading("t => !int32 ^ { min: 1  max: 0xFF }"));
     }
+
 
     @Test
     void aBoundOutsideItsSourceIsStillATighteningError() {

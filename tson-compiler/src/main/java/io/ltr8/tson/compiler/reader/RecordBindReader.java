@@ -22,15 +22,12 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
-import io.ltr8.tson.atom.number.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import java.lang.reflect.RecordComponent;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
@@ -48,21 +45,18 @@ import java.util.Set;
  * <p><b>{@code targetField}</b> (schema position -> bound {@code DataClassField}, or {@code null} if
  * the target class doesn't declare this schema field) is built once, right after {@link
  * RecordAbstractReader}'s own constructor returns, which is also where every inherited {@link
- * #precomputedValue} entry gets narrowed in place to its bound field's target type -- {@link
- * RecordTreeReader} leaves those unnarrowed, since a plain {@code Map} has no target type to narrow
- * toward.
+ * #precomputedValue} entry is decoded again through the field's now-bound parser -- {@link
+ * RecordTreeReader} leaves those as that class computed them, a plain {@code Map} having no target to
+ * decode toward.
  *
- * <p><b>No separate "already filled" tracker is needed at all</b> -- unlike this class's own
- * pre-streaming design, which relied on backward iteration plus an {@code arguments[...] != null}/
- * {@code boolean[] unboundFilled} check to implement "first occurrence found is genuinely the last
- * in source order." {@link RecordAbstractReader#readFields}'s own forward, single-pass, overwrite-
- * on-duplicate design (see its own Javadoc) already gets §2.5's "last value wins" for free -- this
- * class's own {@link FieldSink} just assigns into {@code arguments[target.index()]} unconditionally
- * every time {@code sink} runs, and the {@code boolean[]} {@link RecordAbstractReader#readFields}
- * itself returns is reused directly as the "does this field still need its own required-or-default
- * handling" signal for the second pass -- covering an unbound field (no {@code arguments} slot to
- * write into at all) the same way it covers a bound one, with no separate array for that case
- * anymore either.
+ * <p><b>No separate "already filled" tracker is needed at all.</b>
+ * {@link RecordAbstractReader#readFields}'s forward, single-pass, overwrite-on-duplicate design (see its own
+ * Javadoc) gets §2.5's "last value wins" for free, so this class's {@link FieldSink} assigns into
+ * {@code arguments[target.index()]} unconditionally every time {@code sink} runs, and the {@code boolean[]}
+ * {@link RecordAbstractReader#readFields} returns is reused directly as the "does this field still need its
+ * own required-or-default handling" signal for the second pass -- covering an unbound field (no
+ * {@code arguments} slot to write into at all) the same way it covers a bound one, with no separate array
+ * for that case.
  *
  * <p>Three disagreements between the schema and the class are refused here
  * ({@code BindMismatchException}): a non-FIXED field with no component, a component no field fills, and an
@@ -72,8 +66,8 @@ import java.util.Set;
  * <p>Everything shared with {@link RecordTreeReader} -- the compiled field list, the name lookup,
  * confirming a record-shaped value, precomputing default/fixed values -- lives on {@link
  * RecordAbstractReader}; this class holds only what's genuinely different about producing a real
- * bound object instead of a plain {@code Map}: the target-field lookup, narrowing, and constructor
- * invocation.
+ * bound object instead of a plain {@code Map}: the target-field lookup, binding each field's atom to what
+ * its component holds, and constructor invocation.
  */
 final class RecordBindReader extends RecordAbstractReader<Object> {
 
@@ -174,7 +168,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             FieldState state = field.schema().state();
             if (state == FieldState.REQUIRED_DEFAULT || state == FieldState.REQUIRED_FIXED
                     || state == FieldState.OPTIONAL_FIXED) {
-                precomputedValue[i] = narrow(precomputedValue[i], target.type());
+                precomputedValue[i] = readSchemaDefault(fields.get(i));
             }
         }
         {
@@ -284,9 +278,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      */
     private static TsonTypeReader<?> boxing(TsonTypeReader<?> value, DataClassAnnotated boxed,
                                             AnnotationTypes annotationTypes) {
-        Class<?> valueType = boxed.valueClass().typeClass();
-        TsonTypeReader<?> narrowing = ctx -> narrow(value.read(ctx), valueType);
-        return AnnotationBoxing.wrap(narrowing, boxed, annotationTypes);
+        return AnnotationBoxing.wrap(value, boxed, annotationTypes);
     }
 
     /**
@@ -413,7 +405,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         FieldSink sink = (schemaIndex, decoded) -> {
             DataClassField target = targetField[schemaIndex];
             if (target != null) {
-                arguments[target.index()] = narrow(decoded, target.type());
+                arguments[target.index()] = decoded;
                 return;
             }
             // Unreachable under a strict reader: a field with no component fails when the reader is built,
@@ -453,35 +445,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
     }
 
-    /**
-     * The schema-driven child-reader recursion has no knowledge of the target Java field's own
-     * declared width (e.g. an unconstrained schema {@code integer} atom's natural host type is
-     * {@link BigInteger}, but a bound field might be {@code Optional<Integer>}) -- reuses {@link
-     * NumberNarrowing}, the same utility this codebase's atom-family readers and untyped-number
-     * binding already share for exactly this. Also narrows a schema {@code enum}-typed field's raw
-     * member text to the matching Java {@code enum} constant by exact name, and a schema {@code
-     * uri}-typed field's real {@link java.net.URI} down to {@link String} where the target field
-     * keeps it flat.
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static Object narrow(Object raw, Class<?> target) {
-        if (raw instanceof BigInteger bi && target != BigInteger.class) {
-            return NumberNarrowing.narrowIntegral(bi, target);
-        }
-        if (raw instanceof BigDecimal bd && target != BigDecimal.class) {
-            return NumberNarrowing.narrowDecimal(bd, target);
-        }
-        // Still reached, and by the FIXED path alone: a fixed value is decoded by `readSchemaDefault` with
-        // no target in hand (tree mode shares it) and adapted here, where a read value is now reconciled by
-        // the family itself. meta.tn's `spec` fields are every instance of it.
-        if (raw instanceof java.net.URI uri && target == String.class) {
-            return uri.toString();
-        }
-        if (raw instanceof String s && target.isEnum()) {
-            return Enum.valueOf((Class<Enum>) target, s);
-        }
-        return raw;
-    }
 
     /**
      * A {@code value}-typed field read under the atom of the position it stands in, where the position's own

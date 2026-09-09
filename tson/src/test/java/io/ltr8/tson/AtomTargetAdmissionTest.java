@@ -23,11 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * A family binds the target its component wants, where the reader is built.
  *
- * <p>An atom position under a schema used to be read with no target in hand: the family produced its own
- * natural host value and the constructor discovered any disagreement by failing its cast, unclassified and
- * past a collecting receiver. {@code AtomType.boundTo} is the seam -- this family reading into a given
- * class, or empty where no value of it ever reaches one -- and it is asked once, where the field is wired,
- * so a read carries no target at all and a disagreement is reported before any document exists.
+ * <p>{@code AtomType.boundTo} is the seam -- this family reading into a given class, or empty where no
+ * value of it ever reaches one. It is asked once, where the field is wired, so a read carries no target at
+ * all and a component the family cannot fill is reported before any document exists rather than by a cast
+ * failing inside a constructor, unclassified and past a collecting receiver.
  *
  * <p><b>The wire class, never the declared one.</b> A bridged component is reached by whatever its bridge
  * takes, so that is what the family has to produce; asking about the declared class would refuse every
@@ -139,6 +138,70 @@ class AtomTargetAdmissionTest {
         assertTrue(e.getMessage().contains("no bound Java class for 't'"), e.getMessage());
     }
 
+    // ── a FIXED value arrives the way a written one does ─────────────────
+
+    public record FixedSpec(String spec) {
+    }
+
+    private static final String FIXED_SCHEMA = "  t => { spec: uri = \"https://x.test/v1\" }";
+
+    /**
+     * A FIXED value is the schema's, not the document's, but it still reaches the component the way a
+     * written one does -- through the family bound to that component.
+     */
+    @Test
+    void aFixedValueReachesTheComponentThroughTheFamily() {
+        FixedSpec t = tson(FIXED_SCHEMA, FixedSpec.class).objectReader()
+                .read(doc("!t {}"), FixedSpec.class);
+        assertEquals("https://x.test/v1", t.spec());
+    }
+
+    /** And a document that states the same value still agrees with the schema's own. */
+    @Test
+    void aStatedFixedValueIsCheckedAgainstTheSchemasOwn() {
+        FixedSpec t = tson(FIXED_SCHEMA, FixedSpec.class).objectReader()
+                .read(doc("!t { spec: \"https://x.test/v1\" }"), FixedSpec.class);
+        assertEquals("https://x.test/v1", t.spec());
+    }
+
+    /** A contradicting one is still the §5.2 error it was, decoded on the terms both sides share. */
+    @Test
+    void aContradictingFixedValueIsStillRefused() {
+        assertThrows(ReadException.class, () -> tson(FIXED_SCHEMA, FixedSpec.class).objectReader()
+                .read(doc("!t { spec: \"https://x.test/v2\" }"), FixedSpec.class));
+    }
+
+    public record FixedUuid(String id) {
+    }
+
+    /**
+     * A FIXED {@code uuid} at a {@code String} component: a conversion only the family knows, and the case
+     * that separates asking it from consulting a table of conversions, which answers for the families
+     * someone listed and silently fails the rest.
+     */
+    @Test
+    void aFixedValueConvertsForAFamilyNoTableEverListed() {
+        FixedUuid t = tson("  t => { id: uuid = \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }", FixedUuid.class)
+                .objectReader().read(doc("!t {}"), FixedUuid.class);
+        assertEquals("f81d4fae-7dec-11d0-a765-00a0c91e6bf6", t.id());
+    }
+
+    /**
+     * Whether the document stated a FIXED value decides nothing about what the field holds (§5.2), so an
+     * omitted one and a stated one hand over the same object. A {@code uuid} at a {@code String} component
+     * is where the two would part: the contradiction check decodes the written token on its own pre-rebind
+     * terms, and that value is not what the field holds.
+     */
+    @Test
+    void aStatedFixedValueMatchesWhatOmittingItWouldHaveGiven() {
+        String schema = "  t => { id: uuid = \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }";
+        FixedUuid omitted = tson(schema, FixedUuid.class).objectReader().read(doc("!t {}"), FixedUuid.class);
+        FixedUuid stated = tson(schema, FixedUuid.class).objectReader()
+                .read(doc("!t { id: \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }"), FixedUuid.class);
+        assertEquals(omitted, stated);
+        assertEquals("f81d4fae-7dec-11d0-a765-00a0c91e6bf6", stated.id());
+    }
+
     // ── what a family that states nothing still does ─────────────────────
 
     public record IntAsInt(int n) {
@@ -156,7 +219,7 @@ class AtomTargetAdmissionTest {
                 .read(doc("!t { n: 5 }"), IntAsInt.class).n());
     }
 
-    /** And widens, which the constructor used to refuse after the fact. */
+    /** And widens: the family reaches a target wider than its own natural type. */
     @Test
     void anIntegerFamilyAlsoReachesAWiderTarget() {
         assertEquals(BigInteger.valueOf(5), tson("  t => { n: int32 }", IntAsBig.class).objectReader()

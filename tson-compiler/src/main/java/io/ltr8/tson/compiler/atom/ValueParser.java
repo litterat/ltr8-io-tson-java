@@ -60,13 +60,16 @@ public final class ValueParser implements TokenAtomType<Object> {
      * type ({@link HostAtoms}) -- which is what meta.tn already describes the resolver as doing, and the same
      * rule {@code DecimalType} applies to a member of a {@code set<value>}.
      *
-     * <p><b>Additive, never a re-interpretation.</b> A value the position can already hold is returned
-     * untouched, and so is one a caller's own numeric narrowing will reach -- {@code min: 0x10} at a {@code
-     * BigDecimal} slot stays the integer 16 and is narrowed by the caller, rather than being re-read under
-     * {@code number}, whose grammar admits no based-integer form. Only a token whose natural resolution the
-     * position could not hold under any narrowing reaches the atom, so nothing that reads today reads
-     * differently, and what did not read at all now gets a verdict from the atom that owns the question:
+     * <p><b>The natural reading wins wherever it fits.</b> A value the position can already hold is returned
+     * untouched, and one a numeric narrowing reaches is narrowed here -- {@code min: 0x10} at a {@code
+     * BigDecimal} slot is read as the integer 16 and widened, rather than being re-read under {@code number},
+     * whose grammar admits no based-integer form. Only a token whose natural resolution the position could
+     * not hold under any narrowing reaches the atom, and there it gets that atom's own verdict:
      * {@code !number ^ { min: "abc" }} is refused by {@code number}, not by a cast.
+     *
+     * <p><b>The slot that chose the target is the one that reaches it</b>, so the narrowing happens here and
+     * not in whatever holds the result: {@code min: 1} on a {@code decimal} facet -- an integer token at a
+     * {@code BigDecimal} component -- arrives as the {@code BigDecimal} the component holds.
      *
      * <p>A position whose host type no built-in produces is left alone, so a consumer's own class binding a
      * {@code value} field to their own type keeps whatever their bind context does with it.
@@ -74,28 +77,31 @@ public final class ValueParser implements TokenAtomType<Object> {
     @Override
     public Object read(TokenValue token, Class<?> target) {
         Object natural = read(token);
-        if (target == null || AtomType.wrap(target).isInstance(natural) || narrowsTo(natural, target)) {
+        if (target == null || AtomType.wrap(target).isInstance(natural)) {
             return natural;
+        }
+        Object narrowed = narrowedTo(natural, target);
+        if (narrowed != null) {
+            return narrowed;
         }
         return HostAtoms.forHostType(target).<Object>map(atom -> atom.read(token.text())).orElse(natural);
     }
 
     /**
-     * Whether a caller's own numeric narrowing turns {@code natural} into something {@code target} holds.
-     * Asked rather than performed: the narrowing belongs to whoever declared the target, and doing it here
-     * as well would narrow twice -- the trap {@code verifyFixed} already documents.
+     * {@code natural} as {@code target} holds it, or {@code null} where no numeric narrowing reaches it --
+     * which is the signal to try the atom that produces {@code target} instead, not a refusal.
      */
-    private static boolean narrowsTo(Object natural, Class<?> target) {
+    private static Object narrowedTo(Object natural, Class<?> target) {
         if (!(natural instanceof Number)) {
-            return false;
+            return null;
         }
         try {
             Object narrowed = natural instanceof java.math.BigInteger integer
                     ? NumberNarrowing.narrowIntegral(integer, target)
                     : natural instanceof BigDecimal decimal ? NumberNarrowing.narrowDecimal(decimal, target) : natural;
-            return AtomType.wrap(target).isInstance(narrowed);
+            return AtomType.wrap(target).isInstance(narrowed) ? narrowed : null;
         } catch (RuntimeException e) {
-            return false;
+            return null;
         }
     }
 
