@@ -57,11 +57,13 @@ type-ref reaches it. `JsonAtoms.fromString` asks that index, as `SchemalessObjec
 side, so `"9f1c8e2a-…"` at a `UUID` component is `UuidParser`'s to accept or refuse under either encoding —
 which is what §5.1 means by the string rule being the whole interface.
 
-The index is deliberately **not total over the registered host types**, and the two exclusions are the same
-fact from different directions. `mac`, `email` and `regex` read to `String`, so a `String` component cannot
-say which of them (or `text`) it meant; `CidrNetwork` is produced by *both* `cidr4` and `cidr6`. In each case
-the host class does not determine the family, and picking one would be a guess — a position wanting those
-needs a schema to say so, which is what §5–§8's decode is for. The numeric families are excluded on a
+The index is deliberately **not total over the registered host types**, and what it excludes is every class
+the family is not a function of. `mac`, `email` and `regex` read to `String`, so a `String` component cannot
+say which of them (or `text`) it meant: the host class does not determine the family, picking one would be a
+guess, and a position wanting those needs a schema to say so — which is what §5–§8's decode is for. The CIDR
+pair used to be the same fact from the other direction and is not any more: `cidr4` and `cidr6` have a host
+type each (`CidrInet4Network`, `CidrInet6Network`), so a component naming one is answered here, and only the
+sealed `CidrNetwork` supertype — which is genuinely ambiguous — stays out. The numeric families are excluded on a
 different ground and one that matters more here: they read from a JSON **number**, so admitting them to a
 *string*-content index would let a class declaring `BigInteger` turn `"123"` into one and overrule the
 encoding's own kinds.

@@ -1,7 +1,8 @@
 package io.ltr8.tson.base.bind;
 
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.tson.base.atom.CidrNetwork;
+import io.ltr8.tson.base.atom.CidrInet4Network;
+import io.ltr8.tson.base.atom.CidrInet6Network;
 
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -25,7 +26,7 @@ import java.util.UUID;
  * {@code UUID} component must not have to discover that one front door binds it and the other does not.
  *
  * <p>Every type here is registered as an <b>atom</b> rather than left to {@code tson-bind}'s structural
- * auto-detection. Most are opaque scalars the engine has no way to take apart; {@link CidrNetwork} is a Java
+ * auto-detection. Most are opaque scalars the engine has no way to take apart; a CIDR network is a Java
  * record, so auto-detection would make a {@code { prefix: ... prefixLength: ... }} of it and refuse the
  * scalar {@code cidr4}/{@code cidr6} actually carry.
  *
@@ -79,5 +80,5 @@ public final class AtomContext {
             UUID.class, byte[].class,
             LocalDate.class, OffsetTime.class, OffsetDateTime.class, Duration.class, Period.class,
             URI.class,
-            Inet4Address.class, Inet6Address.class, CidrNetwork.class);
+            Inet4Address.class, Inet6Address.class, CidrInet4Network.class, CidrInet6Network.class);
 }

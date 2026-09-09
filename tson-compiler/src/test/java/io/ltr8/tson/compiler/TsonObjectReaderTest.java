@@ -12,6 +12,8 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
+import io.ltr8.tson.base.atom.CidrInet4Network;
+import io.ltr8.tson.base.atom.CidrInet6Network;
 import io.ltr8.tson.base.atom.CidrNetwork;
 import io.ltr8.tson.base.atom.Complex;
 import io.ltr8.tson.base.atom.Rational;
@@ -966,45 +968,81 @@ class TsonObjectReaderTest {
 
     // ── CIDR networks (§5.5) ─────────────────────────────────────────────
 
+    public record Cidr4Holder(CidrInet4Network value) {
+    }
+
+    public record Cidr6Holder(CidrInet6Network value) {
+    }
+
+    /** The sealed supertype, which names no one family and so binds as what it is -- a union. */
     public record CidrHolder(CidrNetwork value) {
     }
 
     @Test
     void builtinCidrAnnotationsBindAsNetworkValuesThroughTheMapper() throws DataBindException {
-        // The host type is CidrNetwork -- the prefix octets and the prefix length -- so two spellings of
-        // one network bind equal and a holder can ask what the value contains. Both must be quoted: '/' is
-        // not a legal unquoted-token character (§7.2), and an IPv6 network also contains ':'.
-        assertEquals(CidrNetwork.parse("10.0.0.0/8", 32),
-                mapper.read("{ value: !cidr4 \"10.0.0.0/8\" }", CidrHolder.class).value());
-        assertEquals(CidrNetwork.parse("2001:db8::/32", 128),
-                mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", CidrHolder.class).value());
+        // The host type is the family's own network -- the prefix octets and the prefix length -- so two
+        // spellings of one network bind equal and a holder can ask what the value contains. Both must be
+        // quoted: '/' is not a legal unquoted-token character (§7.2), and an IPv6 network also contains ':'.
+        assertEquals(CidrInet4Network.parse("10.0.0.0/8"),
+                mapper.read("{ value: !cidr4 \"10.0.0.0/8\" }", Cidr4Holder.class).value());
+        assertEquals(CidrInet6Network.parse("2001:db8::/32"),
+                mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", Cidr6Holder.class).value());
+    }
+
+    /**
+     * A family has a host type of its own, so the component alone says which one -- no type-ref, no schema.
+     * The reason the two are separate types: one class two families produce answers nothing, and
+     * {@code HostAtoms} can carry no entry for it.
+     */
+    @Test
+    void aNetworkComponentPicksItsFamilyWithNoTypeRefAtAll() throws DataBindException {
+        assertEquals(CidrInet4Network.parse("10.0.0.0/8"),
+                mapper.read("{ value: \"10.0.0.0/8\" }", Cidr4Holder.class).value());
+        assertEquals(CidrInet6Network.parse("2001:db8::/32"),
+                mapper.read("{ value: \"2001:db8::/32\" }", Cidr6Holder.class).value());
+    }
+
+    /**
+     * And the supertype is honestly ambiguous, so it binds as a union and wants a discriminant. The atom
+     * family's name is not one: a union member is matched by its own class name, which is what makes
+     * {@code !cidr4} miss here and {@code BACKLOG.md} carry it.
+     */
+    @Test
+    void theSealedSupertypeBindsAsAUnionAndTheFamilyNameDoesNotDiscriminateIt() {
+        DiagnosticsCollector collected = new DiagnosticsCollector();
+        mapper.withDiagnostics(collected).read("{ value: !cidr4 \"10.0.0.0/8\" }", CidrHolder.class);
+
+        assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
+                collected.diagnostics().stream().map(Diagnostic::code).toList());
+        assertTrue(collected.diagnostics().getFirst().message().contains("union"),
+                collected.diagnostics().getFirst().message());
     }
 
     @Test
     void aNonCanonicalNetworkSpellingBindsToTheSameValueAsItsCanonicalOne() throws DataBindException {
         // What it means for the value to be the octets rather than the text: the expanded RFC 4291 form and
         // the RFC 5952 canonical one are one network, and equality says so.
-        assertEquals(mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", CidrHolder.class).value(),
+        assertEquals(mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", Cidr6Holder.class).value(),
                 mapper.read("{ value: !cidr6 \"2001:0db8:0000:0000:0000:0000:0000:0000/32\" }",
-                        CidrHolder.class).value());
+                        Cidr6Holder.class).value());
     }
 
     @Test
     void builtinCidrAnnotationsRejectNonzeroHostBitsThroughTheMapper() throws DataBindException {
         // §5.5: the host value is a network, and accept-and-mask would be lossy. Without this the two
         // atoms would say nothing an ordinary text field doesn't.
-        assertThrows(ReadException.class, () -> mapper.read("{ value: !cidr4 \"10.1.0.0/8\" }", CidrHolder.class));
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !cidr4 \"10.1.0.0/8\" }", Cidr4Holder.class));
         assertThrows(ReadException.class,
-                () -> mapper.read("{ value: !cidr6 \"2001:db8:1::/32\" }", CidrHolder.class));
+                () -> mapper.read("{ value: !cidr6 \"2001:db8:1::/32\" }", Cidr6Holder.class));
     }
 
     @Test
     void builtinCidrAnnotationsRejectAPrefixLengthOutsideTheirOwnFamilyRangeThroughTheMapper()
             throws DataBindException {
         // /33 is out of range for IPv4 and perfectly ordinary for IPv6 -- the range is per family.
-        assertThrows(ReadException.class, () -> mapper.read("{ value: !cidr4 \"10.0.0.0/33\" }", CidrHolder.class));
-        assertEquals(CidrNetwork.parse("2001:db8:8000::/33", 128),
-                mapper.read("{ value: !cidr6 \"2001:db8:8000::/33\" }", CidrHolder.class).value());
+        assertThrows(ReadException.class, () -> mapper.read("{ value: !cidr4 \"10.0.0.0/33\" }", Cidr4Holder.class));
+        assertEquals(CidrInet6Network.parse("2001:db8:8000::/33"),
+                mapper.read("{ value: !cidr6 \"2001:db8:8000::/33\" }", Cidr6Holder.class).value());
     }
 
     // ── Temporal types (§5.4) ────────────────────────────────────────────

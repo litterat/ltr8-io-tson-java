@@ -8,7 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import java.util.List;
 import java.util.Optional;
-import io.ltr8.tson.base.atom.CidrNetwork;
+import io.ltr8.tson.base.atom.CidrInet6Network;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -44,7 +44,7 @@ class Cidr6ParserTest {
     @Test
     void returnsTheAuthoredTextAndWritesItBackUnchanged() {
         assertEquals("2001:db8::/32", Cidr6Parser.UNCONSTRAINED.read(token("2001:db8::/32")).text());
-        assertEquals("2001:db8::/32", Cidr6Parser.UNCONSTRAINED.write(CidrNetwork.parse("2001:db8::/32", 128)));
+        assertEquals("2001:db8::/32", Cidr6Parser.UNCONSTRAINED.write(CidrInet6Network.parse("2001:db8::/32")));
     }
 
     @ParameterizedTest

@@ -8,7 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import java.util.List;
 import java.util.Optional;
-import io.ltr8.tson.base.atom.CidrNetwork;
+import io.ltr8.tson.base.atom.CidrInet4Network;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -44,7 +44,7 @@ class Cidr4ParserTest {
     @Test
     void returnsTheAuthoredTextAndWritesItBackUnchanged() {
         assertEquals("10.0.0.0/8", Cidr4Parser.UNCONSTRAINED.read(token("10.0.0.0/8")).text());
-        assertEquals("10.0.0.0/8", Cidr4Parser.UNCONSTRAINED.write(CidrNetwork.parse("10.0.0.0/8", 32)));
+        assertEquals("10.0.0.0/8", Cidr4Parser.UNCONSTRAINED.write(CidrInet4Network.parse("10.0.0.0/8")));
     }
 
     @ParameterizedTest

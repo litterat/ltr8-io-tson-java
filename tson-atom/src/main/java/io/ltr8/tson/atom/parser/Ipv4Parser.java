@@ -7,7 +7,7 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.schema.meta.Ipv4Type;
 import java.util.List;
-import io.ltr8.tson.base.atom.CidrNetwork;
+import io.ltr8.tson.base.atom.CidrInet4Network;
 import io.ltr8.tson.base.atom.InternetAddress;
 import java.net.Inet4Address;
 import java.net.UnknownHostException;
@@ -34,7 +34,7 @@ import java.net.UnknownHostException;
  * instance sets either, and set-membership/non-overlap against an array of other addresses or CIDR
  * blocks is a materially bigger piece of work than a scalar constraint, left for later.
  */
-public record Ipv4Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
+public record Ipv4Parser(List<CidrInet4Network> within, List<CidrInet4Network> excluding)
         implements AtomTypeParser<Inet4Address> {
 
     /** §5.5's built-in annotation name -- {@code !ipv4}. */
@@ -58,9 +58,9 @@ public record Ipv4Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
      * ({@code Ipv4Type.coherenceCheck}), so a malformed entry cannot reach here; one that somehow did is dropped
      * rather than silently treated as matching nothing, and the schema-load check is where it is reported.
      */
-    private static List<CidrNetwork> networks(List<String> entries) {
+    private static List<CidrInet4Network> networks(List<String> entries) {
         return entries.stream()
-                .map(entry -> CidrNetwork.parse(entry, 32))
+                .map(entry -> CidrInet4Network.parse(entry))
                 .filter(java.util.Objects::nonNull)
                 .toList();
     }

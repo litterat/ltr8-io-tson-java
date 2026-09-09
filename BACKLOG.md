@@ -92,19 +92,17 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
   caller can hand one in. Reading now works for a bridged or `@Transparent` component under a schema, so
   this is the half that stops the pair being usable.
 
-- [ ] **`cidr4` and `cidr6` share one host type, so a component cannot name either.** Both read to
-  `base.atom.CidrNetwork`, which is therefore absent from `HostAtoms`' reverse index and refused at a
-  schemaless position — where `Inet4Address`/`Inet6Address` are answered, the address families having a host
-  type each. Splitting it into `CidrInet4Network` and `CidrInet6Network` makes the pair as unambiguous as the
-  addresses already are, and takes the last built-in collision out of the index. The shared half is the
-  reason it is not two independent records: containment and equality are over the prefix bits of two
-  equal-length octet arrays, so only the length differs and one implementation serves both — a sealed
-  `CidrNetwork` over the two concrete types keeps that, and leaves a component declaring the general type
-  genuinely ambiguous, which it is. It reaches 12 main-source files: both CIDR parsers and `CidrParsing`,
-  both IP parsers (`within`/`excluding` name networks), `Cidr4Type`/`Ipv4Type`/`Ipv6Type`, `AtomCoherence`'s
-  prefix-tree cover, `AtomContext.hostTypes()` and `HostAtoms`. A published identity does not pin it — the
-  host type is this implementation's choice and §5.5 says nothing about it — but a consumer's `CidrNetwork`
-  component is a source break, so it wants doing while the build is `-SNAPSHOT`.
+- [ ] **A union's members are discriminated by Java class name, so an atom family's name misses.** A
+  component typed `java.net.InetAddress` or the sealed `CidrNetwork` binds as a union — honestly, both being
+  two families wearing one type — and a union wants a type annotation in the document to pick a member. What
+  it matches is the *member class's* name, so `!inet4address` works and `!ipv4` does not
+  (`UNKNOWN_TYPE_REF: no member of union ... matches type name 'ipv4'`), and the same for `!cidr4` against
+  `CidrNetwork` — which is the name an author would reach for, the schema vocabulary being what they write
+  everywhere else. `TsonObjectReaderTest.theSealedSupertypeBindsAsAUnionAndTheFamilyNameDoesNotDiscriminateIt`
+  pins today's answer. What is owed is a decision before any code: whether a union member that *is* a
+  built-in's host type should also answer to the family's name, and whether that generalises past the two
+  pairs in `base.atom` — a consumer's own sealed type has no family names to offer, so this would be a rule
+  about the built-in vocabulary and not about unions.
 
 ## JSON encoding
 
