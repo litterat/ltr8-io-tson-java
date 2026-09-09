@@ -63,15 +63,10 @@ import java.util.Set;
  * write into at all) the same way it covers a bound one, with no separate array for that case
  * anymore either.
  *
- * <p><b>The schema and the class are checked against each other here, and the check has a boundary.</b>
- * Two disagreements are refused ({@code BindMismatchException}): a non-FIXED field with no component, and a
- * component no field fills. A third is refused for the one shape where it is certain -- an <em>atom</em>
- * field whose component binds structurally, which no decoded value can ever fill, and which is what a
- * consumer's own host type looks like when nothing registered it as an atom. What is deliberately <b>not</b>
- * checked is whether two atoms can meet: an {@code int32} field against a {@code String} component still
- * reaches the constructor. That needs a host class per atom family, which {@code AtomType} does not expose
- * and could not be asked for without deciding what a consumer's own implementation must answer;
- * {@code BACKLOG.md} carries it.
+ * <p>Three disagreements between the schema and the class are refused here
+ * ({@code BindMismatchException}): a non-FIXED field with no component, a component no field fills, and an
+ * atom field whose component binds structurally. Whether two <em>atoms</em> can meet is not checked --
+ * {@code AtomType} exposes no host class to check it with; {@code BACKLOG.md} carries it.
  *
  * <p>Everything shared with {@link RecordTreeReader} -- the compiled field list, the name lookup,
  * confirming a record-shaped value, precomputing default/fixed values -- lives on {@link
@@ -140,8 +135,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 }
                 continue;
             }
-            // Asked of the field's own reader, before any rebind: a `value` slot is about to become an
-            // ordinary atom reader over the component's host type, and it is the component that chose it.
+            // Before any rebind: a `value` slot becomes an atom reader over the host type its own component
+            // chose, so judging it after would be judging the component against itself.
             boolean atomPosition = readsAnAtom(field.parser());
             TsonTypeReader<?> rebound = rebindValueIfNeeded(field, target);
             rebound = rebindContainerIfNeeded(new CompiledField(field.schema(), rebound), target, resolver,
@@ -191,10 +186,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     }
 
     /**
-     * Whether this field's value arrives as an atom -- a single decoded host value rather than a structure.
-     *
-     * <p>Looks through a §7.2 subsumption guard the way every other question about a field's reader does.
-     * The uninterpreted {@code value} atom answers false: what it reads is the component's own choice
+     * Whether this field's value arrives as a single decoded host value rather than a structure. The
+     * uninterpreted {@code value} atom answers false: what it reads is the component's own choice
      * ({@link #rebindValueIfNeeded}), so the component cannot disagree with it.
      */
     private static boolean readsAnAtom(TsonTypeReader<?> parser) {
@@ -204,10 +197,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         return parser instanceof AtomTypeReader<?> atom && !atom.readsUninterpretedValue();
     }
 
-    /**
-     * What a component actually binds as, which is not always what it is declared as: an {@code Annotated}
-     * carrier binds its payload's descriptor, and it is that one the value has to fit.
-     */
+    /** What a component binds as -- an {@code Annotated} carrier's payload is what the value has to fit. */
     private static DataClass boundAs(DataClassField target) {
         DataClass bound = target.dataClass();
         return bound instanceof DataClassAnnotated boxed ? boxed.valueClass() : bound;

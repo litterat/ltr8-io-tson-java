@@ -86,19 +86,14 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **The bind-mode check cannot tell whether two atoms meet.** An atom field whose component binds
-  *structurally* is refused at compile — the certain case, and the one a consumer's own host type takes when
-  nothing registered it. Two *atoms* that cannot meet are not: an `int32` field against a `String` component
-  reaches the constructor and fails there, unclassified. Deciding it needs the host class an atom family
-  produces, and `AtomType` does not expose one — `HostAtoms` is a reverse index (host class → family) and
-  the only forward answer in the tree, `IntegerParser.hostType(IntegerSize)`, is private. **So this is an API
-  question before it is a check**: `AtomType` is public and a consumer may implement it, so asking it for a
-  host class decides what every future implementation must answer. A `default` returning `Optional.empty()`
-  keeps it additive and makes the check silent where a family declines, which may be the right trade.
-  Whatever answers it must also model the reader's own tolerances — `RecordBindReader.narrow`'s four
-  conversions, `NumberNarrowing`'s accepted target sets per kind, a bridge being satisfied by its *wire*
-  class, and `Annotated` unwrapping — or it will refuse bindings that work today, at startup, which is a
-  worse failure than the one it replaces. `RecordBindReader`'s class Javadoc states the current boundary.
+- [ ] **The bind-mode check cannot tell whether two atoms meet.** An `int32` field against a `String`
+  component reaches the constructor and fails there, unclassified. Deciding it needs the host class an atom
+  family produces, which `AtomType` does not expose — and since it is public and consumer-implementable,
+  adding one decides what every future implementation must answer (a `default` returning `Optional.empty()`
+  keeps it additive). Whatever answers must also model the reader's own tolerances —
+  `RecordBindReader.narrow`, `NumberNarrowing`'s accepted targets, a bridge satisfied by its *wire* class,
+  `Annotated` unwrapping — or it refuses bindings that work today, at startup, which is worse than the late
+  failure it replaces.
 
 - [ ] **A `value` slot's rebind asks by the declared component class.** `RecordBindReader.rebindValueIfNeeded`
   passes `DataClassField.type()` to `ValueParser.at`, where the schemaless readers pass the bridge's
