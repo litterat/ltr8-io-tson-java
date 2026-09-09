@@ -10,6 +10,8 @@ import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
+import io.ltr8.bind.DataClassAtom;
+import io.ltr8.bind.DataClassBridge;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -103,6 +105,32 @@ public class DefaultClassBinder {
 				? (Class<?>) nested.getRawType()
 				: (Class<?>) argument;
 		return context.componentSource(valueClass, argument);
+	}
+
+	/**
+	 * The atom form {@code targetClass} declares for itself, or {@code null} where it declares none.
+	 *
+	 * <p><b>What makes an atom an atom is a bridge to a type the wire can carry</b>, and the two routes a
+	 * class has for stating one are the two consulted here: a plain Java enum, whose representation is
+	 * settled by {@link DefaultAtomBinder#resolveEnum}, and {@code @Atom} on a constructor or static
+	 * factory. Both end in a {@link DataClassBridge} naming the wire type and the crossing back.
+	 *
+	 * <p>Exposed for {@code DataBindContext.registerAtom}, so that registering a class as an atom finds the
+	 * form it already declares rather than replacing it with one that states nothing. {@link #resolve}
+	 * cannot serve that: it dispatches on shape, so a record carrying {@code @Atom} is claimed by
+	 * {@code isRecord} before {@code isAtom} is ever asked.
+	 *
+	 * <p>A primitive is not asked -- {@link DefaultAtomBinder} refuses one outright, on the grounds that
+	 * reaching it means the primitives were never registered.
+	 */
+	public DataClassAtom atomForm(DataBindContext context, Class<?> targetClass) throws CodeAnalysisException {
+		if (targetClass.isPrimitive()) {
+			return null;
+		}
+		if (targetClass.isEnum()) {
+			return atomBinder.resolveEnum(targetClass);
+		}
+		return atomBinder.resolveAtom(context, targetClass);
 	}
 
 	public DataClass resolve(DataBindContext context,  Class<?> targetClass, Type parameterizedType)

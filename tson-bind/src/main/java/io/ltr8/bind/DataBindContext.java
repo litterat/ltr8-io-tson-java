@@ -173,27 +173,27 @@ public class DataBindContext {
 				: new DataNameBinder.DefaultDataNameBinder(builder.nameBinderPackages, builder.nameBinderAliases);
 
 		try {
-			registerAtom(Boolean.class);
-			registerAtom(boolean.class);
-			registerAtom(Character.class);
-			registerAtom(char.class);
-			registerAtom(Byte.class);
-			registerAtom(byte.class);
-			registerAtom(Short.class);
-			registerAtom(short.class);
-			registerAtom(Integer.class);
-			registerAtom(int.class);
-			registerAtom(Long.class);
-			registerAtom(long.class);
-			registerAtom(Float.class);
-			registerAtom(float.class);
-			registerAtom(Double.class);
-			registerAtom(double.class);
-			registerAtom(BigInteger.class);
-			registerAtom(BigDecimal.class);
-			registerAtom(Void.class);
-			registerAtom(String.class);
-			registerAtom(Date.class);
+			registerCoreAtom(Boolean.class);
+			registerCoreAtom(boolean.class);
+			registerCoreAtom(Character.class);
+			registerCoreAtom(char.class);
+			registerCoreAtom(Byte.class);
+			registerCoreAtom(byte.class);
+			registerCoreAtom(Short.class);
+			registerCoreAtom(short.class);
+			registerCoreAtom(Integer.class);
+			registerCoreAtom(int.class);
+			registerCoreAtom(Long.class);
+			registerCoreAtom(long.class);
+			registerCoreAtom(Float.class);
+			registerCoreAtom(float.class);
+			registerCoreAtom(Double.class);
+			registerCoreAtom(double.class);
+			registerCoreAtom(BigInteger.class);
+			registerCoreAtom(BigDecimal.class);
+			registerCoreAtom(Void.class);
+			registerCoreAtom(String.class);
+			registerCoreAtom(Date.class);
 
 			// The builder's own, after the primitives, so a caller registering one of those gets the
 			// "already registered" error rather than silently shadowing it.
@@ -353,8 +353,38 @@ public class DataBindContext {
 	 * later read produces. Both of these are called only from the constructor, applying the primitives and
 	 * then whatever {@link Builder#registerAtom} accumulated.
 	 */
-	private void registerAtom(Class<?> targetClass) throws DataBindException {
+	/**
+	 * The core scalars, registered as themselves: a {@code String} or an {@code int} <em>is</em> a wire
+	 * value, so there is nothing to bridge and nothing to analyse -- {@link DefaultClassBinder#atomForm}
+	 * would refuse a primitive in any case.
+	 */
+	private void registerCoreAtom(Class<?> targetClass) throws DataBindException {
 		register(targetClass, new DataClassAtom(targetClass));
+	}
+
+	/**
+	 * {@link Builder#registerAtom(Class)}: the class's <em>own</em> atom form where it declares one, and a
+	 * bare {@link DataClassAtom} otherwise.
+	 *
+	 * <p><b>Analysis first, because an explicit registration must not be worse than none.</b> A class
+	 * carrying {@code @Atom}, and a plain enum, already state a bridge to the type the wire carries, and
+	 * {@code getDescriptor} would have found it. Writing a bridgeless descriptor straight into the cache
+	 * instead settles the class as an atom with no wire form at all -- unreadable and unwritable, and
+	 * permanently, since the registration short-circuits analysis for that class.
+	 *
+	 * <p>The bare form is what remains: a class the <em>encoding</em> already knows as a scalar -- the JDK
+	 * types above, and the host types the built-in atom vocabulary reads to ({@code UUID},
+	 * {@code LocalDate}, {@code Inet4Address}, …). That is a fact this module cannot check, knowing nothing
+	 * of any encoding's vocabulary, so a class that is neither is accepted here and refused by the reader
+	 * or writer that meets it.
+	 *
+	 * <p>A class that declares an atom form <em>badly</em> -- {@code @Atom} on a constructor with no matching
+	 * accessor, say -- fails out of here rather than falling back: the author said what they wanted and the
+	 * bare form is not it.
+	 */
+	private void registerAtom(Class<?> targetClass) throws DataBindException {
+		DataClassAtom declared = dataClassResolver.atomForm(this, targetClass);
+		register(targetClass, declared != null ? declared : new DataClassAtom(targetClass));
 	}
 
 	private DataClassAtom registerAtom(Class<?> targetClass, DataBridge<?, ?> bridge) throws DataBindException {

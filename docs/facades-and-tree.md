@@ -441,6 +441,18 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
   `BACKLOG.md`'s standing question about mutating a context after use. What is still a race, and still
   tested, is memoization: `getDescriptor` resolving one class on two threads does the work twice and
   `putIfAbsent` settles which answer everyone sees. Duplicated work, never duplicated state.
+  - **What makes an atom an atom is a bridge to a type the wire can carry**, and `registerAtom(Class)` finds
+    the one the class declares rather than replacing it: it asks `DefaultClassBinder.atomForm` first —
+    `@Atom` on a constructor or static factory, or a plain enum's own `name()` crossing — and falls back to
+    a bare `DataClassAtom` only for a class that declares none. The bare form asserts "one scalar" and
+    supplies nothing that makes it one, so it is right exactly for a class the *encoding* already knows: the
+    JDK scalars, and the vocabulary's host types (`UUID`, `LocalDate`, `Inet4Address`, …). `tson-bind` cannot
+    check which those are, knowing nothing of any encoding, so a class that is neither is accepted here and
+    refused by the reader or writer that meets it. **The order is the point**: writing the bare form
+    unconditionally settled the class in the descriptor cache, short-circuiting analysis permanently, so an
+    explicit registration was strictly worse than none. A component type is admitted when both encodings
+    carry it directly — the primitives and boxes, `String`, and `BigInteger`/`BigDecimal`, §5.3's own exact
+    tiers.
   - **`registerAtoms(List)` and `AtomContext.hostTypes()` are why this reads well.** The vocabulary is a
     named list rather than a chain of eleven calls, so a caller adds it to their own builder in the order
     things happen — `DataBindContext.builder().nameBinder(binder).registerAtoms(AtomContext.hostTypes())` —
