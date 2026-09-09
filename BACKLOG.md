@@ -86,15 +86,19 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **The bind-mode check compares field sets, not host types.** A component whose host type cannot meet
-  its field's family — an `Invoice(Money total)` against `money => text` where nothing registers `Money` as
-  an atom — compiles clean and throws a bare `ClassCastException` from the constructor on the first read,
-  escaping unwrapped so it is neither a diagnostic nor a classified exception. Both halves are fixed before
-  any document exists: the field's type resolves to a family with a known host value, and the component's
-  `DataClass` either carries a bridge that meets it or does not. So it belongs with the rest of the
-  agreement check as a `BindMismatchException` at compile, where every other schema/class disagreement
-  lands, rather than as a read-time diagnostic that fires for a defect knowable at startup.
-  `AtomBoundClassUnderSchemaTest` covers the cases that do bind and states this as its own boundary.
+- [ ] **The bind-mode check cannot tell whether two atoms meet.** An atom field whose component binds
+  *structurally* is refused at compile — the certain case, and the one a consumer's own host type takes when
+  nothing registered it. Two *atoms* that cannot meet are not: an `int32` field against a `String` component
+  reaches the constructor and fails there, unclassified. Deciding it needs the host class an atom family
+  produces, and `AtomType` does not expose one — `HostAtoms` is a reverse index (host class → family) and
+  the only forward answer in the tree, `IntegerParser.hostType(IntegerSize)`, is private. **So this is an API
+  question before it is a check**: `AtomType` is public and a consumer may implement it, so asking it for a
+  host class decides what every future implementation must answer. A `default` returning `Optional.empty()`
+  keeps it additive and makes the check silent where a family declines, which may be the right trade.
+  Whatever answers it must also model the reader's own tolerances — `RecordBindReader.narrow`'s four
+  conversions, `NumberNarrowing`'s accepted target sets per kind, a bridge being satisfied by its *wire*
+  class, and `Annotated` unwrapping — or it will refuse bindings that work today, at startup, which is a
+  worse failure than the one it replaces. `RecordBindReader`'s class Javadoc states the current boundary.
 
 - [ ] **A `value` slot's rebind asks by the declared component class.** `RecordBindReader.rebindValueIfNeeded`
   passes `DataClassField.type()` to `ValueParser.at`, where the schemaless readers pass the bridge's
