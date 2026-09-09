@@ -86,11 +86,6 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **A schemaless bind and a JSON read are not in the allocation harness.** Both ask `AtomType.boundTo`
-  per value where a schema-driven read asks once, so both allocate an `Optional` (and a `BoundAtom` where the
-  reading converts) on a path nothing measures — `whereAReadsBytesGo` covers the event stream, a schemaless
-  *tree* read, and the two schema-driven reads. Escape analysis plausibly removes it; nothing here says so.
-
 - [ ] **A custom atom cannot round-trip, because the write direction has no surface.** `TsonObjectWriter`
   holds a private `VocabularyAtoms.defaults()` copy, whose Javadoc says it is mutable and per-writer "so a
   caller wanting to extend the vocabulary with their own `AtomType` has an actual map to add to" — and no
