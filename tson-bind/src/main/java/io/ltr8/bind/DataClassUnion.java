@@ -30,8 +30,13 @@ import java.util.Objects;
  * <li>embedded union: A class with one or more fields where only one is present at any one time.
  * </ul>
  *
- * The members are the actual classes instead of a DataClass. This is to ensure that infinite
- * resolution loops do not occur.
+ * <p>Members are held as {@link Class} rather than as {@link DataClass}, and not to break a resolution
+ * cycle -- {@link DataBindContext#componentSource} defers a cyclic edge and the holder memoises it, which
+ * is what {@code DataClassField} already does. Two other reasons stand: {@link #addMemberType} grows the
+ * list while a document is being read, where resolving a descriptor would put analysis inside a lock on a
+ * read path; and every caller matching a wire name asks a reflective question the {@code Class} answers
+ * and a {@code DataClass} does not carry -- {@code @Typename}, the simple name. A caller that wants the
+ * descriptor asks the context for it, which caches.
  */
 public class DataClassUnion extends DataClass {
 

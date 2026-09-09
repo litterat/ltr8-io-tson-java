@@ -641,11 +641,19 @@ public final class SchemalessObjectReader {
     // ── Unions ───────────────────────────────────────────────────────────
 
     /**
-     * Disambiguated by the value's own type annotation (§3.2's {@code !typeName}) -- a member class's
-     * {@link Typename} gives the exact match; failing that, its simple class name matches
-     * case-insensitively (so {@code !circle} matches a Java class {@code Circle} without every fixture
-     * being annotated). The type-ref is consumed here; the value's remaining core-value is then bound
-     * as the resolved member.
+     * Disambiguated by the value's own type annotation (§3.2's {@code !typeName}), resolved most-explicit
+     * first: a member's {@link Typename}, then the built-in vocabulary, then a member's simple class name
+     * matched case-insensitively (so {@code !circle} matches a Java class {@code Circle} without every
+     * fixture being annotated). The type-ref is consumed here; the value's remaining core-value is then
+     * bound as the resolved member.
+     *
+     * <p><b>The vocabulary comes before any Java name</b>, which is the order {@link #bindAtom} already
+     * takes: a type-ref is a TSON type name, so a union whose members are built-in host types --
+     * {@code java.net.InetAddress}, {@code base.atom.CidrNetwork} -- is selected by {@code !ipv4} and
+     * {@code !cidr4}, the names every reader of the document knows. The simple-name pass still answers
+     * {@code !inet4address} behind it, and is not narrowed to exclude a member the vocabulary names:
+     * {@code !circle} for a {@code Circle} is the same rule, so restricting it would be one rule for a
+     * consumer's own types and another for the JDK's.
      */
     private Object bindUnion(TsonReadContext ctx, DataClassUnion dataClass) {
         Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
@@ -659,7 +667,8 @@ public final class SchemalessObjectReader {
         Class<?> member = resolveUnionMember(dataClass, typeRef.get());
         if (member == null) {
             ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "no member of union " + dataClass.typeClass()
-                    + " matches type name '" + typeRef.get() + "'", "one of " + describeMembers(dataClass), typeRef.get());
+                    + " matches type name '" + typeRef.get() + "'",
+                    "one of " + describeMembers(dataClass), typeRef.get());
             EventSkip.coreValue(ctx);
             return null;
         }
@@ -671,8 +680,61 @@ public final class SchemalessObjectReader {
         return bind(ctx, memberDataClass);
     }
 
-    /** A declared {@code @Typename} wins over any simple-name match, so the two passes can't be collapsed into one. */
-    private static Class<?> resolveUnionMember(DataClassUnion dataClass, String typeName) {
+    /**
+     * <b>Resolve the name to a class, then ask whether the union admits it.</b> That is the shape, and it
+     * matters because a non-sealed union's listed members are not the whole of its membership:
+     * {@link DataClassUnion#isMemberType} admits and registers an implementation of an open member, but it
+     * takes a {@code Class} where a read holds a name. A scan of the listed members can only ever find what
+     * is already listed.
+     *
+     * <ol>
+     * <li><b>The built-in vocabulary</b>, which is closed and the format's own, so it answers before any
+     *     binder a deployment configures -- the order {@link #bindAtom} takes. Its answer is which listed
+     *     member the family reads, and that is complete rather than a shortcut: every built-in host type is
+     *     a final class ({@code UUID}, {@code Inet4Address}, {@code CidrInet4Network}), so it can never be
+     *     an unlisted implementation of an open member.
+     * <li><b>The context's own {@link io.ltr8.bind.DataNameBinder}</b> -- the one pass that resolves a name
+     *     to a class outright, and so the only one that reaches a member nothing has registered yet. Where
+     *     it is configured it is the authority on what a name means, the standing
+     *     {@code VariantBindReader.isMember} already gives it: a name that is not the class's own is
+     *     recorded nowhere else. A miss falls through rather than failing.
+     * </ol>
+     *
+     * <p><b>The scans behind those cover the opposite gap, not a smaller one.</b> Discovery reaches a member
+     * that is not listed; a scan reaches a listed member whose name no binder resolves -- and that is every
+     * member in an unconfigured context, since {@code DefaultDataNameBinder} searches configured packages
+     * and {@code DataBindContext.Builder} defaults that set to empty. So {@code !circle} finding a
+     * {@code Circle} is the scan's doing and not the binder's. It is also every {@code @Typename}, which the
+     * binder mangles to a class name that does not exist ({@code sq} to {@code Sq}), and every casing the
+     * mangle does not produce, the scan being case-insensitive where {@code Class.forName} is not.
+     *
+     * <p><b>Only one union shape has unlisted members at all</b> ({@code DefaultUnionBinder}): a sealed type
+     * lists its permitted subclasses and {@code @Union({...})} lists its argument, both complete at
+     * analysis. It is {@code @Union} with no value on a non-sealed type that starts empty and grows, so
+     * discovery is narrow -- and it is also the only shape that had the ordering bug it fixes.
+     *
+     * <p><b>What neither route reaches</b> is a member that is unlisted <em>and</em> named something no
+     * binder resolves -- a {@code @Typename} on an implementation of an open member that nothing has
+     * registered. There is no reverse index from an annotation's value to the class carrying it, so such a
+     * name is findable only by asking a class that nothing has yet named. Closing it would take a classpath
+     * scan; a deployment that wants those reachable configures the binder, which is what makes them
+     * discoverable in the first place.
+     *
+     * <p><b>Two scans rather than one</b>, so that a member's declared {@code @Typename} beats another
+     * member's incidental class name where both claim the wire name -- an explicit declaration is the one
+     * the author meant. Collapsing them does not merely reorder that case: {@code TypeRefCheck#names} is
+     * case-insensitive and matches an un-annotated {@code Foo} against {@code !foo}, so one loop would
+     * answer {@code Foo} for both spellings and leave a {@code @Typename("foo")} sibling unaddressable.
+     */
+    private Class<?> resolveUnionMember(DataClassUnion dataClass, String typeName) {
+        Optional<AtomType<?>> family = BuiltinTypeVocabulary.lookup(typeName);
+        if (family.isPresent()) {
+            return memberReadBy(dataClass, family.get());
+        }
+        Class<?> discovered = discoveredMember(dataClass, typeName);
+        if (discovered != null) {
+            return discovered;
+        }
         for (Class<?> member : dataClass.memberTypes()) {
             if (TypeRefCheck.declares(member, typeName)) {
                 return member;
@@ -685,6 +747,52 @@ public final class SchemalessObjectReader {
         }
         return null;
     }
+
+    /**
+     * The class {@code typeName} denotes under this context's own name binder, if the union admits it.
+     *
+     * <p><b>What a non-sealed union's member list does not contain.</b> A union built over an open
+     * permitted type cannot know its implementations at analysis time, so members are registered as they
+     * are met -- and every route that registers one is holding an instance or a class already: the object
+     * writer, {@code tson-bind}'s mappers, and the analysis of the member itself. A read holds a name, so
+     * before this the list only ever grew as a side effect of something else in the process, and the same
+     * document bound or failed depending on whether anything had written that member first.
+     *
+     * <p>Resolving the descriptor is what registers it -- {@code DefaultRecordBinder} adds a class to its
+     * union's members as it analyses it -- so {@link DataClassUnion#isMemberType} is asked afterwards and
+     * answers about a list that now holds the candidate. It still answers {@code false} for a class the
+     * union does not admit, which is the case this must not turn into a bind.
+     *
+     * <p>A name no binder resolves is not an error here: it is one of the ordinary ways a type-ref fails to
+     * name a member, and the caller reports it as that.
+     */
+    private Class<?> discoveredMember(DataClassUnion dataClass, String typeName) {
+        try {
+            Class<?> candidate = context.getDescriptor(typeName).typeClass();
+            return dataClass.isMemberType(candidate) ? candidate : null;
+        } catch (DataBindException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * The one member {@code family} reads to, or {@code null} where none does or several do -- two members
+     * of one family is a union nothing could disambiguate, and saying so beats picking the first.
+     */
+    private static Class<?> memberReadBy(DataClassUnion dataClass, AtomType<?> family) {
+        Class<?> found = null;
+        for (Class<?> member : dataClass.memberTypes()) {
+            Optional<AtomType<?>> memberFamily = HostAtoms.forTypedPosition(member);
+            if (memberFamily.isPresent() && memberFamily.get().getClass() == family.getClass()) {
+                if (found != null) {
+                    return null;
+                }
+                found = member;
+            }
+        }
+        return found;
+    }
+
 
     private static String describeMembers(DataClassUnion dataClass) {
         StringBuilder sb = new StringBuilder("[");
