@@ -22,14 +22,12 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
-import io.ltr8.tson.atom.number.NumberNarrowing;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import java.lang.reflect.RecordComponent;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
@@ -47,9 +45,9 @@ import java.util.Set;
  * <p><b>{@code targetField}</b> (schema position -> bound {@code DataClassField}, or {@code null} if
  * the target class doesn't declare this schema field) is built once, right after {@link
  * RecordAbstractReader}'s own constructor returns, which is also where every inherited {@link
- * #precomputedValue} entry gets narrowed in place to its bound field's target type -- {@link
- * RecordTreeReader} leaves those unnarrowed, since a plain {@code Map} has no target type to narrow
- * toward.
+ * #precomputedValue} entry is decoded again through the field's now-bound parser -- {@link
+ * RecordTreeReader} leaves those as that class computed them, a plain {@code Map} having no target to
+ * decode toward.
  *
  * <p><b>No separate "already filled" tracker is needed at all</b> -- unlike this class's own
  * pre-streaming design, which relied on backward iteration plus an {@code arguments[...] != null}/
@@ -71,8 +69,8 @@ import java.util.Set;
  * <p>Everything shared with {@link RecordTreeReader} -- the compiled field list, the name lookup,
  * confirming a record-shaped value, precomputing default/fixed values -- lives on {@link
  * RecordAbstractReader}; this class holds only what's genuinely different about producing a real
- * bound object instead of a plain {@code Map}: the target-field lookup, narrowing, and constructor
- * invocation.
+ * bound object instead of a plain {@code Map}: the target-field lookup, binding each field's atom to what
+ * its component holds, and constructor invocation.
  */
 final class RecordBindReader extends RecordAbstractReader<Object> {
 
@@ -283,9 +281,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      */
     private static TsonTypeReader<?> boxing(TsonTypeReader<?> value, DataClassAnnotated boxed,
                                             AnnotationTypes annotationTypes) {
-        Class<?> valueType = boxed.valueClass().typeClass();
-        TsonTypeReader<?> narrowing = ctx -> narrow(value.read(ctx), valueType);
-        return AnnotationBoxing.wrap(narrowing, boxed, annotationTypes);
+        return AnnotationBoxing.wrap(value, boxed, annotationTypes);
     }
 
     /**
@@ -412,7 +408,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         FieldSink sink = (schemaIndex, decoded) -> {
             DataClassField target = targetField[schemaIndex];
             if (target != null) {
-                arguments[target.index()] = narrow(decoded, target.type());
+                arguments[target.index()] = decoded;
                 return;
             }
             // Unreachable under a strict reader: a field with no component fails when the reader is built,
@@ -452,24 +448,6 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         }
     }
 
-    /**
-     * The one adaptation a bound reader cannot make for itself: a {@code value}-typed slot, whose atom is
-     * chosen from the component's own class ({@code ValueParser.at}) and which narrows toward it but stops
-     * where the remaining step is a widening -- an integral bound at a {@code BigDecimal} facet is the case
-     * (a {@code value} facet's own tests are what fail without this).
-     *
-     * <p><b>It was four conversions and is one, and the reduction was measured rather than argued.</b>
-     * Instrumenting it over the whole suite found the decimal rule never firing at all, and the enum rule
-     * firing thirty thousand times with every one on the FIXED path -- {@code ElementBridging} having
-     * already made the read-path case dead. Deciding a FIXED value with the field's own bound parser took
-     * the rest, the {@code URI} conversion included. What is left has one caller and one shape, which is
-     * what a general step looks like once the special cases have owners.
-     */    private static Object narrow(Object raw, Class<?> target) {
-        if (raw instanceof BigInteger bi && target != BigInteger.class) {
-            return NumberNarrowing.narrowIntegral(bi, target);
-        }
-        return raw;
-    }
 
     /**
      * A {@code value}-typed field read under the atom of the position it stands in, where the position's own

@@ -42,12 +42,12 @@ import java.util.stream.Collectors;
  * constructor arguments) and stays there, along with anything specific to only one of them (object
  * mode's own target-type narrowing, for instance).
  *
- * <p>{@link #precomputedValue} is stored raw here -- the natural host value {@code readSchemaDefault}
- * produces, with no narrowing applied. {@link RecordBindReader} overwrites its own entries in place,
- * once, right after calling this class's own constructor, narrowing each one to its bound field's
- * target type; {@link RecordTreeReader} leaves them exactly as this class computed them. A field's
- * {@code FixedCheck} keeps the pre-rebind parser for exactly that reason: a written token has to be
- * decoded the same way the schema's own value was, or comparing them would compare across the narrowing.
+ * <p>{@link #precomputedValue} is the natural host value {@code readSchemaDefault} produces here, before
+ * any field knows its target. {@link RecordBindReader} decodes its own entries again, once, right after
+ * calling this class's constructor, through each field's now-bound parser -- so a FIXED value arrives the
+ * way a written one would; {@link RecordTreeReader} leaves them exactly as this class computed them. A
+ * field's {@code FixedCheck} keeps the pre-rebind parser and value for exactly that reason: the written
+ * token and the schema's own have to be decoded the same way, or comparing them would compare across that.
  *
  * <p><b>Forward, single-pass, and a repeated field name is a validation error</b> ({@code
  * DUPLICATE_FIELD}): {@link #readFields} consumes {@code FieldName} events strictly in stream order,

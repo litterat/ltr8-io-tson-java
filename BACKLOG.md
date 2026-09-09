@@ -86,13 +86,6 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **`RecordBindReader.narrow` is one conversion for one caller.** A `value`-typed slot is all that
-  reaches it: `ValueParser.at` narrows toward the component's own class and stops where the remaining step is
-  a widening, so an integral bound at a `BigDecimal` facet still needs finishing. Closing it means giving a
-  `value` slot the same treatment an atom position gets — the slot already picks its atom from the
-  component's class, so what is missing is the widening, not the dispatch. An instrumented run of the suite
-  is what says it is that one shape, and is how to check another has not appeared.
-
 - [ ] **A schemaless bind and a JSON read are not in the allocation harness.** Both ask `AtomType.boundTo`
   per value where a schema-driven read asks once, so both allocate an `Optional` (and a `BoundAtom` where the
   reading converts) on a path nothing measures — `whereAReadsBytesGo` covers the event stream, a schemaless
