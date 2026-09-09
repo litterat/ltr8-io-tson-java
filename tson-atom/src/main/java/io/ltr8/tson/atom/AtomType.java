@@ -1,6 +1,7 @@
 package io.ltr8.tson.atom;
 
 import java.util.Optional;
+import java.util.function.Function;
 
 import io.ltr8.tson.atom.number.NumberNarrowing;
 import io.ltr8.tson.atom.parser.IntegerParser;
@@ -86,6 +87,48 @@ public interface AtomType<T> {
                     "a value representable as " + target.getSimpleName());
         }
         return value;
+    }
+
+    /**
+     * A {@link #boundTo} answer for a family whose value reaches {@code target} unchanged -- the natural
+     * host type, and the primitive of a boxed one. The common shape, so that stating it is a line.
+     */
+    default Optional<AtomType<?>> natural(Class<?> naturalType, Class<?> target) {
+        return wrap(target).isAssignableFrom(wrap(naturalType)) ? Optional.of(this) : Optional.empty();
+    }
+
+    /**
+     * A {@link #boundTo} answer for a family whose value has to be converted to reach {@code target}: this
+     * family read first, then {@code render} applied. The result writes back through {@code parse}, so a
+     * bound reading is not a one-way door.
+     */
+    default <R> Optional<AtomType<?>> converting(Function<T, R> render, Function<R, String> parse) {
+        AtomType<T> self = this;
+        return Optional.of(new AtomType<R>() {
+            @Override
+            public R read(String text) {
+                return render.apply(self.read(text));
+            }
+
+            @Override
+            public String write(R value) {
+                return parse.apply(value);
+            }
+        });
+    }
+
+    /**
+     * {@link #converting} to the text this family read, for a string target. Every family whose wire form is
+     * text can hand back the spelling it validated: the value is checked first and only then rendered, so a
+     * text target chooses the representation and never the rules.
+     */
+    default Optional<AtomType<?>> asWrittenText() {
+        return converting(value -> write(value), text -> text);
+    }
+
+    /** Whether {@code target} is one of the two classes a string-valued reading may land in. */
+    static boolean isTextTarget(Class<?> target) {
+        return target == String.class || target == CharSequence.class;
     }
 
     String write(T value);
