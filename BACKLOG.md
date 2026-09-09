@@ -86,15 +86,14 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **`RecordBindReader.narrow` survives, and it is the wrong shape.** It is a second statement of the
-  atom-to-host mapping, applied after the fact, where `AtomType.boundTo` states it once in the family that
-  owns it. Both its callers were measured and both still need it: a **FIXED** value is decoded by
-  `readSchemaDefault` with no target in hand (tree mode shares the method) and adapted afterwards — meta.tn's
-  `spec` fields are every instance — and the **read** path still needs it for a `[value]`-typed container's
-  elements, which are not atom positions and so are never bound (`NetworkFacetsTest`'s `within`/`excluding`
-  are the ones that fail). Re-decoding the fixed value with the bound parser was tried and moves a malformed
-  schema's error to a different point, so it is not a drop-in. Binding container elements is the half that
-  would actually retire it.
+- [ ] **`RecordBindReader.narrow` is down to two conversions and both have an owner.** Not a general step
+  any more: what reaches it is a value decoded by a parser that did not know the field's target.
+  `verifyFixed` is one — a stated FIXED value is decoded by the *pre-rebind* parser on purpose, so the
+  document's token and the schema's are compared on identical terms — and a `value`-typed slot is the other,
+  where `ValueParser.at` narrows toward the component's class and stops short of a widening. Closing either
+  means giving that path the bound reader without losing what it decodes on purpose. An instrumented run of
+  the suite is what says it is those two and nothing else, so the same run is how to check a third has not
+  appeared.
 
 - [ ] **A schemaless bind and a JSON read are not in the allocation harness.** Both ask `AtomType.boundTo`
   per value where a schema-driven read asks once, so both allocate an `Optional` (and a `BoundAtom` where the

@@ -139,6 +139,56 @@ class AtomTargetAdmissionTest {
         assertTrue(e.getMessage().contains("no bound Java class for 't'"), e.getMessage());
     }
 
+    // ── a FIXED value arrives the way a written one does ─────────────────
+
+    public record FixedSpec(String spec) {
+    }
+
+    private static final String FIXED_SCHEMA = "  t => { spec: uri = \"https://x.test/v1\" }";
+
+    /**
+     * A FIXED value is the schema's, not the document's, but it still has to reach the component the way a
+     * written one would -- through the family bound to that component. It used to be decoded with no target
+     * in hand and adapted afterwards by a table of conversions in the reader.
+     */
+    @Test
+    void aFixedValueReachesTheComponentThroughTheFamily() {
+        FixedSpec t = tson(FIXED_SCHEMA, FixedSpec.class).objectReader()
+                .read(doc("!t {}"), FixedSpec.class);
+        assertEquals("https://x.test/v1", t.spec());
+    }
+
+    /** And a document that states the same value still agrees with the schema's own. */
+    @Test
+    void aStatedFixedValueIsCheckedAgainstTheSchemasOwn() {
+        FixedSpec t = tson(FIXED_SCHEMA, FixedSpec.class).objectReader()
+                .read(doc("!t { spec: \"https://x.test/v1\" }"), FixedSpec.class);
+        assertEquals("https://x.test/v1", t.spec());
+    }
+
+    /** A contradicting one is still the §5.2 error it was, decoded on the terms both sides share. */
+    @Test
+    void aContradictingFixedValueIsStillRefused() {
+        assertThrows(ReadException.class, () -> tson(FIXED_SCHEMA, FixedSpec.class).objectReader()
+                .read(doc("!t { spec: \"https://x.test/v2\" }"), FixedSpec.class));
+    }
+
+    public record FixedUuid(String id) {
+    }
+
+    /**
+     * The case that separates the two routes. A FIXED {@code uuid} at a {@code String} component is a
+     * conversion only the family knows -- there was never a {@code UUID -> String} rule beside the
+     * {@code URI} one, so a table gets this wrong for every family whose row nobody wrote, while asking the
+     * family gets it right for all of them at once. That is the whole argument against the table.
+     */
+    @Test
+    void aFixedValueConvertsForAFamilyNoTableEverListed() {
+        FixedUuid t = tson("  t => { id: uuid = \"f81d4fae-7dec-11d0-a765-00a0c91e6bf6\" }", FixedUuid.class)
+                .objectReader().read(doc("!t {}"), FixedUuid.class);
+        assertEquals("f81d4fae-7dec-11d0-a765-00a0c91e6bf6", t.id());
+    }
+
     // ── what a family that states nothing still does ─────────────────────
 
     public record IntAsInt(int n) {

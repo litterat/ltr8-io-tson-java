@@ -29,7 +29,6 @@ import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import java.lang.reflect.RecordComponent;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -174,7 +173,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             FieldState state = field.schema().state();
             if (state == FieldState.REQUIRED_DEFAULT || state == FieldState.REQUIRED_FIXED
                     || state == FieldState.OPTIONAL_FIXED) {
-                precomputedValue[i] = narrow(precomputedValue[i], target.type());
+                precomputedValue[i] = readSchemaDefault(fields.get(i));
             }
         }
         {
@@ -454,31 +453,27 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     }
 
     /**
-     * The schema-driven child-reader recursion has no knowledge of the target Java field's own
-     * declared width (e.g. an unconstrained schema {@code integer} atom's natural host type is
-     * {@link BigInteger}, but a bound field might be {@code Optional<Integer>}) -- reuses {@link
-     * NumberNarrowing}, the same utility this codebase's atom-family readers and untyped-number
-     * binding already share for exactly this. Also narrows a schema {@code enum}-typed field's raw
-     * member text to the matching Java {@code enum} constant by exact name, and a schema {@code
-     * uri}-typed field's real {@link java.net.URI} down to {@link String} where the target field
-     * keeps it flat.
+     * Adapts a value decoded by a parser that did not know this field's target, which after binding is two
+     * positions and no longer a general step.
+     *
+     * <p>{@code verifyFixed} is one: a stated FIXED value is decoded by the field's <em>pre-rebind</em>
+     * parser on purpose, so that the document's token and the schema's own are compared on identical terms
+     * ({@code FixedCheck}), which leaves the value it produces needing the adaptation the bound reader would
+     * otherwise have made. A {@code value}-typed slot is the other: {@code ValueParser.at} narrows toward the
+     * component's own class and stops where the remaining step is a widening.
+     *
+     * <p>Two conversions cover both, and the pair is measured rather than assumed -- an instrumented run of
+     * the whole suite reaches {@link NumberNarrowing} for an integral value and {@link java.net.URI} to
+     * {@link String}, and nothing else. The {@code enum} and decimal cases this also carried are gone: a
+     * bridged enum component is crossed by {@code ElementBridging} where the field is wired, and no read in
+     * the suite ever reached the decimal one.
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
     private static Object narrow(Object raw, Class<?> target) {
         if (raw instanceof BigInteger bi && target != BigInteger.class) {
             return NumberNarrowing.narrowIntegral(bi, target);
         }
-        if (raw instanceof BigDecimal bd && target != BigDecimal.class) {
-            return NumberNarrowing.narrowDecimal(bd, target);
-        }
-        // Still reached, and by the FIXED path alone: a fixed value is decoded by `readSchemaDefault` with
-        // no target in hand (tree mode shares it) and adapted here, where a read value is now reconciled by
-        // the family itself. meta.tn's `spec` fields are every instance of it.
         if (raw instanceof java.net.URI uri && target == String.class) {
             return uri.toString();
-        }
-        if (raw instanceof String s && target.isEnum()) {
-            return Enum.valueOf((Class<Enum>) target, s);
         }
         return raw;
     }
