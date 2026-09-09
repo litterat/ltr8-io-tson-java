@@ -58,9 +58,16 @@ public final class VocabularyAtoms {
     }
 
     /**
-     * A fresh, mutable map -- deliberately per-writer, not a shared static, so a caller wanting to extend
-     * the vocabulary with their own {@code AtomType} has an actual map to add to rather than a global to
-     * work around (the write-side mirror of {@code DataBindContext#registerAtom}).
+     * A fresh map per writer rather than a shared static, so no writer can alter what another emits.
+     *
+     * <p><b>It is keyed by the <em>wire</em> class, which is why a consumer's own type never appears in
+     * it.</b> A writer applies a {@code DataClass}'s bridge before dispatching, so a class registered as an
+     * atom arrives here as the value it crosses to -- a {@code Money} bridged to text arrives as the
+     * {@code String}, a {@code Ticket} bridged to a {@code UUID} as the {@code UUID}, which is in this table
+     * and so is written {@code !uuid}. Every type an atom may bridge to is either named here or written by
+     * {@code AtomWriter.writeDefaultAtom}, so there is nothing a caller could usefully add: the extension
+     * point is {@code DataBindContext.Builder.registerAtom} and {@code @Atom}, one layer down, where the
+     * crossing is stated once and serves both directions.
      */
     public static Map<Class<?>, Entry> defaults() {
         Map<Class<?>, Entry> atoms = new HashMap<>();

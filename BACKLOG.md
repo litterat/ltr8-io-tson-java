@@ -84,26 +84,6 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
   resolver's own) and the comparison should drop it structurally, before rendering, the way it already drops
   `kind`. `CLAUDE.md`'s traps list carries the hazard meanwhile.
 
-## Binding
-
-- [ ] **A custom atom cannot round-trip, because the write direction has no surface.** `TsonObjectWriter`
-  holds a private `VocabularyAtoms.defaults()` copy, whose Javadoc says it is mutable and per-writer "so a
-  caller wanting to extend the vocabulary with their own `AtomType` has an actual map to add to" — and no
-  caller can hand one in. Reading now works for a bridged or `@Transparent` component under a schema, so
-  this is the half that stops the pair being usable.
-
-- [ ] **A union's members are discriminated by Java class name, so an atom family's name misses.** A
-  component typed `java.net.InetAddress` or the sealed `CidrNetwork` binds as a union — honestly, both being
-  two families wearing one type — and a union wants a type annotation in the document to pick a member. What
-  it matches is the *member class's* name, so `!inet4address` works and `!ipv4` does not
-  (`UNKNOWN_TYPE_REF: no member of union ... matches type name 'ipv4'`), and the same for `!cidr4` against
-  `CidrNetwork` — which is the name an author would reach for, the schema vocabulary being what they write
-  everywhere else. `TsonObjectReaderTest.theSealedSupertypeBindsAsAUnionAndTheFamilyNameDoesNotDiscriminateIt`
-  pins today's answer. What is owed is a decision before any code: whether a union member that *is* a
-  built-in's host type should also answer to the family's name, and whether that generalises past the two
-  pairs in `base.atom` — a consumer's own sealed type has no family names to offer, so this would be a rule
-  about the built-in vocabulary and not about unions.
-
 ## JSON encoding
 
 [TSON-SCHEMA] §6 makes this a spec obligation rather than an interop nicety, and `meta.tn` states it directly: "No

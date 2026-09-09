@@ -13,8 +13,9 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Set;
 
 public class DefaultAtomBinder {
@@ -25,13 +26,32 @@ public class DefaultAtomBinder {
 	public DefaultAtomBinder() {
 	}
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	private static final Set<Class> WRAPPER_TYPES = new HashSet(Arrays.asList(Boolean.class, Character.class,
-			Byte.class, Short.class, Integer.class, Long.class, Float.class, Double.class, Void.class));
+	/**
+	 * The non-primitive types the wire carries as one token, so an atom bridging to one needs nothing
+	 * further to be readable or writable -- the boxes, {@link String}, and the two arbitrary-precision
+	 * numbers.
+	 *
+	 * <p>Each is a value both encodings carry directly: a string, a number, a boolean. {@link BigInteger}
+	 * and {@link BigDecimal} are the exact numeric tiers' own host types ([TSON-DATA] §5.3, [TSON-JSON]
+	 * §5.3) and are registered as core atoms alongside the boxes, so a class wrapping one has the same
+	 * standing as a class wrapping a {@code long}.
+	 *
+	 * <p>Membership is what the wire can carry, not what Java calls a primitive -- which is why this is
+	 * {@link #isWireScalar} rather than the {@code isPrimitive} it was named when it held only the boxes.
+	 * Leaving {@code String} out had made {@code @Atom} the one route to an atom that could not describe a
+	 * string-valued one, where a bridge registered on the context always could.
+	 */
+	private static final Set<Class<?>> BOXED_SCALARS = Set.of(Boolean.class, Character.class, Byte.class,
+			Short.class, Integer.class, Long.class, Float.class, Double.class, Void.class, String.class,
+			BigInteger.class, BigDecimal.class);
 
-	private boolean isPrimitive(Class<?> targetClass) {
-        return targetClass.isPrimitive() || WRAPPER_TYPES.contains(targetClass);
-    }
+	/**
+	 * Whether {@code type} is a value the wire carries directly. Primitives answer for themselves; everything
+	 * else is {@link #BOXED_SCALARS}.
+	 */
+	private static boolean isWireScalar(Class<?> type) {
+		return type.isPrimitive() || BOXED_SCALARS.contains(type);
+	}
 
 	public DataClassAtom resolveAtom(DataBindContext context, Class<?> targetClass)
 			throws CodeAnalysisException {
@@ -50,9 +70,11 @@ public class DefaultAtomBinder {
 						.getAnnotation(Atom.class);
 				if (atomAnnotation != null) {
 					Parameter[] params = constructor.getParameters();
-					if (params.length != 1 || !isPrimitive(params[0].getType())) {
-						throw new CodeAnalysisException(
-								String.format("Atom must have single primitive argument", targetClass));
+					if (params.length != 1 || !isWireScalar(params[0].getType())) {
+						throw new CodeAnalysisException(String.format(
+								"@Atom constructor of %s must take one value the wire carries -- a primitive, a box, "
+										+ "a String or a BigInteger/BigDecimal -- and takes %s",
+								targetClass.getName(), Arrays.toString(constructor.getParameterTypes())));
 					}
 
 					Class<?> dataClass = params[0].getType();
@@ -80,8 +102,12 @@ public class DefaultAtomBinder {
 						.getAnnotation(Atom.class);
 				if (Modifier.isStatic(method.getModifiers()) && atomAnnotation != null) {
 					Parameter[] params = method.getParameters();
-					if (params.length != 1 || !isPrimitive(params[0].getType())) {
-						throw new CodeAnalysisException("Atom static method must have a single primitive value");
+					if (params.length != 1 || !isWireScalar(params[0].getType())) {
+						throw new CodeAnalysisException(String.format(
+								"@Atom static factory %s.%s must take one value the wire carries -- a primitive, a box, "
+										+ "a String or a BigInteger/BigDecimal -- and takes %s",
+								targetClass.getName(), method.getName(),
+								Arrays.toString(method.getParameterTypes())));
 					}
 
 					MethodHandle toObject = MethodHandles.publicLookup().unreflect(method);
