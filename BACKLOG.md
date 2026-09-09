@@ -92,16 +92,19 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
   caller can hand one in. Reading now works for a bridged or `@Transparent` component under a schema, so
   this is the half that stops the pair being usable.
 
-- [ ] **A host class two families share cannot be dispatched by class alone.**
-  `HostAtoms.forStringContentHostType` maps a target class back to the family that parses it, and both
-  encodings' schemaless readers consult it — but it is not total over what `AtomContext` registers, because
-  two families can produce one class. `mac`, `email` and `regex` all read to `String`, so a `String` component
-  cannot say which it meant (or whether it meant `text`); `CidrNetwork` is produced by both `cidr4` and
-  `cidr6`. Today those components bind as their host class does — a `String` stays a string, a
-  `CidrNetwork` is refused — and the content is never checked. Under a schema this is answered outright by
-  the position's own type, so the question is whether a schemaless read wants a second channel to name the
-  family (an annotation on the component, say) or whether "these families need a schema" is the honest
-  answer. Nothing says so at the point of failure either way, which is the part that is actionable now.
+- [ ] **`cidr4` and `cidr6` share one host type, so a component cannot name either.** Both read to
+  `base.atom.CidrNetwork`, which is therefore absent from `HostAtoms`' reverse index and refused at a
+  schemaless position — where `Inet4Address`/`Inet6Address` are answered, the address families having a host
+  type each. Splitting it into `CidrInet4Network` and `CidrInet6Network` makes the pair as unambiguous as the
+  addresses already are, and takes the last built-in collision out of the index. The shared half is the
+  reason it is not two independent records: containment and equality are over the prefix bits of two
+  equal-length octet arrays, so only the length differs and one implementation serves both — a sealed
+  `CidrNetwork` over the two concrete types keeps that, and leaves a component declaring the general type
+  genuinely ambiguous, which it is. It reaches 12 main-source files: both CIDR parsers and `CidrParsing`,
+  both IP parsers (`within`/`excluding` name networks), `Cidr4Type`/`Ipv4Type`/`Ipv6Type`, `AtomCoherence`'s
+  prefix-tree cover, `AtomContext.hostTypes()` and `HostAtoms`. A published identity does not pin it — the
+  host type is this implementation's choice and §5.5 says nothing about it — but a consumer's `CidrNetwork`
+  component is a source break, so it wants doing while the build is `-SNAPSHOT`.
 
 ## JSON encoding
 

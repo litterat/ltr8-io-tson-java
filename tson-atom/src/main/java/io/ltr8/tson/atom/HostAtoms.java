@@ -175,6 +175,21 @@ public final class HostAtoms {
      * {@code Object} (no family at all), {@code CidrNetwork} (both {@code cidr4} and {@code cidr6} produce
      * one), and {@code Rational}/{@code Complex}, which bind structurally rather than as atoms. A caller
      * falls back to base type resolution for those, which is what it did for everything before.
+     *
+     * <p><b>An ambiguity here is answered by a schema, and by nothing else this index could carry.</b> The
+     * inverse exists only where one family produces a class, and two places it does not: {@code mac},
+     * {@code email}, {@code regex} and {@code text} all read to {@code String}, and {@code cidr4}/{@code cidr6}
+     * both read to {@code CidrNetwork}. Giving a component a second channel to name its family -- an
+     * annotation, say -- would be a parallel type system for exactly the question a schema already answers at
+     * the position, and it would answer it only for a reader that had been told, where a schema answers it for
+     * every reader of the document.
+     *
+     * <p>So the two are left as they are, and they fail differently because only one has a defensible default.
+     * {@code String} has one: a {@code String} component nearly always means a string, so it maps to
+     * {@code text} and the other three families are simply not reachable without a schema -- a consumer who
+     * wants a MAC checked declares the field under a schema, or declares a type of their own over a bridge.
+     * {@code CidrNetwork} has none, so it is absent and a component declaring one is refused; naming
+     * {@code Inet4Address} or {@code Inet6Address} instead is unambiguous and works today.
      */
     private static final Map<Class<?>, AtomType<?>> BY_TYPED_POSITION = typedPositions();
 
