@@ -5,13 +5,7 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
-import io.ltr8.tson.compiler.stream.MapEnd;
-import io.ltr8.tson.compiler.stream.MapStart;
-import io.ltr8.tson.compiler.stream.TokenEvent;
-import io.ltr8.tson.compiler.stream.SchemaRef;
-import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
 

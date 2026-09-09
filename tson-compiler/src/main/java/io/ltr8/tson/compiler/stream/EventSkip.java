@@ -1,20 +1,6 @@
-package io.ltr8.tson.compiler.reader;
+package io.ltr8.tson.compiler.stream;
 
 import io.ltr8.tson.compiler.TsonReadContext;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.AnnotationEnd;
-import io.ltr8.tson.compiler.stream.AnnotationStart;
-import io.ltr8.tson.compiler.stream.ArrayEnd;
-import io.ltr8.tson.compiler.stream.ArrayStart;
-import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
-import io.ltr8.tson.compiler.stream.MapEnd;
-import io.ltr8.tson.compiler.stream.MapStart;
-import io.ltr8.tson.compiler.stream.RecordEnd;
-import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.SchemaRef;
-import io.ltr8.tson.compiler.stream.TokenEvent;
-import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.compiler.stream.TypeRef;
 
 import java.util.Optional;
 

@@ -4,6 +4,7 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.stream.EventSkip;
 
 /**
  * A stand-in {@link TsonTypeReader} for a constructor with no compiled reader implemented yet --

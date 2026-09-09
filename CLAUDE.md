@@ -360,7 +360,8 @@ module has a real `module-info.java`; module names mirror each module's root exp
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the atom vocabulary,
   schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades
   (`TsonTreeReader`/`TsonObjectReader`) over their schemaless `reader`-package engines
-  (`SchemalessTreeReader`/`DataClassObjectReader`), the `TsonTreeWriter`/`TsonObjectWriter` writers, and
+  (`SchemalessTreeReader`/`DataClassObjectReader`), the `TsonTreeWriter`/`TsonObjectWriter` writers over
+  their own `writer`-package engines (`TreeValueWriter`/`DataClassObjectWriter`), and
   config/wiring. Everything here is tightly coupled to the shared lexer/token-stream machinery, so it's
   one module. Root package `io.ltr8.tson.compiler`; exports the packages with real cross-module callers
   and keeps `reader`/`atom`/`base`/`lexer` internal.
@@ -543,7 +544,7 @@ on one entry.
 `TsonSchemaResolver` (public) resolves a whole `SchemaDocument`, merging `!!import` entries into the
 namespace first. Namespace dependencies are constructor-fixed functional interfaces. Everything §5 defines
 resolves — composition, refinement (`^`), constructor application (bound generically via the compiled meta
-reader, no name→class table), atom refinement (which **merges with its source** via a `TsonObjectWriter`
+reader, no name→class table), atom refinement (which **merges with its source** via a `DataClassObjectWriter`
 round-trip and is checked to genuinely narrow), subtraction (which empties `type_definition.supertypes` on
 purpose), group restatement, all six field-state spellings. An annotation on a declaration resolves **one hop
 against the governing meta** and nowhere else (§3.3.3): a name the schema declares itself or `!!import`s is
@@ -1020,10 +1021,11 @@ the class and (where noted) pinned by a test; the `docs/` notes carry the full w
   reference them). **Both placeholders keep the failed declaration's own type parameters** (`absorbed`, and
   `SchemaResolver.unresolved` one phase later): answering "how many type parameters?" with zero tells a
   downstream `bl<text>` to "drop the argument list", which is a wrong fix for someone else's error.
-- **Atom refinement's `TsonObjectWriter` round-trip has no cheaper substitute** — the merge must run on the
+- **Atom refinement's write round-trip has no cheaper substitute** — the merge must run on the
   wire record before binding, or `REQUIRED`-no-default constructor fields fail `FIELD_REQUIRED`
-  (`DefinitionResolverTest.atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed`). This dependency is
-  also why the writers can't move out of `tson-compiler`.
+  (`DefinitionResolverTest.atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed`). What the resolver
+  reaches for is `writer.DataClassObjectWriter`, the engine — **never `TsonObjectWriter`**, the facade over
+  it: a resolver naming the front door would make the engine's own module depend on what is built above it.
 
 ## Conformance suite (`ConformanceSuiteTest`, `Class2ConformanceSuiteTest`)
 

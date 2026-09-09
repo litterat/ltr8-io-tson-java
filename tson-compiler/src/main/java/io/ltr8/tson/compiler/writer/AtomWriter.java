@@ -1,10 +1,12 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.compiler.writer;
+
+import io.ltr8.tson.compiler.TsonDataEmitter;
 
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.atom.number.NumberForms;
 
 /**
- * The write-side counterpart to {@link AtomBinder}: <b>framing a value that carries no type-ref of its
+ * The write-side counterpart to {@code AtomBinder}: <b>framing a value that carries no type-ref of its
  * own</b>. Mostly that is §4's default resolution -- boolean/number/string/null -- where the framing follows
  * from the host type, since that is all such a value has to go on.
  * Formatting a *vocabulary* atom's value is each atom's own job now ({@code
@@ -18,12 +20,12 @@ import io.ltr8.tson.atom.number.NumberForms;
  * complex} are), so no type-ref is emitted for it here, unlike every other use of {@code
  * FloatParser}.
  */
-final class AtomWriter {
+public final class AtomWriter {
 
     private AtomWriter() {
     }
 
-    static void writeDefaultAtom(Object value, TsonDataEmitter writer) throws DataBindException {
+    public static void writeDefaultAtom(Object value, TsonDataEmitter writer) throws DataBindException {
         switch (value) {
             case Boolean b -> writer.booleanValue(b);
             case Double d -> writer.unquotedToken(NumberForms.floatToken(d));

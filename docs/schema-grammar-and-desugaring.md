@@ -343,7 +343,7 @@ rebuilt and called a cache.
     the held form the one the author would recognise.
   - **The rewrite has to be here rather than in the resolver**, and that is the finding the earlier attempt
     turned on. Resolving the body and writing the resolved form back out puts a *second producer* in front of
-    a wire form two later phases read, and they disagree: `TsonObjectWriter` states a no-argument `type_ref`
+    a wire form two later phases read, and they disagree: `DataClassObjectWriter` states a no-argument `type_ref`
     in the explicit record form (`{ name: N  arguments: [] }`) where this phase states it positionally (`N`).
     That makes a `type_argument` indistinguishable from a `type_ref` application to a walk that reads neither
     against a vocabulary — and since `DerivedName.ofBinding` hashes what is written, a second spelling is also
@@ -361,7 +361,7 @@ rebuilt and called a cache.
     `WireForm.heldRecord` and this phase's `recordBinding` are two producers of the wire form and one
     producer of its spelling — both going through `WireForm.refValue` and `WireForm.nameField` is what makes
     that true by construction rather than by two authors agreeing.
-    - **`TsonObjectWriter` cannot serve as that second producer**, which is why `WireForm.heldRecord` exists rather
+    - **`DataClassObjectWriter` cannot serve as that second producer**, which is why `WireForm.heldRecord` exists rather
       than a round-trip. Measured against the desugar spelling it differs five ways: `{ name: "text"
       arguments: [] }` for a bare `text`, `!ref { … }` for a `type_argument`, every token quoted, `state:
       REQUIRED` written where the default covers it, and the retired `value_param` channel emitted. The

@@ -6,6 +6,7 @@ import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
+import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.meta.ScopeKind;
@@ -13,7 +14,6 @@ import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.tree.TsonScopedValue;
 import io.ltr8.tson.tree.TsonValue;
 
-import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;

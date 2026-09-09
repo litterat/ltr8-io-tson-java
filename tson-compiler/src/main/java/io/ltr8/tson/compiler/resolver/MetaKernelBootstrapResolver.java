@@ -195,7 +195,7 @@ public final class MetaKernelBootstrapResolver {
      * meta-kernel refines exactly one family, so this handles that one and refuses the rest by name rather
      * than pretending to be general.
      *
-     * <p>Ordinary resolution does this through a {@code TsonObjectWriter} round trip and the governing
+     * <p>Ordinary resolution does this through a {@code DataClassObjectWriter} round trip and the governing
      * meta's compiled reader ({@code DefinitionResolver.resolveAtomRefinement}). The bootstrap has neither:
      * the reader it would use is the one being produced. So the kernel pays for a refinement in hand-written
      * code, which is the same bargain {@link #instanceBody} already strikes -- and the reason to keep the

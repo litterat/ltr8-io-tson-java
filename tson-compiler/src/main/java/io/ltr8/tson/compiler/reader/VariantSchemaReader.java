@@ -4,11 +4,9 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.tree.TsonAnnotation;
-import io.ltr8.tson.tree.TsonValue;
+import io.ltr8.tson.compiler.stream.EventSkip;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 

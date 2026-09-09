@@ -184,14 +184,16 @@ are kept in step deliberately.
   invariant of resolved output.
 - **Chained atom refinement merges with the source, it does not replace it** (§5.6's merge semantics):
   `bounded => !int8 ^ { min: -100 }` must still carry `int8`'s own `size`. `mergeWithSource` re-serializes the
-  source's bound value via `TsonObjectWriter` and merges field-by-field (explicit values win) — no
+  source's bound value via `DataClassObjectWriter` and merges field-by-field (explicit values win) — no
   per-atom-class merge logic needed. **The merge runs on the wire record, before binding, and has to**: a
   constructor field that is `REQUIRED` with no schema default (`float_type.format`, `binary.encoding`) is one
   a refinement body has no reason to restate, so binding the body alone would fail `FIELD_REQUIRED`
   (`DefinitionResolverTest.atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed` pins that case). This is
-  why `DefinitionResolver` still holds a `TsonObjectWriter`, and in turn why `TsonObjectReader`/
-  `TsonObjectWriter` can't move to the `tson` module. **The text round-trip has no cheaper substitute**:
-  `TsonObjectWriter` emits straight to a `TsonDataEmitter`, so there is no object→`DataValue` step to borrow
+  why `DefinitionResolver` still holds a writer at all. **It holds the engine, not the facade**: what it
+  needs is one value's text with no document around it, which is exactly `DataClassObjectWriter`'s contract,
+  and reaching for `TsonObjectWriter` instead would point this module at a front door built over it.
+  **The text round-trip has no cheaper substitute**: the engine
+  emits straight to a `TsonDataEmitter`, so there is no object→`DataValue` step to borrow
   that would skip it. Removing it for real would mean each constraint family owning its own wire decoding —
   duplicating number-grammar handling (`0xFF`, `_` separators, quoted-vs-unquoted) and bypassing the compiled
   reader's own defaults — which costs more than the round-trip does.

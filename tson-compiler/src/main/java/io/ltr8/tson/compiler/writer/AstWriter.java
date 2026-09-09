@@ -1,4 +1,6 @@
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.compiler.writer;
+
+import io.ltr8.tson.compiler.TsonDataEmitter;
 
 import io.ltr8.tson.compiler.ast.AbsentValue;
 import io.ltr8.tson.compiler.ast.Annotation;
@@ -14,11 +16,11 @@ import io.ltr8.tson.compiler.ast.TokenValue;
 
 /**
  * Writes a parsed {@code ast} value back as the source it was parsed from -- the return leg
- * {@link TsonDataParser} never had.
+ * {@code TsonDataParser} never had.
  *
- * <p>The third of this package's three writers, and the only one that writes <b>syntax</b>. {@link
- * TsonObjectWriter} writes a bound Java object and {@link TsonTreeWriter} a {@code TsonValue} tree, both of
- * which describe a <em>value</em> and are free to choose how to spell it; an AST records what an author
+ * <p>The only one of this package's writers that writes <b>syntax</b>. {@link DataClassObjectWriter} writes
+ * a bound Java object and {@link TreeValueWriter} a {@code TsonValue} tree, both of which describe a
+ * <em>value</em> and are free to choose how to spell it; an AST records what an author
  * wrote, including the choices a value no longer remembers -- which token was quoted, what a record's field
  * order was -- so this puts them back rather than deciding them again.
  *
@@ -31,13 +33,13 @@ import io.ltr8.tson.compiler.ast.TokenValue;
  * <p>Package visible: the AST is {@code tson-compiler}'s own model of source, and writing one is this
  * package's business rather than a service offered to consumers.
  */
-final class AstWriter {
+public final class AstWriter {
 
 	private AstWriter() {
 	}
 
 	/** {@code value} as source, annotations and type-ref first, in §7.4's order. */
-	static void write(DataValue value, TsonDataEmitter emitter) {
+	public static void write(DataValue value, TsonDataEmitter emitter) {
 		for (Annotation annotation : value.annotations()) {
 			annotation.value().ifPresentOrElse(
 					carried -> {

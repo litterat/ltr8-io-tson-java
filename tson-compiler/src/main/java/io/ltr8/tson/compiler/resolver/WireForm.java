@@ -37,7 +37,7 @@ import java.util.function.Function;
  * application, and {@code ParameterKinds} walks one for §5.10's parameter kinds. A second opinion about what
  * an application looks like is what makes one of those wrong.
  *
- * <p><b>Nothing here is canonical output, and {@code TsonObjectWriter} cannot serve any of it.</b> That
+ * <p><b>Nothing here is canonical output, and {@code DataClassObjectWriter} cannot serve any of it.</b> That
  * writer's output is canonical-explicit and fully quoted, which is a different language from the one a held
  * body is written in: {@code TemplateBody.names()} and {@link #substitute} both key on a token being
  * unquoted, so a quoted body references no parameters at all. What is written here is what an author would

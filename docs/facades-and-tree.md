@@ -293,9 +293,16 @@ admit UTS #39's own `Toys-Я-Us`.
   and the pattern is gone; `AllocationHarnessTest.writingAQuotedStringDoesNotAllocatePerCharacter` fails at
   anything approaching the old cost. `String.format("\\u%04x", …)` on the branch it guards stays — that
   branch is genuinely rare, and the loop around it is what mattered.
-- These live in `tson-compiler`'s root package (not a separate module) because `DefinitionResolver`
-  depends on `TsonObjectWriter` (atom-refinement merging) — a module depending *on* `tson-compiler`
-  couldn't provide them without a cycle. `tson-bind` (what they're built on) has no such dependency.
+- **Each writer is a facade over an engine in the unexported `writer` package** — `TsonTreeWriter` over
+  `TreeValueWriter`, `TsonObjectWriter` over `DataClassObjectWriter` — the split the readers already have,
+  and for the reason `docs/json-encoding.md` states: a front door owns the *document* (its header, its root
+  type-ref, the sinks it writes to) where an engine owns one value and contributes no framing. `AstWriter`
+  and `AtomWriter` are engines too and live there beside them.
+- **The resolver reaches for the engine, never the facade.** `DefinitionResolver`'s atom-refinement merge
+  and `HeldBody`'s held template body both write a wire record and parse it straight back, where a header
+  would be content the parse would then have to strip — so what they want *is* the engine's contract. It is
+  also what keeps the direction honest: a resolver naming `TsonObjectWriter` would make `tson-compiler`
+  depend on a front door built over itself, which is what used to pin the facades to this module.
 
 ## Tree model: `TsonValue` (`tson-tree` module)
 

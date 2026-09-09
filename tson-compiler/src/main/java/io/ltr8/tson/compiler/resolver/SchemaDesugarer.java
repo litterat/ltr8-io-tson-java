@@ -740,7 +740,7 @@ final class SchemaDesugarer {
      * <p><b>Why here rather than in the resolver.</b> The alternative is to resolve the body and write the
      * result back out, and it does not work: the wire form is what {@link DerivedName#ofBinding} hashes and what
      * substitution walks, so a second producer of it is a second spelling of the same thing --
-     * {@code TsonObjectWriter} states a no-argument {@code type_ref} in the explicit record form where this
+     * {@code DataClassObjectWriter} states a no-argument {@code type_ref} in the explicit record form where this
      * phase states it positionally, which makes a {@code type_argument} indistinguishable from a
      * {@code type_ref} application to a walk that reads neither against a vocabulary. §5.2's rewrite is
      * syntactic, as fixed and as closed as the sugar table above, so it belongs beside it.

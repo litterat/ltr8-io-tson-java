@@ -4,6 +4,7 @@ import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.compiler.ForeignSchemas;
 import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.TsonTypeReader;
+import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.ChoiceBody;
