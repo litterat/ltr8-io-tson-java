@@ -101,4 +101,15 @@ public record PeriodParser(PeriodType constraints) implements AtomType<Period> {
         }
         return out.toString();
     }
+
+    /**
+     * Its own value, or the period text -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomType.isTextTarget(target) ? asWrittenText() : natural(Period.class, target);
+    }
+
 }

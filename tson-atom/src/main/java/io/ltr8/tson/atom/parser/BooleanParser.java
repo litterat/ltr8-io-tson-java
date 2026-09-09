@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
@@ -50,4 +52,11 @@ public record BooleanParser() implements AtomType<Boolean> {
     public String write(Boolean value) {
         return value ? "true" : "false";
     }
+
+    /** §4.2's two tokens and nothing else, so the one target is the boolean they denote. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(Boolean.class, target);
+    }
+
 }

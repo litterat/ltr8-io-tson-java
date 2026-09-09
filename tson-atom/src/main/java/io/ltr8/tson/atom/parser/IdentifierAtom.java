@@ -50,4 +50,11 @@ public final class IdentifierAtom implements AtomType<String> {
     public String write(String value) {
         return value;
     }
+
+    /** This family already reads to text, so a string target is its own value and nothing else is. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(String.class, target);
+    }
+
 }

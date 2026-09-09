@@ -176,4 +176,27 @@ public record FloatParser(FloatType constraints) implements AtomType<Number> {
         }
         return constraints.format() == FloatType.Format.BINARY32 ? abs < Float.MIN_NORMAL : abs < Double.MIN_NORMAL;
     }
+
+    /**
+     * The numeric targets narrowsApproximate reaches, and no text one: a number's wire form is a number,
+     * so handing back its spelling would be a different reading rather than the same value.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        if (!NumberNarrowing.narrowsApproximate(target)) {
+            return Optional.empty();
+        }
+        return Optional.of(new AtomType<Object>() {
+            @Override
+            public Object read(String text) {
+                return FloatParser.this.read(text, target);
+            }
+
+            @Override
+            public String write(Object value) {
+                return FloatParser.this.write((Number) value);
+            }
+        });
+    }
+
 }

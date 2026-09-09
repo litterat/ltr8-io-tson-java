@@ -77,4 +77,11 @@ public record TextParser(TextType constraints) implements AtomType<String> {
             }
         });
     }
+
+    /** This family already reads to text, so a string target is its own value and nothing else is. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(String.class, target);
+    }
+
 }

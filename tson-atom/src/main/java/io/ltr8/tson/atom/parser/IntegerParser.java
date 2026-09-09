@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
@@ -209,4 +211,27 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
     private static boolean fits(BigInteger min, BigInteger max, long primitiveMin, long primitiveMax) {
         return min.compareTo(BigInteger.valueOf(primitiveMin)) >= 0 && max.compareTo(BigInteger.valueOf(primitiveMax)) <= 0;
     }
+
+    /**
+     * The numeric targets narrowsIntegral reaches, and no text one: a number's wire form is a number,
+     * so handing back its spelling would be a different reading rather than the same value.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        if (!NumberNarrowing.narrowsIntegral(target)) {
+            return Optional.empty();
+        }
+        return Optional.of(new AtomType<Object>() {
+            @Override
+            public Object read(String text) {
+                return IntegerParser.this.read(text, target);
+            }
+
+            @Override
+            public String write(Object value) {
+                return IntegerParser.this.write((Number) value);
+            }
+        });
+    }
+
 }

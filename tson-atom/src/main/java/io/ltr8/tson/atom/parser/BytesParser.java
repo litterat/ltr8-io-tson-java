@@ -106,4 +106,15 @@ public record BytesParser(BytesType constraints) implements AtomType<byte[]> {
             }
         });
     }
+
+    /**
+     * Its own value, or the base64 (or base16) text §5.3 wrote -- this family's wire form is text, so a
+     * component keeping the spelling it validated loses nothing. The value is read first either way: a text
+     * target chooses the representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomType.isTextTarget(target) ? asWrittenText() : natural(byte[].class, target);
+    }
+
 }

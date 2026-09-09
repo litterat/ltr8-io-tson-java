@@ -95,4 +95,15 @@ public record RationalParser(RationalType constraints) implements AtomType<Ratio
             }
         });
     }
+
+    /**
+     * Its own value, or the text form -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomType.isTextTarget(target) ? asWrittenText() : natural(Rational.class, target);
+    }
+
 }

@@ -70,4 +70,15 @@ public record UuidParser(UuidType constraints) implements AtomType<UUID> {
     public String write(UUID value) {
         return value.toString();
     }
+
+    /**
+     * Its own value, or the hyphenated text -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomType.isTextTarget(target) ? asWrittenText() : natural(UUID.class, target);
+    }
+
 }

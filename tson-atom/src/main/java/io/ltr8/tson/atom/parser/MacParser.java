@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.schema.meta.MacType;
@@ -52,4 +54,11 @@ public record MacParser(MacType constraints) implements AtomType<String> {
     public String write(String value) {
         return value;
     }
+
+    /** This family already reads to text, so a string target is its own value and nothing else is. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(String.class, target);
+    }
+
 }

@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
@@ -96,4 +98,11 @@ public record EmailParser(EmailType constraints) implements AtomType<String> {
             }
         });
     }
+
+    /** This family already reads to text, so a string target is its own value and nothing else is. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(String.class, target);
+    }
+
 }

@@ -164,18 +164,14 @@ class AtomTargetAdmissionTest {
     }
 
     /**
-     * A target no numeric family reaches is refused by the family rather than by the constructor -- but
-     * <b>still not as a diagnostic</b>: {@code NumberNarrowing} throws {@link IllegalArgumentException},
-     * which is no {@code AtomTypeException}, so it escapes the classification every other refusal here gets.
-     * The numeric families have not stated their targets, so the default binds this one and the compile
-     * stays silent. Both halves are one piece of work; {@code BACKLOG.md} carries it.
+     * A target no numeric family reaches is refused where the schema meets the class. A number's wire form
+     * is a number, so a text target is not the same value rendered differently the way a {@code uri}'s is --
+     * it is a different reading, and the family declines it.
      */
     @Test
-    void anIntegerFamilyRefusesATextTargetButNotYetAsADiagnostic() {
-        Tson tson = tson("  t => { n: int32 }", IntAsString.class);
-        assertNotNull(tson.bindRegistry().get(ID), "int32 has not stated its targets, so nothing is refused here");
-        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> tson.objectReader()
-                .read(doc("!t { n: 5 }"), IntAsString.class));
-        assertTrue(e.getMessage().contains("cannot represent an integer value"), e.getMessage());
+    void anIntegerFamilyRefusesATextTarget() {
+        BindMismatchException thrown = assertThrows(BindMismatchException.class,
+                () -> tson("  t => { n: int32 }", IntAsString.class).bindRegistry().get(ID));
+        assertTrue(thrown.getMessage().contains("cannot produce java.lang.String"), thrown.getMessage());
     }
 }

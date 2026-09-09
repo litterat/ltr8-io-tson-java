@@ -96,4 +96,23 @@ public final class NumberNarrowing {
         throw new IllegalArgumentException("cannot represent an approximate value as " + target
                 + " -- only float/double/BigDecimal can represent it");
     }
+
+    /** The targets {@link #narrowIntegral} reaches -- what an exact integral family reads into. */
+    public static boolean narrowsIntegral(Class<?> target) {
+        return target == byte.class || target == Byte.class || target == short.class || target == Short.class
+                || target == int.class || target == Integer.class || target == long.class || target == Long.class
+                || target == BigInteger.class || target == float.class || target == Float.class
+                || target == double.class || target == Double.class || target == BigDecimal.class;
+    }
+
+    /** The targets {@link #narrowDecimal} reaches. A decimal has no integral reading: §5.3 keeps the tiers apart. */
+    public static boolean narrowsDecimal(Class<?> target) {
+        return target == float.class || target == Float.class || target == double.class || target == Double.class
+                || target == BigDecimal.class;
+    }
+
+    /** The targets {@link #narrowApproximate} reaches -- the same three, an infinity having no exact reading. */
+    public static boolean narrowsApproximate(Class<?> target) {
+        return narrowsDecimal(target);
+    }
 }

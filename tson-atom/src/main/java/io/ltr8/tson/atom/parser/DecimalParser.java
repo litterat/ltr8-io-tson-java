@@ -129,4 +129,27 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
             }
         });
     }
+
+    /**
+     * The numeric targets narrowsDecimal reaches, and no text one: a number's wire form is a number,
+     * so handing back its spelling would be a different reading rather than the same value.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        if (!NumberNarrowing.narrowsDecimal(target)) {
+            return Optional.empty();
+        }
+        return Optional.of(new AtomType<Object>() {
+            @Override
+            public Object read(String text) {
+                return DecimalParser.this.read(text, target);
+            }
+
+            @Override
+            public String write(Object value) {
+                return DecimalParser.this.write((java.math.BigDecimal) value);
+            }
+        });
+    }
+
 }
