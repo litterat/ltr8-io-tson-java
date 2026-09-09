@@ -3,7 +3,6 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.schema.meta.UuidType;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,7 +32,7 @@ import java.util.regex.Pattern;
  * pre-registers it as a bridge-less atom directly, the same way it already does for {@code
  * java.util.Date}, rather than requiring every caller to register it themselves.
  */
-public record UuidParser(UuidType constraints) implements AtomType<UUID> {
+public record UuidParser(UuidType constraints) implements AtomTypeParser<UUID> {
 
     /** §5.5's built-in annotation name -- {@code !uuid}. */
     public static final String TYPENAME = "uuid";
@@ -78,7 +77,7 @@ public record UuidParser(UuidType constraints) implements AtomType<UUID> {
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(UUID.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(UUID.class, target);
     }
 
 }

@@ -27,7 +27,7 @@ import io.ltr8.tson.schema.meta.Cidr4Type;
  * all. Whether a declared bound itself falls inside the family range is a coherence rule and is not checked
  * here; an out-of-range one is inert either way, the family range being enforced regardless.
  */
-public record Cidr4Parser(Cidr4Type constraints) implements AtomType<CidrNetwork> {
+public record Cidr4Parser(Cidr4Type constraints) implements AtomTypeParser<CidrNetwork> {
 
     /** §5.5's built-in annotation name -- {@code !cidr4}. */
     public static final String TYPENAME = "cidr4";
@@ -106,7 +106,7 @@ public record Cidr4Parser(Cidr4Type constraints) implements AtomType<CidrNetwork
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(CidrNetwork.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(CidrNetwork.class, target);
     }
 
 }

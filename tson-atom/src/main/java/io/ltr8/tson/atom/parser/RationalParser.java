@@ -28,7 +28,7 @@ import java.util.Optional;
  * Javadoc for the recommended way to bind {@code !rational} to a richer third-party type instead
  * of this minimal one).
  */
-public record RationalParser(RationalType constraints) implements AtomType<Rational> {
+public record RationalParser(RationalType constraints) implements AtomTypeParser<Rational> {
 
     /** §5.6's built-in annotation name -- {@code !rational}. */
     public static final String TYPENAME = "rational";
@@ -102,7 +102,7 @@ public record RationalParser(RationalType constraints) implements AtomType<Ratio
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(Rational.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(Rational.class, target);
     }
 
 }

@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
  * tenths and {@code precision: 1} admits it. Nothing is truncated; a value genuinely off the grid is
  * rejected. {@code multiple_of} is tested on the magnitude, so {@code -PT30M} is a multiple of {@code PT15M}.
  */
-public record DurationParser(DurationType constraints) implements AtomType<Duration> {
+public record DurationParser(DurationType constraints) implements AtomTypeParser<Duration> {
 
     /** §5.5's built-in annotation name -- {@code !duration}. */
     public static final String TYPENAME = "duration";
@@ -216,7 +216,7 @@ public record DurationParser(DurationType constraints) implements AtomType<Durat
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(Duration.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(Duration.class, target);
     }
 
 }

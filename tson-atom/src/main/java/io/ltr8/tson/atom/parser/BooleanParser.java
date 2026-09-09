@@ -29,7 +29,7 @@ import io.ltr8.tson.atom.BuiltinTypeVocabulary;
  * <p>Registered in {@link BuiltinTypeVocabulary} under {@code boolean} -- see {@code SPEC-FEEDBACK.md} #8
  * for why §5's own table omits it and why that reads as an oversight rather than a decision.
  */
-public record BooleanParser() implements AtomType<Boolean> {
+public record BooleanParser() implements AtomTypeParser<Boolean> {
 
     /** §5's built-in annotation name. */
     public static final String TYPENAME = "boolean";

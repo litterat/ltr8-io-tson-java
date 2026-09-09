@@ -1,4 +1,6 @@
-package io.ltr8.tson.atom;
+package io.ltr8.tson.atom.parser;
+
+import io.ltr8.tson.atom.AtomType;
 
 import java.util.Optional;
 import java.util.function.Function;

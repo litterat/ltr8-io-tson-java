@@ -56,7 +56,7 @@ import java.util.regex.Pattern;
  * auto-downcast entirely.
  */
 public record Ipv6Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
-        implements AtomType<Inet6Address> {
+        implements AtomTypeParser<Inet6Address> {
 
     /** §5.5's built-in annotation name -- {@code !ipv6}. */
     public static final String TYPENAME = "ipv6";
@@ -158,7 +158,7 @@ public record Ipv6Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(Inet6Address.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(Inet6Address.class, target);
     }
 
 }

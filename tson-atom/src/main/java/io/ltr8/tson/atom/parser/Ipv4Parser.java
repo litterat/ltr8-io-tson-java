@@ -35,7 +35,7 @@ import java.net.UnknownHostException;
  * blocks is a materially bigger piece of work than a scalar constraint, left for later.
  */
 public record Ipv4Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
-        implements AtomType<Inet4Address> {
+        implements AtomTypeParser<Inet4Address> {
 
     /** §5.5's built-in annotation name -- {@code !ipv4}. */
     public static final String TYPENAME = "ipv4";
@@ -129,7 +129,7 @@ public record Ipv4Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(Inet4Address.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(Inet4Address.class, target);
     }
 
 }

@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  * top. Holds a {@link DecimalType} -- the pure constraint values, unchanged by this split -- rather than
  * declaring those fields itself.
  */
-public record DecimalParser(DecimalType constraints) implements AtomType<BigDecimal> {
+public record DecimalParser(DecimalType constraints) implements AtomTypeParser<BigDecimal> {
 
     /** §5.6's built-in annotation name -- {@code !number}. */
     public static final String TYPENAME = "number";

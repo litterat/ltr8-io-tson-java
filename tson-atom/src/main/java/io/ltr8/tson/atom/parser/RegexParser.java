@@ -31,7 +31,7 @@ import io.ltr8.tson.schema.meta.RegexType;
  * Unicode blocks). The parsed form is discarded once validation passes; matching a value against a {@code
  * pattern} is a separate capability built on {@code tson-regex}'s AST (see {@code BACKLOG.md}).
  */
-public record RegexParser(RegexType constraints) implements AtomType<String> {
+public record RegexParser(RegexType constraints) implements AtomTypeParser<String> {
 
     /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
     public static final RegexParser UNCONSTRAINED = new RegexParser(RegexType.UNCONSTRAINED);

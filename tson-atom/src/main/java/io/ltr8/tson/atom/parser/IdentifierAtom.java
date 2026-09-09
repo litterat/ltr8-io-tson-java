@@ -27,7 +27,7 @@ import java.util.Optional;
  * vocabulary -- {@code value} is read by base type resolution, which depends on the lexical form, and
  * {@code void} accepts only the absent sentinel.
  */
-public final class IdentifierAtom implements AtomType<String> {
+public final class IdentifierAtom implements AtomTypeParser<String> {
 
     public static final IdentifierAtom INSTANCE = new IdentifierAtom();
 

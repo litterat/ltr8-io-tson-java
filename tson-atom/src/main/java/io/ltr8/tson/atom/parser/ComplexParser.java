@@ -28,7 +28,7 @@ import java.util.Optional;
  * RationalParser} its {@link #boundTo} offers that and the text it was written as -- which is what a
  * {@code TsonObjectReader} {@code DataBridge} registration binds through (see {@link Complex}'s Javadoc).
  */
-public record ComplexParser() implements AtomType<Complex> {
+public record ComplexParser() implements AtomTypeParser<Complex> {
 
     /** §5.6's built-in annotation name -- {@code !complex}. */
     public static final String TYPENAME = "complex";
@@ -92,7 +92,7 @@ public record ComplexParser() implements AtomType<Complex> {
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(Complex.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(Complex.class, target);
     }
 
 }

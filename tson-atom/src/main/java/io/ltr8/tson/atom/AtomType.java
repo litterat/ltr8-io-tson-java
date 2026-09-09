@@ -1,9 +1,7 @@
 package io.ltr8.tson.atom;
 
 import java.util.Optional;
-import java.util.function.Function;
 
-import io.ltr8.tson.atom.number.NumberNarrowing;
 import io.ltr8.tson.atom.parser.IntegerParser;
 
 /**
@@ -49,8 +47,6 @@ import io.ltr8.tson.atom.parser.IntegerParser;
  */
 public interface AtomType<T> {
 
-    T read(String text) throws AtomParseException, AtomValidationException;
-
     /**
      * This family reading into {@code target}, or empty where no value of it ever reaches one.
      *
@@ -59,49 +55,14 @@ public interface AtomType<T> {
      * two meet when the reader is compiled -- and an empty answer there is a disagreement reported before
      * any document exists, rather than a cast failing inside a constructor on the first one.
      *
-     * <p><b>Every family answers; there is no default.</b> A family that admitted whatever it was handed
-     * would give the check nothing to work with, and the answer is rarely hard: {@link #natural} for a value
-     * that reaches its target unchanged, {@link #asWrittenText} for a wire form that is text, {@link #bound}
-     * or {@link #converting} where the reading has to be converted. A family that genuinely reads into any
-     * class -- one embedding another format, say -- says so with {@link #bound} and is the clearer for it.
+     * <p><b>Every family answers; there is no default.</b> One that admitted whatever it was handed would
+     * give the check nothing to work with. The answer is rarely hard -- the natural host type, and for a
+     * family whose wire form is text, the spelling it validated -- and a family that genuinely reads into
+     * any class, one embedding another format say, states that too and is the clearer for saying it.
      */
     Optional<AtomType<?>> boundTo(Class<?> target);
 
-    /**
-     * A {@link #boundTo} answer for a family whose value reaches {@code target} unchanged -- the natural
-     * host type, and the primitive of a boxed one. The common shape, so that stating it is a line.
-     */
-    default Optional<AtomType<?>> natural(Class<?> naturalType, Class<?> target) {
-        return wrap(target).isAssignableFrom(wrap(naturalType)) ? Optional.of(this) : Optional.empty();
-    }
-
-    /**
-     * A {@link #boundTo} answer stated as the two directions themselves, for a family whose reading into a
-     * target is not its own value converted -- the numeric families, which narrow from the token's text
-     * rather than from the host value they would otherwise produce.
-     */
-    default <R> Optional<AtomType<?>> bound(Function<String, R> read, Function<R, String> write) {
-        return Optional.of(new BoundAtom<>(read, write));
-    }
-
-    default <R> Optional<AtomType<?>> converting(Function<T, R> render, Function<R, String> parse) {
-        AtomType<T> self = this;
-        return bound(text -> render.apply(self.read(text)), parse);
-    }
-
-    /**
-     * {@link #converting} to the text this family read, for a string target. Every family whose wire form is
-     * text can hand back the spelling it validated: the value is checked first and only then rendered, so a
-     * text target chooses the representation and never the rules.
-     */
-    default Optional<AtomType<?>> asWrittenText() {
-        return converting(value -> write(value), text -> text);
-    }
-
-    /** Whether {@code target} is one of the two classes a string-valued reading may land in. */
-    static boolean isTextTarget(Class<?> target) {
-        return target == String.class || target == CharSequence.class;
-    }
+    T read(String text) throws AtomParseException, AtomValidationException;
 
     String write(T value);
 

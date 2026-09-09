@@ -38,7 +38,7 @@ import java.util.Optional;
  * its default) exercises this path today, so exact pre-rounding bound checking is deferred until a
  * schema (Part 2) actually needs it rather than implemented speculatively.
  */
-public record FloatParser(FloatType constraints) implements AtomType<Number> {
+public record FloatParser(FloatType constraints) implements AtomTypeParser<Number> {
 
     /** {@code float32 => !float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin. */
     public static final FloatParser FLOAT32 = new FloatParser(FloatType.FLOAT32);

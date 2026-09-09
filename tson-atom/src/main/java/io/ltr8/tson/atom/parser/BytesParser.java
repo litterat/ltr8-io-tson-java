@@ -17,7 +17,7 @@ import java.util.Optional;
  * own {@code encoding} selector, so this holds a {@link BytesType} -- the pure constraint values -- and
  * reads the alphabet off it rather than being told separately.
  */
-public record BytesParser(BytesType constraints) implements AtomType<byte[]> {
+public record BytesParser(BytesType constraints) implements AtomTypeParser<byte[]> {
 
     /**
      * Part 1's one binary tag, {@code !bytes}, and the alphabet it reads in: base64 ([TSON-DATA] §5.3,
@@ -114,7 +114,7 @@ public record BytesParser(BytesType constraints) implements AtomType<byte[]> {
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(byte[].class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(byte[].class, target);
     }
 
 }

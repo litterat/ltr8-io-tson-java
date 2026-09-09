@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
  * <p>Mixing separators ({@code AA-BB:CC-DD:EE-FF}) is rejected: the two forms are alternatives, not a
  * character class, so each is matched whole rather than by a per-octet separator test.
  */
-public record MacParser(MacType constraints) implements AtomType<String> {
+public record MacParser(MacType constraints) implements AtomTypeParser<String> {
 
     /** §5.5's built-in annotation name -- {@code !mac}. */
     public static final String TYPENAME = "mac";

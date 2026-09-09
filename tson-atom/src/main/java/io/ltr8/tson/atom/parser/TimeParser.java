@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
  * than on the parsed value -- {@code 12:00:00.100} carries three digits whatever instant it denotes, and
  * the atom is exact, so nothing is ever truncated to satisfy the facet.
  */
-public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
+public record TimeParser(TimeType constraints) implements AtomTypeParser<OffsetTime> {
 
     /** §5.4's built-in annotation name -- {@code !time}. */
     public static final String TYPENAME = "time";
@@ -92,7 +92,7 @@ public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(OffsetTime.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(OffsetTime.class, target);
     }
 
 }

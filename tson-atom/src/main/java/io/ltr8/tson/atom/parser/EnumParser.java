@@ -35,7 +35,7 @@ import java.util.List;
  * {@code boolean}, which reads the host values its members stand for rather than their text, and that is
  * the one case this class deliberately does not serve.
  */
-public record EnumParser(EnumBody constraints) implements AtomType<String> {
+public record EnumParser(EnumBody constraints) implements AtomTypeParser<String> {
 
     public EnumParser(List<String> members) {
         this(new EnumBody(members));

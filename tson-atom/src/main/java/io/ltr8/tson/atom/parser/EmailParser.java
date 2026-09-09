@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
  * {@link RegexParser} it hands back the text itself rather than a parsed structure, which also lets it bind
  * generically with no {@code DataBridge}.
  */
-public record EmailParser(EmailType constraints) implements AtomType<String> {
+public record EmailParser(EmailType constraints) implements AtomTypeParser<String> {
 
     /** core.tn's own name for this atom -- registered as a built-in despite §5.5's table, see this class's own Javadoc. */
     public static final String TYPENAME = "email";

@@ -26,7 +26,7 @@ import java.util.Optional;
  * java.net.URI}'s behavior is accepted as this atom's actual contract for now. See {@code
  * README.md}'s Conformance section for the one-line version of this note.
  */
-public record UriParser(UriType constraints) implements AtomType<URI> {
+public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
 
     /** §5.5's built-in annotation name -- {@code !uri}. */
     public static final String TYPENAME = "uri";
@@ -78,7 +78,7 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
         if (target == URI.class) {
             return Optional.of(this);
         }
-        if (AtomType.isTextTarget(target)) {
+        if (AtomTypeParser.isTextTarget(target)) {
             return asWrittenText();
         }
         return Optional.empty();

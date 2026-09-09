@@ -48,7 +48,7 @@ import java.util.stream.Collectors;
  * problem to translate (mirroring how {@code TsonObjectReader}'s {@code AtomBinder} already handles the
  * same failure mode for untyped numbers, via the same shared narrowing code).
  */
-public record IntegerParser(IntegerType constraints) implements AtomType<Number> {
+public record IntegerParser(IntegerType constraints) implements AtomTypeParser<Number> {
 
     /** The kernel's unconstrained, arbitrary-precision {@code integer}. */
     public static final IntegerParser UNCONSTRAINED = new IntegerParser(IntegerType.UNCONSTRAINED);

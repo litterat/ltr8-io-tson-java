@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * so bounds compare the value and never the token. {@code multiple_of} is tested on the magnitude, so a
  * negative span is a multiple of a positive step.
  */
-public record PeriodParser(PeriodType constraints) implements AtomType<Period> {
+public record PeriodParser(PeriodType constraints) implements AtomTypeParser<Period> {
 
     /** §5.5's built-in annotation name -- {@code !period}. */
     public static final String TYPENAME = "period";
@@ -109,7 +109,7 @@ public record PeriodParser(PeriodType constraints) implements AtomType<Period> {
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(Period.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(Period.class, target);
     }
 
 }

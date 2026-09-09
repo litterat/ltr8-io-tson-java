@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
  * left to {@code LocalDate.parse}, which already gets it right. Holds a {@link DateType} -- the
  * pure constraint values, unchanged by this split -- rather than declaring those fields itself.
  */
-public record DateParser(DateType constraints) implements AtomType<LocalDate> {
+public record DateParser(DateType constraints) implements AtomTypeParser<LocalDate> {
 
     /** §5.4's built-in annotation name -- {@code !date}. */
     public static final String TYPENAME = "date";
@@ -78,7 +78,7 @@ public record DateParser(DateType constraints) implements AtomType<LocalDate> {
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(LocalDate.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(LocalDate.class, target);
     }
 
 }

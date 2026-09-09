@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * <p>{@code precision} is enforced on the token as written (§5.5), the same upper bound on fractional-second
  * digits {@link TimeParser} applies and for the same reason.
  */
-public record DateTimeParser(DateTimeType constraints) implements AtomType<OffsetDateTime> {
+public record DateTimeParser(DateTimeType constraints) implements AtomTypeParser<OffsetDateTime> {
 
     /** §5.4's built-in annotation name -- {@code !datetime}. */
     public static final String TYPENAME = "datetime";
@@ -84,7 +84,7 @@ public record DateTimeParser(DateTimeType constraints) implements AtomType<Offse
      */
     @Override
     public Optional<AtomType<?>> boundTo(Class<?> target) {
-        return AtomType.isTextTarget(target) ? asWrittenText() : natural(OffsetDateTime.class, target);
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(OffsetDateTime.class, target);
     }
 
 }
