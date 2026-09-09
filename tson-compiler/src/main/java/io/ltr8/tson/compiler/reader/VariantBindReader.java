@@ -105,18 +105,17 @@ final class VariantBindReader implements TsonTypeReader<Object> {
      * !set} body was refused as "not a member of the union 'top'" by the one part of the pipeline that had
      * not been told what the binder knows.
      *
-     * <p>The name passes are kept behind it, unchanged: they are {@code TsonObjectReader.resolveUnionMember}'s
-     * own two-pass precedence, and they are what a consumer's union gets when its members are not registered
+     * <p>The name passes are kept behind it, unchanged: they are {@code SchemalessObjectReader.resolveUnionMember}'s
+     * own name precedence, and they are what a consumer's union gets when its members are not registered
      * under schema names at all.
      */
     private boolean isMember(String typeRef) {
         Class<?> bound = boundClass.apply(typeRef);
-        if (bound != null) {
-            for (Class<?> member : descriptor.memberTypes()) {
-                if (member == bound) {
-                    return true;
-                }
-            }
+        // isMemberType rather than a scan of memberTypes(): a non-sealed union admits an implementation of
+        // an open member and registers it here, and the list is otherwise only grown by whoever holds an
+        // instance -- the writer and the mappers -- so a read-only process never saw one at all.
+        if (bound != null && descriptor.isMemberType(bound)) {
+            return true;
         }
         for (Class<?> member : descriptor.memberTypes()) {
             Typename tn = member.getAnnotation(Typename.class);

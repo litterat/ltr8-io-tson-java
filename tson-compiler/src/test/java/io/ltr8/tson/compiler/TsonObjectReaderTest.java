@@ -11,6 +11,8 @@ import io.ltr8.annotation.Field;
 import io.ltr8.annotation.Typename;
 import io.ltr8.annotation.Union;
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.bind.DataNameBinder;
+import io.ltr8.bind.DataClassUnion;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.base.atom.CidrInet4Network;
 import io.ltr8.tson.base.atom.CidrInet6Network;
@@ -968,6 +970,9 @@ class TsonObjectReaderTest {
 
     // ── CIDR networks (§5.5) ─────────────────────────────────────────────
 
+    public record InetHolder(java.net.InetAddress value) {
+    }
+
     public record Cidr4Holder(CidrInet4Network value) {
     }
 
@@ -1003,19 +1008,39 @@ class TsonObjectReaderTest {
     }
 
     /**
-     * And the supertype is honestly ambiguous, so it binds as a union and wants a discriminant. The atom
-     * family's name is not one: a union member is matched by its own class name, which is what makes
-     * {@code !cidr4} miss here and {@code BACKLOG.md} carry it.
+     * The supertype is honestly ambiguous, so it binds as a union and wants a discriminant -- and the
+     * discriminant is the <b>family's</b> name, which is the name every reader of the document knows.
      */
     @Test
-    void theSealedSupertypeBindsAsAUnionAndTheFamilyNameDoesNotDiscriminateIt() {
-        DiagnosticsCollector collected = new DiagnosticsCollector();
-        mapper.withDiagnostics(collected).read("{ value: !cidr4 \"10.0.0.0/8\" }", CidrHolder.class);
+    void theSealedSupertypeIsDiscriminatedByTheFamilyName() throws DataBindException {
+        assertEquals(CidrInet4Network.parse("10.0.0.0/8"),
+                mapper.read("{ value: !cidr4 \"10.0.0.0/8\" }", CidrHolder.class).value());
+        assertEquals(CidrInet6Network.parse("2001:db8::/32"),
+                mapper.read("{ value: !cidr6 \"2001:db8::/32\" }", CidrHolder.class).value());
+    }
 
-        assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
-                collected.diagnostics().stream().map(Diagnostic::code).toList());
-        assertTrue(collected.diagnostics().getFirst().message().contains("union"),
-                collected.diagnostics().getFirst().message());
+    /**
+     * The member's own class name still answers behind it, unnarrowed. {@code !circle} for a {@code Circle}
+     * is the same pass, so excluding a member the vocabulary happens to name would be one rule for a
+     * consumer's types and another for the JDK's.
+     */
+    @Test
+    void aMembersSimpleClassNameStillDiscriminatesBehindTheVocabulary() throws DataBindException {
+        assertEquals(CidrInet4Network.parse("10.0.0.0/8"),
+                mapper.read("{ value: !cidrinet4network \"10.0.0.0/8\" }", CidrHolder.class).value());
+    }
+
+    /**
+     * The same rule over the JDK's own two-family type, which is where it was first visible: an
+     * {@code InetAddress} component is a union of {@code Inet4Address} and {@code Inet6Address}, and
+     * {@code !ipv4} is what selects one.
+     */
+    @Test
+    void anInetAddressComponentIsDiscriminatedByTheAddressFamilyName() throws Exception {
+        assertEquals(java.net.InetAddress.getByName("10.0.0.1"),
+                mapper.read("{ value: !ipv4 \"10.0.0.1\" }", InetHolder.class).value());
+        assertEquals(java.net.InetAddress.getByName("2001:db8::1"),
+                mapper.read("{ value: !ipv6 \"2001:db8::1\" }", InetHolder.class).value());
     }
 
     @Test
@@ -1295,6 +1320,58 @@ class TsonObjectReaderTest {
     @Test
     void unionWithoutTypeAnnotationThrows() throws DataBindException {
         assertThrows(ReadException.class, () -> mapper.read("{ shape: { radius: 5 } }", ShapeHolder.class));
+    }
+
+    /** Open: no declared members and not sealed, so membership is discovered rather than listed. */
+    @Union
+    public interface OpenShape {
+    }
+
+    public record Hexagon(int sides) implements OpenShape {
+    }
+
+    public record OpenShapeHolder(OpenShape shape) {
+    }
+
+    /**
+     * <b>A member of an open union is found by name, not only once something else has registered it.</b>
+     * Such a union starts with an empty member list and grows through {@code DataClassUnion.addMemberType},
+     * which every route reaching it holds a class or an instance for -- the writer, {@code tson-bind}'s
+     * mappers, and the analysis of the member itself. A read holds a name, so the list used to grow only as
+     * a side effect: writing a {@code Hexagon} made the next read of {@code !hexagon} work and a process
+     * that only ever read never got there. The same document, bound or refused by what else had happened
+     * first.
+     *
+     * <p>The context is built here rather than shared precisely so nothing has touched {@code Hexagon}: a
+     * {@code mapper} that other tests have used is one where the side effect may already have happened.
+     */
+    @Test
+    void anOpenUnionsMemberIsFoundByNameBeforeAnythingHasRegisteredIt() throws DataBindException {
+        DataBindContext fresh = DataBindContext.builder()
+                .nameBinder(DataNameBinder.ofMap(Map.of("hexagon", Hexagon.class)))
+                .registerAtoms(AtomContext.hostTypes()).build();
+        assertEquals(0, ((DataClassUnion) fresh.getDescriptor(OpenShape.class)).memberTypes().length,
+                "nothing has registered a member yet, which is the case under test");
+
+        OpenShapeHolder read = new TsonObjectReader(fresh)
+                .read("{ shape: !hexagon { sides: 6 } }", OpenShapeHolder.class);
+
+        assertEquals(new Hexagon(6), read.shape());
+    }
+
+    /** And a class the union does not admit is still refused, which is what the membership test is for. */
+    @Test
+    void aDiscoveredClassThatIsNoMemberIsStillRefused() {
+        DataBindContext fresh = DataBindContext.builder()
+                .nameBinder(DataNameBinder.ofMap(Map.of("circle", Circle.class)))
+                .registerAtoms(AtomContext.hostTypes()).build();
+        DiagnosticsCollector collected = new DiagnosticsCollector();
+
+        new TsonObjectReader(fresh).withDiagnostics(collected)
+                .read("{ shape: !circle { radius: 5 } }", OpenShapeHolder.class);
+
+        assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
+                collected.diagnostics().stream().map(Diagnostic::code).toList());
     }
 
     @Test
