@@ -86,14 +86,24 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **The bind-mode check cannot tell whether two atoms meet.** An `int32` field against a `String`
-  component reaches the constructor and fails there, unclassified. Deciding it needs the host class an atom
-  family produces, which `AtomType` does not expose — and since it is public and consumer-implementable,
-  adding one decides what every future implementation must answer (a `default` returning `Optional.empty()`
-  keeps it additive). Whatever answers must also model the reader's own tolerances —
-  `RecordBindReader.narrow`, `NumberNarrowing`'s accepted targets, a bridge satisfied by its *wire* class,
-  `Annotated` unwrapping — or it refuses bindings that work today, at startup, which is worse than the late
-  failure it replaces.
+- [ ] **Only `uri` has stated the targets it admits.** `AtomType.admits` is the seam and the mechanism
+  works end to end; the other 22 families take the default, which admits everything and leaves the read to
+  judge. Each is its own small question — which targets are *total over that family's value space and
+  value-preserving*, the rule `uri => URI | String | CharSequence` follows and the rule that keeps
+  `URI => URL` out. The string-content families are the obvious next batch, since "validate it, hand me the
+  text" is one answer for all of them.
+
+- [ ] **`NumberNarrowing` refuses outside the vocabulary the reader classifies.** It throws
+  `IllegalArgumentException`, which is no `AtomTypeException`, so an `int32` field against a `String`
+  component still escapes as an unclassified exception where every other atom refusal is a diagnostic.
+  Pinned by `AtomTargetAdmissionTest.anIntegerFamilyRefusesATextTargetButNotYetAsADiagnostic`. Worth doing
+  with the numeric families' `admits`, since "which targets" and "how it refuses one" are the same question.
+
+- [ ] **`RecordBindReader.narrow` survives, and only the FIXED path still needs it.** A read value is
+  reconciled by its own family now, but a FIXED value is decoded by `readSchemaDefault` with no target in
+  hand — tree mode shares that method — and adapted afterwards. Removing its `URI -> String` rule fails
+  most of the suite, meta.tn's `spec` fields being every instance. Threading a target through the fixed
+  path, or converting it there through the same family, is what would retire the helper.
 
 - [ ] **A `value` slot's rebind asks by the declared component class.** `RecordBindReader.rebindValueIfNeeded`
   passes `DataClassField.type()` to `ValueParser.at`, where the schemaless readers pass the bridge's

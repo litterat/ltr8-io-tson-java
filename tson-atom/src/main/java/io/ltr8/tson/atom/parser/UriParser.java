@@ -60,6 +60,37 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
         return value.toString();
     }
 
+    /**
+     * {@code URI}, and the text it was written as. A {@code uri}'s wire form is text and
+     * {@link URI#toString()} hands back the string it was built from, so a component holding the validated
+     * spelling loses nothing -- which is why §5.5's own facets (length, pattern) are measured on the text.
+     *
+     * <p><b>{@link java.net.URL} is deliberately absent.</b> It is not a narrowing: {@code URI.toURL()} is
+     * partial over this family's value space -- a {@code urn:}, a relative reference and a bare fragment are
+     * all valid here and none of them is a URL -- and which of the rest convert depends on the protocol
+     * handlers a JVM happens to have, so one document would bind on one deployment and not another. Its
+     * {@code equals} resolves host names as well, which would put blocking I/O inside the {@code equals} of
+     * whatever record held one.
+     */
+    @Override
+    public boolean admits(Class<?> target) {
+        return target == URI.class || target == String.class || target == CharSequence.class;
+    }
+
+    /** {@inheritDoc} <p>The text where {@link #admits} named a string target, the {@link URI} otherwise. */
+    @Override
+    public Object read(String text, Class<?> target) {
+        URI value = read(text);
+        if (target == String.class || target == CharSequence.class) {
+            return value.toString();
+        }
+        if (!AtomType.wrap(target).isInstance(value)) {
+            throw new AtomValidationException("cannot represent " + value + " as " + target,
+                    "a value representable as " + target.getSimpleName());
+        }
+        return value;
+    }
+
     private void validate(URI value, String text) {
         constraints.length().ifPresent(len -> {
             if (text.length() != len) {

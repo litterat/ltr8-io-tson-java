@@ -48,6 +48,24 @@ public interface AtomType<T> {
 
     T read(String text) throws AtomParseException, AtomValidationException;
 
+    /**
+     * Whether a value this family reads could reach {@code target} -- asked where there is no value to try,
+     * so that a schema and the class bound to it can be compared before a document exists.
+     *
+     * <p><b>It is an over-approximation, and the direction matters.</b> {@code false} means no value of this
+     * family ever reaches {@code target}; {@code true} means only that this family does not rule it out, and
+     * {@link #read(String, Class)} still judges the value that arrives. So a caller may refuse on
+     * {@code false} and must not conclude anything from {@code true} -- which is what lets the default admit
+     * everything, leaving a family that has not stated its targets checked at the read as before.
+     *
+     * <p>The question is asked of the <em>wire</em> class a bound component wants, never its declared one: a
+     * component crossing a bridge is reached by whatever the bridge takes, and it is that this family has to
+     * produce.
+     */
+    default boolean admits(Class<?> target) {
+        return true;
+    }
+
     default Object read(String text, Class<?> target) throws AtomParseException, AtomValidationException {
         T value = read(text);
         if (!wrap(target).isInstance(value)) {

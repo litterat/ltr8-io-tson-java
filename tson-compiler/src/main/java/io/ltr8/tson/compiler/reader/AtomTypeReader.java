@@ -109,6 +109,14 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     private final AtomType<T> delegate;
     private final SchemaLocation schemaLocation;
 
+    /**
+     * The wire class the bound component at this position wants, or {@code null} where nothing bound it --
+     * a tree read, or a position no class types. Present, it is handed to the family so the reconciliation
+     * happens inside the atom, which owns which targets it reaches, rather than in the constructor that
+     * discovers the disagreement by failing.
+     */
+    private final Class<?> target;
+
     /** A reader over an {@link AtomType} chosen by the caller rather than by the declaration's own body. */
     static <T> AtomTypeReader<T> of(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
         return new AtomTypeReader<>(name, delegate, schemaLocation);
@@ -144,9 +152,28 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     }
 
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
+        this(name, delegate, schemaLocation, null);
+    }
+
+    private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation, Class<?> target) {
         this.name = name;
         this.delegate = delegate;
         this.schemaLocation = schemaLocation;
+        this.target = target;
+    }
+
+    /**
+     * The same position, read against the wire class its bound component wants. {@code RecordBindReader}
+     * wires it beside {@link #overAtom}, and the two are exclusive: a {@code value} slot's atom is already
+     * chosen from that same class, so there is nothing left for the family to reconcile.
+     */
+    TsonTypeReader<?> overTarget(Class<?> wire) {
+        return new AtomTypeReader<>(name, delegate, schemaLocation, wire);
+    }
+
+    /** Whether {@code delegate} rules out a component whose wire class is {@code wire} (§5.2). */
+    boolean refuses(Class<?> wire) {
+        return !delegate.admits(wire);
     }
 
     @Override
@@ -170,6 +197,11 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                 @SuppressWarnings("unchecked")
                 TokenAtomType<T> formSensitive = (TokenAtomType<T>) delegate;
                 return formSensitive.read(tokenValue);
+            }
+            if (target != null) {
+                @SuppressWarnings("unchecked")
+                T reconciled = (T) delegate.read(tokenValue.text(), target);
+                return reconciled;
             }
             return delegate.read(tokenValue.text());
         } catch (AtomTypeException ex) {

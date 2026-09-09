@@ -148,7 +148,17 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             // itself -- tson-bind's binder, which collects a record's arguments through their bridges, is
             // exactly the step a schema-driven read replaces. Same wrapper a container's elements take.
             rebound = ElementBridging.wrap(rebound, target.dataClass());
-            if (atomPosition && !(boundAs(target) instanceof DataClassAtom)) {
+            if (atomPosition && boundAs(target) instanceof DataClassAtom bound) {
+                // The wire class, never the declared one: a bridged component is reached by whatever its
+                // bridge takes, and that is what the family has to produce.
+                Class<?> wire = bound.dataClass();
+                if (refusesWire(field.parser(), wire)) {
+                    mismatches.add("field '" + field.schema().name() + "' cannot produce " + wire.getName()
+                            + ", which is what component '" + target.name() + "' binds");
+                } else {
+                    rebound = overTarget(rebound, wire);
+                }
+            } else if (atomPosition) {
                 mismatches.add("field '" + field.schema().name() + "' is an atom, and component '"
                         + target.name() + "' binds " + boundAs(target).typeClass().getName()
                         + " structurally -- register it as an atom (DataBindContext.Builder.registerAtom, "
@@ -201,6 +211,22 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
     private static DataClass boundAs(DataClassField target) {
         DataClass bound = target.dataClass();
         return bound instanceof DataClassAnnotated boxed ? boxed.valueClass() : bound;
+    }
+
+    /** Both of these look through a §7.2 subsumption guard, as every question about a field's reader does. */
+    private static boolean refusesWire(TsonTypeReader<?> parser, Class<?> wire) {
+        if (parser instanceof VariantSchemaReader guard) {
+            return refusesWire(guard.wrapped(), wire);
+        }
+        return parser instanceof AtomTypeReader<?> atom && atom.refuses(wire);
+    }
+
+    private static TsonTypeReader<?> overTarget(TsonTypeReader<?> parser, Class<?> wire) {
+        if (parser instanceof VariantSchemaReader guard) {
+            TsonTypeReader<?> inner = overTarget(guard.wrapped(), wire);
+            return inner == guard.wrapped() ? parser : guard.rewrap(inner);
+        }
+        return parser instanceof AtomTypeReader<?> atom ? atom.overTarget(wire) : parser;
     }
 
     /** Whether any schema field of this type binds to {@code classField}. */
@@ -441,11 +467,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         if (raw instanceof BigDecimal bd && target != BigDecimal.class) {
             return NumberNarrowing.narrowDecimal(bd, target);
         }
-        if (raw instanceof String s && target.isEnum()) {
-            return Enum.valueOf((Class<Enum>) target, s);
-        }
+        // Still reached, and by the FIXED path alone: a fixed value is decoded by `readSchemaDefault` with
+        // no target in hand (tree mode shares it) and adapted here, where a read value is now reconciled by
+        // the family itself. meta.tn's `spec` fields are every instance of it.
         if (raw instanceof java.net.URI uri && target == String.class) {
             return uri.toString();
+        }
+        if (raw instanceof String s && target.isEnum()) {
+            return Enum.valueOf((Class<Enum>) target, s);
         }
         return raw;
     }
