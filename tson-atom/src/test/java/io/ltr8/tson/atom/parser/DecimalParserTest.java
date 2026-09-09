@@ -149,8 +149,8 @@ class DecimalParserTest {
 
     @Test
     void readWithTargetNarrowsToDoubleOrFloat() {
-        assertEquals(199.90, DecimalParser.UNCONSTRAINED.read(token("199.90"), double.class));
-        assertEquals(199.90f, DecimalParser.UNCONSTRAINED.read(token("199.90"), float.class));
+        assertEquals(199.90, DecimalParser.UNCONSTRAINED.boundTo(double.class).orElseThrow().read(token("199.90")));
+        assertEquals(199.90f, DecimalParser.UNCONSTRAINED.boundTo(float.class).orElseThrow().read(token("199.90")));
     }
 
     @Test

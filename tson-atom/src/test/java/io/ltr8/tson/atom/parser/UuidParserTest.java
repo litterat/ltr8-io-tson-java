@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UuidParserTest {
 
@@ -86,13 +87,16 @@ class UuidParserTest {
     @Test
     void readWithMatchingTargetReturnsTheValue() {
         String text = "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09";
-        assertEquals(UUID.fromString(text), UuidParser.UNCONSTRAINED.read(token(text), UUID.class));
+        assertEquals(UUID.fromString(text), UuidParser.UNCONSTRAINED.boundTo(UUID.class).orElseThrow().read(token(text)));
     }
 
     @Test
-    void readWithMismatchedTargetThrows() {
-        String text = "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09";
-        assertThrows(AtomValidationException.class, () -> UuidParser.UNCONSTRAINED.read(token(text), String.class));
+    void aTargetTheFamilyDoesNotReachIsRefusedBeforeAnyValue() {
+        // Empty rather than a thrown refusal: the answer does not depend on a value, so it is available
+        // where the reader is built. A text target is admitted -- this family's wire form is text.
+        assertTrue(UuidParser.UNCONSTRAINED.boundTo(Integer.class).isEmpty());
+        assertTrue(UuidParser.UNCONSTRAINED.boundTo(UUID.class).isPresent());
+        assertTrue(UuidParser.UNCONSTRAINED.boundTo(String.class).isPresent());
     }
 
     @Test

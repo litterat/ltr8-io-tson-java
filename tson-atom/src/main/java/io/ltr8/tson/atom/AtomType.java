@@ -28,7 +28,7 @@ import io.ltr8.tson.atom.parser.IntegerParser;
  * width actually needs for {@code IntegerParser}, a {@link java.time.LocalDate} for {@code date},
  * etc.) for a caller with no specific target in mind.
  *
- * <p>{@link #read(String, Class)} is for a caller that *does* know its target representation
+ * <p>{@link #boundTo(Class)} is for a caller that *does* know its target representation
  * (e.g. {@code TsonObjectReader} binding to a field declared {@code int}) and wants it directly, without
  * a caller-side table of which method name produces which primitive for which atom type -- that
  * knowledge stays inside each {@code AtomType} implementation instead of leaking into every caller.
@@ -101,15 +101,6 @@ public interface AtomType<T> {
     /** Whether {@code target} is one of the two classes a string-valued reading may land in. */
     static boolean isTextTarget(Class<?> target) {
         return target == String.class || target == CharSequence.class;
-    }
-
-    default Object read(String text, Class<?> target) throws AtomParseException, AtomValidationException {
-        T value = read(text);
-        if (!wrap(target).isInstance(value)) {
-            throw new AtomValidationException("cannot represent " + value + " as " + target,
-                    "a value representable as " + target.getSimpleName());
-        }
-        return value;
     }
 
     String write(T value);

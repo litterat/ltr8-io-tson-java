@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ComplexParserTest {
 
@@ -82,12 +83,16 @@ class ComplexParserTest {
     @Test
     void readWithMatchingTargetReturnsTheValue() {
         Complex expected = new Complex(new BigDecimal("3"), new BigDecimal("4"));
-        assertEquals(expected, ComplexParser.UNCONSTRAINED.read(token("3+4i"), Complex.class));
+        assertEquals(expected, ComplexParser.UNCONSTRAINED.boundTo(Complex.class).orElseThrow().read(token("3+4i")));
     }
 
     @Test
-    void readWithMismatchedTargetThrows() {
-        assertThrows(AtomValidationException.class, () -> ComplexParser.UNCONSTRAINED.read(token("3+4i"), double.class));
+    void aTargetTheFamilyDoesNotReachIsRefusedBeforeAnyValue() {
+        // Empty rather than a thrown refusal: the answer does not depend on a value, so it is available
+        // where the reader is built. A text target is admitted -- this family's wire form is text.
+        assertTrue(ComplexParser.UNCONSTRAINED.boundTo(Integer.class).isEmpty());
+        assertTrue(ComplexParser.UNCONSTRAINED.boundTo(Complex.class).isPresent());
+        assertTrue(ComplexParser.UNCONSTRAINED.boundTo(String.class).isPresent());
     }
 
     // ── write() ──────────────────────────────────────────────────────────

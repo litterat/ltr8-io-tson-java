@@ -25,9 +25,8 @@ import java.util.Optional;
  * (no {@code imag-unit}) is a real-only complex number, imaginary part zero.
  *
  * <p>Has exactly one legitimate host representation ({@link Complex} itself), so like {@link
- * RationalParser} this doesn't override {@link #read(TokenValue, Class)} -- {@link AtomType}'s
- * default already covers the {@code target == Complex.class} case a {@code TsonObjectReader}
- * {@code DataBridge} registration relies on (see {@link Complex}'s Javadoc).
+ * RationalParser} its {@link #boundTo} offers that and the text it was written as -- which is what a
+ * {@code TsonObjectReader} {@code DataBridge} registration binds through (see {@link Complex}'s Javadoc).
  */
 public record ComplexParser() implements AtomType<Complex> {
 

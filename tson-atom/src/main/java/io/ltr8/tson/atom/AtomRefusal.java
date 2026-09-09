@@ -31,7 +31,7 @@ public record AtomRefusal(Diagnostic.Code code, String message, String expected,
     /**
      * The refusal {@code failure} states about {@code text}, read at {@code target}.
      *
-     * <p>Handles the three throwables an {@link AtomType#read(String, Class)} raises, which are three
+     * <p>Handles the three throwables an {@link AtomType#read(String)} raises, which are three
      * different facts and are deliberately not one code:
      *
      * <ul>

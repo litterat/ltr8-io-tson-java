@@ -44,11 +44,11 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
 
     @Override
     public BigDecimal read(String text) {
-        return (BigDecimal) read(text, BigDecimal.class);
+        return (BigDecimal) narrowTo(text, BigDecimal.class);
     }
 
-    @Override
-    public Object read(String text, Class<?> target) {
+    /** This family's own narrowing, private now that {@code AtomType} has no target-aware read. */
+    private Object narrowTo(String text, Class<?> target) {
         return NumberNarrowing.narrowDecimal(readExact(text), target);
     }
 
@@ -139,7 +139,7 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
         if (!NumberNarrowing.narrowsDecimal(target)) {
             return Optional.empty();
         }
-        return bound(text -> read(text, target), value -> write((java.math.BigDecimal) value));
+        return bound(text -> narrowTo(text, target), value -> write((java.math.BigDecimal) value));
     }
 
 }

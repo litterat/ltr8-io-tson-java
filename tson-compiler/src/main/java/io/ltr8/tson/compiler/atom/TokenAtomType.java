@@ -42,8 +42,4 @@ public interface TokenAtomType<T> extends AtomType<T> {
         return read(new TokenValue(text, io.ltr8.tson.compiler.ast.TokenForm.UNQUOTED));
     }
 
-    @Override
-    default Object read(String text, Class<?> target) throws AtomParseException, AtomValidationException {
-        return read(new TokenValue(text, io.ltr8.tson.compiler.ast.TokenForm.UNQUOTED), target);
-    }
 }

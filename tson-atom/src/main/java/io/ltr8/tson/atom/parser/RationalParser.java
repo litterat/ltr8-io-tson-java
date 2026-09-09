@@ -22,10 +22,9 @@ import java.util.Optional;
  * declaring those fields itself.
  *
  * <p>Has exactly one legitimate host representation ({@link Rational} itself), so unlike {@link
- * IntegerParser}/{@link DecimalParser}/{@link FloatParser} this doesn't override {@link
- * #read(TokenValue, Class)} -- {@link AtomType}'s default (read the natural value, require the
- * target to accept it) already gives the right behavior, including the {@code target ==
- * Rational.class} case a {@code TsonObjectReader} bridge registration relies on (see {@link Rational}'s
+ * IntegerParser}/{@link DecimalParser}/{@link FloatParser} its {@link #boundTo} narrows to nothing --
+ * it offers that one type and the text it was written as, which is what a {@code TsonObjectReader}
+ * bridge registration binds through (see {@link Rational}'s
  * Javadoc for the recommended way to bind {@code !rational} to a richer third-party type instead
  * of this minimal one).
  */

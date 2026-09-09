@@ -8,6 +8,7 @@ import java.math.BigInteger;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RationalParserTest {
 
@@ -68,14 +69,16 @@ class RationalParserTest {
 
     @Test
     void readWithMatchingTargetReturnsTheValue() {
-        assertEquals(of(2, 3), RationalParser.UNCONSTRAINED.read(token("2/3"), Rational.class));
+        assertEquals(of(2, 3), RationalParser.UNCONSTRAINED.boundTo(Rational.class).orElseThrow().read(token("2/3")));
     }
 
     @Test
-    void readWithMismatchedTargetThrows() {
-        // No narrowing to double/BigDecimal is implemented -- an application wanting that binds
-        // through its own DataBridge instead (see Rational's Javadoc).
-        assertThrows(AtomValidationException.class, () -> RationalParser.UNCONSTRAINED.read(token("2/3"), double.class));
+    void aTargetTheFamilyDoesNotReachIsRefusedBeforeAnyValue() {
+        // Empty rather than a thrown refusal: the answer does not depend on a value, so it is available
+        // where the reader is built. A text target is admitted -- this family's wire form is text.
+        assertTrue(RationalParser.UNCONSTRAINED.boundTo(Integer.class).isEmpty());
+        assertTrue(RationalParser.UNCONSTRAINED.boundTo(Rational.class).isPresent());
+        assertTrue(RationalParser.UNCONSTRAINED.boundTo(String.class).isPresent());
     }
 
     // ── Constraint vocabulary (unexercised by the built-in instance, but implemented) ──────

@@ -58,11 +58,11 @@ public record FloatParser(FloatType constraints) implements AtomType<Number> {
     @Override
     public Number read(String text) {
         Class<?> natural = constraints.format() == FloatType.Format.BINARY32 ? Float.class : Double.class;
-        return (Number) read(text, natural);
+        return (Number) narrowTo(text, natural);
     }
 
-    @Override
-    public Object read(String text, Class<?> target) {
+    /** This family's own narrowing, private now that {@code AtomType} has no target-aware read. */
+    private Object narrowTo(String text, Class<?> target) {
         double value = parseAtFormatPrecision(text);
         validate(value, text);
         return NumberNarrowing.narrowApproximate(value, target);
@@ -186,7 +186,7 @@ public record FloatParser(FloatType constraints) implements AtomType<Number> {
         if (!NumberNarrowing.narrowsApproximate(target)) {
             return Optional.empty();
         }
-        return bound(text -> read(text, target), value -> write((Number) value));
+        return bound(text -> narrowTo(text, target), value -> write((Number) value));
     }
 
 }

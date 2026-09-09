@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * <p>One parse-then-validate pipeline ({@link #readBigInteger}) backs both {@link #read(String)}
  * (narrows to this atom's own natural host type -- {@link #hostType} when {@code size} is present,
  * {@link BigInteger} otherwise, so a fixed-width {@code int8} instance never hands back a {@code
- * BigInteger} for a value that fits a {@code Byte}) and {@link #read(String, Class)} (narrows
+ * BigInteger} for a value that fits a {@code Byte}) and {@link #boundTo(Class)} (narrows
  * directly to a caller-supplied target via {@link NumberNarrowing}, e.g. {@code !uint8 42} into a
  * declared {@code int} field is one call, no intermediate {@code Number} created). Validation is
  * always against *this atom's own* declared constraint regardless of which entry point is used -- if
@@ -71,11 +71,11 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
     @Override
     public Number read(String text) {
         Class<?> hostType = constraints.size().map(IntegerParser::hostType).orElse(BigInteger.class);
-        return (Number) read(text, hostType);
+        return (Number) narrowTo(text, hostType);
     }
 
-    @Override
-    public Object read(String text, Class<?> target) {
+    /** This family's own narrowing, private now that {@code AtomType} has no target-aware read. */
+    private Object narrowTo(String text, Class<?> target) {
         return NumberNarrowing.narrowIntegral(readBigInteger(text), target);
     }
 
@@ -221,7 +221,7 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
         if (!NumberNarrowing.narrowsIntegral(target)) {
             return Optional.empty();
         }
-        return bound(text -> read(text, target), value -> write((Number) value));
+        return bound(text -> narrowTo(text, target), value -> write((Number) value));
     }
 
 }
