@@ -1199,8 +1199,13 @@ is what the "resolve every schema at startup, then read" design claims and nothi
 **transient bytes**, reported per read with a ceiling loose enough to survive a JDK upgrade and tight enough
 to catch a 50x mistake (a `Pattern` per character was one, at 188 bytes per character written). Numbers move
 with the JDK and the machine; treat the *shape* as the signal — `whereAReadsBytesGo` splits a read into
-stream/tree/bind so a change says which stage moved. `AllocationProbe`'s Javadoc has the Flight Recorder
-flags for when the next question is "where".
+stream/tree/bind so a change says which stage moved, and `whereAJsonReadsBytesGo` does the same for the JSON
+stack. **All three bind paths are measured** — schema-driven, schemaless, and JSON — because the two without a
+schema settle at each value what a compile settles once, and a per-value cost is invisible in a whole-read
+figure: the two TSON paths land within 0.2% of each other. It takes a **difference** to see one, which is what
+the per-line measurement is for, and it puts a schemaless line about a tenth above a compiled one that
+validates every atom it does not. `AllocationProbe`'s Javadoc has the Flight Recorder flags for when the next
+question is "where".
 
 **Publishing is packaging, not release.** Every subproject applies `maven-publish` with a `mavenJava`
 publication (the `java` component plus sources and javadoc jars) and a POM carrying name/description/

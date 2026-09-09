@@ -24,6 +24,12 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // The allocation harness measures both encodings, so it lives in one module and produces one report:
+    // its numbers are a shape rather than a budget ("which stage moved"), and a stage measured in another
+    // module's run, on another machine, is not a stage this one can be compared against. Test-only -- the
+    // front door itself has no business knowing about the JSON stack.
+    testImplementation(project(":tson-json"))
 }
 
 // Gather this module's runtime jars -- itself plus its transitive dependencies (tson-compiler,

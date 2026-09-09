@@ -13,14 +13,21 @@ import io.ltr8.tson.compiler.TsonDataStream;
 import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.TsonTreeReader;
+import io.ltr8.tson.json.JsonObjectReader;
+import io.ltr8.tson.json.stream.JsonStream;
+import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.policy.ProcessorPolicy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import java.io.ByteArrayInputStream;
 import java.lang.ref.WeakReference;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -30,7 +37,10 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * from, and the reason a per-character {@code Matcher} sat in the write path unnoticed.
  *
  * <p>The shape under test is a server's: one {@link Tson}, one schema resolved and compiled at startup, then
- * the same document read thousands of times. Two questions, deliberately separate:
+ * the same document read thousands of times. <b>Three bind paths, not one</b> -- the schema-driven read, a
+ * schemaless TSON read, and a JSON read: the two without a schema settle at each value what a compile settles
+ * once, so a figure taken on the compiled path alone says nothing about either. Two questions, deliberately
+ * separate:
  *
  * <ul>
  *   <li><b>Does anything survive?</b> A read is transient by design -- the compiled schema, the reader graph
@@ -65,8 +75,8 @@ class AllocationHarnessTest {
             }
             """;
 
-    private static final String DOCUMENT = """
-            !!schema:"https://example.test/orders-1.tn"
+    /** The root value on its own, which is what a schemaless read is given -- it has no schema to name. */
+    private static final String ROOT = """
             !order {
               id: "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09"
               customer: "Ada Lovelace"
@@ -79,6 +89,23 @@ class AllocationHarnessTest {
               note: "leave with the neighbour"
             }""";
 
+    private static final String DOCUMENT = "!!schema:\"" + ID + "\"\n" + ROOT;
+
+    /** The same order, in the encoding {@code tson-json} reads -- the same fields, the same host types. */
+    private static final String JSON_DOCUMENT = """
+            { "id": "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09",
+              "customer": "Ada Lovelace",
+              "placed": "2026-08-24T10:00:00Z",
+              "lines": [
+                { "sku": "A-1", "quantity": 2, "price": 9.99 },
+                { "sku": "B-7", "quantity": 1, "price": 129.5 },
+                { "sku": "C-3", "quantity": 12, "price": 0.75 }
+              ],
+              "note": "leave with the neighbour" }""";
+
+    /** Hoisted out of every measured loop: encoding the document is not part of reading it. */
+    private static final byte[] JSON_BYTES = JSON_DOCUMENT.getBytes(StandardCharsets.UTF_8);
+
     public record Line(String sku, int quantity, double price) {
     }
 
@@ -87,6 +114,8 @@ class AllocationHarnessTest {
 
     private static Tson tson;
     private static TsonObjectReader reader;
+    private static TsonObjectReader schemalessReader;
+    private static JsonObjectReader jsonReader;
 
     @BeforeAll
     static void startUp() {
@@ -99,11 +128,17 @@ class AllocationHarnessTest {
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
         reader = tson.objectReader();
+        // The two readers with no schema between them and the class: the same bind context for the TSON one,
+        // so what separates it from `reader` is the schema and nothing else.
+        schemalessReader = new TsonObjectReader(tson.dataBindContext());
+        jsonReader = JsonObjectReader.standard();
 
         // Everything a first read builds -- the compiled schema, the reader graph, the bind descriptors --
         // is startup state under this design, so it is built here rather than measured as a read's cost.
         for (int i = 0; i < 2_000; i++) {
             AllocationProbe.sink = reader.read(DOCUMENT, Order.class);
+            AllocationProbe.sink = schemalessReader.read(ROOT, Order.class);
+            AllocationProbe.sink = jsonReader.read(JSON_DOCUMENT, Order.class);
         }
         AllocationProbe.sink = null;
     }
@@ -230,16 +265,118 @@ class AllocationHarnessTest {
                 AllocationProbe.sink = schemaless.read(DOCUMENT));
         double schemaTree = AllocationProbe.allocatedPerOperation(20_000, () ->
                 AllocationProbe.sink = tson.treeReader().read(DOCUMENT));
+        double schemalessBind = AllocationProbe.allocatedPerOperation(20_000, () ->
+                AllocationProbe.sink = schemalessReader.read(ROOT, Order.class));
         double bind = AllocationProbe.allocatedPerOperation(20_000, () ->
                 AllocationProbe.sink = reader.read(DOCUMENT, Order.class));
 
         report("  event stream only (lex + parse)", events, "bytes");
         report("  schemaless tree read", schemalessTree, "bytes");
         report("  schema-driven tree read", schemaTree, "bytes");
+        report("  schemaless bind read", schemalessBind, "bytes");
         report("  schema-driven bind read", bind, "bytes");
 
         assertTrue(events > 0 && bind >= events * 0.5,
                 "the stack's own stages should not undercut the token stream they all run on");
+    }
+
+    /**
+     * The JSON stack's own two stages, over the same order. It asks {@code AtomType.boundTo} per value for
+     * the same reason a schemaless TSON read does -- [TSON-JSON] §4.1 makes the position's own type decide
+     * and there is no compiled schema to settle it in -- and it is the encoding with no other reading, so
+     * nothing else measures it.
+     *
+     * <p>The document is encoded once, outside the loop: {@code JsonStream} reads bytes (§3.1 has it decode
+     * UTF-8 itself), and encoding a string is not part of reading a document.
+     */
+    @Test
+    void whereAJsonReadsBytesGo() {
+        double events = AllocationProbe.allocatedPerOperation(20_000, () -> {
+            JsonStream stream = new JsonStream(new ByteArrayInputStream(JSON_BYTES),
+                    ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing());
+            while (stream.hasNext()) {
+                AllocationProbe.sink = stream.next();
+            }
+        });
+        double bind = AllocationProbe.allocatedPerOperation(20_000, () ->
+                AllocationProbe.sink = jsonReader.read(JSON_DOCUMENT, Order.class));
+
+        report("  JSON event stream only", events, "bytes");
+        report("  JSON bind read", bind, "bytes");
+
+        assertTrue(events > 0 && bind >= events * 0.5,
+                "the stack's own stages should not undercut the token stream they all run on");
+    }
+
+    /**
+     * <b>What a schemaless bind costs per value, measured against the compiled read that costs nothing per
+     * value.</b> A schema-driven read settles each field once, when the reader is compiled: which family
+     * reads it, and what host type it binds to. Neither schemaless path has a compile to settle it in -- a
+     * TSON read with no {@code !!schema}, and every JSON read, where [TSON-JSON] §4.1 makes the position's
+     * own type decide -- so both do that work at each value, and {@code SchemalessObjectReader} builds a
+     * name-to-index map for each record besides.
+     *
+     * <p><b>Measured as a difference rather than a total</b>, which is the only way to see any of it: the
+     * whole-read figures in {@link #whereAReadsBytesGo} put the two TSON paths within 0.2% of each other and
+     * say nothing either way. Reading the same order with 4 lines and with 64 and dividing the difference
+     * cancels every flat cost and leaves what one line -- one record and three atoms -- costs.
+     *
+     * <p>It is <b>about 10% dearer per line than the compiled read</b>, which validates every one of those
+     * atoms against the schema where this validates none. So the per-value work does not vanish into escape
+     * analysis. Whether that is a defect or the price of discovering at each value what a compile is told
+     * once, this does not say -- it is a ratchet on the gap and nothing more: wide enough to move with the
+     * document and the JDK, tight enough that it cannot quietly double.
+     *
+     * <p>JSON reads the cheapest of the three -- no type-refs to lex, no schema to consult -- and stays
+     * under the compiled read for the same reason it stays under this one.
+     */
+    @Test
+    void aSchemalessBindsPerValueWorkStaysBoundedAgainstTheCompiledRead() {
+        double compiled = perLine(order(4, true), order(64, true), d -> reader.read(d, Order.class));
+        double schemaless = perLine(order(4, false), order(64, false), d -> schemalessReader.read(d, Order.class));
+        double json = perLine(json(4), json(64), d -> jsonReader.read(d, Order.class));
+
+        report("allocated per line, schema-driven bind", compiled, "bytes");
+        report("  schemaless bind", schemaless, "bytes");
+        report("  JSON bind", json, "bytes");
+        assertTrue(schemaless < compiled * 1.5, "a schemaless bind read cost " + schemaless + " bytes per "
+                + "line against the compiled read's " + compiled + ", which validates every atom this one "
+                + "does not -- half again is the ratchet, and the gap is normally about a tenth");
+        assertTrue(json < compiled, "a JSON bind read cost " + json + " bytes per line against the compiled "
+                + "TSON read's " + compiled + ", though it lexes no type-refs and consults no schema");
+    }
+
+    /** Bytes per line of the order, the flat per-read cost cancelling out. */
+    private static double perLine(String few, String many, Function<String, Object> read) {
+        double atMany = AllocationProbe.allocatedPerOperation(2_000, () ->
+                AllocationProbe.sink = read.apply(many));
+        double atFew = AllocationProbe.allocatedPerOperation(2_000, () ->
+                AllocationProbe.sink = read.apply(few));
+        return (atMany - atFew) / 60;
+    }
+
+    /** The order with {@code lines} repeated -- each one three more atoms for a reader to bind. */
+    private static String order(int lines, boolean describing) {
+        StringBuilder document = new StringBuilder();
+        if (describing) {
+            document.append("!!schema:\"").append(ID).append("\"\n");
+        }
+        document.append("!order { id: \"9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09\"  customer: \"Ada Lovelace\"")
+                .append("  placed: \"2026-08-24T10:00:00Z\"  lines: [");
+        for (int i = 0; i < lines; i++) {
+            document.append(" { sku: \"A-1\"  quantity: 2  price: 9.99 }");
+        }
+        return document.append(" ]  note: \"leave with the neighbour\" }").toString();
+    }
+
+    /** The same order in JSON. */
+    private static String json(int lines) {
+        StringBuilder document = new StringBuilder("{ \"id\": \"9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09\",")
+                .append(" \"customer\": \"Ada Lovelace\", \"placed\": \"2026-08-24T10:00:00Z\", \"lines\": [");
+        for (int i = 0; i < lines; i++) {
+            document.append(i == 0 ? "" : ",").append(" { \"sku\": \"A-1\", \"quantity\": 2, \"price\": 9.99 }");
+        }
+        return document.append(" ], \"note\": \"leave with the neighbour\" }").toString();
     }
 
     /**
