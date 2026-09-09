@@ -1,13 +1,12 @@
 package io.ltr8.tson.atom;
 
-import io.ltr8.tson.atom.number.NumberNarrowing;
-import io.ltr8.tson.atom.parser.IntegerParser;
+import java.util.Optional;
 
 /**
  * A built-in vocabulary atom's parsing contract (§5.2): "which tokens it accepts, and what host
  * value results." One implementation per meta-kernel/meta type constructor that the built-in
  * vocabulary (§5) actually surfaces as a schemaless annotation -- e.g. {@code integer_type} backs
- * {@link IntegerParser}. A single instance is a fully-parameterized *instance* of that constructor,
+ * {@code IntegerParser}. A single instance is a fully-parameterized *instance* of that constructor,
  * exactly mirroring the schema's own constructor/instance split: {@code int32}'s entry in the
  * built-in map is one {@code IntegerParser} constructed with {@code size = {bits: 32, signed: true}},
  * the same way {@code core.tn} writes {@code int32 => !integer ^ { size: { bits: 32 signed: true
@@ -25,17 +24,12 @@ import io.ltr8.tson.atom.parser.IntegerParser;
  * width actually needs for {@code IntegerParser}, a {@link java.time.LocalDate} for {@code date},
  * etc.) for a caller with no specific target in mind.
  *
- * <p>{@link #read(String, Class)} is for a caller that *does* know its target representation
- * (e.g. {@code TsonObjectReader} binding to a field declared {@code int}) and wants it directly, without
- * a caller-side table of which method name produces which primitive for which atom type -- that
- * knowledge stays inside each {@code AtomType} implementation instead of leaking into every caller.
- * The default here covers atoms with exactly one legitimate host representation (most of them --
- * {@code uuid}, {@code date}, ...): read the natural value and require the target to accept it.
- * Atoms with more than one legitimate representation (the numeric family) override it to narrow
- * directly, sharing the target-matching logic in {@link
- * io.ltr8.tson.atom.number.NumberNarrowing} with {@code TsonObjectReader}'s untyped-number binding
- * rather than duplicating it -- this interface still has no dependency on any binding library;
- * {@code Class<?>} is a bare JDK type, not {@code tson-bind}'s {@code DataClassAtom}.
+ * <p>{@link #boundTo(Class)} is for a caller that *does* know its target representation (a reader binding
+ * to a field declared {@code int}), and hands back this family reading into that class -- so which method
+ * produces which representation stays inside each implementation instead of becoming a table every caller
+ * keeps. Every family answers it and there is no default; the contract is on the method. **This interface
+ * still has no dependency on any binding library**: {@code Class<?>} is a bare JDK type, not
+ * {@code tson-bind}'s {@code DataClassAtom}, which is what lets one vocabulary serve every encoding.
  *
  * <p>{@link #write(Object)} is {@link #read(String)}'s inverse: given a natural host value,
  * the token text that would read back to an equivalent value (never quoted, never carrying a
@@ -46,16 +40,22 @@ import io.ltr8.tson.atom.parser.IntegerParser;
  */
 public interface AtomType<T> {
 
-    T read(String text) throws AtomParseException, AtomValidationException;
+    /**
+     * This family reading into {@code target}, or empty where no value of it ever reaches one.
+     *
+     * <p><b>The target is bound once, where the reader is built, not carried into every read.</b> A schema
+     * fixes which family reads a position and a bound class fixes what that position must produce, so the
+     * two meet when the reader is compiled -- and an empty answer there is a disagreement reported before
+     * any document exists, rather than a cast failing inside a constructor on the first one.
+     *
+     * <p><b>Every family answers; there is no default.</b> One that admitted whatever it was handed would
+     * give the check nothing to work with. The answer is rarely hard -- the natural host type, and for a
+     * family whose wire form is text, the spelling it validated -- and a family that genuinely reads into
+     * any class, one embedding another format say, states that too and is the clearer for saying it.
+     */
+    Optional<AtomType<?>> boundTo(Class<?> target);
 
-    default Object read(String text, Class<?> target) throws AtomParseException, AtomValidationException {
-        T value = read(text);
-        if (!wrap(target).isInstance(value)) {
-            throw new AtomValidationException("cannot represent " + value + " as " + target,
-                    "a value representable as " + target.getSimpleName());
-        }
-        return value;
-    }
+    T read(String text) throws AtomParseException, AtomValidationException;
 
     String write(T value);
 

@@ -23,6 +23,7 @@ import io.ltr8.tson.compiler.*;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.HostAtoms;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
@@ -310,7 +311,9 @@ public final class SchemalessObjectReader {
      */
     private Object bindBuiltin(TsonReadContext ctx, AtomType<?> atomType, TokenValue token, Class<?> target) {
         try {
-            return atomType.read(token.text(), target);
+            return atomType.boundTo(target).orElseThrow(() -> new AtomValidationException(
+                    "cannot represent " + token.text() + " as " + target,
+                    "a value representable as " + target.getSimpleName())).read(token.text());
         } catch (RuntimeException e) {
             AtomRefusal refusal = AtomRefusal.of(e, token.text(), target);
             ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());

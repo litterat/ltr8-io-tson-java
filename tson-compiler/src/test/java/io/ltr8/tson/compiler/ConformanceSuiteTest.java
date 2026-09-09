@@ -637,41 +637,41 @@ class ConformanceSuiteTest {
         CoreValue payload = family.value().value().coreValue();
         switch (typeRef) {
             case "rational" -> {
-                Rational actual = (Rational) atomType.read(token, Rational.class);
+                Rational actual = (Rational) atomType.boundTo(Rational.class).orElseThrow().read(token);
                 assertEquals(parseRational(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "complex" -> {
-                Complex actual = (Complex) atomType.read(token, Complex.class);
+                Complex actual = (Complex) atomType.boundTo(Complex.class).orElseThrow().read(token);
                 RecordValue expected = (RecordValue) payload;
                 assertEquals(0, new BigDecimal(fieldText(expected, "real")).compareTo(actual.real()), "complex real part");
                 assertEquals(0, new BigDecimal(fieldText(expected, "imaginary")).compareTo(actual.imaginary()), "complex imaginary part");
             }
             case "uuid" -> {
-                UUID actual = (UUID) atomType.read(token, UUID.class);
+                UUID actual = (UUID) atomType.boundTo(UUID.class).orElseThrow().read(token);
                 assertEquals(UUID.fromString(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             // One name, not four: Part 1 fixes base64, a schemaless document having no type to carry
             // bytes_type's encoding selector.
             case "bytes" -> {
-                byte[] actual = (byte[]) atomType.read(token, byte[].class);
+                byte[] actual = (byte[]) atomType.boundTo(byte[].class).orElseThrow().read(token);
                 assertArrayEquals(HexFormat.of().parseHex(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "date" -> {
-                LocalDate actual = (LocalDate) atomType.read(token, LocalDate.class);
+                LocalDate actual = (LocalDate) atomType.boundTo(LocalDate.class).orElseThrow().read(token);
                 assertEquals(LocalDate.parse(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "time" -> {
-                OffsetTime actual = (OffsetTime) atomType.read(token, OffsetTime.class);
+                OffsetTime actual = (OffsetTime) atomType.boundTo(OffsetTime.class).orElseThrow().read(token);
                 assertEquals(OffsetTime.parse(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "datetime" -> {
-                OffsetDateTime actual = (OffsetDateTime) atomType.read(token, OffsetDateTime.class);
+                OffsetDateTime actual = (OffsetDateTime) atomType.boundTo(OffsetDateTime.class).orElseThrow().read(token);
                 assertEquals(OffsetDateTime.parse(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             // duration and period state the *value* -- seconds and months -- rather than a canonical
             // spelling, P3W and PT504H being one duration and P1Y and P12M one period.
             case "duration" -> {
-                Duration actual = (Duration) atomType.read(token, Duration.class);
+                Duration actual = (Duration) atomType.boundTo(Duration.class).orElseThrow().read(token);
                 java.math.BigDecimal seconds = new java.math.BigDecimal(actual.getSeconds())
                         .add(new java.math.BigDecimal(actual.getNano()).movePointLeft(9));
                 // compareTo, not equals: a BigDecimal carries its scale, and 5400 and 5.4E+3 are the same
@@ -680,16 +680,16 @@ class ConformanceSuiteTest {
                         "duration seconds: expected " + ((TokenValue) payload).text() + " but was " + seconds);
             }
             case "period" -> {
-                Period actual = (Period) atomType.read(token, Period.class);
+                Period actual = (Period) atomType.boundTo(Period.class).orElseThrow().read(token);
                 assertEquals(Long.parseLong(((TokenValue) payload).text()), actual.toTotalMonths(),
                         "period months");
             }
             case "uri" -> {
-                URI actual = (URI) atomType.read(token, URI.class);
+                URI actual = (URI) atomType.boundTo(URI.class).orElseThrow().read(token);
                 assertEquals(URI.create(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "ipv4" -> {
-                Inet4Address actual = (Inet4Address) atomType.read(token, Inet4Address.class);
+                Inet4Address actual = (Inet4Address) atomType.boundTo(Inet4Address.class).orElseThrow().read(token);
                 assertEquals(InetAddress.ofLiteral(((TokenValue) payload).text()), actual, "vocabulary value");
             }
             case "ipv6" -> {
@@ -697,7 +697,7 @@ class ConformanceSuiteTest {
                 // convention as the binary family), not a textual IPv6 literal -- InetAddress
                 // itself silently collapses an IPv4-mapped 16-byte pattern to an Inet4Address, so
                 // there's no single JDK parse this suite could trust as a neutral oracle here.
-                Inet6Address actual = (Inet6Address) atomType.read(token, Inet6Address.class);
+                Inet6Address actual = (Inet6Address) atomType.boundTo(Inet6Address.class).orElseThrow().read(token);
                 assertArrayEquals(HexFormat.of().parseHex(((TokenValue) payload).text()), actual.getAddress(),
                         "vocabulary value");
             }
@@ -707,7 +707,7 @@ class ConformanceSuiteTest {
             // A vector must therefore author its subject canonically, or a text-preserving implementation
             // and a value-parsing one cannot both satisfy it (§5.2 leaves the host type open).
             case "cidr4", "cidr6" -> {
-                CidrNetwork actual = (CidrNetwork) atomType.read(token, CidrNetwork.class);
+                CidrNetwork actual = (CidrNetwork) atomType.boundTo(CidrNetwork.class).orElseThrow().read(token);
                 int familyBits = typeRef.equals("cidr4") ? 32 : 128;
                 assertEquals(CidrNetwork.parse(((TokenValue) payload).text(), familyBits), actual,
                         "vocabulary value");
@@ -718,11 +718,11 @@ class ConformanceSuiteTest {
                 // below. `text` is text by definition (§5.5, "the host value is the token's text"), `mac`
                 // keeps its text because Java has no type to map onto (see MacParser), and `email` because
                 // the address shape is the contract.
-                String actual = (String) atomType.read(token, String.class);
+                String actual = (String) atomType.boundTo(String.class).orElseThrow().read(token);
                 assertEquals(((TokenValue) payload).text(), actual, "vocabulary value");
             }
             default -> {
-                BigDecimal actual = (BigDecimal) atomType.read(token, BigDecimal.class);
+                BigDecimal actual = (BigDecimal) atomType.boundTo(BigDecimal.class).orElseThrow().read(token);
                 BigDecimal expected = new BigDecimal(((TokenValue) payload).text());
                 assertEquals(0, expected.compareTo(actual),
                         "vocabulary value: expected " + expected + ", got " + actual);

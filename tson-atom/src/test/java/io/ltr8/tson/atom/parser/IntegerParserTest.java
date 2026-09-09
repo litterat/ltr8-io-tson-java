@@ -22,7 +22,7 @@ class IntegerParserTest {
     }
 
     private static BigInteger big(IntegerParser type, String text) {
-        return (BigInteger) type.read(token(text), BigInteger.class);
+        return (BigInteger) type.boundTo(BigInteger.class).orElseThrow().read(token(text));
     }
 
     // ── §7.6 form acceptance (§5.6: "only integer/based-integer forms") ────
@@ -179,32 +179,32 @@ class IntegerParserTest {
         // !uint8 42 bound directly to an int-typed field: one call, still validated against
         // uint8's own 0..255 contract even though its natural host type is Short.
         IntegerParser uint8 = new IntegerParser(new IntegerSize(8, false));
-        assertEquals(42, uint8.read(token("42"), int.class));
-        assertThrows(AtomValidationException.class, () -> uint8.read(token("256"), int.class));
+        assertEquals(42, uint8.boundTo(int.class).orElseThrow().read(token("42")));
+        assertThrows(AtomValidationException.class, () -> uint8.boundTo(int.class).orElseThrow().read(token("256")));
     }
 
     @Test
     void readWithTargetThrowsArithmeticExceptionWhenNarrowerThanTheAtomsOwnRange() {
         // int32's own contract permits this value; a caller requesting byte can't hold it.
         IntegerParser int32 = new IntegerParser(new IntegerSize(32, true));
-        assertThrows(ArithmeticException.class, () -> int32.read(token("200"), byte.class));
+        assertThrows(ArithmeticException.class, () -> int32.boundTo(byte.class).orElseThrow().read(token("200")));
     }
 
     @Test
     void readWithTargetAgreesAcrossEveryRepresentation() {
         IntegerParser int32 = new IntegerParser(new IntegerSize(32, true));
-        assertEquals((byte) 5, int32.read(token("5"), byte.class));
-        assertEquals((short) 5, int32.read(token("5"), short.class));
-        assertEquals(5, int32.read(token("5"), int.class));
-        assertEquals(5L, int32.read(token("5"), long.class));
-        assertEquals(BigInteger.valueOf(5), int32.read(token("5"), BigInteger.class));
+        assertEquals((byte) 5, int32.boundTo(byte.class).orElseThrow().read(token("5")));
+        assertEquals((short) 5, int32.boundTo(short.class).orElseThrow().read(token("5")));
+        assertEquals(5, int32.boundTo(int.class).orElseThrow().read(token("5")));
+        assertEquals(5L, int32.boundTo(long.class).orElseThrow().read(token("5")));
+        assertEquals(BigInteger.valueOf(5), int32.boundTo(BigInteger.class).orElseThrow().read(token("5")));
     }
 
     @Test
     void readWithTargetAcceptsBoxedAndPrimitiveClassesIdentically() {
         IntegerParser int32 = new IntegerParser(new IntegerSize(32, true));
-        assertEquals(5, int32.read(token("5"), int.class));
-        assertEquals(5, int32.read(token("5"), Integer.class));
+        assertEquals(5, int32.boundTo(int.class).orElseThrow().read(token("5")));
+        assertEquals(5, int32.boundTo(Integer.class).orElseThrow().read(token("5")));
     }
 
     // ── write() ──────────────────────────────────────────────────────────

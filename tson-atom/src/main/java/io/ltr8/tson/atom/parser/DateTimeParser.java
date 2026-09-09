@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * <p>{@code precision} is enforced on the token as written (§5.5), the same upper bound on fractional-second
  * digits {@link TimeParser} applies and for the same reason.
  */
-public record DateTimeParser(DateTimeType constraints) implements AtomType<OffsetDateTime> {
+public record DateTimeParser(DateTimeType constraints) implements AtomTypeParser<OffsetDateTime> {
 
     /** §5.4's built-in annotation name -- {@code !datetime}. */
     public static final String TYPENAME = "datetime";
@@ -76,4 +76,15 @@ public record DateTimeParser(DateTimeType constraints) implements AtomType<Offse
             }
         });
     }
+
+    /**
+     * Its own value, or the RFC 3339 text -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(OffsetDateTime.class, target);
+    }
+
 }

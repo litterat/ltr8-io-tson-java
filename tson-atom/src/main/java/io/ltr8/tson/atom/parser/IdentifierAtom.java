@@ -27,7 +27,7 @@ import java.util.Optional;
  * vocabulary -- {@code value} is read by base type resolution, which depends on the lexical form, and
  * {@code void} accepts only the absent sentinel.
  */
-public final class IdentifierAtom implements AtomType<String> {
+public final class IdentifierAtom implements AtomTypeParser<String> {
 
     public static final IdentifierAtom INSTANCE = new IdentifierAtom();
 
@@ -50,4 +50,11 @@ public final class IdentifierAtom implements AtomType<String> {
     public String write(String value) {
         return value;
     }
+
+    /** This family already reads to text, so a string target is its own value and nothing else is. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(String.class, target);
+    }
+
 }

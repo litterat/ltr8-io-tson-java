@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
  * than on the parsed value -- {@code 12:00:00.100} carries three digits whatever instant it denotes, and
  * the atom is exact, so nothing is ever truncated to satisfy the facet.
  */
-public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
+public record TimeParser(TimeType constraints) implements AtomTypeParser<OffsetTime> {
 
     /** §5.4's built-in annotation name -- {@code !time}. */
     public static final String TYPENAME = "time";
@@ -84,4 +84,15 @@ public record TimeParser(TimeType constraints) implements AtomType<OffsetTime> {
             }
         });
     }
+
+    /**
+     * Its own value, or the RFC 3339 text -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(OffsetTime.class, target);
+    }
+
 }

@@ -3,7 +3,6 @@ package io.ltr8.tson.atom.parser;
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
-import io.ltr8.tson.atom.number.NumberGrammar;
 import io.ltr8.tson.schema.meta.UuidType;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,14 +25,14 @@ import java.util.regex.Pattern;
  * io.ltr8.tson.atom.number.NumberGrammar#isHexFloat}).
  *
  * <p>Has exactly one legitimate host representation ({@link UUID} itself), so like {@link
- * RationalParser}/{@link ComplexParser} this doesn't override {@link #read(TokenValue, Class)} --
- * {@link AtomType}'s default already covers it. Unlike {@code Rational}/{@code Complex}, {@code
+ * RationalParser}/{@link ComplexParser} its {@link #boundTo} offers that and the text it was written
+ * as. Unlike {@code Rational}/{@code Complex}, {@code
  * UUID} isn't a Java record, so it doesn't collide with {@code tson-bind}'s record auto-detection --
  * but it also isn't {@code @Atom}-annotatable (it's a JDK class), so {@code DataBindContext} now
  * pre-registers it as a bridge-less atom directly, the same way it already does for {@code
  * java.util.Date}, rather than requiring every caller to register it themselves.
  */
-public record UuidParser(UuidType constraints) implements AtomType<UUID> {
+public record UuidParser(UuidType constraints) implements AtomTypeParser<UUID> {
 
     /** §5.5's built-in annotation name -- {@code !uuid}. */
     public static final String TYPENAME = "uuid";
@@ -70,4 +69,15 @@ public record UuidParser(UuidType constraints) implements AtomType<UUID> {
     public String write(UUID value) {
         return value.toString();
     }
+
+    /**
+     * Its own value, or the hyphenated text -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(UUID.class, target);
+    }
+
 }

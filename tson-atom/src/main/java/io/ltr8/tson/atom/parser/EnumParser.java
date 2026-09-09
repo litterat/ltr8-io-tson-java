@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
@@ -33,7 +35,7 @@ import java.util.List;
  * {@code boolean}, which reads the host values its members stand for rather than their text, and that is
  * the one case this class deliberately does not serve.
  */
-public record EnumParser(EnumBody constraints) implements AtomType<String> {
+public record EnumParser(EnumBody constraints) implements AtomTypeParser<String> {
 
     public EnumParser(List<String> members) {
         this(new EnumBody(members));
@@ -53,4 +55,11 @@ public record EnumParser(EnumBody constraints) implements AtomType<String> {
     public String write(String value) {
         return value;
     }
+
+    /** This family already reads to text, so a string target is its own value and nothing else is. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(String.class, target);
+    }
+
 }

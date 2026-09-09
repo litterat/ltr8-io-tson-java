@@ -22,7 +22,7 @@ import java.util.Optional;
  * with, and this one's host class is {@code String} -- what both writers emit bare. An entry there would put
  * {@code !text} on every string in every document.
  */
-public record TextParser(TextType constraints) implements AtomType<String> {
+public record TextParser(TextType constraints) implements AtomTypeParser<String> {
 
     /** The §5.5 annotation name this atom is reached by. */
     public static final String TYPENAME = "text";
@@ -77,4 +77,11 @@ public record TextParser(TextType constraints) implements AtomType<String> {
             }
         });
     }
+
+    /** This family already reads to text, so a string target is its own value and nothing else is. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(String.class, target);
+    }
+
 }

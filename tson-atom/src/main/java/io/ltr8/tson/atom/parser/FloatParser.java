@@ -38,7 +38,7 @@ import java.util.Optional;
  * its default) exercises this path today, so exact pre-rounding bound checking is deferred until a
  * schema (Part 2) actually needs it rather than implemented speculatively.
  */
-public record FloatParser(FloatType constraints) implements AtomType<Number> {
+public record FloatParser(FloatType constraints) implements AtomTypeParser<Number> {
 
     /** {@code float32 => !float_type { format: BINARY32 } }; {@code float64} is the BINARY64 twin. */
     public static final FloatParser FLOAT32 = new FloatParser(FloatType.FLOAT32);
@@ -58,11 +58,11 @@ public record FloatParser(FloatType constraints) implements AtomType<Number> {
     @Override
     public Number read(String text) {
         Class<?> natural = constraints.format() == FloatType.Format.BINARY32 ? Float.class : Double.class;
-        return (Number) read(text, natural);
+        return (Number) narrowTo(text, natural);
     }
 
-    @Override
-    public Object read(String text, Class<?> target) {
+    /** This family's own narrowing, private now that {@code AtomType} has no target-aware read. */
+    private Object narrowTo(String text, Class<?> target) {
         double value = parseAtFormatPrecision(text);
         validate(value, text);
         return NumberNarrowing.narrowApproximate(value, target);
@@ -176,4 +176,17 @@ public record FloatParser(FloatType constraints) implements AtomType<Number> {
         }
         return constraints.format() == FloatType.Format.BINARY32 ? abs < Float.MIN_NORMAL : abs < Double.MIN_NORMAL;
     }
+
+    /**
+     * The numeric targets narrowsApproximate reaches, and no text one: a number's wire form is a number,
+     * so handing back its spelling would be a different reading rather than the same value.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        if (!NumberNarrowing.narrowsApproximate(target)) {
+            return Optional.empty();
+        }
+        return bound(text -> narrowTo(text, target), value -> write((Number) value));
+    }
+
 }

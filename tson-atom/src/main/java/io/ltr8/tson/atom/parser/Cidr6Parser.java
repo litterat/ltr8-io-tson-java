@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
@@ -25,7 +27,7 @@ import io.ltr8.tson.schema.meta.Cidr6Type;
  * all. Whether a declared bound itself falls inside the family range is a coherence rule and is not checked
  * here; an out-of-range one is inert either way, the family range being enforced regardless.
  */
-public record Cidr6Parser(Cidr6Type constraints) implements AtomType<CidrNetwork> {
+public record Cidr6Parser(Cidr6Type constraints) implements AtomTypeParser<CidrNetwork> {
 
     /** §5.5's built-in annotation name -- {@code !cidr6}. */
     public static final String TYPENAME = "cidr6";
@@ -96,4 +98,15 @@ public record Cidr6Parser(Cidr6Type constraints) implements AtomType<CidrNetwork
                 + "notation, an address followed by '/' and a prefix length of 0-128, with zero host bits "
                 + "beyond the prefix (§5.5)", "an IPv6 network in CIDR notation");
     }
+
+    /**
+     * Its own value, or the CIDR text -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(CidrNetwork.class, target);
+    }
+
 }

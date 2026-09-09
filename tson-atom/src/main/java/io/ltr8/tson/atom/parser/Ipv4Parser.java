@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
@@ -33,7 +35,7 @@ import java.net.UnknownHostException;
  * blocks is a materially bigger piece of work than a scalar constraint, left for later.
  */
 public record Ipv4Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
-        implements AtomType<Inet4Address> {
+        implements AtomTypeParser<Inet4Address> {
 
     /** §5.5's built-in annotation name -- {@code !ipv4}. */
     public static final String TYPENAME = "ipv4";
@@ -119,4 +121,15 @@ public record Ipv4Parser(List<CidrNetwork> within, List<CidrNetwork> excluding)
             throw new IllegalStateException(e);
         }
     }
+
+    /**
+     * Its own value, or the address text -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(Inet4Address.class, target);
+    }
+
 }

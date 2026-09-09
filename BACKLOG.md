@@ -86,14 +86,20 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
 
 ## Binding
 
-- [ ] **The bind-mode check cannot tell whether two atoms meet.** An `int32` field against a `String`
-  component reaches the constructor and fails there, unclassified. Deciding it needs the host class an atom
-  family produces, which `AtomType` does not expose — and since it is public and consumer-implementable,
-  adding one decides what every future implementation must answer (a `default` returning `Optional.empty()`
-  keeps it additive). Whatever answers must also model the reader's own tolerances —
-  `RecordBindReader.narrow`, `NumberNarrowing`'s accepted targets, a bridge satisfied by its *wire* class,
-  `Annotated` unwrapping — or it refuses bindings that work today, at startup, which is worse than the late
-  failure it replaces.
+- [ ] **`RecordBindReader.narrow` survives, and it is the wrong shape.** It is a second statement of the
+  atom-to-host mapping, applied after the fact, where `AtomType.boundTo` states it once in the family that
+  owns it. Both its callers were measured and both still need it: a **FIXED** value is decoded by
+  `readSchemaDefault` with no target in hand (tree mode shares the method) and adapted afterwards — meta.tn's
+  `spec` fields are every instance — and the **read** path still needs it for a `[value]`-typed container's
+  elements, which are not atom positions and so are never bound (`NetworkFacetsTest`'s `within`/`excluding`
+  are the ones that fail). Re-decoding the fixed value with the bound parser was tried and moves a malformed
+  schema's error to a different point, so it is not a drop-in. Binding container elements is the half that
+  would actually retire it.
+
+- [ ] **A schemaless bind and a JSON read are not in the allocation harness.** Both ask `AtomType.boundTo`
+  per value where a schema-driven read asks once, so both allocate an `Optional` (and a `BoundAtom` where the
+  reading converts) on a path nothing measures — `whereAReadsBytesGo` covers the event stream, a schemaless
+  *tree* read, and the two schema-driven reads. Escape analysis plausibly removes it; nothing here says so.
 
 - [ ] **A `value` slot's rebind asks by the declared component class.** `RecordBindReader.rebindValueIfNeeded`
   passes `DataClassField.type()` to `ValueParser.at`, where the schemaless readers pass the bridge's

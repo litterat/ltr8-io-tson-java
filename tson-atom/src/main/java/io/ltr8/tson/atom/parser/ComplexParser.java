@@ -25,11 +25,10 @@ import java.util.Optional;
  * (no {@code imag-unit}) is a real-only complex number, imaginary part zero.
  *
  * <p>Has exactly one legitimate host representation ({@link Complex} itself), so like {@link
- * RationalParser} this doesn't override {@link #read(TokenValue, Class)} -- {@link AtomType}'s
- * default already covers the {@code target == Complex.class} case a {@code TsonObjectReader}
- * {@code DataBridge} registration relies on (see {@link Complex}'s Javadoc).
+ * RationalParser} its {@link #boundTo} offers that and the text it was written as -- which is what a
+ * {@code TsonObjectReader} {@code DataBridge} registration binds through (see {@link Complex}'s Javadoc).
  */
-public record ComplexParser() implements AtomType<Complex> {
+public record ComplexParser() implements AtomTypeParser<Complex> {
 
     /** §5.6's built-in annotation name -- {@code !complex}. */
     public static final String TYPENAME = "complex";
@@ -85,4 +84,15 @@ public record ComplexParser() implements AtomType<Complex> {
     private static BigDecimal applySign(Optional<NumberForm.Sign> sign, BigDecimal magnitude) {
         return sign.filter(s -> s == NumberForm.Sign.MINUS).isPresent() ? magnitude.negate() : magnitude;
     }
+
+    /**
+     * Its own value, or the text form -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(Complex.class, target);
+    }
+
 }

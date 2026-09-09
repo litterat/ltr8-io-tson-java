@@ -1,5 +1,9 @@
 package io.ltr8.tson.compiler.atom;
 
+import java.util.Optional;
+
+import io.ltr8.tson.atom.AtomType;
+
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.Token;
 
@@ -44,5 +48,18 @@ public final class RawTokenParser implements TokenAtomType<Token> {
     @Override
     public String write(Token value) {
         return value.text();
+    }
+
+    /**
+     * The token itself and nothing else: this atom exists to keep the spelling §8's resolved form records,
+     * so a target that is not a {@link Token} would be asking for the very thing it preserves.
+     *
+     * <p>Written out rather than reached through {@code AtomTypeParser}'s helpers, which are the built-in
+     * vocabulary's own. A form-sensitive atom is not one of that vocabulary -- it reads a {@code TokenValue}
+     * where every family reads text -- and three lines here cost less than a shared supertype spanning both.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return target.isAssignableFrom(Token.class) ? Optional.of(this) : Optional.empty();
     }
 }

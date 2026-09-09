@@ -22,14 +22,13 @@ import java.util.Optional;
  * declaring those fields itself.
  *
  * <p>Has exactly one legitimate host representation ({@link Rational} itself), so unlike {@link
- * IntegerParser}/{@link DecimalParser}/{@link FloatParser} this doesn't override {@link
- * #read(TokenValue, Class)} -- {@link AtomType}'s default (read the natural value, require the
- * target to accept it) already gives the right behavior, including the {@code target ==
- * Rational.class} case a {@code TsonObjectReader} bridge registration relies on (see {@link Rational}'s
+ * IntegerParser}/{@link DecimalParser}/{@link FloatParser} its {@link #boundTo} narrows to nothing --
+ * it offers that one type and the text it was written as, which is what a {@code TsonObjectReader}
+ * bridge registration binds through (see {@link Rational}'s
  * Javadoc for the recommended way to bind {@code !rational} to a richer third-party type instead
  * of this minimal one).
  */
-public record RationalParser(RationalType constraints) implements AtomType<Rational> {
+public record RationalParser(RationalType constraints) implements AtomTypeParser<Rational> {
 
     /** §5.6's built-in annotation name -- {@code !rational}. */
     public static final String TYPENAME = "rational";
@@ -95,4 +94,15 @@ public record RationalParser(RationalType constraints) implements AtomType<Ratio
             }
         });
     }
+
+    /**
+     * Its own value, or the text form -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(Rational.class, target);
+    }
+
 }

@@ -36,6 +36,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -148,7 +149,18 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             // itself -- tson-bind's binder, which collects a record's arguments through their bridges, is
             // exactly the step a schema-driven read replaces. Same wrapper a container's elements take.
             rebound = ElementBridging.wrap(rebound, target.dataClass());
-            if (atomPosition && !(boundAs(target) instanceof DataClassAtom)) {
+            if (atomPosition && boundAs(target) instanceof DataClassAtom bound) {
+                // The wire class, never the declared one: a bridged component is reached by whatever its
+                // bridge takes, and it is that the family has to produce.
+                Class<?> wire = bound.dataClass();
+                Optional<TsonTypeReader<?>> atTarget = boundTo(rebound, wire);
+                if (atTarget.isEmpty()) {
+                    mismatches.add("field '" + field.schema().name() + "' cannot produce " + wire.getName()
+                            + ", which is what component '" + target.name() + "' binds");
+                } else {
+                    rebound = atTarget.get();
+                }
+            } else if (atomPosition) {
                 mismatches.add("field '" + field.schema().name() + "' is an atom, and component '"
                         + target.name() + "' binds " + boundAs(target).typeClass().getName()
                         + " structurally -- register it as an atom (DataBindContext.Builder.registerAtom, "
@@ -194,13 +206,31 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         if (parser instanceof VariantSchemaReader guard) {
             return readsAnAtom(guard.wrapped());
         }
-        return parser instanceof AtomTypeReader<?> atom && !atom.readsUninterpretedValue();
+        return parser instanceof AtomTypeReader<?> atom && !atom.readsUninterpretedValue()
+                && !atom.readsTheTokenItself();
     }
 
     /** What a component binds as -- an {@code Annotated} carrier's payload is what the value has to fit. */
     private static DataClass boundAs(DataClassField target) {
         DataClass bound = target.dataClass();
         return bound instanceof DataClassAnnotated boxed ? boxed.valueClass() : bound;
+    }
+
+    /**
+     * This field's reader bound to {@code wire}, or empty where the family refuses it -- the refusal stays a
+     * value the whole way up, because this caller collects several before raising one
+     * {@code BindMismatchException} that names them all. Looks through a §7.2 subsumption guard as every
+     * question about a field's reader does, and reaches the atom through {@link AtomTypeReader#overAtom} --
+     * the same seam a {@code value} slot's own specialisation takes.
+     */
+    private static Optional<TsonTypeReader<?>> boundTo(TsonTypeReader<?> parser, Class<?> wire) {
+        if (parser instanceof VariantSchemaReader guard) {
+            return boundTo(guard.wrapped(), wire).map(guard::rewrap);
+        }
+        if (!(parser instanceof AtomTypeReader<?> atom)) {
+            return Optional.of(parser);
+        }
+        return atom.boundTo(wire);
     }
 
     /** Whether any schema field of this type binds to {@code classField}. */
@@ -441,11 +471,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         if (raw instanceof BigDecimal bd && target != BigDecimal.class) {
             return NumberNarrowing.narrowDecimal(bd, target);
         }
-        if (raw instanceof String s && target.isEnum()) {
-            return Enum.valueOf((Class<Enum>) target, s);
-        }
+        // Still reached, and by the FIXED path alone: a fixed value is decoded by `readSchemaDefault` with
+        // no target in hand (tree mode shares it) and adapted here, where a read value is now reconciled by
+        // the family itself. meta.tn's `spec` fields are every instance of it.
         if (raw instanceof java.net.URI uri && target == String.class) {
             return uri.toString();
+        }
+        if (raw instanceof String s && target.isEnum()) {
+            return Enum.valueOf((Class<Enum>) target, s);
         }
         return raw;
     }

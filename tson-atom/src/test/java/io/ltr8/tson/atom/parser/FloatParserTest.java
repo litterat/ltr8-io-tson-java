@@ -21,30 +21,30 @@ class FloatParserTest {
 
     @Test
     void acceptsPlainIntegerToken() {
-        assertEquals(42.0, FloatParser.FLOAT64.read(token("42"), double.class));
+        assertEquals(42.0, FloatParser.FLOAT64.boundTo(double.class).orElseThrow().read(token("42")));
     }
 
     @Test
     void acceptsDecimalFloat() {
-        assertEquals(199.90, (double) FloatParser.FLOAT64.read(token("199.90"), double.class), 0.0001);
+        assertEquals(199.90, (double) FloatParser.FLOAT64.boundTo(double.class).orElseThrow().read(token("199.90")), 0.0001);
     }
 
     @Test
     void acceptsHexFloat() {
         // 0x1.8p3 = 1.5 * 2^3 = 12.0
-        assertEquals(12.0, (double) FloatParser.FLOAT64.read(token("0x1.8p3"), double.class), 0.0);
+        assertEquals(12.0, (double) FloatParser.FLOAT64.boundTo(double.class).orElseThrow().read(token("0x1.8p3")), 0.0);
     }
 
     @Test
     void acceptsHexFloatWithNoIntegerPart() {
         // 0x.8p1 = 0.5 * 2^1 = 1.0
-        assertEquals(1.0, (double) FloatParser.FLOAT64.read(token("0x.8p1"), double.class), 0.0);
+        assertEquals(1.0, (double) FloatParser.FLOAT64.boundTo(double.class).orElseThrow().read(token("0x.8p1")), 0.0);
     }
 
     @Test
     void acceptsHexFloatWithUnderscoreSeparators() {
         // 0x1_8.0p0: digits "1_8" strip to "18" (hex) = 24.0, * 2^0 = 24.0
-        assertEquals(24.0, (double) FloatParser.FLOAT64.read(token("0x1_8.0p0"), double.class), 0.0);
+        assertEquals(24.0, (double) FloatParser.FLOAT64.boundTo(double.class).orElseThrow().read(token("0x1_8.0p0")), 0.0);
     }
 
     @Test
@@ -62,13 +62,13 @@ class FloatParserTest {
 
     @Test
     void nanBindsToDouble() {
-        assertTrue(Double.isNaN((double) FloatParser.FLOAT64.read(token(".nan"), double.class)));
+        assertTrue(Double.isNaN((double) FloatParser.FLOAT64.boundTo(double.class).orElseThrow().read(token(".nan"))));
     }
 
     @Test
     void positiveAndNegativeInfinityBind() {
-        assertEquals(Double.POSITIVE_INFINITY, FloatParser.FLOAT64.read(token(".inf"), double.class));
-        assertEquals(Double.NEGATIVE_INFINITY, FloatParser.FLOAT64.read(token("-.inf"), double.class));
+        assertEquals(Double.POSITIVE_INFINITY, FloatParser.FLOAT64.boundTo(double.class).orElseThrow().read(token(".inf")));
+        assertEquals(Double.NEGATIVE_INFINITY, FloatParser.FLOAT64.boundTo(double.class).orElseThrow().read(token("-.inf")));
     }
 
     @Test
@@ -103,14 +103,15 @@ class FloatParserTest {
 
     @Test
     void nanCannotNarrowToBigDecimal() {
-        assertThrows(IllegalArgumentException.class, () -> FloatParser.FLOAT64.read(token(".nan"), BigDecimal.class));
+        assertThrows(IllegalArgumentException.class, () -> FloatParser.FLOAT64
+                .boundTo(BigDecimal.class).orElseThrow().read(token(".nan")));
     }
 
     @Test
     void ordinaryValueNarrowsToBigDecimalAsTheRoundedValue() {
         // Not the exact "0.1" as written -- the atom's contract is approximate, so even a
         // BigDecimal target reflects the post-rounding float64 value.
-        BigDecimal bd = (BigDecimal) FloatParser.FLOAT64.read(token("0.1"), BigDecimal.class);
+        BigDecimal bd = (BigDecimal) FloatParser.FLOAT64.boundTo(BigDecimal.class).orElseThrow().read(token("0.1"));
         assertEquals(new BigDecimal(0.1), bd);
     }
 
@@ -134,7 +135,7 @@ class FloatParserTest {
     void positiveZeroIsFineWhenAllowNegativeZeroFalse() {
         FloatParser strict = new FloatParser(FloatType.Format.BINARY64, Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), true, true, true, false);
-        assertEquals(0.0, strict.read(token("0.0"), double.class));
+        assertEquals(0.0, strict.boundTo(double.class).orElseThrow().read(token("0.0")));
     }
 
     // ── write() ──────────────────────────────────────────────────────────
@@ -152,14 +153,14 @@ class FloatParserTest {
     void writeFloatFormatsAtFloatPrecisionNotWidenedToDouble() {
         // Formatted from the float itself, not float->double widened first -- widening can
         // introduce extra noise digits for a value like 0.1f that isn't exactly representable.
-        float value = (float) FloatParser.FLOAT32.read(token("0.1"), float.class);
+        float value = (float) FloatParser.FLOAT32.boundTo(float.class).orElseThrow().read(token("0.1"));
         assertEquals(Float.toString(value), FloatParser.FLOAT32.write(value));
         assertEquals("0.1", FloatParser.FLOAT32.write(value));
     }
 
     @Test
     void writeDoubleRoundTripsThroughRead() {
-        double value = (double) FloatParser.FLOAT64.read(token("12.5"), double.class);
+        double value = (double) FloatParser.FLOAT64.boundTo(double.class).orElseThrow().read(token("12.5"));
         assertEquals("12.5", FloatParser.FLOAT64.write(value));
     }
 }

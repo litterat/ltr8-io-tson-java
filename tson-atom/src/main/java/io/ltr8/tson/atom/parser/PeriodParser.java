@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * so bounds compare the value and never the token. {@code multiple_of} is tested on the magnitude, so a
  * negative span is a multiple of a positive step.
  */
-public record PeriodParser(PeriodType constraints) implements AtomType<Period> {
+public record PeriodParser(PeriodType constraints) implements AtomTypeParser<Period> {
 
     /** §5.5's built-in annotation name -- {@code !period}. */
     public static final String TYPENAME = "period";
@@ -101,4 +101,15 @@ public record PeriodParser(PeriodType constraints) implements AtomType<Period> {
         }
         return out.toString();
     }
+
+    /**
+     * Its own value, or the period text -- this family's wire form is text, so a component keeping the
+     * spelling it validated loses nothing. The value is read first either way: a text target chooses the
+     * representation, never the rules.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return AtomTypeParser.isTextTarget(target) ? asWrittenText() : natural(Period.class, target);
+    }
+
 }

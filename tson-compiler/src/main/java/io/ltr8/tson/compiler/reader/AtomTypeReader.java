@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
+import java.util.Optional;
+
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -109,6 +111,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     private final AtomType<T> delegate;
     private final SchemaLocation schemaLocation;
 
+
     /** A reader over an {@link AtomType} chosen by the caller rather than by the declaration's own body. */
     static <T> AtomTypeReader<T> of(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
         return new AtomTypeReader<>(name, delegate, schemaLocation);
@@ -134,6 +137,16 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     }
 
     /**
+     * Whether this atom reads the token rather than its text -- {@code value} under §4.4's rule, and
+     * {@code Token}, which records the spelling §8's resolved form carries. Such a position is already
+     * specialised, by {@code tokenAware} or by {@link #overAtom}, and binding a target over it would hand
+     * the family the decoded text and lose the form that was the point of claiming it.
+     */
+    boolean readsTheTokenItself() {
+        return delegate instanceof TokenAtomType;
+    }
+
+    /**
      * The same position, read by a different atom and under a different name -- the location is all that
      * survives. {@code RecordBindReader} uses it for a {@code value}-typed slot, whose atom depends on what
      * the bound component holds and so cannot be known when the factory runs. The name goes with it because
@@ -143,11 +156,26 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         return new AtomTypeReader<>(displayName, replacement, schemaLocation);
     }
 
+    /**
+     * This position reading into {@code wire}, or empty where the family produces nothing that reaches it
+     * (§5.2). The family binds the target once, here, so a read carries no target and the
+     * disagreement is a compile-time one -- see {@link AtomType#boundTo}.
+     *
+     * <p><b>The name is kept, where {@link #overAtom}'s caller replaces it.</b> Binding a target changes
+     * what the position produces and not what the author wrote, so a diagnostic still names the declaration
+     * it came from -- {@code type_name}, not the field that happens to hold one. A {@code value} slot is the
+     * case that does rename, its entry naming the escape hatch rather than anything in the schema.
+     */
+    Optional<TsonTypeReader<?>> boundTo(Class<?> wire) {
+        return delegate.boundTo(wire).map(bound -> overAtom(name, bound));
+    }
+
     private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
         this.name = name;
         this.delegate = delegate;
         this.schemaLocation = schemaLocation;
     }
+
 
     @Override
     public T read(TsonReadContext ctx) {

@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
@@ -27,7 +29,7 @@ import io.ltr8.tson.atom.BuiltinTypeVocabulary;
  * <p>Registered in {@link BuiltinTypeVocabulary} under {@code boolean} -- see {@code SPEC-FEEDBACK.md} #8
  * for why §5's own table omits it and why that reads as an oversight rather than a decision.
  */
-public record BooleanParser() implements AtomType<Boolean> {
+public record BooleanParser() implements AtomTypeParser<Boolean> {
 
     /** §5's built-in annotation name. */
     public static final String TYPENAME = "boolean";
@@ -50,4 +52,11 @@ public record BooleanParser() implements AtomType<Boolean> {
     public String write(Boolean value) {
         return value ? "true" : "false";
     }
+
+    /** §4.2's two tokens and nothing else, so the one target is the boolean they denote. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(Boolean.class, target);
+    }
+
 }

@@ -26,7 +26,7 @@ import java.util.Optional;
  * java.net.URI}'s behavior is accepted as this atom's actual contract for now. See {@code
  * README.md}'s Conformance section for the one-line version of this note.
  */
-public record UriParser(UriType constraints) implements AtomType<URI> {
+public record UriParser(UriType constraints) implements AtomTypeParser<URI> {
 
     /** §5.5's built-in annotation name -- {@code !uri}. */
     public static final String TYPENAME = "uri";
@@ -58,6 +58,30 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
     @Override
     public String write(URI value) {
         return value.toString();
+    }
+
+    /**
+     * {@code URI}, and the text it was written as. A {@code uri}'s wire form is text and
+     * {@link URI#toString()} hands back the string it was built from, so a component holding the validated
+     * spelling loses nothing -- which is why §5.5's own facets (length, pattern) are measured on the text.
+     * The URI is still read first: a text target chooses the representation, never the rules.
+     *
+     * <p><b>{@link java.net.URL} is deliberately absent.</b> It is not a narrowing: {@code URI.toURL()} is
+     * partial over this family's value space -- a {@code urn:}, a relative reference and a bare fragment are
+     * all valid here and none of them is a URL -- and which of the rest convert depends on the protocol
+     * handlers a JVM happens to have, so one document would bind on one deployment and not another. Its
+     * {@code equals} resolves host names as well, which would put blocking I/O inside the {@code equals} of
+     * whatever record held one.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        if (target == URI.class) {
+            return Optional.of(this);
+        }
+        if (AtomTypeParser.isTextTarget(target)) {
+            return asWrittenText();
+        }
+        return Optional.empty();
     }
 
     private void validate(URI value, String text) {

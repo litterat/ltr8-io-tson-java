@@ -24,7 +24,8 @@ class AtomRefusalTest {
     private static final AtomType<?> INT8 = BuiltinTypeVocabulary.lookup("int8").orElseThrow();
 
     private static AtomRefusal refusing(String text) {
-        RuntimeException failure = assertThrows(RuntimeException.class, () -> INT8.read(text, byte.class));
+        RuntimeException failure = assertThrows(RuntimeException.class, () -> INT8
+                .boundTo(byte.class).orElseThrow().read(text));
         return AtomRefusal.of(failure, text, byte.class);
     }
 
@@ -59,20 +60,29 @@ class AtomRefusalTest {
     }
 
     @Test
-    void a_target_that_cannot_hold_the_value_is_neither() {
-        // `number` parses 1.5 happily and no integral target can take it -- the type-ref and the class name
-        // different things, which is a mismatch rather than anything the atom refused.
+    void a_target_the_family_does_not_reach_is_settled_before_any_value() {
+        // `number` reads an approximate value and no integral target can hold one -- a fact about the two
+        // types rather than about a token, so it is answered where the reader is built and there is no
+        // refusal to classify. This is what closes the numeric route into TYPE_MISMATCH: the
+        // IllegalArgumentException that fed it was NumberNarrowing being handed a target it does not reach,
+        // which boundTo now refuses first.
         AtomType<?> number = BuiltinTypeVocabulary.lookup("number").orElseThrow();
-        RuntimeException failure = assertThrows(RuntimeException.class, () -> number.read("1.5", int.class));
+        assertTrue(number.boundTo(int.class).isEmpty());
 
-        assertEquals(Diagnostic.Code.TYPE_MISMATCH, AtomRefusal.of(failure, "1.5", int.class).code());
+        // What a numeric family still refuses at the read is a value outside the target's range, which is a
+        // verdict on the token and files as one.
+        AtomType<?> int32 = BuiltinTypeVocabulary.lookup("int32").orElseThrow();
+        RuntimeException failure = assertThrows(RuntimeException.class,
+                () -> int32.boundTo(byte.class).orElseThrow().read("300"));
+        assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, AtomRefusal.of(failure, "300", byte.class).code());
     }
 
     @Test
     void a_value_the_family_admits_and_the_target_cannot_hold_is_a_constraint() {
         // `integer` is unbounded, so the range check passes and the narrowing is what fails.
         AtomType<?> integer = HostAtoms.forNumberContentHostType(BigInteger.class).orElseThrow();
-        RuntimeException failure = assertThrows(RuntimeException.class, () -> integer.read("200", byte.class));
+        RuntimeException failure = assertThrows(RuntimeException.class, () -> integer
+                .boundTo(byte.class).orElseThrow().read("200"));
 
         AtomRefusal refusal = AtomRefusal.of(failure, "200", byte.class);
         assertEquals(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION, refusal.code());

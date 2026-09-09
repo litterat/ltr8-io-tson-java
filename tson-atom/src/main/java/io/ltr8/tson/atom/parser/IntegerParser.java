@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomValidationException;
@@ -37,7 +39,7 @@ import java.util.stream.Collectors;
  * <p>One parse-then-validate pipeline ({@link #readBigInteger}) backs both {@link #read(String)}
  * (narrows to this atom's own natural host type -- {@link #hostType} when {@code size} is present,
  * {@link BigInteger} otherwise, so a fixed-width {@code int8} instance never hands back a {@code
- * BigInteger} for a value that fits a {@code Byte}) and {@link #read(String, Class)} (narrows
+ * BigInteger} for a value that fits a {@code Byte}) and {@link #boundTo(Class)} (narrows
  * directly to a caller-supplied target via {@link NumberNarrowing}, e.g. {@code !uint8 42} into a
  * declared {@code int} field is one call, no intermediate {@code Number} created). Validation is
  * always against *this atom's own* declared constraint regardless of which entry point is used -- if
@@ -46,7 +48,7 @@ import java.util.stream.Collectors;
  * problem to translate (mirroring how {@code TsonObjectReader}'s {@code AtomBinder} already handles the
  * same failure mode for untyped numbers, via the same shared narrowing code).
  */
-public record IntegerParser(IntegerType constraints) implements AtomType<Number> {
+public record IntegerParser(IntegerType constraints) implements AtomTypeParser<Number> {
 
     /** The kernel's unconstrained, arbitrary-precision {@code integer}. */
     public static final IntegerParser UNCONSTRAINED = new IntegerParser(IntegerType.UNCONSTRAINED);
@@ -69,11 +71,11 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
     @Override
     public Number read(String text) {
         Class<?> hostType = constraints.size().map(IntegerParser::hostType).orElse(BigInteger.class);
-        return (Number) read(text, hostType);
+        return (Number) narrowTo(text, hostType);
     }
 
-    @Override
-    public Object read(String text, Class<?> target) {
+    /** This family's own narrowing, private now that {@code AtomType} has no target-aware read. */
+    private Object narrowTo(String text, Class<?> target) {
         return NumberNarrowing.narrowIntegral(readBigInteger(text), target);
     }
 
@@ -209,4 +211,17 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
     private static boolean fits(BigInteger min, BigInteger max, long primitiveMin, long primitiveMax) {
         return min.compareTo(BigInteger.valueOf(primitiveMin)) >= 0 && max.compareTo(BigInteger.valueOf(primitiveMax)) <= 0;
     }
+
+    /**
+     * The numeric targets narrowsIntegral reaches, and no text one: a number's wire form is a number,
+     * so handing back its spelling would be a different reading rather than the same value.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        if (!NumberNarrowing.narrowsIntegral(target)) {
+            return Optional.empty();
+        }
+        return bound(text -> narrowTo(text, target), value -> write((Number) value));
+    }
+
 }

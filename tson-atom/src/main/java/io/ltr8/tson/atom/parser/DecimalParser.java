@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  * top. Holds a {@link DecimalType} -- the pure constraint values, unchanged by this split -- rather than
  * declaring those fields itself.
  */
-public record DecimalParser(DecimalType constraints) implements AtomType<BigDecimal> {
+public record DecimalParser(DecimalType constraints) implements AtomTypeParser<BigDecimal> {
 
     /** §5.6's built-in annotation name -- {@code !number}. */
     public static final String TYPENAME = "number";
@@ -44,11 +44,11 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
 
     @Override
     public BigDecimal read(String text) {
-        return (BigDecimal) read(text, BigDecimal.class);
+        return (BigDecimal) narrowTo(text, BigDecimal.class);
     }
 
-    @Override
-    public Object read(String text, Class<?> target) {
+    /** This family's own narrowing, private now that {@code AtomType} has no target-aware read. */
+    private Object narrowTo(String text, Class<?> target) {
         return NumberNarrowing.narrowDecimal(readExact(text), target);
     }
 
@@ -129,4 +129,17 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
             }
         });
     }
+
+    /**
+     * The numeric targets narrowsDecimal reaches, and no text one: a number's wire form is a number,
+     * so handing back its spelling would be a different reading rather than the same value.
+     */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        if (!NumberNarrowing.narrowsDecimal(target)) {
+            return Optional.empty();
+        }
+        return bound(text -> narrowTo(text, target), value -> write((java.math.BigDecimal) value));
+    }
+
 }

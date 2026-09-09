@@ -4,6 +4,7 @@ import io.ltr8.bind.DataClassAtom;
 import io.ltr8.bind.DataClassBridge;
 import io.ltr8.tson.atom.AtomRefusal;
 import io.ltr8.tson.atom.AtomType;
+import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.HostAtoms;
 import io.ltr8.tson.base.Diagnostic;
@@ -184,7 +185,9 @@ public final class JsonAtoms {
      */
     private static Object content(JsonReadContext ctx, AtomType<?> family, String value, Class<?> target) {
         try {
-            return family.read(value, target);
+            return family.boundTo(target).orElseThrow(() -> new AtomValidationException(
+                    "cannot represent " + value + " as " + target,
+                    "a value representable as " + target.getSimpleName())).read(value);
         } catch (RuntimeException e) {
             AtomRefusal refusal = AtomRefusal.of(e, value, target);
             ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());

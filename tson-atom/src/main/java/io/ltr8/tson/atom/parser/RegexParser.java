@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
@@ -29,7 +31,7 @@ import io.ltr8.tson.schema.meta.RegexType;
  * Unicode blocks). The parsed form is discarded once validation passes; matching a value against a {@code
  * pattern} is a separate capability built on {@code tson-regex}'s AST (see {@code BACKLOG.md}).
  */
-public record RegexParser(RegexType constraints) implements AtomType<String> {
+public record RegexParser(RegexType constraints) implements AtomTypeParser<String> {
 
     /** {@code regex => !regex_type {}} -- the unconstrained regex type. */
     public static final RegexParser UNCONSTRAINED = new RegexParser(RegexType.UNCONSTRAINED);
@@ -50,4 +52,11 @@ public record RegexParser(RegexType constraints) implements AtomType<String> {
     public String write(String value) {
         return value;
     }
+
+    /** This family already reads to text, so a string target is its own value and nothing else is. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(String.class, target);
+    }
+
 }

@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom.parser;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.AtomParseException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.schema.meta.MacType;
@@ -26,7 +28,7 @@ import java.util.regex.Pattern;
  * <p>Mixing separators ({@code AA-BB:CC-DD:EE-FF}) is rejected: the two forms are alternatives, not a
  * character class, so each is matched whole rather than by a per-octet separator test.
  */
-public record MacParser(MacType constraints) implements AtomType<String> {
+public record MacParser(MacType constraints) implements AtomTypeParser<String> {
 
     /** §5.5's built-in annotation name -- {@code !mac}. */
     public static final String TYPENAME = "mac";
@@ -52,4 +54,11 @@ public record MacParser(MacType constraints) implements AtomType<String> {
     public String write(String value) {
         return value;
     }
+
+    /** This family already reads to text, so a string target is its own value and nothing else is. */
+    @Override
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        return natural(String.class, target);
+    }
+
 }
