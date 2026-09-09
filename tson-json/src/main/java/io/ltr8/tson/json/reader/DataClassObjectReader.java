@@ -37,10 +37,10 @@ import java.util.Set;
  * third engine under this same facade rather than a second front door -- so the two axes have to stay in
  * the name or the family stops scaling.
  *
- * <p>{@code tson-compiler}'s peer is {@code SchemalessObjectReader}, and this deliberately does not copy
- * that name: the class <em>is</em> the schema here, as that class's own Javadoc says of its own target
- * ("in effect the schema the data must satisfy"), so "schemaless" describes the one thing this reader is
- * not short of. It is accurate of a <em>tree</em> reader, which really is driven by nothing.
+ * <p>{@code tson-compiler}'s peer carries the same name, because it is the same engine against the other
+ * encoding's events. Neither is "schemaless": the class <em>is</em> the schema here, as that peer's own
+ * Javadoc says of its own target ("in effect the schema the data must satisfy"). The word stays accurate
+ * of a <em>tree</em> reader, which really is driven by nothing, and both encodings keep it there.
  *
  * <p><b>Frame-free.</b> Whole-document framing -- draining the source through
  * {@link JsonEvent.EndOfDocument}, which is what rejects trailing content -- belongs to whoever owns the
@@ -296,7 +296,7 @@ public final class DataClassObjectReader {
         }
         int mark = ctx.reported();
         // Buffered because the array's own constructor takes a length, which a JSON array does not state
-        // until it closes -- the same shape SchemalessObjectReader's array path takes, and the reason a
+        // until it closes -- the same shape DataClassObjectReader's array path takes, and the reason a
         // read's memory is proportional to the widest array as well as to the deepest nesting.
         List<Object> buffered = new ArrayList<>();
         int slot = 0;

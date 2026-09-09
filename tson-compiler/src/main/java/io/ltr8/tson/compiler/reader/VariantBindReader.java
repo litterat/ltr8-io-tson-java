@@ -105,7 +105,7 @@ final class VariantBindReader implements TsonTypeReader<Object> {
      * !set} body was refused as "not a member of the union 'top'" by the one part of the pipeline that had
      * not been told what the binder knows.
      *
-     * <p>The name passes are kept behind it, unchanged: they are {@code SchemalessObjectReader.resolveUnionMember}'s
+     * <p>The name passes are kept behind it, unchanged: they are {@code DataClassObjectReader.resolveUnionMember}'s
      * own name precedence, and they are what a consumer's union gets when its members are not registered
      * under schema names at all.
      */

@@ -552,7 +552,7 @@ either. If the JSON encoding's answer is that the position types the value, the 
 the identical processing mode should not be the opposite.
 
 **The interpretation this implementation has taken** is that a position typed by a host type is a typed
-position: `HostAtoms.forTypedPosition` maps a target class to the family it names, `SchemalessObjectReader`
+position: `HostAtoms.forTypedPosition` maps a target class to the family it names, `DataClassObjectReader`
 reads through it, and base type resolution is reached only where no family names the target.
 `ClassTypedPositionTest` asserts every row above against the schema that declares the same types, so the
 schema is the oracle rather than a literal.

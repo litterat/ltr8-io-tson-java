@@ -25,7 +25,7 @@ dependencies {
     implementation(project(":tson-regex"))
     // tson-bind has no dependency on tson-compiler/tson-schema (a leaf module), so depending on it
     // here directly is clean -- needed in main scope because the class-driven read/write front doors
-    // (TsonObjectReader/TsonObjectWriter, and the SchemalessObjectReader engine under them) live in
+    // (TsonObjectReader/TsonObjectWriter, and the DataClassObjectReader engine under them) live in
     // this module, so schema resolution can bind a DataValue onto a schema.meta class without a
     // module cycle. DefinitionResolver's atom-refinement merge is the caller that forces it.
     implementation(project(":tson-bind"))

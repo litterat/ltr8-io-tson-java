@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * is one character. The refusal itself is unchanged and still reported: it is not one of §8.1's four
  * categories ({@code Code.verdict()} is false), which is what §8.2 requires of it.
  *
- * <p>This covers the class-driven reader ({@code SchemalessObjectReader}). The schema-driven one
+ * <p>This covers the class-driven reader ({@code DataClassObjectReader}). The schema-driven one
  * ({@code RecordAbstractReader}) applies the same rule and is tested at the front door, in {@code :tson},
  * where a schema can actually be resolved -- a document's verdict must not depend on which reader read it.
  *

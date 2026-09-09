@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 /**
  * {@link DataClassRecord#fieldIndex()} -- each wire field name to its slot, settled once per descriptor.
  *
- * <p>Every reader with no compile step of its own needs this map: {@code SchemalessObjectReader} on the TSON
+ * <p>Every reader with no compile step of its own needs this map: {@code DataClassObjectReader} on the TSON
  * side and {@code DataClassObjectReader} on the JSON side both match a written name to a constructor slot at
  * each record they read, where a schema-driven TSON read settles it when the reader is compiled. Built at the
  * point of use it is one identical map per record value, from data that changes only with the class.

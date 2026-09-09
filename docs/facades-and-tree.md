@@ -75,7 +75,7 @@ there is no path yet at the point the check runs. `perSegment()` is refused rath
 admit UTS #39's own `Toys-Я-Us`.
 
 - **The class-driven binding / tree-building mechanics live in the internal `reader` package**
-  (`SchemalessObjectReader`/`SchemalessTreeReader`, unexported); the public readers are thin facades that
+  (`DataClassObjectReader`/`SchemalessTreeReader`, unexported); the public readers are thin facades that
   peek the `DocumentStart` for a `!!schema` and dispatch to either the compiled schema registry or the
   schemaless engine. The whole-document entry points (`read`/`readWithoutSchema`/`readAs`) own document
   framing — consuming the leading `DocumentStart`, and the `requireDocumentEnd` pull that makes the lazy
@@ -203,7 +203,7 @@ admit UTS #39's own `Toys-Я-Us`.
   goes straight to `writeCore`, rather than recursing and landing them after it. An annotation's value writes
   back in whichever form the read produced — a bound object like any other value, a structurally-kept
   `TsonValue` through `TsonTreeWriter`'s own node emission (package-private, both writers share a package).
-- **`SchemalessObjectReader` streams events** (like the compiled readers), walking the descriptor in
+- **`DataClassObjectReader` streams events** (like the compiled readers), walking the descriptor in
   parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
   `ReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /
   applying a bridge / invoking a constructor is caught and re-reported through `ctx`, so a caller sees one

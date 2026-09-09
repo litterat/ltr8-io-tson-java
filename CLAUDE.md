@@ -360,7 +360,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
 - **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the atom vocabulary,
   schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades
   (`TsonTreeReader`/`TsonObjectReader`) over their schemaless `reader`-package engines
-  (`SchemalessTreeReader`/`SchemalessObjectReader`), the `TsonTreeWriter`/`TsonObjectWriter` writers, and
+  (`SchemalessTreeReader`/`DataClassObjectReader`), the `TsonTreeWriter`/`TsonObjectWriter` writers, and
   config/wiring. Everything here is tightly coupled to the shared lexer/token-stream machinery, so it's
   one module. Root package `io.ltr8.tson.compiler`; exports the packages with real cross-module callers
   and keeps `reader`/`atom`/`base`/`lexer` internal.
