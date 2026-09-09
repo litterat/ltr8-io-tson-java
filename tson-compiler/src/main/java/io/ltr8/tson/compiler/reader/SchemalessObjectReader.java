@@ -42,7 +42,6 @@ import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -292,6 +291,15 @@ public final class SchemalessObjectReader {
         return bindBaseValue(ctx, BaseTypeResolver.resolve(tokenValue), dataClass.dataClass());
     }
 
+    /** §2.5's repeat, reported wherever the field was noticed to be one. */
+    private static void reportRepeat(TsonReadContext ctx, String name, DataClass dataClass) {
+        ctx.field(name).report(Diagnostic.Code.DUPLICATE_FIELD,
+                "duplicate field '" + name + "' for " + dataClass.typeClass()
+                        + " -- a record states each field at most once (§2.5), and the repeat "
+                        + "states a value for nothing",
+                "each field stated once", "'" + name + "' stated again");
+    }
+
     private Object bindBaseValue(TsonReadContext ctx, BaseValue value, Class<?> target) {
         try {
             return AtomBinder.bind(value, target);
@@ -374,12 +382,7 @@ public final class SchemalessObjectReader {
         // see ConstructionGuard, and RecordBindReader, which marks at the same point.
         int mark = ConstructionGuard.mark(ctx);
 
-        Map<String, Integer> indexByName = new HashMap<>();
-        for (int i = 0; i < fields.length; i++) {
-            if (fields[i] != carrier) {
-                indexByName.put(fields[i].name(), i);
-            }
-        }
+        Map<String, Integer> indexByName = dataClass.fieldIndex();
 
         Object[] construct = new Object[fields.length];
         boolean[] seen = new boolean[fields.length];
@@ -393,9 +396,11 @@ public final class SchemalessObjectReader {
             }
         }
 
-        // §2.5's "each field at most once" is about the *document*, so a repeat is tracked by written name
-        // rather than by target-class slot -- a name the class doesn't declare is still stated twice.
-        Set<String> statedNames = new HashSet<>();
+        // §2.5's "each field at most once" is about the *document*, so it holds for a field the class does
+        // not declare as much as for one it does -- but only the latter needs remembering: `seen` already
+        // records every declared field that has arrived. So the set below exists for the undeclared ones
+        // alone and is built only if one turns up, which for a document matching its class is never.
+        Set<String> statedUnknown = null;
 
         if (!empty) {
             while (!(ctx.peek() instanceof RecordEnd)) {
@@ -405,15 +410,14 @@ public final class SchemalessObjectReader {
                 FieldName fieldName = (FieldName) ctx.next();
                 boolean nameRefused = ctx.reported() > reportedBeforeName;
 
-                if (!statedNames.add(fieldName.name())) {
-                    ctx.field(fieldName.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
-                            "duplicate field '" + fieldName.name() + "' for " + dataClass.typeClass()
-                                    + " -- a record states each field at most once (§2.5), and the repeat "
-                                    + "states a value for nothing",
-                            "each field stated once", "'" + fieldName.name() + "' stated again");
-                }
                 Integer idx = indexByName.get(fieldName.name());
                 if (idx == null) {
+                    if (statedUnknown == null) {
+                        statedUnknown = new HashSet<>();
+                    }
+                    if (!statedUnknown.add(fieldName.name())) {
+                        reportRepeat(ctx, fieldName.name(), dataClass);
+                    }
                     if (!ignoreUnknownFields && !nameRefused) {
                         ctx.field(fieldName.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
                                 "unknown field '" + fieldName.name() + "' for " + dataClass.typeClass()
@@ -422,6 +426,9 @@ public final class SchemalessObjectReader {
                     }
                     EventSkip.scopedValue(ctx); // reported or not, the value is discarded unread
                     continue;
+                }
+                if (seen[idx]) {
+                    reportRepeat(ctx, fieldName.name(), dataClass);
                 }
                 ScopePush.refuseSchemaless(ctx);
                 construct[fields[idx].index()] = bindField(ctx, fields[idx]);

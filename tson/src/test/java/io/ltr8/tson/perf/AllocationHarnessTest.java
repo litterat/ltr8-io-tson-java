@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -65,8 +66,8 @@ class AllocationHarnessTest {
             }
             """;
 
-    private static final String DOCUMENT = """
-            !!schema:"https://example.test/orders-1.tn"
+    /** The root value on its own, which is what a schemaless read is given -- it names no schema. */
+    private static final String ROOT = """
             !order {
               id: "9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09"
               customer: "Ada Lovelace"
@@ -79,6 +80,8 @@ class AllocationHarnessTest {
               note: "leave with the neighbour"
             }""";
 
+    private static final String DOCUMENT = "!!schema:\"" + ID + "\"\n" + ROOT;
+
     public record Line(String sku, int quantity, double price) {
     }
 
@@ -87,6 +90,7 @@ class AllocationHarnessTest {
 
     private static Tson tson;
     private static TsonObjectReader reader;
+    private static TsonObjectReader schemalessReader;
 
     @BeforeAll
     static void startUp() {
@@ -99,11 +103,14 @@ class AllocationHarnessTest {
                                 .orElse(SchemaMetaNameBinder.INSTANCE))
                         .registerAtoms(AtomContext.hostTypes()).build()));
         reader = tson.objectReader();
+        // The same bind context, so what separates this from `reader` is the schema and nothing else.
+        schemalessReader = new TsonObjectReader(tson.dataBindContext());
 
         // Everything a first read builds -- the compiled schema, the reader graph, the bind descriptors --
         // is startup state under this design, so it is built here rather than measured as a read's cost.
         for (int i = 0; i < 2_000; i++) {
             AllocationProbe.sink = reader.read(DOCUMENT, Order.class);
+            AllocationProbe.sink = schemalessReader.read(ROOT, Order.class);
         }
         AllocationProbe.sink = null;
     }
@@ -230,16 +237,70 @@ class AllocationHarnessTest {
                 AllocationProbe.sink = schemaless.read(DOCUMENT));
         double schemaTree = AllocationProbe.allocatedPerOperation(20_000, () ->
                 AllocationProbe.sink = tson.treeReader().read(DOCUMENT));
+        double schemalessBind = AllocationProbe.allocatedPerOperation(20_000, () ->
+                AllocationProbe.sink = schemalessReader.read(ROOT, Order.class));
         double bind = AllocationProbe.allocatedPerOperation(20_000, () ->
                 AllocationProbe.sink = reader.read(DOCUMENT, Order.class));
 
         report("  event stream only (lex + parse)", events, "bytes");
         report("  schemaless tree read", schemalessTree, "bytes");
         report("  schema-driven tree read", schemaTree, "bytes");
+        report("  schemaless bind read", schemalessBind, "bytes");
         report("  schema-driven bind read", bind, "bytes");
 
         assertTrue(events > 0 && bind >= events * 0.5,
                 "the stack's own stages should not undercut the token stream they all run on");
+    }
+
+    /**
+     * What one bound record costs on each of the two bind paths, reported per record so that per-record work
+     * shows up as itself. A whole-read figure cannot: the two land within a fraction of a percent of each
+     * other, and which one comes out ahead flips between runs.
+     *
+     * <p>The schemaless path has no compile in which to settle a written name against a constructor slot, so
+     * it looks the name up as it reads -- but the <em>map</em> it looks it up in is a function of the
+     * {@code DataClassRecord} alone and lives there ({@code DataClassRecord.fieldIndex}), and §2.5's repeat
+     * is answered for every declared field by the slot it already filled. With both off the read, a
+     * schemaless record costs what a schema-driven one does, though it reaches its slots by name where the
+     * other was told them.
+     *
+     * <p>{@code DataClassRecordFieldIndexTest} in {@code tson-bind} pins that the index is built once, and
+     * {@code TsonObjectReaderTest} the repeat that still needs remembering; this reports what a record costs
+     * and catches a regression by a multiple rather than by a fraction.
+     */
+    @Test
+    void bindingARecordCostsItsOwnValuesAndLittleElse() {
+        double compiled = perLine(order(4, true), order(64, true), d -> reader.read(d, Order.class));
+        double schemaless = perLine(order(4, false), order(64, false), d -> schemalessReader.read(d, Order.class));
+
+        report("allocated per record bound, schema-driven", compiled, "bytes");
+        report("  schemaless", schemaless, "bytes");
+        assertTrue(schemaless < compiled * 1.5, "a schemaless bind cost " + schemaless + " bytes per record "
+                + "against the compiled read's " + compiled + ", which validates every value this one does "
+                + "not -- half again is the ratchet on what it does per record instead");
+    }
+
+    /** Bytes per line of the order, the flat per-read cost cancelling out. */
+    private static double perLine(String few, String many, Function<String, Object> read) {
+        double atMany = AllocationProbe.allocatedPerOperation(2_000, () ->
+                AllocationProbe.sink = read.apply(many));
+        double atFew = AllocationProbe.allocatedPerOperation(2_000, () ->
+                AllocationProbe.sink = read.apply(few));
+        return (atMany - atFew) / 60;
+    }
+
+    /** The order carrying {@code lines} lines -- each one a record for a reader to bind. */
+    private static String order(int lines, boolean describing) {
+        StringBuilder document = new StringBuilder();
+        if (describing) {
+            document.append("!!schema:\"").append(ID).append("\"\n");
+        }
+        document.append("!order { id: \"9f1c8e2a-4b7d-4e6f-9a3b-2c5d8e7f1a09\"  customer: \"Ada Lovelace\"")
+                .append("  placed: \"2026-08-24T10:00:00Z\"  lines: [");
+        for (int i = 0; i < lines; i++) {
+            document.append(" { sku: \"A-1\"  quantity: 2  price: 9.99 }");
+        }
+        return document.append(" ]  note: \"leave with the neighbour\" }").toString();
     }
 
     /**

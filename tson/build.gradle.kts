@@ -8,6 +8,10 @@ plugins {
 // src/testShared, added to both test source sets rather than copied into each.
 sourceSets["test"].java.srcDir("../tson-compiler/src/testShared/java")
 
+// AllocationProbe is HotSpot's per-thread allocation counter and nothing else -- no TSON, no JSON, no
+// encoding at all -- so the two harnesses that read it share one copy rather than each keeping its own.
+sourceSets["test"].java.srcDir("../tson-base/src/testShared/java")
+
 dependencies {
     api(project(":tson-base"))
     // api, not implementation -- this module's own public surface (Tson/TsonConfig in particular)
