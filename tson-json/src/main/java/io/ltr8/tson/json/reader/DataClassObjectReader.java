@@ -22,7 +22,6 @@ import io.ltr8.tson.json.stream.JsonEventSource;
 
 import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -168,12 +167,7 @@ public final class DataClassObjectReader {
         DataClassField[] fields = target.fields();
         DataClassField carrier = target.annotationsCarrier().orElse(null);
 
-        Map<String, Integer> indexByName = new HashMap<>(fields.length);
-        for (int i = 0; i < fields.length; i++) {
-            if (fields[i] != carrier) {
-                indexByName.put(fields[i].name(), i);
-            }
-        }
+        Map<String, Integer> indexByName = target.fieldIndex();
 
         Object[] construct = new Object[fields.length];
         boolean[] seen = new boolean[fields.length];
@@ -184,10 +178,11 @@ public final class DataClassObjectReader {
             seen[indexOf(fields, carrier)] = true;
         }
 
-        // §3.1's duplicate rule, tracked by written name rather than by target slot: a name the class does
-        // not declare is still stated twice, and this is a read at a *record* position, where §3.1 makes
-        // the repeat a resolver error rather than something a key type relates.
-        Set<String> stated = new HashSet<>();
+        // §3.1's duplicate rule is about the *document*, so it holds for a member the class does not
+        // declare as much as for one it does -- but only the latter needs remembering: `seen` already
+        // records every declared member that has arrived. So the set below exists for the undeclared ones
+        // alone and is built only if one turns up, which for a document matching its class is never.
+        Set<String> statedUnknown = null;
 
         while (true) {
             JsonEvent event = ctx.next();
@@ -195,14 +190,14 @@ public final class DataClassObjectReader {
                 break;
             }
             JsonEvent.MemberName member = (JsonEvent.MemberName) event;
-            if (!stated.add(member.name())) {
-                ctx.field(member.name()).report(Diagnostic.Code.DUPLICATE_FIELD,
-                        "'%s' is already a member of this object, and a member name appears once"
-                                .formatted(member.name()),
-                        "each member stated once", "'" + member.name() + "' stated again");
-            }
             Integer index = indexByName.get(member.name());
             if (index == null) {
+                if (statedUnknown == null) {
+                    statedUnknown = new HashSet<>();
+                }
+                if (!statedUnknown.add(member.name())) {
+                    reportRepeat(ctx, member.name());
+                }
                 if (!ignoreUnknownMembers) {
                     ctx.field(member.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
                             "%s declares no member '%s'; it declares (%s)"
@@ -212,6 +207,9 @@ public final class DataClassObjectReader {
                 }
                 skipValue(ctx, ctx.next());
                 continue;
+            }
+            if (seen[index]) {
+                reportRepeat(ctx, member.name());
             }
             DataClassField field = fields[index];
             construct[field.index()] = bindMember(ctx, field);
@@ -235,6 +233,13 @@ public final class DataClassObjectReader {
             return null;
         }
         return construct(ctx, target.constructor(), construct, target.typeClass());
+    }
+
+    /** §3.1's repeat, reported wherever the member was noticed to be one. */
+    private static void reportRepeat(JsonReadContext ctx, String name) {
+        ctx.field(name).report(Diagnostic.Code.DUPLICATE_FIELD,
+                "'%s' is already a member of this object, and a member name appears once".formatted(name),
+                "each member stated once", "'" + name + "' stated again");
     }
 
     /**

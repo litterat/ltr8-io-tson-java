@@ -1302,4 +1302,29 @@ class TsonObjectReaderTest {
         assertEquals(new Point(1, 2), mapper.ignoringUnknownFields()
                 .read("{ x: 1  z: { deep: [1, { a: _ }] }  y: 2 }", Point.class));
     }
+
+    /**
+     * §2.5 is about the document, so an undeclared field is stated twice as much as a declared one is --
+     * and it is the case the reader has to remember for, a declared field's repeat being visible in the
+     * slot it already filled. Both reports arrive, the repeat first.
+     */
+    @Test
+    void anUndeclaredFieldStatedTwiceIsBothARepeatAndUnknown() {
+        DiagnosticsCollector collected = new DiagnosticsCollector();
+        mapper.withDiagnostics(collected).read("{ x: 1  y: 2  z: 3  z: 4 }", Point.class);
+
+        assertEquals(List.of(Diagnostic.Code.UNRECOGNIZED_FIELD, Diagnostic.Code.DUPLICATE_FIELD,
+                        Diagnostic.Code.UNRECOGNIZED_FIELD),
+                collected.diagnostics().stream().map(Diagnostic::code).toList());
+    }
+
+    /** And the repeat is still a repeat where the reader was told to drop what it cannot see. */
+    @Test
+    void anUndeclaredFieldStatedTwiceIsStillARepeatWhenUnknownFieldsAreIgnored() {
+        DiagnosticsCollector collected = new DiagnosticsCollector();
+        mapper.ignoringUnknownFields().withDiagnostics(collected).read("{ x: 1  y: 2  z: 3  z: 4 }", Point.class);
+
+        assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD),
+                collected.diagnostics().stream().map(Diagnostic::code).toList());
+    }
 }

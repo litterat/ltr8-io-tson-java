@@ -35,15 +35,15 @@ import java.lang.ref.WeakReference;
  * jfr print --events ObjectAllocationSample,OldObjectSample build/alloc.jfr | less
  * }</pre>
  */
-final class AllocationProbe {
+public final class AllocationProbe {
 
     /** Keeps the work's result reachable to the end of the loop, so nothing measured is optimised away. */
-    static volatile Object sink;
+    public static volatile Object sink;
 
     private AllocationProbe() {
     }
 
-    static boolean supported() {
+    public static boolean supported() {
         return ManagementFactory.getThreadMXBean() instanceof ThreadMXBean bean && bean.isThreadAllocatedMemoryEnabled();
     }
 
@@ -59,7 +59,7 @@ final class AllocationProbe {
      * Bytes {@code work} allocates per run, net of the harness's own loop -- an empty run of the same shape
      * is measured and subtracted, so what is left is the work's.
      */
-    static double allocatedPerOperation(int iterations, Runnable work) {
+    public static double allocatedPerOperation(int iterations, Runnable work) {
         Runnable empty = () -> sink = null;
         long overhead = allocatedBy(iterations, empty);
         long measured = allocatedBy(iterations, work);
@@ -82,7 +82,7 @@ final class AllocationProbe {
      * happened to compile, or a code cache that grew, in with the work's own retention, and those settle
      * where a real leak does not.
      */
-    static double retainedPerOperation(int iterations, Runnable work) {
+    public static double retainedPerOperation(int iterations, Runnable work) {
         double first = measureRetention(iterations, work);
         double second = measureRetention(iterations, work);
         return Math.min(first, second);
@@ -104,7 +104,7 @@ final class AllocationProbe {
      * where a bare {@code System.gc()} is only a request. Bounded, so a JVM that ignores the request (an
      * {@code -XX:+DisableExplicitGC} run) leaves the harness reporting noise rather than hanging.
      */
-    static void settle() {
+    public static void settle() {
         for (int round = 0; round < 3; round++) {
             WeakReference<Object> sentinel = new WeakReference<>(new Object());
             long deadline = System.nanoTime() + 2_000_000_000L;
@@ -120,7 +120,7 @@ final class AllocationProbe {
      * measurement noise can enter the answer. A reference that survives a settled collector is held by
      * something, and for a read's own output that something can only be the library.
      */
-    static boolean allCollected(Iterable<? extends WeakReference<?>> references) {
+    public static boolean allCollected(Iterable<? extends WeakReference<?>> references) {
         settle();
         for (WeakReference<?> reference : references) {
             if (reference.get() != null) {

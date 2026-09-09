@@ -184,6 +184,33 @@ class JsonObjectReaderTest {
             assertEquals(new JsonPosition(1, 15, 14), e.dataPosition().orElseThrow());
         }
 
+        /**
+         * §3.1 is about the document, so an undeclared member is stated twice as much as a declared one is
+         * -- and it is the case the reader has to remember for, a declared member's repeat being visible in
+         * the slot it already filled. Both reports arrive, the repeat first.
+         */
+        @Test
+        void an_undeclared_member_stated_twice_is_both_a_repeat_and_unknown() {
+            DiagnosticsCollector collected = new DiagnosticsCollector();
+            READER.withDiagnostics(collected)
+                    .read("{\"name\": \"a\", \"age\": 1, \"x\": 1, \"x\": 2}", Person.class);
+
+            assertEquals(List.of(Diagnostic.Code.UNRECOGNIZED_FIELD, Diagnostic.Code.DUPLICATE_FIELD,
+                            Diagnostic.Code.UNRECOGNIZED_FIELD),
+                    collected.diagnostics().stream().map(Diagnostic::code).toList());
+        }
+
+        /** And the repeat is still a repeat where the reader was told to drop what it cannot see. */
+        @Test
+        void an_undeclared_member_stated_twice_is_still_a_repeat_when_unknown_members_are_ignored() {
+            DiagnosticsCollector collected = new DiagnosticsCollector();
+            READER.ignoringUnknownMembers().withDiagnostics(collected)
+                    .read("{\"name\": \"a\", \"age\": 1, \"x\": 1, \"x\": 2}", Person.class);
+
+            assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD),
+                    collected.diagnostics().stream().map(Diagnostic::code).toList());
+        }
+
         @Test
         void a_value_of_the_wrong_shape_names_what_was_due_and_what_arrived() {
             assertTrue(refused("[1, 2]", Person.class).message()

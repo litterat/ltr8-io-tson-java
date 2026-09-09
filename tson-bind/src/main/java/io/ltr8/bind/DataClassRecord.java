@@ -18,6 +18,9 @@ package io.ltr8.bind;
 import java.lang.invoke.MethodHandle;
 import java.util.Optional;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * A DataClassRecord provides a descriptor for record data classes projected/embedded pair for use
@@ -40,6 +43,9 @@ public class DataClassRecord extends DataClass {
 	// The one field (if any) whose declared type is Annotations -- see annotationsCarrier().
 	private final DataClassField annotationsCarrier;
 
+	// Wire name -> index into fields(), the carrier excluded -- see fieldIndex().
+	private final Map<String, Integer> fieldIndex;
+
 	public DataClassRecord( Class<?> targetType, DataClassBridge bridge, boolean isMutable, MethodHandle creator, MethodHandle constructor,  DataClassField[] fields) {
 		this(targetType, bridge, isMutable, creator, constructor, fields, null);
 	}
@@ -52,6 +58,17 @@ public class DataClassRecord extends DataClass {
 		this.creator = creator;
 		this.constructor = constructor;
 		this.annotationsCarrier = annotationsCarrier;
+		this.fieldIndex = indexByName(fields, annotationsCarrier);
+	}
+
+	private static Map<String, Integer> indexByName(DataClassField[] fields, DataClassField carrier) {
+		Map<String, Integer> index = new HashMap<>(fields.length);
+		for (int i = 0; i < fields.length; i++) {
+			if (fields[i] != carrier) {
+				index.put(fields[i].name(), i);
+			}
+		}
+		return Collections.unmodifiableMap(index);
 	}
 
 	public boolean isMutable() {
@@ -76,6 +93,20 @@ public class DataClassRecord extends DataClass {
 		return fields;
 	}
 
+	/**
+	 * Each wire field name to its index in {@link #fields()}, with {@link #annotationsCarrier()} left out --
+	 * it is matched against nothing on the wire.
+	 *
+	 * <p><b>Here rather than in the reader that wants it</b>, because it is a function of this descriptor and
+	 * of nothing a document carries: a reader building it per value builds the same map for every record it
+	 * reads. A descriptor is resolved once per class per {@code DataBindContext} and this is final, so every
+	 * reader over that context shares one map with no memo to make safe under concurrent reads.
+	 *
+	 * <p>Unmodifiable, and empty for a class whose only component is the carrier.
+	 */
+	public Map<String, Integer> fieldIndex() {
+		return fieldIndex;
+	}
 
 
 	/**
