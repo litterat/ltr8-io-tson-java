@@ -45,4 +45,13 @@ public final class RawTokenParser implements TokenAtomType<Token> {
     public String write(Token value) {
         return value.text();
     }
+
+    /**
+     * The token itself and nothing else: this atom exists to keep the spelling §8's resolved form records,
+     * so a target that is not a {@link Token} would be asking for the very thing it preserves.
+     */
+    @Override
+    public java.util.Optional<io.ltr8.tson.atom.AtomType<?>> boundTo(Class<?> target) {
+        return natural(Token.class, target);
+    }
 }

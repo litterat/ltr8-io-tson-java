@@ -78,18 +78,8 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
         if (target == URI.class) {
             return Optional.of(this);
         }
-        if (target == String.class || target == CharSequence.class) {
-            return Optional.of(new AtomType<String>() {
-                @Override
-                public String read(String text) {
-                    return UriParser.this.read(text).toString();
-                }
-
-                @Override
-                public String write(String value) {
-                    return value;
-                }
-            });
+        if (AtomType.isTextTarget(target)) {
+            return asWrittenText();
         }
         return Optional.empty();
     }

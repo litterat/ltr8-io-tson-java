@@ -59,35 +59,13 @@ public interface AtomType<T> {
      * two meet when the reader is compiled -- and an empty answer there is a disagreement reported before
      * any document exists, rather than a cast failing inside a constructor on the first one.
      *
-     * <p>The default binds nothing and refuses nothing: it hands back this family reading its own value and
-     * checking that {@code target} can hold it, so a family that has not stated its targets behaves as it
-     * always did -- judged at the read, and never refused at compile. That is the conservative direction,
-     * and it is what lets this be added to an interface an application may implement.
+     * <p><b>Every family answers; there is no default.</b> A family that admitted whatever it was handed
+     * would give the check nothing to work with, and the answer is rarely hard: {@link #natural} for a value
+     * that reaches its target unchanged, {@link #asWrittenText} for a wire form that is text, {@link #bound}
+     * or {@link #converting} where the reading has to be converted. A family that genuinely reads into any
+     * class -- one embedding another format, say -- says so with {@link #bound} and is the clearer for it.
      */
-    default Optional<AtomType<?>> boundTo(Class<?> target) {
-        AtomType<T> self = this;
-        return Optional.of(new AtomType<Object>() {
-            @Override
-            public Object read(String text) {
-                return self.read(text, target);
-            }
-
-            @Override
-            @SuppressWarnings("unchecked")
-            public String write(Object value) {
-                return self.write((T) value);
-            }
-        });
-    }
-
-    default Object read(String text, Class<?> target) throws AtomParseException, AtomValidationException {
-        T value = read(text);
-        if (!wrap(target).isInstance(value)) {
-            throw new AtomValidationException("cannot represent " + value + " as " + target,
-                    "a value representable as " + target.getSimpleName());
-        }
-        return value;
-    }
+    Optional<AtomType<?>> boundTo(Class<?> target);
 
     /**
      * A {@link #boundTo} answer for a family whose value reaches {@code target} unchanged -- the natural
@@ -98,23 +76,17 @@ public interface AtomType<T> {
     }
 
     /**
-     * A {@link #boundTo} answer for a family whose value has to be converted to reach {@code target}: this
-     * family read first, then {@code render} applied. The result writes back through {@code parse}, so a
-     * bound reading is not a one-way door.
+     * A {@link #boundTo} answer stated as the two directions themselves, for a family whose reading into a
+     * target is not its own value converted -- the numeric families, which narrow from the token's text
+     * rather than from the host value they would otherwise produce.
      */
+    default <R> Optional<AtomType<?>> bound(Function<String, R> read, Function<R, String> write) {
+        return Optional.of(new BoundAtom<>(read, write));
+    }
+
     default <R> Optional<AtomType<?>> converting(Function<T, R> render, Function<R, String> parse) {
         AtomType<T> self = this;
-        return Optional.of(new AtomType<R>() {
-            @Override
-            public R read(String text) {
-                return render.apply(self.read(text));
-            }
-
-            @Override
-            public String write(R value) {
-                return parse.apply(value);
-            }
-        });
+        return bound(text -> render.apply(self.read(text)), parse);
     }
 
     /**
@@ -129,6 +101,15 @@ public interface AtomType<T> {
     /** Whether {@code target} is one of the two classes a string-valued reading may land in. */
     static boolean isTextTarget(Class<?> target) {
         return target == String.class || target == CharSequence.class;
+    }
+
+    default Object read(String text, Class<?> target) throws AtomParseException, AtomValidationException {
+        T value = read(text);
+        if (!wrap(target).isInstance(value)) {
+            throw new AtomValidationException("cannot represent " + value + " as " + target,
+                    "a value representable as " + target.getSimpleName());
+        }
+        return value;
     }
 
     String write(T value);

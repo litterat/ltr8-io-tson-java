@@ -186,17 +186,7 @@ public record FloatParser(FloatType constraints) implements AtomType<Number> {
         if (!NumberNarrowing.narrowsApproximate(target)) {
             return Optional.empty();
         }
-        return Optional.of(new AtomType<Object>() {
-            @Override
-            public Object read(String text) {
-                return FloatParser.this.read(text, target);
-            }
-
-            @Override
-            public String write(Object value) {
-                return FloatParser.this.write((Number) value);
-            }
-        });
+        return bound(text -> read(text, target), value -> write((Number) value));
     }
 
 }

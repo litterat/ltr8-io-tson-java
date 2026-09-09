@@ -114,6 +114,12 @@ public final class ValueParser implements TokenAtomType<Object> {
             public String write(Object value) {
                 return INSTANCE.write(value);
             }
+
+            /** Already at a target: binding happens once, and this reader is the result of it. */
+            @Override
+            public java.util.Optional<io.ltr8.tson.atom.AtomType<?>> boundTo(Class<?> ignored) {
+                return java.util.Optional.empty();
+            }
         };
     }
 
@@ -159,5 +165,16 @@ public final class ValueParser implements TokenAtomType<Object> {
             case String s -> s;
             default -> throw new IllegalArgumentException("not a value this compiler ever produced: " + value);
         };
+    }
+
+    /**
+     * {@code value} reads whatever the position's own host type says, which is exactly {@link #at}: the
+     * uninterpreted atom has no host type of its own to offer, so the target chooses the family and this
+     * hands back a reader over it. {@code RecordBindReader} reaches a {@code value} slot through its own
+     * rebind rather than here, the two being one answer by two routes.
+     */
+    @Override
+    public java.util.Optional<io.ltr8.tson.atom.AtomType<?>> boundTo(Class<?> target) {
+        return java.util.Optional.of(at(target));
     }
 }

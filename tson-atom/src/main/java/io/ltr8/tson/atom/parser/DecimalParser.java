@@ -139,17 +139,7 @@ public record DecimalParser(DecimalType constraints) implements AtomType<BigDeci
         if (!NumberNarrowing.narrowsDecimal(target)) {
             return Optional.empty();
         }
-        return Optional.of(new AtomType<Object>() {
-            @Override
-            public Object read(String text) {
-                return DecimalParser.this.read(text, target);
-            }
-
-            @Override
-            public String write(Object value) {
-                return DecimalParser.this.write((java.math.BigDecimal) value);
-            }
-        });
+        return bound(text -> read(text, target), value -> write((java.math.BigDecimal) value));
     }
 
 }

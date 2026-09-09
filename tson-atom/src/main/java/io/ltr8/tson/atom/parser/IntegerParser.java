@@ -221,17 +221,7 @@ public record IntegerParser(IntegerType constraints) implements AtomType<Number>
         if (!NumberNarrowing.narrowsIntegral(target)) {
             return Optional.empty();
         }
-        return Optional.of(new AtomType<Object>() {
-            @Override
-            public Object read(String text) {
-                return IntegerParser.this.read(text, target);
-            }
-
-            @Override
-            public String write(Object value) {
-                return IntegerParser.this.write((Number) value);
-            }
-        });
+        return bound(text -> read(text, target), value -> write((Number) value));
     }
 
 }
