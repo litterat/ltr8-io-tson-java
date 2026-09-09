@@ -527,7 +527,13 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      * default resolves via this today, matching {@link #positionalFieldIndex}'s own scope note: no
      * composite (record/array/map-shaped) schema default resolves anywhere in this codebase yet.
      */
-    private Object readSchemaDefault(CompiledField field) {
+    /**
+     * The schema's own value for a field, decoded by that field's parser. Package-private because
+     * {@link RecordBindReader} runs it again once it has bound each field's atom to its component's wire
+     * class: the value a bound class receives has to be decoded the way that class's own reads are, and this
+     * class computes it before any of that is known (tree mode, which shares it, binds nothing).
+     */
+    Object readSchemaDefault(CompiledField field) {
         RecordField schema = field.schema();
         Token token = schema.value().orElseThrow(() -> new IllegalStateException("'" + schema.name() + "' on '"
                 + displayName + "' is " + schema.state() + " but the schema carries no value for it -- "

@@ -64,6 +64,7 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
      * {@code URI}, and the text it was written as. A {@code uri}'s wire form is text and
      * {@link URI#toString()} hands back the string it was built from, so a component holding the validated
      * spelling loses nothing -- which is why §5.5's own facets (length, pattern) are measured on the text.
+     * The URI is still read first: a text target chooses the representation, never the rules.
      *
      * <p><b>{@link java.net.URL} is deliberately absent.</b> It is not a narrowing: {@code URI.toURL()} is
      * partial over this family's value space -- a {@code urn:}, a relative reference and a bare fragment are
@@ -73,22 +74,24 @@ public record UriParser(UriType constraints) implements AtomType<URI> {
      * whatever record held one.
      */
     @Override
-    public boolean admits(Class<?> target) {
-        return target == URI.class || target == String.class || target == CharSequence.class;
-    }
-
-    /** {@inheritDoc} <p>The text where {@link #admits} named a string target, the {@link URI} otherwise. */
-    @Override
-    public Object read(String text, Class<?> target) {
-        URI value = read(text);
+    public Optional<AtomType<?>> boundTo(Class<?> target) {
+        if (target == URI.class) {
+            return Optional.of(this);
+        }
         if (target == String.class || target == CharSequence.class) {
-            return value.toString();
+            return Optional.of(new AtomType<String>() {
+                @Override
+                public String read(String text) {
+                    return UriParser.this.read(text).toString();
+                }
+
+                @Override
+                public String write(String value) {
+                    return value;
+                }
+            });
         }
-        if (!AtomType.wrap(target).isInstance(value)) {
-            throw new AtomValidationException("cannot represent " + value + " as " + target,
-                    "a value representable as " + target.getSimpleName());
-        }
-        return value;
+        return Optional.empty();
     }
 
     private void validate(URI value, String text) {

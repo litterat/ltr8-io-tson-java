@@ -1,5 +1,7 @@
 package io.ltr8.tson.atom;
 
+import java.util.Optional;
+
 import io.ltr8.tson.atom.number.NumberNarrowing;
 import io.ltr8.tson.atom.parser.IntegerParser;
 
@@ -49,21 +51,32 @@ public interface AtomType<T> {
     T read(String text) throws AtomParseException, AtomValidationException;
 
     /**
-     * Whether a value this family reads could reach {@code target} -- asked where there is no value to try,
-     * so that a schema and the class bound to it can be compared before a document exists.
+     * This family reading into {@code target}, or empty where no value of it ever reaches one.
      *
-     * <p><b>It is an over-approximation, and the direction matters.</b> {@code false} means no value of this
-     * family ever reaches {@code target}; {@code true} means only that this family does not rule it out, and
-     * {@link #read(String, Class)} still judges the value that arrives. So a caller may refuse on
-     * {@code false} and must not conclude anything from {@code true} -- which is what lets the default admit
-     * everything, leaving a family that has not stated its targets checked at the read as before.
+     * <p><b>The target is bound once, where the reader is built, not carried into every read.</b> A schema
+     * fixes which family reads a position and a bound class fixes what that position must produce, so the
+     * two meet when the reader is compiled -- and an empty answer there is a disagreement reported before
+     * any document exists, rather than a cast failing inside a constructor on the first one.
      *
-     * <p>The question is asked of the <em>wire</em> class a bound component wants, never its declared one: a
-     * component crossing a bridge is reached by whatever the bridge takes, and it is that this family has to
-     * produce.
+     * <p>The default binds nothing and refuses nothing: it hands back this family reading its own value and
+     * checking that {@code target} can hold it, so a family that has not stated its targets behaves as it
+     * always did -- judged at the read, and never refused at compile. That is the conservative direction,
+     * and it is what lets this be added to an interface an application may implement.
      */
-    default boolean admits(Class<?> target) {
-        return true;
+    default Optional<AtomType<?>> boundTo(Class<?> target) {
+        AtomType<T> self = this;
+        return Optional.of(new AtomType<Object>() {
+            @Override
+            public Object read(String text) {
+                return self.read(text, target);
+            }
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public String write(Object value) {
+                return self.write((T) value);
+            }
+        });
     }
 
     default Object read(String text, Class<?> target) throws AtomParseException, AtomValidationException {

@@ -21,22 +21,21 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * A field's atom reconciles against the wire class its bound component wants.
+ * A family binds the target its component wants, where the reader is built.
  *
  * <p>An atom position under a schema used to be read with no target in hand: the family produced its own
  * natural host value and the constructor discovered any disagreement by failing its cast, unclassified and
- * past a collecting receiver. The family is asked now -- {@code AtomType.read(String, Class)} at the read,
- * and {@code AtomType.admits} where the schema and the class are compared -- so which targets a family
- * reaches is stated by the family that knows, once, for both questions.
+ * past a collecting receiver. {@code AtomType.boundTo} is the seam -- this family reading into a given
+ * class, or empty where no value of it ever reaches one -- and it is asked once, where the field is wired,
+ * so a read carries no target at all and a disagreement is reported before any document exists.
  *
  * <p><b>The wire class, never the declared one.</b> A bridged component is reached by whatever its bridge
  * takes, so that is what the family has to produce; asking about the declared class would refuse every
  * bridged component, Java enums included.
  *
- * <p>{@code admits} is an over-approximation and the direction is load-bearing: {@code false} refuses at
- * compile, {@code true} means only that the family does not rule the target out, leaving the read to judge.
- * That is what lets the default admit everything, so a family that has not stated its targets -- every
- * built-in but {@code uri} so far, and any a consumer implements -- behaves exactly as before.
+ * <p>The default binds nothing and refuses nothing, which is what lets this be added to an interface an
+ * application may implement: a family that has not stated its targets is judged at the read exactly as
+ * before, and only one that answers empty is refused at compile.
  */
 class AtomTargetAdmissionTest {
 
@@ -109,8 +108,8 @@ class AtomTargetAdmissionTest {
 
     /**
      * A target the family rules out is refused where the schema meets the class, not by the first document.
-     * {@code Integer} is the case that reaches this: it binds perfectly well, so nothing before {@code
-     * admits} has an opinion about it.
+     * {@code Integer} is the case that reaches this: it binds perfectly well, so nothing before
+     * {@code boundTo} has an opinion about it.
      */
     @Test
     void uriRefusesATargetItCannotProduceAtCompile() {
@@ -120,12 +119,12 @@ class AtomTargetAdmissionTest {
     }
 
     /**
-     * {@code java.net.URL} never reaches {@code admits}: {@code tson-bind} finds no conversion for it and
+     * {@code java.net.URL} never reaches {@code boundTo}: {@code tson-bind} finds no conversion for it and
      * refuses the class outright, a layer earlier. Worth pinning because the reason it is not admitted is a
      * different and older one than the reason it should not be -- {@code URI.toURL} is partial over this
      * family's value space, a {@code urn:}, a relative reference and a bare fragment all being valid
      * {@code uri}s and none a URL, so which documents bound would depend on the protocol handlers a JVM
-     * happens to carry. {@code UriParser.admits} states that; this states that nothing exercises it yet --
+     * happens to carry. {@code UriParser.boundTo} states that; this states that nothing exercises it yet --
      * and that the refusal names the enclosing type rather than the component that caused it, the class
      * having failed to resolve as a whole.
      */
@@ -168,8 +167,8 @@ class AtomTargetAdmissionTest {
      * A target no numeric family reaches is refused by the family rather than by the constructor -- but
      * <b>still not as a diagnostic</b>: {@code NumberNarrowing} throws {@link IllegalArgumentException},
      * which is no {@code AtomTypeException}, so it escapes the classification every other refusal here gets.
-     * The numeric families have not stated their targets, so {@code admits} defaults to admitting this one
-     * and the compile stays silent. Both halves are one piece of work; {@code BACKLOG.md} carries it.
+     * The numeric families have not stated their targets, so the default binds this one and the compile
+     * stays silent. Both halves are one piece of work; {@code BACKLOG.md} carries it.
      */
     @Test
     void anIntegerFamilyRefusesATextTargetButNotYetAsADiagnostic() {

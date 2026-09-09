@@ -109,13 +109,6 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     private final AtomType<T> delegate;
     private final SchemaLocation schemaLocation;
 
-    /**
-     * The wire class the bound component at this position wants, or {@code null} where nothing bound it --
-     * a tree read, or a position no class types. Present, it is handed to the family so the reconciliation
-     * happens inside the atom, which owns which targets it reaches, rather than in the constructor that
-     * discovers the disagreement by failing.
-     */
-    private final Class<?> target;
 
     /** A reader over an {@link AtomType} chosen by the caller rather than by the declaration's own body. */
     static <T> AtomTypeReader<T> of(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
@@ -142,6 +135,16 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     }
 
     /**
+     * Whether this atom reads the token rather than its text -- {@code value} under §4.4's rule, and
+     * {@code Token}, which records the spelling §8's resolved form carries. Such a position is already
+     * specialised, by {@code tokenAware} or by {@link #overAtom}, and binding a target over it would hand
+     * the family the decoded text and lose the form that was the point of claiming it.
+     */
+    boolean readsTheTokenItself() {
+        return delegate instanceof TokenAtomType;
+    }
+
+    /**
      * The same position, read by a different atom and under a different name -- the location is all that
      * survives. {@code RecordBindReader} uses it for a {@code value}-typed slot, whose atom depends on what
      * the bound component holds and so cannot be known when the factory runs. The name goes with it because
@@ -151,30 +154,26 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
         return new AtomTypeReader<>(displayName, replacement, schemaLocation);
     }
 
-    private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
-        this(name, delegate, schemaLocation, null);
+    /**
+     * This position reading into {@code wire}, or {@code null} where the family produces nothing that
+     * reaches it (§5.2). The family binds the target once, here, so a read carries no target and the
+     * disagreement is a compile-time one -- see {@link AtomType#boundTo}.
+     *
+     * <p><b>The name is kept, where {@link #overAtom}'s caller replaces it.</b> Binding a target changes
+     * what the position produces and not what the author wrote, so a diagnostic still names the declaration
+     * it came from -- {@code type_name}, not the field that happens to hold one. A {@code value} slot is the
+     * case that does rename, its entry naming the escape hatch rather than anything in the schema.
+     */
+    TsonTypeReader<?> boundTo(Class<?> wire) {
+        return delegate.boundTo(wire).<TsonTypeReader<?>>map(bound -> overAtom(name, bound)).orElse(null);
     }
 
-    private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation, Class<?> target) {
+    private AtomTypeReader(String name, AtomType<T> delegate, SchemaLocation schemaLocation) {
         this.name = name;
         this.delegate = delegate;
         this.schemaLocation = schemaLocation;
-        this.target = target;
     }
 
-    /**
-     * The same position, read against the wire class its bound component wants. {@code RecordBindReader}
-     * wires it beside {@link #overAtom}, and the two are exclusive: a {@code value} slot's atom is already
-     * chosen from that same class, so there is nothing left for the family to reconcile.
-     */
-    TsonTypeReader<?> overTarget(Class<?> wire) {
-        return new AtomTypeReader<>(name, delegate, schemaLocation, wire);
-    }
-
-    /** Whether {@code delegate} rules out a component whose wire class is {@code wire} (§5.2). */
-    boolean refuses(Class<?> wire) {
-        return !delegate.admits(wire);
-    }
 
     @Override
     public T read(TsonReadContext ctx) {
@@ -197,11 +196,6 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                 @SuppressWarnings("unchecked")
                 TokenAtomType<T> formSensitive = (TokenAtomType<T>) delegate;
                 return formSensitive.read(tokenValue);
-            }
-            if (target != null) {
-                @SuppressWarnings("unchecked")
-                T reconciled = (T) delegate.read(tokenValue.text(), target);
-                return reconciled;
             }
             return delegate.read(tokenValue.text());
         } catch (AtomTypeException ex) {

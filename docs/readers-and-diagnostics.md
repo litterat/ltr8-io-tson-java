@@ -133,15 +133,16 @@ is small and parsed once.)
   that chose to look there. Narrower uses of the same `ctx.reported()` idiom are unrelated and stay put:
   `MapAbstractReader`/`SchemalessObjectReader` asking whether one key bound, `verifyFixed` asking whether one
   token decoded, `AnnotationCapture`'s throwaway probe context — each brackets a single child read.
-- **An atom field is read against the wire class its bound component wants** (`AtomType.read(String, Class)`,
-  wired by `RecordBindReader` through `AtomTypeReader.overTarget`). Which targets a family reaches is the
-  family's own fact, stated once for both the read and the compile: `AtomType.admits` answers the same
-  question with no value in hand, so a component a family rules out is a `BindMismatchException` at compile
-  rather than a cast failing in the constructor. **`admits` is an over-approximation** — `false` refuses,
-  `true` says only that the family does not rule the target out — which is what lets it default to admitting
-  everything, leaving a family that has not stated its targets (every built-in but `uri`, and any a consumer
-  implements) judged at the read exactly as before. The wire class is the question, never the declared one:
-  a bridged component is reached by whatever its bridge takes.
+- **A family binds the target its component wants, where the reader is built** (`AtomType.boundTo`, reached
+  through `AtomTypeReader.overAtom` from `RecordBindReader`'s field loop — the same seam a `value` slot's own
+  specialisation takes). The answer is a reader for that class or nothing at all, so a read carries no target
+  and a component the family cannot fill is a `BindMismatchException` at compile rather than a cast failing in
+  a constructor. **The default binds nothing and refuses nothing** — a family that has not stated its targets
+  is judged at the read as before, which is what lets this live on an interface a consumer may implement. The
+  question is the **wire** class, never the declared one: a bridged component is reached by whatever its bridge
+  takes. Two positions are excluded because something already specialised them: a `value` slot, whose atom is
+  chosen from that same class, and a form-sensitive one (`Token`), where handing the family decoded text would
+  lose the spelling that was the point of claiming it.
 - **A bound component's own bridge is applied where the field is wired, not where the value is read**
   (`ElementBridging.wrap`, from `RecordBindReader`'s field loop and from the array and map readers). A
   schema-driven read is exactly the path that does not go through `tson-bind`'s binder, which is what

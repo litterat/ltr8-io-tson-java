@@ -150,13 +150,14 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
             rebound = ElementBridging.wrap(rebound, target.dataClass());
             if (atomPosition && boundAs(target) instanceof DataClassAtom bound) {
                 // The wire class, never the declared one: a bridged component is reached by whatever its
-                // bridge takes, and that is what the family has to produce.
+                // bridge takes, and it is that the family has to produce.
                 Class<?> wire = bound.dataClass();
-                if (refusesWire(field.parser(), wire)) {
+                TsonTypeReader<?> atTarget = boundTo(rebound, wire);
+                if (atTarget == null) {
                     mismatches.add("field '" + field.schema().name() + "' cannot produce " + wire.getName()
                             + ", which is what component '" + target.name() + "' binds");
                 } else {
-                    rebound = overTarget(rebound, wire);
+                    rebound = atTarget;
                 }
             } else if (atomPosition) {
                 mismatches.add("field '" + field.schema().name() + "' is an atom, and component '"
@@ -204,7 +205,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         if (parser instanceof VariantSchemaReader guard) {
             return readsAnAtom(guard.wrapped());
         }
-        return parser instanceof AtomTypeReader<?> atom && !atom.readsUninterpretedValue();
+        return parser instanceof AtomTypeReader<?> atom && !atom.readsUninterpretedValue()
+                && !atom.readsTheTokenItself();
     }
 
     /** What a component binds as -- an {@code Annotated} carrier's payload is what the value has to fit. */
@@ -213,20 +215,20 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
         return bound instanceof DataClassAnnotated boxed ? boxed.valueClass() : bound;
     }
 
-    /** Both of these look through a §7.2 subsumption guard, as every question about a field's reader does. */
-    private static boolean refusesWire(TsonTypeReader<?> parser, Class<?> wire) {
+    /**
+     * This field's reader bound to {@code wire}, or {@code null} where the family refuses it. Looks through
+     * a §7.2 subsumption guard as every question about a field's reader does, and reaches the atom through
+     * {@link AtomTypeReader#overAtom} -- the same seam a {@code value} slot's own specialisation takes.
+     */
+    private static TsonTypeReader<?> boundTo(TsonTypeReader<?> parser, Class<?> wire) {
         if (parser instanceof VariantSchemaReader guard) {
-            return refusesWire(guard.wrapped(), wire);
+            TsonTypeReader<?> inner = boundTo(guard.wrapped(), wire);
+            return inner == null ? null : guard.rewrap(inner);
         }
-        return parser instanceof AtomTypeReader<?> atom && atom.refuses(wire);
-    }
-
-    private static TsonTypeReader<?> overTarget(TsonTypeReader<?> parser, Class<?> wire) {
-        if (parser instanceof VariantSchemaReader guard) {
-            TsonTypeReader<?> inner = overTarget(guard.wrapped(), wire);
-            return inner == guard.wrapped() ? parser : guard.rewrap(inner);
+        if (!(parser instanceof AtomTypeReader<?> atom)) {
+            return parser;
         }
-        return parser instanceof AtomTypeReader<?> atom ? atom.overTarget(wire) : parser;
+        return atom.boundTo(wire);
     }
 
     /** Whether any schema field of this type binds to {@code classField}. */
