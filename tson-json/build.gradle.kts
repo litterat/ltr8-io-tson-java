@@ -15,7 +15,11 @@ dependencies {
     // object with no TSON schema in sight. `api` rather than `implementation` because a caller building a
     // `DataBindContext` to hand `JsonObjectReader` names its types directly.
     //
-    // The schema-directed decode of [TSON-JSON] §5-§8 is what will bring a dependency on `tson-compiler`.
+    // The schema-directed decode of [TSON-JSON] §5-§8 does *not* bring a dependency on `tson-compiler`, which
+    // this line long predicted that it would. What a compiled JSON reader needs is `TsonLinkedSchema` -- a
+    // record in `tson-schema`, a module requiring only `tson-base`, and one `tson-atom` below already
+    // re-exports. So what crosses from the schema pipeline is its output, a value model; the resolve -> link ->
+    // register phases that produce it stay `tson-compiler`'s and are named by no type in this module.
     api(project(":tson-base"))
     api(project(":tson-bind"))
 
@@ -25,10 +29,22 @@ dependencies {
     // quoted token's text would be. §5-§8's schema-directed decode needs the rest of it.
     api(project(":tson-atom"))
 
-    // `io.ltr8.bind` requires it transitively, so the module path needs it here even though nothing in
-    // this module names one of its types directly -- `tson-bind` declares it `implementation`, which does
-    // not propagate. `tson-compiler` carries the same line for the same reason.
+    // `TsonLinkedSchema` and the `schema.meta` value model the compiled readers walk. `tson-atom` already
+    // re-exports it, so this line adds nothing to the module graph; it declares that this module reads it in
+    // its own right rather than by accident of another dependency's `requires transitive`.
+    api(project(":tson-schema"))
+
+    // Named directly now -- `@Typename`, read off a resolved body to learn which constructor it instantiates
+    // -- and needed on the module path regardless, since `tson-bind` declares it `implementation` and that
+    // does not propagate. `tson-compiler` carries the same line.
     implementation(project(":tson-annotation"))
+
+    // Tests only, and one direction only. Producing a `TsonLinkedSchema` means parsing, resolving and
+    // linking a schema document, which is `tson-compiler`'s and reached here through the `:tson` front door
+    // -- so the schema-directed readers are exercised against schemas resolved by the real pipeline, core.tn
+    // included, rather than against a value model assembled by hand. It is also what a cross-encoding parity
+    // test needs, since asserting one verdict over both encodings means running both.
+    testImplementation(project(":tson"))
 
     testImplementation(platform("org.junit:junit-bom:6.0.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")

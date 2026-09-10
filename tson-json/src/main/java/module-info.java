@@ -42,4 +42,13 @@ module io.ltr8.tson.json {
     requires transitive io.ltr8.bind;
     requires transitive io.ltr8.tson.base;
     requires transitive io.ltr8.tson.atom;
+
+    // The schema-directed decode of [TSON-JSON] §5-§8 compiles readers from a `TsonLinkedSchema`, a record in
+    // `tson-schema` -- a value model requiring only `tson-base`, which `tson-atom` above already reads
+    // transitively. Naming it here is what says this module reads it in its own right. It is deliberately not
+    // a dependency on `tson-compiler`: what crosses from the schema pipeline is its output, never its engine.
+    requires transitive io.ltr8.tson.schema;
+
+    // `@Typename`, read off a resolved body to learn which constructor it is an instance of.
+    requires io.ltr8.annotation;
 }
