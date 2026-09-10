@@ -1,4 +1,5 @@
 package io.ltr8.tson.perf;
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
@@ -227,7 +228,7 @@ class AllocationHarnessTest {
     @Test
     void whereAReadsBytesGo() {
         double events = AllocationProbe.allocatedPerOperation(20_000, () -> {
-            TsonDataStream stream = new TsonDataStream(DOCUMENT);
+            TsonDataStream stream = new TsonDataStream(ByteSource.of(DOCUMENT));
             while (stream.hasNext()) {
                 AllocationProbe.sink = stream.next();
             }
@@ -315,7 +316,7 @@ class AllocationHarnessTest {
         String document = "{ note: \"" + "x".repeat(20_000) + "\" }";
 
         double perLex = AllocationProbe.allocatedPerOperation(2_000, () -> {
-            TsonDataStream stream = new TsonDataStream(document);
+            TsonDataStream stream = new TsonDataStream(ByteSource.of(document));
             while (stream.hasNext()) {
                 AllocationProbe.sink = stream.next();
             }

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.lexer;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.unicode.Xid;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -33,7 +34,7 @@ class IdentifierProfileTest {
     }
 
     private static List<Token> tokens(String source) {
-        List<Token> all = new Lexer(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8))).tokenize();
+        List<Token> all = new Lexer(ByteSource.of(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)))).tokenize();
         return all.subList(0, all.size() - 1);
     }
 

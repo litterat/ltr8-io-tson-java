@@ -3,7 +3,10 @@ package io.ltr8.tson.compiler.lexer;
 import io.ltr8.tson.base.unicode.Xid;
 import io.ltr8.tson.compiler.Position;
 import java.io.IOException;
-import java.io.InputStream;
+import io.ltr8.tson.base.io.ByteSource;
+
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.io.UncheckedIOException;
 import java.text.Normalizer;
 import java.util.ArrayList;
@@ -12,8 +15,8 @@ import java.util.List;
 /**
  * Converts TSON source bytes into a stream of {@link Token}s per spec §7.2–§7.3.
  *
- * <p>The lexer is a single hand-written scanner over UTF-8 bytes read incrementally from an
- * {@link InputStream}, decoding UTF-8 itself (§9.1) and addressed one Unicode code point
+ * <p>The lexer is a single hand-written scanner over UTF-8 bytes taken from a {@link ByteSource},
+ * decoding UTF-8 itself (§9.1) and addressed one Unicode code point
  * at a time (so supplementary-plane characters, which are valid in identifiers per UAX #31, are
  * never split). At most a couple of code points of lookahead beyond the cursor are ever buffered
  * ({@link #lookaheadCodePoints}) — every lexical rule in this class needs to peek at most one or two code
@@ -39,27 +42,43 @@ import java.util.List;
  * retainable {@link Token} snapshot (rather than reading the live-cursor accessors immediately)
  * builds one itself from these seven values, exactly as {@link #tokenize()} does.
  *
- * <p>Not thread-safe; a {@code Lexer} instance is single-use over one source stream. Errors are
+ * <p><b>A source already in memory is never copied.</b> {@link ByteSource#resident()} hands back the whole
+ * input as a {@link MemorySegment} -- a {@code byte[]}, a heap or direct {@code ByteBuffer}, a mapped file
+ * -- and this indexes it directly, allocating no block buffer at all. A streaming source keeps the block
+ * read below. The choice is made once, at construction, off a final field.
+ *
+ * <p>Not thread-safe; a {@code Lexer} instance is single-use over one source. Errors are
  * reported by throwing {@link LexException} immediately (fail-fast) rather than the "SHOULD
  * continue processing" best practice of §8.1, which is left to a future error-recovery pass.
  */
 public final class Lexer {
 
-    private final InputStream source;
+    private final ByteSource source;
 
     /**
      * Bytes pulled off {@link #source} in bulk, decoded one code point at a time by {@link
      * #decodeCodePoint()}.
      *
+     * <p>{@code null} when {@link #resident} answered -- there is nothing to buffer when the bytes are
+     * already addressable.
+     *
      * <p><b>The bulk read is the point, not the buffer's size.</b> Reading a byte (or a character) at a
-     * time from the stream -- which is what a code-point-addressed lexer naturally wants to do -- costs a
-     * call and, through a {@code Reader}, an allocation per character. Reading a block at a
-     * time makes that per-block, and the block is deliberately modest: it is throughput, not a lookahead
-     * window ({@link #lookaheadCodePoints} is that, and stays two code points deep), so a large document
-     * gains nothing from a larger one and a small document should not pay for it.
-     * {@code AllocationHarnessTest} pins the result.
+     * time from the source -- which is what a code-point-addressed lexer naturally wants to do -- costs a
+     * call and, through a {@code Reader}, an allocation per character. Reading a block at a time makes that
+     * per-block, and it is throughput rather than a lookahead window ({@link #lookaheadCodePoints} is that,
+     * and stays two code points deep). <b>The size is {@link ByteSource#block()}'s to choose</b>, not this
+     * class's: it is a property of where the bytes come from, and it is the one allocation here proportional
+     * to nothing at all -- so it is also where a pool would go. {@code AllocationHarnessTest} pins the result.
      */
-    private final byte[] bytes = new byte[512];
+    private final byte[] bytes;
+
+    /**
+     * The whole input, addressable, when the source had it in memory -- then {@link #bytes} is {@code null},
+     * nothing is copied and no block buffer is allocated at all. {@code null} for a streaming source, which
+     * keeps the block above. One final field, so the branch in {@link #nextByte()} is hoisted.
+     */
+    private final MemorySegment resident;
+
     private int bytePosition;
     private int byteLimit;
     private boolean sourceExhausted;
@@ -102,8 +121,11 @@ public final class Lexer {
     private int tokenStartByteOffset;
     private String tokenText;
 
-    public Lexer(InputStream source) {
+    public Lexer(ByteSource source) {
         this.source = source;
+        this.resident = source.resident().orElse(null);
+        this.bytes = resident == null ? source.block() : null;
+        this.byteLimit = resident == null ? 0 : (int) Math.min(Integer.MAX_VALUE, resident.byteSize());
         this.line = 1;
         this.col = 1;
         this.byteOffset = 0;
@@ -975,11 +997,19 @@ public final class Lexer {
             return -1;
         }
         bytesDecoded++;
-        return bytes[bytePosition++] & 0xFF;
+        return resident != null
+                ? resident.get(ValueLayout.JAVA_BYTE, bytePosition++) & 0xFF
+                : bytes[bytePosition++] & 0xFF;
     }
 
-    /** Refills {@link #bytes}, answering whether anything was read. */
+    /**
+     * Refills {@link #bytes}, answering whether anything was read. A resident source has nothing to refill
+     * -- {@link #byteLimit} was the whole input from the start -- so reaching here means it is exhausted.
+     */
     private boolean fillBytes() {
+        if (resident != null) {
+            return false;
+        }
         try {
             int read = source.read(bytes, 0, bytes.length);
             if (read <= 0) {

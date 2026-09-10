@@ -44,11 +44,19 @@ changes — a statement about the *layering*, which holds. It is not a promise t
 the spec is a working revision and this implementation has no users, so a lexer rule that turns out wrong is
 fixed rather than kept (Revision 35's escape-table change is exactly that).
 
-- **Constructed from an `InputStream`**, decoding UTF-8 and buffering a few code points of lookahead —
+- **Constructed from a `ByteSource`** (`tson-base`'s `base.io`), decoding UTF-8 and buffering a few code
+  points of lookahead —
   never requires the whole document resident as a `String`. **Code-point addressed, not char-addressed**
   (surrogate pairs are never split; supplementary-plane identifiers per UAX #31 work). `Position` tracks
   line, code-point column, and a UTF-8 byte offset (§8.1 error reporting).
-- **The lexer decodes UTF-8 itself**, off a 512-byte block it reads from the `InputStream` — no
+- **A source already in memory is never copied.** `ByteSource.resident()` hands back the whole input as a
+  `MemorySegment` — a `byte[]`, a heap or direct `ByteBuffer`, a mapped file — and the lexer indexes it,
+  allocating no block at all. The choice is made once, at construction, off a final field, so the streaming
+  path is unchanged. Measured: the stream stage drops ~455 bytes per read on the resident path and gains
+  ~32 on the streaming one (one wrapper object), which is the trade the abstraction makes.
+- **The lexer decodes UTF-8 itself**, off a block it reads from the source when that source is *not*
+  resident — sized by `ByteSource.block()` rather than by the lexer, since the size belongs to where the
+  bytes come from and it is the one allocation here proportional to nothing at all. No
   `InputStreamReader`, no `char[]` in between. Three reasons, and only the third is performance:
   - **A port has to do this.** A language without Java's charset machinery writes exactly this loop, so a
     reference that hides it behind the platform decoder omits the one part it exists to show. §9.1 makes

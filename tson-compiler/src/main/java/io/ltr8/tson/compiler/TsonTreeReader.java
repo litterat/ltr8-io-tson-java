@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -287,13 +288,27 @@ public final class TsonTreeReader {
     // ── Whole-document entry points ──────────────────────────────────────
 
     /** Reads {@code source}'s whole document into a {@link TsonValue} tree, fail-fast -- validated against its {@code !!schema} if this reader is schema-aware and the document declares one, schemaless otherwise. */
-    public TsonValue read(String source) {
+    /**
+     * Reads {@code source} -- the general entry the {@code String} and {@code InputStream} forms adapt to.
+     * {@code ByteSource.of} covers a {@code byte[]}, a {@code ByteBuffer}, a {@code Path} and a mapped file
+     * besides, so a further source costs no method here; and a source already in memory is read without a
+     * copy ({@code ByteSource.resident()}).
+     */
+    public TsonValue read(ByteSource source) {
         return readRoot(new TsonDataStream(source, policy, receiver), false);
+    }
+
+    public TsonValue read(String source) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readRoot(new TsonDataStream(bytes, policy, receiver), false);
+        }
     }
 
     /** {@link #read(String)} straight off a stream -- reads {@code source}'s bytes (UTF-8) incrementally, never buffering the whole document into a {@code String} first; {@code source} is not closed here. */
     public TsonValue read(InputStream source) {
-        return readRoot(new TsonDataStream(source, policy, receiver), false);
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readRoot(new TsonDataStream(bytes, policy, receiver), false);
+        }
     }
 
     /**
@@ -314,23 +329,36 @@ public final class TsonTreeReader {
      * @return the document, or {@code null} where {@link #read} would also return nothing -- a document that
      *         will not lex or parse, reported through this read's receiver rather than thrown past it
      */
-    public TsonDocument readDocument(String source) {
+    /** {@link #read(ByteSource)} with the header kept -- see {@link #readDocument(String)}. */
+    public TsonDocument readDocument(ByteSource source) {
         return readDocument(new TsonDataStream(source, policy, receiver));
+    }
+
+    public TsonDocument readDocument(String source) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readDocument(new TsonDataStream(bytes, policy, receiver));
+        }
     }
 
     /** {@link #readDocument(String)} straight off a stream; {@code source} is not closed here. */
     public TsonDocument readDocument(InputStream source) {
-        return readDocument(new TsonDataStream(source, policy, receiver));
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readDocument(new TsonDataStream(bytes, policy, receiver));
+        }
     }
 
     /** Like {@link #read(String)} but always schemaless -- reads the wire structure, even when the document declares a {@code !!schema}. (A schemaless reader's {@link #read} already does this.) */
     public TsonValue readWithoutSchema(String source) {
-        return readRoot(new TsonDataStream(source, policy, receiver), true);
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readRoot(new TsonDataStream(bytes, policy, receiver), true);
+        }
     }
 
     /** {@link #readWithoutSchema(String)} straight off a stream. */
     public TsonValue readWithoutSchema(InputStream source) {
-        return readRoot(new TsonDataStream(source, policy, receiver), true);
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readRoot(new TsonDataStream(bytes, policy, receiver), true);
+        }
     }
 
     /**
@@ -339,13 +367,22 @@ public final class TsonTreeReader {
      * !!schema} plus a root type-ref would otherwise say, and validation is identical either way; a root
      * type-ref the data does carry is read as part of the value, not used to select the type.
      */
-    public TsonValue readAs(String source, String typeName) {
+    /** {@link #read(ByteSource)} against {@code typeName} -- see {@link #readAs(String, String)}. */
+    public TsonValue readAs(ByteSource source, String typeName) {
         return readRootAs(new TsonDataStream(source, policy, receiver), typeName);
+    }
+
+    public TsonValue readAs(String source, String typeName) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readRootAs(new TsonDataStream(bytes, policy, receiver), typeName);
+        }
     }
 
     /** {@link #readAs(String, String)} straight off a stream. */
     public TsonValue readAs(InputStream source, String typeName) {
-        return readRootAs(new TsonDataStream(source, policy, receiver), typeName);
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readRootAs(new TsonDataStream(bytes, policy, receiver), typeName);
+        }
     }
 
     /**

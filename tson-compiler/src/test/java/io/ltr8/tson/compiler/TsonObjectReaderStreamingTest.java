@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
@@ -65,7 +66,7 @@ class TsonObjectReaderStreamingTest {
         hugeArray.append("]");
         String source = "{ a: 1  b: [1 2 3]  huge: " + hugeArray + " }";
 
-        TsonDataStream realStream = new TsonDataStream(source);
+        TsonDataStream realStream = new TsonDataStream(ByteSource.of(source));
         realStream.next(); // DocumentStart
         CountingEventSource counting = new CountingEventSource(realStream);
         TsonReadContext ctx = TsonReadContext.throwing(counting, UnicodePolicy.unrestricted());
@@ -80,7 +81,7 @@ class TsonObjectReaderStreamingTest {
         // Both fields are malformed independently: "first" is an array where a long is wanted, and
         // "second" is likewise. A collecting bind surfaces both, not just the first.
         String source = "{ first: [1]  second: [2] }";
-        TsonDataStream stream = new TsonDataStream(source);
+        TsonDataStream stream = new TsonDataStream(ByteSource.of(source));
         stream.next(); // DocumentStart
         DiagnosticsCollector problems = new DiagnosticsCollector();
         TsonReadContext ctx = TsonReadContext.of(stream, problems);

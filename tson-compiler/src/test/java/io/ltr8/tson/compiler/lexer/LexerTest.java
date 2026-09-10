@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.lexer;
 
+import io.ltr8.tson.base.io.ByteSource;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -13,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LexerTest {
 
     private static List<Token> lex(String source) {
-        return new Lexer(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8))).tokenize();
+        return new Lexer(ByteSource.of(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)))).tokenize();
     }
 
     /** Tokenizes and strips the trailing EOF, for tests that only care about content tokens. */
@@ -602,7 +603,7 @@ class LexerTest {
         for (int i = 0; i < unsigned.length; i++) {
             raw[i] = (byte) unsigned[i];
         }
-        return new Lexer(new ByteArrayInputStream(raw)).tokenize();
+        return new Lexer(ByteSource.of(new ByteArrayInputStream(raw))).tokenize();
     }
 
     private static void assertNotUtf8(String why, int... unsigned) {

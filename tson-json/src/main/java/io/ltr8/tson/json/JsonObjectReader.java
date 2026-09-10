@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
@@ -7,9 +8,7 @@ import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.reader.DataClassObjectReader;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 
 
 /**
@@ -202,13 +201,25 @@ public final class JsonObjectReader {
     public <T> T read(String source, Class<T> type) {
         // §3.1 makes the document UTF-8 and the lexer takes bytes; a string is re-encoded here, at the
         // front door, rather than by a convenience on every layer beneath.
-        return read(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)), type);
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return read(bytes, type);
+        }
     }
 
 
     /** Off UTF-8 bytes, where §3.1's rules bite. {@code source} is not closed here. */
-    public <T> T read(InputStream source, Class<T> type) {
+    /**
+     * Reads {@code source} -- the general entry, and what the {@code String} and {@code InputStream} forms
+     * above adapt to. A source already in memory is read without a copy.
+     */
+    public <T> T read(ByteSource source, Class<T> type) {
         return read(new JsonStream(source, policy, receiver), type);
+    }
+
+    public <T> T read(InputStream source, Class<T> type) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return read(new JsonStream(bytes, policy, receiver), type);
+        }
     }
 
 

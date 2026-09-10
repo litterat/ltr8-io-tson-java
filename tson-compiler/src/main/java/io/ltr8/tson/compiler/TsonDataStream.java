@@ -3,6 +3,7 @@ import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -38,7 +39,6 @@ import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.compiler.stream.TypeRef;
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
@@ -147,28 +147,26 @@ public final class TsonDataStream implements TsonEventSource {
     private UnicodePolicy tokenPolicy;
     private DiagnosticsReceiver tokenPolicyReceiver;
 
-    public TsonDataStream(String source) {
+    /**
+     * A stream over {@code source}, one lexer token at a time -- for a large document this streams
+     * genuinely, and for one already in memory the lexer indexes its bytes directly rather than copying
+     * them through a block buffer ({@link ByteSource#resident()}). A stream is never closed here; a caller
+     * that opened one owns closing it.
+     *
+     * <p><b>One source type, not a pair per entry point.</b> {@code ByteSource.of} adapts a {@code String},
+     * an {@code InputStream}, a {@code byte[]}, a {@code ByteBuffer}, a {@code Path} or a mapped file, so a
+     * seventh costs nothing here.
+     */
+    public TsonDataStream(ByteSource source) {
         this(source, LimitsPolicy.defaults());
     }
 
-    public TsonDataStream(String source, LimitsPolicy limits) {
-        this(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)), limits);
+    /** As {@link #TsonDataStream(ByteSource)} under a caller's own §9.1 bounds rather than the defaults. */
+    public TsonDataStream(ByteSource source, LimitsPolicy limits) {
+        this.lexer = new Lexer(source);
+        this.limits = Objects.requireNonNull(limits, "limits");
     }
 
-    /**
-     * Reads directly off {@code source}'s own bytes (UTF-8), one lexer token at a time -- for a large
-     * file this streams genuinely, never slurping the whole document into a {@code String} first the
-     * way the {@code String} constructor's callers necessarily have. {@code source} is not closed here;
-     * a caller that opened it owns closing it.
-     */
-    public TsonDataStream(InputStream source) {
-        this(source, LimitsPolicy.defaults());
-    }
-
-    /**
-     * As {@link #TsonDataStream(InputStream)}, under a caller's own resource limits rather than the
-     * defaults -- what the facades pass when a {@code TsonConfig} states one.
-     */
     /**
      * A stream reading under {@code policy}: its limits bound what this will spend (§9.1), and its token
      * policy is applied to every token it hands out (§8.2's "Values").
@@ -187,22 +185,10 @@ public final class TsonDataStream implements TsonEventSource {
      * <p>At {@code unrestricted()} -- the default, and every ordinary read -- the check is a field read and
      * a branch: {@code checksScripts()} is false and nothing else happens.
      */
-    public TsonDataStream(InputStream source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
+    public TsonDataStream(ByteSource source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
         this(source, policy.limits());
         this.tokenPolicy = policy.tokenPolicy();
         this.tokenPolicyReceiver = receiver;
-    }
-
-    /** {@link #TsonDataStream(InputStream, ProcessorPolicy, DiagnosticsReceiver)} over a string. */
-    public TsonDataStream(String source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
-        this(source, policy.limits());
-        this.tokenPolicy = policy.tokenPolicy();
-        this.tokenPolicyReceiver = receiver;
-    }
-
-    public TsonDataStream(InputStream source, LimitsPolicy limits) {
-        this.lexer = new Lexer(source);
-        this.limits = Objects.requireNonNull(limits, "limits");
     }
 
     @Override

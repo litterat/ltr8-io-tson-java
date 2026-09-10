@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -32,6 +33,11 @@ import java.util.Objects;
  * differ is the lexical half of the policy: the token policy and §9.1's limits were applied to the tokens
  * this header is made of, so a reader handed a peek must agree with the one that opened it. It is refused
  * rather than ignored.
+ *
+ * <p><b>Every entry here builds a source that acquires nothing</b> -- a {@code String} or an {@code
+ * InputStream}, whose {@code ByteSource.close()} is a no-op -- which is what lets a peek hold its stream
+ * across the gap between the header and the read without owning a resource nobody will release. An entry
+ * taking a {@code ByteSource} would inherit that obligation, so it would also have to say who closes it.
  *
  * <p><b>Total in the document's own content.</b> A document whose <em>value</em> is malformed still yields
  * its header, and a malformed <em>header</em> yields {@link TsonDocumentHeader#NONE} rather than throwing --
@@ -76,12 +82,12 @@ public final class TsonDocumentPeek {
 
     /** {@link #of(InputStream)} under {@code policy} -- what {@code Tson#begin} supplies from its config. */
     public static TsonDocumentPeek of(InputStream source, ProcessorPolicy policy) {
-        return of(new TsonDataStream(source, policy, DiagnosticsReceiver.throwing()), policy);
+        return of(new TsonDataStream(ByteSource.of(source), policy, DiagnosticsReceiver.throwing()), policy);
     }
 
     /** {@link #of(String)} under {@code policy}. */
     public static TsonDocumentPeek of(String source, ProcessorPolicy policy) {
-        return of(new TsonDataStream(source, policy, DiagnosticsReceiver.throwing()), policy);
+        return of(new TsonDataStream(ByteSource.of(source), policy, DiagnosticsReceiver.throwing()), policy);
     }
 
     private static TsonDocumentPeek of(TsonDataStream stream, ProcessorPolicy policy) {

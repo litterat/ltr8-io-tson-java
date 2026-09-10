@@ -11,7 +11,7 @@
 import module io.ltr8.tson;
 
 void main() {
-    var stream = new TsonDataStream("{ name: \"Ada\" }");
+    var stream = new TsonDataStream(ByteSource.of("{ name: \"Ada\" }"));
     while (stream.hasNext()) {
         TsonEvent event = stream.next();   // DocumentStart, RecordStart, FieldName, TokenEvent, ...
         IO.println(event.getClass().getSimpleName());
