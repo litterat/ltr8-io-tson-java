@@ -61,7 +61,7 @@ for you.
 ## Naming the classes for a schema's types
 
 ```java
-Tson tson = Tson.of(TsonConfig.defaults()
+Tson tson = Tson.of(ProcessorConfig.defaults()
         .withDataBindContext(DataBindContext.builder()
                 .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "customer", Customer.class)))
                 .registerAtoms(AtomContext.hostTypes())
@@ -142,7 +142,7 @@ public record Order(String sku, int quantity, String currency) {
     public Order(String sku, int quantity) { this(sku, quantity, "AUD"); }
 }
 
-Tson v3 = Tson.of(TsonConfig.defaults().withDataBindContext(
+Tson v3 = Tson.of(ProcessorConfig.defaults().withDataBindContext(
         DataBindContext.builder().nameBinder(…).profile("api-3")
                 .registerAtoms(AtomContext.hostTypes()).build()));
 ```

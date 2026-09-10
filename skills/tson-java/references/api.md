@@ -14,7 +14,7 @@ Only the packages listed here are exported. JPMS enforcement is real, not conven
 
 ```java
 public final class Tson {
-    public static TsonConfig builder();
+    public static ProcessorConfig builder();
 
     public TsonObjectReader objectReader();      // schema-aware, over this instance's bindRegistry
     public TsonTreeReader   treeReader();        // schema-aware, over this instance's treeRegistry
@@ -43,28 +43,36 @@ from it. `validateSchema` stops at the first phase that reports anything (parse,
 link), javac-style, so consequences of an earlier error are not reported as independent problems; and a
 schema that reported anything is never registered.
 
-### `TsonConfig`
+### `ProcessorConfig`
 
 ```java
-public final class TsonConfig {
-    public TsonConfig schemaSource(TsonSchemaSource schemaSource);
-    public TsonConfig httpSchemas(String... hosts);              // TsonHttpSchemaSource, allow-listed
-    public TsonConfig fileSchemas(String host, Path directory);  // TsonFileSchemaSource
+public final class ProcessorConfig {                 // io.ltr8.tson.base
+    public static ProcessorConfig defaults();
 
-    public TsonConfig dataBindContext(DataBindContext context);
-    public TsonConfig bindings(Map<String, Class<?>> bindings);  // exclusive with dataBindContext
-    public TsonConfig profile(String profile);                   // exclusive with dataBindContext
-    public TsonConfig metaNameBinder(DataNameBinder binder);     // a consumer's own meta vocabulary
+    public ProcessorConfig withSchemaAccess(SchemaAccess access);      // where a schema may come from
+    public ProcessorConfig withDataBindContext(DataBindContext ctx);   // which classes the types bind to
+    public ProcessorConfig withMetaNameBinder(DataNameBinder binder);  // a consumer's own meta vocabulary
 
-    public TsonConfig identifierPolicy(UnicodePolicy policy);  // declared names
-    public TsonConfig tokenPolicy(UnicodePolicy policy);       // every token a read pulls
+    public ProcessorConfig withProcessorPolicy(ProcessorPolicy policy);   // the whole value
+    public ProcessorConfig withIdentifierPolicy(UnicodePolicy policy);    // declared names
+    public ProcessorConfig withTokenPolicy(UnicodePolicy policy);         // every token a read pulls
+    public ProcessorConfig withLimits(LimitsPolicy limits);               // §9.1's resource bounds
 
-    public Tson build();
+    public SchemaAccess schemaAccess();
+    public DataBindContext dataBindContext();
+    public DataNameBinder metaNameBinder();
+    public ProcessorPolicy processorPolicy();
 }
 ```
 
-`httpSchemas` / `fileSchemas` are repeatable and mutually exclusive with each other and with
-`schemaSource(…)`, the general seam.
+**It is a value, not a builder** — every setter returns a new instance and there is no `build()`.
+Construction belongs to whichever encoding is being built: `Tson.of(config)` for TSON text,
+`Json.of(config)` for JSON, from the same value. The three policy components each derive from what is
+already stated rather than replacing it, so a piecewise configuration and a composed one agree.
+
+Where schemas come from is one value: `withSchemaAccess(SchemaAccess.httpSchemas(hosts…))`,
+`SchemaAccess.fileSchemas(host, dir)`, or `SchemaAccess.of(source)` for one you built. The
+mutual-exclusion rules among those live on `SchemaAccess.Builder`, not here.
 
 ### Schema sources
 

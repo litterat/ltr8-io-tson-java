@@ -454,7 +454,7 @@ invisible at the call site and absent from review. The relaxation to reach for f
 identifier policy subsumes it: a name is a token — which §8.2 asks an implementation's documentation to say,
 and this is where it is said. The two names are §8.2's own: it defines the **identifier policy** and the
 **token policy** as the two parts of a processor's configuration for that section, precisely so that two
-implementations reporting them agree on what they are called, and `TsonConfig` uses those names.
+implementations reporting them agree on what they are called, and `ProcessorConfig` uses those names.
 
 **Field** names see all three, being names at every layer (§2.5, §7.7): the two per-name rules in the read
 context beside a type-ref's and an annotation's, and the look-alike rule in `SchemalessTreeReader`, which is
@@ -566,8 +566,8 @@ grew the matching three so a reader's derivation is one call rather than a rebui
 the whole-value form, and what `Tson.objectReader()`/`treeReader()` now use — they chained all three before,
 which was three chances to state two and forget the third.
 
-**The front door states it the same way.** `TsonConfig.processorPolicy` takes the whole value and is the
-setter to reach for; `identifierPolicy`/`tokenPolicy`/`limits` are its components, each deriving from
+**The front door states it the same way.** `ProcessorConfig.withProcessorPolicy` takes the whole value and is the
+setter to reach for; `withIdentifierPolicy`/`withTokenPolicy`/`withLimits` are its components, each deriving from
 whatever is already stated rather than replacing it, so a piecewise configuration and a composed one reach
 the same processor and neither clobbers the other. `Tson` holds the one value, so `Tson.processorPolicy()`
 is an accessor: the identifier half is handed to the schema registry at construction because the linker
@@ -591,7 +591,7 @@ and the rename is what made the grouping coherent rather than a reversal of that
 states one policy; the three components stay independent, and changing one still says nothing about the
 others.
 
-The two §8.2 policies (`identifierPolicy` and `tokenPolicy` — `TsonConfig`'s own names for them, so a
+The two §8.2 policies (`identifierPolicy` and `tokenPolicy` — `ProcessorConfig`'s own names for them, so a
 configuration and the report it produces are one vocabulary; each a level, a unit, and any `permitting`
 relaxations) and the
 UCD version the rules were computed against, as one value: `Tson.processorPolicy()`, either facade's

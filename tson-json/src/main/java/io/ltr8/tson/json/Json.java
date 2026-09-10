@@ -1,10 +1,9 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.bind.DataBindContext;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
-import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.base.TsonConfig;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.stream.JsonEventSource;
@@ -35,9 +34,9 @@ import java.util.Objects;
  */
 public final class Json {
 
-    private final TsonConfig config;
+    private final ProcessorConfig config;
 
-    private Json(TsonConfig config) {
+    private Json(ProcessorConfig config) {
         this.config = config;
     }
 
@@ -54,7 +53,7 @@ public final class Json {
      * encoding's.
      */
     public static Json standard() {
-        return of(TsonConfig.defaults());
+        return of(ProcessorConfig.defaults());
     }
 
     /**
@@ -63,13 +62,13 @@ public final class Json {
      * <p>That is the point of it living in {@code tson-base}: what a deployment states about reading TSON --
      * what it will admit and spend, where it may obtain a schema, which Java classes its types bind to -- is
      * one statement, and stating it twice is two places for it to differ. A deployment reading both
-     * encodings builds one {@code TsonConfig} and hands it to both.
+     * encodings builds one {@code ProcessorConfig} and hands it to both.
      *
      * <p>Not every setting reaches this encoding yet: the schema access waits on [TSON-JSON] §5-§8's
      * schema-directed decode, which is the point at which a JSON document has a schema to obtain at all.
      * Holding the whole value now is what stops that arriving as another setter.
      */
-    public static Json of(TsonConfig config) {
+    public static Json of(ProcessorConfig config) {
         return new Json(Objects.requireNonNull(config, "config"));
     }
 

@@ -14,7 +14,7 @@ sourceSets["test"].java.srcDir("../tson-base/src/testShared/java")
 
 dependencies {
     api(project(":tson-base"))
-    // api, not implementation -- this module's own public surface (Tson/TsonConfig in particular)
+    // api, not implementation -- this module's own public surface (Tson in particular)
     // hands back tson-compiler/tson-schema types directly (TsonCompiledMetaSchema, TsonLinkedSchema,
     // TsonObjectReader/TsonTreeReader/TsonObjectWriter, ...), so a caller depending on just this
     // module still needs them on its own compile classpath.

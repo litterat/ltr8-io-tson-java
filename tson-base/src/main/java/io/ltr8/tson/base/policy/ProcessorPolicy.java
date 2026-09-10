@@ -1,5 +1,4 @@
 package io.ltr8.tson.base.policy;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 
@@ -57,7 +56,7 @@ import java.util.Objects;
  * check on each named setter is a check each new route has to remember. The identifier surface is
  * unaffected, per-segment being exactly where it means something.
  *
- * <p>The components are named for the {@code TsonConfig} settings they report, so a configuration and the
+ * <p>The components are named for the {@code ProcessorConfig} settings they report, so a configuration and the
  * report it produces are one vocabulary and one grep.
  *
  * <p><b>A record, and not yet an interface.</b> [TSON-JSON] adds policies of its own -- §4.3's annotation
@@ -66,9 +65,9 @@ import java.util.Objects;
  * one depends on what JSON actually adds, and every candidate today is encode-side. Deciding it now would
  * be designing against a guess.
  *
- * @param identifierPolicy    the policy applied to names -- {@code TsonConfig.identifierPolicy}
- * @param tokenPolicy         the policy applied to token values -- {@code TsonConfig.tokenPolicy}
- * @param limits              what this processor will spend reading a document -- {@code TsonConfig.limits}
+ * @param identifierPolicy    the policy applied to names -- {@code ProcessorConfig.identifierPolicy}
+ * @param tokenPolicy         the policy applied to token values -- {@code ProcessorConfig.tokenPolicy}
+ * @param limits              what this processor will spend reading a document -- {@code ProcessorConfig.limits}
  * @param unicodeDataVersion  {@link UnicodePolicy#dataVersion()}, the UCD release whose tables the
  *                            rules were computed against ([TSON-DATA] §8.2 on why that is the
  *                            version §8.2's "UTS #39 data version" means)

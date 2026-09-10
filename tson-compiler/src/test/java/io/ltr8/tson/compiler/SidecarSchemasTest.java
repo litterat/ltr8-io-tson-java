@@ -1,5 +1,4 @@
 package io.ltr8.tson.compiler;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.compiler.ast.schema.SchemaDocument;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -65,7 +64,7 @@ class SidecarSchemasTest {
         String source = read(schemasRoot.resolve(fileName));
         SchemaDocument document = new TsonSchemaParser(source).parseSchemaDocument();
 
-        // Same bootstrap sequence TsonConfig#build uses -- meta-kernel has to be resolved and
+        // Same bootstrap sequence ProcessorConfig#build uses -- meta-kernel has to be resolved and
         // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
         // register itself. A fresh registry per schema file, deliberately, so one file's own
         // failure doesn't leave a shared registry in a half-registered state for the next.

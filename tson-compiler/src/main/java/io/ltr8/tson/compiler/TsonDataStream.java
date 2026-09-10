@@ -1,5 +1,4 @@
 package io.ltr8.tson.compiler;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
@@ -10,9 +9,7 @@ import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.TokenForm;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomParseException;
-import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
@@ -39,8 +36,7 @@ import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
 import io.ltr8.tson.compiler.stream.TypeRef;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;

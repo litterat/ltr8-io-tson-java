@@ -2,7 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@link TsonConfig#withTokenPolicy} end to end ([TSON-DATA] §8.2's "Values"): the level reaches both
+ * {@link ProcessorConfig#withTokenPolicy} end to end ([TSON-DATA] §8.2's "Values"): the level reaches both
  * facades a {@link Tson} hands out, and its default leaves ordinary data alone.
  *
  * <p>Mixed-script spellings are built from code points rather than typed -- the subject is spellings that
@@ -41,7 +41,7 @@ class TokenPolicyConfigTest {
     /** Raised through the builder, the same document is refused -- so the config really reaches the read. */
     @Test
     void aRaisedPolicyReachesTheTreeReader() {
-        List<Diagnostic> found = Tson.of(TsonConfig.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()))
+        List<Diagnostic> found = Tson.of(ProcessorConfig.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()))
                 .validate(DOCUMENT);
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -55,7 +55,7 @@ class TokenPolicyConfigTest {
     @Test
     void aRaisedPolicyReachesTheObjectReader() {
         DiagnosticsCollector collected = new DiagnosticsCollector();
-        Tson.of(TsonConfig.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()))
+        Tson.of(ProcessorConfig.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()))
                 .objectReader().withDiagnostics(collected).read("\"" + CYR_A + "dmin\"", String.class);
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -73,7 +73,7 @@ class TokenPolicyConfigTest {
      */
     @Test
     void aDataFieldNameIsSubjectToTheTokenPolicy() {
-        List<Diagnostic> found = Tson.of(TsonConfig.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()))
+        List<Diagnostic> found = Tson.of(ProcessorConfig.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()))
                 .validate("{ " + CYRILLIC_NAME + ": 1 }");
 
         assertEquals(List.of(Diagnostic.Code.RESTRICTED_SCRIPT),
@@ -98,7 +98,7 @@ class TokenPolicyConfigTest {
     @Test
     void aPerSegmentTokenPolicyIsRefusedAtConfiguration() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-                () -> TsonConfig.defaults().withTokenPolicy(UnicodePolicy.highlyRestrictive().perSegment()));
+                () -> ProcessorConfig.defaults().withTokenPolicy(UnicodePolicy.highlyRestrictive().perSegment()));
         assertTrue(e.getMessage().contains("per-segment"), e.getMessage());
     }
 

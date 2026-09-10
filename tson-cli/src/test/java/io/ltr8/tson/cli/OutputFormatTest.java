@@ -1,5 +1,4 @@
 package io.ltr8.tson.cli;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -21,7 +20,7 @@ class OutputFormatTest {
 
     /**
      * The default policy pair -- Highly Restrictive over whole names, Unrestricted over tokens, which is
-     * what {@code TsonConfig}'s own {@code identifierPolicy}/{@code tokenPolicy} give a run that has
+     * what {@code ProcessorConfig}'s own {@code identifierPolicy}/{@code tokenPolicy} give a run that has
      * configured nothing. Every envelope in this file carries
      * one, because every envelope the CLI emits does: [TSON-DATA] §8.2's rules are the deployment's own
      * configuration, so a report that did not state them could not be interpreted anywhere but here.

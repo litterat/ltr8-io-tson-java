@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
@@ -54,7 +54,7 @@ class BrokenSchemaDuringDataValidationTest {
             }
             throw new IllegalStateException("no schema for " + uri);
         };
-        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
     }
 
     /**
@@ -74,7 +74,7 @@ class BrokenSchemaDuringDataValidationTest {
                   second => { q: !int32 ^ { min: 1 } }
                 }
                 """;
-        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(uri -> unparseable)));
+        Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(uri -> unparseable)));
 
         List<Diagnostic> problems = tson.validate(DATA);
 
@@ -140,7 +140,7 @@ class BrokenSchemaDuringDataValidationTest {
     /** A schema that cannot be reached at all is still one problem -- there is nothing to enumerate. */
     @Test
     void anUnreachableSchemaIsStillASingleDiagnostic() {
-        List<Diagnostic> problems = Tson.of(TsonConfig.defaults()
+        List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults()
                         .withSchemaAccess(SchemaAccess.of(uri -> {
                             throw new SchemaFetchException(uri, SchemaFetchException.Reason.TRANSPORT,
                                     "nothing here", null);
@@ -161,7 +161,7 @@ class BrokenSchemaDuringDataValidationTest {
     @Test
     void aSourceFailingAnyOtherWayIsAFaultAndNotAVerdict() {
         IllegalStateException fault = new IllegalStateException("the cache is in an impossible state");
-        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(uri -> {
+        Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(uri -> {
             throw fault;
         })));
 

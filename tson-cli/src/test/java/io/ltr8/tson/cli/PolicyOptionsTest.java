@@ -1,5 +1,4 @@
 package io.ltr8.tson.cli;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -37,7 +36,7 @@ class PolicyOptionsTest {
     /**
      * <b>The CLI's restatement of the defaults is pinned against a real {@code Tson}.</b> {@link
      * PolicyOptions#DEFAULTS} exists so {@link CliPolicy#isDefault()} can decide whether a person needs to
-     * be told the policy at all; if {@code TsonConfig} ever changed a default, that decision would silently
+     * be told the policy at all; if {@code ProcessorConfig} ever changed a default, that decision would silently
      * invert and a relaxed run would stop announcing itself.
      */
     @Test

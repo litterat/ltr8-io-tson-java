@@ -1,6 +1,6 @@
 package io.ltr8.tson;
 
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * TsonCompiledMetaRegistry}; this pins that a caller gets it from {@link Tson#defaults()} without giving up
  * the reader, the writer or the per-mode registries that come with a {@link Tson}.
  *
- * <p>{@link TsonConfig#metaNameBinder} is the whole difference. It is composed over {@link
+ * <p>{@link ProcessorConfig#metaNameBinder} is the whole difference. It is composed over {@link
  * SchemaMetaNameBinder#INSTANCE} rather than replacing it, so what it changes is which names resolve and
  * nothing else -- the standard library still compiles in object-binding mode, which is the thing the
  * internal context is fixed to protect.
@@ -93,7 +93,7 @@ class MetaLayerConstructorThroughTsonTest {
             new DataNameBinder.DefaultDataNameBinder(Set.of("io.ltr8.tson.consumer"), Map.of());
 
     private static Tson tson() {
-        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)).withMetaNameBinder(CONSUMER_NAMES));
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)).withMetaNameBinder(CONSUMER_NAMES));
     }
 
     /**
@@ -150,13 +150,13 @@ class MetaLayerConstructorThroughTsonTest {
      */
     @Test
     void withoutTheBinderTheSameSchemaHasNoBoundClass() {
-        Tson unextended = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)));
+        Tson unextended = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)));
 
         MissingBindingException thrown =
                 assertThrows(MissingBindingException.class, () -> unextended.resolve(API_SCHEMA));
 
         assertTrue(thrown.getMessage().contains("no bound Java class for 'operation'"), thrown.getMessage());
-        assertTrue(thrown.getMessage().contains("TsonConfig.bindings"), "it names the way to fix it: "
+        assertTrue(thrown.getMessage().contains("ProcessorConfig.bindings"), "it names the way to fix it: "
                 + thrown.getMessage());
     }
 

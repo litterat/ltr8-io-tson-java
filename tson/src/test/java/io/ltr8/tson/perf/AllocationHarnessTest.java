@@ -1,6 +1,6 @@
 package io.ltr8.tson.perf;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.io.ByteSource;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -98,7 +98,7 @@ class AllocationHarnessTest {
         assumeTrue(AllocationProbe.supported(), "needs HotSpot's per-thread allocation counter");
 
         SchemaSource source = uri -> SCHEMA;
-        tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
+        tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext(DataBindContext.builder()
                         .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "line", Line.class))
                                 .orElse(SchemaMetaNameBinder.INSTANCE))

@@ -1,5 +1,4 @@
 package io.ltr8.tson.compiler.config;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -91,7 +90,7 @@ public final class SchemaMetaNameBinder {
      * {@link #defaultContext()} extended with the names a consumer's own <b>meta layer</b> adds -- the
      * context to resolve a schema against when its governing meta declares constructors of its own
      * ({@code operation => ~data & { ... }}), whose instances bind to that consumer's Java classes.
-     * {@code TsonConfig.metaNameBinder} is the front-door route to it.
+     * {@code ProcessorConfig.metaNameBinder} is the front-door route to it.
      *
      * <p>Composition, never replacement: {@link #INSTANCE} answers first and {@code additional} is asked
      * only for a name the kernel's own vocabulary does not know. So a consumer cannot shadow {@code

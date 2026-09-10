@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
@@ -37,7 +37,7 @@ class ConstructorLevelDisciplineTest {
                 {
                 %s }
                 """.formatted(meta, declarations);
-        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, source)))))
                 .validateSchema(source);
     }
 

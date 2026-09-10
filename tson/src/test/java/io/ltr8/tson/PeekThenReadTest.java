@@ -7,7 +7,7 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -80,7 +80,7 @@ class PeekThenReadTest {
                 name -> "order".equals(name) ? Order.class : SchemaMetaNameBinder.INSTANCE.resolve(name);
         DataBindContext context = DataBindContext.builder().nameBinder(binder).profile(profile)
                 .registerAtoms(AtomContext.hostTypes()).build();
-        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)).withDataBindContext(context));
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source)).withDataBindContext(context));
     }
 
     private static final String V1_DOC = """

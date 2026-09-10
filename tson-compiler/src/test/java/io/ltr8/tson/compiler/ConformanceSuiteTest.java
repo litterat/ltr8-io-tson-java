@@ -1,6 +1,5 @@
 package io.ltr8.tson.compiler;
 import io.ltr8.tson.base.io.ByteSource;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -764,7 +763,7 @@ class ConformanceSuiteTest {
         SchemaDocument schemaDocument = new TsonSchemaParser(resolved).parseSchemaDocument();
         // Resolution (unlike compilation) always needs an object-binding-mode governing-meta reader,
         // regardless of what mode the caller eventually wants -- see Tson's own class Javadoc.
-        // Same bootstrap sequence TsonConfig#build uses: meta-kernel has to be resolved and
+        // Same bootstrap sequence ProcessorConfig#build uses: meta-kernel has to be resolved and
         // registered explicitly before anything that transitively !!imports it (meta.tn, here) can
         // register itself -- see TsonBundledSchemas's own class Javadoc for why.
         TsonCompiledMetaRegistry compiledRegistry =

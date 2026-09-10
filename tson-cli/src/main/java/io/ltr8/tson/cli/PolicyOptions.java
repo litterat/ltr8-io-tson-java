@@ -1,6 +1,6 @@
 package io.ltr8.tson.cli;
 
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -28,7 +28,7 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
                      LimitsPolicy limits) {
 
     /**
-     * What {@code TsonConfig} applies to a run that configures nothing, restated here because this is where
+     * What {@code ProcessorConfig} applies to a run that configures nothing, restated here because this is where
      * the CLI decides whether a report is worth printing to a person ({@link CliPolicy#isDefault()}).
      * {@code PolicyOptionsTest} pins the restatement against a real {@code Tson}.
      */
@@ -46,8 +46,8 @@ record PolicyOptions(UnicodePolicy identifierPolicy, UnicodePolicy tokenPolicy,
      */
     private static final UnicodePolicy.Level IMPLIED_BY_SCRIPTS = UnicodePolicy.Level.SINGLE_SCRIPT;
 
-    /** This run's policies on a fresh {@link TsonConfig}. */
-    TsonConfig applyTo(TsonConfig config) {
+    /** This run's policies on a fresh {@link ProcessorConfig}. */
+    ProcessorConfig applyTo(ProcessorConfig config) {
         return config.withProcessorPolicy(ProcessorPolicy.of(identifierPolicy, tokenPolicy, limits));
     }
 

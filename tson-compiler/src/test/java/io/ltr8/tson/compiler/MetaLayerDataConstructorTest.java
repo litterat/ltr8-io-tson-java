@@ -1,5 +1,4 @@
 package io.ltr8.tson.compiler;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.bind.DataBindContext;
@@ -97,7 +96,7 @@ class MetaLayerDataConstructorTest {
      * resolves the kernel's own vocabulary; a consumer wants that <em>plus</em> their own, so {@link
      * SchemaMetaNameBinder#contextExtendedWith} asks the library's binder first and this one only for a
      * name it does not know. Nothing here duplicates the kernel's table, and nothing needs keeping in sync
-     * when that vocabulary grows. {@code TsonConfig.metaNameBinder} is the same seam through the front door.
+     * when that vocabulary grows. {@code ProcessorConfig.metaNameBinder} is the same seam through the front door.
      */
     private static final DataNameBinder CONSUMER_NAMES = new DataNameBinder.DefaultDataNameBinder(
             Set.of("io.ltr8.tson.compiler.consumer"), Map.of());

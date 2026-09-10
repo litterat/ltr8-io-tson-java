@@ -89,8 +89,8 @@ an immutable artifact. Per-endpoint policy is the awkward case, a well-known doc
 the honest answer is probably that the profile advertises the origin's default and the refusal reports what
 actually applied.
 
-**Interpretation chosen:** all three policies are code calls on `TsonConfig` (`identifierPolicy`,
-`tokenPolicy`, `maxDepth`), with no artifact of any kind; `Tson.processorPolicy()`, `Tson.limitsPolicy()`,
+**Interpretation chosen:** all three policies are code calls on `ProcessorConfig`
+(`withIdentifierPolicy`, `withTokenPolicy`, `withLimits`), with no artifact of any kind; `Tson.processorPolicy()`, `Tson.limitsPolicy()`,
 either read facade's, and `tson policy` are the no-document-in-hand surfaces §8.2 and §9.1 ask for. The
 consuming HTTP project leaves them at this library's defaults with its position written down in prose rather
 than expressed in a document — which is the gap this entry reports, met from the other side.

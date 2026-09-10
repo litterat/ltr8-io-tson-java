@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -38,7 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ResolvedFixtureTest {
 
     private static Tson tson() {
-        return Tson.of(TsonConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
+        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
     }
 
     // ── The comparison ───────────────────────────────────────────────────

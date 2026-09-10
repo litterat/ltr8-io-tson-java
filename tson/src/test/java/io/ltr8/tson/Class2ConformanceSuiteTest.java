@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -90,7 +90,7 @@ class Class2ConformanceSuiteTest {
         // The source serves the corpus's own schemas beside the bundled ones, which is what lets a subject
         // `!!import` a fixture: the link layer's §2.2.3 vectors need a second schema document, and the
         // corpus publishes those under its own identity prefix rather than inventing a file convention.
-        return Tson.of(TsonConfig.defaults()
+        return Tson.of(ProcessorConfig.defaults()
                 .withDataBindContext(SchemaMetaNameBinder.defaultContext())
                 .withSchemaAccess(SchemaAccess.of(Class2ConformanceSuiteTest::fetchSuiteSchema)));
     }

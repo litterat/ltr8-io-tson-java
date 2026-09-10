@@ -1,5 +1,5 @@
 package io.ltr8.tson.cli;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.Tson;
@@ -79,7 +79,7 @@ final class ValidateCommand {
         // One Tson for the whole run, so the identifier policy governs the schema files' own declared names
         // at link time and the data documents' names at read time alike -- it is one processor, and a flag
         // that reached only one of the two ends would be a trap.
-        Tson tson = Tson.of(policies.applyTo(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))));
+        Tson tson = Tson.of(policies.applyTo(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))));
         CliPolicy policy = CliPolicy.from(tson.processorPolicy());
 
         for (ValidateInput input : inputs) {
@@ -186,7 +186,7 @@ final class ValidateCommand {
         return "cannot read " + input.name() + ": " + reason;
     }
 
-    /** The three bundled standard-library identities, which {@code TsonConfig} always serves from its own resources. */
+    /** The three bundled standard-library identities, which {@code ProcessorConfig} always serves from its own resources. */
     private static boolean isBundledId(String id) {
         return id.equals(TsonBundledSchemas.META_KERNEL_ID)
                 || id.equals(TsonBundledSchemas.META_ID)

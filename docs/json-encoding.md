@@ -6,7 +6,7 @@ one-paragraph orientation; this file holds the detail.
 
 ## One configuration, two front doors
 
-`Json.standard()` and `Json.of(TsonConfig)` are the whole construction surface, and they are `Tson`'s to the
+`Json.standard()` and `Json.of(ProcessorConfig)` are the whole construction surface, and they are `Tson`'s to the
 letter:
 
 | | TSON text | JSON |
@@ -16,7 +16,7 @@ letter:
 | readers | `treeReader()` / `objectReader()` | `treeReader()` / `objectReader()` |
 | what it holds | `processorPolicy()` / `dataBindContext()` | `processorPolicy()` / `dataBindContext()` |
 
-**The same `TsonConfig` value.** What a deployment states about reading TSON — what it will admit and spend,
+**The same `ProcessorConfig` value.** What a deployment states about reading TSON — what it will admit and spend,
 where it may obtain a schema, which Java classes its types bind to — is one statement, and stating it twice
 is two places for it to differ. That is why the configuration is a value in `tson-base` and construction is
 not: `Tson.of` names the compiler's own registry and could never live there, but nothing about the

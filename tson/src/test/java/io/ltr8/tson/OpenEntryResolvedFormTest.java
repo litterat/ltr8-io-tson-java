@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -52,7 +52,7 @@ class OpenEntryResolvedFormTest {
      * visible as a value rather than as a clean verdict.
      */
     private static Tson metaBoundTson() {
-        return Tson.of(TsonConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
+        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
     }
 
     /** {@code spec/m}, found by walking up rather than assumed relative to a working directory. */

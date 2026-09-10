@@ -154,7 +154,7 @@ sit at the schema layer because that is the only layer able to name request and 
   able to find it. A consumer composes rather than copies — `SchemaMetaNameBinder.extendedWith(theirs)` asks
   the kernel's own vocabulary first and theirs only for a name it does not know, so the kernel's table is
   never duplicated and nothing shadows it. `contextExtendedWith` is that binder in a ready-made context, and
-  `TsonConfig.metaNameBinder` is the same seam through the front door — the resolution core's *mode* is
+  `ProcessorConfig.withMetaNameBinder` is the same seam through the front door — the resolution core's *mode* is
   fixed (bind, always), which names it knows is not. **No
   reader family and no `ValueReaderFactoryRegistry` entry**: the ordinary record reader binds the
   `!operation { ... }` payload straight into the record, so §7.2 closure, field states and every atom
@@ -259,7 +259,7 @@ match.
 **And the restriction level is refused per name, in the same pass** (`UnicodePolicy`, UTS #39 §5.2). The two
 are complementary rather than overlapping: the confusable check is a *relation* and needs the whole set, so
 it can never fire on a lone name; the level is a *property* of one name, so it is what reaches a name nothing
-else in the schema resembles. Configured by `TsonConfig.identifierPolicy` and carried on
+else in the schema resembles. Configured by `ProcessorConfig.withIdentifierPolicy` and carried on
 `TsonCompiledMetaRegistry`, which is the one object every resolve and every read already passes through.
 **Two axes, not a ladder** — a level and a unit — because per-segment Highly Restrictive and Moderately
 Restrictive are incomparable. The default is Highly Restrictive over a whole name, which refuses
