@@ -361,6 +361,20 @@ public final class TsonTreeReader {
     // ── Internals ────────────────────────────────────────────────────────
 
     /**
+     * The document's header, refused if it opens a <em>schema</em> document ([TSON-SCHEMA] §12.1's {@code
+     * !!meta}). {@link TsonDataStream} reports that directive rather than refusing it -- classifying a
+     * document is §7.1's point, and the schema parser sits on the same stream -- so the Class 1 verdict is
+     * taken here, where a data read is what was actually asked for.
+     */
+    private static DocumentStart requireDataDocument(TsonReadContext ctx) {
+        DocumentStart start = (DocumentStart) ctx.next();
+        if (start.isSchemaDocument()) {
+            throw new TsonUnsupportedDocumentException(start.position());
+        }
+        return start;
+    }
+
+    /**
      * The whole document, header included. Structured as {@link #readRoot} is and for the same reason -- the
      * {@code DocumentStart} event already carries both directives, so keeping them costs a field read rather
      * than a second pass over the source.
@@ -368,7 +382,7 @@ public final class TsonTreeReader {
     private TsonDocument readDocument(TsonDataStream stream) {
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            DocumentStart start = (DocumentStart) ctx.next();
+            DocumentStart start = requireDataDocument(ctx);
             TsonValue root = (tree == null || start.schema().isEmpty())
                     ? schemaless.read(ctx)
                     : readAgainstSchema(start.schema().get(), ctx, null);
@@ -383,7 +397,7 @@ public final class TsonTreeReader {
     private TsonValue readRoot(TsonDataStream stream, boolean ignoreSchema) {
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            DocumentStart start = (DocumentStart) ctx.next();
+            DocumentStart start = requireDataDocument(ctx);
             TsonValue result = (ignoreSchema || tree == null || start.schema().isEmpty())
                     ? schemaless.read(ctx)
                     : readAgainstSchema(start.schema().get(), ctx, null);
@@ -400,7 +414,7 @@ public final class TsonTreeReader {
         }
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
+            requireDataDocument(ctx); // any !!schema it declares is overridden by withSchema
             TsonValue result = readAgainstSchema(schemaUri, ctx, typeName);
             requireDocumentEnd(ctx);
             return result;

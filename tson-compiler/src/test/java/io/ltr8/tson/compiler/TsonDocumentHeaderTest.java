@@ -155,14 +155,22 @@ class TsonDocumentHeaderTest {
                 TsonDocumentHeader.peek("!!schema:\"https://example.com/order.tn\n{ id: 1 }").schema());
     }
 
-    /** The directives read before the broken one still stand -- they are what the document does say. */
+    /**
+     * <b>A malformed header yields nothing at all</b>, not the directives read before the break.
+     *
+     * <p>§2.2's header has one implementation -- the stream's, which builds {@code DocumentStart} once the
+     * whole header has been read -- so a header that fails part-way produces no event and there is no
+     * partial answer to hand back. That is the stricter reading of the rule this method already had: what a
+     * peek must never do is answer with something the document does not say, and a document whose header is
+     * broken has not finished saying anything. A caller wanting the {@code !!id} of a document that does not
+     * parse is asking the read for a diagnostic, not the peek for a guess.
+     */
     @Test
-    void keepsWhatItReadBeforeAMalformedDirective() {
+    void aMalformedDirectiveYieldsNothingEvenAfterAGoodOne() {
         TsonDocumentHeader header =
                 TsonDocumentHeader.peek("!!id:\"https://example.com/orders/1\"\n!!schema:\n{ id: 1 }");
 
-        assertEquals(Optional.of("https://example.com/orders/1"), header.id());
-        assertEquals(Optional.empty(), header.schema());
+        assertEquals(TsonDocumentHeader.NONE, header);
     }
 
     /** A source that fails is not a verdict on the document, so it is not swallowed as "no header". */

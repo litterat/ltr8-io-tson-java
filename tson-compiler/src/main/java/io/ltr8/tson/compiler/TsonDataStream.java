@@ -15,7 +15,6 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
-import io.ltr8.tson.compiler.lexer.LexException;
 import io.ltr8.tson.compiler.lexer.Lexer;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.compiler.lexer.Token;
@@ -308,50 +307,16 @@ public final class TsonDataStream implements TsonEventSource {
         return drain(new AnnotationOnlyFrame());
     }
 
-    // ── Startup: header directives (§2.2), mirroring TsonDataParser.parseDocument ───────
-
     /**
-     * §2.2's header directives at {@code stream}'s start and nothing after them -- the scan behind {@link
-     * TsonDocumentHeader#peek}, which is where its contract is stated. Static over a freshly constructed
-     * stream because the scan leaves the cursor mid-document: a stream this has read is a stream whose
-     * events would start after the header, so none is ever handed back.
+     * §2.2's header, once, as the stream's first event -- {@code !!id} then at most one of {@code !!schema}
+     * / {@code !!meta}.
      *
-     * <p>Unlike {@link #ensureStarted()} this accepts {@code !!meta} rather than rejecting the document --
-     * classifying a schema document is the point (§7.1), not a failure -- and it stops at any directive
-     * that is neither, leaving whether the document goes on to parse to whoever parses it.
+     * <p><b>A {@code !!meta} document starts like any other.</b> Whether one may be <em>read</em> is a
+     * conformance-class question and this tier is below it: {@code TsonDataParser} is a Class 1 processor
+     * and refuses one ({@code TsonUnsupportedDocumentException}), {@code TsonSchemaParser} requires one, and
+     * both sit on this stream. Refusing here would settle it for both, and would also make classifying a
+     * document (§7.1) impossible through the events -- which is what a second header scan used to exist for.
      */
-    static TsonDocumentHeader peekHeader(TsonDataStream stream) {
-        return stream.readHeader();
-    }
-
-    /**
-     * Total in the document's own content: a header that will not lex or parse yields whatever directives
-     * were read before it went wrong, never a throw. The document is still there to be read properly, and
-     * that read is where a malformed document earns a real diagnostic -- a peek's one job is not to answer
-     * with a schema the document does not name. An {@link java.io.UncheckedIOException} is not that: the
-     * source itself failed, no header was read or not read, and it propagates.
-     */
-    private TsonDocumentHeader readHeader() {
-        Optional<String> id = Optional.empty();
-        try {
-            if (check(TokenType.DIRECTIVE) && "id".equals(peekDirectiveName())) {
-                id = Optional.of(parseNamedDirective("id"));
-            }
-            if (check(TokenType.DIRECTIVE)) {
-                String name = peekDirectiveName();
-                if ("meta".equals(name)) {
-                    return new TsonDocumentHeader(id, Optional.empty(), Optional.of(parseNamedDirective("meta")));
-                }
-                if ("schema".equals(name)) {
-                    return new TsonDocumentHeader(id, Optional.of(parseNamedDirective("schema")), Optional.empty());
-                }
-            }
-        } catch (ParseException | LexException e) {
-            // Not this method's verdict to give -- see above.
-        }
-        return new TsonDocumentHeader(id, Optional.empty(), Optional.empty());
-    }
-
     private void ensureStarted() {
         if (started) {
             return;
@@ -364,24 +329,25 @@ public final class TsonDataStream implements TsonEventSource {
             id = Optional.of(parseNamedDirective("id"));
         }
 
-        if (check(TokenType.DIRECTIVE) && "meta".equals(peekDirectiveName())) {
-            Position metaStart = peekToken().start();
-            parseNamedDirective("meta");
-            throw new TsonUnsupportedDocumentException(metaStart);
-        }
-
         Optional<String> schema = Optional.empty();
+        Optional<String> meta = Optional.empty();
         if (check(TokenType.DIRECTIVE)) {
             String name = peekDirectiveName();
-            if ("schema".equals(name)) {
-                schema = Optional.of(parseNamedDirective("schema"));
-            } else {
-                throw parseError("directive '!!" + name + "' is not permitted here "
-                        + "(expected '!!schema' or the start of the document's value)");
+            switch (name) {
+                case "schema" -> schema = Optional.of(parseNamedDirective("schema"));
+                case "meta" -> meta = Optional.of(parseNamedDirective("meta"));
+                default -> throw parseError("directive '!!" + name + "' is not permitted here "
+                        + "(expected '!!schema', '!!meta' or the start of the document's value)");
             }
         }
 
-        ready.add(new DocumentStart(id, schema, docStart));
+        ready.add(new DocumentStart(id, schema, meta, docStart));
+        if (meta.isPresent()) {
+            // A schema document has no data value to frame ([TSON-SCHEMA] §12.1: a schema map, not a
+            // core-value), so the header is the whole of what this stream has to say about it. Pushing the
+            // root frames anyway would leave them to be stepped over `!!import` by whatever asked next.
+            return;
+        }
         pushFrame(new RootFrame());
         pushFrame(new DataValueFrame());
     }

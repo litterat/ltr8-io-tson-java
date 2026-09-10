@@ -261,16 +261,19 @@ admit UTS #39's own `Toys-Я-Us`.
   content sniffers can classify a document from its opening bytes". A caller routing to the right schema
   version has to know what a document names *before* choosing how to read it, and every other public entry
   point reads the whole document to answer that. `peek` takes a `String` or an `InputStream`, runs the same
-  `Lexer`/`TsonDataStream` cursor the real read runs (`TsonDataStream.peekHeader`, static over a fresh
-  stream — the scan leaves the cursor mid-document, so no half-read stream is ever handed back), and never
-  touches the value.
-  - **`!!meta` classifies rather than fails.** `ensureStarted` throws `TsonUnsupportedDocumentException` on
-    it because a *data* stream cannot go on; a peek exists precisely to say "schema document" and answers
-    with `meta()` present (§12.1 requires exactly one, so `isSchemaDocument()` is that question). `tson
+  `Lexer`/`TsonDataStream` cursor the real read runs — it pulls the stream's first event, `DocumentStart`,
+  which carries all three of §2.2's directives — and never touches the value: the stream fills only until it
+  has an event, and the header alone produces one. **There is no second header scan**; this is a projection
+  of the one the stream performs for every reader.
+  - **`!!meta` classifies rather than fails**, at every layer. The stream reports the directive, and the
+    Class 1 verdict is taken by whoever asked for a data read — `TsonDataParser.parseDocument` and both
+    facades' `requireDataDocument`. A peek exists precisely to say "schema document" and answers with
+    `meta()` present (§12.1 requires exactly one, so `isSchemaDocument()` is that question). `tson
     validate`'s file classification is this call.
   - **What it will not do is guess — and that makes it total.** A malformed *value* is not its business and
-    still yields a header; a malformed *header* yields the directives read before it went wrong rather than
-    throwing, and a directive §2.2 does not admit there stops the scan. The read that follows is where a
+    still yields a header; a malformed *header* yields **nothing at all** rather than throwing — the header is
+    built once, when the whole of it has been read, so a break part-way leaves no partial answer to hand back
+    — and a directive §2.2 does not admit there stops the scan. The read that follows is where a
     malformed document earns a real diagnostic, so a peek loses nothing by staying silent, where a throw
     would force every caller sniffing arbitrary bytes to wrap it. The one answer it must never give is a
     schema the document does not name, so a `!!schema` written inside the value or after it is that value's

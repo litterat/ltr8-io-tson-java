@@ -1,5 +1,9 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.ParseException;
+import io.ltr8.tson.compiler.lexer.LexException;
+import io.ltr8.tson.compiler.stream.DocumentStart;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -46,7 +50,7 @@ public record TsonDocumentHeader(Optional<String> id, Optional<String> schema, O
      * propagate: that is not a verdict on the document.)
      */
     public static TsonDocumentHeader peek(String source) {
-        return TsonDataStream.peekHeader(new TsonDataStream(source));
+        return firstEventOf(new TsonDataStream(source));
     }
 
     /**
@@ -60,7 +64,28 @@ public record TsonDocumentHeader(Optional<String> id, Optional<String> schema, O
      * a caller that opened it owns closing it.
      */
     public static TsonDocumentHeader peek(InputStream source) {
-        return TsonDataStream.peekHeader(new TsonDataStream(source));
+        return firstEventOf(new TsonDataStream(source));
+    }
+
+    /**
+     * §2.2's header as the stream itself read it -- {@link DocumentStart} is the first event and carries all
+     * three directives, so there is one implementation of the header grammar and this is a projection of it
+     * rather than a second scan.
+     *
+     * <p><b>No value is parsed to get it</b> (§7.1): the stream fills only until it has an event, and the
+     * header alone produces one.
+     *
+     * <p>A header that will not lex or parse yields {@link #NONE} -- what a peek must never do is answer
+     * with a schema the document does not name, and saying nothing is how that is guaranteed. An {@code
+     * UncheckedIOException} is not caught: the source failed, which is no verdict on the document.
+     */
+    private static TsonDocumentHeader firstEventOf(TsonDataStream stream) {
+        try {
+            DocumentStart start = (DocumentStart) stream.next();
+            return new TsonDocumentHeader(start.id(), start.schema(), start.meta());
+        } catch (ParseException | LexException e) {
+            return NONE;
+        }
     }
 
     /**
@@ -85,8 +110,7 @@ public record TsonDocumentHeader(Optional<String> id, Optional<String> schema, O
      */
     public static TsonDocumentPeek peekResumable(InputStream source) {
         RecordingStream recorder = new RecordingStream(source);
-        TsonDocumentHeader header = TsonDataStream.peekHeader(new TsonDataStream(recorder));
-        return new TsonDocumentPeek(header, recorder.replay());
+        return new TsonDocumentPeek(firstEventOf(new TsonDataStream(recorder)), recorder.replay());
     }
 
     /**

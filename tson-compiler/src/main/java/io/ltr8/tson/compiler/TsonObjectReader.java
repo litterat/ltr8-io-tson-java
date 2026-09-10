@@ -371,6 +371,20 @@ public final class TsonObjectReader {
 
     // ── Internals ────────────────────────────────────────────────────────
 
+    /**
+     * The document's header, refused if it opens a <em>schema</em> document ([TSON-SCHEMA] §12.1's {@code
+     * !!meta}). {@link TsonDataStream} reports that directive rather than refusing it -- classifying a
+     * document is §7.1's point, and the schema parser sits on the same stream -- so the Class 1 verdict is
+     * taken here, where a data read is what was actually asked for.
+     */
+    private static DocumentStart requireDataDocument(TsonReadContext ctx) {
+        DocumentStart start = (DocumentStart) ctx.next();
+        if (start.isSchemaDocument()) {
+            throw new TsonUnsupportedDocumentException(start.position());
+        }
+        return start;
+    }
+
     /** A {@link Bound}'s value, or none -- the shape the two object-only entry points want. */
     private static <T> T valueOf(Bound<T> bound) {
         return bound == null ? null : bound.value();
@@ -385,7 +399,7 @@ public final class TsonObjectReader {
         Objects.requireNonNull(type, "type");
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            DocumentStart start = (DocumentStart) ctx.next();
+            DocumentStart start = requireDataDocument(ctx);
             T value;
             Optional<String> rootType = Optional.empty();
             if (bind == null || start.schema().isEmpty()) {
@@ -409,7 +423,7 @@ public final class TsonObjectReader {
         Objects.requireNonNull(type, "type");
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            DocumentStart start = (DocumentStart) ctx.next();
+            DocumentStart start = requireDataDocument(ctx);
             T result = (ignoreSchema || bind == null || start.schema().isEmpty())
                     ? schemaless.read(ctx, type)
                     : valueOf(readAgainstSchema(start.schema().get(), ctx, type, null));
@@ -427,7 +441,7 @@ public final class TsonObjectReader {
         }
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            ctx.next(); // DocumentStart -- any !!schema it declares is overridden by withSchema
+            requireDataDocument(ctx); // any !!schema it declares is overridden by withSchema
             T result = valueOf(readAgainstSchema(schemaUri, ctx, type, typeName));
             requireDocumentEnd(ctx);
             return valid(ctx, result);

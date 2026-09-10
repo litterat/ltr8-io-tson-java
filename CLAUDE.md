@@ -449,8 +449,12 @@ would otherwise resolve as a number — and never a key that is not a name; a ke
 map is for, and the diagnostic says so. Normalisation runs *before* the match, since §2.5 gives a field name
 its identity by NFC-normalised comparison and the lexer already normalises the unquoted spelling: requiring
 NFC as a form here would make the quoted spelling the stricter of the two.
-`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException` (a
-schema document is unsupported, not malformed).
+`!!meta` in the header is **reported, not refused**: `DocumentStart` carries all three of §2.2's directives,
+so classifying a schema document (§7.1) is an answer the events give. Whether one may be *read* is a
+conformance-class question one tier up — `TsonDataParser` and both read facades raise
+`TsonUnsupportedDocumentException` on it (not `TsonParseException`: a schema document is unsupported, not
+malformed), while `TsonSchemaParser` requires the directive. One header grammar, each parser applying its own
+class to the result.
 
 ### Base type resolution (`.../base/`) — `docs/lexer-and-data-parsing.md`
 
