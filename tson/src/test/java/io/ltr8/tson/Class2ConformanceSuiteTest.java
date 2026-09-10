@@ -5,7 +5,7 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.compiler.TsonDocumentHeader;
+import io.ltr8.tson.compiler.TsonDocumentPeek;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.schema.TsonLinkedSchema;
@@ -382,7 +382,7 @@ class Class2ConformanceSuiteTest {
 
     /** The identity a subject claims for itself, which is what its resolved form is registered under. */
     private static String identityOf(String source) {
-        return TsonDocumentHeader.peek(source).id().orElseThrow(() ->
+        return TsonDocumentPeek.of(source).header().id().orElseThrow(() ->
                 new AssertionError("a class2/ subject must carry its own !!id"));
     }
 }

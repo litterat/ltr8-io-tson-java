@@ -1,4 +1,4 @@
-/// Read a document's header without reading the document -- route first, read second.
+/// Read a document's header without reading the document -- route first, read second, one stream.
 ///
 /// A single-file Java 25 program (compact source file + instance `main`), loading the `tson`
 /// library via the module system:
@@ -17,24 +17,24 @@ void main() {
             { id: 1  note: "two boxes" }""";
 
     // What does it declare? No schema needed, no value read.
-    TsonDocumentHeader header = TsonDocumentHeader.peek(order);
+    TsonDocumentHeader header = TsonDocumentPeek.of(order).header();
     IO.println("id:     " + header.id().orElse("(none)"));
     IO.println("schema: " + header.schema().orElse("(none)"));
     IO.println("schema document? " + header.isSchemaDocument());
 
     // A schema document says so with !!meta -- the same peek classifies it.
-    TsonDocumentHeader schema = TsonDocumentHeader.peek("""
+    TsonDocumentHeader schema = TsonDocumentPeek.of("""
             !!id:"https://example.com/order-2.tn"
             !!meta:"https://tson.io/2026/35/m/meta.tn"
-            { order => { id: int32 } }""");
+            { order => { id: int32 } }""").header();
     IO.println("schema document? " + schema.isSchemaDocument() + " (meta " + schema.meta().orElseThrow() + ")");
 
-    // A one-shot stream -- an HTTP request body, say -- is handed back whole, header included,
-    // so the reader that follows sees the document from its first byte.
+    // A one-shot stream -- an HTTP request body, say -- is never rewound: the peek holds the rest of
+    // the document, and the reader chosen from the header continues on that same stream.
     InputStream body = new ByteArrayInputStream(order.getBytes(StandardCharsets.UTF_8));
-    TsonDocumentPeek peeked = TsonDocumentHeader.peekResumable(body);
+    TsonDocumentPeek peeked = TsonDocumentPeek.of(body);
     IO.println("routing to " + peeked.header().schema().orElseThrow());
 
-    TsonValue value = new TsonTreeReader().read(peeked.document());   // schemaless here; withSchema(...) in real use
+    TsonValue value = new TsonTreeReader().read(peeked);   // schemaless here; a Tson instance in real use
     IO.println("note: " + value.get("note").asString().orElseThrow());
 }

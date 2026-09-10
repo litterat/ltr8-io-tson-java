@@ -358,6 +358,71 @@ public final class TsonTreeReader {
         return schemaless.read(ctx);
     }
 
+
+    /**
+     * Reads the document {@code peek} opened into a tree -- <b>continuing on its stream, not re-reading
+     * it</b>. The header is already in hand, so this is the same read the {@code InputStream} entry point
+     * performs, minus the part that has happened.
+     *
+     * <p>The point is choosing <em>this</em> reader after seeing the header -- a different {@code
+     * withSchema}, a different receiver -- on a source that cannot be read twice.
+     *
+     * @throws IllegalArgumentException if this reader's {@code ProcessorPolicy} is not the one the peek was
+     *                                  opened under -- the header's tokens were already read under that one
+     */
+    public TsonValue read(TsonDocumentPeek peek) {
+        return readPeeked(peek, false);
+    }
+
+    /** {@link #read(TsonDocumentPeek)}, ignoring any {@code !!schema} the document declares. */
+    public TsonValue readWithoutSchema(TsonDocumentPeek peek) {
+        return readPeeked(peek, true);
+    }
+
+    /** {@link #read(TsonDocumentPeek)} with the header kept -- see {@link #readDocument(String)}. */
+    public TsonDocument readDocument(TsonDocumentPeek peek) {
+        if (peek.failure() != null) {
+            readFailure(peek.failure());
+            return null;
+        }
+        try {
+            return documentFrom(continuing(peek), requireDataDocument(peek.start()));
+        } catch (RuntimeException e) {
+            readFailure(e);
+            return null;
+        }
+    }
+
+    /** {@link #read(TsonDocumentPeek)} against {@code typeName} -- see {@link #readAs(String, String)}. */
+    public TsonValue readAs(TsonDocumentPeek peek, String typeName) {
+        if (schemaUri == null) {
+            throw new IllegalStateException("readAs needs a schema -- call withSchema(uri) first");
+        }
+        if (peek.failure() != null) {
+            return readFailure(peek.failure());
+        }
+        try {
+            TsonReadContext ctx = continuing(peek);
+            requireDataDocument(peek.start()); // any !!schema it declares is overridden by withSchema
+            TsonValue result = readAgainstSchema(schemaUri, ctx, typeName);
+            requireDocumentEnd(ctx);
+            return result;
+        } catch (RuntimeException e) {
+            return readFailure(e);
+        }
+    }
+
+    private TsonValue readPeeked(TsonDocumentPeek peek, boolean ignoreSchema) {
+        if (peek.failure() != null) {
+            return readFailure(peek.failure());
+        }
+        try {
+            return valueFrom(continuing(peek), requireDataDocument(peek.start()), ignoreSchema);
+        } catch (RuntimeException e) {
+            return readFailure(e);
+        }
+    }
+
     // ── Internals ────────────────────────────────────────────────────────
 
     /**
@@ -367,11 +432,31 @@ public final class TsonTreeReader {
      * taken here, where a data read is what was actually asked for.
      */
     private static DocumentStart requireDataDocument(TsonReadContext ctx) {
-        DocumentStart start = (DocumentStart) ctx.next();
+        return requireDataDocument((DocumentStart) ctx.next());
+    }
+
+    /** The same verdict over a header a {@link TsonDocumentPeek} already pulled. */
+    private static DocumentStart requireDataDocument(DocumentStart start) {
         if (start.isSchemaDocument()) {
             throw new TsonUnsupportedDocumentException(start.position());
         }
         return start;
+    }
+
+    /**
+     * The context this reader continues {@code peek} on -- its own receiver and identifier policy over the
+     * stream the peek holds. The lexical half cannot be this reader's: the token policy and §9.1's limits
+     * were applied to the tokens the header is made of, so a reader that disagrees with the one that opened
+     * the peek is refused rather than quietly reading under a policy it did not state.
+     */
+    private TsonReadContext continuing(TsonDocumentPeek peek) {
+        if (!peek.policy().equals(policy)) {
+            throw new IllegalArgumentException("this reader's processor policy differs from the one this "
+                    + "document was opened under, and the header has already been read under that one -- "
+                    + "continue with a reader sharing it, or read the document from the start");
+        }
+        peek.stream().reportTokenPolicyTo(receiver);
+        return TsonReadContext.of(peek.stream(), receiver, policy.identifierPolicy());
     }
 
     /**
@@ -382,30 +467,38 @@ public final class TsonTreeReader {
     private TsonDocument readDocument(TsonDataStream stream) {
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            DocumentStart start = requireDataDocument(ctx);
-            TsonValue root = (tree == null || start.schema().isEmpty())
-                    ? schemaless.read(ctx)
-                    : readAgainstSchema(start.schema().get(), ctx, null);
-            requireDocumentEnd(ctx);
-            return new TsonDocument(start.id(), start.schema(), root);
+            return documentFrom(ctx, requireDataDocument(ctx));
         } catch (RuntimeException e) {
             readFailure(e);
             return null;
         }
     }
 
+    /** The document's value and header, from a header already read -- shared by the source and peek routes. */
+    private TsonDocument documentFrom(TsonReadContext ctx, DocumentStart start) {
+        TsonValue root = (tree == null || start.schema().isEmpty())
+                ? schemaless.read(ctx)
+                : readAgainstSchema(start.schema().get(), ctx, null);
+        requireDocumentEnd(ctx);
+        return new TsonDocument(start.id(), start.schema(), root);
+    }
+
     private TsonValue readRoot(TsonDataStream stream, boolean ignoreSchema) {
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            DocumentStart start = requireDataDocument(ctx);
-            TsonValue result = (ignoreSchema || tree == null || start.schema().isEmpty())
-                    ? schemaless.read(ctx)
-                    : readAgainstSchema(start.schema().get(), ctx, null);
-            requireDocumentEnd(ctx);
-            return result;
+            return valueFrom(ctx, requireDataDocument(ctx), ignoreSchema);
         } catch (RuntimeException e) {
             return readFailure(e);
         }
+    }
+
+    /** The document's value alone, from a header already read -- shared by the source and peek routes. */
+    private TsonValue valueFrom(TsonReadContext ctx, DocumentStart start, boolean ignoreSchema) {
+        TsonValue result = (ignoreSchema || tree == null || start.schema().isEmpty())
+                ? schemaless.read(ctx)
+                : readAgainstSchema(start.schema().get(), ctx, null);
+        requireDocumentEnd(ctx);
+        return result;
     }
 
     private TsonValue readRootAs(TsonDataStream stream, String typeName) {

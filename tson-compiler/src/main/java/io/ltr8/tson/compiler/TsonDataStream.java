@@ -235,6 +235,16 @@ public final class TsonDataStream implements TsonEventSource {
      * naming an external resource rather than document content, §2.2.1 governs what an identity may be,
      * and an IRI's scripts are the resource owner's business, not this document's.
      */
+    /**
+     * Re-points §8.2's token surface at the receiver of whoever is reading <em>now</em>. A stream opened by
+     * {@link TsonDocumentPeek} was given a throwing receiver to read the header with; the reader that
+     * continues on it has its own, and a token refusal past the header is that read's to report. The policy
+     * itself does not move -- a continuing reader must already share it.
+     */
+    void reportTokenPolicyTo(DiagnosticsReceiver receiver) {
+        this.tokenPolicyReceiver = receiver;
+    }
+
     private void checkTokenPolicy(TsonEvent event) {
         if (tokenPolicy == null || !tokenPolicy.checksScripts()) {
             return;

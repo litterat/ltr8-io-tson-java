@@ -5,7 +5,7 @@ import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
-import io.ltr8.tson.compiler.TsonDocumentHeader;
+import io.ltr8.tson.compiler.TsonDocumentPeek;
 import io.ltr8.tson.compiler.TsonSchemaParser;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.schema.TsonBundledSchemas;
@@ -196,7 +196,7 @@ final class ValidateCommand {
     /** A file whose header carries {@code !!meta} is a schema document ([TSON-SCHEMA] §12.1 requires one). */
     private static boolean isSchemaDocument(Path file) throws IOException {
         try (InputStream in = Files.newInputStream(file)) {
-            return TsonDocumentHeader.peek(in).isSchemaDocument();
+            return TsonDocumentPeek.of(in).isSchemaDocument();
         } catch (UncheckedIOException e) {
             return false;   // unreadable -> data, so Tson.validate reports the real error rather than this
         }

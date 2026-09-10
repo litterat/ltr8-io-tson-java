@@ -25,7 +25,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * schema the document does not name -- so the adversarial cases (a directive spelled inside the value, a
  * document that stops mid-value) matter as much as the well-formed ones.
  */
-class TsonDocumentHeaderTest {
+class TsonDocumentPeekTest {
+
+    /** Classification only: what the document declares, with the read it could have continued discarded. */
+    private static TsonDocumentHeader peek(String source) {
+        return TsonDocumentPeek.of(source).header();
+    }
+
+    private static TsonDocumentHeader peek(InputStream source) {
+        return TsonDocumentPeek.of(source).header();
+    }
 
     private static InputStream stream(String source) {
         return new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8));
@@ -53,7 +62,7 @@ class TsonDocumentHeaderTest {
 
     @Test
     void readsTheSchemaADataDocumentNames() {
-        TsonDocumentHeader header = TsonDocumentHeader.peek("!!schema:\"https://example.com/order.tn\"\n{ id: 1 }");
+        TsonDocumentHeader header = peek("!!schema:\"https://example.com/order.tn\"\n{ id: 1 }");
 
         assertEquals(Optional.of("https://example.com/order.tn"), header.schema());
         assertEquals(Optional.empty(), header.id());
@@ -62,7 +71,7 @@ class TsonDocumentHeaderTest {
 
     @Test
     void readsBothDirectivesInOrder() {
-        TsonDocumentHeader header = TsonDocumentHeader.peek("""
+        TsonDocumentHeader header = peek("""
                 !!id:"https://example.com/orders/1"
                 !!schema:"https://example.com/order.tn"
                 { id: 1 }
@@ -74,7 +83,7 @@ class TsonDocumentHeaderTest {
 
     @Test
     void classifiesASchemaDocumentByItsMeta() {
-        TsonDocumentHeader header = TsonDocumentHeader.peek("""
+        TsonDocumentHeader header = peek("""
                 !!id:"https://example.com/order.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!import:"https://tson.io/2026/35/m/core.tn"
@@ -89,7 +98,7 @@ class TsonDocumentHeaderTest {
 
     @Test
     void aDocumentWithNoDirectivesHasAnEmptyHeader() {
-        TsonDocumentHeader header = TsonDocumentHeader.peek("{ id: 1 }");
+        TsonDocumentHeader header = peek("{ id: 1 }");
 
         assertEquals(Optional.empty(), header.id());
         assertEquals(Optional.empty(), header.schema());
@@ -99,20 +108,20 @@ class TsonDocumentHeaderTest {
 
     @Test
     void emptyInputHasAnEmptyHeader() {
-        assertEquals(TsonDocumentHeader.NONE, TsonDocumentHeader.peek(""));
+        assertEquals(TsonDocumentHeader.NONE, peek(""));
     }
 
     /** No value parsing (§7.1): the header is answerable whether or not what follows it is a document. */
     @Test
     void readsTheHeaderOfADocumentWhoseValueIsMalformed() {
-        TsonDocumentHeader header = TsonDocumentHeader.peek("!!schema:\"https://example.com/order.tn\"\n{ id: ");
+        TsonDocumentHeader header = peek("!!schema:\"https://example.com/order.tn\"\n{ id: ");
 
         assertEquals(Optional.of("https://example.com/order.tn"), header.schema());
     }
 
     @Test
     void readsTheHeaderOfADocumentWithNoValueAtAll() {
-        TsonDocumentHeader header = TsonDocumentHeader.peek("!!schema:\"https://example.com/order.tn\"\n");
+        TsonDocumentHeader header = peek("!!schema:\"https://example.com/order.tn\"\n");
 
         assertEquals(Optional.of("https://example.com/order.tn"), header.schema());
     }
@@ -121,7 +130,7 @@ class TsonDocumentHeaderTest {
     @Test
     void doesNotReportADirectiveWrittenInsideTheValue() {
         TsonDocumentHeader header =
-                TsonDocumentHeader.peek("{ note: \"!!schema:\\\"https://attacker.example/evil.tn\\\"\" }");
+                peek("{ note: \"!!schema:\\\"https://attacker.example/evil.tn\\\"\" }");
 
         assertEquals(Optional.empty(), header.schema());
     }
@@ -129,7 +138,7 @@ class TsonDocumentHeaderTest {
     /** {@code !!schema} after the value has started is not a header directive and is not reported as one. */
     @Test
     void doesNotReportADirectiveAfterTheValue() {
-        TsonDocumentHeader header = TsonDocumentHeader.peek("{ id: 1 }\n!!schema:\"https://attacker.example/evil.tn\"");
+        TsonDocumentHeader header = peek("{ id: 1 }\n!!schema:\"https://attacker.example/evil.tn\"");
 
         assertEquals(Optional.empty(), header.schema());
     }
@@ -137,7 +146,7 @@ class TsonDocumentHeaderTest {
     /** A directive §2.2 does not admit here stops the scan; whether the document parses is the parser's answer. */
     @Test
     void stopsAtADirectiveThatIsNeitherSchemaNorMeta() {
-        TsonDocumentHeader header = TsonDocumentHeader.peek("!!import:\"https://example.com/core.tn\"\n{ id: 1 }");
+        TsonDocumentHeader header = peek("!!import:\"https://example.com/core.tn\"\n{ id: 1 }");
 
         assertEquals(TsonDocumentHeader.NONE, header);
     }
@@ -148,11 +157,11 @@ class TsonDocumentHeaderTest {
      */
     @Test
     void aMalformedHeaderYieldsNothingRatherThanGuessing() {
-        assertEquals(Optional.empty(), TsonDocumentHeader.peek("!!schema:\n{ id: 1 }").schema());
+        assertEquals(Optional.empty(), peek("!!schema:\n{ id: 1 }").schema());
         assertEquals(Optional.empty(),
-                TsonDocumentHeader.peek("!!schema:\"not a uri at all\"\n{ id: 1 }").schema());
+                peek("!!schema:\"not a uri at all\"\n{ id: 1 }").schema());
         assertEquals(Optional.empty(),
-                TsonDocumentHeader.peek("!!schema:\"https://example.com/order.tn\n{ id: 1 }").schema());
+                peek("!!schema:\"https://example.com/order.tn\n{ id: 1 }").schema());
     }
 
     /**
@@ -168,7 +177,7 @@ class TsonDocumentHeaderTest {
     @Test
     void aMalformedDirectiveYieldsNothingEvenAfterAGoodOne() {
         TsonDocumentHeader header =
-                TsonDocumentHeader.peek("!!id:\"https://example.com/orders/1\"\n!!schema:\n{ id: 1 }");
+                peek("!!id:\"https://example.com/orders/1\"\n!!schema:\n{ id: 1 }");
 
         assertEquals(TsonDocumentHeader.NONE, header);
     }
@@ -183,27 +192,29 @@ class TsonDocumentHeaderTest {
             }
         };
 
-        assertThrows(UncheckedIOException.class, () -> TsonDocumentHeader.peek(broken));
+        assertThrows(UncheckedIOException.class, () -> peek(broken));
     }
 
     /**
-     * The one-shot-stream case: an HTTP body cannot be re-opened, so the peek hands the document back whole
-     * -- from its first byte, header directives included -- and the read that follows sees what it would
-     * have seen had no one peeked.
+     * The one-shot-stream case: an HTTP body cannot be re-opened, and none is needed -- the peek holds the
+     * rest of the document on the stream it already has, so the read that follows sees what it would have
+     * seen had no one peeked, without a byte being replayed.
      */
     @Test
-    void resumesAOneShotStreamFromItsFirstByte() throws Exception {
+    void continuesAOneShotStreamWithoutRewinding() throws Exception {
         String document = "!!id:\"https://example.com/orders/1\"\n"
                 + "!!schema:\"https://example.com/order.tn\"\n"
                 + "{ id: 1  note: \"hello\" }\n";
-        TsonDocumentPeek peeked = TsonDocumentHeader.peekResumable(oneShot(document));
+        TsonDocumentPeek peeked = TsonDocumentPeek.of(oneShot(document));
 
         assertEquals(Optional.of("https://example.com/order.tn"), peeked.header().schema());
         assertEquals(Optional.of("https://example.com/orders/1"), peeked.header().id());
-        assertEquals(document, new String(peeked.document().readAllBytes(), StandardCharsets.UTF_8));
+        TsonValue value = new TsonTreeReader().read(peeked);
+        assertEquals(1, value.get("id").asInt().orElseThrow());
+        assertEquals("hello", value.get("note").asString().orElseThrow());
     }
 
-    /** Replaying is a prefix in front of the rest, not a buffer of the whole: a big document still streams. */
+    /** The peek reads the header and no more: a big document is not buffered to classify it. */
     @Test
     void resumingDoesNotBufferTheDocument() throws Exception {
         String body = "x".repeat(500_000);
@@ -229,37 +240,42 @@ class TsonDocumentHeaderTest {
             }
         };
 
-        TsonDocumentPeek peeked = TsonDocumentHeader.peekResumable(counting);
+        TsonDocumentPeek peeked = TsonDocumentPeek.of(counting);
 
         assertEquals(Optional.of("https://example.com/order.tn"), peeked.header().schema());
         assertTrue(pulled.get() < 64_000, "the peek pulled " + pulled.get() + " bytes for a header of 41");
-        assertEquals(document, new String(peeked.document().readAllBytes(), StandardCharsets.UTF_8));
+
+        // And the 500 KB it did not pull is still there to be read, on the same stream.
+        assertEquals(body, new TsonTreeReader().read(peeked).get("note").asString().orElseThrow());
     }
 
-    /** A resumed document reads as a document -- the header the peek consumed is parsed again, by the reader. */
+    /**
+     * A peeked document reads through an ordinary reader, <b>on the same stream</b> -- the header is not
+     * replayed and not re-lexed, which is the whole point on a source that cannot be read twice.
+     */
     @Test
-    void aResumedDocumentReadsWholeThroughAnOrdinaryReader() throws Exception {
+    void aPeekedDocumentReadsWholeThroughAnOrdinaryReader() throws Exception {
         String document = "!!schema:\"https://example.com/order.tn\"\n{ id: 1 }";
-        TsonDocumentPeek peeked = TsonDocumentHeader.peekResumable(oneShot(document));
+        TsonDocumentPeek peeked = TsonDocumentPeek.of(oneShot(document));
 
-        TsonValue value = new TsonTreeReader().read(peeked.document());
+        TsonValue value = new TsonTreeReader().read(peeked);
 
         assertEquals(1, value.get("id").asInt().orElseThrow());
     }
 
-    /** Nothing to replay when the document declares no header at all. */
+    /** A document that declares no header at all still continues from where the peek left it. */
     @Test
-    void resumesADocumentWithNoHeader() throws Exception {
-        TsonDocumentPeek peeked = TsonDocumentHeader.peekResumable(oneShot("{ id: 1 }"));
+    void continuesADocumentWithNoHeader() throws Exception {
+        TsonDocumentPeek peeked = TsonDocumentPeek.of(oneShot("{ id: 1 }"));
 
         assertEquals(TsonDocumentHeader.NONE, peeked.header());
-        assertEquals("{ id: 1 }", new String(peeked.document().readAllBytes(), StandardCharsets.UTF_8));
+        assertEquals(1, new TsonTreeReader().read(peeked).get("id").asInt().orElseThrow());
     }
 
     @Test
     void peeksAnInputStreamWithoutReadingTheDocument() {
         try (InputStream in = stream("!!schema:\"https://example.com/order.tn\"\n{ id: 1 }")) {
-            assertEquals(Optional.of("https://example.com/order.tn"), TsonDocumentHeader.peek(in).schema());
+            assertEquals(Optional.of("https://example.com/order.tn"), peek(in).schema());
         } catch (Exception e) {
             throw new AssertionError(e);
         }
@@ -273,7 +289,7 @@ class TsonDocumentHeaderTest {
                 .describing("https://example.com/order.tn")
                 .toTson(TsonAtom.of("hello", "text"));
 
-        TsonDocumentHeader header = TsonDocumentHeader.peek(document);
+        TsonDocumentHeader header = peek(document);
 
         assertEquals(Optional.of("https://example.com/orders/1"), header.id());
         assertEquals(Optional.of("https://example.com/order.tn"), header.schema());

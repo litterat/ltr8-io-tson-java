@@ -148,6 +148,38 @@ public final class Tson {
      * the schema's declared names under. They are one processor, and {@link #processorPolicy()} reports one
      * answer for it, which is only true if one answer is what both ends use.
      */
+    /**
+     * Reads {@code source}'s header and stops, handing back the rest of the document on the same stream --
+     * for a caller that must know what a document declares <em>before</em> choosing how to read it.
+     *
+     * <p><b>Nothing is rewound, because nothing is re-read.</b> §2.2's header is the stream's first event,
+     * so a reader continues from just past it: {@code objectReader().read(peek, Invoice.class)}, or the
+     * tree reader's equivalent. That is what makes this work on a source that cannot be read twice -- an
+     * HTTP request body, a socket, a pipe.
+     *
+     * <p>The read that continues may be <b>any</b> reader sharing this instance's {@link ProcessorPolicy},
+     * which is what a version dispatch needs: a schema version names a bind context, a bind context names a
+     * compiled registry, so v1 and v2 are two {@code Tson} instances rather than one reconfigured.
+     *
+     * <pre>{@code
+     * TsonDocumentPeek peek = v1.begin(request.getInputStream());
+     * Tson version = isV2(peek.header()) ? v2 : v1;
+     * Invoice invoice = version.objectReader().read(peek, Invoice.class);
+     * }</pre>
+     *
+     * <p>Total in the document's own content: a malformed header yields {@link TsonDocumentHeader#NONE}
+     * rather than throwing, and the read that follows reports the real problem through its own receiver.
+     * {@code source} is not closed here, and must not be read directly afterwards.
+     */
+    public TsonDocumentPeek begin(InputStream source) {
+        return TsonDocumentPeek.of(source, policy);
+    }
+
+    /** {@link #begin(InputStream)} over text already in hand. */
+    public TsonDocumentPeek begin(String source) {
+        return TsonDocumentPeek.of(source, policy);
+    }
+
     public TsonObjectReader objectReader() {
         return new TsonObjectReader(bind, dataBindContext).withProcessorPolicy(processorPolicy());
     }

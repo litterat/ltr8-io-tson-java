@@ -184,7 +184,7 @@ writing an unparseable document.
 ```java
 public record TsonDocumentHeader(Optional<String> id, Optional<String> schema, Optional<String> meta) {
     public static TsonDocumentHeader peek(String|InputStream source);   // total: never throws
-    public static TsonDocumentPeek   peekResumable(InputStream source); // .header(), .document()
+    public static TsonDocumentPeek   of(InputStream source);            // .header(), then read(peek)
     public boolean isSchemaDocument();                                  // it carries !!meta
 }
 ```

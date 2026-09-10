@@ -256,15 +256,27 @@ admit UTS #39's own `Toys-Я-Us`.
     parse. The flag clears the moment a core-value starts, so nested values and annotation values are
     unaffected. Like the directive URI check beside it, this keeps "a writer cannot emit a document that
     will not read back" true.
-- **`TsonDocumentHeader.peek` reads a header and stops**, which is the same carrier from the reading end —
-  [TSON-DATA] §7.1's "at most two directives of lookahead and no value parsing, so streams, previews, and
-  content sniffers can classify a document from its opening bytes". A caller routing to the right schema
-  version has to know what a document names *before* choosing how to read it, and every other public entry
-  point reads the whole document to answer that. `peek` takes a `String` or an `InputStream`, runs the same
-  `Lexer`/`TsonDataStream` cursor the real read runs — it pulls the stream's first event, `DocumentStart`,
-  which carries all three of §2.2's directives — and never touches the value: the stream fills only until it
-  has an event, and the header alone produces one. **There is no second header scan**; this is a projection
-  of the one the stream performs for every reader.
+- **`TsonDocumentPeek` reads a header and stops, and keeps the rest of the document** — [TSON-DATA] §7.1's
+  "at most two directives of lookahead and no value parsing, so streams, previews, and content sniffers can
+  classify a document from its opening bytes". A caller routing to the right schema version has to know what
+  a document names *before* choosing how to read it, and every other public entry point reads the whole
+  document to answer that. It runs the same `Lexer`/`TsonDataStream` cursor the real read runs — pulling the
+  stream's first event, `DocumentStart`, which carries all three of §2.2's directives — and never touches the
+  value: the stream fills only until it has an event, and the header alone produces one. **There is no second
+  header scan**; the header is a projection of the one the stream performs for every reader.
+  - **Nothing is rewound, because nothing is re-read.** The peek holds the live stream, positioned just past
+    the header, and a reader continues on it: `objectReader().read(peek, Invoice.class)`, `treeReader()
+    .read(peek)`, `readAs(peek, type)`. That is what makes it work on a source that cannot be read twice —
+    an HTTP request body, a socket, a pipe — which is the case the whole surface exists for. There is no
+    resumable/non-resumable pair, because every peek continues; a caller who only wants to classify takes
+    `header()` and drops the peek, which is what `tson validate` does per file.
+  - **Which reader continues is the caller's, and that is the point.** A schema version names a bind context,
+    a bind context names a compiled registry, so v1 and v2 are two readers rather than one reconfigured
+    (`PeekThenReadTest` drives exactly that, over a stream that fails the test if anything rewinds it). What
+    may *not* differ is the lexical half of the policy — §8.2's token policy and §9.1's limits were applied to
+    the tokens the header is made of — so a reader that disagrees is **refused**, not quietly obeyed. The
+    receiver *does* move: the peek reads the header with a throwing receiver of its own and the continuing
+    read re-points the token surface at its own, or a collecting read would throw at the first problem.
   - **`!!meta` classifies rather than fails**, at every layer. The stream reports the directive, and the
     Class 1 verdict is taken by whoever asked for a data read — `TsonDataParser.parseDocument` and both
     facades' `requireDataDocument`. A peek exists precisely to say "schema document" and answers with
@@ -273,22 +285,15 @@ admit UTS #39's own `Toys-Я-Us`.
   - **What it will not do is guess — and that makes it total.** A malformed *value* is not its business and
     still yields a header; a malformed *header* yields **nothing at all** rather than throwing — the header is
     built once, when the whole of it has been read, so a break part-way leaves no partial answer to hand back
-    — and a directive §2.2 does not admit there stops the scan. The read that follows is where a
-    malformed document earns a real diagnostic, so a peek loses nothing by staying silent, where a throw
-    would force every caller sniffing arbitrary bytes to wrap it. The one answer it must never give is a
-    schema the document does not name, so a `!!schema` written inside the value or after it is that value's
-    text and nothing more — `TsonDocumentHeaderTest` is adversarial about it. An `UncheckedIOException` does
-    propagate: the *source* failed, which is not a verdict on the document.
-  - **A peeked `InputStream` is not rewound**, so a source that can be read twice is peeked on one and read
-    on the other — which is what `tson validate` does, re-opening each file it classifies.
-  - **`peekResumable` is the one-shot-stream form**, for an HTTP request body, a socket, a pipe: the routing
-    decision needs the header, the body is gone once read, and there is no second stream to be had. It
-    records every byte the peek pulls off the source and returns a `TsonDocumentPeek` whose `document()` is
-    that prefix in front of the rest — the document from its **first** byte, header directives included, so
-    the reader that follows sees exactly what it would have seen had no one peeked. Recording at the
-    *source* rather than at the token cursor is what makes the replay exact: the decoder reads ahead in
-    chunks, and bytes it pulled but never tokenised are recorded too. Memory is that read-ahead, not the
-    document — a test pins the pull under 64 KB for a 500 KB body.
+    — and a directive §2.2 does not admit there stops the scan. The one answer it must never give is a schema
+    the document does not name, so a `!!schema` written inside the value or after it is that value's text and
+    nothing more — `TsonDocumentPeekTest` is adversarial about it. **The failure is kept, not discarded**: the
+    read that continues reports it through that reader's own receiver, so a caller who peeks and then reads
+    gets exactly the diagnostic a caller who only read would have, and `begin` is safe to call on arbitrary
+    bytes. An `UncheckedIOException` does propagate: the *source* failed, which is not a verdict on the
+    document.
+  - **The header alone is buffered, not the document** — a test pins the pull under 64 KB for a 500 KB body,
+    and then reads that body off the same peek.
 - **`quotedString` escapes with a comparison, not a `Pattern`.** The escape loop runs once per character of
   every string a writer emits, and asking `c <= 0x1f` through a compiled `Pattern` cost a `String`, a
   `Matcher` and the matcher's own internals *per character* — 188 bytes against 3.7 for the whole write,

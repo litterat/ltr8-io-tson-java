@@ -49,7 +49,7 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
 ## CLI (`tson-cli`)
 
 `tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each
-as schema or data (`TsonDocumentHeader.peek` — a header carrying `!!meta` is a schema document), exposes the
+as schema or data (`TsonDocumentPeek.of(…).isSchemaDocument()` — a header carrying `!!meta` is a schema document), exposes the
 schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the
 `!!schema` URI selects the schema, the root type-ref selects the type, no `!!schema` means schemaless.
 **Fully self-describing: no `--type`.**

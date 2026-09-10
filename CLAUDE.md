@@ -876,11 +876,18 @@ has to exist as a `String`; `TsonDataEmitter` holds an `Appendable`, and `toTson
 **off by default** so existing output is unchanged — the object writer needs the root type too, a bound
 object carrying neither fact, where a tree already names its own; `TsonDataEmitter.typeRef` refuses a second
 type-ref on one value, which is what keeps a declared root type from writing an unparseable document. The
-same `TsonDocumentHeader` carrier reads: `peek(String|InputStream)` is §7.1's classification from the opening
-bytes — `!!id` plus `!!schema`, or `!!meta` and it is a schema document — for a caller that must route on
-what a document names before reading it, **total** (a header it cannot read yields nothing rather than
-throwing, never a schema the document does not name), and `peekResumable` hands a one-shot stream back whole
-(`TsonDocumentPeek`) so an HTTP body can be routed and then read.
+same `TsonDocumentHeader` carrier reads, through **`TsonDocumentPeek`** (`Tson.begin(…)`, or
+`TsonDocumentPeek.of(…)` standalone): §7.1's classification from the opening bytes — `!!id` plus `!!schema`,
+or `!!meta` and it is a schema document — for a caller that must route on what a document names before
+reading it. **The peek keeps the rest of the document**, so a reader continues on the same stream
+(`read(peek, …)` / `readAs(peek, …)`) and an HTTP body is routed and then read without a rewind — there is no
+resumable/non-resumable pair, every peek continues, and a caller who only classifies takes `header()` and
+drops it. Which reader continues is the caller's — that is how one process serves two schema versions — but
+the **lexical** half of the policy may not differ from the one the header was read under, and a reader that
+disagrees is refused. It is **total**: a header it cannot read yields nothing rather than throwing, never a
+schema the document does not name, and the failure it kept is reported by the read that follows.
+`TsonDocumentHeader` itself is a pure value with no way to obtain one — reading a header means running the
+lexer, which is the stream's job.
 These live in `tson-compiler`'s root package because `DefinitionResolver` depends on
 `TsonObjectWriter`.
 

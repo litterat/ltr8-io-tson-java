@@ -48,4 +48,4 @@ These are the six numbered reader entry points from the main [README](../README.
 | [`EventStream.java`](EventStream.java) | Schemaless — pull a lazy `TsonEvent` stream without materializing a tree. |
 | [`SchemaValidation.java`](SchemaValidation.java) | Schema-driven — compile a TSON *schema* and validate data against a type, collecting every problem in one pass. |
 | [`SchemaAwareRead.java`](SchemaAwareRead.java) | Schema-aware facade — `tson.treeReader()` reads a *self-describing* document (its own `!!schema`), validating automatically, and falls back to a schemaless read when none is declared. |
-| [`DocumentRouting.java`](DocumentRouting.java) | Header only — `TsonDocumentHeader.peek` reads what a document *declares* (`!!id`/`!!schema`, or `!!meta` for a schema document) before reading it, and `peekResumable` hands a one-shot stream back whole. |
+| [`DocumentRouting.java`](DocumentRouting.java) | Route first, read second — `TsonDocumentPeek` reads what a document *declares* (`!!id`/`!!schema`, or `!!meta` for a schema document) and keeps the rest of it, so a one-shot stream is routed and then read without a rewind. |
