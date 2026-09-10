@@ -11,12 +11,6 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.schema.meta.Atom;
-import io.ltr8.tson.schema.meta.EnumBody;
-import io.ltr8.tson.schema.meta.FloatType;
-import io.ltr8.tson.schema.meta.DecimalType;
-import io.ltr8.tson.schema.meta.IntegerType;
-import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
 /**
@@ -82,23 +76,7 @@ final class JsonAtomReader<T> implements JsonTypeReader<T> {
     private static JsonTypeReader<?> of(String name, TypeDefinition definition, JsonValueReaderContext context) {
         AtomType<?> parser = AtomParsers.forType(name, definition.body()).orElseThrow(() -> new IllegalStateException(
                 "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
-        return new JsonAtomReader<>(name, parser, formOf(definition.body()), context.locationOf(name, definition));
-    }
-
-    /**
-     * §5's table, read off the resolved body rather than off a name -- so a schema's own refinement of a
-     * family ({@code price => number ^ { min: 0 }}) takes its parent's form without being listed anywhere.
-     */
-    private static JsonAtomForm formOf(Top body) {
-        return switch (body) {
-            case EnumBody ignored -> JsonAtomForm.ENUM;
-            case IntegerType ignored -> JsonAtomForm.NUMBER;
-            case DecimalType ignored -> JsonAtomForm.NUMBER;
-            case FloatType ignored -> JsonAtomForm.NUMBER_OR_STRING;
-            case Atom ignored -> JsonAtomForm.STRING;
-            default -> throw new IllegalStateException(
-                    "an atom factory was handed a non-atom body: " + body.getClass().getSimpleName());
-        };
+        return new JsonAtomReader<>(name, parser, JsonAtomForm.of(definition.body()), context.locationOf(name, definition));
     }
 
     @Override

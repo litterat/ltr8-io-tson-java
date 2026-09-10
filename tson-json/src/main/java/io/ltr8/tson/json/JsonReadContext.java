@@ -72,14 +72,22 @@ public final class JsonReadContext {
      */
     private final JsonSchemaLocation schemaLocation;
 
-    private JsonReadContext(Cursor cursor, PathStep tail, JsonSchemaLocation schemaLocation) {
+    /**
+     * A position pinned by {@link #withPosition}, or null to follow the shared cursor. Per-context for the
+     * same reason the schema location is: it belongs to one step's report, not to the read.
+     */
+    private final SourcePosition pinnedPosition;
+
+    private JsonReadContext(Cursor cursor, PathStep tail, JsonSchemaLocation schemaLocation,
+                            SourcePosition pinnedPosition) {
         this.cursor = cursor;
         this.tail = tail;
         this.schemaLocation = schemaLocation;
+        this.pinnedPosition = pinnedPosition;
     }
 
     public static JsonReadContext of(JsonEventSource events, DiagnosticsReceiver receiver) {
-        return new JsonReadContext(new Cursor(events, receiver), null, null);
+        return new JsonReadContext(new Cursor(events, receiver), null, null, null);
     }
 
     // ── The cursor ───────────────────────────────────────────────────────
@@ -96,19 +104,19 @@ public final class JsonReadContext {
 
     /** Where the last event consumed began -- what a diagnostic points at. */
     public Optional<SourcePosition> position() {
-        return Optional.ofNullable(cursor.position);
+        return Optional.ofNullable(pinnedPosition != null ? pinnedPosition : cursor.position);
     }
 
     // ── Stepping ─────────────────────────────────────────────────────────
 
     /** This context at member {@code name} -- a new context, sharing this read's cursor. */
     public JsonReadContext field(String name) {
-        return new JsonReadContext(cursor, new PathStep(tail, name, -1), schemaLocation);
+        return new JsonReadContext(cursor, new PathStep(tail, name, -1), schemaLocation, pinnedPosition);
     }
 
     /** This context at element {@code i}. */
     public JsonReadContext index(int i) {
-        return new JsonReadContext(cursor, new PathStep(tail, null, i), schemaLocation);
+        return new JsonReadContext(cursor, new PathStep(tail, null, i), schemaLocation, pinnedPosition);
     }
 
     /** The RFC 6901 pointer to where this context sits; {@code ""} at the root, which is a location and not an absence. */
@@ -155,7 +163,46 @@ public final class JsonReadContext {
      * the container that reached it owns the pointer.
      */
     public JsonReadContext underDeclaration(JsonSchemaLocation declaration) {
-        return schemaLocation != null ? this : new JsonReadContext(cursor, tail, declaration);
+        return schemaLocation != null ? this : new JsonReadContext(cursor, tail, declaration, pinnedPosition);
+    }
+
+    /**
+     * A copy of this context anchored on the record now being read: {@code declaration}'s identity and line
+     * replace whatever was there, and its pointer is taken only if none has been established.
+     *
+     * <p>The asymmetry with {@link #underDeclaration} is the one that keeps a schema pointer useful. A record
+     * <em>declares</em> the member the pointer ends with, so it owns the identity and the line; an atom or a
+     * container reached from that member does not, and offering its own would name the file the type came
+     * from -- core.tn -- rather than the line the author can edit.
+     */
+    public JsonReadContext inRecord(JsonSchemaLocation declaration) {
+        return new JsonReadContext(cursor, tail,
+                schemaLocation == null ? declaration : schemaLocation.anchoredOn(declaration), pinnedPosition);
+    }
+
+    /**
+     * A copy of this context one <em>declared</em> member deeper, stepping the data path, the schema pointer
+     * and the schema line together -- the one descent where the schema has a name of its own for where the
+     * read went.
+     *
+     * <p>{@code fieldPosition} is a parameter rather than a second overload because every caller has the field
+     * in hand: two ways to take this descent would mean the one that forgot the line was the shorter one.
+     */
+    public JsonReadContext schemaField(String name, Optional<SourcePosition> fieldPosition) {
+        return new JsonReadContext(cursor, new PathStep(tail, name, -1),
+                schemaLocation == null ? null : schemaLocation.field(name, fieldPosition), pinnedPosition);
+    }
+
+    /**
+     * A copy of this context whose {@link #position()} is pinned rather than following the shared cursor.
+     *
+     * <p>A field the document never mentioned has no event of its own to be noticed at, so it can only be
+     * noticed after the whole enclosing object has been consumed -- by which time the live cursor is sitting
+     * on the closing brace or past it. Pinning the object's own opening position puts the report where the
+     * reader would look for the missing member.
+     */
+    public JsonReadContext withPosition(SourcePosition pinned) {
+        return new JsonReadContext(cursor, tail, schemaLocation, pinned);
     }
 
     // ── Reporting ────────────────────────────────────────────────────────

@@ -1,6 +1,12 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.json.stream.JsonEvent;
+import io.ltr8.tson.schema.meta.Atom;
+import io.ltr8.tson.schema.meta.DecimalType;
+import io.ltr8.tson.schema.meta.EnumBody;
+import io.ltr8.tson.schema.meta.FloatType;
+import io.ltr8.tson.schema.meta.IntegerType;
+import io.ltr8.tson.schema.meta.Top;
 
 /**
  * Which JSON value kinds an atom family admits, and how the admitted kind becomes the text its parser reads
@@ -40,6 +46,23 @@ enum JsonAtomForm {
      * a sparse numeric value set is a member-constrained numeric atom, not an enum.
      */
     ENUM;
+
+    /**
+     * §5's table, read off the <em>resolved body</em> rather than off a name -- so a schema's own refinement
+     * of a family ({@code price => !decimal ^ { min: 0 }}) takes its parent's form without being listed
+     * anywhere, and a family added to the vocabulary lands in the right branch by its body's own type.
+     */
+    static JsonAtomForm of(Top body) {
+        return switch (body) {
+            case EnumBody ignored -> ENUM;
+            case IntegerType ignored -> NUMBER;
+            case DecimalType ignored -> NUMBER;
+            case FloatType ignored -> NUMBER_OR_STRING;
+            case Atom ignored -> STRING;
+            default -> throw new IllegalStateException(
+                    "an atom form was asked of a non-atom body: " + body.getClass().getSimpleName());
+        };
+    }
 
     /**
      * The text {@code event} carries for this form's parser, or null when the kind is one this form does not

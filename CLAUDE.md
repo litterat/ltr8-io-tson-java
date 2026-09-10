@@ -401,8 +401,19 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `Tson.standard()` for the unconfigured case.
 - **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree, readers,
   writers, and its own schema-directed reader stack over them — `JsonTypeReader`/`JsonCompiledSchema`/
-  `JsonSchemaCompiler`, with [TSON-JSON] §5's atoms compiled and §6–§8's constructors reaching a
-  `NOT_IMPLEMENTED` reader. A
+  `JsonSchemaCompiler`, with [TSON-JSON] §5's atoms, §6's records/arrays/sets/tuples and §7's absence
+  compiled in **tree mode**, and §6.5's maps and §8's sums reaching a `NOT_IMPLEMENTED` reader. **A
+  schema-directed read hands back a `JsonValue`, never a `TsonValue`**: the parsers run, which is the
+  validation, and the host value is discarded — tree mode answers *does this conform* and bind mode
+  answers *give me the value*, so converting an encoding belongs to neither. What that costs is one kind
+  of test, which is why `JsonValueReaderFactoryRegistry.atoms()` (§5's vocabulary with no mode over it)
+  stays as the registry the parsing contract is pinned against. Two copies of the field-state rules are
+  what the parallel stack buys, and `CrossEncodingParityTest` is the guard §9.4 makes obligatory — same
+  schema, same document in both encodings, same `Diagnostic.Code` and same RFC 6901 pointer, over the
+  rules that are genuinely written twice. The atom vocabulary is excluded because it is shared and cannot
+  drift; **one divergence is pinned as a divergence** — an unquoted TSON token at a `text` field is that
+  field's content where a JSON number is of the wrong kind (§5.1 makes which kinds reach a parser each
+  encoding's own). A
   separate stack rather than a front end over `tson-compiler`'s `TsonEventSource` — see "Not yet implemented"
   for the two disagreements that decide it. The **tree model follows [JEP 540](https://openjdk.org/jeps/540)**
   (`jdk.incubator.json`, JDK 28, unavailable now): sealed `JsonValue` over `JsonObject`/`JsonArray`/`JsonString`/

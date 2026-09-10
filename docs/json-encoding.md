@@ -228,6 +228,28 @@ and stays there; what crosses to this module is its output, which is a value mod
 long-standing prediction — in `BACKLOG.md`, in this module's build file and in `CLAUDE.md` — that §5–§8 is
 where `tson-json` gains that dependency. It is not.
 
+### Tree mode hands back JSON, and that settles what a schema-directed read is for
+
+A schema-directed tree read produces a `JsonValue`, never a `TsonValue`. The read runs each family's parser —
+which **is** the validation, [TSON-JSON] §5.1's contract boundary applied — and then discards the host value
+it produced. `tson-cli` validating a JSON document against a TSON schema is the caller this exists for, and it
+keeps only the diagnostics.
+
+That is not a limitation worked around; it is what the two modes are *for*. Tree mode answers **does this
+document conform**, and the answer is the diagnostics plus the document. Bind mode answers **give me the
+value**, and a class is what says what to build. Converting an encoding is a third operation and belongs to
+neither. A `TsonValue`-producing JSON read would be that third thing wearing the first one's clothes.
+
+It also keeps the JEP 540 alignment true of the whole module rather than only its schemaless half, and it
+keeps `JsonAtomTreeReader` trivial: peek the event, let the family's reader consume and judge it, hand back
+the node the document carried.
+
+**What it costs is one kind of test.** With the host value discarded, "did `date` really parse this?" is
+unobservable from a clean tree read — the evidence is only the diagnostic on a *bad* value. So
+`JsonValueReaderFactoryRegistry.atoms()` stays: §5's vocabulary with no mode over it, which is what
+`JsonAtomReadTest` compiles against to assert what each parser produced. It is what the modes are built over,
+not a mode of its own.
+
 ### The risk this keeps, and the guard that holds it
 
 Two copies of the field-state rules — §5.2's six field states, `REQUIRED_FIXED` injection, the FIXED check,
@@ -235,11 +257,30 @@ duplicate members, closure — can drift apart, and [TSON-JSON] §9.4 makes one 
 encodings a **specification obligation** rather than a tidiness. Duplication here does not cost maintenance
 so much as it costs the guarantee that one schema yields one verdict over both encodings.
 
-That guarantee does not need shared code. It needs to be checked, and to go red when it breaks: a
-**cross-encoding parity test** — one schema, the equivalent document in TSON text and in JSON, asserting the
-same `Diagnostic.Code` and the same RFC 6901 pointer into the data. It is a local test rather than a corpus
-vector, because the corpus has no way to state a fact about two encodings at all (`BACKLOG.md` carries that
-gap). It is worth having from the first container reader rather than added once the two have already drifted.
+That guarantee does not need shared code. It needs to be checked, and to go red when it breaks:
+`CrossEncodingParityTest` is one schema, the equivalent document in TSON text and in JSON, asserting the same
+`Diagnostic.Code` and the same RFC 6901 pointer into the data — the two components a consumer routes on, never
+the message, which is each reader's own prose. A local test rather than a corpus vector, because the corpus has
+no way to state a fact about two encodings at all.
+
+**It earned its place on the first run**, catching three disagreements before any of them could reach `main`: a
+size-facet violation reported as a constraint code on one side and `TYPE_MISMATCH` on the other, and an absent
+element and an absent tuple slot reported as `TYPE_MISMATCH` where the TSON reader says `FIELD_REQUIRED`. All
+three were the JSON reader's to fix — the TSON side is the incumbent, and one closed vocabulary means the
+newcomer conforms.
+
+**Its scope is the rules that are actually written twice**, and the boundary is worth stating because it is not
+obvious. The field-state machine is duplicated: closure, duplicate members, §5.2's six states, injection, the
+FIXED check, group multiplicity, container size and arity. The **atom vocabulary is not** — `tson-atom` is one
+implementation both encodings call, so its acceptance sets and its split between contract rejection and
+constraint violation cannot drift, and asserting them here would test the shared code twice.
+
+**Between those two sits one legitimate divergence, and the test asserts it as a divergence.** JSON has six
+value *kinds* where TSON text has tokens: `name: 42` at a `text` field is the unquoted token `42`, whose
+content `text`'s contract accepts ([TSON-DATA] §5.2), while JSON's `42` is of the number kind and §5.6 admits
+only strings there. Neither reader is wrong. §5.1 makes *which kinds reach a family's parser* each encoding's
+own — it is the whole of what `JsonAtomForm` decides — so this difference is by specification, and pinning it
+is what stops a later change quietly "fixing" it into agreement.
 
 ## Aligned with JEP 540 — and only in the tree
 

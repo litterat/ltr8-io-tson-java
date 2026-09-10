@@ -3,14 +3,16 @@ package io.ltr8.tson.json.reader;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 
 /**
- * A {@code constructor name -> JsonValueReaderFactory} table. {@link #atoms()} is the one instance today.
+ * A {@code constructor name -> JsonValueReaderFactory} table, one per read mode. {@link #tree()} is the one
+ * instance today; bind mode joins it over the same containers.
  *
- * <p><b>There is no mode split yet, and that is a fact about atoms rather than a shortcut.</b> An atom reader
- * produces its family's natural host value whichever mode is compiling -- the same is true on the TSON side,
- * where tree mode merely wraps the leaf. The modes genuinely diverge at the containers, so the split arrives
- * with [TSON-JSON] §6 and not before.
+ * <p><b>The atom factories are shared and only the wrapper differs.</b> An atom reader produces its family's
+ * natural host value whichever mode is compiling, so tree mode wraps each leaf to yield the node the document
+ * carried instead ({@link JsonAtomTreeReader}) and changes nothing about what was parsed or refused. The modes
+ * genuinely diverge at the containers, which is why the split arrives with [TSON-JSON] §6.
  *
  * <p><b>An unregistered constructor is a gap, not a fault.</b> {@link #resolve} raises, {@code
  * JsonSchemaCompiler} catches, and the entry becomes a {@link JsonErrorReader} -- so a schema whose types this
@@ -35,15 +37,47 @@ public final class JsonValueReaderFactoryRegistry implements JsonValueReaderFact
         this.factories = factories;
     }
 
-    /** [TSON-JSON] §5's whole vocabulary: every atom family, the enums, and the three {@code unit} instances. */
+    /**
+     * [TSON-JSON] §5's vocabulary alone, with no mode over it: every atom family, the enums, and the three
+     * {@code unit} instances, each reading to its family's natural host value. No container constructor is
+     * registered, so a schema using one compiles to a gap.
+     *
+     * <p>This is what a mode's registry is built over rather than a mode of its own -- {@link #tree} wraps
+     * each leaf to yield the node the document carried instead. It is also the registry that answers the
+     * question a mode hides: <em>what did the parser produce</em>, which tree mode discards by design.
+     */
     public static JsonValueReaderFactoryRegistry atoms() {
-        Map<String, JsonValueReaderFactory> factories = new LinkedHashMap<>();
-        factories.put("unit", JsonAtomReader.UNIT);
-        factories.put("enum", JsonAtomReader.ENUM);
-        for (String constructor : ATOM_CONSTRUCTORS) {
-            factories.put(constructor, JsonAtomReader.ATOM);
-        }
+        return new JsonValueReaderFactoryRegistry(Map.copyOf(vocabulary(UnaryOperator.identity())));
+    }
+
+    /**
+     * Tree mode: the document comes back as a {@link io.ltr8.tson.json.tree.JsonValue}, validated.
+     *
+     * <p>A schema-directed tree read answers <em>does this document conform</em> -- the atom parsers run,
+     * which is the validation, and their host values are discarded. It yields a JSON tree and never a TSON
+     * one: converting an encoding is a different operation from reading one, and a caller who wants a typed
+     * value reads in bind mode, where a class says what to build.
+     */
+    public static JsonValueReaderFactoryRegistry tree() {
+        Map<String, JsonValueReaderFactory> factories = vocabulary(JsonAtomTreeReader::over);
+        factories.put("record", JsonRecordTreeReader.FACTORY);
+        factories.put("array", JsonArrayTreeReader.FACTORY);
+        // A `set` resolves to an ArrayBody like `array` itself -- refinement never adds or removes a field --
+        // so the same factory serves it and the body's own `unique_items` is what separates them.
+        factories.put("set_type", JsonArrayTreeReader.FACTORY);
+        factories.put("tuple", JsonTupleTreeReader.FACTORY);
         return new JsonValueReaderFactoryRegistry(Map.copyOf(factories));
+    }
+
+    /** §5's atom constructors, each leaf passed through {@code leaf} so a mode can wrap what it produces. */
+    private static Map<String, JsonValueReaderFactory> vocabulary(UnaryOperator<JsonValueReaderFactory> leaf) {
+        Map<String, JsonValueReaderFactory> factories = new LinkedHashMap<>();
+        factories.put("unit", leaf.apply(JsonAtomReader.UNIT));
+        factories.put("enum", leaf.apply(JsonAtomReader.ENUM));
+        for (String constructor : ATOM_CONSTRUCTORS) {
+            factories.put(constructor, leaf.apply(JsonAtomReader.ATOM));
+        }
+        return factories;
     }
 
     @Override
@@ -51,7 +85,7 @@ public final class JsonValueReaderFactoryRegistry implements JsonValueReaderFact
         JsonValueReaderFactory factory = factories.get(name);
         if (factory == null) {
             throw new IllegalStateException("no JSON reader is registered for constructor '" + name
-                    + "' -- [TSON-JSON] §6-§8 (containers, absence, discrimination) are not built yet");
+                    + "' -- [TSON-JSON] §6.5 (maps) and §8 (discrimination) are not built yet");
         }
         return factory;
     }
