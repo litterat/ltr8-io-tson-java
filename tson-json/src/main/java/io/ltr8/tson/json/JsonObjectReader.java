@@ -60,7 +60,10 @@ import java.io.InputStream;
  * {@code payload}. A reader that drops it has not read a subset of the document; it has read a different
  * document and cannot tell. The class is the schema here, and a closed reading is what makes that claim
  * mean anything — it is also what [TSON-SCHEMA] §7.2 already says of a record under a real schema, so
- * the two paths agree. {@link #ignoringUnknownMembers} is the opt-out.
+ * the two paths agree. {@link #ignoringUnknownFields} is the opt-out -- <b>the same name the TSON reader
+ * uses</b>, because the rule is about a <em>record's fields</em> and a record is the same thing in both
+ * encodings. RFC 8259 calls an object's entries members, but what is being closed here is a bound class's
+ * field set, not a JSON syntactic category, and one rule with two names is a rule two readers can drift on.
  *
  * <p>The cost is real and is worth stating: a converted JSON Schema whose {@code additionalProperties}
  * defaults to true describes documents this reader refuses. That is §6.2's rest field's job to fix, and
@@ -92,7 +95,7 @@ public final class JsonObjectReader {
 
     /**
      * Whether a member the target class does not declare is discarded rather than refused -- see
-     * {@link #ignoringUnknownMembers} .
+     * {@link #ignoringUnknownFields} .
      */
     private final boolean ignoreUnknownMembers;
 
@@ -192,7 +195,7 @@ public final class JsonObjectReader {
      * that a rest field <em>keeps</em> what it collects, where this drops it. A schema is what tells the
      * two apart, and the schema-directed decode is where the keeping form arrives.
      */
-    public JsonObjectReader ignoringUnknownMembers() {
+    public JsonObjectReader ignoringUnknownFields() {
         return new JsonObjectReader(context, true, receiver, policy);
     }
 

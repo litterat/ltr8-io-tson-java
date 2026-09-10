@@ -5,6 +5,7 @@ import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.tree.JsonValue;
@@ -84,6 +85,16 @@ public final class Json {
     /** Everything a read off this instance will admit and spend. */
     public ProcessorPolicy processorPolicy() {
         return config.processorPolicy();
+    }
+
+    /**
+     * What a read off this instance will spend -- [TSON-JSON] §10.1's bounds, which are §9.1's "in JSON
+     * clothing, and the same policy applies with the same defaults", so this is one component of the policy
+     * above rather than a second statement. {@code Tson.limitsPolicy()} is the text front door's, and the
+     * two answer with the same record from the same configuration.
+     */
+    public LimitsPolicy limitsPolicy() {
+        return config.processorPolicy().limits();
     }
 
     /** A reader producing a {@link JsonValue} tree, carrying this instance's policy and receiver. */

@@ -1,4 +1,7 @@
 package io.ltr8.tson;
+import io.ltr8.tson.compiler.TsonTreeWriter;
+import io.ltr8.tson.compiler.TsonTreeReader;
+import io.ltr8.tson.base.io.ByteSink;
 import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -19,6 +22,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -130,5 +134,30 @@ class SelfDescribingWriteTest {
                 () -> tson().treeWriter().describing(ID).toTson(untagged));
 
         assertTrue(thrown.getMessage().contains("needs a root type-ref"), thrown.getMessage());
+    }
+
+    /**
+     * <b>Both writers reach a {@code ByteSink}, not only an {@code OutputStream}.</b> The stream form is
+     * the sink form adapted, so a document written to a buffer or a channel is the same document -- and
+     * the UTF-8 is this library's own encoding rather than an {@code OutputStreamWriter}'s.
+     */
+    @Test
+    void bothWritersWriteToAnyByteSink() {
+        TsonValue value = new TsonTreeReader().read("{ sku: \"A-1\"  note: \"h\\u00e9llo\" }");
+
+        java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(256);
+        new TsonTreeWriter().write(value, ByteSink.of(buffer));
+        buffer.flip();
+        byte[] fromBuffer = new byte[buffer.remaining()];
+        buffer.get(fromBuffer);
+
+        java.io.ByteArrayOutputStream stream = new java.io.ByteArrayOutputStream();
+        new TsonTreeWriter().write(value, stream);
+
+        assertArrayEquals(stream.toByteArray(), fromBuffer,
+                "a sink and a stream must produce the same bytes");
+        assertEquals(new TsonTreeWriter().toTson(value),
+                new String(fromBuffer, java.nio.charset.StandardCharsets.UTF_8),
+                "and the same document toTson builds through an Appendable");
     }
 }

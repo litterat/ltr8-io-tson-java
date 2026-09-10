@@ -21,6 +21,15 @@ import java.util.Objects;
  */
 public interface ByteSink {
 
+    /**
+     * The block a writer encodes into before handing bytes over -- {@link ByteSource#block()}'s counterpart,
+     * and the same argument: the size belongs to where the bytes are going, and it is the one allocation on
+     * the write path proportional to nothing at all, so it is where a pool would go.
+     */
+    default byte[] block() {
+        return new byte[ByteSource.DEFAULT_BLOCK_SIZE];
+    }
+
     /** Writes {@code length} bytes of {@code from} starting at {@code offset}. */
     void write(byte[] from, int offset, int length) throws IOException;
 

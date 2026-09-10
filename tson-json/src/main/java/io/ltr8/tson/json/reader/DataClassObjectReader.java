@@ -56,7 +56,7 @@ public final class DataClassObjectReader {
 
     /**
      * Whether a member the target class does not declare is discarded rather than refused -- see
-     * {@code JsonObjectReader.ignoringUnknownMembers} .
+     * {@code JsonObjectReader.ignoringUnknownFields} .
      */
     private final boolean ignoreUnknownMembers;
 

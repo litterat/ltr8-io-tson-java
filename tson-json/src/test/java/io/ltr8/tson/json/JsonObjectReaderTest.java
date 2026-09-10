@@ -161,7 +161,7 @@ class JsonObjectReaderTest {
         void the_derived_reader_discards_one_instead_and_the_default_reader_is_unchanged() {
             // The opt-out is the derived reader, never the default: the safe reading is the one nobody has
             // to know to ask for.
-            JsonObjectReader lenient = READER.ignoringUnknownMembers();
+            JsonObjectReader lenient = READER.ignoringUnknownFields();
             assertEquals(new Person("Ada", 36), lenient.read(
                     "{\"name\": \"Ada\", \"extra\": {\"deep\": [1, {\"x\": null}]}, \"age\": 36}", Person.class));
             assertThrows(ReadException.class, () -> READER.read(
@@ -204,7 +204,7 @@ class JsonObjectReaderTest {
         @Test
         void an_undeclared_member_stated_twice_is_still_a_repeat_when_unknown_members_are_ignored() {
             DiagnosticsCollector collected = new DiagnosticsCollector();
-            READER.ignoringUnknownMembers().withDiagnostics(collected)
+            READER.ignoringUnknownFields().withDiagnostics(collected)
                     .read("{\"name\": \"a\", \"age\": 1, \"x\": 1, \"x\": 2}", Person.class);
 
             assertEquals(List.of(Diagnostic.Code.DUPLICATE_FIELD),
@@ -513,7 +513,7 @@ class JsonObjectReaderTest {
         void the_nesting_bound_holds_even_over_a_value_being_discarded() {
             // Read through the lenient reader on purpose: the deep value is one nothing keeps, which is
             // exactly where a bound is easiest to lose -- skipValue walks it and must still be counted.
-            JsonObjectReader lenient = READER.ignoringUnknownMembers();
+            JsonObjectReader lenient = READER.ignoringUnknownFields();
             String deep = "{\"name\": \"a\", \"age\": 1, \"extra\": " + "[".repeat(200) + "]".repeat(200) + "}";
             assertThrows(LimitExceededException.class, () -> lenient.read(deep, Person.class));
             assertInstanceOf(Person.class, lenient

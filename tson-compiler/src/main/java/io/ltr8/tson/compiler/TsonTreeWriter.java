@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.io.ByteSink;
 import io.ltr8.tson.compiler.writer.TreeValueWriter;
 import io.ltr8.bind.DataBindException;
 import io.ltr8.tson.tree.*;
@@ -10,7 +11,6 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
 import java.io.Writer;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -143,13 +143,32 @@ public final class TsonTreeWriter {
      * <em>second</em> copy: the rendered document, which for a large tree is the bigger of the two.
      */
     public void write(TsonValue node, OutputStream out) {
-        Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
-        write(node, writer);
+        write(node, ByteSink.of(out));
+    }
+
+    /**
+     * Writes {@code node} into {@code sink} -- the general byte target, which {@link #write(TsonValue,
+     * OutputStream)} adapts to. {@code ByteSink.of} also covers a {@code ByteBuffer} and a channel, so a
+     * further target costs no method here.
+     *
+     * <p>UTF-8 is encoded by this library ({@code Utf8Sink}), not by an {@code OutputStreamWriter}: the
+     * block is the sink's to size, and an unpaired surrogate is refused rather than written as {@code ?}.
+     * The sink is flushed and not closed.
+     */
+    public void write(TsonValue node, ByteSink sink) {
+        if (header.schema().isPresent() && node.typeRef().isEmpty()) {
+            throw new TsonWriteException("a document declaring !!schema \"" + header.schema().get()
+                    + "\" needs a root type-ref to select a type, and this root node carries none -- read"
+                    + " the tree against its schema (which records each node's type) or set one on the"
+                    + " root before writing", null);
+        }
         try {
-            // Without this the encoder's own buffer is dropped, and a short document writes nothing at all.
-            writer.flush();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            TsonDataEmitter emitter = new TsonDataEmitter(sink);
+            header.emit(emitter);
+            ENGINE.write(node, emitter);
+            emitter.flush();
+        } catch (DataBindException e) {
+            throw new TsonWriteException("cannot write TsonValue as TSON: " + e.getMessage(), e);
         }
     }
 
