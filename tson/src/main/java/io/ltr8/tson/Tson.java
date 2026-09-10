@@ -105,13 +105,6 @@ public final class Tson {
     }
 
     /**
-     * Bootstraps meta-kernel/meta.tn/core.tn under {@code config} and returns the governed environment.
-     *
-     * <p>The configuration is a value and lives in {@code tson-base}, so the same one configures every
-     * encoding; what cannot live there is this method, which names the compiler's own registry. That split
-     * is the whole of why construction is here and settings are there.
-     */
-    /**
      * The unconfigured environment: the bundled standard library, nothing else fetchable, and the default
      * policy. {@code Json.standard()} is the other encoding's counterpart, and the two answer alike on
      * purpose -- a caller who needs no configuration should not have to name a configuration to say so.
@@ -120,6 +113,13 @@ public final class Tson {
         return of(ProcessorConfig.defaults());
     }
 
+    /**
+     * Bootstraps meta-kernel/meta.tn/core.tn under {@code config} and returns the governed environment.
+     *
+     * <p>The configuration is a value and lives in {@code tson-base}, so the same one configures every
+     * encoding; what cannot live there is this method, which names the compiler's own registry. That split
+     * is the whole of why construction is here and settings are there.
+     */
     public static Tson of(ProcessorConfig config) {
         // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
         // bundled meta-kernel/meta/core, and the access's source is consulted only for other URIs. It
@@ -137,17 +137,6 @@ public final class Tson {
         return new Tson(core, config.dataBindContext(), config.processorPolicy());
     }
 
-    /**
-     * A schema-aware {@link TsonObjectReader} over this instance -- reads TSON text into bound Java objects
-     * (via {@link #dataBindContext()}), validating against a self-describing document's {@code !!schema},
-     * schemaless when it declares none. Built over {@link #bindRegistry()}, so every reader from this
-     * instance shares one compiled-schema cache: a schema is compiled once here, not once per reader.
-     *
-     * <p><b>Both [TSON-DATA] §8.2 policies come from this instance</b>, {@link ProcessorConfig#withIdentifierPolicy}
-     * included -- a reader built here judges the names in a document under the same policy the linker judged
-     * the schema's declared names under. They are one processor, and {@link #processorPolicy()} reports one
-     * answer for it, which is only true if one answer is what both ends use.
-     */
     /**
      * Reads {@code source}'s header and stops, handing back the rest of the document on the same stream --
      * for a caller that must know what a document declares <em>before</em> choosing how to read it.
@@ -180,6 +169,17 @@ public final class Tson {
         return TsonDocumentPeek.of(source, policy);
     }
 
+    /**
+     * A schema-aware {@link TsonObjectReader} over this instance -- reads TSON text into bound Java objects
+     * (via {@link #dataBindContext()}), validating against a self-describing document's {@code !!schema},
+     * schemaless when it declares none. Built over {@link #bindRegistry()}, so every reader from this
+     * instance shares one compiled-schema cache: a schema is compiled once here, not once per reader.
+     *
+     * <p><b>Both [TSON-DATA] §8.2 policies come from this instance</b>, {@link ProcessorConfig#withIdentifierPolicy}
+     * included -- a reader built here judges the names in a document under the same policy the linker judged
+     * the schema's declared names under. They are one processor, and {@link #processorPolicy()} reports one
+     * answer for it, which is only true if one answer is what both ends use.
+     */
     public TsonObjectReader objectReader() {
         return new TsonObjectReader(bind, dataBindContext).withProcessorPolicy(processorPolicy());
     }

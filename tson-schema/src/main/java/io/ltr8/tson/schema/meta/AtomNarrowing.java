@@ -140,14 +140,6 @@ final class AtomNarrowing {
     }
 
     /**
-     * A member/value set may only shrink -- an enum's own {@code members}, a numeric family's sparse
-     * {@code members}, a CIDR family's {@code within}. §5.7 declares the member-set facet kind once and
-     * never enum-specifically ("an enum's {@code members}, a pattern alternation authored as a set"), so
-     * one comparison serves every family that carries one. Members are compared by {@code equals}, which
-     * is [TSON-DATA] §4.3's identity where a member's host type has one value per number -- an identifier,
-     * a {@link java.math.BigInteger}, so {@code 0x50} and {@code 80} are one member.
-     */
-    /**
      * A facet a refinement may <b>set where the source left it unset, and thereafter only restate</b> --
      * §5.7's identity-only rule, for a facet where narrowing is decidable in principle and not cheaply.
      *
@@ -180,6 +172,14 @@ final class AtomNarrowing {
         }
     }
 
+    /**
+     * A member/value set may only shrink -- an enum's own {@code members}, a numeric family's sparse
+     * {@code members}, a CIDR family's {@code within}. §5.7 declares the member-set facet kind once and
+     * never enum-specifically ("an enum's {@code members}, a pattern alternation authored as a set"), so
+     * one comparison serves every family that carries one. Members are compared by {@code equals}, which
+     * is [TSON-DATA] §4.3's identity where a member's host type has one value per number -- an identifier,
+     * a {@link java.math.BigInteger}, so {@code 0x50} and {@code 80} are one member.
+     */
     static <T> void checkSubset(List<String> out, String facet, List<T> source, List<T> refined) {
         checkSubset(out, facet, source, refined, Object::equals);
     }

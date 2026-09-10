@@ -77,11 +77,6 @@ public record Ipv4Parser(List<CidrInet4Network> within, List<CidrInet4Network> e
         return (Inet4Address) toInetAddress(octets);
     }
 
-    /**
-     * {@code getHostAddress()}, not {@code toString()} -- confirmed empirically that {@code
-     * Inet4Address#toString()} prepends a stray {@code /} (a leftover from {@code InetAddress}'s
-     * combined hostname-plus-address design), which {@code getHostAddress()} doesn't.
-     */
 
     /**
      * §5.5's {@code within}/{@code excluding}: the address must lie inside at least one {@code within}
@@ -103,6 +98,11 @@ public record Ipv4Parser(List<CidrInet4Network> within, List<CidrInet4Network> e
         }
     }
 
+    /**
+     * {@code getHostAddress()}, not {@code toString()} -- confirmed empirically that {@code
+     * Inet4Address#toString()} prepends a stray {@code /} (a leftover from {@code InetAddress}'s
+     * combined hostname-plus-address design), which {@code getHostAddress()} doesn't.
+     */
     @Override
     public String write(Inet4Address value) {
         return value.getHostAddress();

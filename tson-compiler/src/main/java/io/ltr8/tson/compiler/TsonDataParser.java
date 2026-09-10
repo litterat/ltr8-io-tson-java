@@ -121,16 +121,6 @@ public class TsonDataParser {
     }
 
     /**
-     * <b>The refusal is here, not in the stream.</b> {@link TsonDataStream} opens a {@code !!meta} document
-     * like any other -- classifying one is §7.1's point, and {@link TsonSchemaParser} sits on that same
-     * stream and requires the directive this class refuses. So the header is read once, by the stream, and
-     * each parser applies its own conformance class to the result.
-     *
-     * <p>Refused on the first event, before the document's value is reduced: a schema document is not this
-     * parser's to parse, so parsing it and then complaining would be work done to reach a verdict already
-     * available.
-     */
-    /**
      * §2.2's header, as the stream's first event -- <b>the one place either parser reads it</b>.
      * {@link TsonSchemaParser} takes its {@code !!id}/{@code !!meta} from here too, which is what leaves
      * one implementation of the header grammar rather than one per conformance class.
@@ -143,6 +133,16 @@ public class TsonDataParser {
         return (DocumentStart) stream.next();
     }
 
+    /**
+     * <b>The refusal is here, not in the stream.</b> {@link TsonDataStream} opens a {@code !!meta} document
+     * like any other -- classifying one is §7.1's point, and {@link TsonSchemaParser} sits on that same
+     * stream and requires the directive this class refuses. So the header is read once, by the stream, and
+     * each parser applies its own conformance class to the result.
+     *
+     * <p>Refused on the first event, before the document's value is reduced: a schema document is not this
+     * parser's to parse, so parsing it and then complaining would be work done to reach a verdict already
+     * available.
+     */
     public Document parseDocument() {
         DocumentStart start = documentStart();
         if (start.isSchemaDocument()) {

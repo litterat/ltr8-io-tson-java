@@ -610,13 +610,6 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
   rejects the wrong one up front instead of failing on a cast at the first value. `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (configurable via
   `ProcessorConfig.withDataBindContext`, default `AtomContext.defaultContext()`). `schemaRegistry()`/`loader()`
   reach the underlying machinery.
-- **`bindings(Map)`/`profile(String)` are the short form of `dataBindContext`**, and mutually exclusive with
-  it (a profile is fixed when a context is built, so it cannot apply to one that arrives already built). The
-  map becomes a `DataNameBinder` chained over `SchemaMetaNameBinder.INSTANCE` with
-  `AtomContext.hostTypes()` registered — the last being the step nothing reminds a caller of, and the
-  reason the convenience earns its place. **The map authors the failure**: a name outside it reports
-  `bindings(...) maps [...]` with the kernel's own account as the cause, because the chain is a backstop and
-  letting the backstop speak reports a missing line of the caller's configuration as "not kernel vocabulary".
 - **A `Tson` is one profile, and the schema being read never picks it.** Routing a document to the right
   profile stays the application's job. The alternative — the schema declaring its own profile through a
   meta-layer annotation — links a *coding* decision to a *format* one and buys less flexibility than it

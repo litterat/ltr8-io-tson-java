@@ -78,7 +78,6 @@ public final class JsonTreeReader {
         }
     }
 
-    /** {@code source} is not closed here. */
     /**
      * Reads {@code source} -- the general entry, and what the {@code String} and {@code InputStream} forms
      * above adapt to. {@code ByteSource.of} covers a {@code byte[]}, a {@code ByteBuffer}, a {@code Path}
@@ -88,6 +87,7 @@ public final class JsonTreeReader {
         return read(new JsonStream(source, policy, receiver));
     }
 
+    /** {@code source} is not closed here. */
     public JsonValue read(InputStream source) {
         try (ByteSource bytes = ByteSource.of(source)) {
             return read(new JsonStream(bytes, policy, receiver));

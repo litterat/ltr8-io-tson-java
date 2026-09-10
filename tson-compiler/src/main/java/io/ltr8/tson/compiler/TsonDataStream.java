@@ -213,6 +213,16 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
+     * Re-points §8.2's token surface at the receiver of whoever is reading <em>now</em>. A stream opened by
+     * {@link TsonDocumentPeek} was given a throwing receiver to read the header with; the reader that
+     * continues on it has its own, and a token refusal past the header is that read's to report. The policy
+     * itself does not move -- a continuing reader must already share it.
+     */
+    void reportTokenPolicyTo(DiagnosticsReceiver receiver) {
+        this.tokenPolicyReceiver = receiver;
+    }
+
+    /**
      * [TSON-DATA] §8.2's token surface, applied as an event leaves this stream.
      *
      * <p><b>A name is a token here.</b> The four events carrying text are checked alike -- a value, a field
@@ -225,16 +235,6 @@ public final class TsonDataStream implements TsonEventSource {
      * naming an external resource rather than document content, §2.2.1 governs what an identity may be,
      * and an IRI's scripts are the resource owner's business, not this document's.
      */
-    /**
-     * Re-points §8.2's token surface at the receiver of whoever is reading <em>now</em>. A stream opened by
-     * {@link TsonDocumentPeek} was given a throwing receiver to read the header with; the reader that
-     * continues on it has its own, and a token refusal past the header is that read's to report. The policy
-     * itself does not move -- a continuing reader must already share it.
-     */
-    void reportTokenPolicyTo(DiagnosticsReceiver receiver) {
-        this.tokenPolicyReceiver = receiver;
-    }
-
     private void checkTokenPolicy(TsonEvent event) {
         if (tokenPolicy == null || !tokenPolicy.checksScripts()) {
             return;
@@ -260,7 +260,6 @@ public final class TsonDataStream implements TsonEventSource {
         return ready.peek();
     }
 
-    /** Runs frames until an event is ready or the stream is exhausted. */
     /**
      * Runs the frame stack until an event is ready, framing the document's root value first if nothing has
      * yet asked for one.
@@ -327,6 +326,25 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /**
+     * Nothing here can start a value.
+     *
+     * <p><b>A directive is named rather than described</b>, because at a value position it is almost always
+     * a header directive in the wrong place -- §2.2 admits {@code !!id} and one governing directive and
+     * nothing else, and {@code !!import} is a schema document's. "found '!!'" is true and useless; naming
+     * the directive says which rule was broken. The rule is the <em>position's</em>, not the document
+     * kind's, so this holds whoever is reading -- which is why it can live here while the header's own
+     * verdicts have moved up to the parsers.
+     */
+    private ParseException notAValue(Token t) {
+        if (t.type() == TokenType.DIRECTIVE) {
+            return parseError("directive '!!" + peekDirectiveName() + "' is not permitted here "
+                    + "(expected '!!schema', '!!meta' or the start of the document's value)");
+        }
+        return parseError("expected a value (record, map, array, empty braces, "
+                + "the absent sentinel '_', or a token), found " + describe(t));
+    }
+
+    /**
      * §2.2's header, once, as the stream's first event -- {@code !!id} then at most one of {@code !!schema}
      * / {@code !!meta}.
      *
@@ -348,25 +366,6 @@ public final class TsonDataStream implements TsonEventSource {
      * header -- which is also what lets a schema parser take {@code !!id}/{@code !!meta} from this event and
      * then read {@code !!import} at token level over an empty frame stack.
      */
-    /**
-     * Nothing here can start a value.
-     *
-     * <p><b>A directive is named rather than described</b>, because at a value position it is almost always
-     * a header directive in the wrong place -- §2.2 admits {@code !!id} and one governing directive and
-     * nothing else, and {@code !!import} is a schema document's. "found '!!'" is true and useless; naming
-     * the directive says which rule was broken. The rule is the <em>position's</em>, not the document
-     * kind's, so this holds whoever is reading -- which is why it can live here while the header's own
-     * verdicts have moved up to the parsers.
-     */
-    private ParseException notAValue(Token t) {
-        if (t.type() == TokenType.DIRECTIVE) {
-            return parseError("directive '!!" + peekDirectiveName() + "' is not permitted here "
-                    + "(expected '!!schema', '!!meta' or the start of the document's value)");
-        }
-        return parseError("expected a value (record, map, array, empty braces, "
-                + "the absent sentinel '_', or a token), found " + describe(t));
-    }
-
     private void ensureStarted() {
         if (started) {
             return;

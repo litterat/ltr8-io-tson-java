@@ -103,12 +103,6 @@ public record Ipv6Parser(List<CidrInet6Network> within, List<CidrInet6Network> e
         }
     }
 
-    /**
-     * {@code getHostAddress()}, not {@code toString()} -- same reason as {@link Ipv4Parser#write}.
-     * Writes the uncompressed, full 8-group form ({@code getHostAddress()} doesn't apply RFC 5952's
-     * {@code ::} canonicalization) -- still valid per {@link #read}'s own grammar, just not the
-     * shortest legal spelling; canonicalizing isn't needed for round-tripping to work.
-     */
 
     /**
      * §5.5's {@code within}/{@code excluding}: the address must lie inside at least one {@code within}
@@ -130,6 +124,12 @@ public record Ipv6Parser(List<CidrInet6Network> within, List<CidrInet6Network> e
         }
     }
 
+    /**
+     * {@code getHostAddress()}, not {@code toString()} -- same reason as {@link Ipv4Parser#write}.
+     * Writes the uncompressed, full 8-group form ({@code getHostAddress()} doesn't apply RFC 5952's
+     * {@code ::} canonicalization) -- still valid per {@link #read}'s own grammar, just not the
+     * shortest legal spelling; canonicalizing isn't needed for round-tripping to work.
+     */
     @Override
     public String write(Inet6Address value) {
         return value.getHostAddress();
