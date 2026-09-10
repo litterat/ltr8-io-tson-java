@@ -119,7 +119,8 @@ public final class JsonObjectReader {
         this.ignoreUnknownMembers = ignoreUnknownMembers;
         this.receiver = receiver;
         this.policy = policy;
-        this.engine = new DataClassObjectReader(context, ignoreUnknownMembers);
+        this.engine = new DataClassObjectReader(context, ignoreUnknownMembers,
+                policy.identifierPolicy());
     }
 
 

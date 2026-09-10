@@ -113,17 +113,15 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **The identifier policy reaches no JSON name.** `JsonStream` applies the token policy to every token
-  ([TSON-DATA] §8.2's second surface), and nothing applies the identifier policy at all — so a JSON member
-  name that reads alike, carries a restricted character or mixes scripts is admitted where the same name in
-  TSON text is refused, and the two encodings disagree about a rule §8.2 states once. The semantics to build:
-  **the identifier policy applies to a record's member names and not to a map's keys** — §4.1 makes the
-  position decide which a `{...}` is, so this cannot be answered where the name is read and has to wait for
-  the schema-directed decode to say what the position is — and **the token policy applies to every JSON
-  token and overrides the identifier policy where both reach one**, which is the rule the text encoding
-  already follows. A map key is data, not a name, which is why it is exempt and why a JSON-Schema conversion
-  does not hit a name rule on `additionalProperties`. The look-alike rule is a property of a *set*, so it
-  belongs where `SchemalessTreeReader` puts it on the text side: over one record's member names, once.
+- [ ] **§8.2's look-alike rule has nowhere to run in JSON.** The two per-name rules reach a record's
+  member names through `JsonObjectReader`, whose target class says which `{...}` is a record. The third
+  is a property of a *set*, and `tson-compiler` asks it of a record's field names in its schemaless
+  **tree** reader -- where the document's own field set is all there is. JSON's tree reader cannot: §4.1
+  makes the position decide and a `JsonObject` has none. Under a class the question is arguably answered
+  already (a member reading alike to a declared one is undeclared, and reports `UNRECOGNIZED_FIELD`), and
+  the TSON bind path draws the line in the same place -- so what is owed is a decision rather than code:
+  whether the schema-directed decode gives the rule a home, or whether a class-directed read is where
+  §8.2 stops and that is stated rather than left looking like an omission.
 
 - [ ] **No schema-directed decode — §5–§8.** The whole of what Part 3 actually specifies: atoms by their parsing
   contracts (§5), containers by their constructors (§6), JSON `null` as the absent sentinel (§7), and the
@@ -225,6 +223,14 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   session-oriented internal narrative exists.
 
 ## Miscellaneous
+
+- [ ] **`DefaultTsonReadContext.checkNameHygiene` allocates a capturing lambda per name.** Both §8.2 rule
+  implementations are allocation-free when a name passes, and `Optional.ifPresent` with a lambda that
+  captures the context and the name is not -- it allocates whether or not the `Optional` holds anything.
+  The JSON side measured it at ~140 bytes per bound record for two such calls per member name, and
+  testing the `Optional` instead put it back inside the noise; this runs on every type-ref, annotation
+  and field name of every TSON read, so the figure there is per *name* rather than per record.
+  `AllocationHarnessTest` is where the before/after goes.
 
 - [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is
   the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one

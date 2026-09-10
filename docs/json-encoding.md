@@ -491,6 +491,51 @@ parse category. JEP 540 calls it a parse error for want of anywhere else to put 
 somewhere to put a partial answer and a Java record does not. Same asymmetry `tson-compiler` draws between
 its own two readers.
 
+## The identifier policy, and the one reader that can apply it
+
+[TSON-DATA] §8.2 has two Unicode surfaces. The **token** policy reaches every JSON token and is
+`JsonStream`'s, upstream of everything. The **identifier** policy reaches *names* — and in this encoding
+only one reader can tell a name from a key.
+
+**§4.1 is why.** `{"a": 1}` is one syntax for a record and a map, and the position decides which. So
+nothing that merely reads a member name can say whether it read a field name (§2.5 makes that an
+identifier at every layer) or a map key (data, which is the token policy's business). `tson-compiler` has
+no such problem: TSON text spells the two apart (`a: 1` against `k => v`), so its read context checks every
+`FieldName` event it delivers. That difference is the same one that made this a separate stack rather than
+a front end over `TsonEventSource`.
+
+**`JsonObjectReader` holds a position; `JsonTreeReader` does not.** The target class plays the schema's
+part in this encoding, so a `DataClassRecord` position means the members are names and a `DataClassMap`
+position means they are keys. `DataClassObjectReader.checkNameHygiene` applies the two per-name rules
+there and `bindMap` applies nothing, deliberately — which is also what keeps a JSON-Schema conversion from
+meeting a name rule on `additionalProperties`. The tree reader applies nothing at all: a `JsonObject`'s
+members could be either, and guessing is what §4.1 forbids.
+
+**Both defaults are on**, as §8.2 requires — the identifier profile MUST apply and a name's scripts SHOULD
+be judged at Highly Restrictive over the whole name — and both relax through
+`withProcessorPolicy(policy.withIdentifierPolicy(…))`, which §8.2 requires be code rather than ambient.
+Every member name a record position carries is judged, declared or not: §8.2's scope is the names the
+document wrote, and the undeclared case is the one that matters, a look-alike of a declared name arriving
+where the class will not keep it.
+
+**A refusal is a verdict but not an invalidity.** §8.2 says it MUST NOT be reported in any of §8.1's four
+categories and §9.4 carries those categories here unchanged, so what keeps it apart is the *code* —
+`RESTRICTED_CHARACTER` and `RESTRICTED_SCRIPT`, one per rule, because the two want different fixes.
+`Code.verdict()` stays `true`: the processor looked and declined, and the sender holds the fix, which is
+the question a consumer routes on.
+
+**The third rule has no home here**, and `BACKLOG.md` carries the decision that is owed. Names that read
+alike is a property of a *set*, which `tson-compiler` asks of a record's field names in its schemaless
+tree reader — where the document's own field set is all there is. Under a class the admissible names are
+declared, so a member reading alike to a declared one is undeclared and already reports
+`UNRECOGNIZED_FIELD`; the TSON bind path draws the line in the same place, and drawing it elsewhere would
+make this encoding stricter than that one for a rule §8.2 states once.
+
+**It costs nothing measurable**, which took one edit rather than a design: both rule implementations are
+allocation-free when a name passes, but `Optional.ifPresent` with a capturing lambda is not — it captures
+and allocates whether or not the `Optional` holds anything. Two per member name was ~140 bytes per bound
+record in `JsonAllocationHarnessTest`; tested rather than `ifPresent`-ed, it is back inside the noise.
+
 ## Writing: the two readers, inverted
 
 `JsonTreeWriter` is the inverse of `JsonTreeReader` and `JsonObjectWriter` of `JsonObjectReader`, each a
