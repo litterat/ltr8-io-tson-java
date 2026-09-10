@@ -199,13 +199,32 @@ So: `tson-json` has its own lexer, its own structural layer, its own tree, and i
 half of §5–§8 is where it will depend on `tson-compiler`; the JSON layers under that stay usable, and
 testable, without one.
 
-## Aligned with JEP 540
+## Aligned with JEP 540 — and only in the tree
 
 [JEP 540](https://openjdk.org/jeps/540) puts a simple JSON API in the JDK — `jdk.incubator.json`, JDK 28, not
 available to build against now. The tree model follows its shape and its names: a sealed `JsonValue` over
-`JsonObject`/`JsonArray`/`JsonString`/`JsonNumber`/`JsonBoolean`/`JsonNull`, `Json.parse`,
-`JsonParseException`. A consumer moving between the two learns one API, and a bridge is later a mapping rather
-than a rewrite.
+`JsonObject`/`JsonArray`/`JsonString`/`JsonNumber`/`JsonBoolean`/`JsonNull`. A consumer moving between the two
+learns one value model, and a bridge is later a mapping rather than a rewrite.
+
+**The alignment is the `tree` package and its vocabulary. It is not a claim about anything else.** Reading,
+writing and the exceptions either raises follow the **TSON side of this library** — `TsonTreeReader`,
+`TsonObjectReader` and what they throw — because a consumer here holds documents in two encodings and must
+route on one rule, not on which encoding happened to refuse. Where the JDK's shape and this library's
+behaviour disagree, this library wins, and every JEP 540 mention elsewhere in the code should be read as
+naming a value model rather than settling a behaviour.
+
+Three consequences, all of them already true:
+
+- **A fail-fast read throws `ReadException`, never a parse exception.** A syntax failure goes through the
+  read's own receiver like every other problem ([TSON-DATA] §8.1 makes it a verdict the sender can act on),
+  and for a fail-fast read the receiver is what throws — so `Json.parse("[1] 2")` raises `ReadException` with
+  the position and `Diagnostic.Code` on `diagnostic()`, exactly as `new TsonTreeReader().read(…)` does. There
+  is no `JsonParseException` in this library; the stack raises `tson-base`'s shared `ParseException` beneath
+  the readers, and the readers classify it (`JsonDiagnostics`).
+- **A collecting read never throws for a bad document.** It returns nothing and the collector says why —
+  again the TSON readers' rule, not a JDK one, JEP 540 having no diagnostics model at all.
+- **Diagnostics are one vocabulary across both encodings** ([TSON-JSON] §9.4), so a JSON problem is a
+  `Diagnostic` with a `Code` from the same closed enum, never a JSON-specific report.
 
 **`Json` leads a name here, on `Tson`'s own terms.** `CLAUDE.md`'s rule reserves a prefix for types a consumer
 of this library names in their own code, and the names a consumer writes in this module are the JDK's — so
@@ -420,7 +439,37 @@ this is where it will live.
 
 **JEP 540's entry points stay static on it** — `Json.parse(text)`, `Json.toDisplayString(value)` — over a
 default configuration. They are the zero-ceremony path the API is named for, and what a consumer moving from
-`jdk.incubator.json` will type. A caller needing a policy, a receiver or a binding builds an instance.
+`jdk.incubator.json` will type. A caller needing a policy, a receiver or a binding builds an instance. What
+they borrow is the spelling and not the contract: `parse` fails the way every read here fails, through the
+default receiver.
+
+**A document that will not parse is reported through the read's own receiver, not thrown past it.** Both
+readers funnel their `String`/`ByteSource`/`InputStream` forms through one `read(JsonEventSource)` seam, so
+one `try` there covers every entry point, and the failure goes to `readFailure`:
+
+- a **syntax failure** is `JsonDiagnostics.ofBaseSyntaxError` — `VALIDATION_ERROR`, located, with `expected`
+  naming the encoding that refused (`well-formed JSON`), because a caller routing on a diagnostic can hold
+  documents in either and that word is the difference between reaching for the right writer and the wrong one;
+- a **limit refusal** is `Diagnostic.ofLimitExceeded`, tried first — the read ends the same way but what is
+  reported says this processor declined rather than that the document is malformed (§10.1, and `verdict()` is
+  `false`);
+- **anything else is rethrown**, so a fault in this library reaches the caller as itself. A bug is not a
+  verdict on the document, and turning one into a diagnostic would bury the real failure behind a false one.
+
+So a collecting read never throws for a bad *document* — it returns nothing and the collector says why, with
+whatever value-level problems it found first still in it — and a fail-fast read still throws, as
+`ReadException`, because its receiver is what throws. That is the TSON readers' rule exactly (`TsonTreeReader.
+readFailure`), which is the point: the two encodings answered this differently for as long as the JSON readers
+caught nothing, and a `ParseException` escaping a collecting read was the one failure a caller who asked for
+every problem could not see coming.
+
+**`JsonDiagnostics` is a peer of `TsonDiagnostics`, not a case inside it.** A `Diagnostic` is the shape of an
+answer and is shared (§9.4 adds no category of its own); *classifying* a failure is reading a document, and
+reading is where the two are separate stacks — one switch over both would be a switch responsible for
+exceptions it cannot name. It has one case where the text encoding has three: §8.1 makes a lexer error and a
+parse error separate categories and TSON text keeps them separate in the type, where this stack raises
+`ParseException` for both and splits them here; and there is no counterpart to
+`TsonUnsupportedDocumentException`, a JSON document declaring no conformance class to be refused for.
 
 `Json` used to reduce events into a tree itself, which put an **engine in a front door's name** and left the
 stack with no tree *facade* at all — a tree read could not be given a receiver, a policy or a path where a

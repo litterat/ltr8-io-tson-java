@@ -3,7 +3,8 @@ package io.ltr8.tson.json;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
-import io.ltr8.tson.base.ParseException;
+import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.stream.JsonEventSource;
@@ -26,6 +27,12 @@ import java.util.Objects;
  * zero-ceremony path this API is named for -- {@code Json.parse(text)} and nothing else to know -- and they
  * stay static because that is what a consumer moving from {@code jdk.incubator.json} will type. A caller
  * who needs a policy, a receiver or a binding builds an instance instead.
+ *
+ * <p><b>What is borrowed there is the spelling, not the contract.</b> {@code parse} fails the way every
+ * read in this library fails -- {@link ReadException} carrying a {@link Diagnostic}, thrown by the default
+ * receiver -- rather than the way {@code jdk.incubator.json} fails. The JEP 540 alignment is the {@code
+ * tree} package's value model; reading, writing and exceptions follow the TSON side of this library, so a
+ * consumer reading both encodings routes on one rule.
  *
  * <p><b>What this class no longer is.</b> It used to reduce events into a tree itself, which put an engine
  * in a front door's name and left the JSON stack with no tree <em>facade</em> at all -- so a tree read
@@ -108,7 +115,13 @@ public final class Json {
 
     // ── JEP 540's entry points ───────────────────────────────────────────
 
-    /** @throws ParseException if the document is not JSON within [TSON-JSON] §3.1's profile */
+    /**
+     * @throws ReadException if the document is not JSON within [TSON-JSON] §3.1's profile -- the reader's
+     *         default receiver is the throwing one, and a syntax failure reaches it like every other
+     *         problem, so the fail-fast answer is one type across both encodings and the position and
+     *         {@link Diagnostic.Code} travel on {@link ReadException#diagnostic()}. A caller wanting every
+     *         problem in one pass takes {@link #treeReader()} with a collecting receiver instead.
+     */
     public static JsonValue parse(String source) {
         return JsonTreeReader.standard().read(source);
     }

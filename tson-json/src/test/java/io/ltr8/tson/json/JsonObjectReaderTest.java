@@ -2,8 +2,6 @@ package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
@@ -29,6 +27,7 @@ import java.util.UUID;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -497,7 +496,7 @@ class JsonObjectReaderTest {
 
         @Test
         void trailing_content_is_refused_because_the_source_is_drained() {
-            assertTrue(assertThrows(ParseException.class,
+            assertTrue(assertThrows(ReadException.class,
                     () -> READER.read("{\"name\": \"a\", \"age\": 1} 2", Person.class))
                     .getMessage().contains("this one is complete"));
         }
@@ -515,7 +514,7 @@ class JsonObjectReaderTest {
             // exactly where a bound is easiest to lose -- skipValue walks it and must still be counted.
             JsonObjectReader lenient = READER.ignoringUnknownFields();
             String deep = "{\"name\": \"a\", \"age\": 1, \"extra\": " + "[".repeat(200) + "]".repeat(200) + "}";
-            assertThrows(LimitExceededException.class, () -> lenient.read(deep, Person.class));
+            assertThrows(ReadException.class, () -> lenient.read(deep, Person.class));
             assertInstanceOf(Person.class, lenient
                     .withProcessorPolicy(ProcessorPolicy.defaults()
                             .withLimits(LimitsPolicy.defaults().withMaxDepth(256)))
@@ -524,9 +523,17 @@ class JsonObjectReaderTest {
 
         @Test
         void a_document_that_is_not_json_fails_as_a_parse_rather_than_a_bind() {
-            // The two exceptions answer different questions: "this is not JSON" against "this is not my
-            // JSON", and a caller routes on which it caught.
-            assertThrows(ParseException.class, () -> READER.read("{\"name\": }", Person.class));
+            // Both arrive as ReadException now -- a syntax failure goes through the receiver like every
+            // other problem -- so what separates them is the diagnostic, which is what a caller routes on.
+            // The two answer different questions: "this is not JSON" against "this is not my JSON".
+            Diagnostic notJson = assertThrows(ReadException.class,
+                    () -> READER.read("{\"name\": }", Person.class)).diagnostic();
+            assertEquals(Diagnostic.Code.VALIDATION_ERROR, notJson.code());
+            assertEquals("well-formed JSON", notJson.expected());
+
+            Diagnostic notMine = assertThrows(ReadException.class,
+                    () -> READER.read("{\"name\": 1, \"age\": 2}", Person.class)).diagnostic();
+            assertNotEquals("well-formed JSON", notMine.expected());
         }
     }
 }

@@ -5,6 +5,12 @@ package io.ltr8.tson.json.tree;
  * index of one that is not an array, a member or index that is not there, or a host conversion the
  * value does not support or cannot represent exactly.
  *
+ * <p><b>A navigation failure, never a read failure.</b> It belongs to the tree the way {@code
+ * TsonMissing} belongs to {@code TsonValue} -- raised by a consumer asking this value a question it cannot
+ * answer, long after any document was read. What a <em>read</em> raises is the TSON side's answer and not
+ * this: {@code ReadException} carrying a {@code Diagnostic}. That is why naming this one after JEP 540 is
+ * consistent with the alignment stopping at the tree package rather than an exception to it.
+ *
  * <p>Unchecked, and named for JEP 540's exception of the same name and role. The throwing accessors
  * ({@link JsonValue#get}, {@link JsonValue#asInt} and the rest) are the ergonomic path; every one has a
  * non-throwing peer ({@link JsonValue#tryGet}, {@link JsonValue#tryValue}) for a caller reading a

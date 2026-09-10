@@ -1,7 +1,9 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.io.ByteSource;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.reader.JsonReadContext;
 import io.ltr8.tson.json.reader.SchemalessTreeReader;
@@ -102,11 +104,42 @@ public final class JsonTreeReader {
      * {@code "[1] 2"}.
      */
     public JsonValue read(JsonEventSource events) {
-        JsonReadContext ctx = JsonReadContext.of(events, receiver);
-        JsonValue root = ENGINE.read(ctx);
-        if (!(events.next() instanceof JsonEvent.EndOfDocument)) {
-            throw new IllegalStateException("the stream produced events after the document's root value");
+        try {
+            JsonReadContext ctx = JsonReadContext.of(events, receiver);
+            JsonValue root = ENGINE.read(ctx);
+            if (!(events.next() instanceof JsonEvent.EndOfDocument)) {
+                throw new IllegalStateException("the stream produced events after the document's root value");
+            }
+            return root;
+        } catch (RuntimeException e) {
+            return readFailure(e);
         }
-        return root;
+    }
+
+    /**
+     * A document that will not parse, reported through this read's own receiver rather than thrown past it
+     * -- so a collecting read never throws for a bad <i>document</i>, and a fail-fast one still throws,
+     * because its receiver does when handed this.
+     *
+     * <p><b>Why the receiver rather than the caller.</b> The lexer is fail-fast and the stream is lazy, so a
+     * syntax failure surfaces mid-read, after any earlier value-level problem has already been reported --
+     * which leaves a collecting caller holding a populated collector <em>and</em> an exception, with no way
+     * to tell that the two belong to one document. Reporting it is also the only way the problem reaches a
+     * caller who asked for problems.
+     *
+     * <p>Nothing continues past this, and nothing pretends to: the read is over and hands back no tree.
+     *
+     * <p>{@link JsonDiagnostics#ofBaseSyntaxError} rethrows anything that is not a syntax failure, so a
+     * fault in this library still reaches the caller as itself: a bug is not a verdict on the document.
+     *
+     * <p><b>A limit refusal comes through here too, and is classified apart</b> ([TSON-JSON] §10.1 gives
+     * this encoding [TSON-DATA] §9.1's bounds): the read ends the same way -- report once, hand back nothing
+     * -- but what is reported says this processor declined rather than that the document is malformed.
+     */
+    private JsonValue readFailure(RuntimeException e) {
+        receiver.report(e instanceof LimitExceededException limit
+                ? Diagnostic.ofLimitExceeded(limit)
+                : JsonDiagnostics.ofBaseSyntaxError(e));
+        return null;
     }
 }

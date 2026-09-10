@@ -6,7 +6,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.ParseException;
-import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.json.tree.JsonArray;
 import io.ltr8.tson.json.tree.JsonBoolean;
 import io.ltr8.tson.json.tree.JsonNull;
@@ -108,7 +107,7 @@ class JsonTest {
 
         @Test
         void the_stream_is_drained_so_trailing_content_is_refused() {
-            assertTrue(assertThrows(ParseException.class, () -> Json.parse("[1] 2"))
+            assertTrue(assertThrows(ReadException.class, () -> Json.parse("[1] 2"))
                     .getMessage().contains("this one is complete"));
         }
 
@@ -116,7 +115,7 @@ class JsonTest {
         void bytes_and_a_string_parse_alike_and_bytes_are_where_the_utf8_rules_bite() {
             String source = "{\"\u00E9\": [1, true, null]}";
             assertEquals(Json.parse(source), Json.parse(new ByteArrayInputStream(source.getBytes(UTF_8))));
-            assertTrue(assertThrows(ParseException.class,
+            assertTrue(assertThrows(ReadException.class,
                     () -> Json.parse(new ByteArrayInputStream(new byte[]{'"', (byte) 0xC3, '"'})))
                     .getMessage().contains("not valid UTF-8"));
         }
@@ -124,7 +123,7 @@ class JsonTest {
         @Test
         void the_nesting_bound_reaches_parse_and_refuses_before_the_reducer_descends() {
             String deep = "[".repeat(200) + "1" + "]".repeat(200);
-            assertThrows(LimitExceededException.class, () -> Json.parse(deep));
+            assertThrows(ReadException.class, () -> Json.parse(deep));
             assertInstanceOf(JsonArray.class, Json.parse(deep,
                     ProcessorPolicy.defaults().withLimits(LimitsPolicy.defaults().withMaxDepth(256))));
         }
@@ -158,7 +157,7 @@ class JsonTest {
             // It keeps the output well-formed UTF-8. The value is still one §3.1 refuses on the way back
             // in, and refusing it there is where the spec puts the rule.
             assertEquals("\"\\ud83d\"", new JsonString("\uD83D").toString());
-            assertThrows(ParseException.class, () -> Json.parse(new JsonString("\uD83D").toString()));
+            assertThrows(ReadException.class, () -> Json.parse(new JsonString("\uD83D").toString()));
         }
 
         @Test

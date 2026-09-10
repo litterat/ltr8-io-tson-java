@@ -9,8 +9,13 @@ import java.util.Optional;
  *
  * <p><b>Shaped and named after JEP 540</b>, the JDK's forthcoming {@code jdk.incubator.json} — the same
  * six subtypes, the same {@code get}/{@code tryGet} navigation and {@code as*} conversion vocabulary,
- * the same {@code of} factories — so a consumer learns one API across the two and a bridge is later a
- * mapping rather than a rewrite. Where this differs, {@code docs/json-encoding.md} says why.
+ * the same {@code of} factories — so a consumer learns one value model across the two and a bridge is later
+ * a mapping rather than a rewrite. Where this differs, {@code docs/json-encoding.md} says why.
+ *
+ * <p><b>The alignment stops at this package.</b> It is a statement about a tree's shape and names, never
+ * about how a document is read or written or what a failure is raised as — those follow the TSON side of
+ * this library ({@code TsonValue}'s own readers and writers), because a consumer holding both encodings
+ * routes on one rule rather than on which one refused.
  *
  * <p><b>This is a faithful JSON model, not a TSON one.</b> {@link JsonNull} is a value here, because at
  * this layer it is one; [TSON-JSON] §7 makes JSON null the absent sentinel's spelling <em>at a typed
