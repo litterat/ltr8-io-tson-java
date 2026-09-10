@@ -444,6 +444,15 @@ for free by sitting upstream of the rewind. That decorator skips itself entirely
 without making the wrapper unconditional and putting a switch per token back into the cost of a read that
 has no policy at all.
 
+**Both surfaces are allocation-free when nothing is refused**, which is what makes the on-by-default one
+affordable. `UnicodePolicy.violation` and `IdentifierProfile.hygiene` each scan and return
+`Optional.empty()` — no split array, no script set, no stream — and the two call sites test that `Optional`
+rather than passing a lambda to `ifPresent`. That last part is not a style preference: a lambda capturing
+the name and the receiver allocates whether or not the `Optional` holds anything, and at one per rule per
+name it was the whole measured cost of a check that is otherwise free — ~110 bytes per bound record, ~640
+per read, and ~670 of the ~770 a raised *token* policy used to add. `AllocationHarnessTest` carries the
+figures and the ceiling that now catches a return to them.
+
 **Two surfaces, two defaults, and §8.2 sets both.** `withTokenPolicy` defaults to `unrestricted()` because a
 value is data and may legitimately be anything; `withIdentifierPolicy` defaults to Highly Restrictive over
 the whole name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able to

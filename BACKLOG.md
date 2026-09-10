@@ -214,14 +214,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **`DefaultTsonReadContext.checkNameHygiene` allocates a capturing lambda per name.** Both §8.2 rule
-  implementations are allocation-free when a name passes, and `Optional.ifPresent` with a lambda that
-  captures the context and the name is not -- it allocates whether or not the `Optional` holds anything.
-  The JSON side measured it at ~140 bytes per bound record for two such calls per member name, and
-  testing the `Optional` instead put it back inside the noise; this runs on every type-ref, annotation
-  and field name of every TSON read, so the figure there is per *name* rather than per record.
-  `AllocationHarnessTest` is where the before/after goes.
-
 - [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is
   the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one
   table with a default each, so nothing here is a judgement call any more — what is left is eleven document
