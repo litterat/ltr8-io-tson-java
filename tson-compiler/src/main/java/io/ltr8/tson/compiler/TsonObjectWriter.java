@@ -1,34 +1,15 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.base.io.ByteSink;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
-import io.ltr8.tson.atom.VocabularyAtoms;
-import io.ltr8.annotation.Transparent;
-import io.ltr8.annotation.Typename;
 import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
-import io.ltr8.bind.DataClassAnnotated;
-import io.ltr8.annotation.Annotation;
-import io.ltr8.annotation.Annotations;
-import io.ltr8.tson.tree.TsonValue;
 import io.ltr8.bind.DataClass;
-import io.ltr8.bind.DataClassArray;
-import io.ltr8.bind.DataClassAtom;
-import io.ltr8.bind.DataClassElement;
-import io.ltr8.bind.DataClassField;
-import io.ltr8.bind.DataClassMap;
-import io.ltr8.bind.DataClassRecord;
-import io.ltr8.bind.DataClassTuple;
-import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
-import java.io.Writer;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -121,7 +102,7 @@ public final class TsonObjectWriter {
      * has them, so reproducing a document reproduces it while a writer configured for something the document
      * does not state still contributes it.
      *
-     * @throws TsonWriteException if {@code document} names a schema but no root type -- the pair is what
+     * @throws WriteException if {@code document} names a schema but no root type -- the pair is what
      *                            makes a document self-describing, and a reader given only the directive
      *                            has a schema and no way to pick a type from it
      */
@@ -143,7 +124,7 @@ public final class TsonObjectWriter {
     private TsonObjectWriter forDocument(TsonObjectDocument<?> document) {
         TsonObjectWriter writer = this;
         if (document.schema().isPresent()) {
-            String type = document.rootType().orElseThrow(() -> new TsonWriteException(
+            String type = document.rootType().orElseThrow(() -> new WriteException(
                     "this document names the schema \"" + document.schema().get() + "\" and no root type, so "
                     + "there is nothing to write as the root's type-ref and a reader would have no way to pick "
                     + "a type from that schema -- a document read against a schema carries both, so this one "

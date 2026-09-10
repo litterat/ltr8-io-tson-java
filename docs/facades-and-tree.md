@@ -222,7 +222,8 @@ admit UTS #39's own `Toys-Я-Us`.
   compile time about a schema and a class that disagree.
 - **`TsonObjectWriter.toTson` is mainly a debugging tool**, not a guaranteed-lossless serializer (integer
   width, tuple-ness, and captured wire annotations are documented write-side losses). Both throw unchecked
-  (`ReadException`/`TsonWriteException`), so the pair is symmetric and a caller writes neither a
+  (`ReadException`/`WriteException`, both `tson-base`'s and shared by every encoding), so the pair is
+  symmetric and a caller writes neither a
   `throws` clause nor a try/catch for the common path.
 - **Both writers take a sink, and `toTson` is that method over a `StringBuilder`.** `write(value,
   OutputStream)` / `write(value, Appendable)` mirror every reader taking an `InputStream`: `TsonDataEmitter`
@@ -231,7 +232,7 @@ admit UTS #39's own `Toys-Я-Us`.
   is UTF-8 ([TSON-DATA] §9.1), **flushed and not closed**: unflushed, the encoder's own buffer swallows a
   short document whole, and closing would end the HTTP response body this exists for. An `IOException` from
   the sink becomes an `UncheckedIOException` — the same treatment `Lexer` gives a failing `InputStream`, and
-  deliberately *not* `TsonWriteException`, which means "this value cannot be written as TSON". That
+  deliberately *not* `WriteException`, which means "this value cannot be written in this encoding". That
   distinction needs `TsonObjectWriter`'s two `catch (Throwable)` handlers to let it past, or an IO fault
   surfaces blaming the object.
 - **A writer can emit a document header, and it is off by default.** `TsonDataEmitter` gained `documentId`/

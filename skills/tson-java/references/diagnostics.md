@@ -144,14 +144,14 @@ Every exception this library raises at read time is unchecked. There is no commo
 
 ```
 RuntimeException
-├── ReadException              io.ltr8.tson.compiler  — .diagnostic(); what a fail-fast read throws
-├── TsonParseException             io.ltr8.tson.compiler  — well-formed tokens, invalid document (§7.4)
+├── ReadException              io.ltr8.tson.base — .diagnostic(); what a fail-fast read throws
+├── ParseException             io.ltr8.tson.base — well-formed tokens, invalid document (§7.4)
+├── WriteException             io.ltr8.tson.base — the write-side peer of ReadException
 ├── TsonUnsupportedDocumentException  a well-formed document of a kind this parser does not implement
-├── TsonWriteException             the write-side peer of ReadException
 ├── BindMismatchException      a schema type and its bound class disagree
 │   └── MissingBindingException   a schema type with no bound class at all
-├── TsonSchemaValidationException  io.ltr8.tson.schema — the author's schema is wrong and the spec says so
-├── SchemaFetchException       .uri(), .reason() — the ONLY exception a TsonSchemaSource may throw
+├── SchemaValidationException  io.ltr8.tson.base — the author's schema is wrong and the spec says so
+├── SchemaFetchException       .uri(), .reason() — the ONLY exception a SchemaSource may throw
 ├── ContentHashMismatchException  a ?sha256= pin did not match the fetched content
 ├── AtomTypeException              (sealed, internal package) .expected()
 │   ├── AtomParseException         the token is not this atom's grammar

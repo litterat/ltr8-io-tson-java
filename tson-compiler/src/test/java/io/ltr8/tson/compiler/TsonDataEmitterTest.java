@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.WriteException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -131,7 +132,7 @@ class TsonDataEmitterTest {
     /** A directive argument MUST be a URI (§3.3), so a caller cannot emit a document that will not read back. */
     @Test
     void aDirectiveArgumentThatIsNotAUriIsRefused() {
-        TsonWriteException thrown = assertThrows(TsonWriteException.class,
+        WriteException thrown = assertThrows(WriteException.class,
                 () -> new TsonDataEmitter().schemaRef("not a uri"));
 
         assertTrue(thrown.getMessage().contains("is not a valid URI"), thrown.getMessage());
@@ -141,7 +142,7 @@ class TsonDataEmitterTest {
 
     @Test
     void asecondTypeRefOnOneValueIsRefused() {
-        TsonWriteException thrown = assertThrows(TsonWriteException.class,
+        WriteException thrown = assertThrows(WriteException.class,
                 () -> new TsonDataEmitter().typeRef("point").typeRef("uuid"));
 
         assertTrue(thrown.getMessage().contains("two type annotations on one value"), thrown.getMessage());

@@ -2,7 +2,7 @@ package io.ltr8.tson.cli;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonObjectWriter;
-import io.ltr8.tson.compiler.TsonWriteException;
+import io.ltr8.tson.base.WriteException;
 
 import java.util.List;
 import java.util.Locale;
@@ -113,7 +113,7 @@ enum OutputFormat {
     private static String renderTson(ValidationRun run) {
         try {
             return new TsonObjectWriter().toTson(run);
-        } catch (TsonWriteException e) {
+        } catch (WriteException e) {
             throw new IllegalStateException("failed to render this CLI's own diagnostics as TSON", e);
         }
     }
@@ -385,7 +385,7 @@ enum OutputFormat {
     private static String renderTson(ValidationReport report) {
         try {
             return new TsonObjectWriter().toTson(report);
-        } catch (TsonWriteException e) {
+        } catch (WriteException e) {
             throw new IllegalStateException("failed to render this CLI's own diagnostics as TSON", e);
         }
     }
@@ -394,7 +394,7 @@ enum OutputFormat {
     private static String renderTson(CliPolicy policy) {
         try {
             return new TsonObjectWriter().toTson(policy);
-        } catch (TsonWriteException e) {
+        } catch (WriteException e) {
             throw new IllegalStateException("failed to render this CLI's own policy as TSON", e);
         }
     }

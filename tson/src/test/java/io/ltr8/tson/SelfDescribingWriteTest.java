@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 import io.ltr8.tson.base.ProcessorConfig;
+import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.TsonTreeWriter;
 import io.ltr8.tson.compiler.TsonTreeReader;
 import io.ltr8.tson.base.io.ByteSink;
@@ -7,7 +8,6 @@ import io.ltr8.tson.base.io.ByteSink;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.TsonWriteException;
 import io.ltr8.tson.tree.TsonAtom;
 import io.ltr8.tson.tree.TsonRecord;
 import io.ltr8.tson.tree.TsonValue;
@@ -130,7 +130,7 @@ class SelfDescribingWriteTest {
         fields.put("x", TsonAtom.of(BigInteger.valueOf(3)));
         TsonRecord untagged = new TsonRecord(fields, Optional.empty(), List.of());
 
-        TsonWriteException thrown = assertThrows(TsonWriteException.class,
+        WriteException thrown = assertThrows(WriteException.class,
                 () -> tson().treeWriter().describing(ID).toTson(untagged));
 
         assertTrue(thrown.getMessage().contains("needs a root type-ref"), thrown.getMessage());

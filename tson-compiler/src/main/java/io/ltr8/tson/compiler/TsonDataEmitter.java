@@ -1,12 +1,12 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.base.io.ByteSink;
 import io.ltr8.tson.base.io.Utf8Sink;
-import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
-import io.ltr8.tson.compiler.ast.TokenForm;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayDeque;
@@ -229,7 +229,7 @@ public final class TsonDataEmitter {
         try {
             URI_ATOM.read(uri);
         } catch (AtomTypeException e) {
-            throw new TsonWriteException("'!!" + name + "' argument \"" + uri + "\" is not a valid URI (§3.3): "
+            throw new WriteException("'!!" + name + "' argument \"" + uri + "\" is not a valid URI (§3.3): "
                     + e.getMessage(), e);
         }
         emit("!!");
@@ -253,7 +253,7 @@ public final class TsonDataEmitter {
      */
     public TsonDataEmitter typeRef(String name) {
         if (typeRefPending) {
-            throw new TsonWriteException("two type annotations on one value ('!" + pendingTypeRef + "' then '!"
+            throw new WriteException("two type annotations on one value ('!" + pendingTypeRef + "' then '!"
                     + name + "'): §3.2 admits at most one, so the result would not parse", null);
         }
         typeRefPending = true;

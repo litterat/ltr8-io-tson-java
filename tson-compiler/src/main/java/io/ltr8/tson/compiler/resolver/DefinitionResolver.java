@@ -1,9 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
-import io.ltr8.tson.base.BindMismatchException;
-import io.ltr8.tson.base.MissingBindingException;
-import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.compiler.TsonWriteException;
+import io.ltr8.tson.base.*;
+import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -33,8 +31,6 @@ import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
-import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -43,7 +39,6 @@ import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
-import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
@@ -862,7 +857,7 @@ final class DefinitionResolver {
         try {
             String sourceText = writer.toTson(sourceBody);
             return new TsonDataParser(sourceText).parseDocument().root().coreValue();
-        } catch (TsonWriteException e) {
+        } catch (WriteException e) {
             throw new UnsupportedOperationException(
                     "'" + name + "': failed to re-serialize the refinement source: " + e.getMessage(), e);
         }

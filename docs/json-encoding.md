@@ -491,6 +491,75 @@ parse category. JEP 540 calls it a parse error for want of anywhere else to put 
 somewhere to put a partial answer and a Java record does not. Same asymmetry `tson-compiler` draws between
 its own two readers.
 
+## Writing: the two readers, inverted
+
+`JsonTreeWriter` is the inverse of `JsonTreeReader` and `JsonObjectWriter` of `JsonObjectReader`, each a
+facade over an engine in the unexported `writer` package (`TreeValueWriter`, `DataClassObjectWriter`) — the
+same front-door/engine split the read side makes, and for the same reason: a front door owns the
+*document* (the sinks it writes to, the form it writes in) where an engine owns one value and contributes
+no framing.
+
+**`JsonDataEmitter` owns the punctuation, and that is the whole reason it exists.** It is the push-based
+peer of `JsonStream`'s pull: a caller says `beginObject()`, `member(name)`, `endObject()`, and the commas,
+the colons and the newlines between them are the emitter's to place. Two walks placing their own commas is
+two chances to place one wrongly, and the failure is a document that will not parse. One flag —
+`expectingMemberValue` — is what keeps a comma out from between a name and its own value; everything else
+is a per-scope count.
+
+**The tree round trip is total, and that is a stronger claim than `TsonTreeWriter` can make.** TSON text
+spells one value several ways and a tree does not record which, so `TsonTreeWriter` documents its losses
+(integer width, tuple-ness). RFC 8259 has six kinds and one spelling each, and `JsonNumber` holds the
+*literal* rather than a parsed number — so §5.3's digits and scale come back out, `199.90` is written
+`199.90`, and `JsonTreeWriterTest` asserts equality of **text**, not merely of value. The only thing not
+preserved is whitespace, which §9.3 does not make part of a value. That closes the half of §5.3 a read alone
+could not test: the scale survived into a `BigDecimal` and nothing checked it came back.
+
+**The object round trip is through the class that wrote it**, which is the accurate claim rather than a
+weaker one. §4.1 makes reading schema-directed and the reader lets the target class play that part; writing
+is that arrangement seen from the other end, so the descriptor decides whether a value is an object, an
+array or a leaf and nothing inspects a value to guess. An `int`'s width and a tuple's tuple-ness live in the
+class exactly as they live in a schema, so a document written here is self-describing only to a reader
+holding one.
+
+**One lookup answers both "is this a vocabulary atom" and "how is it spelled".** `VocabularyAtoms` is keyed
+by the wire class, and every entry in it — a `UUID`, a `LocalDate`, a `byte[]` — encodes as a JSON string,
+because the table holds exactly the host types the vocabulary reads to that are not numbers or booleans.
+What falls through is the set §5.3 and §5.4 spell as JSON's own kinds. Dispatching on `instanceof Number`
+instead is how `litterat-json`'s `JsonMapper.writeAtom` puts a `long` and a `BigInteger` down one branch and
+writes neither by its family.
+
+**Two things are refused rather than approximated, both because the reader could not take them back:**
+
+- **a choice.** §8.2 admits an untagged one by a declared discriminator or by class-stable disjoint
+  variants, both facts a *schema* states; a Java union states neither. This is the exact mirror of the
+  reader's own refusal, and writing one would produce a document this library cannot read.
+- **a host value with no JSON spelling**, and a map whose key type a member name cannot spell — the write
+  side of the reader's own `BIND_MISMATCH` on the same shape.
+
+Non-finite doubles are **not** among them: §5.4's approximate families spell them `".inf"`, `"-.inf"` and
+`".nan"` — [TSON-DATA] §7.6's own productions, so the parser that reads them back is the one that reads
+every other number, and no third spelling of infinity enters the series.
+
+**What is dropped is what the reader cannot produce.** Wire annotations: §3.3's annotation object belongs to
+the schema-directed decode, and `DataClassObjectReader` binds every carrier to `Annotations.empty()`, so
+writing them would emit members no reader here takes back. An absent field is left out rather than written
+`null` — §7 makes JSON null the absent sentinel at a typed position, so the two say the same thing and the
+shorter one is what a reader of any strictness takes.
+
+**`WriteException` is `tson-base`'s**, shared by both encodings for `ParseException`'s reason: a value the
+encoding cannot take is the *processor's* fact rather than one format's. `DataBindException` is the
+different failure — a class that could not be taken apart — and it is wrapped rather than passed through, so
+one unchecked type covers every way a write can fail. Both encodings' writers throw it, which is what puts
+the difference in the message rather than in the type: each throw site names its own encoding ("cannot write
+X as JSON"), so nothing about the exception has to.
+
+**Every sink is UTF-8 and none is closed here.** `write(value, ByteSink)` encodes UTF-8 itself, so a
+document reaches a `ByteBuffer`, a channel or a file without existing as a `String` first; each `write`
+flushes what it emitted, because closing is the caller's and a sink cannot tell a caller who finished from
+one who abandoned the write. `indented(indent)` is a derivation, not a setting — the compact form is the
+default and the one to send, and the indented one is byte-identical to `JsonValue.toDisplayString(indent)`,
+which is the same rendering reached from a value instead of from a writer.
+
 ## Binding: a facade over an engine
 
 `JsonObjectReader` reads a document straight into a Java object, driven by the target class's own

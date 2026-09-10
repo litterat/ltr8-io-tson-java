@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.tree.TsonArray;
 import io.ltr8.tson.tree.TsonAtom;
 import io.ltr8.tson.tree.TsonValue;
@@ -139,7 +140,7 @@ class TsonWriterStreamingTest {
     /**
      * A sink that fails is an IO fault, not a verdict on the value: {@link UncheckedIOException}, the same
      * treatment {@code Lexer} gives a failing {@code InputStream} on the read side, rather than
-     * {@link TsonWriteException}, which means "this value cannot be written as TSON".
+     * {@link WriteException}, which means "this value cannot be written as TSON".
      */
     @Test
     void aFailingSinkIsAnUncheckedIoException() {

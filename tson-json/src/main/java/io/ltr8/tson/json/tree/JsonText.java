@@ -15,19 +15,27 @@ package io.ltr8.tson.json.tree;
  * written as its own {@code \\u} escape rather than emitted raw, which keeps the output well-formed
  * UTF-8 -- the value is still one this profile would refuse on the way back in, and refusing it there
  * is where §3.1 puts the rule.
+ *
+ * <p><b>Public because the write side is two callers, not one.</b> {@link JsonValue#toString()} renders a
+ * tree JEP 540's way and {@code JsonDataEmitter} writes one to a sink; a second copy of this table is a
+ * second chance to disagree with {@code JsonLexer} about what an escape is, and the two would disagree
+ * silently -- both produce a document, and only one of them round-trips. The class stays the only place
+ * this module writes a string, which is what the name is for.
  */
-final class JsonText {
+public final class JsonText {
 
     private JsonText() {
     }
 
-    static String quote(String value) {
+    /** {@code value} as an RFC 8259 string literal, quotation marks included. */
+    public static String quote(String value) {
         StringBuilder out = new StringBuilder(value.length() + 2);
         quote(value, out);
         return out.toString();
     }
 
-    static void quote(String value, StringBuilder out) {
+    /** {@link #quote(String)} appended to {@code out} rather than returned. */
+    public static void quote(String value, StringBuilder out) {
         out.append('"');
         for (int i = 0; i < value.length(); i++) {
             char c = value.charAt(i);
