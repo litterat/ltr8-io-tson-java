@@ -483,10 +483,13 @@ so classifying a schema document (§7.1) is an answer the events give. Whether o
 conformance-class question one tier up — `TsonDataParser` and both read facades raise
 `TsonUnsupportedDocumentException` on it (not `TsonParseException`: a schema document is unsupported, not
 malformed), while `TsonSchemaParser` requires the directive. One header grammar, each parser applying its own
-class to the result. **The root value is framed on first demand rather than with the header**, so reading
-only the header leaves an empty frame stack — which is what lets a schema parser take the event and then
-drive `drain` over a stack the header never touched, and what stops the stream needing to know what kind of
-document it holds.
+class to the result -- and `TsonSchemaParser` takes its `!!id`/`!!meta` off the same event, so §2.2's header
+has **one** implementation rather than one per conformance class. What stays with each parser is its own
+rule: §12.1 requires exactly one `!!meta` where §2.2 merely permits it, and a schema document governed by
+`!!schema` is told which directive it needs. **The root value is framed on first demand rather than with
+the header**, so reading only the header leaves an empty frame stack — which is what lets a schema parser
+take the event and then drive `drain` over a stack the header never touched, and what stops the stream
+needing to know what kind of document it holds.
 
 ### Base type resolution (`.../base/`) — `docs/lexer-and-data-parsing.md`
 

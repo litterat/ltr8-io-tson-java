@@ -221,7 +221,9 @@ Key points:
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
   parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic). The
   *stream* judges nothing: it reads §2.2's header once, for everyone, and `TsonSchemaParser` sits on the same
-  stream and requires the very directive this parser refuses.
+  stream and requires the very directive this parser refuses -- taking its own `!!id`/`!!meta` off the same
+  `DocumentStart`, through `TsonDataParser.documentStart()`, so the grammar has one implementation and each
+  parser applies only its own rule on top.
 - **A directive §2.2 does not admit in a header is left unconsumed**, not refused by the stream. `!!import`
   is a schema document's and `TsonSchemaParser` reads it; a data document carrying one is an error, but the
   wording that names the broken rule belongs to the parser that knows which kind of document was expected.
