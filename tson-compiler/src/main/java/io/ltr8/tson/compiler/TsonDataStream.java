@@ -140,6 +140,14 @@ public final class TsonDataStream implements TsonEventSource {
 
     private boolean started;
 
+    /**
+     * Whether the document's root value still has to be framed. Set once the header is read and cleared by
+     * the first {@link #fill()} that needs an event past it, so a caller who wants only the header -- a
+     * peek, a schema parser taking {@code !!id}/{@code !!meta} -- never pushes a frame at all and leaves an
+     * empty stack behind for {@link #drain(Frame)} to work over.
+     */
+    private boolean rootPending;
+
     /** [TSON-DATA] §9.1's bounds -- consulted by {@link #advance()} as containers open. */
     private final LimitsPolicy limits;
 
@@ -257,7 +265,26 @@ public final class TsonDataStream implements TsonEventSource {
     }
 
     /** Runs frames until an event is ready or the stream is exhausted. */
+    /**
+     * Runs the frame stack until an event is ready, framing the document's root value first if nothing has
+     * yet asked for one.
+     *
+     * <p><b>The root is framed here rather than with the header</b>, which is what makes reading the header
+     * free of consequence: a caller that stops after {@code DocumentStart} has pushed nothing, and one that
+     * goes on to read a value gets the frames the moment it asks. It also means this stream never has to
+     * know what kind of document it holds -- a schema document simply never asks for a value, where it used
+     * to be recognised by its {@code !!meta} and framed differently on that basis.
+     *
+     * <p>{@link #drain(Frame)} does not come through here and never consults {@link #rootPending}: it
+     * frames what its caller asked for and runs that to completion, which is how {@code TsonSchemaParser}
+     * reads a schema map over a stack this method has never touched.
+     */
     private void fill() {
+        if (rootPending && ready.isEmpty() && frames.isEmpty()) {
+            rootPending = false;
+            pushFrame(new RootFrame());
+            pushFrame(new DataValueFrame());
+        }
         while (ready.isEmpty() && !frames.isEmpty()) {
             frames.pop().step();
         }
@@ -307,12 +334,43 @@ public final class TsonDataStream implements TsonEventSource {
      * §2.2's header, once, as the stream's first event -- {@code !!id} then at most one of {@code !!schema}
      * / {@code !!meta}.
      *
-     * <p><b>A {@code !!meta} document starts like any other.</b> Whether one may be <em>read</em> is a
-     * conformance-class question and this tier is below it: {@code TsonDataParser} is a Class 1 processor
-     * and refuses one ({@code TsonUnsupportedDocumentException}), {@code TsonSchemaParser} requires one, and
-     * both sit on this stream. Refusing here would settle it for both, and would also make classifying a
-     * document (§7.1) impossible through the events -- which is what a second header scan used to exist for.
+     * <p><b>This reads the header for everyone and judges nobody.</b> Whether a document may be read at all
+     * is a conformance-class question and this tier is below it: {@code TsonDataParser} is a Class 1
+     * processor and refuses a {@code !!meta} document, {@code TsonSchemaParser} requires one, and both sit
+     * on this stream. Deciding here would settle it for both, and would also make classifying a document
+     * (§7.1) impossible through the events -- which is what a second header scan used to exist for.
+     *
+     * <p><b>A directive that is neither {@code !!schema} nor {@code !!meta} is left unconsumed</b> rather
+     * than refused, for the same reason one step further on. {@code !!import} is a schema document's and
+     * {@code TsonSchemaParser} reads it; a data document carrying one is an error, but the wording that
+     * names the rule it broke belongs to the parser that knows which kind of document was expected --
+     * refusing here produced "expected '!!schema', '!!meta' or the start of the document's value" for a
+     * schema document whose real problem was a missing {@code !!meta}.
+     *
+     * <p><b>No frame is pushed here</b>, so the header costs a caller who wants only the header nothing
+     * more. A document's root value is framed by {@link #fill()} on the first demand for an event past the
+     * header -- which is also what lets a schema parser take {@code !!id}/{@code !!meta} from this event and
+     * then read {@code !!import} at token level over an empty frame stack.
      */
+    /**
+     * Nothing here can start a value.
+     *
+     * <p><b>A directive is named rather than described</b>, because at a value position it is almost always
+     * a header directive in the wrong place -- §2.2 admits {@code !!id} and one governing directive and
+     * nothing else, and {@code !!import} is a schema document's. "found '!!'" is true and useless; naming
+     * the directive says which rule was broken. The rule is the <em>position's</em>, not the document
+     * kind's, so this holds whoever is reading -- which is why it can live here while the header's own
+     * verdicts have moved up to the parsers.
+     */
+    private ParseException notAValue(Token t) {
+        if (t.type() == TokenType.DIRECTIVE) {
+            return parseError("directive '!!" + peekDirectiveName() + "' is not permitted here "
+                    + "(expected '!!schema', '!!meta' or the start of the document's value)");
+        }
+        return parseError("expected a value (record, map, array, empty braces, "
+                + "the absent sentinel '_', or a token), found " + describe(t));
+    }
+
     private void ensureStarted() {
         if (started) {
             return;
@@ -332,20 +390,16 @@ public final class TsonDataStream implements TsonEventSource {
             switch (name) {
                 case "schema" -> schema = Optional.of(parseNamedDirective("schema"));
                 case "meta" -> meta = Optional.of(parseNamedDirective("meta"));
-                default -> throw parseError("directive '!!" + name + "' is not permitted here "
-                        + "(expected '!!schema', '!!meta' or the start of the document's value)");
+                default -> {
+                    // Left where it stands, deliberately -- see this method's Javadoc. `!!import` is a
+                    // schema document's and the schema parser consumes it; anything else is an error whose
+                    // wording belongs to whoever knows which kind of document this was meant to be.
+                }
             }
         }
 
         ready.add(new DocumentStart(id, schema, meta, docStart));
-        if (meta.isPresent()) {
-            // A schema document has no data value to frame ([TSON-SCHEMA] §12.1: a schema map, not a
-            // core-value), so the header is the whole of what this stream has to say about it. Pushing the
-            // root frames anyway would leave them to be stepped over `!!import` by whatever asked next.
-            return;
-        }
-        pushFrame(new RootFrame());
-        pushFrame(new DataValueFrame());
+        rootPending = true;
     }
 
     // ── Cursor primitives over Lexer.nextToken() (bounded 2-token lookahead) ────────────
@@ -799,8 +853,7 @@ public final class TsonDataStream implements TsonEventSource {
                     advance();
                     ready.add(new TokenEvent(t.text(), formOf(t.type()), t.start()));
                 }
-                default -> throw parseError("expected a value (record, map, array, empty braces, "
-                        + "the absent sentinel '_', or a token), found " + describe(t));
+                default -> throw notAValue(t);
             }
         }
 
