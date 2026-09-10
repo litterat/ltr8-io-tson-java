@@ -51,8 +51,8 @@ import java.util.function.BiConsumer;
  *
  * <p>Rejects schema documents (header containing {@code !!meta}) with {@link
  * TsonUnsupportedDocumentException} rather than attempting to parse them -- this is a Class 1
- * (data-format-only) processor (§1.5); that check lives in {@link TsonDataStream#hasNext()}, the
- * first thing it does on any document.
+ * (data-format-only) processor (§1.5). The check is {@link #parseDocument()}'s own, on the {@link
+ * DocumentStart} the stream hands it: the stream reads §2.2's header for everyone and judges nobody.
  *
  * <p><b>Not {@code final}, deliberately.</b> {@link TsonSchemaParser} (Part 2's schema-document
  * compiler, same package) extends this class to reuse the machinery [TSON-SCHEMA] itself says it
@@ -115,13 +115,26 @@ public class TsonDataParser {
         return value;
     }
 
+    /**
+     * <b>The refusal is here, not in the stream.</b> {@link TsonDataStream} opens a {@code !!meta} document
+     * like any other -- classifying one is §7.1's point, and {@link TsonSchemaParser} sits on that same
+     * stream and requires the directive this class refuses. So the header is read once, by the stream, and
+     * each parser applies its own conformance class to the result.
+     *
+     * <p>Refused on the first event, before the document's value is reduced: a schema document is not this
+     * parser's to parse, so parsing it and then complaining would be work done to reach a verdict already
+     * available.
+     */
     public Document parseDocument() {
-        List<TsonEvent> all = new ArrayList<>();
-        while (stream.hasNext()) {
-            all.add(stream.next());
+        DocumentStart start = (DocumentStart) stream.next();
+        if (start.isSchemaDocument()) {
+            throw new TsonUnsupportedDocumentException(start.position());
         }
-        DocumentStart start = (DocumentStart) all.get(0);
-        List<TsonEvent> rootEvents = all.subList(1, all.size() - 1); // trims the trailing DocumentEnd
+        List<TsonEvent> rest = new ArrayList<>();
+        while (stream.hasNext()) {
+            rest.add(stream.next());
+        }
+        List<TsonEvent> rootEvents = rest.subList(0, rest.size() - 1); // trims the trailing DocumentEnd
         DataValue root = new EventReducer(rootEvents, positions::put).dataValue();
         return new Document(start.id(), start.schema(), root);
     }

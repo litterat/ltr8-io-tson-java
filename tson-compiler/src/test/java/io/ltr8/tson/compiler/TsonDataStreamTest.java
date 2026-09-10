@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -124,17 +125,45 @@ class TsonDataStreamTest {
         assertEquals("https://example.com/order.tn", start.schema().orElseThrow());
     }
 
+    /**
+     * The stream reports {@code !!meta}; it does not refuse it. Whether a schema document may be
+     * <em>read</em> is a conformance-class question one tier up -- {@code TsonDataParser} is Class 1 and
+     * refuses one ({@code TsonDataParserTest} pins that), {@code TsonSchemaParser} requires it, and both sit
+     * on this stream. Refusing here would settle it for both, and would leave §7.1's classification with no
+     * answer to read off the events.
+     */
     @Test
-    void metaDirectiveIsRejectedAsSchemaDocument() {
+    void metaDirectiveOpensTheStreamAndIsReported() {
         TsonDataStream stream = new TsonDataStream("!!meta:\"https://example.com/m.tn\" { }");
-        assertThrows(TsonUnsupportedDocumentException.class, stream::hasNext);
+
+        DocumentStart start = (DocumentStart) stream.next();
+
+        assertEquals("https://example.com/m.tn", start.meta().orElseThrow());
+        assertTrue(start.isSchemaDocument());
+        assertEquals(Optional.empty(), start.schema());
     }
 
     @Test
-    void idThenMetaIsRejectedAsSchemaDocument() {
+    void idThenMetaIsReportedWithBoth() {
         TsonDataStream stream = new TsonDataStream(
                 "!!id:\"https://example.com/x.tn\"\n!!meta:\"https://example.com/m.tn\" { }");
-        assertThrows(TsonUnsupportedDocumentException.class, stream::hasNext);
+
+        DocumentStart start = (DocumentStart) stream.next();
+
+        assertEquals("https://example.com/x.tn", start.id().orElseThrow());
+        assertEquals("https://example.com/m.tn", start.meta().orElseThrow());
+        assertTrue(start.isSchemaDocument());
+    }
+
+    /** A data document says so too: the discriminant is the directive's absence, not a separate flag. */
+    @Test
+    void aDataDocumentIsNotASchemaDocument() {
+        TsonDataStream stream = new TsonDataStream("!!schema:\"https://example.com/order.tn\" { }");
+
+        DocumentStart start = (DocumentStart) stream.next();
+
+        assertEquals(Optional.empty(), start.meta());
+        assertFalse(start.isSchemaDocument());
     }
 
     @Test

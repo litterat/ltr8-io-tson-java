@@ -206,9 +206,14 @@ Key points:
   field name its identity by NFC-normalised comparison — a decomposed spelling is the same name, and a
   duplicate rather than a malformed one. The lexer already normalises the unquoted spelling, so refusing the
   form here would make the quoted spelling the stricter of the two, which is the asymmetry the rule removes.
-- **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`.** This is a
+- **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`** — and the
+  throw is `parseDocument`'s, on the `DocumentStart` the stream hands it, never the stream's own. This is a
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
-  parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic).
+  parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic). The
+  *stream* judges nothing: it reads §2.2's header once, for everyone, and `TsonSchemaParser` sits on the same
+  stream and requires the very directive this parser refuses. A schema document's `DocumentStart` is also the
+  whole of what the stream has to say about it — no root frames are pushed, there being no data value to
+  frame.
 - **Nested annotation value-scope is right-recursive** and can legitimately leave an outer data-value
   without a core-value (`@a:@b:val`) — §3.1's own worked example says so; intentional, not a bug.
 
