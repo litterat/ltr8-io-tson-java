@@ -399,8 +399,10 @@ module has a real `module-info.java`; module names mirror each module's root exp
   chose, so it sits in `tson-base` with the values it holds and is shared by every encoding; what cannot
   follow it is construction, which names the compiler's own registry. Hence `Tson.of(config)`, and
   `Tson.standard()` for the unconfigured case.
-- **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree, readers and
-  writers. A
+- **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree, readers,
+  writers, and its own schema-directed reader stack over them — `JsonTypeReader`/`JsonCompiledSchema`/
+  `JsonSchemaCompiler`, with [TSON-JSON] §5's atoms compiled and §6–§8's constructors reaching a
+  `NOT_IMPLEMENTED` reader. A
   separate stack rather than a front end over `tson-compiler`'s `TsonEventSource` — see "Not yet implemented"
   for the two disagreements that decide it. The **tree model follows [JEP 540](https://openjdk.org/jeps/540)**
   (`jdk.incubator.json`, JDK 28, unavailable now): sealed `JsonValue` over `JsonObject`/`JsonArray`/`JsonString`/
@@ -427,8 +429,18 @@ module has a real `module-info.java`; module names mirror each module's root exp
   a choice (§8.2 admits an untagged one only by facts a schema states) and a host value with no JSON
   spelling — `WriteException`, `tson-base`'s, shared for `ParseException`'s reason. Non-finite doubles are
   *not* among them: §5.4 spells them `".inf"`/`"-.inf"`/`".nan"`, [TSON-DATA] §7.6's own productions.
-  A pure leaf so far; the schema-directed decode of §5–§8 is what brings a
-  dependency on `tson-compiler`.
+  A pure leaf, and the schema-directed decode of §5–§8 keeps it one: what a compiled JSON
+  reader consumes is `TsonLinkedSchema`, a `tson-schema` record `tson-atom` already re-exports, so the
+  stack is `tson-json`'s own **all the way up** — `JsonTypeReader`/`JsonCompiledSchema`/`JsonSchemaCompiler`
+  beside `tson-compiler`'s rather than derived from them, with no dependency on that engine at all. That is a
+  deferral and not a conclusion: the two disagreements above defeat a shared *event source* and both dissolve
+  above the schema, where §4.1 makes the position decide and a compiled reader **is** the position
+  (`EmptyBraceEvent` is the precedent already in the tree). One compiled schema over an encoding-neutral
+  context stays a real design; it is just not one worth deriving from a single implementation, and the seam
+  is cheaper to find from two working stacks than to unpick from a wrong shared contract. What the choice
+  keeps is drift between two copies of the field-state rules, which §9.4 makes a spec obligation rather than
+  a tidiness — guarded by a **cross-encoding parity test** (one schema, the same document in both encodings,
+  same `Diagnostic.Code` and same RFC 6901 pointer) rather than by shared code.
 - **`tson-cli`** — the `tson` command-line application. Depends on nothing depending on it (exports
   nothing).
 

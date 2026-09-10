@@ -5,7 +5,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.json.reader.JsonReadContext;
 import io.ltr8.tson.json.reader.SchemalessTreeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;

@@ -8,7 +8,7 @@ import io.ltr8.tson.atom.AtomValidationException;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.HostAtoms;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.json.reader.JsonReadContext;
+import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.stream.JsonEvent;
 
 import java.math.BigDecimal;
