@@ -288,7 +288,7 @@ Two lexical rules differ from the text encoding's and are worth naming, because 
   characters to RFC 8259. Counting a line at one would put this lexer's positions out of step with every other
   JSON tool's, over a document that is otherwise byte-identical.
 
-Errors are `JsonParseException`, thrown immediately — fail-fast, as the TSON lexer is. **The message states
+Errors are `tson-base`'s shared `ParseException`, thrown immediately — fail-fast, as the TSON lexer is. **The message states
 what went wrong and never where**; `position()` is the location, so a diagnostic built from one carries it
 structurally rather than by parsing prose. §9.4 splits what the exception covers across two of [TSON-DATA]
 §8.1's categories — a lexer error for malformed UTF-8 and ill-formed strings, a parse error for grammar
@@ -344,9 +344,10 @@ number and the refusal are the processor's, not this encoding's**: §10.1 makes 
 encoding refuses with, from `tson-base`. A deployment that raises the bound raises it for both encodings at
 once, which is what one policy means.
 
-That refusal type stays distinct from `JsonParseException`, and has to be: §10.1 makes a refusal §8.1's
+That refusal type stays distinct from `ParseException`, and has to be: §10.1 makes a refusal §8.1's
 fifth outcome, never a verdict, so it must be distinguishable or a configured bound reaches a consumer as a
-syntax failure.
+syntax failure. `JsonDiagnostics` keeps them apart on the way out too — `Diagnostic.ofLimitExceeded` is
+tried ahead of `ofBaseSyntaxError`, so the code a consumer routes on says which happened.
 
 **Error messages name the construct the position admits**, not the token class found — "a member name is due"
 where "expected STRING" would tell an author what a lexer calls the thing they already wrote.

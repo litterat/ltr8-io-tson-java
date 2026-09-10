@@ -236,9 +236,10 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `Throwable`" would be sorting by Java mechanism in any case; this library files by subject, which is why
   `LexException` sits in `lexer`. **The prefix is dropped here and only here**: `Tson` earns its keep
   disambiguating a consumer's own `Schema` from `TsonSchema`, and in this module the competing name is
-  another *encoding's* type in this same library — `ReadException` beside `JsonParseException` reads right
+  another *encoding's* type in this same library — `ReadException` beside `JsonValueException` reads right
   where `TsonReadException` beside it implies the first belongs to the text encoding, which is exactly what
-  nothing here does. A **true pure leaf** — depends on
+  nothing here does. The argument outlived its first example: `ParseException` is now *shared* rather than
+  one encoding's, which is the same conclusion reached from the other end. A **true pure leaf** — depends on
   nothing, and nothing in it knows what a TSON document or a JSON one looks like. It is a module rather
   than a package because [TSON-JSON] §9.4 makes the JSON encoding report in [TSON-DATA] §8.1's four
   categories and add none of its own: the vocabulary is one vocabulary across both encodings *by
