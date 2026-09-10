@@ -549,8 +549,9 @@ shorter one is what a reader of any strictness takes.
 **`WriteException` is `tson-base`'s**, shared by both encodings for `ParseException`'s reason: a value the
 encoding cannot take is the *processor's* fact rather than one format's. `DataBindException` is the
 different failure — a class that could not be taken apart — and it is wrapped rather than passed through, so
-one unchecked type covers every way a write can fail. `tson-compiler` still throws its own
-`TsonWriteException`; `BACKLOG.md` carries the convergence.
+one unchecked type covers every way a write can fail. Both encodings' writers throw it, which is what puts
+the difference in the message rather than in the type: each throw site names its own encoding ("cannot write
+X as JSON"), so nothing about the exception has to.
 
 **Every sink is UTF-8 and none is closed here.** `write(value, ByteSink)` encodes UTF-8 itself, so a
 document reaches a `ByteBuffer`, a channel or a file without existing as a `String` first; each `write`

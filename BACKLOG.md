@@ -93,12 +93,6 @@ declared on those terms and neither has a consumer, because TSON text tags its c
 never flattens — so it cannot exercise `@discriminator` or `@rest` at all. A JSON front end is what puts that half of
 §6 under test, and is expected to move both: a directive with no consumer has never had its shape checked against one.
 
-- [ ] **`TsonWriteException` has not converged on `tson-base`'s `WriteException`.** The JSON writers throw
-  the shared one -- a value the encoding cannot take is the processor's fact, not one format's, which is
-  `ParseException`'s and `ReadException`'s own argument for living in the base. `tson-compiler` still throws
-  its own across about 30 sites, so the library states one fact two ways. The work is the rename plus
-  deciding whether the message convention ("cannot write X as TSON") survives it.
-
 - [ ] **A JSON document cannot name the schema that governs it, so the front door and the CLI need a surface that
   does.** `!!schema` is TSON text syntax (`SPEC-FEEDBACK.md` #2, open): a JSON body has no in-band channel, so
   `Tson.validate(text)` and `tson validate`'s auto-classification — both of which read a header to decide what a
@@ -217,8 +211,9 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
       already holds the compiled schema and the class→type binding, so a schema-aware writer could derive
       both facts instead of having the caller name what the library already knows. The explicit form stays
       either way — a caller writing against a schema it did not compile here has nothing to derive from.
-- [ ] **Writers are fail-fast only, no diagnostics.** They throw `TsonWriteException` at the first
-  problem, with nothing symmetric to the read side's `DiagnosticsReceiver`. The `TsonValueWriter`
+- [ ] **Writers are fail-fast only, no diagnostics — on both encodings.** Every writer throws
+  `WriteException` at the first problem, with nothing symmetric to the read side's `DiagnosticsReceiver`,
+  where both encodings' *readers* have carried one for a while. The `TsonValueWriter`
   above especially needs it, to report every schema violation in one pass the way the reader does — and
   the seam already exists and is write-direction-agnostic (`Diagnostic` carries a data path and both
   positions; nothing about `void report(Diagnostic)` assumes reading), so this is a matter of threading a

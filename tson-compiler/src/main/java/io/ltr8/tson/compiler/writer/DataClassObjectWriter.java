@@ -18,7 +18,7 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.atom.VocabularyAtoms;
 import io.ltr8.tson.compiler.TsonDataEmitter;
-import io.ltr8.tson.compiler.TsonWriteException;
+import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.tree.TsonValue;
@@ -83,7 +83,7 @@ public final class DataClassObjectWriter {
             }
             write(value, context.getDescriptor(value.getClass()), out);
         } catch (DataBindException e) {
-            throw new TsonWriteException("cannot write " + value.getClass() + " as TSON: " + e.getMessage(), e);
+            throw new WriteException("cannot write " + value.getClass() + " as TSON: " + e.getMessage(), e);
         }
     }
 
@@ -175,10 +175,10 @@ public final class DataClassObjectWriter {
                 writer.typeRef(typeRef);
             }
             writeCore(value, dataClass, writer);
-        } catch (DataBindException | UncheckedIOException | TsonWriteException e) {
+        } catch (DataBindException | UncheckedIOException | WriteException e) {
             // Both of the non-binding failures pass through rather than being wrapped as "cannot write
             // <class> as TSON", which would blame the object for neither being its fault: an
-            // UncheckedIOException is the sink failing, and a TsonWriteException is the emitter refusing
+            // UncheckedIOException is the sink failing, and a WriteException is the emitter refusing
             // what was asked of it (two type annotations on one value, say) and already says so exactly.
             throw e;
         } catch (Throwable t) {
@@ -203,10 +203,10 @@ public final class DataClassObjectWriter {
                 case DataClassUnion union -> writeUnion(value, union, writer);
                 default -> throw new DataBindException("unsupported DataClass for writing: " + dataClass);
             }
-        } catch (DataBindException | UncheckedIOException | TsonWriteException e) {
+        } catch (DataBindException | UncheckedIOException | WriteException e) {
             // Both of the non-binding failures pass through rather than being wrapped as "cannot write
             // <class> as TSON", which would blame the object for neither being its fault: an
-            // UncheckedIOException is the sink failing, and a TsonWriteException is the emitter refusing
+            // UncheckedIOException is the sink failing, and a WriteException is the emitter refusing
             // what was asked of it (two type annotations on one value, say) and already says so exactly.
             throw e;
         } catch (Throwable t) {

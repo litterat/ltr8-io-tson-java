@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.base.io.ByteSink;
 import io.ltr8.tson.compiler.writer.TreeValueWriter;
 import io.ltr8.bind.DataBindException;
@@ -8,12 +9,7 @@ import io.ltr8.tson.tree.TsonDocument;
 import io.ltr8.tson.tree.TsonValue;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
-import java.io.Writer;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 /**
  * Writes an immutable {@link TsonValue} tree back to TSON text -- the write-side counterpart to {@link
@@ -159,7 +155,7 @@ public final class TsonTreeWriter {
      */
     public void write(TsonValue node, ByteSink sink) {
         if (header.schema().isPresent() && node.typeRef().isEmpty()) {
-            throw new TsonWriteException("a document declaring !!schema \"" + header.schema().get()
+            throw new WriteException("a document declaring !!schema \"" + header.schema().get()
                     + "\" needs a root type-ref to select a type, and this root node carries none -- read"
                     + " the tree against its schema (which records each node's type) or set one on the"
                     + " root before writing", null);
@@ -170,7 +166,7 @@ public final class TsonTreeWriter {
             ENGINE.write(node, emitter);
             emitter.flush();
         } catch (DataBindException e) {
-            throw new TsonWriteException("cannot write TsonValue as TSON: " + e.getMessage(), e);
+            throw new WriteException("cannot write TsonValue as TSON: " + e.getMessage(), e);
         }
     }
 
@@ -181,7 +177,7 @@ public final class TsonTreeWriter {
     public void write(TsonValue node, Appendable out) {
         try {
             if (header.schema().isPresent() && node.typeRef().isEmpty()) {
-                throw new TsonWriteException("a document declaring !!schema \"" + header.schema().get()
+                throw new WriteException("a document declaring !!schema \"" + header.schema().get()
                         + "\" needs a root type-ref to select a type, and this root node carries none -- read"
                         + " the tree against its schema (which records each node's type) or set one on the"
                         + " root before writing", null);
@@ -190,7 +186,7 @@ public final class TsonTreeWriter {
             header.emit(emitter);
             ENGINE.write(node, emitter);
         } catch (DataBindException e) {
-            throw new TsonWriteException("cannot write TsonValue as TSON: " + e.getMessage(), e);
+            throw new WriteException("cannot write TsonValue as TSON: " + e.getMessage(), e);
         }
     }
 }

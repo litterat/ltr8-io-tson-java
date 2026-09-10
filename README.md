@@ -452,8 +452,9 @@ does not. Only the header is buffered, never the document; a 500 KB body still s
 
 `TsonObjectWriter` is the inverse of `TsonObjectReader`: a Java object to TSON text. Mainly a debugging
 aid, not a guaranteed-lossless serializer (see [CONFORMANCE.md](CONFORMANCE.md) for exactly where it's
-lossy). It throws unchecked `TsonWriteException` on failure, symmetric to the reader's
-`ReadException` — no checked exceptions on either side of the object-binding pair:
+lossy). It throws unchecked `WriteException` on failure, symmetric to the reader's
+`ReadException` — no checked exceptions on either side of the object-binding pair, and one type across
+both encodings, since a value an encoding cannot take is the processor's fact rather than one format's:
 
 ```java
 String text = new TsonObjectWriter().toTson(server);

@@ -2,16 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.annotation.Annotations;
 import io.ltr8.annotation.Unbound;
-import io.ltr8.bind.DataClassAnnotated;
-import io.ltr8.bind.DataBindContext;
-import io.ltr8.bind.DataBindException;
-import io.ltr8.bind.DataClass;
-import io.ltr8.bind.DataClassArray;
-import io.ltr8.bind.DataClassAtom;
-import io.ltr8.bind.DataClassField;
-import io.ltr8.bind.DataClassMap;
-import io.ltr8.bind.DataClassRecord;
-import io.ltr8.bind.DataClassUnion;
+import io.ltr8.bind.*;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.MissingBindingException;
@@ -19,21 +10,12 @@ import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
-import io.ltr8.tson.schema.meta.FieldState;
-import io.ltr8.tson.schema.meta.ElementState;
-import io.ltr8.tson.schema.meta.FieldGroup;
-import io.ltr8.tson.schema.meta.RecordBody;
-import io.ltr8.tson.schema.meta.TypeDefinition;
+import io.ltr8.tson.compiler.atom.ValueParser;
+import io.ltr8.tson.schema.meta.*;
+
 import java.lang.reflect.RecordComponent;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Object-binding mode's own {@code record} reader -- reads a record-shaped value into a real, bound

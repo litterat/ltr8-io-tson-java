@@ -3,6 +3,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
+import io.ltr8.tson.base.WriteException;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.source.SchemaAccess;
@@ -11,7 +12,6 @@ import io.ltr8.annotation.Typename;
 import io.ltr8.tson.compiler.TsonObjectDocument;
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.base.source.SchemaSource;
-import io.ltr8.tson.compiler.TsonWriteException;
 import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.Optional;
@@ -151,8 +151,8 @@ class TsonObjectDocumentRoundTripTest {
         TsonObjectDocument<Order> handAssembled = new TsonObjectDocument<>(
                 Optional.empty(), Optional.of(SCHEMA_URI), Optional.empty(), new Order("ABC-1", 3));
 
-        TsonWriteException thrown =
-                assertThrows(TsonWriteException.class, () -> new TsonObjectWriter().toTson(handAssembled));
+        WriteException thrown =
+                assertThrows(WriteException.class, () -> new TsonObjectWriter().toTson(handAssembled));
         assertTrue(thrown.getMessage().contains("no root type"), thrown.getMessage());
     }
 
