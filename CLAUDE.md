@@ -402,7 +402,11 @@ module has a real `module-info.java`; module names mirror each module's root exp
 - **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree, readers,
   writers, and its own schema-directed reader stack over them — `JsonTypeReader`/`JsonCompiledSchema`/
   `JsonSchemaCompiler`, with [TSON-JSON] §5's atoms, the whole of §6's containers and §7's absence
-  compiled in **tree mode**, and §8's sums reaching a `NOT_IMPLEMENTED` reader. §6.5's two map forms are
+  compiled in **tree mode**, and §8's sums reaching a `NOT_IMPLEMENTED` reader. **A schema is named, never
+  authored** — `Json.withSchemas(TsonSchemaLoader)` takes an already-resolved one, because a schema document
+  is TSON text whichever encoding the data arrives in, so §3.4's out-of-band binding costs no dependency on
+  that engine either; `treeReader().withSchema(uri).readAs(source, rootType)` and `Json.validate` are the
+  surface, and a schema that cannot be reached is a diagnostic rather than a verdict. §6.5's two map forms are
   chosen by the key type at compile time and never by inspecting the value, which is §4.1's rule applied
   where it matters most — an object being one syntax for a record and a map both. **A
   schema-directed read hands back a `JsonValue`, never a `TsonValue`**: the parsers run, which is the
@@ -1064,6 +1068,15 @@ nothing is a usage error rather than a no-op — `withTokenPolicy`'s own habit o
 mean what it says. There is no `--token-per-segment`; the library refuses one. In `--output text` a run prints
 the policy when it refused something **or** when it configured one (§8.2 requires a relaxation not be silent);
 the machine formats always carry it, a consumer wanting one shape.
+**A `.json` input is validated too**, against a schema supplied out of band: `--schema <uri> --type <name>`
+are one statement binding every JSON input in the run ([TSON-JSON] §3.4, since a JSON document names neither
+for itself), and the encoding is read off the extension on §3.1's own authority — the one filename this CLI
+reads, the axis being the encoding where the `!!id` rule is about schema-versus-data. Half a binding, a
+`.json` with none, a binding with no JSON to bind, and a `--type` the schema does not declare are all **usage
+errors** (exit 2) rather than verdicts: each is the command line's mistake, and the last is checked before any
+document is read so one typo prints once instead of once per file. Stdin takes the binding as its marker,
+having no name to classify by. One envelope, one exit-code ranking, one policy field across both encodings.
+
 `TsonBundledSchemas` serves the three bundled schemas' identities, text (copied from `spec/m/` at build
 time) and published digests. `TsonContentHash` hashes every byte past the `!!id` line; pins are
 verification metadata, not identity, checked through the loader on every pinned reference — a schema

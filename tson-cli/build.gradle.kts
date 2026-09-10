@@ -14,6 +14,11 @@ dependencies {
     implementation(project(":tson"))
     implementation(project(":tson-compiler"))
     implementation(project(":tson-schema"))
+
+    // The JSON encoding, so `validate` can read a .json input against a TSON schema
+    // ([TSON-JSON] §3.4's out-of-band binding). One CLI over both encodings is the point:
+    // the report, the exit codes and the policy field are the run's, not an encoding's.
+    implementation(project(":tson-json"))
     implementation(project(":tson-bind"))
     implementation(project(":tson-annotation"))
 

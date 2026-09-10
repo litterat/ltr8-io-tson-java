@@ -93,14 +93,14 @@ declared on those terms and neither has a consumer, because TSON text tags its c
 never flattens — so it cannot exercise `@discriminator` or `@rest` at all. A JSON front end is what puts that half of
 §6 under test, and is expected to move both: a directive with no consumer has never had its shape checked against one.
 
-- [ ] **A JSON document cannot name the schema that governs it, so the front door and the CLI need a surface that
-  does.** `!!schema` is TSON text syntax (`SPEC-FEEDBACK.md` #2, open): a JSON body has no in-band channel, so
-  `Tson.validate(text)` and `tson validate`'s auto-classification — both of which read a header to decide what a
-  document is — have nothing to read. Reading against a named schema already works
-  (`withSchema(uri).readAs(text, typeName)`), so what is owed is the surface: which front-door and CLI forms take the
-  schema identity and root type out of band, and what a JSON document naming neither gets. #2's own interpretation —
-  the `TSON-Schema` header as a projection of the directive — is the channel a server would use, and is where this
-  answer has to stay consistent.
+- [ ] **A JSON document has no in-band way to name its schema — §3.4's second route.** The out-of-band route
+  is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
+  and it is the one the spec calls the expected production route. What is left is the in-band one: a root value
+  that is or is wrapped by an annotation object carrying `$schema` and `$type`, both REQUIRED on that route. It
+  needs §3.3's annotation object, so it arrives with §8 rather than before it. Where both routes supply a binding
+  they MUST agree by canonical identity, and disagreement is a resolver error — never a precedence question.
+  `SPEC-FEEDBACK.md` #2's interpretation, the `TSON-Schema` header as a projection of the directive (§3.5), is the
+  channel a server uses and is where this answer has to stay consistent.
 
 **`tson-json` is a stack of its own, not a second front end over `TsonEventSource`.** Reusing the TSON event
 contract would make one encoding's layering decide the other's at the two points where JSON and TSON genuinely
