@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.stream.AbsentEvent;
 import io.ltr8.tson.compiler.stream.AnnotationEnd;
@@ -36,7 +37,7 @@ class TsonDataStreamTest {
 
     private static List<TsonEvent> events(String source) {
         List<TsonEvent> list = new ArrayList<>();
-        TsonDataStream stream = new TsonDataStream(source);
+        TsonDataStream stream = new TsonDataStream(ByteSource.of(source));
         while (stream.hasNext()) {
             list.add(stream.next());
         }
@@ -134,7 +135,7 @@ class TsonDataStreamTest {
      */
     @Test
     void metaDirectiveOpensTheStreamAndIsReported() {
-        TsonDataStream stream = new TsonDataStream("!!meta:\"https://example.com/m.tn\" { }");
+        TsonDataStream stream = new TsonDataStream(ByteSource.of("!!meta:\"https://example.com/m.tn\" { }"));
 
         DocumentStart start = (DocumentStart) stream.next();
 
@@ -145,8 +146,7 @@ class TsonDataStreamTest {
 
     @Test
     void idThenMetaIsReportedWithBoth() {
-        TsonDataStream stream = new TsonDataStream(
-                "!!id:\"https://example.com/x.tn\"\n!!meta:\"https://example.com/m.tn\" { }");
+        TsonDataStream stream = new TsonDataStream(ByteSource.of("!!id:\"https://example.com/x.tn\"\n!!meta:\"https://example.com/m.tn\" { }"));
 
         DocumentStart start = (DocumentStart) stream.next();
 
@@ -158,7 +158,7 @@ class TsonDataStreamTest {
     /** A data document says so too: the discriminant is the directive's absence, not a separate flag. */
     @Test
     void aDataDocumentIsNotASchemaDocument() {
-        TsonDataStream stream = new TsonDataStream("!!schema:\"https://example.com/order.tn\" { }");
+        TsonDataStream stream = new TsonDataStream(ByteSource.of("!!schema:\"https://example.com/order.tn\" { }"));
 
         DocumentStart start = (DocumentStart) stream.next();
 
@@ -168,7 +168,7 @@ class TsonDataStreamTest {
 
     @Test
     void unexpectedContentAfterRootValueIsParseError() {
-        TsonDataStream stream = new TsonDataStream("Alice Bob");
+        TsonDataStream stream = new TsonDataStream(ByteSource.of("Alice Bob"));
         assertThrows(ParseException.class, () -> {
             while (stream.hasNext()) {
                 stream.next();

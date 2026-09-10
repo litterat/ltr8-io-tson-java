@@ -285,6 +285,21 @@ module has a real `module-info.java`; module names mirror each module's root exp
   to a Java object and has never heard of a schema — system-library standing, like the `java.net.http` this
   module already rests on. The property that matters is unchanged: nothing here knows what a TSON document or
   a JSON one looks like.
+  **`io.ltr8.tson.base.io`** is where a document's bytes come from and go — `ByteSource` and `ByteSink`,
+  one pair for both encodings because [TSON-JSON] §3.1 makes the JSON lexer decode UTF-8 from bytes exactly
+  as [TSON-DATA] §9.1 makes the TSON one. **Bytes, never characters**: §7.1 forbids substituting on
+  malformed UTF-8 and §8.1 requires a byte offset in every diagnostic, so a `Reader` could satisfy neither
+  — the substitution would already have happened under someone else's rules — while a `String` is admitted
+  because it re-encodes as a value and the offset stays exact. **`resident()` is the zero-copy path**: a
+  source already in memory hands back the whole input as a `MemorySegment` (a `byte[]`, a heap or direct
+  `ByteBuffer`, a mapped file) and a lexer indexes it, allocating no block at all — asked once, at
+  construction, off a final field; a streaming source keeps the block, and **the block is the source's to
+  size** (`block()`, defaulting to 512), which is where a pool would go and the knob a throughput
+  measurement turns. **Closing releases what a source acquired and nothing it was handed**, so
+  `of(InputStream)` closes nothing and `of(Path)` closes the stream it opened — and whoever *creates* a
+  source closes it, which is why a reader given one through `read(ByteSource)` does not.
+  `ByteSink` is the write-side counterpart and deliberately smaller: `OutputStream` and `Appendable` are
+  two genuinely different targets rather than one spelled twice, so the char path stays.
   **`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
   `IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — and the
   UTS #39 rules over them, read by two engines and knowing nothing about either format. `UnicodePolicy` is
@@ -410,8 +425,8 @@ note named at the head of each.
 `Lexer` is a single hand-written scanner producing `Token`s off `nextToken()` (never a batch). §1.3 says
 higher parts add no tokens, modes or character-classification changes, which is a statement about the
 *layering* and holds; it is not a reason to leave a lexer bug in place, and Revision 35's escape-table change
-is what that looks like in practice. Constructed from an
-`InputStream` whose **UTF-8 it decodes itself** (§9.1), code-point
+is what that looks like in practice. Constructed from a
+**`ByteSource`** (`tson-base`) whose **UTF-8 it decodes itself** (§9.1), code-point
 addressed (never char-addressed), with `Position` tracking line / code-point column / UTF-8 byte offset —
 counted from the input rather than re-derived from the decoded character, and malformed UTF-8 is a
 `LexException` rather than a U+FFFD substitution (§7.1: a decoder MUST NOT substitute). NFC normalization

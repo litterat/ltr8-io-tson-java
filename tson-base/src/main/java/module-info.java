@@ -61,6 +61,7 @@ module io.ltr8.tson.base {
     requires transitive io.ltr8.bind;
 
     exports io.ltr8.tson.base;
+    exports io.ltr8.tson.base.io;
 
     /**
      * What this processor will admit as a name and spend on a document -- {@code ProcessorPolicy} and the

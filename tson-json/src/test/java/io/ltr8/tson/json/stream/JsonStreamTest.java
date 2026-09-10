@@ -1,5 +1,6 @@
 package io.ltr8.tson.json.stream;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.LimitExceededException;
@@ -258,7 +259,7 @@ class JsonStreamTest {
 
         @Test
         void the_refusal_lands_at_the_container_that_did_not_fit_before_any_consumer_descends() {
-            JsonStream stream = new JsonStream(utf8("[[[1]]]"),
+            JsonStream stream = new JsonStream(ByteSource.of(utf8("[[[1]]]")),
                     ProcessorPolicy.defaults().withLimits(LimitsPolicy.defaults().withMaxDepth(2)),
                     DiagnosticsReceiver.throwing());
             assertInstanceOf(JsonEvent.ArrayStart.class, stream.next());
@@ -374,12 +375,12 @@ class JsonStreamTest {
      * once, where they can be seen -- which is the arrangement the single constructor is for.
      */
     private static JsonStream stream(String source) {
-        return new JsonStream(utf8(source), ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing());
+        return new JsonStream(ByteSource.of(utf8(source)), ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing());
     }
 
     /** A stream over {@code source} bounded at {@code maxDepth}, everything else at the processor's defaults. */
     private static JsonStream bounded(String source, int maxDepth) {
-        return new JsonStream(utf8(source),
+        return new JsonStream(ByteSource.of(utf8(source)),
                 ProcessorPolicy.defaults().withLimits(LimitsPolicy.defaults().withMaxDepth(maxDepth)),
                 DiagnosticsReceiver.throwing());
     }

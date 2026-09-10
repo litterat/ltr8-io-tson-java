@@ -1,5 +1,6 @@
 package io.ltr8.tson.json.perf;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.JsonObjectReader;
@@ -87,7 +88,7 @@ class JsonAllocationHarnessTest {
     @Test
     void whereAJsonReadsBytesGo() {
         double events = AllocationProbe.allocatedPerOperation(20_000, () -> {
-            JsonStream stream = new JsonStream(new ByteArrayInputStream(BYTES),
+            JsonStream stream = new JsonStream(ByteSource.of(new ByteArrayInputStream(BYTES)),
                     ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing());
             while (stream.hasNext()) {
                 AllocationProbe.sink = stream.next();

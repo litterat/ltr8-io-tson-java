@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.reader.JsonReadContext;
@@ -9,9 +10,7 @@ import io.ltr8.tson.json.stream.JsonEventSource;
 import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.json.tree.JsonValue;
 
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Reads a JSON document into a {@link JsonValue} tree -- the peer of {@link JsonObjectReader}, and what
@@ -74,12 +73,25 @@ public final class JsonTreeReader {
 
     /** A string as the bytes this encoding reads -- §3.1 makes the document UTF-8 and the lexer takes bytes. */
     public JsonValue read(String source) {
-        return read(new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)));
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return read(bytes);
+        }
     }
 
     /** {@code source} is not closed here. */
-    public JsonValue read(InputStream source) {
+    /**
+     * Reads {@code source} -- the general entry, and what the {@code String} and {@code InputStream} forms
+     * above adapt to. {@code ByteSource.of} covers a {@code byte[]}, a {@code ByteBuffer}, a {@code Path}
+     * and a mapped file besides, and a source already in memory is read without a copy.
+     */
+    public JsonValue read(ByteSource source) {
         return read(new JsonStream(source, policy, receiver));
+    }
+
+    public JsonValue read(InputStream source) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return read(new JsonStream(bytes, policy, receiver));
+        }
     }
 
     /**

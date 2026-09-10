@@ -4,7 +4,10 @@ import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
 
 import java.io.IOException;
-import java.io.InputStream;
+import io.ltr8.tson.base.io.ByteSource;
+
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +16,7 @@ import java.util.List;
  * Converts JSON source bytes into a stream of tokens: RFC 8259 §2-§7, under the profile
  * [TSON-JSON] §3.1 states.
  *
- * <p>A single hand-written scanner over UTF-8 bytes read incrementally from an {@link InputStream},
+ * <p>A single hand-written scanner over UTF-8 bytes taken from a {@link ByteSource},
  * <b>decoding UTF-8 itself</b> and addressed one Unicode code point at a time. That is the one place
  * this layer departs from JEP 540, whose {@code Json.parse} takes an already-decoded {@code String}
  * or {@code char[]}, and §3.1 is why: this encoding defines interchange, so the document MUST be
@@ -49,14 +52,21 @@ import java.util.List;
  */
 public final class JsonLexer {
 
-    private final InputStream source;
+    private final ByteSource source;
 
     /**
      * Bytes pulled off {@link #source} in bulk, decoded one code point at a time by
      * {@link #decodeCodePoint()}. Throughput, not a lookahead window -- {@link #lookaheadCodePoints}
      * is that, and stays one code point deep.
      */
-    private final byte[] bytes = new byte[512];
+    private final byte[] bytes;
+
+    /**
+     * The whole input, addressable, when the source had it in memory -- then {@link #bytes} is {@code null}
+     * and nothing is copied. {@code null} for a streaming source. The TSON lexer takes the same path, off
+     * the same {@link ByteSource}: §3.1 makes this decoder's job identical to [TSON-DATA] §9.1's.
+     */
+    private final MemorySegment resident;
     private int bytePosition;
     private int byteLimit;
     private boolean sourceExhausted;
@@ -90,8 +100,11 @@ public final class JsonLexer {
     /** Reused by {@link #scanString()} and {@link #scanNumber()} so a document costs one builder, not one per token. */
     private final StringBuilder scratch = new StringBuilder();
 
-    public JsonLexer(InputStream source) {
+    public JsonLexer(ByteSource source) {
         this.source = source;
+        this.resident = source.resident().orElse(null);
+        this.bytes = resident == null ? source.block() : null;
+        this.byteLimit = resident == null ? 0 : (int) Math.min(Integer.MAX_VALUE, resident.byteSize());
         stripLeadingBom();
     }
 
@@ -595,10 +608,16 @@ public final class JsonLexer {
             return -1;
         }
         bytesDecoded++;
-        return bytes[bytePosition++] & 0xFF;
+        return resident != null
+                ? resident.get(ValueLayout.JAVA_BYTE, bytePosition++) & 0xFF
+                : bytes[bytePosition++] & 0xFF;
     }
 
+    /** A resident source has nothing to refill -- its limit was the whole input from the start. */
     private boolean fillBytes() {
+        if (resident != null) {
+            return false;
+        }
         try {
             int read = source.read(bytes, 0, bytes.length);
             if (read <= 0) {

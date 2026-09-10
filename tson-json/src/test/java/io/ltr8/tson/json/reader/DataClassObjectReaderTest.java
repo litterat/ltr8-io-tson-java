@@ -1,5 +1,6 @@
 package io.ltr8.tson.json.reader;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.DiagnosticsReceiver;
@@ -72,7 +73,7 @@ class DataClassObjectReaderTest {
      * once, where they can be seen -- which is the arrangement the single constructor is for.
      */
     private static JsonStream stream(String source) {
-        return new JsonStream(utf8(source), ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing());
+        return new JsonStream(ByteSource.of(utf8(source)), ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing());
     }
 
     /** §3.1 makes the document UTF-8 and the lexer takes bytes; a test holding a string says so here. */

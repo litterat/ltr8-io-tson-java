@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.compiler.lexer.Lexer;
 
 import java.io.ByteArrayInputStream;
@@ -27,7 +28,7 @@ class MultiLineEmitTest {
 
     /** The value the lexer gets back out of that document. */
     private static String roundTrip(String value) {
-        Lexer lexer = new Lexer(new ByteArrayInputStream(emit(value).getBytes(StandardCharsets.UTF_8)));
+        Lexer lexer = new Lexer(ByteSource.of(new ByteArrayInputStream(emit(value).getBytes(StandardCharsets.UTF_8))));
         lexer.nextToken();
         return lexer.text();
     }

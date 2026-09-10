@@ -1,5 +1,6 @@
 package io.ltr8.tson.json.lexer;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.json.JsonPosition;
 import org.junit.jupiter.api.DisplayNameGeneration;
@@ -25,11 +26,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class JsonLexerTest {
 
     private static List<JsonToken> tokens(String source) {
-        return new JsonLexer(utf8(source)).tokenize();
+        return new JsonLexer(ByteSource.of(utf8(source))).tokenize();
     }
 
     private static List<JsonToken> tokens(byte... source) {
-        return new JsonLexer(new ByteArrayInputStream(source)).tokenize();
+        return new JsonLexer(ByteSource.of(new ByteArrayInputStream(source))).tokenize();
     }
 
     private static List<JsonTokenType> types(String source) {
@@ -352,7 +353,7 @@ class JsonLexerTest {
 
         @Test
         void end_of_input_repeats() {
-            JsonLexer lexer = new JsonLexer(utf8("1"));
+            JsonLexer lexer = new JsonLexer(ByteSource.of(utf8("1")));
             assertEquals(JsonTokenType.NUMBER, lexer.nextToken());
             assertEquals(JsonTokenType.EOF, lexer.nextToken());
             assertEquals(JsonTokenType.EOF, lexer.nextToken());
@@ -360,7 +361,7 @@ class JsonLexerTest {
 
         @Test
         void the_accessors_describe_whichever_token_was_produced_last() {
-            JsonLexer lexer = new JsonLexer(utf8("  \"ab\""));
+            JsonLexer lexer = new JsonLexer(ByteSource.of(utf8("  \"ab\"")));
             assertEquals(JsonTokenType.STRING, lexer.nextToken());
             assertEquals("ab", lexer.text());
             assertEquals(3, lexer.startColumn());

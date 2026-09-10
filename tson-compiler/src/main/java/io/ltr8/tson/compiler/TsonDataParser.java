@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.AbsentValue;
 import io.ltr8.tson.compiler.ast.Annotation;
@@ -54,6 +55,10 @@ import java.util.function.BiConsumer;
  * (data-format-only) processor (§1.5). The check is {@link #parseDocument()}'s own, on the {@link
  * DocumentStart} the stream hands it: the stream reads §2.2's header for everyone and judges nobody.
  *
+ * <p><b>The sources it accepts acquire nothing</b> -- a {@code String} or an {@code InputStream}, whose
+ * {@code ByteSource.close()} is a no-op -- so a parser holding its stream for its own lifetime releases
+ * nothing by ending. A constructor taking a {@code ByteSource} would need to say who closes it.
+ *
  * <p><b>Not {@code final}, deliberately.</b> {@link TsonSchemaParser} (Part 2's schema-document
  * compiler, same package) extends this class to reuse the machinery [TSON-SCHEMA] itself says it
  * imports from [TSON-DATA] §7.4 -- {@code annotation}, {@code data-value}, directive parsing
@@ -90,7 +95,7 @@ public class TsonDataParser {
     final Map<CoreValue, Position> positions = new IdentityHashMap<>();
 
     public TsonDataParser(String source) {
-        this.stream = new TsonDataStream(source);
+        this.stream = new TsonDataStream(ByteSource.of(source));
     }
 
     /**
@@ -101,7 +106,7 @@ public class TsonDataParser {
      * -- the {@code InputStream} only bounds the raw source-text buffering, not the tree.
      */
     public TsonDataParser(InputStream source) {
-        this.stream = new TsonDataStream(source);
+        this.stream = new TsonDataStream(ByteSource.of(source));
     }
 
     /** Every {@link CoreValue} built by {@link #parseDocument()}, mapped to its own start {@link Position} in the source -- see {@link #positions}'s own Javadoc for why this is identity-keyed. */

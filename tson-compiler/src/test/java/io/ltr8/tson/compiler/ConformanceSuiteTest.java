@@ -1,4 +1,5 @@
 package io.ltr8.tson.compiler;
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.ParseException;
@@ -148,7 +149,7 @@ class ConformanceSuiteTest {
         byte[] raw = subjectBytes(subject, sidecar);
         switch (outcomeOf(sidecar)) {
             case "valid" -> {
-                List<Token> actual = new Lexer(new ByteArrayInputStream(raw)).tokenize();
+                List<Token> actual = new Lexer(ByteSource.of(new ByteArrayInputStream(raw))).tokenize();
                 actual.removeIf(t -> t.type() == TokenType.EOF);
                 ArrayValue expectedTokens = (ArrayValue) fieldCore(outcomePayload(sidecar), "tokens");
                 assertEquals(expectedTokens.elements().size(), actual.size(), "token count");
@@ -161,7 +162,7 @@ class ConformanceSuiteTest {
                 }
             }
             case "error" -> assertThrows(errorClassFor(sidecar),
-                    () -> new Lexer(new ByteArrayInputStream(raw)).tokenize());
+                    () -> new Lexer(ByteSource.of(new ByteArrayInputStream(raw))).tokenize());
             default -> fail("unknown lexer-layer outcome: " + outcomeOf(sidecar));
         }
     }
@@ -186,7 +187,7 @@ class ConformanceSuiteTest {
         byte[] raw = Files.readAllBytes(subject);
         switch (outcomeOf(sidecar)) {
             case "error" -> assertThrows(errorClassFor(sidecar),
-                    () -> new Lexer(new ByteArrayInputStream(raw)).tokenize());
+                    () -> new Lexer(ByteSource.of(new ByteArrayInputStream(raw))).tokenize());
             case "valid" -> fail("an 'invalid-utf8' subject cannot lex cleanly: " + subject.getFileName());
             default -> fail("unknown lexer-layer outcome: " + outcomeOf(sidecar));
         }

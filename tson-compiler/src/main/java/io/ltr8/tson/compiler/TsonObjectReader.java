@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.*;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -299,13 +300,27 @@ public final class TsonObjectReader {
     // ── Whole-document entry points ──────────────────────────────────────
 
     /** Reads {@code source}'s whole document into {@code targetClass}, fail-fast -- validated against its {@code !!schema} if this reader is schema-aware and the document declares one, schemaless otherwise. */
-    public <T> T read(String source, Class<T> targetClass) {
+    /**
+     * Reads {@code source} -- the general entry the {@code String} and {@code InputStream} forms adapt to.
+     * {@code ByteSource.of} covers a {@code byte[]}, a {@code ByteBuffer}, a {@code Path} and a mapped file
+     * besides, so a further source costs no method here; and a source already in memory is read without a
+     * copy ({@code ByteSource.resident()}).
+     */
+    public <T> T read(ByteSource source, Class<T> targetClass) {
         return readDocument(new TsonDataStream(source, policy, receiver), targetClass, false);
+    }
+
+    public <T> T read(String source, Class<T> targetClass) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass, false);
+        }
     }
 
     /** {@link #read(String, Class)} straight off a stream -- binds {@code source}'s bytes (UTF-8) genuinely, never buffering the whole document into a {@code String} first; {@code source} is not closed here. */
     public <T> T read(InputStream source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, policy, receiver), targetClass, false);
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass, false);
+        }
     }
 
     /**
@@ -323,23 +338,36 @@ public final class TsonObjectReader {
      *
      * @return the document, or {@code null} where {@link #read} would also yield nothing
      */
-    public <T> TsonObjectDocument<T> readDocument(String source, Class<T> targetClass) {
+    /** {@link #read(ByteSource, Class)} with the header and root type kept -- see {@link #readDocument(String, Class)}. */
+    public <T> TsonObjectDocument<T> readDocument(ByteSource source, Class<T> targetClass) {
         return readDocument(new TsonDataStream(source, policy, receiver), targetClass);
+    }
+
+    public <T> TsonObjectDocument<T> readDocument(String source, Class<T> targetClass) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass);
+        }
     }
 
     /** {@link #readDocument(String, Class)} straight off a stream; {@code source} is not closed here. */
     public <T> TsonObjectDocument<T> readDocument(InputStream source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, policy, receiver), targetClass);
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass);
+        }
     }
 
     /** Like {@link #read(String, Class)} but always schemaless -- binds to {@code targetClass} without validating, even when the document declares a {@code !!schema}. (A schemaless reader's {@link #read} already does this.) */
     public <T> T readWithoutSchema(String source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, policy, receiver), targetClass, true);
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass, true);
+        }
     }
 
     /** {@link #readWithoutSchema(String, Class)} straight off a stream. */
     public <T> T readWithoutSchema(InputStream source, Class<T> targetClass) {
-        return readDocument(new TsonDataStream(source, policy, receiver), targetClass, true);
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readDocument(new TsonDataStream(bytes, policy, receiver), targetClass, true);
+        }
     }
 
     /**
@@ -348,13 +376,22 @@ public final class TsonObjectReader {
      * !!schema} plus a root type-ref would otherwise say, and validation (including the up-front check that
      * {@code targetClass} can hold that type) is identical either way.
      */
-    public <T> T readAs(String source, String typeName, Class<T> targetClass) {
+    /** {@link #read(ByteSource, Class)} against {@code typeName} -- see {@link #readAs(String, String, Class)}. */
+    public <T> T readAs(ByteSource source, String typeName, Class<T> targetClass) {
         return readDocumentAs(new TsonDataStream(source, policy, receiver), typeName, targetClass);
+    }
+
+    public <T> T readAs(String source, String typeName, Class<T> targetClass) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readDocumentAs(new TsonDataStream(bytes, policy, receiver), typeName, targetClass);
+        }
     }
 
     /** {@link #readAs(String, String, Class)} straight off a stream. */
     public <T> T readAs(InputStream source, String typeName, Class<T> targetClass) {
-        return readDocumentAs(new TsonDataStream(source, policy, receiver), typeName, targetClass);
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readDocumentAs(new TsonDataStream(bytes, policy, receiver), typeName, targetClass);
+        }
     }
 
     /**

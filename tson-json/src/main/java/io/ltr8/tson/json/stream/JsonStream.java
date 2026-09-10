@@ -1,5 +1,6 @@
 package io.ltr8.tson.json.stream;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.LimitExceededException;
@@ -135,7 +136,7 @@ public final class JsonStream implements JsonEventSource {
      * {@code ProcessorPolicy.defaults()} and {@code DiagnosticsReceiver.throwing()} where they can be seen,
      * rather than picking them up from an overload that hides which defaults it chose.
      */
-    public JsonStream(InputStream source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
+    public JsonStream(ByteSource source, ProcessorPolicy policy, DiagnosticsReceiver receiver) {
         this(new JsonLexer(source), policy.limits());
         this.tokenPolicy = policy.tokenPolicy();
         this.tokenPolicyReceiver = receiver;

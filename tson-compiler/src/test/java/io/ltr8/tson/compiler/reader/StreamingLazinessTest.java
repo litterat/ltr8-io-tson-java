@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
+import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.compiler.TsonCompiledSchema;
 import io.ltr8.tson.compiler.TsonDataStream;
@@ -91,7 +92,7 @@ class StreamingLazinessTest {
         hugeArray.append("]");
         String dataSource = "{ a: 1  b: [1 2 3]  huge: " + hugeArray + " }";
 
-        TsonDataStream realStream = new TsonDataStream(dataSource);
+        TsonDataStream realStream = new TsonDataStream(ByteSource.of(dataSource));
         realStream.next(); // DocumentStart
         CountingEventSource counting = new CountingEventSource(realStream);
         TsonReadContext ctx = TsonReadContext.throwing(counting, UnicodePolicy.unrestricted());
