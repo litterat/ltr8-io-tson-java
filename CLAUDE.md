@@ -225,7 +225,8 @@ module has a real `module-info.java`; module names mirror each module's root exp
   around it. `io.ltr8.tson.base` is how a problem is stated — `Diagnostic` (the record and its closed `Code`
   enum), the three diagnostics receivers, `SourcePosition`, `CanonicalIdentity` (§2.2.1's algorithm, how a
   schema is named), and the exceptions whose fact is the **processor's** rather than
-  any one encoding's — `ReadException`, `ParseException`, `LimitExceededException`, `SchemaValidationException`,
+  any one encoding's — `ReadException`, `ParseException`, `WriteException`, `LimitExceededException`,
+  `SchemaValidationException`,
   `BindMismatchException` and its
   `MissingBindingException` subclass, `SchemaFetchException` (whose `Reason` is what `Diagnostic.Code.of`
   maps), `ContentHashMismatchException`. **The exceptions stay at the root rather than following their
@@ -244,8 +245,8 @@ module has a real `module-info.java`; module names mirror each module's root exp
   specification*, so leaving it in `tson-compiler` would make every other encoding depend on the TSON text
   engine to say "this field is required", or mint a second vocabulary for one fact. **What deliberately
   stayed behind is the classifying half**: `Diagnostic`'s ten `of*` factories all switch on an exception
-  type an encoding declares, so each encoding owns its own (`TsonDiagnostics` here, and the JSON stack's
-  own when it needs one) — which is also what closes the old "`ofBaseSyntaxError` cannot classify another
+  type an encoding declares, so each encoding owns its own (`TsonDiagnostics` here, `JsonDiagnostics` in
+  the JSON stack) — which is also what closes the old "`ofBaseSyntaxError` cannot classify another
   encoding's syntax failure" gap, since there is no longer one switch responsible for exceptions it cannot
   name. `SourcePosition` moved here from `schema.meta` so the base need not require `tson-schema`; the
   bonus is that any encoding's own position type can implement it and reach a `Diagnostic` with no
@@ -397,7 +398,8 @@ module has a real `module-info.java`; module names mirror each module's root exp
   chose, so it sits in `tson-base` with the values it holds and is shared by every encoding; what cannot
   follow it is construction, which names the compiler's own registry. Hence `Tson.of(config)`, and
   `Tson.standard()` for the unconfigured case.
-- **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree and readers. A
+- **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree, readers and
+  writers. A
   separate stack rather than a front end over `tson-compiler`'s `TsonEventSource` — see "Not yet implemented"
   for the two disagreements that decide it. The **tree model follows [JEP 540](https://openjdk.org/jeps/540)**
   (`jdk.incubator.json`, JDK 28, unavailable now): sealed `JsonValue` over `JsonObject`/`JsonArray`/`JsonString`/
@@ -414,7 +416,17 @@ module has a real `module-info.java`; module names mirror each module's root exp
   readers and `JsonDiagnostics` classifies it, the peer of `TsonDiagnostics` and separate for the reason that
   class's own note gives: each encoding owns the switch over its own exceptions. **`Json` is the prefix here, on `Tson`'s own
   terms** — the names a consumer writes are the JDK's, so this module keeps them rather than minting a second
-  vocabulary for one hierarchy. A pure leaf so far; the schema-directed decode of §5–§8 is what brings a
+  vocabulary for one hierarchy. **The write side is the read side's inverse and no more**:
+  `JsonTreeWriter`/`JsonObjectWriter` over `JsonDataEmitter` (the push peer of `JsonStream`, which owns the
+  separators so no walk places its own) and their `writer`-package engines. The **tree** round trip is total
+  — RFC 8259 has six kinds and one spelling each, and `JsonNumber` holds the literal, so §5.3's digits and
+  scale come back out — where `TsonTreeWriter`'s has documented losses; the **object** round trip is through
+  the class that wrote it, an `int`'s width and a tuple's tuple-ness living there exactly as they live in a
+  schema. Two things are refused rather than approximated, both because the reader could not take them back:
+  a choice (§8.2 admits an untagged one only by facts a schema states) and a host value with no JSON
+  spelling — `WriteException`, `tson-base`'s, shared for `ParseException`'s reason. Non-finite doubles are
+  *not* among them: §5.4 spells them `".inf"`/`"-.inf"`/`".nan"`, [TSON-DATA] §7.6's own productions.
+  A pure leaf so far; the schema-directed decode of §5–§8 is what brings a
   dependency on `tson-compiler`.
 - **`tson-cli`** — the `tson` command-line application. Depends on nothing depending on it (exports
   nothing).

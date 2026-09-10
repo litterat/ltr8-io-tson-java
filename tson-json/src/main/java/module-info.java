@@ -25,8 +25,14 @@
  * [TSON-DATA] §8.1's four categories and adds none), a source position, and one limits policy (§10.1, "the
  * same policy applies with the same defaults"). Reading a document is still entirely this module's own.
  *
- * <p>{@code lexer} and {@code atom} stay internal, on the same terms as {@code tson-compiler}'s packages
- * of those names: a consumer names a value, an event or a reader -- never a token or a parser.
+ * <p><b>Writing is the same two doors from the other side.</b> {@code JsonTreeWriter} is the inverse of
+ * {@code JsonTreeReader} and {@code JsonObjectWriter} of {@code JsonObjectReader}, over {@code
+ * JsonDataEmitter} -- the push-based peer of {@code stream}'s pull, which owns the separators so no walk
+ * places its own. The tree round trip is total, the object one is through the class that wrote it.
+ *
+ * <p>{@code lexer}, {@code atom}, {@code reader} and {@code writer} stay internal, on the same terms as
+ * {@code tson-compiler}'s packages of those names: a consumer names a value, an event, a reader or a
+ * writer -- never a token, a parser or an engine.
  */
 module io.ltr8.tson.json {
     exports io.ltr8.tson.json;

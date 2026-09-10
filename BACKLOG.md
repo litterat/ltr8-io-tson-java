@@ -93,20 +93,11 @@ declared on those terms and neither has a consumer, because TSON text tags its c
 never flattens — so it cannot exercise `@discriminator` or `@rest` at all. A JSON front end is what puts that half of
 §6 under test, and is expected to move both: a directive with no consumer has never had its shape checked against one.
 
-- [ ] **Nothing writes JSON.** `tson-json` is three readers and no writer — `Json.parse`, `JsonTreeReader`,
-  `JsonObjectReader` — where the text side has `TsonObjectWriter`, `TsonTreeWriter` and `TsonDataEmitter`
-  under them. The escape half already exists and nothing composes it: `JsonText` is RFC 8259 string quoting,
-  package-private, and its own Javadoc calls itself "the only place this module writes a string". §5's
-  per-family table states an **encode** column beside the decode one, §9.2 is a processor contract in its own
-  right, and §9.3's round-trip guarantees cannot be asserted at all with one direction built — so §5.3's
-  digits-and-scale promise (`199.90` encodes as `199.90`, not `199.9`) is currently half-tested: the scale
-  survives into a `BigDecimal` and nothing checks it comes back out. What the shape should be is settled by
-  the read side rather than open: the tree and object writers are the mirror of the two readers, `JsonText`
-  is the leaf, and `VocabularyAtoms`' keying on the *declared* host class rather than the value's runtime
-  class is the rule to carry over — `litterat-json`'s `JsonMapper.writeAtom` dispatches on
-  `object instanceof Number`, which is how a `long` and a `BigInteger` come to be written by the same branch
-  and neither is written by its family. One walk serves both directions there, in one class; whether that is
-  worth copying is the one real design question here.
+- [ ] **`TsonWriteException` has not converged on `tson-base`'s `WriteException`.** The JSON writers throw
+  the shared one -- a value the encoding cannot take is the processor's fact, not one format's, which is
+  `ParseException`'s and `ReadException`'s own argument for living in the base. `tson-compiler` still throws
+  its own across about 30 sites, so the library states one fact two ways. The work is the rename plus
+  deciding whether the message convention ("cannot write X as TSON") survives it.
 
 - [ ] **A JSON document cannot name the schema that governs it, so the front door and the CLI need a surface that
   does.** `!!schema` is TSON text syntax (`SPEC-FEEDBACK.md` #2, open): a JSON body has no in-band channel, so

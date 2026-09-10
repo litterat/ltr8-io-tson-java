@@ -113,6 +113,16 @@ public final class Json {
         return JsonObjectReader.using(config.dataBindContext()).withProcessorPolicy(config.processorPolicy());
     }
 
+    /** A {@link JsonTreeWriter} -- the inverse of {@link #treeReader()}, and total over a tree this reads. */
+    public JsonTreeWriter treeWriter() {
+        return new JsonTreeWriter();
+    }
+
+    /** A {@link JsonObjectWriter} over this instance's bindings -- the inverse of {@link #objectReader()}. */
+    public JsonObjectWriter objectWriter() {
+        return JsonObjectWriter.using(config.dataBindContext());
+    }
+
     // ── JEP 540's entry points ───────────────────────────────────────────
 
     /**
