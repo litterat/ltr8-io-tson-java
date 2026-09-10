@@ -72,6 +72,23 @@ class ConfusablesTest {
     }
 
     /** A name is confusable with itself, whatever normalisation form it arrived in. */
+    /**
+     * The pairs that are confusable without leaving ASCII -- and the reason {@link Confusables#skeleton}
+     * may never take a "pure ASCII, nothing to do" shortcut.
+     *
+     * <p>Eight ASCII code points carry a mapping, {@code m -> rn} and {@code 1 -> l} among them, so two
+     * names a keyboard can type without any Unicode at all still read alike. An implementation that skipped
+     * the table for ASCII would keep passing every other test here and stop catching exactly the attack
+     * that needs no special input method to mount.
+     */
+    @Test
+    void asciiAloneIsEnoughToBeConfusable() {
+        confusable("payment", "payrnent");
+        confusable("l1", "ll");
+        confusable("IO", "l0");
+        distinct("payment", "payments");
+    }
+
     @Test
     void normalisationDoesNotAffectTheSkeleton() {
         confusable("caf" + cp(0x00E9), "cafe" + cp(0x0301));

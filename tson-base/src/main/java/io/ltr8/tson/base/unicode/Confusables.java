@@ -58,15 +58,35 @@ public final class Confusables {
      */
     public static String skeleton(String text) {
         String decomposed = Normalizer.normalize(text, Normalizer.Form.NFD);
-        StringBuilder mapped = new StringBuilder(decomposed.length());
-        decomposed.codePoints().forEach(cp -> {
+        // Scanned before it is built, because most names map nothing and the ones that do are the minority
+        // this exists for. A name with no confusable character is its own decomposition, and NFD is
+        // idempotent, so returning it is the same answer without a builder, a second normalisation or the
+        // stream and capturing lambda a forEach over codePoints() costs. This runs per name per record on
+        // the schemaless tree path, which is where that adds up.
+        int first = -1;
+        for (int i = 0; i < decomposed.length(); ) {
+            int cp = decomposed.codePointAt(i);
+            if (MAPPING.containsKey(cp)) {
+                first = i;
+                break;
+            }
+            i += Character.charCount(cp);
+        }
+        if (first < 0) {
+            return decomposed;
+        }
+        StringBuilder mapped = new StringBuilder(decomposed.length() + 8);
+        mapped.append(decomposed, 0, first);
+        for (int i = first; i < decomposed.length(); ) {
+            int cp = decomposed.codePointAt(i);
             String replacement = MAPPING.get(cp);
             if (replacement == null) {
                 mapped.appendCodePoint(cp);
             } else {
                 mapped.append(replacement);
             }
-        });
+            i += Character.charCount(cp);
+        }
         return Normalizer.normalize(mapped, Normalizer.Form.NFD);
     }
 }

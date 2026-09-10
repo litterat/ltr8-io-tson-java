@@ -214,6 +214,19 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **The look-alike check recomputes every skeleton per record, and ignores the identifier policy.**
+  `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of
+  every schemaless tree read, which builds a `HashMap` and a UTS #39 skeleton per field name. Field names
+  repeat across the records of a document, so the same skeletons are built again for each one; measured,
+  the whole check is ~1,300 bytes per read of the harness document even after `Confusables.skeleton` stopped
+  allocating for a name that maps nothing. A cache would take most of that, and the design question is its
+  bound: names are attacker-controlled, so a per-read cache is the safe shape and a process-wide one is not.
+  Separately, the check consults **no policy** -- a deployment that stated
+  `withIdentifierPolicy(unrestricted())` still gets `CONFUSABLE_NAMES`, where the two per-name rules honour
+  it. §8.2 requires a deployment be able to relax any of the three rules, so either that is a conformance
+  gap or the rule is deliberately unconditional and should say so; the two per-name rules gate themselves,
+  which makes the silence here look like an oversight rather than a decision.
+
 - [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is
   the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one
   table with a default each, so nothing here is a judgement call any more — what is left is eleven document
