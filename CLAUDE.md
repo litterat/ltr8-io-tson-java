@@ -27,9 +27,9 @@ A from-scratch Java implementation of TSON (Typed Schema Object Notation), built
 spec series (2026 revision):
 
 - Part 1 — lexer, structural grammar, base type resolution, built-in type vocabulary:
-  https://tson.io/raw/2026/34/tson-part1-data.md
+  https://tson.io/raw/2026/35/tson-part1-data.md
 - Part 2 — schema grammar, type system, resolution, linking, compilation:
-  https://tson.io/raw/2026/34/tson-part2-schema.md
+  https://tson.io/raw/2026/35/tson-part2-schema.md
 
 The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
 doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached

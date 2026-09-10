@@ -480,8 +480,8 @@ issues still open against the current revision, and `STATUS.md` the implemented/
 
 ## Specification
 
-- Part 1 — Text Data Format: https://tson.io/raw/2026/34/tson-part1-data.md
-- Part 2 — Type System and Schema: https://tson.io/raw/2026/34/tson-part2-schema.md
+- Part 1 — Text Data Format: https://tson.io/raw/2026/35/tson-part1-data.md
+- Part 2 — Type System and Schema: https://tson.io/raw/2026/35/tson-part2-schema.md
 
 Both are working revisions and change without compatibility guarantees. Re-fetch and check the revision
 number at the top rather than trusting a cached copy.
