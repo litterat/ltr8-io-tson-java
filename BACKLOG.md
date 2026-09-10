@@ -58,6 +58,16 @@ own prose (which had gone stale on it):
   belongs with the other constructor-eligibility checks, where `requireApplicable` already asks what `!C`
   may be applied to.
 
+- [ ] **A schema registered in-process is never pin-checked.** `Tson.resolve` and `Tson.validateSchema` register a
+  linked schema straight into the core's `TsonSchemaRegistry`, bypassing `TsonCompiledMetaRegistry.recordAndVerify`,
+  so no content hash is recorded for that identity. `verifyPin` then has nothing to compare against and returns
+  silently: a data document referencing that schema with a wrong `?sha256=` pin validates clean, where the same
+  reference is refused with `SCHEMA_ERROR` once the schema has arrived through a `SchemaSource`. `TsonValidateTest`'s
+  pin cases all take the fetched path, which is why the gap is green. Fix is to hash the source text at both
+  registration sites (the identity's `putIfAbsent` semantics already handle a later fetch of the same bytes), and a
+  test that registers via `validateSchema` then validates a mis-pinned reference. [TSON-SCHEMA] §10.2 makes
+  verification per identity, not per route.
+
 ## Checked annotations
 
 [TSON-SCHEMA] §6 defines the category and §5.4's `@disjoint` is the precedent both follow: an annotation with
