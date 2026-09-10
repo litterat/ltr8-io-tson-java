@@ -130,8 +130,21 @@ public class TsonDataParser {
      * parser's to parse, so parsing it and then complaining would be work done to reach a verdict already
      * available.
      */
+    /**
+     * §2.2's header, as the stream's first event -- <b>the one place either parser reads it</b>.
+     * {@link TsonSchemaParser} takes its {@code !!id}/{@code !!meta} from here too, which is what leaves
+     * one implementation of the header grammar rather than one per conformance class.
+     *
+     * <p>Reading it frames nothing: the stream pushes the root value's frames on the first demand for an
+     * event past this one, so a caller that goes on to read a schema map at token level does so over an
+     * untouched frame stack.
+     */
+    DocumentStart documentStart() {
+        return (DocumentStart) stream.next();
+    }
+
     public Document parseDocument() {
-        DocumentStart start = (DocumentStart) stream.next();
+        DocumentStart start = documentStart();
         if (start.isSchemaDocument()) {
             throw new TsonUnsupportedDocumentException(start.position());
         }

@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ParseException;
 import io.ltr8.tson.compiler.ast.Annotation;
@@ -168,18 +169,21 @@ public final class TsonSchemaParser extends TsonDataParser {
     }
 
     private Optional<SchemaDocument> parseDocumentBody() {
-        Optional<String> documentId = Optional.empty();
-        if (check(TokenType.DIRECTIVE) && "id".equals(peekDirectiveName())) {
-            documentId = Optional.of(parseNamedDirective("id"));
-            schemaId = canonicalIdOrAsWritten(documentId.get());
-        }
-        final Optional<String> id = documentId;
+        // §2.2's header comes off the stream's first event, exactly as a data document's does -- one
+        // implementation of that grammar, not one per conformance class. What differs is the verdict, which
+        // is this parser's: [TSON-SCHEMA] §12.1 requires exactly one `!!meta` where §2.2 merely permits it.
+        DocumentStart start = documentStart();
+        final Optional<String> id = start.id();
+        id.ifPresent(value -> schemaId = canonicalIdOrAsWritten(value));
 
-        if (!check(TokenType.DIRECTIVE) || !"meta".equals(peekDirectiveName())) {
-            throw parseError("expected '!!meta' (a schema document requires exactly one, "
-                    + "immediately after '!!id' if present)");
+        if (start.meta().isEmpty()) {
+            throw start.schema().isPresent()
+                    ? parseError("a schema document is governed by '!!meta', not '!!schema' (§12.1 requires "
+                            + "exactly one '!!meta', immediately after '!!id' if present)")
+                    : parseError("expected '!!meta' (a schema document requires exactly one, "
+                            + "immediately after '!!id' if present)");
         }
-        String meta = parseNamedDirective("meta");
+        String meta = start.meta().get();
 
         List<String> imports = new ArrayList<>();
         while (check(TokenType.DIRECTIVE) && "import".equals(peekDirectiveName())) {

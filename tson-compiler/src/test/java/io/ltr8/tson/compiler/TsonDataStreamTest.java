@@ -524,4 +524,53 @@ class TsonDataStreamTest {
         }
         assertEquals(0, depth, "every opened container must be closed exactly once");
     }
+
+    /**
+     * <b>Reading the header frames nothing.</b> The root value is framed by the first demand for an event
+     * past {@code DocumentStart}, so a caller that stops there -- a peek, or a schema parser taking
+     * {@code !!id}/{@code !!meta} -- leaves an empty frame stack behind. That is the invariant that lets
+     * {@code TsonSchemaParser} read a schema map over the same stream: {@code drain} frames what its caller
+     * asked for and would otherwise inherit whatever the header had pushed.
+     */
+    @Test
+    void readingOnlyTheHeaderLeavesTheFrameStackClean() {
+        TsonDataStream stream = new TsonDataStream(ByteSource.of(
+                "!!id:\"https://example.com/x\"\n!!meta:\"https://example.com/m.tn\"\n{ a => text }"));
+
+        DocumentStart start = (DocumentStart) stream.next();
+        assertTrue(start.isSchemaDocument());
+
+        // A schema map is not a data value, and reading one is the schema parser's job -- but the stream
+        // must be in a state where that is still possible, which means having framed nothing of its own.
+        // `{ a => text }` is a map to the data grammar (`=>`), which is beside the point: what matters is
+        // that the drain starts at the schema map's own opening brace, with no frame the header left behind.
+        List<String> body = stream.nextDataValueEvents().stream().map(TsonDataStreamTest::describe).toList();
+        assertEquals(List.of("MapStart", "Token(a,UNQUOTED)"), body.subList(0, 2),
+                "the frame this asks for is the only one that runs");
+    }
+
+    /** And a data document still gets framed, on the first pull past the header rather than before it. */
+    @Test
+    void aDataDocumentIsFramedOnTheFirstPullPastTheHeader() {
+        assertEquals(List.of("DocumentStart(|)", "RecordStart", "FieldName(a)", "Token(1,UNQUOTED)",
+                        "RecordEnd", "DocumentEnd"),
+                shape("{ a: 1 }"));
+    }
+
+    /**
+     * A directive §2.2 does not admit in a header is <b>left for the parser</b> and refused at the value
+     * position it then occupies -- named, because "found '!!'" says nothing about which rule broke. The
+     * stream no longer decides it, so a schema document missing its {@code !!meta} keeps the schema
+     * parser's own wording instead of being told about {@code !!schema}.
+     */
+    @Test
+    void aStrayDirectiveIsNamedAtTheValuePosition() {
+        TsonDataStream stream = new TsonDataStream(ByteSource.of(
+                "!!import:\"https://example.com/core.tn\"\n{ a: 1 }"));
+
+        assertEquals(Optional.empty(), ((DocumentStart) stream.next()).schema(), "the header reports nothing");
+
+        ParseException e = assertThrows(ParseException.class, stream::next);
+        assertTrue(e.getMessage().contains("'!!import' is not permitted here"), e.getMessage());
+    }
 }

@@ -221,9 +221,23 @@ Key points:
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
   parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic). The
   *stream* judges nothing: it reads §2.2's header once, for everyone, and `TsonSchemaParser` sits on the same
-  stream and requires the very directive this parser refuses. A schema document's `DocumentStart` is also the
-  whole of what the stream has to say about it — no root frames are pushed, there being no data value to
-  frame.
+  stream and requires the very directive this parser refuses -- taking its own `!!id`/`!!meta` off the same
+  `DocumentStart`, through `TsonDataParser.documentStart()`, so the grammar has one implementation and each
+  parser applies only its own rule on top.
+- **A directive §2.2 does not admit in a header is left unconsumed**, not refused by the stream. `!!import`
+  is a schema document's and `TsonSchemaParser` reads it; a data document carrying one is an error, but the
+  wording that names the broken rule belongs to the parser that knows which kind of document was expected.
+  Refusing it in the stream produced *"expected `!!schema`, `!!meta` or the start of the document's value"*
+  for a schema document whose actual problem was a missing `!!meta`. What survives in the stream is the
+  **value-position** rule (`notAValue`), which names the directive rather than saying "found `!!`" — true
+  whoever is reading, because nothing spelled `!!` can start a value.
+- **The root value is framed on first demand, not with the header.** `fill()` pushes `RootFrame`/
+  `DataValueFrame` the first time an event past `DocumentStart` is wanted, so reading only the header costs
+  nothing and leaves an empty frame stack — which is what lets a schema parser take `!!id`/`!!meta` off the
+  event and then drive `drain` over a stack the header never touched. The stream thereby stops needing to
+  know what kind of document it holds at all: a schema document simply never asks for a value, where it used
+  to be recognised by its `!!meta` and framed differently on that basis. `TsonDataStreamTest` pins both
+  halves.
 - **Nested annotation value-scope is right-recursive** and can legitimately leave an outer data-value
   without a core-value (`@a:@b:val`) — §3.1's own worked example says so; intentional, not a bug.
 

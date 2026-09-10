@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import java.util.Optional;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.DiagnosticsReceiver;
@@ -1013,5 +1014,59 @@ class TsonSchemaParserTest {
         assertEquals(new Position(3, 3, source.indexOf("first")), declarationPositions.get(first));
         assertEquals(5, declarationPositions.get(second).line());
         assertTrue(declarationPositions.get(second).line() > declarationPositions.get(first).line());
+    }
+
+    /**
+     * <b>The header comes off {@code DocumentStart} now, and the verdict is still this parser's.</b>
+     * §2.2's grammar has one implementation -- the stream's -- where it had three; what stays here is
+     * [TSON-SCHEMA] §12.1's rule, that a schema document carries exactly one {@code !!meta} where §2.2
+     * merely permits it. These pin the messages, because the risk of reading the header off a shared event
+     * was always that a schema document would be told about a data document's rules.
+     */
+    @Test
+    void aSchemaDocumentMissingItsMetaSaysSo() {
+        for (String source : new String[]{
+                "!!import:\"https://example.com/core.tn\"\n{ a => text }",   // a directive §2.2 does not admit
+                "{ a => text }"}) {                                          // no header at all
+            ParseException e = assertThrows(ParseException.class, () -> parse(source));
+            assertTrue(e.getMessage().startsWith("expected '!!meta'"), e.getMessage());
+        }
+    }
+
+    /** And a document governed by the wrong directive is told which one it should carry. */
+    @Test
+    void aSchemaDocumentGovernedBySchemaSaysWhichDirectiveItNeeds() {
+        for (String source : new String[]{
+                "!!schema:\"https://example.com/s.tn\"\n{ a => text }",
+                "!!id:\"https://example.com/x\"\n!!schema:\"https://example.com/s.tn\"\n{ a => text }"}) {
+            ParseException e = assertThrows(ParseException.class, () -> parse(source));
+            assertTrue(e.getMessage().contains("governed by '!!meta', not '!!schema'"), e.getMessage());
+        }
+    }
+
+    /** A directive after the header is still the schema map's business, and names its own alternatives. */
+    @Test
+    void aStrayDirectiveAfterTheMetaIsTheSchemaParsersToRefuse() {
+        ParseException e = assertThrows(ParseException.class, () -> parse("""
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!bogus:"https://example.com/x"
+                { a => text }"""));
+
+        assertTrue(e.getMessage().contains("'!!bogus' is not permitted here"), e.getMessage());
+        assertTrue(e.getMessage().contains("'!!import' or the schema map's opening"), e.getMessage());
+    }
+
+    /** The whole header, read through the shared event: id, meta and the imports that follow it. */
+    @Test
+    void theWholeHeaderSurvivesTheSharedRead() {
+        SchemaDocument doc = parse("""
+                !!id:"https://example.com/s.tn"
+                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!import:"https://tson.io/2026/35/m/core.tn"
+                { a => text }""");
+
+        assertEquals(Optional.of("https://example.com/s.tn"), doc.id());
+        assertEquals("https://tson.io/2026/35/m/meta.tn", doc.meta());
+        assertEquals(List.of("https://tson.io/2026/35/m/core.tn"), doc.imports());
     }
 }
