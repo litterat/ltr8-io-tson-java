@@ -78,8 +78,14 @@ merging a divergence early costs `main` the one signal it exists to give. The bu
 revision's own identities from the start, so a content change lands on artifacts named for the revision
 proposing it rather than being re-identified at the end.
 
-§1.3's Part 1 freeze is a claim the published revision makes; Revision 35 reopened the lexer for #8's
-escape-table change, which is the first thing to rely on that.
+**Nothing here is frozen, and nothing is owed to a user who does not exist.** The spec is a working
+revision, this is its first implementation, and the artifact has no published releases and no remote
+repository configured — every version carries `-SNAPSHOT`. So **correctness wins over stability, every
+time**: a wrong rule gets fixed rather than kept, a bad name gets changed rather than deprecated, a public
+method that turned out to be the wrong shape gets deleted rather than wrapped. Where the spec itself is
+wrong, `SPEC-FEEDBACK.md` is how that gets fixed too. A compatibility argument is only worth making about a
+real consumer, and there are none — the one place any of this becomes binding is §10's immutability rule for
+a *published* schema `!!id`, which is about documents in the world, not about Java signatures.
 
 **Status:** Part 2's grammar, resolution, linking, and Class 2 compilation
 all work: the three bundled schemas resolve/register/compile in full, user schemas governed by them
@@ -401,9 +407,10 @@ note named at the head of each.
 
 ### Lexer (`tson-compiler/.../lexer/`) — `docs/lexer-and-data-parsing.md`
 
-`Lexer` is a single hand-written scanner producing `Token`s off `nextToken()` (never a batch) — **frozen for
-the whole series on `main`** (§1.3), and reopened on this branch by #8's escape-table change, which principle 7
-permits and which wants doing before anything is published against the frozen claim. Constructed from an
+`Lexer` is a single hand-written scanner producing `Token`s off `nextToken()` (never a batch). §1.3 says
+higher parts add no tokens, modes or character-classification changes, which is a statement about the
+*layering* and holds; it is not a reason to leave a lexer bug in place, and Revision 35's escape-table change
+is what that looks like in practice. Constructed from an
 `InputStream` whose **UTF-8 it decodes itself** (§9.1), code-point
 addressed (never char-addressed), with `Position` tracking line / code-point column / UTF-8 byte offset —
 counted from the input rather than re-derived from the decoded character, and malformed UTF-8 is a
@@ -873,7 +880,8 @@ annotations in §7.4 order; `toTson` is mainly a debugging tool with documented 
 take a sink — `write(value, OutputStream|Appendable)`, UTF-8, flushed and not closed — so a document never
 has to exist as a `String`; `TsonDataEmitter` holds an `Appendable`, and `toTson` is that method over a
 `StringBuilder`. Both can also emit a document header (`describing(schemaUri[, rootType])`/`identifiedBy`),
-**off by default** so existing output is unchanged — the object writer needs the root type too, a bound
+**off by default** because a bare value is what a writer is usually asked for, not to protect output
+nobody consumes — the object writer needs the root type too, a bound
 object carrying neither fact, where a tree already names its own; `TsonDataEmitter.typeRef` refuses a second
 type-ref on one value, which is what keeps a declared root type from writing an unparseable document. The
 same `TsonDocumentHeader` carrier reads, through **`TsonDocumentPeek`** (`Tson.begin(…)`, or

@@ -483,5 +483,10 @@ issues still open against the current revision, and `STATUS.md` the implemented/
 - Part 1 — Text Data Format: https://tson.io/raw/2026/34/tson-part1-data.md
 - Part 2 — Type System and Schema: https://tson.io/raw/2026/34/tson-part2-schema.md
 
-Both are working revisions and change without compatibility guarantees until the spec freezes at
-version 1. Re-fetch and check the revision number at the top rather than trusting a cached copy.
+Both are working revisions and change without compatibility guarantees. Re-fetch and check the revision
+number at the top rather than trusting a cached copy.
+
+**The spec and this implementation are both in design, and neither has users.** The library is unreleased --
+no Maven Central artifact, no remote repository, every version `-SNAPSHOT` -- so nothing in its API is held
+stable for a consumer's sake. Where a rule or a name turns out wrong it is changed, not deprecated. Treat any
+signature here as current rather than settled.

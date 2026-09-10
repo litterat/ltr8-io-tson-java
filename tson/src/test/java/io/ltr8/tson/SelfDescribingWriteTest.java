@@ -53,7 +53,7 @@ class SelfDescribingWriteTest {
         return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)));
     }
 
-    /** The default is untouched: a bare value, which is what every existing consumer of this output expects. */
+    /** The default is a bare value -- what a writer is usually asked for, and what `describing` opts out of. */
     @Test
     void aPlainWriterStillWritesABareValue() {
         assertEquals("{ x: 3 y: 4 }", tson().objectWriter().toTson(new Point(3, 4)));

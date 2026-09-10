@@ -242,7 +242,8 @@ class TsonDataStreamTest {
     /**
      * The data path shares {@code expect}/{@code describe} with the schema path, so it gets the same
      * construct-led wording and the same structured {@code expected}/{@code actual} pair (issue #29). Pinned
-     * here because Part 1's accept/reject set is frozen and only the wording may move.
+     * here because what is asserted is the accept/reject set, which the grammar fixes, where the wording is
+     * free to move.
      */
     @Test
     void aMismatchNamesTheConstructAndCarriesItStructurally() {

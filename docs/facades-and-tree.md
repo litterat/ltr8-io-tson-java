@@ -238,8 +238,8 @@ admit UTS #39's own `Toys-Я-Us`.
   `schemaRef` (the two of §3.3's four directive names that belong to a *data* document; `meta`/`import` are a
   schema document's and this emitter does not write one), and both writers a `describing(...)` derivation
   over a shared `TsonDocumentHeader` carrier that knows §2.2's order — `!!id` first when both are present.
-  **Default output is unchanged**, deliberately: emitting a directive by default would rewrite every
-  document this library has ever produced, `tson validate --output tson` included.
+  **A bare value is the default**, because that is what a writer is usually asked for — not to protect
+  output already in the world, of which there is none. A caller who wants a self-describing document says so.
   - **The object writer takes the schema *and* the root type; the tree writer takes only the schema.** A
     bound object carries neither fact — the schemaless writer emits a type-ref only where a value would not
     read back without one — so `!!schema` alone yields a document whose own reader says "declares a

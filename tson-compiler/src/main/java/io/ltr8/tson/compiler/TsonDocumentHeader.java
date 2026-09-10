@@ -10,8 +10,8 @@ import java.util.Optional;
  * <p><b>Both ends of the library share this type.</b> {@link TsonDocumentPeek} reads one off source text and
  * {@code TsonObjectWriter#describing}/{@code TsonTreeWriter#describing} build one to emit. §2.2 makes
  * {@code !!id} the first line when present, and {@link #emit} is the one place that knows it. {@link #NONE}
- * is every writer's default -- a bare value, which is what this library has always written and what every
- * existing consumer of its output expects.
+ * is every writer's default -- a bare value, which is what a writer is usually asked for; a caller wanting
+ * a self-describing document says so.
  *
  * <p><b>A pure value, with no way to obtain one on it.</b> Reading a header means running the lexer over a
  * document, which is {@code TsonDataStream}'s job and reaches this type only as a projection of the

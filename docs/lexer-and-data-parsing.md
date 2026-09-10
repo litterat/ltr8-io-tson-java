@@ -39,8 +39,10 @@ evidence.
 ## Lexer (`tson-compiler/.../lexer/`)
 
 `Lexer` is a single hand-written scanner producing `Token`s, driven off `nextToken()` (never a
-`tokenize()` batch). **Complete and frozen for the whole series** (§1.3: higher parts introduce no new
-tokens, modes, or character-classification changes).
+`tokenize()` batch). §1.3 says higher parts introduce no new tokens, modes, or character-classification
+changes — a statement about the *layering*, which holds. It is not a promise that this class never changes:
+the spec is a working revision and this implementation has no users, so a lexer rule that turns out wrong is
+fixed rather than kept (Revision 35's escape-table change is exactly that).
 
 - **Constructed from an `InputStream`**, decoding UTF-8 and buffering a few code points of lookahead —
   never requires the whole document resident as a `String`. **Code-point addressed, not char-addressed**

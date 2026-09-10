@@ -5,10 +5,16 @@ schemas whose definitions are themselves data. A document names its schema, the 
 one hash verifies the whole chain. The finishing touch, TSON's data format is a Unicode-first notation you'll
 actually enjoy writing — JSON-like in shape, and not a superset of it.
 
-> **Status:** first implementation of TSON, built against a working-draft spec — revision 34
-> published, with this branch carrying the proposed 2026 revision 35 artifacts. Part 1 (data format) and most of Part 2 (schema layer) are implemented; the
-> API and the format itself may still change. See [STATUS.md](STATUS.md) for the full
-> checklist.
+> **Status: pure design, no users.** This is the first implementation of TSON, built against a working-draft
+> spec (Revision 35 of the 2026 series), and it is the first real test of whether that spec resolves to one
+> behaviour — which is the point of it existing. Nothing is released: there is no Maven Central artifact, no
+> remote repository is configured, and every version carries `-SNAPSHOT`.
+>
+> **So nothing here is frozen, and correctness wins over stability every time.** A rule that turns out wrong
+> gets fixed rather than kept; a name that turns out wrong gets changed rather than deprecated; a method that
+> turned out to be the wrong shape gets deleted rather than wrapped. Where the *spec* turns out wrong, that
+> gets fixed too — see [SPEC-FEEDBACK.md](SPEC-FEEDBACK.md). Expect the API and the format to move, and do
+> not build on either without expecting to follow. See [STATUS.md](STATUS.md) for the full checklist.
 
 **Reads from a stream, not a string.** Every facade reader takes an `InputStream` and pulls events through
 it (`TsonDataStream`), so memory is proportional to nesting depth rather than document size — worth naming
@@ -486,16 +492,21 @@ A bound object carries neither fact, so the object writer takes both: `!!schema`
 document whose reader answers *"declares a !!schema but has no root type-ref to select a type"*. A
 `TsonValue` already knows its own type, so `treeWriter().describing(schemaUri)` takes just the URI.
 `identifiedBy(documentId)` adds `!!id`. All three are derivations — the writer you called them on is
-unchanged, and default output is exactly what it was.
+unchanged, and a writer that was not asked for a header still writes a bare value.
 
 ---
 
 ## Status
 
 This is the **first implementation** of TSON, built against a working-draft spec (Part 1 data format
-and Part 2 schema layer, 2026 revision). Part 1 and most of Part 2 — schema grammar, resolution,
-linking/registration, and a compiled schema-validating reader — are implemented; some Part 2 constructs
-are still out of scope. Details live in dedicated docs rather than crowding this page:
+and Part 2 schema layer, Revision 35 of the 2026 series). Part 1 and most of Part 2 — schema grammar,
+resolution, linking/registration, and a compiled schema-validating reader — are implemented; some Part 2
+constructs are still out of scope.
+
+**Both the spec and this implementation are in design, and neither has users.** That is deliberate and it is
+the working method: the implementation is how the spec gets tested, and where the two disagree the answer may
+be a change to either. Nothing is held stable for the sake of a consumer who does not exist. Details live in
+dedicated docs rather than crowding this page:
 
 - **[STATUS.md](STATUS.md)** — the full implemented / not-yet-implemented checklist
 - **[CONFORMANCE.md](CONFORMANCE.md)** — edge-case behavior where a JDK parser and the RFC/ISO standard the spec cites disagree
