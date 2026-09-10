@@ -401,8 +401,10 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `Tson.standard()` for the unconfigured case.
 - **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree, readers,
   writers, and its own schema-directed reader stack over them — `JsonTypeReader`/`JsonCompiledSchema`/
-  `JsonSchemaCompiler`, with [TSON-JSON] §5's atoms, §6's records/arrays/sets/tuples and §7's absence
-  compiled in **tree mode**, and §6.5's maps and §8's sums reaching a `NOT_IMPLEMENTED` reader. **A
+  `JsonSchemaCompiler`, with [TSON-JSON] §5's atoms, the whole of §6's containers and §7's absence
+  compiled in **tree mode**, and §8's sums reaching a `NOT_IMPLEMENTED` reader. §6.5's two map forms are
+  chosen by the key type at compile time and never by inspecting the value, which is §4.1's rule applied
+  where it matters most — an object being one syntax for a record and a map both. **A
   schema-directed read hands back a `JsonValue`, never a `TsonValue`**: the parsers run, which is the
   validation, and the host value is discarded — tree mode answers *does this conform* and bind mode
   answers *give me the value*, so converting an encoding belongs to neither. What that costs is one kind

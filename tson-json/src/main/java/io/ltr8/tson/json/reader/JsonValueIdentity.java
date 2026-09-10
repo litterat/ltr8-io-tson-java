@@ -1,8 +1,16 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.unicode.Nfc;
+import io.ltr8.tson.json.tree.JsonArray;
+import io.ltr8.tson.json.tree.JsonNumber;
+import io.ltr8.tson.json.tree.JsonObject;
+import io.ltr8.tson.json.tree.JsonString;
+import io.ltr8.tson.json.tree.JsonValue;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.nio.ByteBuffer;
 import java.time.OffsetDateTime;
 import java.time.OffsetTime;
@@ -29,12 +37,35 @@ final class JsonValueIdentity {
 
     static Object of(Object decoded) {
         return switch (decoded) {
+            case JsonValue node -> ofNode(node);
             case String text -> Nfc.of(text);
             case byte[] octets -> ByteBuffer.wrap(octets);
             case BigDecimal number -> number.stripTrailingZeros();
             case OffsetDateTime moment -> moment.toInstant();
             case OffsetTime clock -> clock.withOffsetSameInstant(ZoneOffset.UTC).toLocalTime();
             default -> decoded;
+        };
+    }
+
+    /**
+     * A decoded tree reduced the same way, for a compound map key ([TSON-JSON] §6.5's pairs form): a
+     * {@code JsonNumber} keeps its literal, so {@code 1} and {@code 1.0} would compare unequal inside a key
+     * that §5.3 makes one value. Reduced recursively, since the key may be a record or an array of them.
+     *
+     * <p>Member order is dropped with it -- §6.1.6 gives it no meaning, so two objects differing only in
+     * order are one key.
+     */
+    private static Object ofNode(JsonValue node) {
+        return switch (node) {
+            case JsonNumber number -> number.toBigDecimal().stripTrailingZeros();
+            case JsonString string -> Nfc.of(string.value());
+            case JsonArray array -> array.elements().stream().map(JsonValueIdentity::ofNode).toList();
+            case JsonObject object -> {
+                Map<Object, Object> members = new LinkedHashMap<>();
+                object.members().forEach((key, value) -> members.put(Nfc.of(key), ofNode(value)));
+                yield Map.copyOf(members);
+            }
+            default -> node;
         };
     }
 }

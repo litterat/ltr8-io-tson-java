@@ -113,13 +113,13 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **No schema-directed decode of maps or sums — §6.5 and §8.** Maps in their two wire forms, selected by
-  the key type and never by inspecting the value (§6.5: object form for a scalar-token key, pairs form for a
-  compound one), with member names parsed by the key type's own contract and duplicates judged under
-  decoded-key identity. Then the discrimination predicate over the derived `disjoint` fact (§8), which brings
-  the reserved member namespace (`$schema`/`$type`/`$value`, §3.2/§3.3) and the annotation object with it, and
-  is where `@discriminator` gets its first consumer. Both constructors compile to a `NOT_IMPLEMENTED` reader
-  meanwhile. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`, `JsonCompiledSchema`,
+- [ ] **No schema-directed decode of sums — §8.** The discrimination predicate over the derived `disjoint`
+  fact: two routes to omit a tag and no third, §8.3's class-stability verdict computed per choice at schema
+  load, and §8.5's scoped positions. It brings the reserved member namespace (`$schema`/`$type`/`$value`,
+  §3.2/§3.3) and the annotation object with it, and is where `@discriminator` gets its first consumer.
+  `choice` and `scoped` compile to a `NOT_IMPLEMENTED` reader meanwhile, and a `$`-initial member at a record
+  position reports the same, the annotation object it belongs to being unbuilt. **The stack is `tson-json`'s
+  own all the way up** — `JsonTypeReader`, `JsonCompiledSchema`,
   `JsonSchemaCompiler`, its own factory registries — and `docs/json-encoding.md` carries why that is a deferral
   rather than a conclusion: the two disagreements that keep the *event* layers apart both dissolve above the
   schema, where the reader is the position, so one compiled schema over an encoding-neutral context stays a real
@@ -127,6 +127,13 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   `tson-compiler`**, contrary to what this entry used to predict: `TsonLinkedSchema` is a `tson-schema` record and
   `tson-atom` already re-exports that module, so what crosses is a value model and the pipeline producing it stays
   where it is.
+
+- [ ] **`ValueIdentity` has no `BigDecimal` case, so the exact tier compares by scale** (issue #470, found by
+  `CrossEncodingParityTest`). [TSON-SCHEMA] §5.5 puts scale outside a `number`'s value space and [TSON-JSON]
+  §5.3 states it outright, but `tson-compiler` compares with `BigDecimal.equals`: a `number`-keyed map admits
+  `1` and `1.0` as two keys, a `set` of `number` admits both as two elements, and a field `= 1.0` turns away a
+  document that writes `1`. The JSON side already carries the case, which is how the disagreement surfaced.
+  The parity case is left out of that suite until this lands rather than pinned as expected divergence.
 
 - [ ] **Bind mode has no schema-directed reader.** Tree mode validates and hands back the JSON; the other door
   — an HTTP service accepting both encodings and getting a Java object back — needs the same containers over a
