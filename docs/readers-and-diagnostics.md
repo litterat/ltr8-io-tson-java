@@ -444,6 +444,24 @@ for free by sitting upstream of the rewind. That decorator skips itself entirely
 without making the wrapper unconditional and putting a switch per token back into the cost of a read that
 has no policy at all.
 
+**Both surfaces are allocation-free when nothing is refused**, which is what makes the on-by-default one
+affordable. `UnicodePolicy.violation` and `IdentifierProfile.hygiene` each scan and return
+`Optional.empty()` — no split array, no script set, no stream — and the two call sites test that `Optional`
+rather than passing a lambda to `ifPresent`. That last part is not a style preference: a lambda capturing
+the name and the receiver allocates whether or not the `Optional` holds anything, and at one per rule per
+name it was the whole measured cost of a check that is otherwise free — ~110 bytes per bound record, ~640
+per read, and ~670 of the ~770 a raised *token* policy used to add. `AllocationHarnessTest` carries the
+figures and the ceiling that now catches a return to them.
+
+**The look-alike rule is the expensive one, and `Confusables.skeleton` is where that was spent.** It runs
+per name per record on the schemaless tree path, and it normalised, built and re-normalised for every name
+whether or not the name carried a confusable character. It now scans first and returns the decomposition
+untouched when nothing maps — no builder, no second normalisation, and none of the stream and capturing
+lambda a `forEach` over `codePoints()` costs — which is ~2.4 KB of a ~27 KB tree read. **What it must never
+do is skip the table for ASCII**: eight ASCII code points carry a mapping, `m → rn` and `1 → l` among them,
+so `payment` and `payrnent` read alike without a single non-ASCII character. `ConfusablesTest`
+pins that pair for exactly this reason.
+
 **Two surfaces, two defaults, and §8.2 sets both.** `withTokenPolicy` defaults to `unrestricted()` because a
 value is data and may legitimately be anything; `withIdentifierPolicy` defaults to Highly Restrictive over
 the whole name. Relaxing either is a method rather than a setting on purpose — §8.2 requires a deployment be able to

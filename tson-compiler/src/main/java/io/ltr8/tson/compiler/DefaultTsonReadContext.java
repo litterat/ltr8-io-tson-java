@@ -194,14 +194,24 @@ final class DefaultTsonReadContext implements TsonReadContext {
         if (name == null) {
             return;
         }
+        // Tested rather than `ifPresent`-ed, and measurably so: both rules are allocation-free when a name
+        // passes, which is every name of an ordinary document, but a capturing lambda is not -- it captures
+        // `name` and `this` and so allocates per call whether or not the Optional holds anything. This runs
+        // on every type-ref, annotation and field name of every read, so that was the largest per-name cost
+        // in a check that is otherwise free.
+
         // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile
         // too", taking that rule with it. Script mixing gates itself inside violation().
         if (cursor.identifierPolicy.appliesIdentifierProfile()) {
-            IdentifierProfile.hygiene(name).ifPresent(violation ->
-                    refuse(name, violation, Diagnostic.Code.RESTRICTED_CHARACTER));
+            Optional<String> restricted = IdentifierProfile.hygiene(name);
+            if (restricted.isPresent()) {
+                refuse(name, restricted.get(), Diagnostic.Code.RESTRICTED_CHARACTER);
+            }
         }
-        cursor.identifierPolicy.violation(name).ifPresent(violation ->
-                refuse(name, violation, Diagnostic.Code.RESTRICTED_SCRIPT));
+        Optional<String> script = cursor.identifierPolicy.violation(name);
+        if (script.isPresent()) {
+            refuse(name, script.get(), Diagnostic.Code.RESTRICTED_SCRIPT);
+        }
     }
 
     /**

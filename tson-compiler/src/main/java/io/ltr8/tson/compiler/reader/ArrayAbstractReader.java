@@ -10,6 +10,7 @@ import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 
 import java.math.BigInteger;
+import java.util.Optional;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -135,20 +136,37 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         return null;
     }
 
+    /**
+     * §5.3's {@code min_items}/{@code max_items}, per value.
+     *
+     * <p>Tested rather than {@code ifPresent}-ed: this runs on every array a document
+     * carries, and a lambda capturing {@code size}, {@code ctx} and this reader allocates whether or not
+     * the bound is set -- which for the overwhelming majority of positions, whose type states neither
+     * bound, is pure cost. The {@code BigInteger} both comparisons need is built once for the same reason,
+     * and only where a bound exists at all.
+     */
     private void validateSize(int size, TsonReadContext ctx) {
-        body.minItems().ifPresent(min -> {
-            if (BigInteger.valueOf(size).compareTo(min) < 0) {
+        Optional<BigInteger> minItems = body.minItems();
+        Optional<BigInteger> maxItems = body.maxItems();
+        if (minItems.isEmpty() && maxItems.isEmpty()) {
+            return;
+        }
+        BigInteger actual = BigInteger.valueOf(size);
+        if (minItems.isPresent()) {
+            BigInteger min = minItems.get();
+            if (actual.compareTo(min) < 0) {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                         "'" + displayName + "' has " + size + " elements, fewer than the minimum " + min,
                         "at least " + min + " elements", String.valueOf(size));
             }
-        });
-        body.maxItems().ifPresent(max -> {
-            if (BigInteger.valueOf(size).compareTo(max) > 0) {
+        }
+        if (maxItems.isPresent()) {
+            BigInteger max = maxItems.get();
+            if (actual.compareTo(max) > 0) {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                         "'" + displayName + "' has " + size + " elements, more than the maximum " + max,
                         "at most " + max + " elements", String.valueOf(size));
             }
-        });
+        }
     }
 }

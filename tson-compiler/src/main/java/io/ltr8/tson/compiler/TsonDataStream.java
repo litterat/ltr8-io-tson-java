@@ -247,8 +247,14 @@ public final class TsonDataStream implements TsonEventSource {
             default -> null;
         };
         if (text != null) {
-            tokenPolicy.violation(text).ifPresent(why ->
-                    tokenPolicyReceiver.report(Diagnostic.ofRestrictedToken(text, why, event.position())));
+            // Tested rather than `ifPresent`-ed, for §8.2's other surface's reason: violation() is
+            // allocation-free when a token passes, and a lambda capturing `text`, `event` and `this` is
+            // not -- it allocates whether or not the Optional holds anything. This runs on every token a
+            // deployment that raised the token policy reads, which is where that policy's whole cost is.
+            Optional<String> why = tokenPolicy.violation(text);
+            if (why.isPresent()) {
+                tokenPolicyReceiver.report(Diagnostic.ofRestrictedToken(text, why.get(), event.position()));
+            }
         }
     }
 

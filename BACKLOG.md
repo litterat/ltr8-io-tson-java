@@ -214,13 +214,18 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
-- [ ] **`DefaultTsonReadContext.checkNameHygiene` allocates a capturing lambda per name.** Both §8.2 rule
-  implementations are allocation-free when a name passes, and `Optional.ifPresent` with a lambda that
-  captures the context and the name is not -- it allocates whether or not the `Optional` holds anything.
-  The JSON side measured it at ~140 bytes per bound record for two such calls per member name, and
-  testing the `Optional` instead put it back inside the noise; this runs on every type-ref, annotation
-  and field name of every TSON read, so the figure there is per *name* rather than per record.
-  `AllocationHarnessTest` is where the before/after goes.
+- [ ] **The look-alike check recomputes every skeleton per record, and ignores the identifier policy.**
+  `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of
+  every schemaless tree read, which builds a `HashMap` and a UTS #39 skeleton per field name. Field names
+  repeat across the records of a document, so the same skeletons are built again for each one; measured,
+  the whole check is ~1,300 bytes per read of the harness document even after `Confusables.skeleton` stopped
+  allocating for a name that maps nothing. A cache would take most of that, and the design question is its
+  bound: names are attacker-controlled, so a per-read cache is the safe shape and a process-wide one is not.
+  Separately, the check consults **no policy** -- a deployment that stated
+  `withIdentifierPolicy(unrestricted())` still gets `CONFUSABLE_NAMES`, where the two per-name rules honour
+  it. §8.2 requires a deployment be able to relax any of the three rules, so either that is a conformance
+  gap or the rule is deliberately unconditional and should say so; the two per-name rules gate themselves,
+  which makes the silence here look like an oversight rather than a decision.
 
 - [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is
   the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one

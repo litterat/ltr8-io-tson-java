@@ -203,6 +203,12 @@ class AllocationHarnessTest {
      * <p>The ceiling is loose enough to survive a JDK upgrade and tight enough to catch the shape this
      * guards: the first cut of this code allocated ~2.3 KB per read of this document at {@code asciiOnly},
      * two orders of magnitude over what it now costs.
+     *
+     * <p><b>The last of that cost was the lambda this note already claimed was not there.</b> The scan was
+     * allocation-free and the call site was not -- {@code ifPresent} with a lambda capturing the token and
+     * the receiver allocates whether or not the {@code Optional} holds anything -- which is ~670 of the
+     * ~770 bytes this measured before. A ceiling of 1,000 could not see it, so it is 300 now: the figure is
+     * under 100, and a return to per-token allocation fails here rather than passing quietly.
      */
     @Test
     void aRaisedTokenPolicyCostsAlmostNothingPerRead() {
@@ -214,7 +220,7 @@ class AllocationHarnessTest {
 
         report("allocated per read, tokenPolicy raised to highlyRestrictive", restricted, "bytes");
         report("  overhead over the unrestricted default", overhead, "bytes");
-        assertTrue(overhead < 1_000, "a raised token policy added " + overhead + " bytes per read, which is "
+        assertTrue(overhead < 300, "a raised token policy added " + overhead + " bytes per read, which is "
                 + "per-token allocation rather than the one decorator a read should cost");
     }
 
