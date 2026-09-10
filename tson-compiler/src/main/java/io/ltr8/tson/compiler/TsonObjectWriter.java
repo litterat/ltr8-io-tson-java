@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.io.ByteSink;
 import io.ltr8.tson.compiler.config.ResolverBindContext;
 import io.ltr8.tson.atom.VocabularyAtoms;
 import io.ltr8.annotation.Transparent;
@@ -26,7 +27,6 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UncheckedIOException;
 import java.io.Writer;
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -192,14 +192,25 @@ public final class TsonObjectWriter {
      * whole document in hand.
      */
     public void write(Object value, OutputStream out) {
-        Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);
-        write(value, writer);
-        try {
-            // Without this the encoder's own buffer is dropped, and a short document writes nothing at all.
-            writer.flush();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        try (ByteSink sink = ByteSink.of(out)) {
+            write(value, sink);
         }
+    }
+
+    /**
+     * Writes {@code value} into {@code sink} -- the general byte target, which {@link #write(Object,
+     * OutputStream)} adapts to. {@code ByteSink.of} also covers a {@code ByteBuffer} and a channel.
+     *
+     * <p>UTF-8 is encoded by this library ({@code Utf8Sink}), not by an {@code OutputStreamWriter}: the
+     * block is the sink's to size, and an unpaired surrogate is refused rather than written as {@code ?}.
+     * The sink is flushed and not closed.
+     */
+    public void write(Object value, ByteSink sink) {
+        TsonDataEmitter emitter = new TsonDataEmitter(sink);
+        header.emit(emitter);
+        rootTypeName.ifPresent(emitter::typeRef);
+        engine.write(value, emitter);
+        emitter.flush();
     }
 
     /**

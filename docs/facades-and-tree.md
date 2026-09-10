@@ -294,6 +294,18 @@ admit UTS #39's own `Toys-Я-Us`.
     document.
   - **The header alone is buffered, not the document** — a test pins the pull under 64 KB for a 500 KB body,
     and then reads that body off the same peek.
+- **The byte path encodes UTF-8 itself.** `TsonDataEmitter` takes a `ByteSink` as well as an `Appendable`,
+  and the sink form runs through `base.io`'s `Utf8Sink` rather than an `OutputStreamWriter` — the mirror of
+  the lexer decoding UTF-8 off a `ByteSource`. Three things follow: a document reaches a `ByteBuffer` or a
+  channel and not only an `OutputStream`; the block is `ByteSink.block()`'s to size rather than the JDK
+  encoder's; and an unpaired surrogate is **refused** where `OutputStreamWriter` silently writes `?`, which
+  is a character nobody wrote appearing in a document whose identity may be a hash of its bytes. The
+  `Appendable` path is unchanged and is what `toTson` uses — chars into a `StringBuilder` have nothing to
+  encode.
+  - **A sink is closed by whoever built it, and closing is not flushing.** `write(value, OutputStream)`
+    builds a `ByteSink` and closes it (a no-op — the stream is the caller's); `ByteSink.of(Path)` closes the
+    stream it opened. The flush is separate and always explicit, because a sink cannot tell a caller who
+    finished from one who abandoned the document part-written — so it never pushes on their behalf.
 - **`quotedString` escapes with a comparison, not a `Pattern`.** The escape loop runs once per character of
   every string a writer emits, and asking `c <= 0x1f` through a compiled `Pattern` cost a `String`, a
   `Matcher` and the matcher's own internals *per character* — 188 bytes against 3.7 for the whole write,

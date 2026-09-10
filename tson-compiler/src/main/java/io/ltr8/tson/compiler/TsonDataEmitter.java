@@ -1,5 +1,7 @@
 package io.ltr8.tson.compiler;
 
+import io.ltr8.tson.base.io.ByteSink;
+import io.ltr8.tson.base.io.Utf8Sink;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.AtomType;
@@ -46,6 +48,12 @@ public final class TsonDataEmitter {
 
     private final Appendable out;
 
+    /**
+     * The encoder this emitter owns, when it was built over a {@link ByteSink} -- {@code null} when it was
+     * handed an {@code Appendable}, which is the caller's and has nothing here to push.
+     */
+    private final Utf8Sink encoder;
+
     /** Accumulates into a {@link StringBuilder} this emitter owns -- see {@link #toString()}. */
     public TsonDataEmitter() {
         this(new StringBuilder());
@@ -54,6 +62,31 @@ public final class TsonDataEmitter {
     /** Writes into {@code out} as it goes, appending nothing this class does not immediately emit. */
     public TsonDataEmitter(Appendable out) {
         this.out = out;
+        this.encoder = null;
+    }
+
+    /**
+     * Writes into {@code sink} as it goes, encoding UTF-8 itself ({@link Utf8Sink}) rather than through an
+     * {@code OutputStreamWriter} -- the write-side mirror of the lexer decoding UTF-8 off a {@code
+     * ByteSource}, and what lets a document be written to a {@code ByteBuffer} or a channel and not only to
+     * an {@code OutputStream}.
+     *
+     * <p><b>{@link #flush()} is required</b> on this path and does nothing on the other: bytes accumulate in
+     * a block, and a document that is never flushed is a document never written.
+     */
+    public TsonDataEmitter(ByteSink sink) {
+        this.encoder = Utf8Sink.over(sink);
+        this.out = encoder;
+    }
+
+    /**
+     * Pushes anything this emitter buffered to its sink. A no-op for an {@code Appendable}, which holds
+     * whatever it was given the moment it is given it.
+     */
+    public void flush() {
+        if (encoder != null) {
+            encoder.flush();
+        }
     }
 
     /** One entry per open record/map/array scope: how many elements written so far. */

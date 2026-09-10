@@ -499,8 +499,10 @@ change what the members this class does read mean** — a `currency` beside an `
 it has read a different document and cannot tell. The class is the schema here, and a closed reading is
 what makes that claim mean anything — it is also what [TSON-SCHEMA] §7.2 already says of a record under a
 real schema, so the two paths agree, and `DataClassObjectReader` applies the same rule on the TSON side.
-`ignoringUnknownMembers()` is the opt-out, deliberately the derived reader: the safe reading is the one
-nobody has to know to ask for.
+`ignoringUnknownFields()` is the opt-out, deliberately the derived reader: the safe reading is the one
+nobody has to know to ask for. **It carries the TSON reader's name, not RFC 8259's word** — what is closed
+is a bound class's *field set*, which is the same thing under both encodings, and one rule spelled two ways
+is a rule the two readers can drift on.
 
 The cost is real and worth stating, because it lands squarely on the on-ramp: a converted JSON Schema whose
 `additionalProperties` defaults to *true* describes documents this reader refuses. That is §6.2's rest

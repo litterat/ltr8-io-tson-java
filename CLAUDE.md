@@ -298,8 +298,13 @@ module has a real `module-info.java`; module names mirror each module's root exp
   measurement turns. **Closing releases what a source acquired and nothing it was handed**, so
   `of(InputStream)` closes nothing and `of(Path)` closes the stream it opened — and whoever *creates* a
   source closes it, which is why a reader given one through `read(ByteSource)` does not.
-  `ByteSink` is the write-side counterpart and deliberately smaller: `OutputStream` and `Appendable` are
-  two genuinely different targets rather than one spelled twice, so the char path stays.
+  **`ByteSink` is the write-side counterpart and carries the same two rules**: the block is the sink's to
+  size (`block()`), and closing releases what it acquired and nothing it was handed — `of(OutputStream)`
+  closes nothing, `of(Path)` closes the stream it opened. **Closing is not flushing**, and for output that
+  distinction is load-bearing: bytes sit in a block until pushed, so a document never flushed is a document
+  never written, and a sink cannot tell a caller who finished from one who abandoned the write. Every writer
+  flushes explicitly. What stays smaller is the *target* set, not the contract: `Appendable` is a genuinely
+  different target rather than one spelled twice, so `toTson`'s char path is untouched.
   **`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
   `IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — and the
   UTS #39 rules over them, read by two engines and knowing nothing about either format. `UnicodePolicy` is
@@ -892,11 +897,17 @@ annotation *names* against the governing schema (§1.3's Class 2 bullet) — **w
 reader keeps them**, since whether a bound class has an `Annotations` carrier is no part of whether the
 document conforms. `TsonTreeWriter`/`TsonObjectWriter` re-emit
 annotations in §7.4 order; `toTson` is mainly a debugging tool with documented losses. Both writers also
-take a sink — `write(value, OutputStream|Appendable)`, UTF-8, flushed and not closed — so a document never
-has to exist as a `String`; `TsonDataEmitter` holds an `Appendable`, and `toTson` is that method over a
-`StringBuilder`. Both can also emit a document header (`describing(schemaUri[, rootType])`/`identifiedBy`),
-**off by default** because a bare value is what a writer is usually asked for, not to protect output
-nobody consumes — the object writer needs the root type too, a bound
+take a sink — `write(value, ByteSink|OutputStream|Appendable)`, UTF-8, flushed and not closed — so a
+document never
+has to exist as a `String`; `TsonDataEmitter` holds either an `Appendable` or a `ByteSink`, and `toTson` is that method
+over a
+`StringBuilder`. **The byte path encodes UTF-8 itself** (`base.io`'s `Utf8Sink`) rather than through an
+`OutputStreamWriter` — the write-side mirror of the lexer decoding it, which is what lets a document reach a
+`ByteBuffer` or a channel and not only an `OutputStream`, puts the block under `ByteSink.block()` rather
+than the JDK's, and **refuses an unpaired surrogate where the JDK writes `?`**: a character nobody wrote,
+in a document whose identity may be a hash of its bytes. Both can also emit a document header
+(`describing(schemaUri[, rootType])`/`identifiedBy`), **off by default** because a bare value is what a
+writer is usually asked for, not to protect output nobody consumes — the object writer needs the root type too, a bound
 object carrying neither fact, where a tree already names its own; `TsonDataEmitter.typeRef` refuses a second
 type-ref on one value, which is what keeps a declared root type from writing an unparseable document. The
 same `TsonDocumentHeader` carrier reads, through **`TsonDocumentPeek`** (`Tson.begin(…)`, or
