@@ -65,7 +65,7 @@ must match the library's own revision.
 | a data document                    | every problem, not the value                  | `tson.validate(…)` → `List<Diagnostic>`   |
 | a *schema* document                | every problem with the schema itself          | `tson.validateSchema(…)` → `List<Diagnostic>` |
 | a data document                    | the value **and** every problem               | `.withDiagnostics(…)` on either reader    |
-| a data document                    | only what it *declares*, before reading it    | `TsonDocumentHeader.peek(…)`              |
+| a data document                    | only what it *declares*, before reading it    | `tson.begin(…)` -> `TsonDocumentPeek`     |
 | a `TsonValue` tree                 | TSON text                                     | `tson.treeWriter()` / `new TsonTreeWriter()` |
 | a Java object                      | TSON text                                     | `tson.objectWriter()` / `new TsonObjectWriter()` |
 | a data document                    | a grammar-faithful AST                        | `new TsonDataParser(text).parseDocument()` |
@@ -236,20 +236,24 @@ Whether a file is data or schema is a property of its header, not its extension,
 cost at two directives of lookahead:
 
 ```java
-TsonDocumentHeader header = TsonDocumentHeader.peek(text);   // or an InputStream
+TsonDocumentPeek peek = tson.begin(text);                    // or an InputStream
+TsonDocumentHeader header = peek.header();
 if (header.isSchemaDocument()) { … }                         // it carries !!meta
 String uri = header.schema().orElse(DEFAULT_SCHEMA);
 ```
 
 It is **total**: a header it cannot read yields nothing rather than throwing, and it never answers with
 a schema the document does not name. A peek does not rewind its stream; when the source cannot be
-reopened — an HTTP body, a socket — `peekResumable` hands the document back whole:
+reopened — an HTTP body, a socket — the peek keeps the rest of the document, so the reader continues on
+the same stream with no rewind:
 
 ```java
-TsonDocumentPeek peeked = TsonDocumentHeader.peekResumable(request.getInputStream());
-TsonValue value = tson.treeReader().withSchema(versionFor(peeked.header()))
-        .readAs(peeked.document(), "order");
+TsonDocumentPeek peek = tson.begin(request.getInputStream());
+TsonValue value = tson.treeReader().withSchema(versionFor(peek.header())).readAs(peek, "order");
 ```
+
+The reader that continues may be a different one — that is how a receiver serves two schema versions, one
+`DataBindContext` each — but it must share the policy the header was read under, and is refused if not.
 
 Only the read-ahead is buffered (one decoder chunk), never the document.
 

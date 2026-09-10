@@ -369,6 +369,67 @@ public final class TsonObjectReader {
         return schemaless.read(ctx, targetClass);
     }
 
+
+    /**
+     * Binds the document {@code peek} opened -- <b>continuing on its stream, not re-reading it</b>. The
+     * header is already in hand, so this is the same read the {@code InputStream} entry point performs,
+     * minus the part that has happened.
+     *
+     * <p>The point is choosing <em>this</em> reader after seeing the header: a schema version names a bind
+     * context, a bind context names a compiled registry, and so v1 and v2 are two readers rather than one
+     * reconfigured. Any {@code !!schema} the document declares governs as it always does.
+     *
+     * <pre>{@code
+     * TsonDocumentPeek peek = tson.begin(request.getInputStream());
+     * Invoice invoice = (isV2(peek.header()) ? v2 : v1).objectReader().read(peek, Invoice.class);
+     * }</pre>
+     *
+     * @throws IllegalArgumentException if this reader's {@code ProcessorPolicy} is not the one the peek was
+     *                                  opened under -- the header's tokens were already read under that one
+     */
+    public <T> T read(TsonDocumentPeek peek, Class<T> targetClass) {
+        return readPeeked(peek, targetClass, false);
+    }
+
+    /** {@link #read(TsonDocumentPeek, Class)}, ignoring any {@code !!schema} the document declares. */
+    public <T> T readWithoutSchema(TsonDocumentPeek peek, Class<T> targetClass) {
+        return readPeeked(peek, targetClass, true);
+    }
+
+    /**
+     * {@link #read(TsonDocumentPeek, Class)} with the header and resolved root type kept -- see
+     * {@link #readDocument(String, Class)}.
+     */
+    public <T> TsonObjectDocument<T> readDocument(TsonDocumentPeek peek, Class<T> targetClass) {
+        Objects.requireNonNull(targetClass, "targetClass");
+        if (peek.failure() != null) {
+            readFailure(peek.failure());
+            return null;
+        }
+        try {
+            TsonReadContext ctx = continuing(peek);
+            DocumentStart start = requireDataDocument(peek.start());
+            return documentFrom(ctx, start, targetClass);
+        } catch (RuntimeException e) {
+            readFailure(e);
+            return null;
+        }
+    }
+
+    private <T> T readPeeked(TsonDocumentPeek peek, Class<T> targetClass, boolean ignoreSchema) {
+        Objects.requireNonNull(targetClass, "targetClass");
+        if (peek.failure() != null) {
+            return readFailure(peek.failure());
+        }
+        try {
+            TsonReadContext ctx = continuing(peek);
+            DocumentStart start = requireDataDocument(peek.start());
+            return valueFrom(ctx, start, targetClass, ignoreSchema);
+        } catch (RuntimeException e) {
+            return readFailure(e);
+        }
+    }
+
     // ── Internals ────────────────────────────────────────────────────────
 
     /**
@@ -378,11 +439,31 @@ public final class TsonObjectReader {
      * taken here, where a data read is what was actually asked for.
      */
     private static DocumentStart requireDataDocument(TsonReadContext ctx) {
-        DocumentStart start = (DocumentStart) ctx.next();
+        return requireDataDocument((DocumentStart) ctx.next());
+    }
+
+    /** The same verdict over a header a {@link TsonDocumentPeek} already pulled. */
+    private static DocumentStart requireDataDocument(DocumentStart start) {
         if (start.isSchemaDocument()) {
             throw new TsonUnsupportedDocumentException(start.position());
         }
         return start;
+    }
+
+    /**
+     * The context this reader continues {@code peek} on -- its own receiver and identifier policy over the
+     * stream the peek holds. The lexical half cannot be this reader's: the token policy and §9.1's limits
+     * were applied to the tokens the header is made of, so a reader that disagrees with the one that opened
+     * the peek is refused rather than quietly reading under a policy it did not state.
+     */
+    private TsonReadContext continuing(TsonDocumentPeek peek) {
+        if (!peek.policy().equals(policy)) {
+            throw new IllegalArgumentException("this reader's processor policy differs from the one this "
+                    + "document was opened under, and the header has already been read under that one -- "
+                    + "continue with a reader sharing it, or read the document from the start");
+        }
+        peek.stream().reportTokenPolicyTo(receiver);
+        return TsonReadContext.of(peek.stream(), receiver, policy.identifierPolicy());
     }
 
     /** A {@link Bound}'s value, or none -- the shape the two object-only entry points want. */
@@ -399,39 +480,47 @@ public final class TsonObjectReader {
         Objects.requireNonNull(type, "type");
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            DocumentStart start = requireDataDocument(ctx);
-            T value;
-            Optional<String> rootType = Optional.empty();
-            if (bind == null || start.schema().isEmpty()) {
-                value = schemaless.read(ctx, type);
-            } else {
-                Bound<T> bound = readAgainstSchema(start.schema().get(), ctx, type, null);
-                value = valueOf(bound);
-                rootType = bound == null ? Optional.empty() : Optional.of(bound.typeName());
-            }
-            requireDocumentEnd(ctx);
-            T checked = valid(ctx, value);
-            return checked == null ? null
-                    : new TsonObjectDocument<>(start.id(), start.schema(), rootType, checked);
+            return documentFrom(ctx, requireDataDocument(ctx), type);
         } catch (RuntimeException e) {
             readFailure(e);
             return null;
         }
     }
 
+    /** The document's value and header, from a header already read -- shared by the source and peek routes. */
+    private <T> TsonObjectDocument<T> documentFrom(TsonReadContext ctx, DocumentStart start, Class<T> type) {
+        T value;
+        Optional<String> rootType = Optional.empty();
+        if (bind == null || start.schema().isEmpty()) {
+            value = schemaless.read(ctx, type);
+        } else {
+            Bound<T> bound = readAgainstSchema(start.schema().get(), ctx, type, null);
+            value = valueOf(bound);
+            rootType = bound == null ? Optional.empty() : Optional.of(bound.typeName());
+        }
+        requireDocumentEnd(ctx);
+        T checked = valid(ctx, value);
+        return checked == null ? null
+                : new TsonObjectDocument<>(start.id(), start.schema(), rootType, checked);
+    }
+
     private <T> T readDocument(TsonDataStream stream, Class<T> type, boolean ignoreSchema) {
         Objects.requireNonNull(type, "type");
         try {
             TsonReadContext ctx = TsonReadContext.of(stream, receiver, policy.identifierPolicy());
-            DocumentStart start = requireDataDocument(ctx);
-            T result = (ignoreSchema || bind == null || start.schema().isEmpty())
-                    ? schemaless.read(ctx, type)
-                    : valueOf(readAgainstSchema(start.schema().get(), ctx, type, null));
-            requireDocumentEnd(ctx);
-            return valid(ctx, result);
+            return valueFrom(ctx, requireDataDocument(ctx), type, ignoreSchema);
         } catch (RuntimeException e) {
             return readFailure(e);
         }
+    }
+
+    /** The document's value alone, from a header already read -- shared by the source and peek routes. */
+    private <T> T valueFrom(TsonReadContext ctx, DocumentStart start, Class<T> type, boolean ignoreSchema) {
+        T result = (ignoreSchema || bind == null || start.schema().isEmpty())
+                ? schemaless.read(ctx, type)
+                : valueOf(readAgainstSchema(start.schema().get(), ctx, type, null));
+        requireDocumentEnd(ctx);
+        return valid(ctx, result);
     }
 
     private <T> T readDocumentAs(TsonDataStream stream, String typeName, Class<T> type) {
