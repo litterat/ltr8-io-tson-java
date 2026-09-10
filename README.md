@@ -174,7 +174,7 @@ The write side is the mirror: a value in hand, TSON text out. The matrix:
 | a data document | only what it *declares* — before reading it | **`tson.begin(…)`** | a `TsonDocumentPeek`: its header, and the rest of the document |
 | a data document | a grammar-faithful AST | **`TsonDataParser`** | a `Document` AST |
 | a data document | to pull events lazily | **`TsonDataStream`** | a `TsonEvent` stream |
-| nothing yet | to emit TSON without building a tree or object first | **`TsonDataEmitter`** | text pushed to any `Appendable` |
+| nothing yet | to emit TSON without building a tree or object first | **`TsonDataEmitter`** | pushed to any `Appendable` or `ByteSink` |
 
 `tson.treeReader()` / `tson.objectReader()` and their writer peers `tson.objectWriter()` /
 `tson.treeWriter()` are the facade doors on a built `Tson`: the readers take a *self-describing* document
@@ -183,8 +183,12 @@ declares none — the object form also checking your target class against the sc
 `readWithoutSchema(…)` opts a reader back out to a pure schemaless read. When your *data* isn't
 self-describing but you hold the schema out of band, `withSchema(uri).readAs(source, type)` supplies what
 the document didn't say. All of these stream their input — a large document is never fully buffered before
-reading begins — and take a `String` or an `InputStream`. The writers mirror that: `write(value, out)` takes
-an `OutputStream` or any `Appendable` and emits as it goes, with `toTson(…)` the same call over a buffer.
+reading begins — and take a `String`, an `InputStream` or any `ByteSource` (a `byte[]`, a `ByteBuffer`, a
+`Path`, a mapped file), where bytes already in memory are read without a copy. The writers mirror that:
+`write(value, out)` takes an `OutputStream`, any `ByteSink` (a `ByteBuffer`, a channel, a file) or any
+`Appendable`, and emits as it goes, with `toTson(…)` the same call over a buffer. The byte targets encode
+UTF-8 here rather than through an `OutputStreamWriter`, so an unpaired surrogate is refused rather than
+silently written as `?`.
 
 A schemaless read still holds a `!type-ref` to account, since it is the only contract on offer: a built-in
 name (`!uuid`, `!int32`, `!date`) must sit on a scalar and satisfy that type, and any other name must name
@@ -471,6 +475,7 @@ the caller's, which is what makes an HTTP response body the natural case.
 
 ```java
 new TsonObjectWriter().write(server, response.getOutputStream());   // or any OutputStream
+new TsonTreeWriter().write(node, ByteSink.of(buffer));              // or a ByteBuffer, channel, file
 new TsonTreeWriter().write(node, appendable);                       // or any Appendable
 ```
 

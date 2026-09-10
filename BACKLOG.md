@@ -201,6 +201,16 @@ fail-fast and collecting/diagnostics modes; the write side has the two schemales
 push emitter (`TsonDataEmitter`, the write-direction peer of `TsonDataStream`) and is missing the rest of
 the mirror. What is left below is the schema-aware writer and diagnostics.
 
+- [ ] **Nothing measures the write path.** `AllocationHarnessTest` and `JsonAllocationHarnessTest` both read
+  and neither writes, so the write side has no number attached to it at all. That matters now rather than in
+  principle: the byte path encodes UTF-8 itself through `Utf8Sink` instead of an `OutputStreamWriter`, and
+  `ByteSink.block()` is a tuning knob with nothing to tune against — a deployment asking "what should my
+  block be?" has no way to answer, and a regression in the encoder would be invisible. The shape is settled
+  by the read side rather than open: bytes per document written, split by stage the way `whereAReadsBytesGo`
+  splits a read, plus a per-record difference measured between a small document and a large one so the
+  figure is not a fixed cost in disguise. `AllocationProbe` is already shared from `tson-base/src/testShared`
+  and needs nothing new.
+
 - [ ] **Key-position annotations are lost on the resolved-form round trip.** A schema *source* carries them
   through now: §6's name-position channel — `@doc` before a declared name, and the resolver's own derived
   `@synthetic` — reaches `TsonSchema.entries()` as key annotations (`AnnotatedMap`) and survives
