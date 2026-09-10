@@ -346,12 +346,12 @@ public class DataBindContext {
 	}
 
 
-	/**
-	 * <b>Registration is the builder's, not this context's.</b> A context's configuration is fixed once it is
+	/*
+	 * Registration is the builder's, not this context's. A context's configuration is fixed once it is
 	 * built: descriptors are handed out and cached from the moment the first read runs, so a registration
 	 * arriving afterwards either loses a race with a descriptor already given out or silently changes what a
 	 * later read produces. Both of these are called only from the constructor, applying the primitives and
-	 * then whatever {@link Builder#registerAtom} accumulated.
+	 * then whatever Builder#registerAtom accumulated.
 	 */
 	/**
 	 * The core scalars, registered as themselves: a {@code String} or an {@code int} <em>is</em> a wire

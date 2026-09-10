@@ -627,7 +627,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 return context.getDescriptor(name);
             } catch (DataBindException e) {
                 throw new MissingBindingException("no bound Java class for '" + name + "': nothing in this "
-                        + "bind context resolves that schema type name. Map it (TsonConfig.bindings) or give "
+                        + "bind context resolves that schema type name. Map it (ProcessorConfig.bindings) or give "
                         + "the context a DataNameBinder that can find it -- " + e.getMessage());
             }
         }

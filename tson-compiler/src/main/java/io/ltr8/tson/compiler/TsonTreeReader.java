@@ -72,8 +72,6 @@ public final class TsonTreeReader {
     /** The schema {@link #readAs} validates against, or {@code null} until {@link #withSchema} names one. */
     private final String schemaUri;
 
-    /** UTS #39 §5.2 over every token this reader pulls. Never {@code null} -- the unset default is
-     * {@link UnicodePolicy#unrestricted()}, which checks nothing. */
     /**
      * Everything this reader will admit and spend: [TSON-DATA] §8.2's two name and token surfaces, the
      * Unicode data version behind them, and §9.1's bounds. One value because a deployment states one --
@@ -253,12 +251,6 @@ public final class TsonTreeReader {
     }
 
     /**
-     * This reader under {@code limits} -- a new reader, leaving this one unchanged, sharing its
-     * compiled-schema registry. [TSON-DATA] §9.1 requires the bounds be configurable, and requires it in
-     * code rather than from the ambient environment, for the reason {@link #withTokenPolicy} is: a limit a
-     * deployment did not choose is one it cannot explain.
-     */
-    /**
      * This reader under {@code policy} whole -- a new reader, leaving this one unchanged, sharing its
      * compiled-schema registry.
      *
@@ -270,6 +262,12 @@ public final class TsonTreeReader {
         return new TsonTreeReader(tree, receiver, schemaUri, schemaless, policy);
     }
 
+    /**
+     * This reader under {@code limits} -- a new reader, leaving this one unchanged, sharing its
+     * compiled-schema registry. [TSON-DATA] §9.1 requires the bounds be configurable, and requires it in
+     * code rather than from the ambient environment, for the reason {@link #withTokenPolicy} is: a limit a
+     * deployment did not choose is one it cannot explain.
+     */
     public TsonTreeReader withLimits(LimitsPolicy limits) {
         return new TsonTreeReader(tree, receiver, schemaUri, schemaless, policy.withLimits(limits));
     }
@@ -287,7 +285,6 @@ public final class TsonTreeReader {
 
     // ── Whole-document entry points ──────────────────────────────────────
 
-    /** Reads {@code source}'s whole document into a {@link TsonValue} tree, fail-fast -- validated against its {@code !!schema} if this reader is schema-aware and the document declares one, schemaless otherwise. */
     /**
      * Reads {@code source} -- the general entry the {@code String} and {@code InputStream} forms adapt to.
      * {@code ByteSource.of} covers a {@code byte[]}, a {@code ByteBuffer}, a {@code Path} and a mapped file
@@ -298,6 +295,11 @@ public final class TsonTreeReader {
         return readRoot(new TsonDataStream(source, policy, receiver), false);
     }
 
+    /**
+     * Reads {@code source}'s whole document into a {@link TsonValue} tree, fail-fast -- validated against
+     * its {@code !!schema} if this reader is schema-aware and the document declares one, schemaless
+     * otherwise.
+     */
     public TsonValue read(String source) {
         try (ByteSource bytes = ByteSource.of(source)) {
             return readRoot(new TsonDataStream(bytes, policy, receiver), false);
@@ -309,6 +311,11 @@ public final class TsonTreeReader {
         try (ByteSource bytes = ByteSource.of(source)) {
             return readRoot(new TsonDataStream(bytes, policy, receiver), false);
         }
+    }
+
+    /** {@link #read(ByteSource)} with the header kept -- see {@link #readDocument(String)}. */
+    public TsonDocument readDocument(ByteSource source) {
+        return readDocument(new TsonDataStream(source, policy, receiver));
     }
 
     /**
@@ -329,11 +336,6 @@ public final class TsonTreeReader {
      * @return the document, or {@code null} where {@link #read} would also return nothing -- a document that
      *         will not lex or parse, reported through this read's receiver rather than thrown past it
      */
-    /** {@link #read(ByteSource)} with the header kept -- see {@link #readDocument(String)}. */
-    public TsonDocument readDocument(ByteSource source) {
-        return readDocument(new TsonDataStream(source, policy, receiver));
-    }
-
     public TsonDocument readDocument(String source) {
         try (ByteSource bytes = ByteSource.of(source)) {
             return readDocument(new TsonDataStream(bytes, policy, receiver));
@@ -361,17 +363,17 @@ public final class TsonTreeReader {
         }
     }
 
+    /** {@link #read(ByteSource)} against {@code typeName} -- see {@link #readAs(String, String)}. */
+    public TsonValue readAs(ByteSource source, String typeName) {
+        return readRootAs(new TsonDataStream(source, policy, receiver), typeName);
+    }
+
     /**
      * Reads {@code source} as {@code typeName}, declared by the schema {@link #withSchema} named -- for data
      * that isn't self-describing, where you hold the schema out of band. The caller supplies what a {@code
      * !!schema} plus a root type-ref would otherwise say, and validation is identical either way; a root
      * type-ref the data does carry is read as part of the value, not used to select the type.
      */
-    /** {@link #read(ByteSource)} against {@code typeName} -- see {@link #readAs(String, String)}. */
-    public TsonValue readAs(ByteSource source, String typeName) {
-        return readRootAs(new TsonDataStream(source, policy, receiver), typeName);
-    }
-
     public TsonValue readAs(String source, String typeName) {
         try (ByteSource bytes = ByteSource.of(source)) {
             return readRootAs(new TsonDataStream(bytes, policy, receiver), typeName);

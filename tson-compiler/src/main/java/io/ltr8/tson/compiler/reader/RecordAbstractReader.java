@@ -514,19 +514,18 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
     }
 
     /**
-     * Builds a one-event {@link ListEventSource} wrapping the schema's own literal {@link Token} and
-     * reads it through a fail-fast-only {@link TsonReadContext} -- there's no real stream to pull a
-     * schema-composed default from (this runs once, at construction, before any actual document is
-     * being read), and no real source position for it either (a {@link Position} placeholder is
-     * used; a schema-authoring bug here always throws immediately regardless). Only a bare-token
-     * default resolves via this today, matching {@link #positionalFieldIndex}'s own scope note: no
-     * composite (record/array/map-shaped) schema default resolves anywhere in this codebase yet.
-     */
-    /**
      * The schema's own value for a field, decoded by that field's parser. Package-private because
      * {@link RecordBindReader} runs it again once it has bound each field's atom to its component's wire
      * class: the value a bound class receives has to be decoded the way that class's own reads are, and this
      * class computes it before any of that is known (tree mode, which shares it, binds nothing).
+     *
+     * <p>Reads through a one-event {@link ListEventSource} wrapping the schema's own literal {@link Token}
+     * and a fail-fast-only {@link TsonReadContext}: there is no real stream to pull a schema-composed
+     * default from (this runs once, at construction, before any document is read) and no real source
+     * position for it either (a {@link Position} placeholder stands in; a schema-authoring bug here always
+     * throws immediately regardless). Only a bare-token default resolves through this today, matching
+     * {@link #positionalFieldIndex}'s own scope note: no composite (record/array/map-shaped) schema default
+     * resolves anywhere in this codebase yet.
      */
     Object readSchemaDefault(CompiledField field) {
         RecordField schema = field.schema();

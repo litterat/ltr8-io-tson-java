@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.compiler.TsonObjectWriter;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TypeRefAnnotationTest {
 
     private static TypeDefinition read(String document) {
-        return Tson.of(TsonConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()))
+        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()))
                 .objectReader().withSchema(TsonBundledSchemas.META_ID)
                 .readAs(document, "type_definition", TypeDefinition.class);
     }

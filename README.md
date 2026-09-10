@@ -391,7 +391,7 @@ your `SchemaAccess`, and validates against it — falling back to a schemaless r
 declares none. It's the value-returning peer of `tson.validate`:
 
 ```java
-Tson tson = Tson.of(TsonConfig.defaults()
+Tson tson = Tson.of(ProcessorConfig.defaults()
         // Schemas you already hold, keyed by identity. Not `schemas::get` -- a source says "I cannot
         // supply that" by throwing, where a map returns null, for whichever identity the document names.
         .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(   // the `server` schema from §4
@@ -799,8 +799,8 @@ consumer works either way — plain classpath, or a `module-info.java` of its ow
 
 ```java
 module my.app {
-    requires io.ltr8.tson;            // Tson, TsonConfig
-    requires io.ltr8.tson.compiler;   // Diagnostic, the readers and writers
+    requires io.ltr8.tson;            // Tson
+    requires io.ltr8.tson.compiler;   // ProcessorConfig, Diagnostic, the readers and writers
     requires io.ltr8.tson.tree;       // TsonValue
 }
 ```

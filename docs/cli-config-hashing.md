@@ -125,7 +125,7 @@ the throw used to take the second verdict with it.
 **78 rather than 70 for a bind mismatch**, because `EX_CONFIG` is "found in an unconfigured or misconfigured
 state" and unconfigured is what this is. 70 would say this library cannot do it, which is the reading
 `MissingBindingException` exists to prevent — and the note printed with 78 deliberately does not repeat
-the diagnostic's own remedy (`TsonConfig.bindings`, a `DataNameBinder`), neither of which has a command-line
+the diagnostic's own remedy (`ProcessorConfig.withDataBindContext`, a `DataNameBinder`), neither of which has a command-line
 surface.
 
 **69 and 75 are reached two ways each, and all of them are `SchemaFetchException`.** A data document's
@@ -149,7 +149,7 @@ discriminator that could contradict it.
 against — **plus `limits`, §9.1's bounds on the same terms**, currently a `max_depth` and nothing else. It is
 inside `policy` rather than beside it because the envelope's one question is "what judged this run", and a
 limit refusal answers it as much as a name refusal does; it also inherits `CliPolicy.isDefault()`, so a run
-that raised the depth states it even when nothing was refused. The two surfaces keep `TsonConfig`'s own names
+that raised the depth states it even when nothing was refused. The two surfaces keep `ProcessorConfig`'s own names
 all the way to the wire, so what a deployment set and what its reports say are one vocabulary. It is there rather than on each
 diagnostic because it is a fact about the *processor*: constant for the whole run, so a per-refusal copy is N
 copies of one string; and needed by a sender *before* it writes a document rather than after being refused,

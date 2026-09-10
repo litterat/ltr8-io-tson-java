@@ -4,7 +4,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -56,7 +56,7 @@ class ClassTypedPositionTest {
                 .nameBinder(DataNameBinder.ofMap(Map.of("box", Box.class)))
                 .registerAtoms(AtomContext.hostTypes())
                 .build();
-        Tson tson = Tson.of(TsonConfig.defaults()
+        Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(SchemaSource.ofMap(Map.of(ID, SCHEMA))))
                 .withDataBindContext(context));
         tson.resolve(SCHEMA);

@@ -1,5 +1,4 @@
 package io.ltr8.tson.base;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -44,22 +43,22 @@ import java.util.Objects;
  * validates against, where its diagnostics go, whether an undeclared field is discarded -- all of those are
  * per-reader derivations, because two endpoints of one application legitimately differ on them.
  */
-public final class TsonConfig {
+public final class ProcessorConfig {
 
     private final DataBindContext dataBindContext;
     private final SchemaAccess schemaAccess;
     private final DataNameBinder metaNameBinder;
     private final ProcessorPolicy policy;
 
-    TsonConfig(DataBindContext dataBindContext, SchemaAccess schemaAccess, ProcessorPolicy policy, DataNameBinder metaNameBinder) {
+    ProcessorConfig(DataBindContext dataBindContext, SchemaAccess schemaAccess, ProcessorPolicy policy, DataNameBinder metaNameBinder) {
         this.dataBindContext = dataBindContext;
         this.schemaAccess = schemaAccess;
         this.policy = policy;
         this.metaNameBinder = metaNameBinder;
     }
 
-    public static TsonConfig defaults() {
-        return new TsonConfig( AtomContext.defaultContext(), SchemaAccess.registeredOnly(), ProcessorPolicy.defaults(), null);
+    public static ProcessorConfig defaults() {
+        return new ProcessorConfig( AtomContext.defaultContext(), SchemaAccess.registeredOnly(), ProcessorPolicy.defaults(), null);
     }
 
     public SchemaAccess schemaAccess() {
@@ -92,15 +91,15 @@ public final class TsonConfig {
      * to be stated twice.
      *
      * <pre>{@code
-     * TsonConfig.defaults().withSchemaAccess(SchemaAccess.fileSchemas("schemas.example.com", dir));
+     * ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.fileSchemas("schemas.example.com", dir));
      * }</pre>
      *
      * <p>It is the schema half of what a deployment constrains, {@link #withProcessorPolicy} being the reading
      * half. Two values because they are consumed by different subsystems: a reader applies one and fetches
      * nothing, the loader applies the other and reads no documents.
      */
-    public TsonConfig withSchemaAccess(SchemaAccess schemaAccess) {
-        return new TsonConfig(this.dataBindContext, Objects.requireNonNull(schemaAccess, "schemaAccess"), this.policy, this.metaNameBinder);
+    public ProcessorConfig withSchemaAccess(SchemaAccess schemaAccess) {
+        return new ProcessorConfig(this.dataBindContext, Objects.requireNonNull(schemaAccess, "schemaAccess"), this.policy, this.metaNameBinder);
     }
 
     /**
@@ -126,8 +125,8 @@ public final class TsonConfig {
      * internally to resolve the standard library itself -- see {@code Tson}'s own Javadoc for why that one's
      * mode is fixed, and {@link #metaNameBinder} for the one thing about it a consumer may extend.
      */
-    public TsonConfig withDataBindContext(DataBindContext dataBindContext) {
-        return new TsonConfig(Objects.requireNonNull(dataBindContext, "dataBindContext"), this.schemaAccess, this.policy, this.metaNameBinder);
+    public ProcessorConfig withDataBindContext(DataBindContext dataBindContext) {
+        return new ProcessorConfig(Objects.requireNonNull(dataBindContext, "dataBindContext"), this.schemaAccess, this.policy, this.metaNameBinder);
     }
 
     /**
@@ -144,8 +143,8 @@ public final class TsonConfig {
      * <p>Distinct from {@link #dataBindContext}, which binds the <em>data</em> a schema describes; this
      * binds the <em>schema vocabulary</em> a meta describes. A consumer with both supplies both.
      */
-    public TsonConfig withMetaNameBinder(DataNameBinder metaNameBinder) {
-        return new TsonConfig(this.dataBindContext, this.schemaAccess, this.policy, Objects.requireNonNull(metaNameBinder, "metaNameBinder"));
+    public ProcessorConfig withMetaNameBinder(DataNameBinder metaNameBinder) {
+        return new ProcessorConfig(this.dataBindContext, this.schemaAccess, this.policy, Objects.requireNonNull(metaNameBinder, "metaNameBinder"));
     }
 
     /**
@@ -168,8 +167,8 @@ public final class TsonConfig {
      * library embedding this one could not hold its own. A method call is greppable, diffable and scoped to
      * the instance that holds it.
      */
-    public TsonConfig withProcessorPolicy(ProcessorPolicy policy) {
-        return new TsonConfig(this.dataBindContext, this.schemaAccess, Objects.requireNonNull(policy, "policy"), this.metaNameBinder);
+    public ProcessorConfig withProcessorPolicy(ProcessorPolicy policy) {
+        return new ProcessorConfig(this.dataBindContext, this.schemaAccess, Objects.requireNonNull(policy, "policy"), this.metaNameBinder);
     }
 
     /**
@@ -199,8 +198,8 @@ public final class TsonConfig {
      * <p>One component of {@link #withProcessorPolicy}, which is where a deployment stating all three at once
      * says so.
      */
-    public TsonConfig withIdentifierPolicy(UnicodePolicy identifierPolicy) {
-        return new TsonConfig(this.dataBindContext, this.schemaAccess,  policy.withIdentifierPolicy(Objects.requireNonNull(identifierPolicy, "identifierPolicy")), this.metaNameBinder);
+    public ProcessorConfig withIdentifierPolicy(UnicodePolicy identifierPolicy) {
+        return new ProcessorConfig(this.dataBindContext, this.schemaAccess,  policy.withIdentifierPolicy(Objects.requireNonNull(identifierPolicy, "identifierPolicy")), this.metaNameBinder);
     }
 
     /**
@@ -241,8 +240,8 @@ public final class TsonConfig {
      *         admits UTS #39's own {@code Toys-Я-Us}, the spoof a strict token policy exists to refuse.
      *         {@link ProcessorPolicy} enforces it, so every route to a policy refuses it alike
      */
-    public TsonConfig withTokenPolicy(UnicodePolicy tokenPolicy) {
-        return new TsonConfig(this.dataBindContext, this.schemaAccess,  policy.withTokenPolicy(Objects.requireNonNull(tokenPolicy, "tokenPolicy")), this.metaNameBinder);
+    public ProcessorConfig withTokenPolicy(UnicodePolicy tokenPolicy) {
+        return new ProcessorConfig(this.dataBindContext, this.schemaAccess,  policy.withTokenPolicy(Objects.requireNonNull(tokenPolicy, "tokenPolicy")), this.metaNameBinder);
     }
 
     /**
@@ -262,8 +261,8 @@ public final class TsonConfig {
      * ({@code TsonTreeReader.limitsPolicy()}), which is where a derived reader's own {@code withLimits}
      * shows.
      */
-    public TsonConfig withLimits(LimitsPolicy limits) {
-        return new TsonConfig(this.dataBindContext, this.schemaAccess,  policy.withLimits(Objects.requireNonNull(limits, "limits")), this.metaNameBinder);
+    public ProcessorConfig withLimits(LimitsPolicy limits) {
+        return new ProcessorConfig(this.dataBindContext, this.schemaAccess,  policy.withLimits(Objects.requireNonNull(limits, "limits")), this.metaNameBinder);
     }
 
 }

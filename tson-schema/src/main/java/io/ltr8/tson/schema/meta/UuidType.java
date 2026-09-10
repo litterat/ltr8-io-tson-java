@@ -18,15 +18,6 @@ public record UuidType(Optional<Integer> version) implements Atom {
     /** {@code uuid => !uuid_type {}} -- the unconstrained UUID, §5.5's {@code !uuid}. */
     public static final UuidType UNCONSTRAINED = new UuidType(Optional.empty());
 
-    /**
-     * {@inheritDoc}
-     *
-     * <p><b>No narrowing check.</b> {@link #version} selects a generation scheme rather than
-     * measuring anything, so it does not order -- version 7 is not narrower than version 4, it is a
-     * different set of values. Selector facets are left unchecked across this package rather than
-     * treated as identity facets a refinement may only restate; {@link ComplexType} carries the
-     * reasoning and the spec citation.
-     */
 
     /**
      * {@inheritDoc}

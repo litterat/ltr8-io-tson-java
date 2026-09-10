@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -108,7 +108,7 @@ class SchemaPolicyRefusalTest {
      */
     @Test
     void theInstanceStatesThePolicyThatRefusedTheName() {
-        Tson tson = Tson.of(TsonConfig.defaults().withIdentifierPolicy(UnicodePolicy.asciiOnly()));
+        Tson tson = Tson.of(ProcessorConfig.defaults().withIdentifierPolicy(UnicodePolicy.asciiOnly()));
 
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, tson.validateSchema("""
                 !!id:"https://example.test/refusal-policy.tn"
@@ -138,7 +138,7 @@ class SchemaPolicyRefusalTest {
                 Tson.standard().validate(document).stream().map(Diagnostic::code).toList(),
                 "the default policy refuses a mixed-script type-ref");
 
-        List<Diagnostic> relaxed = Tson.of(TsonConfig.defaults()
+        List<Diagnostic> relaxed = Tson.of(ProcessorConfig.defaults()
                         .withIdentifierPolicy(UnicodePolicy.highlyRestrictive()
                                 .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC)))
                 .validate(document);

@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
@@ -81,7 +81,7 @@ class ScopedReadTest {
     };
 
     private static Tson tson() {
-        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)));
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE)));
     }
 
     private static TsonValue read(String data) {
@@ -328,7 +328,7 @@ class ScopedReadTest {
      */
     @Test
     void bindModeReadsAPushedValueIntoTheClassTheForeignTypeNames() {
-        Tson tson = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE))
+        Tson tson = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(SOURCE))
                 .withDataBindContext(DataBindContext.builder()
                         .nameBinder(DataNameBinder.ofMap(Map.of("pinpoint", Pinpoint.class, "claim", Claim.class))
                                 .orElse(SchemaMetaNameBinder.INSTANCE))

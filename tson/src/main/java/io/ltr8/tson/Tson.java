@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.HttpSchemaSource;
 import io.ltr8.tson.base.source.FileSchemaSource;
@@ -28,7 +28,7 @@ import java.util.Optional;
  * mechanical surface (lexer, both grammars, resolution, linking-adjacent validation, compilation,
  * config wiring), the way Retrofit sits on top of OkHttp or Apache HttpClient5 sits on top of
  * HttpCore5. Doesn't reimplement anything -- every method here just constructs/returns the real
- * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #of(TsonConfig)}, which
+ * {@code tson-compiler}/{@code tson-schema} class underneath. Built via {@link #of(ProcessorConfig)}, which
  * bootstraps meta-kernel/meta.tn/core.tn into a fresh, governed environment:
  *
  * <pre>{@code
@@ -65,12 +65,12 @@ import java.util.Optional;
  *
  * <p><b>What that fixes is the mode, not the vocabulary.</b> The resolution core's own binder knows the
  * kernel's names; a governing meta of a consumer's own may declare constructors beyond them ({@code
- * operation => ~data & { ... }}), and {@link TsonConfig#metaNameBinder} adds the classes those bind to --
+ * operation => ~data & { ... }}), and {@link ProcessorConfig#metaNameBinder} adds the classes those bind to --
  * composed over the library's binder, so the mode and every kernel name stand.
  *
  * <p>Out of the box this serves only meta-kernel/meta.tn/core.tn: {@link SchemaSource#registeredOnly()}
  * is the default source, so a schema governed by or importing anything else has to be registered first, or
- * reachable through a source configured on {@link TsonConfig} -- {@link HttpSchemaSource} and {@link
+ * reachable through a source configured on {@link ProcessorConfig} -- {@link HttpSchemaSource} and {@link
  * FileSchemaSource} ship, and both deny by default.
  *
  * <p>{@link TsonObjectReader}/{@link TsonObjectWriter} live in {@code tson-compiler}'s own root
@@ -78,7 +78,7 @@ import java.util.Optional;
  * module's own resolution engine, has a real, current dependency on {@link TsonObjectWriter}
  * (atom-refinement merging), so they can't move to a module that depends *on* {@code tson-compiler}
  * without a cycle. {@link #objectReader()}/{@link #objectWriter()} bind them to this instance's own
- * {@link #dataBindContext()} (configurable via {@link TsonConfig#dataBindContext}), so a caller gets
+ * {@link #dataBindContext()} (configurable via {@link ProcessorConfig#dataBindContext}), so a caller gets
  * one consistent binding configuration without having to wire it up twice.
  */
 public final class Tson {
@@ -89,7 +89,7 @@ public final class Tson {
     private final DataBindContext dataBindContext;
 
     /**
-     * What this instance will admit as a name and spend on a document -- {@link TsonConfig#withProcessorPolicy},
+     * What this instance will admit as a name and spend on a document -- {@link ProcessorConfig#withProcessorPolicy},
      * held whole rather than as its three components. The core is handed the identifier half at
      * construction, since the linker judges declared names; this stays the one statement of the policy, so
      * reporting it is an accessor rather than a reassembly of values living in three places.
@@ -105,22 +105,22 @@ public final class Tson {
     }
 
     /**
+     * The unconfigured environment: the bundled standard library, nothing else fetchable, and the default
+     * policy. {@code Json.standard()} is the other encoding's counterpart, and the two answer alike on
+     * purpose -- a caller who needs no configuration should not have to name a configuration to say so.
+     */
+    public static Tson standard() {
+        return of(ProcessorConfig.defaults());
+    }
+
+    /**
      * Bootstraps meta-kernel/meta.tn/core.tn under {@code config} and returns the governed environment.
      *
      * <p>The configuration is a value and lives in {@code tson-base}, so the same one configures every
      * encoding; what cannot live there is this method, which names the compiler's own registry. That split
      * is the whole of why construction is here and settings are there.
      */
-    /**
-     * The unconfigured environment: the bundled standard library, nothing else fetchable, and the default
-     * policy. {@code Json.standard()} is the other encoding's counterpart, and the two answer alike on
-     * purpose -- a caller who needs no configuration should not have to name a configuration to say so.
-     */
-    public static Tson standard() {
-        return of(TsonConfig.defaults());
-    }
-
-    public static Tson of(TsonConfig config) {
+    public static Tson of(ProcessorConfig config) {
         // The resolution core is both the store and the on-demand loader; withStandardLibrary loads the
         // bundled meta-kernel/meta/core, and the access's source is consulted only for other URIs. It
         // compiles the standard library in object-binding mode -- the only mode that can (a DOM reader
@@ -137,17 +137,6 @@ public final class Tson {
         return new Tson(core, config.dataBindContext(), config.processorPolicy());
     }
 
-    /**
-     * A schema-aware {@link TsonObjectReader} over this instance -- reads TSON text into bound Java objects
-     * (via {@link #dataBindContext()}), validating against a self-describing document's {@code !!schema},
-     * schemaless when it declares none. Built over {@link #bindRegistry()}, so every reader from this
-     * instance shares one compiled-schema cache: a schema is compiled once here, not once per reader.
-     *
-     * <p><b>Both [TSON-DATA] §8.2 policies come from this instance</b>, {@link TsonConfig#withIdentifierPolicy}
-     * included -- a reader built here judges the names in a document under the same policy the linker judged
-     * the schema's declared names under. They are one processor, and {@link #processorPolicy()} reports one
-     * answer for it, which is only true if one answer is what both ends use.
-     */
     /**
      * Reads {@code source}'s header and stops, handing back the rest of the document on the same stream --
      * for a caller that must know what a document declares <em>before</em> choosing how to read it.
@@ -180,6 +169,17 @@ public final class Tson {
         return TsonDocumentPeek.of(source, policy);
     }
 
+    /**
+     * A schema-aware {@link TsonObjectReader} over this instance -- reads TSON text into bound Java objects
+     * (via {@link #dataBindContext()}), validating against a self-describing document's {@code !!schema},
+     * schemaless when it declares none. Built over {@link #bindRegistry()}, so every reader from this
+     * instance shares one compiled-schema cache: a schema is compiled once here, not once per reader.
+     *
+     * <p><b>Both [TSON-DATA] §8.2 policies come from this instance</b>, {@link ProcessorConfig#withIdentifierPolicy}
+     * included -- a reader built here judges the names in a document under the same policy the linker judged
+     * the schema's declared names under. They are one processor, and {@link #processorPolicy()} reports one
+     * answer for it, which is only true if one answer is what both ends use.
+     */
     public TsonObjectReader objectReader() {
         return new TsonObjectReader(bind, dataBindContext).withProcessorPolicy(processorPolicy());
     }
@@ -209,9 +209,9 @@ public final class Tson {
 
     /**
      * Everything this instance will admit and spend -- [TSON-DATA] §8.2's two Unicode policies
-     * ({@link TsonConfig#withIdentifierPolicy} over declared names, {@link TsonConfig#withTokenPolicy} over token
+     * ({@link ProcessorConfig#withIdentifierPolicy} over declared names, {@link ProcessorConfig#withTokenPolicy} over token
      * values), the Unicode data version they are computed against, and §9.1's resource limits
-     * ({@link TsonConfig#withLimits}) -- under the names that configured them.
+     * ({@link ProcessorConfig#withLimits}) -- under the names that configured them.
      *
      * <p><b>What a run or a response states beside its diagnostics</b>, and what a deployment can publish
      * with no document in hand at all. §8.2's rules read data the UCD does not freeze and are applied at a
@@ -225,7 +225,7 @@ public final class Tson {
     }
 
     /**
-     * The [TSON-DATA] §9.1 resource limits this instance applies -- {@link TsonConfig#withLimits}, and
+     * The [TSON-DATA] §9.1 resource limits this instance applies -- {@link ProcessorConfig#withLimits}, and
      * {@link #processorPolicy()}'s {@code limits} component in one call.
      *
      * <p>A limit is the reading deployment's own choice, so the same bytes may be read here and refused
@@ -239,7 +239,7 @@ public final class Tson {
     }
 
     /** The {@link DataBindContext} {@link #objectReader()}/{@link #objectWriter()}/
-            {@link #bindRegistry()} bind against -- see {@link TsonConfig#dataBindContext} to customize it. */
+            {@link #bindRegistry()} bind against -- see {@link ProcessorConfig#dataBindContext} to customize it. */
     public DataBindContext dataBindContext() {
         return dataBindContext;
     }
@@ -277,7 +277,7 @@ public final class Tson {
     /**
      * Validates a data document, working out on its own whether a schema applies. If the document
      * declares a {@code !!schema}, that URI selects the schema (resolved through this instance's own
-     * {@link TsonConfig#schemaAccess} and compiled once, in tree mode) and the document's root type-ref
+     * {@link ProcessorConfig#schemaAccess} and compiled once, in tree mode) and the document's root type-ref
      * (e.g. {@code !person}) selects the type; with no {@code !!schema} it's validated schemalessly
      * (Class 1: base syntax, plus the built-in type vocabulary for whatever the wire tags).
      *

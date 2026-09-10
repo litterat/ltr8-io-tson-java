@@ -96,7 +96,8 @@
     statement of why: identifier_policy governs declared names, field names, type-refs and annotation
     names, where all three rules apply; token_policy governs values, where only the restricted-script rule
     can, a token having no identifier profile and no scope to be distinct within. Both keep the names
-    TsonConfig gives them, so a deployment's configuration and the report it produces are one vocabulary.
+    ProcessorConfig gives them, so a deployment's configuration and the report it produces are one
+    vocabulary.
 
     unicode_data_version is the UCD release whose tables the rules were computed against, which is the
     version §8.2 asks a report to name. It is here rather than on each

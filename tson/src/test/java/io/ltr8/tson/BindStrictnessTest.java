@@ -1,15 +1,12 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.*;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.annotation.DataBridge;
 import io.ltr8.annotation.Unbound;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
-import io.ltr8.tson.base.BindMismatchException;
-import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.source.SchemaSource;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
 import io.ltr8.tson.base.bind.AtomContext;
@@ -73,7 +70,7 @@ class BindStrictnessTest {
     private static Tson tson(String schema, Class<?> bound) {
         SchemaSource source = uri -> schema;
         DataNameBinder binder = name -> "order".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
-        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)
                         .registerAtoms(AtomContext.hostTypes()).build()));
     }
@@ -225,7 +222,7 @@ class BindStrictnessTest {
                 : SchemaMetaNameBinder.INSTANCE.resolve(name);
         DataBindContext.Builder builder = DataBindContext.builder().nameBinder(binder)
                 .registerAtoms(AtomContext.hostTypes());
-        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext((registered ? builder.registerAtom(Money.class, new MoneyBridge())
                         : builder).build()));
     }

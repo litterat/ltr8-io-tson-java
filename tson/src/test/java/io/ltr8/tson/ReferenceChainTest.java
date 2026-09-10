@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.config.SchemaMetaNameBinder;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ReferenceChainTest {
 
     private static Tson tson() {
-        return Tson.of(TsonConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
+        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()));
     }
 
     private static TypeRef fieldType(TypeDefinition definition, String field) {
@@ -66,7 +66,7 @@ class ReferenceChainTest {
               holder => { f: b }""";
 
     private static TypeDefinition resolve(String body, String entry) {
-        return Tson.of(TsonConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()))
+        return Tson.of(ProcessorConfig.defaults().withDataBindContext(SchemaMetaNameBinder.defaultContext()))
                 .resolve(schema(body)).schema().entries().get(entry);
     }
 

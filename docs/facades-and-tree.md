@@ -1,7 +1,7 @@
 # Read facades, writers, tree model, and front door
 
 Design notes for the consumer-facing read/write surface: `TsonObjectReader`/`TsonTreeReader`, the writers,
-the `TsonValue` tree model, and the `Tson`/`TsonConfig` front door. Current form only; history lives in
+the `TsonValue` tree model, and the `Tson`/`ProcessorConfig` front door. Current form only; history lives in
 git. `CLAUDE.md` holds the one-paragraph orientation; this file holds the detail.
 
 ## Read facades: `TsonObjectReader`/`TsonTreeReader` (root package) + `TsonObjectWriter`
@@ -32,8 +32,8 @@ and its three name-hygiene mechanisms). Both have to be reader axes rather than 
 surface they guard includes the standalone schemaless constructors, which hold no registry at all — and a
 Class 1 read is exactly where a value arrives least constrained.
 
-**A `Tson` applies both to every reader it makes**, from the one `TsonConfig.processorPolicy` it was built
-with (`identifierPolicy`/`tokenPolicy`/`limits` are its components, each deriving from what is already
+**A `Tson` applies both to every reader it makes**, from the one `ProcessorConfig.withProcessorPolicy` it was built
+with (`withIdentifierPolicy`/`withTokenPolicy`/`withLimits` are its components, each deriving from what is already
 stated) — the identifier half riding the registry to the linker *as well*, so a schema's declared
 names and a document's own type-ref and annotation names are judged under one setting. They are one processor,
 and `Tson.processorPolicy()` reports one answer for it, which is only true if one answer is what both ends
@@ -435,7 +435,7 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
   more information about use cases involving generating and transforming JSON documents, in order to evolve
   these areas of the API."
 
-## Front door: `Tson`/`TsonConfig` (`tson` module)
+## Front door: `Tson` (`tson` module) and `ProcessorConfig` (`tson-base`)
 
 A small module over `tson-compiler`, the consumer entry point. `Tson.standard()` bootstraps
 meta-kernel/meta.tn/core.tn into a governed environment and returns an immutable `Tson`.
@@ -447,7 +447,7 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
 ```
 
 - **The schema-to-class agreement check has no opt-out, and that is the point.** It ran under a
-  `lenientBinding` flag threaded from `TsonConfig` through five layers to `RecordBindReader`'s constructor,
+  `lenientBinding` flag threaded from the front-door configuration through five layers to `RecordBindReader`'s constructor,
   and the flag is gone. What it allowed was the defect: a v1 class reading a v2 schema kept `sku` and
   `quantity` and dropped `currency` **without naming it** — accepting fewer fields while saying only how
   many, which is exactly what [TSON-SCHEMA] §7.2 refuses on the wire and for the same reason, since a field
@@ -499,7 +499,7 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
   stays the general seam and the three are mutually exclusive, on the precedent `bindings`/`dataBindContext`
   already set — each builds one source, so mixing them would drop one rather than compose it. A deployment
   needing both writes the composition itself, where the order it tries them in is stated rather than
-  assumed. **`TsonConfig` carries none of that vocabulary**: it has one setter, `schemaAccess`, so the four
+  assumed. **`ProcessorConfig` carries none of that vocabulary**: it has one setter, `withSchemaAccess`, so the four
   ways of naming a source are learnt once and the exclusion rules among them are stated once — a second copy
   at the front door would be a second surface to keep in step.
   - **Identity is not location, and that is what makes two sources one design** ([TSON-DATA] §2.2.1). A
@@ -520,9 +520,9 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
     facts always travel together and are meaningless apart — a source with no policy has unstated bounds, a
     policy with no source governs nothing — so handing them separately makes every caller reassemble the
     pair, and one that reassembles it wrongly is a deployment whose bounds silently do not apply.
-    `TsonConfig.schemaAccess` takes one; `schemaSource`/`httpSchemas`/`fileSchemas`/`fetchPolicy` are the
+    `ProcessorConfig.withSchemaAccess` takes one; `schemaSource`/`httpSchemas`/`fileSchemas`/`fetchPolicy` are the
     short forms that assemble one, and naming both is refused. The mutual-exclusion rules *among* the four
-    live on `SchemaAccess.Builder` rather than on `TsonConfig`, so they are stated where the access is built
+    live on `SchemaAccess.Builder` rather than on `ProcessorConfig`, so they are stated where the access is built
     instead of once per front door — which is what the JSON encoding's schema-directed decode needs, it
     being the next caller and one that would otherwise grow its own copy of the host list and the caps.
     **The name is not `SchemaLibrary`**: [TSON-SCHEMA] §10's library is the *store* mapping identities to
@@ -532,8 +532,8 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
     how large a document may be, how many may be cached, and whether a reference must carry a `?sha256=`
     pin. The three are the same question whichever source answers it, and holding them as loose fields per
     source is two places for a default or a bounds check to drift. `fetchPolicy(...)` is the setter to reach
-    for on either builder and on `TsonConfig`, with the three component setters folding into it — the shape
-    `TsonConfig.processorPolicy` takes, so the library has one convention for stating a policy. A `timeout`
+    for on either builder, with the three component setters folding into it — the shape
+    `ProcessorConfig.withProcessorPolicy` takes, so the library has one convention for stating a policy. A `timeout`
     is deliberately **not** a component: a directory has none, and a component one implementation silently
     ignores is what makes a shared policy value untrustworthy. Nor is the host map, which is where *this*
     deployment can reach rather than what any deployment will admit, and is differently typed on each source.
@@ -585,7 +585,7 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
   picks a mode.
 - **`validate(String|InputStream)` *is* `treeReader()` with a collecting receiver**, both halves of it —
   one try/catch over one call, no second implementation. The reader already works out whether a schema
-  applies (a `!!schema` directive selects the schema through `TsonConfig.schemaSource`, compiled once in
+  applies (a `!!schema` directive selects the schema through `ProcessorConfig.withSchemaAccess`, compiled once in
   tree mode, and the root type-ref selects the type; with no `!!schema` it reads schemalessly, checking
   the wire's own type-refs), and reports every failure around all of that through the receiver. Validating
   is that read with the tree thrown away. Returns every problem as a `List<Diagnostic>` (empty means valid)
@@ -608,15 +608,8 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
   `TsonCompiledSchemaRegistry` rather than a `TsonCompiledMetaRegistry` for exactly that reason; since the
   read mode isn't visible in the registry's type, each constructor checks a package-private `mode()` and
   rejects the wrong one up front instead of failing on a cast at the first value. `objectReader()`/`objectWriter()` bind to this instance's `dataBindContext` (configurable via
-  `TsonConfig.dataBindContext`, default `AtomContext.defaultContext()`). `schemaRegistry()`/`loader()`
+  `ProcessorConfig.withDataBindContext`, default `AtomContext.defaultContext()`). `schemaRegistry()`/`loader()`
   reach the underlying machinery.
-- **`bindings(Map)`/`profile(String)` are the short form of `dataBindContext`**, and mutually exclusive with
-  it (a profile is fixed when a context is built, so it cannot apply to one that arrives already built). The
-  map becomes a `DataNameBinder` chained over `SchemaMetaNameBinder.INSTANCE` with
-  `AtomContext.hostTypes()` registered — the last being the step nothing reminds a caller of, and the
-  reason the convenience earns its place. **The map authors the failure**: a name outside it reports
-  `bindings(...) maps [...]` with the kernel's own account as the cause, because the chain is a backstop and
-  letting the backstop speak reports a missing line of the caller's configuration as "not kernel vocabulary".
 - **A `Tson` is one profile, and the schema being read never picks it.** Routing a document to the right
   profile stays the application's job. The alternative — the schema declaring its own profile through a
   meta-layer annotation — links a *coding* decision to a *format* one and buys less flexibility than it
@@ -624,8 +617,8 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
   same reason it is not by matching the schema's field set: no serialization library does that, and the
   parameter names it would need are not retained for a secondary constructor. Reconsider only if something
   needs to re-derive the binding without the application in between.
-- **Two binding seams, never merged.** `TsonConfig.dataBindContext` binds the *data* a schema describes
-  (`order` → `Order`); `TsonConfig.metaNameBinder` binds a governing meta's own *vocabulary*
+- **Two binding seams, never merged.** `ProcessorConfig.withDataBindContext` binds the *data* a schema
+  describes (`order` → `Order`); `ProcessorConfig.withMetaNameBinder` binds a governing meta's own *vocabulary*
   (`operation` → `Operation`, the `data` base kind's case — `docs/linking-and-compilation.md`). One
   namespace holding both would collide the first time a schema type and a meta-layer constructor shared a
   name. The meta binder is composed over `SchemaMetaNameBinder.INSTANCE` rather than replacing it, so what a

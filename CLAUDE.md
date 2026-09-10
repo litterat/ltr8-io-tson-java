@@ -270,7 +270,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `SchemaAccess` collecting a source with the `FetchPolicy` governing it. [TSON-JSON]
   §10.4 names that as the restriction an application processing untrusted input sets, which makes it
   configuration like the policies rather than machinery like an encoding's reader.
-  **`TsonConfig` sits at the root**, beside the values it holds: one immutable value naming what a
+  **`ProcessorConfig` sits at the root**, beside the values it holds: one immutable value naming what a
   deployment states -- the policy, the schema access, the bind context, and the one seam into the meta
   vocabulary -- with every setting returning a new instance, so a configuration may be handed out and
   derived from without the holder losing what they stated. Construction is not here and cannot be: it names
@@ -393,7 +393,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   and keeps `reader`/`atom`/`base`/`lexer` internal.
 - **`tson`** — the front door, and now **one class**: `Tson`, over `tson-compiler`, the way Retrofit sits on
   OkHttp. Declares `tson-compiler`/`tson-schema`/`tson-bind`/`tson-tree` as `api` so a caller sees the real
-  classes underneath. **`TsonConfig` is not here** — a configuration is a value stating what a deployment
+  classes underneath. **`ProcessorConfig` is not here** — a configuration is a value stating what a deployment
   chose, so it sits in `tson-base` with the values it holds and is shared by every encoding; what cannot
   follow it is construction, which names the compiler's own registry. Hence `Tson.of(config)`, and
   `Tson.standard()` for the unconfigured case.
@@ -706,7 +706,7 @@ with `DATA` in `type_kind` — is where an instance of a meta-schema's own const
 describes is not a data type; `schema.meta.Data` is the matching **`non-sealed`** branch of `Top` — the one open
 point in the body model, because the constructors reaching it are declared by meta-schemas this library has
 never seen. A consumer registers a class by carrying `@Typename` and being findable by the
-`DataNameBinder` (`TsonConfig.metaNameBinder` through the front door, composed over
+`DataNameBinder` (`ProcessorConfig.metaNameBinder` through the front door, composed over
 `SchemaMetaNameBinder.INSTANCE` — the resolution core's *mode* is fixed, the names it knows are not); there
 is no reader family and no factory entry, the ordinary record reader binding the payload and validating it
 in full, and an unresolvable class is an error where the constructor is applied.
@@ -852,11 +852,11 @@ reference to a dropped declaration on top of the real error. Namespace-level fai
 lexer under everything, are still fail-fast.
 
 **`ProcessorPolicy` is the configuration a report is read against, and it is stated once.** The two §8.2 policies
-(`identifierPolicy`, `tokenPolicy`, under `TsonConfig`'s own names — level, whole-name or per-segment unit, and any
+(`identifierPolicy`, `tokenPolicy`, under `ProcessorConfig`'s own names — level, whole-name or per-segment unit, and any
 `permitting` relaxations) plus the UCD version and §9.1's limits, reachable as `Tson.processorPolicy()`, either facade's
 `processorPolicy()` (read off the reader that judged, since a derived reader is where the two can differ), and `tson policy`
-on the command line. **It is also configured once**: `TsonConfig.processorPolicy` takes the whole value, the three named
-setters derive one component each from what is already stated, and `Tson` holds the result — so the report is an accessor
+on the command line. **It is also configured once**: `ProcessorConfig.withProcessorPolicy` takes the whole value, the three
+named setters derive one component each from what is already stated, and `Tson` holds the result — so the report is an accessor
 rather than a reassembly, and `Json.withProcessorPolicy` takes the same value, one policy serving both encodings. **The value
 holds its own invariant**: a token policy may not be per-segment (`_` and `-` are word separators in a name and ordinary
 characters in a value, so segmenting one admits UTS #39's own `Toys-Я-Us`), and the compact constructor is what refuses it,
@@ -968,11 +968,11 @@ the facades) is the object side's, and a distinct type rather than the same one:
 `rootType` is a name a `DataNameBinder` cannot invert, which is also why `TsonObjectWriter.describing` takes
 two arguments where the tree writer's takes one.
 
-### Front door: `Tson`/`TsonConfig` (`tson` module) — `docs/facades-and-tree.md`
+### Front door: `Tson` (`tson` module) / `ProcessorConfig` (`tson-base`) — `docs/facades-and-tree.md`
 
 `Tson.standard()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
-`dataBindContext(DataBindContext)` says which Java classes the schema's types bind to. **The vocabulary
-for building a context is `tson-bind`'s, not `TsonConfig`'s** — `DataNameBinder.ofMap(map)` over
+`ProcessorConfig.withDataBindContext` says which Java classes the schema's types bind to. **The vocabulary
+for building a context is `tson-bind`'s, not `ProcessorConfig`'s** — `DataNameBinder.ofMap(map)` over
 `DataBindContext.builder().registerAtoms(AtomContext.hostTypes())`, with `orElse` composing a caller's
 names over the kernel's own — so `bindings`/`profile` are gone from the front door rather than
 restating it. **Strictness is configuration and not a reader derivation**, which is a fact about when
@@ -1379,7 +1379,7 @@ compatibility).
   readers are immutable, the lexer/stream are per-read, both on-demand caches settle a race by keeping
   one entry, and a cache *hit* — which is every read, in a process that resolved its schemas at startup —
   takes no lock at all; `docs/linking-and-compilation.md`), and **both halves are now stated on `Tson` and
-  `TsonConfig` themselves** rather than only in the design notes — a consumer reads the front door, not
+  `ProcessorConfig` themselves** rather than only in the design notes — a consumer reads the front door, not
   `docs/`, and that guarantee is what decides between one instance and one per request
   (`SharedInstanceConcurrencyTest` pins it at that surface). What is still open is everything *outside* a
   read: registering schemas concurrently. **Mutating a `DataBindContext` after use is no longer one** —

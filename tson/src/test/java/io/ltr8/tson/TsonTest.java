@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.compiler.TsonCompiledMetaSchema;
@@ -130,7 +130,7 @@ class TsonTest {
     @Test
     void objectReaderAndWriterAreBoundToTheConfiguredDataBindContext() {
         DataBindContext context = DataBindContext.builder().build();
-        Tson tson = Tson.of(TsonConfig.defaults().withDataBindContext(context));
+        Tson tson = Tson.of(ProcessorConfig.defaults().withDataBindContext(context));
 
         assertSame(context, tson.dataBindContext());
     }

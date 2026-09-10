@@ -1,7 +1,7 @@
 package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.policy.LimitsPolicy;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * {@link TsonConfig#withProcessorPolicy} -- the whole of what a deployment constrains this processor with,
+ * {@link ProcessorConfig#withProcessorPolicy} -- the whole of what a deployment constrains this processor with,
  * stated as the one value {@link Tson#processorPolicy()} reports and {@code Json.withProcessorPolicy} takes.
  *
  * <p>The three component setters fold into it rather than standing beside it, so what is pinned here is
@@ -33,7 +33,7 @@ class ProcessorPolicyConfigTest {
 
     @Test
     void theWholePolicyRoundTripsThroughTheInstance() {
-        assertEquals(TIGHTENED, Tson.of(TsonConfig.defaults().withProcessorPolicy(TIGHTENED)).processorPolicy());
+        assertEquals(TIGHTENED, Tson.of(ProcessorConfig.defaults().withProcessorPolicy(TIGHTENED)).processorPolicy());
     }
 
     /**
@@ -43,7 +43,7 @@ class ProcessorPolicyConfigTest {
      */
     @Test
     void theComponentSettersReachTheSameValue() {
-        Tson piecewise = Tson.of(TsonConfig.defaults()
+        Tson piecewise = Tson.of(ProcessorConfig.defaults()
                 .withIdentifierPolicy(TIGHTENED.identifierPolicy())
                 .withTokenPolicy(TIGHTENED.tokenPolicy())
                 .withLimits(TIGHTENED.limits()));
@@ -59,7 +59,7 @@ class ProcessorPolicyConfigTest {
      */
     @Test
     void statingOneComponentLeavesTheOthersAlone() {
-        ProcessorPolicy stated = Tson.of(TsonConfig.defaults()
+        ProcessorPolicy stated = Tson.of(ProcessorConfig.defaults()
                         .withLimits(LimitsPolicy.defaults().withMaxDepth(8))
                         .withIdentifierPolicy(UnicodePolicy.asciiOnly()))
                 .processorPolicy();
@@ -73,7 +73,7 @@ class ProcessorPolicyConfigTest {
     /** A component stated after the whole policy refines it; the policy is not a floor the components clear. */
     @Test
     void aComponentStatedAfterTheWholePolicyRefinesIt() {
-        ProcessorPolicy stated = Tson.of(TsonConfig.defaults()
+        ProcessorPolicy stated = Tson.of(ProcessorConfig.defaults()
                         .withProcessorPolicy(TIGHTENED)
                         .withLimits(LimitsPolicy.defaults()))
                 .processorPolicy();
@@ -89,7 +89,7 @@ class ProcessorPolicyConfigTest {
      */
     @Test
     void theIdentifierHalfOfAWholePolicyReachesTheLinker() {
-        List<Diagnostic> refused = Tson.of(TsonConfig.defaults().withProcessorPolicy(TIGHTENED)).validateSchema("""
+        List<Diagnostic> refused = Tson.of(ProcessorConfig.defaults().withProcessorPolicy(TIGHTENED)).validateSchema("""
                 !!id:"https://example.test/whole-policy.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!import:"https://tson.io/2026/35/m/core.tn"
@@ -103,7 +103,7 @@ class ProcessorPolicyConfigTest {
     /** And the limits half reaches a read, the other component that has to travel past the report. */
     @Test
     void theLimitsHalfOfAWholePolicyReachesARead() {
-        Tson tson = Tson.of(TsonConfig.defaults()
+        Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withProcessorPolicy(ProcessorPolicy.defaults().withLimits(LimitsPolicy.defaults().withMaxDepth(3))));
 
         assertEquals(LimitsPolicy.defaults().withMaxDepth(3), tson.limitsPolicy());
@@ -120,8 +120,8 @@ class ProcessorPolicyConfigTest {
     void aPerSegmentTokenPolicyIsRefusedWhicheverSetterCarriesIt() {
         UnicodePolicy perSegment = UnicodePolicy.highlyRestrictive().perSegment();
 
-        assertThrows(IllegalArgumentException.class, () -> TsonConfig.defaults().withTokenPolicy(perSegment));
+        assertThrows(IllegalArgumentException.class, () -> ProcessorConfig.defaults().withTokenPolicy(perSegment));
         assertThrows(IllegalArgumentException.class,
-                () -> TsonConfig.defaults().withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(perSegment)));
+                () -> ProcessorConfig.defaults().withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(perSegment)));
     }
 }

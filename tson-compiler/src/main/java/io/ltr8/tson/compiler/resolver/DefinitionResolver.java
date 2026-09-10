@@ -492,6 +492,19 @@ final class DefinitionResolver {
     }
 
     /**
+     * {@code resolved} with its body held and its kind set to TEMPLATE -- what an entry becomes once it is
+     * known to be open.
+     *
+     * <p>The kind it had was the one its <em>body</em> would have produced, which is the kind of the entry
+     * materialisation mints and not of the template itself: a template is not a type ([TSON-SCHEMA] §5.10),
+     * so it takes {@code TEMPLATE} and an application of it takes the constructor's.
+     */
+    private static TypeDefinition openWith(TypeDefinition resolved, io.ltr8.tson.schema.meta.TemplateBody held) {
+        return new TypeDefinition(resolved.source(), TypeKind.TEMPLATE, resolved.supertypes(),
+                resolved.subtypes(), held, resolved.position(), resolved.annotations());
+    }
+
+    /**
      * A composition or refinement template's body, <b>held</b> like every other open body -- so that one
      * process closes them all and {@code record_field.value_param} has one fewer producer.
      *
@@ -505,19 +518,6 @@ final class DefinitionResolver {
      * <p>Only a record-shaped body: a parameterized atom refinement is not a form §12.1 admits, and an atom
      * body has no parameters to hold open.
      */
-    /**
-     * {@code resolved} with its body held and its kind set to TEMPLATE -- what an entry becomes once it is
-     * known to be open.
-     *
-     * <p>The kind it had was the one its <em>body</em> would have produced, which is the kind of the entry
-     * materialisation mints and not of the template itself: a template is not a type ([TSON-SCHEMA] §5.10),
-     * so it takes {@code TEMPLATE} and an application of it takes the constructor's.
-     */
-    private static TypeDefinition openWith(TypeDefinition resolved, io.ltr8.tson.schema.meta.TemplateBody held) {
-        return new TypeDefinition(resolved.source(), TypeKind.TEMPLATE, resolved.supertypes(),
-                resolved.subtypes(), held, resolved.position(), resolved.annotations());
-    }
-
     private TypeDefinition holdIfOpen(String name, List<String> parameters, TypeDefinition resolved) {
         if (parameters.isEmpty() || !(resolved.body() instanceof RecordBody record)) {
             return resolved;

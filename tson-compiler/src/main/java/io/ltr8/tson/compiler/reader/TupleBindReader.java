@@ -1,5 +1,4 @@
 package io.ltr8.tson.compiler.reader;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataBindException;
@@ -104,7 +103,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
             } catch (DataBindException e) {
                 // A misconfiguration, not a gap -- see RecordBindReader.Factory.descriptorFor.
                 throw new MissingBindingException("no bound Java class for '" + name + "': nothing in this "
-                        + "bind context resolves that schema type name. Map it (TsonConfig.bindings) or give "
+                        + "bind context resolves that schema type name. Map it (ProcessorConfig.bindings) or give "
                         + "the context a DataNameBinder that can find it -- " + e.getMessage());
             }
         }

@@ -3,8 +3,8 @@ package io.ltr8.tson.json;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsCollector;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.policy.LimitsPolicy;
-import io.ltr8.tson.base.TsonConfig;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.ReadException;
 import io.ltr8.tson.base.policy.UnicodePolicy;
@@ -34,7 +34,7 @@ class JsonFrontDoorTest {
     @Test
     void both_readers_carry_the_configuration_the_front_door_holds() {
         DiagnosticsCollector problems = new DiagnosticsCollector();
-        Json json = Json.of(TsonConfig.defaults()
+        Json json = Json.of(ProcessorConfig.defaults()
                 .withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(UnicodePolicy.asciiOnly())));
 
         json.treeReader().withDiagnostics(problems).read("{\"note\": \"" + CYRILLIC_A + "\"}");
@@ -52,7 +52,7 @@ class JsonFrontDoorTest {
      */
     @Test
     void a_front_door_built_from_one_configuration_is_untouched_by_another() {
-        TsonConfig config = TsonConfig.defaults();
+        ProcessorConfig config = ProcessorConfig.defaults();
         Json json = Json.of(config);
 
         config.withProcessorPolicy(ProcessorPolicy.defaults().withTokenPolicy(UnicodePolicy.asciiOnly()));
@@ -62,7 +62,7 @@ class JsonFrontDoorTest {
 
     @Test
     void the_bound_is_stated_once_and_both_readers_carry_it() {
-        Json json = Json.of(TsonConfig.defaults().withProcessorPolicy(
+        Json json = Json.of(ProcessorConfig.defaults().withProcessorPolicy(
                 ProcessorPolicy.defaults().withLimits(LimitsPolicy.defaults().withMaxDepth(3))));
 
         // Both readers report the one policy the front door holds, which is the point of it holding one.
@@ -95,7 +95,7 @@ class JsonFrontDoorTest {
     void the_binding_the_front_door_holds_reaches_the_object_reader() {
         DataBindContext context = DataBindContext.builder().build();
         assertEquals(new Person("Ada", 36),
-                Json.of(TsonConfig.defaults().withDataBindContext(context)).objectReader().read("{\"name\": \"Ada\", \"age\": 36}", Person.class));
+                Json.of(ProcessorConfig.defaults().withDataBindContext(context)).objectReader().read("{\"name\": \"Ada\", \"age\": 36}", Person.class));
     }
 
     @Test

@@ -5,7 +5,7 @@ import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -51,7 +51,7 @@ class AtomTargetAdmissionTest {
                 """.formatted(decls);
         DataNameBinder binder = name -> "t".equals(name) ? bound : SchemaMetaNameBinder.INSTANCE.resolve(name);
         SchemaSource source = uri -> schema;
-        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source))
                 .withDataBindContext(DataBindContext.builder().nameBinder(binder)
                         .registerAtoms(AtomContext.hostTypes()).build()));
     }

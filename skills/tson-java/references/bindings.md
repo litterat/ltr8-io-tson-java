@@ -61,25 +61,27 @@ for you.
 ## Naming the classes for a schema's types
 
 ```java
-Tson tson = Tson.of(TsonConfig.defaults()
+Tson tson = Tson.of(ProcessorConfig.defaults()
         .withDataBindContext(DataBindContext.builder()
                 .nameBinder(DataNameBinder.ofMap(Map.of("order", Order.class, "customer", Customer.class)))
                 .registerAtoms(AtomContext.hostTypes())
                 .build()));
 ```
 
-`bindings(Map)` is the short form of the long way, whose three steps include two that are invisible: a
-caller who builds only a `DataNameBinder` gets atoms unbound, and one who maps their own names without
-chaining loses the kernel's vocabulary. **A name outside the map is an error naming the map**, not a
-class-not-found from whatever was consulted last.
+**The vocabulary for building a context is `tson-bind`'s**, so all three steps are written out — and two
+of them are the ones a caller forgets: `registerAtoms(AtomContext.hostTypes())`, without which the atoms
+are unbound, and `DataNameBinder.orElse` where a caller's own names should sit *over* the kernel's rather
+than replace them. **A name outside the map is an error naming the map**, not a class-not-found from
+whatever was consulted last: `orElse` composes the caller's binder over the kernel's, and the caller's is
+the one that authors the failure, because a name neither knows is a missing line of *their* configuration.
 
-`bindings` binds the **data** a schema describes. `metaNameBinder` is a separate namespace and binds the
-**schema vocabulary** a governing *meta* describes — a consumer's own meta-schema declaring
+`withDataBindContext` binds the **data** a schema describes. `withMetaNameBinder` is a separate namespace
+and binds the **schema vocabulary** a governing *meta* describes — a consumer's own meta-schema declaring
 `search => !operation { … }` needs its `operation` class there. It composes over the library's binder
 rather than replacing it, so the kernel's names still resolve first.
 
-`bindings`/`profile` are mutually exclusive with `dataBindContext(…)` — a context is built or given, not
-both, and a profile is fixed when a context is built.
+A **profile** is fixed when the context is built (`DataBindContext.Builder.profile`), never afterwards, so
+one `Tson` is one profile — a server speaking two schema versions builds one instance per version.
 
 **Writing a binder rather than a map.** `DataNameBinder` is a one-method interface, and the implementation
 a consumer usually wants is already there — mangle the schema's `snake_case` name to `PascalCase` and try
@@ -142,7 +144,7 @@ public record Order(String sku, int quantity, String currency) {
     public Order(String sku, int quantity) { this(sku, quantity, "AUD"); }
 }
 
-Tson v3 = Tson.of(TsonConfig.defaults().withDataBindContext(
+Tson v3 = Tson.of(ProcessorConfig.defaults().withDataBindContext(
         DataBindContext.builder().nameBinder(…).profile("api-3")
                 .registerAtoms(AtomContext.hostTypes()).build()));
 ```

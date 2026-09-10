@@ -1,5 +1,4 @@
 package io.ltr8.tson.cli;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.MissingBindingException;
@@ -306,7 +305,7 @@ public final class TsonCli {
             return 70;
         }
         if (codes.contains(Diagnostic.Code.BIND_MISMATCH)) {
-            // Deliberately not naming TsonConfig.bindings or DataNameBinder the way the diagnostic's own
+            // Deliberately not naming ProcessorConfig.bindings or DataNameBinder the way the diagnostic's own
             // message does: neither has a command-line surface, so the remedy it states is not one the
             // person reading this can carry out.
             System.err.println("note: some of this could not be checked -- a type the schema needs has no"

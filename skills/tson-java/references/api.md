@@ -14,7 +14,7 @@ Only the packages listed here are exported. JPMS enforcement is real, not conven
 
 ```java
 public final class Tson {
-    public static TsonConfig builder();
+    public static ProcessorConfig builder();
 
     public TsonObjectReader objectReader();      // schema-aware, over this instance's bindRegistry
     public TsonTreeReader   treeReader();        // schema-aware, over this instance's treeRegistry
@@ -43,59 +43,173 @@ from it. `validateSchema` stops at the first phase that reports anything (parse,
 link), javac-style, so consequences of an earlier error are not reported as independent problems; and a
 schema that reported anything is never registered.
 
-### `TsonConfig`
+---
+
+## `io.ltr8.tson.base` (module `tson-base`) — the shared vocabulary
+
+How a problem is stated, what this processor will admit and spend, and where it may obtain a schema.
+**Every encoding reads the same values here** — [TSON-JSON] §9.4 makes JSON report in [TSON-DATA]
+§8.1's four categories and add none of its own, and §10.1 gives it §9.1's bounds with the same
+defaults. It is also the one module where the `Tson` prefix is dropped, since the name it would
+disambiguate from here is another encoding's type in this same library.
+
+### `ProcessorConfig`
 
 ```java
-public final class TsonConfig {
-    public TsonConfig schemaSource(TsonSchemaSource schemaSource);
-    public TsonConfig httpSchemas(String... hosts);              // TsonHttpSchemaSource, allow-listed
-    public TsonConfig fileSchemas(String host, Path directory);  // TsonFileSchemaSource
+public final class ProcessorConfig {                 // io.ltr8.tson.base
+    public static ProcessorConfig defaults();
 
-    public TsonConfig dataBindContext(DataBindContext context);
-    public TsonConfig bindings(Map<String, Class<?>> bindings);  // exclusive with dataBindContext
-    public TsonConfig profile(String profile);                   // exclusive with dataBindContext
-    public TsonConfig metaNameBinder(DataNameBinder binder);     // a consumer's own meta vocabulary
+    public ProcessorConfig withSchemaAccess(SchemaAccess access);      // where a schema may come from
+    public ProcessorConfig withDataBindContext(DataBindContext ctx);   // which classes the types bind to
+    public ProcessorConfig withMetaNameBinder(DataNameBinder binder);  // a consumer's own meta vocabulary
 
-    public TsonConfig identifierPolicy(UnicodePolicy policy);  // declared names
-    public TsonConfig tokenPolicy(UnicodePolicy policy);       // every token a read pulls
+    public ProcessorConfig withProcessorPolicy(ProcessorPolicy policy);   // the whole value
+    public ProcessorConfig withIdentifierPolicy(UnicodePolicy policy);    // declared names
+    public ProcessorConfig withTokenPolicy(UnicodePolicy policy);         // every token a read pulls
+    public ProcessorConfig withLimits(LimitsPolicy limits);               // §9.1's resource bounds
 
-    public Tson build();
+    public SchemaAccess schemaAccess();
+    public DataBindContext dataBindContext();
+    public DataNameBinder metaNameBinder();
+    public ProcessorPolicy processorPolicy();
 }
 ```
 
-`httpSchemas` / `fileSchemas` are repeatable and mutually exclusive with each other and with
-`schemaSource(…)`, the general seam.
+**It is a value, not a builder** — every setter returns a new instance and there is no `build()`.
+Construction belongs to whichever encoding is being built: `Tson.of(config)` for TSON text,
+`Json.of(config)` for JSON, from the same value. The three policy components each derive from what is
+already stated rather than replacing it, so a piecewise configuration and a composed one agree.
+
+Where schemas come from is one value: `withSchemaAccess(SchemaAccess.httpSchemas(hosts…))`,
+`SchemaAccess.fileSchemas(host, dir)`, or `SchemaAccess.of(source)` for one you built. The
+mutual-exclusion rules among those live on `SchemaAccess.Builder`, not here.
 
 ### Schema sources
 
 ```java
-public interface TsonSchemaSource {                 // io.ltr8.tson.compiler
+public interface SchemaSource {                     // io.ltr8.tson.base.source
     String fetch(String uri);                       // throws SchemaFetchException and nothing else
-    static TsonSchemaSource registeredOnly();       // the default: refuses everything, NOT_PERMITTED
-    static TsonSchemaSource ofMap(Map<String, String> schemas);   // matched by canonical identity
+    static SchemaSource registeredOnly();           // the default: refuses everything, NOT_PERMITTED
+    static SchemaSource ofMap(Map<String, String> schemas);   // matched by canonical identity
 }
 
-public final class TsonHttpSchemaSource implements TsonSchemaSource, AutoCloseable {
-    public static Builder builder();                // allowHost, mapHost, maxDocumentBytes, timeout,
-                                                    // maxCachedSchemas, requireContentHashPin, httpClient
+public final class SchemaAccess {                   // a source plus the FetchPolicy governing it
+    public static SchemaAccess registeredOnly();    // ProcessorConfig's default
+    public static SchemaAccess of(SchemaSource source);           // the general seam
+    public static SchemaAccess httpSchemas(String... hosts);      // one-call forms
+    public static SchemaAccess fileSchemas(String host, Path directory);
+    public static Builder builder();                // httpSchemas, fileSchemas, source, fetchPolicy
+
+    public SchemaSource source();
+    public FetchPolicy fetchPolicy();
+}
+
+public record FetchPolicy(int maxDocumentBytes, int maxCachedSchemas,
+                          boolean requireContentHashPin) {
+    public static FetchPolicy defaults();
+    public FetchPolicy withMaxDocumentBytes(int n);      // and withMaxCachedSchemas,
+                                                         // withRequireContentHashPin
+    public static final int DEFAULT_MAX_DOCUMENT_BYTES = 1 << 20;
+    public static final int DEFAULT_MAX_CACHED_SCHEMAS = 128;
+}
+
+public final class HttpSchemaSource implements SchemaSource, AutoCloseable {
+    public static Builder builder();                // allowHost, mapHost, fetchPolicy, timeout,
+                                                    // httpClient (and the three FetchPolicy
+                                                    // components as short forms)
     public void preload(String... references);
     public boolean isCached(String reference);
-    public static final int      DEFAULT_MAX_DOCUMENT_BYTES  = 1 << 20;
-    public static final Duration DEFAULT_TIMEOUT             = Duration.ofSeconds(5);
-    public static final int      DEFAULT_MAX_CACHED_SCHEMAS  = 128;
+    public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(5);
 }
 
-public final class TsonFileSchemaSource implements TsonSchemaSource {
-    public static Builder builder();                // mapHost(host, dir), maxDocumentBytes,
-                                                    // maxCachedSchemas, requireContentHashPin
+public final class FileSchemaSource implements SchemaSource {
+    public static Builder builder();                // mapHost(host, dir), fetchPolicy
     public void preload(String... references);
     public boolean isCached(String reference);
 }
 ```
 
-`SchemaReference` (same package) holds §2.2.1's rules on what an identity may be, shared by both.
-Neither source verifies the `?sha256=` pin or the fetched `!!id` — the loader does both;
-`requireContentHashPin` adds the one thing it cannot, that a pin be *present*.
+**`SchemaAccess` is the pair, and it is what `ProcessorConfig` takes** — a source with no policy has
+unstated bounds and a policy with no source governs nothing, so handing them separately makes every
+caller reassemble the pair. The mutual-exclusion rules among `httpSchemas`/`fileSchemas`/`source` live
+on `SchemaAccess.Builder`, stated once where the access is built.
+
+A `timeout` is deliberately not a `FetchPolicy` component: a directory has none, and a component one
+implementation silently ignores is what makes a shared policy value untrustworthy. It stays
+`HttpSchemaSource.Builder`'s own.
+
+`SchemaReference` (§2.2.1's rules on what an identity may be) is **package-private** among these — shared
+by both sources, nameable by neither a consumer nor another module. Neither source verifies the
+`?sha256=` pin or the fetched `!!id`; the loader does both, and `requireContentHashPin` adds the one
+thing it cannot — that a pin be *present*.
+
+### Diagnostics
+
+```java
+public record Diagnostic(…) { public enum Code { … } }        // see references/diagnostics.md
+public interface DiagnosticsReceiver { void report(Diagnostic d);
+    static DiagnosticsReceiver throwing();
+    static DiagnosticsCollector collecting(); }
+public final class DiagnosticsCollector implements DiagnosticsReceiver {
+    public List<Diagnostic> diagnostics();  public boolean isEmpty(); }
+// The base holds Diagnostic, the receivers, SourcePosition, the three policies, and the exceptions
+// whose fact is the processor's rather than one encoding's: ReadException, ParseException,
+// LimitExceededException, SchemaValidationException, BindMismatchException, MissingBindingException,
+// SchemaFetchException, ContentHashMismatchException. The classifying half stays with each encoding,
+// which is why TsonDiagnostics' factories are the compiler's and not these.
+
+public record Position(int line, int column, int byteOffset)   // io.ltr8.tson.compiler --
+        implements SourcePosition {}                           // any encoding's own position type
+                                                               // may implement SourcePosition instead
+public record SchemaLocation(…)   // io.ltr8.tson.compiler -- id + pointer + position, accumulated
+                                  // as a read descends
+```
+
+```java
+public record ProcessorPolicy(UnicodePolicy identifierPolicy,
+                                  UnicodePolicy tokenPolicy,
+                                  LimitsPolicy limits,
+                                  String unicodeDataVersion) {
+    public static ProcessorPolicy of(UnicodePolicy identifier, UnicodePolicy token,
+                                         LimitsPolicy limits);
+}
+```
+
+**What a report is read against, stated once.** [TSON-DATA] §8.2's rules read Unicode data the Consortium
+does not freeze, at a level this deployment chose, so the same document can be refused here and accepted
+elsewhere — and that reason is in neither the document nor the schema. `Tson.processorPolicy()` gives it, and
+so does `processorPolicy()` on either read facade, which is the one to use when a derived reader may have
+changed a policy. A refusal carries **no** copy of its own: it is constant for a run, and what a sender needs
+in order not to be refused is this record *before* it writes. `tson policy` prints it from the shell.
+
+### Unicode policy
+
+```java
+public final class UnicodePolicy {
+    public enum Level { ASCII_ONLY, SINGLE_SCRIPT, HIGHLY_RESTRICTIVE,
+                        MODERATELY_RESTRICTIVE, MINIMALLY_RESTRICTIVE, UNRESTRICTED }
+
+    public static UnicodePolicy of(Level level);
+    public static UnicodePolicy asciiOnly();
+    public static UnicodePolicy singleScript();
+    public static UnicodePolicy highlyRestrictive();       // the identifier default, whole-name
+    public static UnicodePolicy moderatelyRestrictive();
+    public static UnicodePolicy scriptsUnchecked();
+    public static UnicodePolicy unrestricted();            // the token default
+
+    public UnicodePolicy perSegment();                     // identifiers only -- tokenPolicy throws on one
+    public UnicodePolicy permitting(UnicodeScript... scripts);
+
+    public static String dataVersion();                        // the Unicode data version, e.g. "16.0"
+    public Level level();                                      // the three below are the whole of a policy
+    public boolean isPerSegment();
+    public List<Set<UnicodeScript>> permittedScripts();
+    public boolean checksScripts();
+    public boolean appliesIdentifierProfile();
+    public Optional<String> violation(String text);
+    // equals/hashCode are by value: two policies configured alike are equal
+}
+```
 
 ---
 
@@ -192,71 +306,6 @@ public record TsonDocumentHeader(Optional<String> id, Optional<String> schema, O
 §7.1's classification from the opening bytes — at most two directives of lookahead and no value parsing.
 A gigabyte document costs the same as a two-line one, and a document whose body will not parse still
 classifies.
-
-### Diagnostics
-
-```java
-public record Diagnostic(…) { public enum Code { … } }        // see references/diagnostics.md
-public interface DiagnosticsReceiver { void report(Diagnostic d);
-    static DiagnosticsReceiver throwing();
-    static DiagnosticsCollector collecting(); }
-public final class DiagnosticsCollector implements DiagnosticsReceiver {
-    public List<Diagnostic> diagnostics();  public boolean isEmpty(); }
-public record Position(int line, int column, int byteOffset) implements SourcePosition {}
-// `io.ltr8.tson.base` holds Diagnostic, the receivers, SourcePosition, the three policies,
-// and the exceptions whose fact is the processor's rather than one encoding's: ReadException,
-// LimitExceededException, BindMismatchException, MissingBindingException, SchemaFetchException,
-// ContentHashMismatchException. One vocabulary across every encoding -- [TSON-JSON] §9.4 adds no
-// category of its own -- and the only module where the `Tson` prefix is dropped, since there the
-// name it would disambiguate from is another encoding's type in this same library.
-public record SchemaLocation(…)             // id + pointer + position, accumulated as a read descends
-```
-
-```java
-public record ProcessorPolicy(UnicodePolicy identifierPolicy,
-                                  UnicodePolicy tokenPolicy,
-                                  LimitsPolicy limits,
-                                  String unicodeDataVersion) {
-    public static ProcessorPolicy of(UnicodePolicy identifier, UnicodePolicy token,
-                                         LimitsPolicy limits);
-}
-```
-
-**What a report is read against, stated once.** [TSON-DATA] §8.2's rules read Unicode data the Consortium
-does not freeze, at a level this deployment chose, so the same document can be refused here and accepted
-elsewhere — and that reason is in neither the document nor the schema. `Tson.processorPolicy()` gives it, and
-so does `processorPolicy()` on either read facade, which is the one to use when a derived reader may have
-changed a policy. A refusal carries **no** copy of its own: it is constant for a run, and what a sender needs
-in order not to be refused is this record *before* it writes. `tson policy` prints it from the shell.
-
-### Unicode policy
-
-```java
-public final class UnicodePolicy {
-    public enum Level { ASCII_ONLY, SINGLE_SCRIPT, HIGHLY_RESTRICTIVE,
-                        MODERATELY_RESTRICTIVE, MINIMALLY_RESTRICTIVE, UNRESTRICTED }
-
-    public static UnicodePolicy of(Level level);
-    public static UnicodePolicy asciiOnly();
-    public static UnicodePolicy singleScript();
-    public static UnicodePolicy highlyRestrictive();       // the identifier default, whole-name
-    public static UnicodePolicy moderatelyRestrictive();
-    public static UnicodePolicy scriptsUnchecked();
-    public static UnicodePolicy unrestricted();            // the token default
-
-    public UnicodePolicy perSegment();                     // identifiers only -- tokenPolicy throws on one
-    public UnicodePolicy permitting(UnicodeScript... scripts);
-
-    public static String dataVersion();                        // the Unicode data version, e.g. "16.0"
-    public Level level();                                      // the three below are the whole of a policy
-    public boolean isPerSegment();
-    public List<Set<UnicodeScript>> permittedScripts();
-    public boolean checksScripts();
-    public boolean appliesIdentifierProfile();
-    public Optional<String> violation(String text);
-    // equals/hashCode are by value: two policies configured alike are equal
-}
-```
 
 ### Content hashing
 

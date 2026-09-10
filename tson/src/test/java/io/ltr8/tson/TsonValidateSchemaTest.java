@@ -1,5 +1,5 @@
 package io.ltr8.tson;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.Diagnostic;
@@ -48,7 +48,7 @@ class TsonValidateSchemaTest {
             throw new SchemaFetchException(uri, SchemaFetchException.Reason.NOT_PERMITTED,
                     "not an allowed host", null);
         };
-        List<Diagnostic> problems = Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(refusing))).validateSchema("""
+        List<Diagnostic> problems = Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(refusing))).validateSchema("""
                 !!id:"https://example.test/importer.tn"
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 !!import:"https://example.test/nowhere.tn"
@@ -498,7 +498,7 @@ class TsonValidateSchemaTest {
                 !!meta:"https://tson.io/2026/35/m/meta.tn"
                 { widget => { name: text } }
                 """;
-        Tson tson = Tson.of(TsonConfig.defaults()
+        Tson tson = Tson.of(ProcessorConfig.defaults()
                 .withSchemaAccess(SchemaAccess.of(uri -> {
                     if (uri.equals("https://example.test/fetched-as.tn")) {
                         return lib;

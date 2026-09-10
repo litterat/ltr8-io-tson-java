@@ -137,7 +137,6 @@ public final class JsonObjectReader {
         return new JsonObjectReader(context, ignoreUnknownMembers, receiver, policy);
     }
 
-    /** Everything this reader will admit and spend, for a caller stating it beside a read's diagnostics. */
     /**
      * The bind context this reader binds through -- {@link AtomContext#defaultContext()} unless a caller
      * supplied one. {@code TsonObjectReader}'s counterpart on the other encoding.
@@ -146,6 +145,7 @@ public final class JsonObjectReader {
         return context;
     }
 
+    /** Everything this reader will admit and spend, for a caller stating it beside a read's diagnostics. */
     public ProcessorPolicy processorPolicy() {
         return policy;
     }
@@ -210,7 +210,6 @@ public final class JsonObjectReader {
     }
 
 
-    /** Off UTF-8 bytes, where §3.1's rules bite. {@code source} is not closed here. */
     /**
      * Reads {@code source} -- the general entry, and what the {@code String} and {@code InputStream} forms
      * above adapt to. A source already in memory is read without a copy.
@@ -219,6 +218,7 @@ public final class JsonObjectReader {
         return read(new JsonStream(source, policy, receiver), type);
     }
 
+    /** Off UTF-8 bytes, where §3.1's rules bite. {@code source} is not closed here. */
     public <T> T read(InputStream source, Class<T> type) {
         try (ByteSource bytes = ByteSource.of(source)) {
             return read(new JsonStream(bytes, policy, receiver), type);

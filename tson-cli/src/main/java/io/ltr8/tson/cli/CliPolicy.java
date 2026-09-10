@@ -1,5 +1,4 @@
 package io.ltr8.tson.cli;
-import io.ltr8.tson.base.TsonConfig;
 
 import io.ltr8.annotation.Field;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
@@ -26,7 +25,7 @@ import java.util.Set;
  * some 170 members that no wire schema should be restating. The scripts render by name; {@link
  * UnicodePolicy.Level} stays the real enum, since enum narrowing is the proven binding path here.
  *
- * <p>The two surfaces keep {@code TsonConfig}'s own names, here and on the wire, so a deployment's
+ * <p>The two surfaces keep {@code ProcessorConfig}'s own names, here and on the wire, so a deployment's
  * configuration and the report it produces are one vocabulary.
  */
 public record CliPolicy(@Field("identifier_policy") CliUnicodePolicy identifierPolicy,

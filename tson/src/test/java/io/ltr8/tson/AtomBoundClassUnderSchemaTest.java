@@ -6,7 +6,7 @@ import io.ltr8.bind.DataBindContext;
 import io.ltr8.bind.DataNameBinder;
 import io.ltr8.tson.base.DiagnosticsCollector;
 import io.ltr8.tson.base.ReadException;
-import io.ltr8.tson.base.TsonConfig;
+import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.base.source.SchemaSource;
@@ -118,7 +118,7 @@ class AtomBoundClassUnderSchemaTest {
 
     private static Tson tson(String schema, DataBindContext context) {
         SchemaSource source = uri -> schema;
-        return Tson.of(TsonConfig.defaults().withSchemaAccess(SchemaAccess.of(source)).withDataBindContext(context));
+        return Tson.of(ProcessorConfig.defaults().withSchemaAccess(SchemaAccess.of(source)).withDataBindContext(context));
     }
 
     // ── Schemaless: the answer a schema-driven read has to match ─────────
