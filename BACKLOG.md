@@ -146,17 +146,6 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   `tson-compiler` and where `@discriminator` and `@rest` get their first consumer. The reserved member namespace
   (`$schema`/`$type`/`$value`, §3.2/§3.3) and the annotation object come with it.
 
-- [ ] **A JSON read has no base-syntax classifier, so a collecting read throws where the TSON one collects.**
-  `TsonTreeReader` and `TsonObjectReader` catch at every entry point and route through
-  `TsonDiagnostics.ofBaseSyntaxError` (or `Diagnostic.ofLimitExceeded`, tried first); `JsonTreeReader` and
-  `JsonObjectReader` catch nothing, so `JsonParseException` and `JsonStream`'s own `LimitExceededException`
-  escape a read whose receiver asked for problems — and the limit refusal is not even a verdict. §8.1 makes a
-  syntax failure a verdict the sender can act on and `TsonCli.exitCodeFor` owes it exit 1, which is what a JSON
-  document reaching the CLI would get wrong. `TsonDiagnostics` is the shape to copy rather than extend: each
-  encoding owns the switch over its own exceptions, which is why `Diagnostic` keeps only the two factories that
-  classify nothing. What the copy has to decide is what the `expected: "well-formed TSON"` default becomes when
-  the encoding that refused is named.
-
 - [ ] **Nothing dispatches a choice on `@discriminator`, and the JSON reader is what settles its shape.** meta.tn
   declares it as naming "the field a member-dispatching encoding selects a choice's variant on", with force in that
   class of encodings and none in the model, and states three load-time checks — but no encoding in the class exists,

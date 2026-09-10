@@ -401,10 +401,18 @@ module has a real `module-info.java`; module names mirror each module's root exp
   separate stack rather than a front end over `tson-compiler`'s `TsonEventSource` — see "Not yet implemented"
   for the two disagreements that decide it. The **tree model follows [JEP 540](https://openjdk.org/jeps/540)**
   (`jdk.incubator.json`, JDK 28, unavailable now): sealed `JsonValue` over `JsonObject`/`JsonArray`/`JsonString`/
-  `JsonNumber`/`JsonBoolean`/`JsonNull`, `Json.parse`, `JsonParseException` — one API to learn across the two,
-  and a bridge that is later a mapping rather than a rewrite. Where it must differ, §3.1 is why: it decodes UTF-8
+  `JsonNumber`/`JsonBoolean`/`JsonNull` — one value model to learn across the two, and a bridge that is later a
+  mapping rather than a rewrite. Where it must differ, §3.1 is why: it decodes UTF-8
   itself from bytes where JEP 540 parses an already-decoded `String`, and carries a byte offset in every position
-  because [TSON-DATA] §8.1 requires one of every error report. **`Json` is the prefix here, on `Tson`'s own
+  because [TSON-DATA] §8.1 requires one of every error report.
+  **The alignment is the `tree` package and nothing else, and every JEP 540 mention in the module is to be read
+  that way** — it names a value model or a spelling, never a behaviour. **Reading, writing and exceptions follow
+  the TSON side of this library**: a fail-fast read throws `ReadException` carrying a `Diagnostic` (`Json.parse`
+  included — the statics borrow the JDK's spelling, not its contract), a collecting read throws nothing for a bad
+  document and the collector says why, and problems come from one closed `Code` vocabulary across both encodings
+  (§9.4). There is no `JsonParseException`: the stack raises `tson-base`'s shared `ParseException` beneath the
+  readers and `JsonDiagnostics` classifies it, the peer of `TsonDiagnostics` and separate for the reason that
+  class's own note gives: each encoding owns the switch over its own exceptions. **`Json` is the prefix here, on `Tson`'s own
   terms** — the names a consumer writes are the JDK's, so this module keeps them rather than minting a second
   vocabulary for one hierarchy. A pure leaf so far; the schema-directed decode of §5–§8 is what brings a
   dependency on `tson-compiler`.

@@ -69,9 +69,12 @@ class JsonFrontDoorTest {
         assertEquals(3, json.treeReader().processorPolicy().limits().maxDepth());
         assertEquals(3, json.objectReader().processorPolicy().limits().maxDepth());
 
-        // And it is applied, not merely carried.
-        assertThrows(io.ltr8.tson.base.LimitExceededException.class,
+        // And it is applied, not merely carried. A refusal reaches a fail-fast caller the way every other
+        // problem does -- through the receiver, as ReadException -- and says LIMIT_EXCEEDED, which is not a
+        // verdict: the document is fine, this processor declined to read it.
+        io.ltr8.tson.base.ReadException refused = assertThrows(io.ltr8.tson.base.ReadException.class,
                 () -> json.treeReader().read("[".repeat(10) + "1" + "]".repeat(10)));
+        assertEquals(Diagnostic.Code.LIMIT_EXCEEDED, refused.diagnostic().code());
     }
 
     @Test

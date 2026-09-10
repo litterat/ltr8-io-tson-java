@@ -4,8 +4,14 @@
  * <p>Three exported packages, layered the way the module reads a document.
  * {@code io.ltr8.tson.json} is the front door -- {@code Json}, {@code JsonPosition} and the exceptions
  * every layer raises. {@code io.ltr8.tson.json.tree} is the value model, shaped after JEP 540 so a
- * consumer learns one API across this and the JDK's forthcoming {@code jdk.incubator.json}; it is the
- * JSON counterpart of {@code io.ltr8.tson.tree} and stands in the same relation to its front door.
+ * consumer learns one value model across this and the JDK's forthcoming {@code jdk.incubator.json}; it is
+ * the JSON counterpart of {@code io.ltr8.tson.tree} and stands in the same relation to its front door.
+ *
+ * <p><b>That alignment is the tree package and nothing else.</b> Reading, writing and the exceptions they
+ * raise follow the TSON side of this library rather than the JDK's API: a fail-fast read throws {@code
+ * ReadException} carrying a {@code Diagnostic}, a collecting one throws nothing at all, and problems come
+ * from one vocabulary across both encodings ([TSON-JSON] §9.4). Every JEP 540 reference in this module
+ * names a value model or a spelling; none of them settles a behaviour.
  * {@code io.ltr8.tson.json.stream} is the pull-based event layer under both, exported for the same
  * reason {@code tson-compiler} exports its own: it is a real contract a caller may consume directly,
  * and JEP 540 excludes streaming as a non-goal, so there is nowhere else for that need to go.

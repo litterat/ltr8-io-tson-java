@@ -3,7 +3,9 @@ package io.ltr8.tson.json;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.bind.AtomContext;
+import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.LimitExceededException;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.json.reader.DataClassObjectReader;
 import io.ltr8.tson.json.stream.JsonEventSource;
@@ -228,7 +230,30 @@ public final class JsonObjectReader {
 
     /** Off an event source, which is the seam the two families above come through. */
     public <T> T read(JsonEventSource events, Class<T> type) {
-        return readDocument(events, type);
+        try {
+            return readDocument(events, type);
+        } catch (RuntimeException e) {
+            return readFailure(e);
+        }
+    }
+
+    /**
+     * A document that will not parse, reported through this read's own receiver rather than thrown past it
+     * -- {@code JsonTreeReader.readFailure}'s peer, and the reason a collecting read never throws for a bad
+     * <i>document</i> while a fail-fast one still does.
+     *
+     * <p>Hands back {@code null}: bind mode is all-or-nothing, so a document whose syntax failed produces no
+     * object at all rather than one built from the members that arrived before the failure.
+     *
+     * <p>{@link JsonDiagnostics#ofBaseSyntaxError} rethrows anything that is not a syntax failure, and a
+     * limit refusal is classified apart ({@link Diagnostic#ofLimitExceeded}) because it says this processor
+     * declined rather than that the document is malformed.
+     */
+    private <T> T readFailure(RuntimeException e) {
+        receiver.report(e instanceof LimitExceededException limit
+                ? Diagnostic.ofLimitExceeded(limit)
+                : JsonDiagnostics.ofBaseSyntaxError(e));
+        return null;
     }
 
     // ── Framing ──────────────────────────────────────────────────────────
