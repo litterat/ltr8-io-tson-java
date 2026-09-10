@@ -1162,7 +1162,20 @@ single-script name is refused with nothing mixed):
 | Layer | Walk | Scopes |
 |---|---|---|
 | Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (§11.4 declines the scope) |
-| Data | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
+| Data (TSON) | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
+| Data (JSON) | `reader.DataClassObjectReader.checkNameHygiene` | one record's member names — the two per-name rules only |
+
+**JSON reaches fewer scopes, and the reason is §4.1 rather than an omission.** `{"a": 1}` is one syntax
+for a record and a map, so the position decides which — and only a reader holding one can say. The object
+reader's target class *is* that position (it plays the schema's part, §4.1), so a record component's
+members are names and a `Map` component's are keys, which are data and the token policy's business. The
+tree reader holds no position and so applies nothing; that is the same fact that made `tson-json` a
+separate stack rather than a front end over `TsonEventSource`. **The look-alike rule reaches no JSON
+position, and that is settled rather than owed**: it is a property of a *set*, and the one place any
+encoding applies it to data is TSON's schemaless tree read, where the grammar has already said the members
+are fields. In JSON the attack and a legitimate map of look-alike keys are spelled identically, so it must
+be accepted — a deployment that will not accept it raises the **token** policy, which reaches every token
+including a key. `docs/json-encoding.md` has the worked comparison.
 
 **A minted name is judged by the same walk, and is built so it can be.** A derived name splices
 author-written content into its readable half, so `InternalName` restricts that half to **ASCII**: what §7.7

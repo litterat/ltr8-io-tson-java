@@ -15,6 +15,8 @@ import io.ltr8.bind.DataClassTuple;
 import io.ltr8.bind.DataClassUnion;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
+import io.ltr8.tson.base.policy.UnicodePolicy;
+import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.json.JsonPosition;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
@@ -25,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -60,9 +63,26 @@ public final class DataClassObjectReader {
      */
     private final boolean ignoreUnknownMembers;
 
-    public DataClassObjectReader(DataBindContext context, boolean ignoreUnknownMembers) {
+    /**
+     * [TSON-DATA] §8.2's <b>identifier</b> policy, which this engine can apply and the tree engine cannot.
+     *
+     * <p>§4.1 makes a {@code {...}} a record or a map by the <em>position</em>, and JSON spells the two the
+     * same way -- so nothing that reads a member name can say whether it read a name or a key. Here the
+     * target class answers it, standing in for the schema exactly as it does for every other decision this
+     * engine makes: a {@link DataClassRecord} position means the member names are field names, and §2.5
+     * makes a field name an identifier at every layer. A {@link DataClassMap} position means they are keys,
+     * which are data, and data is the token policy's business rather than this one's.
+     *
+     * <p>That is why this lives on the engine rather than on {@code JsonReadContext}: the context is shared
+     * with the tree engine, which has no position to consult and so would carry a policy it must ignore.
+     */
+    private final UnicodePolicy identifierPolicy;
+
+    public DataClassObjectReader(DataBindContext context, boolean ignoreUnknownMembers,
+                                 UnicodePolicy identifierPolicy) {
         this.context = context;
         this.ignoreUnknownMembers = ignoreUnknownMembers;
+        this.identifierPolicy = identifierPolicy;
     }
 
     /**
@@ -190,6 +210,7 @@ public final class DataClassObjectReader {
                 break;
             }
             JsonEvent.MemberName member = (JsonEvent.MemberName) event;
+            checkNameHygiene(ctx, member.name());
             Integer index = indexByName.get(member.name());
             if (index == null) {
                 if (statedUnknown == null) {
@@ -287,6 +308,62 @@ public final class DataClassObjectReader {
     }
 
     // ── Arrays, tuples, maps ─────────────────────────────────────────────
+
+    /**
+     * [TSON-DATA] §8.2's <b>restricted-character and restricted-script</b> rules over one record's member
+     * names -- the two per-name rules, applied where the position says the names are names.
+     *
+     * <p><b>Both defaults are on</b>, which §8.2 requires: the identifier profile MUST apply and a name's
+     * scripts SHOULD be judged at Highly Restrictive over the whole name. They are one report shape because
+     * they are one outcome -- the document is refused, and which table said so is the code's business.
+     *
+     * <p><b>A refusal is not an invalidity</b> (§8.2, and §9.4 carries the categories into this encoding
+     * unchanged): the document is not invalid, it is declined by this processor under a policy reading data
+     * the UCD does not freeze, and it MUST NOT be reported in any of §8.1's four categories. That is what
+     * the code carries -- {@code RESTRICTED_CHARACTER} and {@code RESTRICTED_SCRIPT}, one per rule, because
+     * the two want different fixes. It is still a {@link Diagnostic.Code#verdict()}: the processor looked
+     * and declined, and the sender holds the fix, which is the question a consumer routes on.
+     *
+     * <p><b>The third rule has nowhere here to run.</b> Names that read alike is a property of a
+     * <em>set</em>, and {@code tson-compiler} asks it of a record's field names in its schemaless
+     * <em>tree</em> reader, where the document's own field set is all there is. Under a class -- as here --
+     * the admissible names are declared, so a member that reads alike to a declared one is simply
+     * undeclared and already reports {@code UNRECOGNIZED_FIELD}. The TSON bind path draws the line in the
+     * same place, and drawing it elsewhere would make this encoding stricter than that one for a rule §8.2
+     * states once.
+     *
+     * <p>Applied to <b>every</b> member name a record position carries, declared or not: §8.2's scope is
+     * the names the document wrote, and a name refused for its characters is refused whether or not the
+     * class was going to keep the value under it.
+     */
+    private void checkNameHygiene(JsonReadContext ctx, String name) {
+        // Tested rather than `ifPresent`-ed, and measurably so: both rules are allocation-free when a name
+        // passes, which is every name of an ordinary document, but a capturing lambda is not -- it captures
+        // `ctx` and `name` and so allocates per member name whether or not the Optional holds anything.
+        // Two of those per name cost ~140 bytes per bound record in JsonAllocationHarnessTest.
+
+        // The restricted-character rule is gated on the level, per §8.2: Unrestricted "drops the profile
+        // too", taking that rule with it. Script mixing gates itself inside violation().
+        if (identifierPolicy.appliesIdentifierProfile()) {
+            Optional<String> restricted = IdentifierProfile.hygiene(name);
+            if (restricted.isPresent()) {
+                refuse(ctx, name, restricted.get(), Diagnostic.Code.RESTRICTED_CHARACTER);
+            }
+        }
+        Optional<String> script = identifierPolicy.violation(name);
+        if (script.isPresent()) {
+            refuse(ctx, name, script.get(), Diagnostic.Code.RESTRICTED_SCRIPT);
+        }
+    }
+
+    /**
+     * One shape for both name-hygiene rules, and the same one {@code DefaultTsonReadContext} uses: refused
+     * under this read's <em>name</em> policy, never invalid. The rule is the code -- a character outside the
+     * identifier profile and a script the policy does not admit want different fixes.
+     */
+    private static void refuse(JsonReadContext ctx, String name, String violation, Diagnostic.Code code) {
+        ctx.report(code, "the name " + violation, "a name this processor will accept", "'" + name + "'");
+    }
 
     private Object bindArray(JsonReadContext ctx, JsonEvent first, DataClassArray target) {
         if (!(first instanceof JsonEvent.ArrayStart)) {
@@ -395,6 +472,10 @@ public final class DataClassObjectReader {
             skipValue(ctx, first);
             return null;
         }
+        // No name hygiene here, deliberately: §4.1 makes this position a map, so its member names are
+        // *keys*, and a key is data. §8.2's identifier policy governs names; what governs data is the token
+        // policy, which JsonStream has already applied to every token including these. It is also what
+        // keeps a JSON-Schema conversion from meeting a name rule on `additionalProperties`.
         int mark = ctx.reported();
         Set<String> stated = new HashSet<>();
         try {
