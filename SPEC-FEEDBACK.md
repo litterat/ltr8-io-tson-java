@@ -607,3 +607,66 @@ unquoted `true`, so the annotation is never *needed* — then §5 should say so,
 would remove `text` (§4.4 already recovers a string) and §5.5 explicitly keeps that one: the annotation
 exists to **assert** the case where it is in doubt, which is exactly what a quoted `"true"` at a boolean
 position is.
+
+## 9. §6.5's map-form test is stated over the type hierarchy where it means content grammar, and `value` falls the wrong way
+
+**Documents:** [TSON-JSON] §6.5 (the two map forms), §5.7 (`void`, `value`, scoped positions); [TSON-SCHEMA]
+§4.2, §5.2; [TSON-DATA] §2.9.
+**Kind:** underspecification — a case the prose does not address where an implementation must still pick
+something, and where two implementations would pick differently with equal justification.
+
+§6.5 selects a map's JSON form from its key type, and the test is a single clause: **object form** "when `K`
+resolves, after following its reference chain, to an **atom-family instance or an enum**: the types a single
+scalar token denotes directly, the same line [TSON-SCHEMA] §5.2 draws for value modifiers"; **pairs form**
+"when `K` is anything else". The split is exclusive and decidable at schema load, which is right — §4.1
+forbids reading speculatively, so the position must be settled before the value is touched.
+
+**The clause is stated over a position in the type hierarchy, and the property it means to test is a content
+grammar.** Those coincide for every family but the kernel's `unit`, whose three instances are all
+atom-family instances ([TSON-SCHEMA] §4.2 dispatches them on the declaration's own name, their resolved
+shapes being identical) and are three different things at a key position:
+
+- **`identifier`** is a scalar token type. Object form, plainly, and the member name faces its profile.
+- **`void`** has absence as its sole value, and [TSON-DATA] §2.9 forbids an absent key — so a `void`-keyed
+  map is uninhabited and no reader ever reaches the question. Harmless either way.
+- **`value`** is the one that decides the clause. Its inhabitants span four JSON kinds — §5.7 reads a
+  boolean as a boolean, a number without fraction or exponent as an integer, one with either as a float, and
+  a string as a string — and **JSON member names are only ever strings**. So object form re-types every key:
+  a decoded key could never be a boolean or a number, and `1` and `"1"` would arrive as one key.
+
+**That last consequence contradicts two rules §6.5 itself states.** Identity under a declared key type is
+"over its value space ([TSON-SCHEMA] §5.5)", and a form that can only produce strings does not have `value`'s
+value space to compare over. And "a member name `K`'s contract rejects is a resolver error" presumes a
+contract that reads token content, which is exactly what `value` does not have — §5.7 gives it a reading by
+*kind*, this encoding's own, invoking none of [TSON-DATA] §4.
+
+**The cross-reference nearly answers it and does not quite.** §5.2's line — which fields may carry a `~`/`=`
+value — excludes `void` and the scoped instances, and [TSON-SCHEMA] §5.2 makes that a rule about the field's
+own declared type. But it is a rule about *carrying a literal in a schema*, not about *spelling a key on the
+wire*, and the two exclusions are not the same set: `value` is admissible under one reading of §5.2's line
+and is precisely the case §6.5 cannot afford to admit.
+
+**The interpretation this implementation chose** is pairs form for `value`, on the ground that it has no
+content grammar for a key token to face: `JsonMapTreeReader` selects object form exactly when the resolved
+key body is an `Atom` **and** the shared atom vocabulary answers with a parser for it, which is true of every
+family, every enum and `identifier`, and false for `value` and `void`. Pairs form then reads each key as an
+ordinary `value` position, so a boolean key stays a boolean and `1` and `"1"` stay two keys — `value`'s value
+space preserved, which is what §6.5's identity rule asks for. The cost is that a `value`-keyed map is
+bracket-shaped where a reader might expect braces; the alternative silently re-types every key it carries.
+
+**Scope, stated so the priority is visible.** `value` is meta-kernel's and core.tn does not re-export it, so
+no user schema can declare such a map — the case arises only inside a meta-schema, and neither meta-kernel.tn
+nor meta.tn declares one today (both their maps are `type_name`- and `uri`-keyed, squarely object form). This
+is a rule the series should state rather than a defect biting anyone. It is worth stating all the same,
+because [TSON-SCHEMA] §2.2.2 makes the meta layer the format's extension point: a processor must compile
+whatever constructor an extension meta-schema declares, and "atom-family instance" is the kind of phrase two
+implementations read differently with no vector able to catch it.
+
+**Suggested resolution.** State the object-form test as a property of the key type's **parsing contract**
+rather than of its position in the hierarchy: object form when `K` resolves to a type whose contract reads
+*token content* — every atom family, every enum, and `identifier` — and pairs form otherwise, `value` and
+`void` included. One added clause in §6.5 naming the two exclusions and why (`value` is read by kind and not
+by content, §5.7; `void` has no value a key could be, [TSON-DATA] §2.9) would close it. If instead `value`
+is meant to take object form and be read as text there, §6.5 should say so outright and §5.7 should note that
+a key position is the one place `value`'s four-kind reading does not apply — because that is a real exception
+to a rule stated without one, and it is not derivable from either section as written.
