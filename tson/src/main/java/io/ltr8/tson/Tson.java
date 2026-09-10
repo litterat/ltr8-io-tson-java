@@ -255,8 +255,8 @@ public final class Tson {
         TsonSchemaParser parser = new TsonSchemaParser(schemaText);
         SchemaDocument document = parser.parseSchemaDocument();
         TsonSchema resolved = new TsonSchemaResolver(core).resolveSchema(document, parser.schemaPositions());
-        return core.schemaRegistry().register(
-                TsonSchemaLinker.link(resolved, core.schemaRegistry(), core.identifierPolicy()));
+        return core.register(
+                TsonSchemaLinker.link(resolved, core.schemaRegistry(), core.identifierPolicy()), schemaText);
     }
 
     /**
@@ -352,7 +352,7 @@ public final class Tson {
             if (!problems.isEmpty()) {
                 return problems.diagnostics();
             }
-            treeRegistry().compile(core.schemaRegistry().register(linked));
+            treeRegistry().compile(core.register(linked, schemaText));
         } catch (SchemaFetchException e) {
             // An !!import or !!meta naming an identity no configured source will serve. The document fails
             // either way, but it was never checked: nothing here saw the imported schema, so "this schema
@@ -366,6 +366,11 @@ public final class Tson {
             // so it reports the wiring mistake rather than letting a bare runtime exception past a caller who
             // asked for a list of problems, which would read as a fault in this library.
             problems.report(TsonDiagnostics.ofSchemaBindMismatch("", "", e, Optional.empty()));
+        } catch (ContentHashMismatchException e) {
+            // A ?sha256= pin -- this document's own !!id, or one on an !!import or !!meta -- against
+            // content that does not hash to it. §2.2.1's integrity failure is a verdict on the reference,
+            // so it is reported like the rest rather than escaping a call that promised a list.
+            problems.report(TsonDiagnostics.ofSchemaError("", "", e.getMessage(), Optional.empty()));
         } catch (SchemaValidationException e) {
             // Whatever the phases still raise rather than report: a document with no !!id, an !!import that
             // loaded and would not link, a !!meta that may not govern. Author errors about the document as

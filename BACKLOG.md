@@ -58,16 +58,6 @@ own prose (which had gone stale on it):
   belongs with the other constructor-eligibility checks, where `requireApplicable` already asks what `!C`
   may be applied to.
 
-- [ ] **A schema registered in-process is never pin-checked.** `Tson.resolve` and `Tson.validateSchema` register a
-  linked schema straight into the core's `TsonSchemaRegistry`, bypassing `TsonCompiledMetaRegistry.recordAndVerify`,
-  so no content hash is recorded for that identity. `verifyPin` then has nothing to compare against and returns
-  silently: a data document referencing that schema with a wrong `?sha256=` pin validates clean, where the same
-  reference is refused with `SCHEMA_ERROR` once the schema has arrived through a `SchemaSource`. `TsonValidateTest`'s
-  pin cases all take the fetched path, which is why the gap is green. Fix is to hash the source text at both
-  registration sites (the identity's `putIfAbsent` semantics already handle a later fetch of the same bytes), and a
-  test that registers via `validateSchema` then validates a mis-pinned reference. [TSON-SCHEMA] §10.2 makes
-  verification per identity, not per route.
-
 ## Checked annotations
 
 [TSON-SCHEMA] §6 defines the category and §5.4's `@disjoint` is the precedent both follow: an annotation with
@@ -236,6 +226,18 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   it. §8.2 requires a deployment be able to relax any of the three rules, so either that is a conformance
   gap or the rule is deliberately unconditional and should say so; the two per-name rules gate themselves,
   which makes the silence here look like an oversight rather than a decision.
+
+- [ ] **The shared corpus states nothing about [TSON-DATA] §2.2.1's content-hash pins.** No vector anywhere
+  in `ltr8-io-tson-test-suite` mentions `sha256`, so three MUSTs go unmeasured across implementations: a
+  reference whose pin does not match its target's bytes is refused, a query parameter that is not a
+  recognized hash algorithm is an error rather than silently retained, and a hashed reference whose target
+  carries no id line is refused (the hash input having no boundary). All three are expressible at the
+  `class2/validate` layer, where a subject's own `!!schema` names a corpus fixture the runner serves: a
+  wrong pin is portable without pinning any fixture's bytes, since no conforming processor may accept it.
+  What is *not* expressible is which registration route recorded the hash — a corpus subject always reaches
+  its schema through the runner's `SchemaSource`, where a host application registering a schema from text it
+  holds is the case this repo covers in `TsonValidateTest`. Adding the vectors needs a `refused`-style
+  decision on §8.1's category for a pin failure, which the corpus does not yet state.
 
 - [ ] **The rest of [TSON-DATA] §9.1's resource limits, and [TSON-SCHEMA] §11.5's.** `LimitsPolicy` is
   the policy value and carries nesting depth at §9.1's own default of 64. §9.1 now states the whole set as one

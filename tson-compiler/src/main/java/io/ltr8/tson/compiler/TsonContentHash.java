@@ -21,7 +21,26 @@ public final class TsonContentHash {
 
     /** The lowercase-hex SHA-256 over every byte from {@link #contentStart} to the end. */
     public static String sha256(byte[] document) {
-        int start = contentStart(document);
+        return hashFrom(document, contentStart(document));
+    }
+
+    /**
+     * {@link #sha256} for a caller hashing a document nothing has pinned yet: empty where {@link #sha256}
+     * throws, the first line carrying no terminator and the hash input therefore having no boundary.
+     *
+     * <p><b>Not being content-addressable is a property of the document, not a failure of the load.</b>
+     * §2.2.1 requires the terminator of a <i>content-addressed</i> document, so a single-line document is
+     * simply one no reference may pin -- and a processor that hashes every document it loads (to have an
+     * answer ready for a later pinned reference) must not turn that into a refusal of the document itself.
+     * What the caller owes instead is refusing the pin: {@code sha256IfAddressable} returning empty is what
+     * says the target of a hashed reference carries no id line, which §2.2.1 makes an error.
+     */
+    public static Optional<String> sha256IfAddressable(byte[] document) {
+        int start = contentBoundary(document);
+        return start < 0 ? Optional.empty() : Optional.of(hashFrom(document, start));
+    }
+
+    private static String hashFrom(byte[] document, int start) {
         MessageDigest digest = sha256Digest();
         digest.update(document, start, document.length - start);
         return toHex(digest.digest());
@@ -34,6 +53,16 @@ public final class TsonContentHash {
      * @throws IllegalArgumentException if the first line has no terminator, so there is no hash-input boundary
      */
     public static int contentStart(byte[] document) {
+        int start = contentBoundary(document);
+        if (start < 0) {
+            throw new IllegalArgumentException("the first line has no terminator -- a content-addressed "
+                    + "document must follow its !!id line with one ([TSON-DATA] §2.2.1)");
+        }
+        return start;
+    }
+
+    /** {@link #contentStart}'s scan, answering {@code -1} where that one throws. */
+    private static int contentBoundary(byte[] document) {
         int i = document.length >= 3 && (document[0] & 0xFF) == 0xEF
                 && (document[1] & 0xFF) == 0xBB && (document[2] & 0xFF) == 0xBF ? 3 : 0;
         for (; i < document.length; i++) {
@@ -54,8 +83,7 @@ public final class TsonContentHash {
                 }
             }
         }
-        throw new IllegalArgumentException("the first line has no terminator -- a content-addressed "
-                + "document must follow its !!id line with one ([TSON-DATA] §2.2.1)");
+        return -1;
     }
 
     /**

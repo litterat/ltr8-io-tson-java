@@ -67,6 +67,15 @@ class TsonContentHashTest {
     }
 
     @Test
+    void sha256IfAddressableAnswersEmptyWhereSha256Throws() {
+        // §2.2.1 asks for the terminator of a *content-addressed* document, so its absence says the
+        // document cannot be pinned -- not that it cannot be loaded. A caller hashing every document it
+        // loads needs that told apart from a hash; the pin is what gets refused, one layer up.
+        assertEquals(Optional.empty(), TsonContentHash.sha256IfAddressable(utf8("!!id:\"x\"")));
+        assertEquals(Optional.of(SHA_ABC), TsonContentHash.sha256IfAddressable(utf8("!!id:\"x\"\nabc")));
+    }
+
+    @Test
     void declaredSha256ExtractsAPinOrEmpty() {
         assertEquals(Optional.of(SHA_ABC), TsonContentHash.declaredSha256("https://x/s.tn?sha256=" + SHA_ABC));
         assertEquals(Optional.empty(), TsonContentHash.declaredSha256("https://x/s.tn"));
