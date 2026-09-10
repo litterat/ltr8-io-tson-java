@@ -146,13 +146,16 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   `tson-compiler` and where `@discriminator` and `@rest` get their first consumer. The reserved member namespace
   (`$schema`/`$type`/`$value`, §3.2/§3.3) and the annotation object come with it.
 
-- [ ] **`Diagnostic.ofBaseSyntaxError` cannot classify another encoding's syntax failure.** Its switch covers
-  `TsonParseException`/`LexException`/`TsonUnsupportedDocumentException` and rethrows the rest, so a JSON syntax error
-  would escape as a fault — the please-report-it banner, exit 70 — where §8.1 makes it a verdict the sender can act on
-  and `TsonCli.exitCodeFor` owes it exit 1. `TsonParseException` is `final`, so a front end cannot ride the
-  classification by subclassing it, and `JsonParseException` is a separate stack's exception that deliberately does
-  not extend it. What is left is choosing between a fourth case and a seam each encoding contributes to, and making
-  the `expected: "well-formed TSON"` default name the encoding that actually refused.
+- [ ] **A JSON read has no base-syntax classifier, so a collecting read throws where the TSON one collects.**
+  `TsonTreeReader` and `TsonObjectReader` catch at every entry point and route through
+  `TsonDiagnostics.ofBaseSyntaxError` (or `Diagnostic.ofLimitExceeded`, tried first); `JsonTreeReader` and
+  `JsonObjectReader` catch nothing, so `JsonParseException` and `JsonStream`'s own `LimitExceededException`
+  escape a read whose receiver asked for problems — and the limit refusal is not even a verdict. §8.1 makes a
+  syntax failure a verdict the sender can act on and `TsonCli.exitCodeFor` owes it exit 1, which is what a JSON
+  document reaching the CLI would get wrong. `TsonDiagnostics` is the shape to copy rather than extend: each
+  encoding owns the switch over its own exceptions, which is why `Diagnostic` keeps only the two factories that
+  classify nothing. What the copy has to decide is what the `expected: "well-formed TSON"` default becomes when
+  the encoding that refused is named.
 
 - [ ] **Nothing dispatches a choice on `@discriminator`, and the JSON reader is what settles its shape.** meta.tn
   declares it as naming "the field a member-dispatching encoding selects a choice's variant on", with force in that
@@ -264,20 +267,6 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
   *where it is counted*: the ones that bound shape are per-container state the stream does not keep, where
   depth was a counter it already had, and the two aggregates (total values, foreign schemas) need their own
   counter since §9.1 is explicit that the total is not bounded by the parts.
-
-- [ ] **`TsonConfig` is a builder and a configuration value in one class, and only the value belongs in
-  `tson-base`.** `tson-base` holds what a deployment constrains this processor with — `base.policy` (what it
-  will admit and spend) beside `base.source` (where it will obtain a schema), siblings rather than one
-  nested in the other, because a `ProcessorPolicy` is a value the CLI renders in every envelope's `policy`
-  field and a `SchemaSource` has no rendering. What is missing is the type that collects them, so an
-  encoding other than TSON text can be handed one object rather than reassembling the set. `TsonConfig`
-  cannot become it as it stands: it imports `io.ltr8.tson.compiler.*`, `TsonCompiledMetaRegistry`,
-  `SchemaMetaNameBinder` and `TsonAtomContext`, and its `build()` resolves meta-kernel/meta.tn/core.tn and
-  returns a `Tson` — the compiler's assembly point, not a value. The work is the extraction: which of its
-  fields are constraints (the policies, the source, `requireContentHashPin`, `lenientBinding`) against which
-  are assembly (the registries, the bind context, the name binder), and whether the binding travels with the
-  constraints or stays behind. The name is free — `Config` in `io.ltr8.tson.base` — and `Tson.builder()`
-  keeps its shape either way, taking one where it takes several today.
 
 - [ ] **`scripts/restamp-bundled-schemas.sh` does not cover the spec's own §13.2 table.** The script moves
   every pin in the repo bottom-up — the three `spec/m/*.tn` headers, `TsonBundledSchemas`, `InitCommand`,
