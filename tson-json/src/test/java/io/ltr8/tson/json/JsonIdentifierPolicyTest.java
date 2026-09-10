@@ -185,6 +185,60 @@ class JsonIdentifierPolicyTest {
     }
 
     @Nested
+    class NamesThatReadAlike {
+
+        /** {@code payment} beside {@code pаyment} -- identical but for a Cyrillic а (U+0430). */
+        private static final String LOOK_ALIKE = "{\"payment\": 1, \"p\\u0430yment\": 2}";
+
+        /** Both names pass the per-name rules here, so only the set rule could have anything to say. */
+        private static final ProcessorPolicy BILINGUAL = ProcessorPolicy.defaults()
+                .withIdentifierPolicy(UnicodePolicy.highlyRestrictive()
+                        .permitting(Character.UnicodeScript.LATIN, Character.UnicodeScript.CYRILLIC));
+
+        public record Invoice(int payment) {
+        }
+
+        public record Ledger(Map<String, Integer> entries) {
+        }
+
+        @Test
+        void are_accepted_at_a_map_position_because_two_of_them_are_two_keys() {
+            // The rule §8.2 states over a *set* does not reach JSON, and this is why rather than an
+            // omission: at a Map position these are keys, and two keys that read alike are two
+            // legitimately distinct keys. The attack and the safe case are spelled identically -- §4.1 in
+            // one sentence -- so this must be accepted.
+            JsonObjectReader reader = READER.withProcessorPolicy(BILINGUAL);
+            assertEquals(List.of(), codes(reader, "{\"entries\": " + LOOK_ALIKE + "}", Ledger.class));
+        }
+
+        @Test
+        void are_accepted_by_the_tree_reader_which_cannot_tell_which_it_read() {
+            DiagnosticsCollector problems = new DiagnosticsCollector();
+            JsonTreeReader.standard().withProcessorPolicy(BILINGUAL).withDiagnostics(problems).read(LOOK_ALIKE);
+            assertTrue(problems.isEmpty(), problems.diagnostics().toString());
+        }
+
+        @Test
+        void need_nothing_extra_at_a_record_position_where_one_of_them_is_undeclared() {
+            // The admissible names are declared here, so the look-alike arrives as a member the class does
+            // not have and is reported on its own. The TSON bind path draws the line in the same place;
+            // drawing it elsewhere would make this encoding stricter for a rule §8.2 states once.
+            assertEquals(List.of(Diagnostic.Code.UNRECOGNIZED_FIELD),
+                    codes(READER.withProcessorPolicy(BILINGUAL), LOOK_ALIKE, Invoice.class));
+        }
+
+        @Test
+        void are_refused_by_a_deployment_that_raises_the_token_policy() {
+            // The surface that does reach a key. §8.2's identifier policy judges names; where JSON cannot
+            // know a member is a name, what is left is the rule that judges data.
+            JsonObjectReader strictTokens = READER.withProcessorPolicy(
+                    BILINGUAL.withTokenPolicy(UnicodePolicy.singleScript()));
+            assertTrue(codes(strictTokens, "{\"entries\": " + LOOK_ALIKE + "}", Ledger.class)
+                    .contains(Diagnostic.Code.RESTRICTED_SCRIPT));
+        }
+    }
+
+    @Nested
     class BesideTheTokenPolicy {
 
         @Test

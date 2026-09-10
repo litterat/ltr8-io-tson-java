@@ -113,16 +113,6 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **§8.2's look-alike rule has nowhere to run in JSON.** The two per-name rules reach a record's
-  member names through `JsonObjectReader`, whose target class says which `{...}` is a record. The third
-  is a property of a *set*, and `tson-compiler` asks it of a record's field names in its schemaless
-  **tree** reader -- where the document's own field set is all there is. JSON's tree reader cannot: §4.1
-  makes the position decide and a `JsonObject` has none. Under a class the question is arguably answered
-  already (a member reading alike to a declared one is undeclared, and reports `UNRECOGNIZED_FIELD`), and
-  the TSON bind path draws the line in the same place -- so what is owed is a decision rather than code:
-  whether the schema-directed decode gives the rule a home, or whether a class-directed read is where
-  §8.2 stops and that is stated rather than left looking like an omission.
-
 - [ ] **No schema-directed decode — §5–§8.** The whole of what Part 3 actually specifies: atoms by their parsing
   contracts (§5), containers by their constructors (§6), JSON `null` as the absent sentinel (§7), and the
   discrimination predicate over the derived `disjoint` fact (§8). This is where `tson-json` gains its dependency on

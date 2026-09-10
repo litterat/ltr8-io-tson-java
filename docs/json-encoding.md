@@ -524,12 +524,23 @@ categories and §9.4 carries those categories here unchanged, so what keeps it a
 `Code.verdict()` stays `true`: the processor looked and declined, and the sender holds the fix, which is
 the question a consumer routes on.
 
-**The third rule has no home here**, and `BACKLOG.md` carries the decision that is owed. Names that read
-alike is a property of a *set*, which `tson-compiler` asks of a record's field names in its schemaless
-tree reader — where the document's own field set is all there is. Under a class the admissible names are
-declared, so a member reading alike to a declared one is undeclared and already reports
-`UNRECOGNIZED_FIELD`; the TSON bind path draws the line in the same place, and drawing it elsewhere would
-make this encoding stricter than that one for a rule §8.2 states once.
+**The third rule does not reach JSON, and that is the answer rather than a gap.** Names that read alike
+is a property of a *set*, which `tson-compiler` asks of a record's field names in its schemaless tree
+reader — where the grammar has already said those members are *fields*, so two that read alike are
+unambiguously a problem. JSON cannot get there from either reader: a tree has no positions at all, and at
+an object reader's `Map` position the members are keys, where two look-alike keys are two legitimately
+distinct keys. **The dangerous case and the safe case are spelled identically**, which is §4.1 in one
+sentence, so JSON must accept it.
+
+A deployment that will not accept it has a surface that does reach these: the **token** policy, which
+governs every JSON token including a map key, and which a stricter deployment raises. That is the honest
+division — §8.2's identifier policy judges names, and where JSON cannot know that a member is a name, what
+is left is the rule that judges data.
+
+The record positions need nothing extra either: the admissible names are declared, so a member reading
+alike to a declared one is undeclared and already reports `UNRECOGNIZED_FIELD`. The TSON bind path draws
+the line in the same place, and drawing it elsewhere would make this encoding stricter than that one for a
+rule §8.2 states once.
 
 **It costs nothing measurable**, which took one edit rather than a design: both rule implementations are
 allocation-free when a name passes, but `Optional.ifPresent` with a capturing lambda is not — it captures
