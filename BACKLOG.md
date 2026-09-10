@@ -113,12 +113,13 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **No schema-directed decode above the atoms — §6–§8.** Containers by their constructors (§6), JSON `null`
-  as the absent sentinel (§7), and the discrimination predicate over the derived `disjoint` fact (§8). Where
-  `@discriminator` and `@rest` get their first consumer; the reserved member namespace
-  (`$schema`/`$type`/`$value`, §3.2/§3.3) and the annotation object come with it. Every constructor but §5's
-  compiles to a `NOT_IMPLEMENTED` reader meanwhile, so a schema using one still compiles and each unreadable
-  value costs a verdict on itself alone. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`, `JsonCompiledSchema`,
+- [ ] **No schema-directed decode of maps or sums — §6.5 and §8.** Maps in their two wire forms, selected by
+  the key type and never by inspecting the value (§6.5: object form for a scalar-token key, pairs form for a
+  compound one), with member names parsed by the key type's own contract and duplicates judged under
+  decoded-key identity. Then the discrimination predicate over the derived `disjoint` fact (§8), which brings
+  the reserved member namespace (`$schema`/`$type`/`$value`, §3.2/§3.3) and the annotation object with it, and
+  is where `@discriminator` gets its first consumer. Both constructors compile to a `NOT_IMPLEMENTED` reader
+  meanwhile. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`, `JsonCompiledSchema`,
   `JsonSchemaCompiler`, its own factory registries — and `docs/json-encoding.md` carries why that is a deferral
   rather than a conclusion: the two disagreements that keep the *event* layers apart both dissolve above the
   schema, where the reader is the position, so one compiled schema over an encoding-neutral context stays a real
@@ -126,6 +127,20 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   `tson-compiler`**, contrary to what this entry used to predict: `TsonLinkedSchema` is a `tson-schema` record and
   `tson-atom` already re-exports that module, so what crosses is a value model and the pipeline producing it stays
   where it is.
+
+- [ ] **Bind mode has no schema-directed reader.** Tree mode validates and hands back the JSON; the other door
+  — an HTTP service accepting both encodings and getting a Java object back — needs the same containers over a
+  `DataBindContext`, with the bind-agreement machinery `tson-compiler` carries (`BindMismatchException` at
+  compile, `MissingBindingException` deferred to first read). The factory registry already takes a mode
+  (`JsonValueReaderFactoryRegistry.tree()` beside `atoms()`); what is owed is the second set of container
+  factories and the front-door surface that selects it.
+
+- [ ] **`@rest` still has no consumer, and the JSON record reader is the one that will judge it.** §6.2's
+  flatten is deliberately unbuilt: an undeclared member is §6.1.1's closure error and lands nowhere, which is
+  the strict reading the annotation would later relax. Now that a JSON record reader exists, the question the
+  directive was always waiting on can be asked — whether a rest field's stated shape (`{text => X}`, one field
+  per composed chain, declared names winning, `$`-initial names never collected, one source per field) survives
+  a consumer. Its three load-time checks are tracked under "Checked annotations".
 
 - [ ] **A JSON diagnostic names the type at the end of a reference chain, not the alias the author wrote.**
   `JsonSchemaCompiler` collapses a `REFERENCE` entry onto its target's reader ([TSON-SCHEMA] §8.3 permits
@@ -135,14 +150,6 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   it with `UseSite.named` over `EntryDisplayName`, which also renders a minted entry as the sugar or application
   that produced it; this stack has no counterpart. Owed with the facade, which is what will seed the root for a
   real read rather than a test doing it.
-
-- [ ] **Nothing checks that the two encodings give one verdict.** [TSON-JSON] §9.4 makes a single diagnostic
-  vocabulary across both encodings a specification obligation, and the schema-directed decode puts a second copy
-  of the field-state rules (§5.2's six states, `REQUIRED_FIXED` injection, the FIXED check, duplicate members,
-  closure) beside `tson-compiler`'s. Two copies drift silently. The guard is a **cross-encoding parity test**: one
-  schema, the equivalent document in TSON text and JSON, asserting the same `Diagnostic.Code` and the same RFC
-  6901 pointer. Local rather than a corpus vector — the corpus cannot state a fact about two encodings at all, per
-  the entry below. Owed from the first container reader; atoms alone do not yet exercise a shared rule.
 
 - [ ] **Nothing dispatches a choice on `@discriminator`, and the JSON reader is what settles its shape.** meta.tn
   declares it as naming "the field a member-dispatching encoding selects a choice's variant on", with force in that

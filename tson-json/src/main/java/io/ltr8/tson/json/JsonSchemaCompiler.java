@@ -43,9 +43,9 @@ public final class JsonSchemaCompiler {
     private JsonSchemaCompiler() {
     }
 
-    /** Compiles every entry with [TSON-JSON] §5's atom vocabulary; §6-§8's constructors become gaps. */
+    /** Compiles every entry in tree mode; the constructors this encoding cannot yet read become gaps. */
     public static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        return compile(linkedSchema, JsonValueReaderFactoryRegistry.atoms());
+        return compile(linkedSchema, JsonValueReaderFactoryRegistry.tree());
     }
 
     /** Compiles every entry, dispatching each resolved body to {@code factories} by its constructor name. */

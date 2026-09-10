@@ -6,6 +6,7 @@ import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.json.reader.JsonValueReaderFactoryRegistry;
 import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import org.junit.jupiter.api.Test;
@@ -50,12 +51,19 @@ class JsonAtomReadTest {
               small      => !integer ^ { min: 0  max: 10 }
               alias      => count
               point      => { x: int32  y: int32 }
+              lookup     => { text => int32 }
             }
             """;
 
     private static final Tson TSON = Tson.standard();
 
-    private static final JsonCompiledSchema COMPILED = JsonSchemaCompiler.compile(TSON.resolve(SCHEMA));
+    /**
+     * Compiled over §5's vocabulary alone, with no read mode over it -- so these tests can assert what each
+     * family's parser <em>produced</em>. Tree mode discards that by design (it answers "does this conform"
+     * and hands back the JSON), which is exactly why the parsing contract is pinned here instead.
+     */
+    private static final JsonCompiledSchema COMPILED =
+            JsonSchemaCompiler.compile(TSON.resolve(SCHEMA), JsonValueReaderFactoryRegistry.atoms());
 
     /**
      * The kernel's own compiled readers. {@code value} and {@code identifier} are declared by meta-kernel.tn
@@ -64,7 +72,8 @@ class JsonAtomReadTest {
      */
     private static final JsonCompiledSchema KERNEL = JsonSchemaCompiler.compile(
             TSON.schemaRegistry().get(TsonBundledSchemas.META_KERNEL_ID)
-                    .orElseThrow(() -> new IllegalStateException("meta-kernel.tn is not registered")));
+                    .orElseThrow(() -> new IllegalStateException("meta-kernel.tn is not registered")),
+            JsonValueReaderFactoryRegistry.atoms());
 
     /** One value read at {@code typeName}, with every problem collected rather than thrown. */
     private static Read read(String typeName, String json) {
@@ -293,13 +302,13 @@ class JsonAtomReadTest {
     }
 
     /**
-     * §6-§8 are unbuilt, so every container constructor compiles to a gap. A gap is <b>not a verdict</b>
+     * §6.5's maps are unbuilt, so that constructor compiles to a gap. A gap is <b>not a verdict</b>
      * ({@code Code.verdict()} is false), which is what keeps it from being mistaken for a statement about
      * the document -- and it costs that value a verdict and nothing else's.
      */
     @Test
     void aConstructorThisEncodingCannotYetReadIsAGapAndNotAVerdict() {
-        Diagnostic gap = read("point", "{\"x\": 1}").refusal();
+        Diagnostic gap = read("lookup", "{}").refusal();
         assertEquals(Diagnostic.Code.NOT_IMPLEMENTED, gap.code());
         assertFalse(gap.code().verdict(), "a gap must not be a verdict on the document");
     }
@@ -307,6 +316,6 @@ class JsonAtomReadTest {
     /** A schema whose types this encoding cannot read still compiles: the gap is per entry, not per schema. */
     @Test
     void aSchemaWithUnreadableEntriesStillCompiles() {
-        assertInstanceOf(JsonTypeReader.class, COMPILED.get("point"));
+        assertInstanceOf(JsonTypeReader.class, COMPILED.get("lookup"));
     }
 }

@@ -34,6 +34,17 @@ public record JsonSchemaLocation(String schemaId, String pointer, Optional<Sourc
     }
 
     /**
+     * As {@link #field(String)}, taking the field's own declaration line where it has one -- so a diagnostic
+     * against {@code /person/age} is located at {@code age} rather than at {@code person}'s line. A field with
+     * no position of its own leaves the enclosing declaration's in place, which is the honest answer for a
+     * schema this processor never saw source text for.
+     */
+    public JsonSchemaLocation field(String name, Optional<SourcePosition> at) {
+        JsonSchemaLocation stepped = field(name);
+        return at.isPresent() ? new JsonSchemaLocation(stepped.schemaId, stepped.pointer, at) : stepped;
+    }
+
+    /**
      * This location's pointer over {@code declaration}'s identity and position -- what a record offers as it
      * begins reading, so the pointer keeps the path the read took while the id and line follow the
      * declaration that actually owns the members being read. A declaration with no position of its own
