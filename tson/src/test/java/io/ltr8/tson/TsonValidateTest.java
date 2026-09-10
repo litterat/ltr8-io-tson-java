@@ -168,6 +168,79 @@ class TsonValidateTest {
     }
 
     @Test
+    void aMisPinnedReferenceToAnInProcessRegisteredSchemaIsRejected() {
+        // §10.2 verifies per identity, not per route. A schema registered from text this process already
+        // holds is hashed exactly as a fetched one is, so a later pinned reference has something to compare
+        // against; without that the reference finds the registered schema and its wrong pin is never
+        // noticed -- verification silently skipped for every schema that never went through a SchemaSource.
+        Tson tson = Tson.standard();
+        tson.resolve(POINT_SCHEMA);
+
+        List<Diagnostic> problems = tson.validate(
+                "!!schema:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 1  y: 2 }");
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("mismatch"), problems.toString());
+    }
+
+    @Test
+    void aMisPinnedReferenceToASchemaRegisteredByValidateSchemaIsRejected() {
+        // validateSchema is the other in-process registration route and records the same hash.
+        Tson tson = Tson.standard();
+        assertEquals(List.of(), tson.validateSchema(POINT_SCHEMA));
+
+        List<Diagnostic> problems = tson.validate(
+                "!!schema:\"" + POINT_ID + "?sha256=" + "a".repeat(64) + "\"\n!point { x: 1  y: 2 }");
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("mismatch"), problems.toString());
+    }
+
+    @Test
+    void aCorrectlyPinnedReferenceToAnInProcessRegisteredSchemaVerifies() {
+        // The other half: recording a hash for the in-process route must not refuse the pin that matches.
+        Tson tson = Tson.standard();
+        tson.resolve(POINT_SCHEMA);
+        String hash = TsonContentHash.sha256(POINT_SCHEMA.getBytes(StandardCharsets.UTF_8));
+
+        assertEquals(List.of(), tson.validate(
+                "!!schema:\"" + POINT_ID + "?sha256=" + hash + "\"\n!point { x: 1  y: 2 }"));
+    }
+
+    @Test
+    void aSchemaWhoseOwnIdPinsTheWrongHashIsRejected() {
+        // §2.2.1 lets an id line carry the document's own hash (the id line is excluded from the hash
+        // input, so there is no circularity). Registering from text verifies that self-pin against the
+        // bytes -- and validateSchema reports it rather than throwing, the pin being an author error.
+        String selfPinned = POINT_SCHEMA.replace(POINT_ID + "\"", POINT_ID + "?sha256=" + "a".repeat(64) + "\"");
+        List<Diagnostic> problems = Tson.standard().validateSchema(selfPinned);
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("mismatch"), problems.toString());
+    }
+
+    @Test
+    void aSchemaWithNoLineTerminatorAfterItsIdLoadsButCannotBePinned() {
+        // §2.2.1 requires the terminator of a *content-addressed* document, so a single-line schema is one
+        // no reference may pin -- not one that fails to load. Hashing every schema on load must therefore
+        // record the absence rather than refuse the document, and refuse the pin when one arrives.
+        String oneLine = "!!id:\"https://example.test/one-1.tn\" "
+                + "!!meta:\"https://tson.io/2026/35/m/meta.tn\" "
+                + "!!import:\"https://tson.io/2026/35/m/core.tn\" { point => { x: int32 } }";
+        Tson tson = Tson.standard();
+        tson.resolve(oneLine);
+
+        assertEquals(List.of(), tson.validate(
+                "!!schema:\"https://example.test/one-1.tn\"\n!point { x: 1 }"));
+
+        List<Diagnostic> problems = tson.validate("!!schema:\"https://example.test/one-1.tn?sha256="
+                + "a".repeat(64) + "\"\n!point { x: 1 }");
+        assertEquals(1, problems.size(), problems.toString());
+        assertEquals(Diagnostic.Code.SCHEMA_ERROR, problems.getFirst().code());
+        assertTrue(problems.getFirst().message().contains("no line terminator"), problems.toString());
+    }
+
+    @Test
     void aDocumentReturnedUnderTheWrongIdentityIsRejected() {
         // §2.2.1 cross-check: a source hands back the point schema (own !!id point-1.tn) for a data
         // file that references a different identity -- so the content doesn't own the identity it was

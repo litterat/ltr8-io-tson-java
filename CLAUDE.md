@@ -1041,7 +1041,9 @@ the policy when it refused something **or** when it configured one (§8.2 requir
 the machine formats always carry it, a consumer wanting one shape.
 `TsonBundledSchemas` serves the three bundled schemas' identities, text (copied from `spec/m/` at build
 time) and published digests. `TsonContentHash` hashes every byte past the `!!id` line; pins are
-verification metadata, not identity, checked through the loader on every fetched pinned reference. The
+verification metadata, not identity, checked through the loader on every pinned reference — a schema
+registered from text in-process is hashed by the same call that registers it, since §10.2 verifies per
+identity and not per route. The
 `config` package holds the two default bind contexts (consumer vs. internal `schema.meta` resolution),
 differing by exactly the name binder.
 

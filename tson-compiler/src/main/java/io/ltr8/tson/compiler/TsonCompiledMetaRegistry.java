@@ -89,6 +89,15 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     private final Map<String, String> contentHashes = new ConcurrentHashMap<>();
 
     /**
+     * Recorded for an identity whose document cannot be content-addressed at all -- no line terminator
+     * after its id line, so §2.2.1's hash input has no boundary. Never a hash (which is 64 hex digits), so
+     * no pin can match it, which is the point: a pinned reference to such a document is refused rather
+     * than left silently unverified, and the document itself still loads for every reference that pins
+     * nothing.
+     */
+    private static final String UNADDRESSABLE = "";
+
+    /**
      * UTS #39 §5.2's restriction level for declared names, applied by {@link TsonSchemaLinker} wherever a
      * schema names something ([TSON-DATA] §8.2's restricted-script rule). Held here because this registry is the
      * one object every resolve and every read already passes through, so a policy set on it reaches both
@@ -441,6 +450,25 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     }
 
     /**
+     * Registers an already-linked schema a caller resolved from text it holds, recording that text's
+     * content hash for the schema's own identity -- {@link #resolveUncached}'s bookkeeping for a document
+     * that never went through a {@link SchemaSource}, and the document's own {@code !!id} pin verified
+     * against its bytes on the way past (an id line may carry the document's own hash, §2.2.1).
+     *
+     * <p><b>One call rather than two, because [TSON-SCHEMA] §10.2 verifies per identity and not per
+     * route.</b> A hash recorded only where a schema was fetched leaves {@link #verifyPin} with nothing to
+     * compare a later pinned reference against, and its silence in that case is indistinguishable from a
+     * verified pin: a wrong {@code ?sha256=} on a schema this process registered itself would validate
+     * clean. Pairing the two here is what keeps the registering caller from having to remember the second
+     * half.
+     */
+    public TsonLinkedSchema register(TsonLinkedSchema linked, String sourceText) {
+        String id = linked.schema().id();
+        recordAndVerify(sourceText, id, CanonicalIdentity.canonicalize(id));
+        return schemaRegistry.register(linked);
+    }
+
+    /**
      * Links {@code schema} (via {@link TsonSchemaLinker#link}, using the paired {@link
      * #schemaRegistry} itself as the lookup source for {@code !!import}/{@code !!meta} targets) and
      * registers the result (via {@link TsonSchemaRegistry#register}, so the usual {@code
@@ -545,20 +573,27 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     }
 
     /**
-     * Verify {@code uri}'s own pin against the fetched content, then record the content hash for the
+     * Verify {@code uri}'s own pin against the content, then record the content hash for the
      * identity -- verification *first*, so a rejected fetch records nothing and cannot poison the
      * identity's cache entry for a later, valid one (§10.2 caching semantics). {@code putIfAbsent}
      * keeps the first-resolved (known-good) hash immutable thereafter.
+     *
+     * <p><b>A document with no line terminator after its id line records {@link #UNADDRESSABLE}</b> rather
+     * than failing here: §2.2.1 requires that terminator of a <i>content-addressed</i> document, so its
+     * absence refuses the pin and never the document -- which is what lets a single-line schema, which no
+     * reference can pin, still load.
      */
     private void recordAndVerify(String sourceText, String uri, String identity) {
-        String contentHash = TsonContentHash.sha256(sourceText.getBytes(StandardCharsets.UTF_8));
+        String contentHash = TsonContentHash
+                .sha256IfAddressable(sourceText.getBytes(StandardCharsets.UTF_8)).orElse(UNADDRESSABLE);
         // A pre-loaded bundled schema ships with a digest the library holds (§10.2): the shipped bytes
         // MUST match it -- the authoritative digest a pinned reference to it is checked against, and an
         // integrity check that the packaged resource is the one the library was built for.
         TsonBundledSchemas.declaredSha256(uri).ifPresent(held -> {
             if (!held.equals(contentHash)) {
                 throw new IllegalStateException("bundled schema \"" + identity + "\" content hashes to "
-                        + contentHash + " but the library holds digest " + held
+                        + (contentHash.isEmpty() ? "nothing (no line terminator after its !!id line)" : contentHash)
+                        + " but the library holds digest " + held
                         + " -- the packaged resource does not match its published digest");
             }
         });
@@ -577,6 +612,12 @@ public final class TsonCompiledMetaRegistry implements TsonCompiledSchemaLoader 
     /** A reference's declared {@code ?sha256=} pin, if present, MUST equal {@code contentHash}. */
     private static void checkPin(String referenceUri, String contentHash, String identity) {
         TsonContentHash.declaredSha256(referenceUri).ifPresent(declared -> {
+            if (contentHash.equals(UNADDRESSABLE)) {
+                throw new ContentHashMismatchException("the hash-pinned reference \"" + referenceUri
+                        + "\" names a document with no line terminator after its !!id line, so it has no "
+                        + "content hash to verify against -- the target of a hashed reference must carry an "
+                        + "id line ([TSON-DATA] §2.2.1)");
+            }
             if (!declared.equals(contentHash)) {
                 throw new ContentHashMismatchException("content hash mismatch for \"" + referenceUri
                         + "\": the reference declares sha256=" + declared + " but the content for identity \""

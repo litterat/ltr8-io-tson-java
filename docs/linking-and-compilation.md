@@ -575,7 +575,23 @@ Two registries over one shared resolution core, the compiled-side counterparts t
 - **Content-hash verification is per identity** (§10.2): the core records an identity's content hash on
   first resolution and checks every reference's `?sha256=` pin against it, on both fetch and cache-hit
   paths, so a conflicting pin errors rather than silently resolving to the cached instance. Verify-before-
-  record, so a rejected fetch can't poison a later valid one.
+  record, so a rejected fetch can't poison a later valid one. **Per identity means per identity and not per
+  route**, which is why registering a schema from text is one call (`TsonCompiledMetaRegistry.register(linked,
+  sourceText)`, what `Tson.resolve`/`Tson.validateSchema` reach) rather than a registration a caller may
+  remember to pair with a hash: a hash recorded only where a schema was *fetched* leaves `verifyPin` nothing
+  to compare against, and its silence there is indistinguishable from a verified pin — a wrong `?sha256=` on
+  a schema the process registered itself validated clean. The same call verifies the document's own `!!id`
+  pin against its bytes, §2.2.1's id line being excluded from the hash input precisely so a document can
+  carry its own hash.
+- **A document with no line terminator after its id line records that it has no hash, rather than failing.**
+  §2.2.1 asks for the terminator of a *content-addressed* document, so a single-line schema is one no
+  reference may pin — not one that fails to load. Hashing every schema on load (to have the answer ready for
+  a later pinned reference) must not turn that into a refusal of the document, so `TsonContentHash`
+  has `sha256IfAddressable` beside `sha256` and the registry records `UNADDRESSABLE` for the empty answer.
+  What gets refused is the pin: a hashed reference whose target carries no id line is
+  a `ContentHashMismatchException` naming that, which §2.2.1 requires ("the target of a hashed reference
+  MUST carry an id line"). Eagerly hashing instead made an unpinned single-line schema an
+  `IllegalArgumentException` escaping the read as a fault.
 - **Concurrent first use of one identity is safe, and deliberately not serialized.** `loadMeta`/
   `resolveLinked` recurse into themselves and hold no lock across a fetch, so two threads reaching the same
   cold identity both do the work; the caches settle it, keeping the first entry and handing it to both
