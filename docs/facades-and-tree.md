@@ -302,6 +302,10 @@ admit UTS #39's own `Toys-Я-Us`.
   is a character nobody wrote appearing in a document whose identity may be a hash of its bytes. The
   `Appendable` path is unchanged and is what `toTson` uses — chars into a `StringBuilder` have nothing to
   encode.
+  - **A sink is closed by whoever built it, and closing is not flushing.** `write(value, OutputStream)`
+    builds a `ByteSink` and closes it (a no-op — the stream is the caller's); `ByteSink.of(Path)` closes the
+    stream it opened. The flush is separate and always explicit, because a sink cannot tell a caller who
+    finished from one who abandoned the document part-written — so it never pushes on their behalf.
 - **`quotedString` escapes with a comparison, not a `Pattern`.** The escape loop runs once per character of
   every string a writer emits, and asking `c <= 0x1f` through a compiled `Pattern` cost a `String`, a
   `Matcher` and the matcher's own internals *per character* — 188 bytes against 3.7 for the whole write,

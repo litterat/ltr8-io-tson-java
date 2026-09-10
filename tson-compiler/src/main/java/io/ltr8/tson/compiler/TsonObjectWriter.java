@@ -192,7 +192,9 @@ public final class TsonObjectWriter {
      * whole document in hand.
      */
     public void write(Object value, OutputStream out) {
-        write(value, ByteSink.of(out));
+        try (ByteSink sink = ByteSink.of(out)) {
+            write(value, sink);
+        }
     }
 
     /**

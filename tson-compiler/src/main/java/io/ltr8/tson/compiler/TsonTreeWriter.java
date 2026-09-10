@@ -143,7 +143,9 @@ public final class TsonTreeWriter {
      * <em>second</em> copy: the rendered document, which for a large tree is the bigger of the two.
      */
     public void write(TsonValue node, OutputStream out) {
-        write(node, ByteSink.of(out));
+        try (ByteSink sink = ByteSink.of(out)) {
+            write(node, sink);
+        }
     }
 
     /**

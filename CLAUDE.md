@@ -298,8 +298,13 @@ module has a real `module-info.java`; module names mirror each module's root exp
   measurement turns. **Closing releases what a source acquired and nothing it was handed**, so
   `of(InputStream)` closes nothing and `of(Path)` closes the stream it opened — and whoever *creates* a
   source closes it, which is why a reader given one through `read(ByteSource)` does not.
-  `ByteSink` is the write-side counterpart and deliberately smaller: `OutputStream` and `Appendable` are
-  two genuinely different targets rather than one spelled twice, so the char path stays.
+  **`ByteSink` is the write-side counterpart and carries the same two rules**: the block is the sink's to
+  size (`block()`), and closing releases what it acquired and nothing it was handed — `of(OutputStream)`
+  closes nothing, `of(Path)` closes the stream it opened. **Closing is not flushing**, and for output that
+  distinction is load-bearing: bytes sit in a block until pushed, so a document never flushed is a document
+  never written, and a sink cannot tell a caller who finished from one who abandoned the write. Every writer
+  flushes explicitly. What stays smaller is the *target* set, not the contract: `Appendable` is a genuinely
+  different target rather than one spelled twice, so `toTson`'s char path is untouched.
   **`io.ltr8.tson.base.unicode`** is the UCD 16.0 tables: `Xid`,
   `IdentifierStatus`, `Confusables`, `ConfusableNames`, `JoiningControls`, `Nfc` — and the
   UTS #39 rules over them, read by two engines and knowing nothing about either format. `UnicodePolicy` is
