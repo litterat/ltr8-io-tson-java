@@ -195,9 +195,51 @@ formats defeat it, and both are the shape of the JSON-superset claim Revision 35
   schema it is the absent sentinel and nothing else (§7). Mapping it to `AbsentEvent` in the event layer
   settles that question one layer too early, and forces the schemaless reading to inherit a schema's answer.
 
-So: `tson-json` has its own lexer, its own structural layer, its own tree, and its own readers. The schema
-half of §5–§8 is where it will depend on `tson-compiler`; the JSON layers under that stay usable, and
-testable, without one.
+So: `tson-json` has its own lexer, its own structural layer, its own tree, and its own readers.
+
+## All the way up, and the seam is deferred rather than chosen
+
+The schema-directed half of §5–§8 is `tson-json`'s own on the same terms: `JsonTypeReader`,
+`JsonCompiledSchema`, `JsonSchemaCompiler` and its own factory registries, beside `tson-compiler`'s rather
+than derived from them.
+
+**The argument against the two disagreements above does not reach this layer, and that is worth saying
+plainly** — because it is the reason this decision is a deferral rather than a conclusion. Both defeat a
+*shared event source*, and both do so for one reason: a pull-only stream has no channel for the position to
+speak. Above the schema that reason is gone. §4.1 makes the position decide, and a compiled reader **is** the
+position — a record reader knows it is reading a record, a map reader a map, a reader at a `void` position
+knows what `null` means there. The codebase already contains the precedent: TSON text's `{}` reaches the
+reader as `EmptyBraceEvent` and is resolved from the position ([TSON-DATA] §2.8), not guessed at by the
+stream. So a single compiled schema over an encoding-neutral read context, with the encoding pushed down into
+a source the reader drives, is a real design and stays available.
+
+It is not taken now because it is an abstraction designed from one implementation. The seam between what two
+encodings genuinely share and what each owns is worth **finding** from two working stacks, not guessed at
+from one and then discovered wrong through the one consumer that has to bend around it. Consolidating two
+implementations that both pass their tests is cheap and safe; unpicking a shared contract that was wrong is
+neither. The same discipline governs `@discriminator` and `@rest`, which stay unbuilt until this reader is
+what exercises them.
+
+**It also costs nothing structurally, which is what makes the deferral free.** `TsonLinkedSchema` is a record
+in `tson-schema`, a module requiring only `tson-base`, and `tson-atom` already re-exports it — so compiling
+JSON readers from a linked schema adds **no dependency at all**, and in particular no dependency on
+`tson-compiler`. The resolve → link → register pipeline that *produces* a linked schema is `tson-compiler`'s
+and stays there; what crosses to this module is its output, which is a value model. This corrects the
+long-standing prediction — in `BACKLOG.md`, in this module's build file and in `CLAUDE.md` — that §5–§8 is
+where `tson-json` gains that dependency. It is not.
+
+### The risk this keeps, and the guard that holds it
+
+Two copies of the field-state rules — §5.2's six field states, `REQUIRED_FIXED` injection, the FIXED check,
+duplicate members, closure — can drift apart, and [TSON-JSON] §9.4 makes one diagnostic vocabulary across both
+encodings a **specification obligation** rather than a tidiness. Duplication here does not cost maintenance
+so much as it costs the guarantee that one schema yields one verdict over both encodings.
+
+That guarantee does not need shared code. It needs to be checked, and to go red when it breaks: a
+**cross-encoding parity test** — one schema, the equivalent document in TSON text and in JSON, asserting the
+same `Diagnostic.Code` and the same RFC 6901 pointer into the data. It is a local test rather than a corpus
+vector, because the corpus has no way to state a fact about two encodings at all (`BACKLOG.md` carries that
+gap). It is worth having from the first container reader rather than added once the two have already drifted.
 
 ## Aligned with JEP 540 — and only in the tree
 
