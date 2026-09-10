@@ -2,7 +2,6 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonDataStream;
-import io.ltr8.tson.compiler.TsonObjectReader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.atom.AtomType;
@@ -10,17 +9,7 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.atom.BuiltinTypeVocabulary;
 import io.ltr8.tson.compiler.atom.ValueParser;
 import io.ltr8.tson.base.unicode.ConfusableNames;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.ArrayEnd;
-import io.ltr8.tson.compiler.stream.ArrayStart;
-import io.ltr8.tson.compiler.stream.EmptyBraceEvent;
-import io.ltr8.tson.compiler.stream.FieldName;
-import io.ltr8.tson.compiler.stream.MapEnd;
-import io.ltr8.tson.compiler.stream.MapStart;
-import io.ltr8.tson.compiler.stream.RecordEnd;
-import io.ltr8.tson.compiler.stream.RecordStart;
-import io.ltr8.tson.compiler.stream.TokenEvent;
-import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.tree.*;
 import io.ltr8.tson.tree.TsonValue;
 import java.util.ArrayList;
@@ -33,13 +22,13 @@ import java.util.Set;
 
 /**
  * Reads a TSON data document into an immutable {@link TsonValue} tree with <b>no schema</b> -- the
- * schemaless (Class 1) tree-producing peer of {@link TsonObjectReader} (which produces Java objects). Like
+ * schemaless (Class 1) tree-producing peer of {@code TsonObjectReader} (which produces Java objects). Like
  * Jackson's {@code readTree}: the wire structure is the source of truth. Leaves are typed by §4 base
  * resolution ({@code Boolean}/{@code BigInteger}/{@code BigDecimal}/{@code Double}/{@code String}), or by the
  * built-in vocabulary when a leaf carries a type-ref for one (e.g. {@code !uuid},
  * {@code !date}); a container carries its own wire type-ref (e.g. {@code !person}) when present.
  *
- * <p><b>Streams the event source directly</b> (a {@link TsonDataStream}), the same way {@link
+ * <p><b>Streams the event source directly</b> (a {@link TsonDataStream}), the same way {@code
  * TsonObjectReader} does -- building nodes as events arrive, never materializing an intermediate {@code
  * DataValue} AST. Since a tree materializes the whole document anyway, the point isn't a bounded working
  * set (as it is for object binding), but avoiding a second representation and staying consistent with the

@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler;
 
-import io.ltr8.tson.compiler.reader.EventSkip;
+import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.AnnotationStart;
 import io.ltr8.tson.compiler.stream.RecordStart;
 import io.ltr8.tson.compiler.stream.TsonEvent;

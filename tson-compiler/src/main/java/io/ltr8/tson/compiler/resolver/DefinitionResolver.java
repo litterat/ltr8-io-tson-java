@@ -31,7 +31,7 @@ import io.ltr8.tson.compiler.ast.schema.TypeArg;
 import io.ltr8.tson.compiler.ast.schema.TypeDef;
 import io.ltr8.tson.compiler.ast.schema.TypeRef;
 import io.ltr8.tson.compiler.SchemaPositions;
-import io.ltr8.tson.compiler.TsonObjectWriter;
+import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -245,7 +245,7 @@ final class DefinitionResolver {
      * {@link #resolveAtomRefinement}. Structural, not incidental: the merge has to happen on the wire
      * record, so this is the only way to get the source's already-bound facets back into one.
      */
-    private final TsonObjectWriter writer = new TsonObjectWriter();
+    private final DataClassObjectWriter writer = new DataClassObjectWriter();
 
     private final DefinitionMetaReader definitionMetaReader;
     private final AnnotationValueReader annotationValueReader;
@@ -819,7 +819,7 @@ final class DefinitionResolver {
      * §5.7's "Body materialisation" rule, applied to atom refinement (§5.6's chained-refinement merge):
      * {@code newBindings} merged *over* {@code sourceBody}'s own
      * already-bound fields, not replacing them. {@code sourceBody} is re-serialized back to plain
-     * record wire form via {@code TsonObjectWriter.toTson} (writing a {@code Top}-typed value by its
+     * record wire form via {@code DataClassObjectWriter.toTson} (writing a {@code Top}-typed value by its
      * own runtime class never emits a type-ref -- exactly the plain-record shape wanted here) and
      * re-parsed, so this needs no per-atom-class merge logic -- it works generically for every
      * atom-constraint class the same way. Field merge is by name at the {@link RecordValue} level:

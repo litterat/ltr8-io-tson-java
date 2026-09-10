@@ -6,11 +6,7 @@ import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
-import io.ltr8.tson.compiler.stream.AbsentEvent;
-import io.ltr8.tson.compiler.stream.AnnotationEnd;
-import io.ltr8.tson.compiler.stream.AnnotationStart;
-import io.ltr8.tson.compiler.stream.ListEventSource;
-import io.ltr8.tson.compiler.stream.TsonEvent;
+import io.ltr8.tson.compiler.stream.*;
 import io.ltr8.tson.tree.TsonAnnotation;
 import io.ltr8.tson.tree.TsonValue;
 

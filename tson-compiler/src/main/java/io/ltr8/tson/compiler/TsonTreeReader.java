@@ -6,7 +6,7 @@ import io.ltr8.tson.base.policy.ProcessorPolicy;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 
 import java.util.Objects;
-import io.ltr8.tson.compiler.reader.EventSkip;
+import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.reader.SchemalessTreeReader;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;

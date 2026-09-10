@@ -1,7 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.tson.compiler.TsonDataParser;
-import io.ltr8.tson.compiler.TsonObjectWriter;
+import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
@@ -48,7 +48,7 @@ import java.util.Set;
 public final class HeldBody {
 
     /** Vocabulary-free, because a held application is written as the tree it is and read against nothing. */
-    private static final TsonObjectWriter WRITER = new TsonObjectWriter();
+    private static final DataClassObjectWriter WRITER = new DataClassObjectWriter();
 
     private final TemplateBody body;
     private final DataValue application;

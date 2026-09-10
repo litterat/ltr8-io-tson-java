@@ -9,7 +9,7 @@ import io.ltr8.bind.DataBindException;
 import io.ltr8.bind.DataClass;
 import io.ltr8.tson.base.bind.AtomContext;
 import io.ltr8.tson.compiler.reader.DataClassObjectReader;
-import io.ltr8.tson.compiler.reader.EventSkip;
+import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.DocumentEnd;
 import io.ltr8.tson.compiler.stream.DocumentStart;
 import io.ltr8.tson.compiler.stream.TsonEvent;

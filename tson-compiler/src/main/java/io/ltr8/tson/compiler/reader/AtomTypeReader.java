@@ -14,9 +14,9 @@ import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.atom.ValueParser;
+import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.TokenEvent;
 import io.ltr8.tson.compiler.stream.TsonEvent;
-import io.ltr8.tson.schema.meta.EnumBody;
 
 /**
  * Adapts an {@code atom} {@link AtomType} into a {@link TsonTypeReader} -- this package's own copy
