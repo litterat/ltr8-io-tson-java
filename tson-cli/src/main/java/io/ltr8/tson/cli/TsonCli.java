@@ -89,25 +89,37 @@ public final class TsonCli {
             everywhere else. `tson policy` with the same flags prints what they would apply.""";
 
     private static final String VALIDATE_USAGE =
-            "usage: tson validate [--output text|json|tson] [<policy options>] <file|->...   (`-` reads one"
+            "usage: tson validate [--output text|json|tson] [--schema <uri> --type <name>] [<policy options>]"
+                    + " <file|->...   (`-` reads one"
                     + " data document from stdin)";
 
     private static final String VALIDATE_HELP = """
-            usage: tson validate [--output text|json|tson] [<policy options>] <file|->...
+            usage: tson validate [--output text|json|tson] [--schema <uri> --type <name>]
+                                 [<policy options>] <file|->...
 
-            Validates data documents. Each file is auto-classified as a schema document (its header
+            Validates data documents. Each .tn file is auto-classified as a schema document (its header
             carries !!meta) or a data document, by content and never by filename, so the order of the
             arguments does not matter. A data file's own !!schema selects the schema and its root
-            type-ref (!person) the type; a file with no !!schema gets a base-syntax and built-in-type
-            check instead. There is no --type and no --schema, and nothing is fetched over the network:
-            a schema no file here declares is reported as SCHEMA_NOT_FOUND, which is exit 69 and not a
-            verdict on your document.
+            type-ref (!person) the type. A file with no !!schema gets a base-syntax and built-in-type
+            check instead. Nothing is fetched over the network: a schema no file here declares is
+            reported as SCHEMA_NOT_FOUND, which is exit 69 and not a verdict on your document.
+
+            A .json file is a JSON encoding of TSON data ([TSON-JSON] §3.1: a JSON file, and .json is
+            its extension -- the one place this tool reads a filename, because the axis is the encoding
+            and the !!id rule above says nothing about it). A JSON document names neither its schema nor
+            its root type, so --schema and --type supply both, out of band ([TSON-JSON] §3.4). They are
+            one statement and are given together; they bind every JSON input in the run, so two bindings
+            mean two runs. The schema must still be one of the .tn schema files on the command line.
 
             `-` reads one data document from standard input, at most once, always data, and is reported
-            under the name "-" (a file really named - is reachable as ./-). Schemas must be files.
+            under the name "-" (a file really named - is reachable as ./-). It is read as JSON when
+            --schema and --type are given, since a .tn document names its own binding and would not need
+            them. Schemas must be files.
 
             options:
               --output text|json|tson    output format (default: text)
+              --schema <uri>             schema identity for the JSON inputs (with --type)
+              --type <name>              root type for the JSON inputs (with --schema)
 
             """ + POLICY_OPTIONS + """
 
@@ -391,11 +403,15 @@ public final class TsonCli {
         OutputFormat format = OutputFormat.TEXT;
         List<ValidateInput> inputs = new ArrayList<>();
         int stdin = 0;
+        String schemaUri = null;
+        String rootType = null;
 
         for (int i = 0; i < args.size(); i++) {
             String arg = args.get(i);
             switch (arg) {
                 case "--output" -> format = OutputFormat.parse(requireValue(args, ++i, "--output"));
+                case "--schema" -> schemaUri = requireValue(args, ++i, "--schema");
+                case "--type" -> rootType = requireValue(args, ++i, "--type");
                 case "-" -> {
                     stdin++;
                     inputs.add(new ValidateInput.OfStdin());
@@ -413,7 +429,42 @@ public final class TsonCli {
         if (inputs.isEmpty()) {
             throw new UsageException(VALIDATE_USAGE);
         }
-        return ValidateCommand.run(inputs, format, policies);
+        return ValidateCommand.run(inputs, format, policies, jsonBinding(schemaUri, rootType, inputs));
+    }
+
+    /**
+     * The JSON binding, or null when the run has no JSON in it -- [TSON-JSON] §3.4's out-of-band route,
+     * which is the only one a command line has.
+     *
+     * <p>Three usage errors, each because the flag would otherwise mean nothing or half of something.
+     * The two flags are one statement, so neither stands alone; a {@code .json} input without them cannot be
+     * read at all, since a JSON document names neither its schema nor its root type; and the binding with no
+     * JSON input to bind is a flag that changes nothing, which this CLI refuses rather than ignores -- the
+     * same habit {@code PolicyOptions} applies to a relaxation that scans nothing.
+     */
+    private static JsonBinding jsonBinding(String schemaUri, String rootType, List<ValidateInput> inputs) {
+        boolean stated = schemaUri != null || rootType != null;
+        if (stated && (schemaUri == null || rootType == null)) {
+            throw new UsageException("--schema and --type are one binding and are given together: "
+                    + (schemaUri == null ? "--schema" : "--type") + " is missing");
+        }
+        boolean anyJson = inputs.stream().anyMatch(input -> JsonBinding.isJsonFile(input.name()));
+        if (!stated) {
+            if (anyJson) {
+                throw new UsageException("a .json input is read against a schema supplied out of band "
+                        + "([TSON-JSON] §3.4) -- give --schema <uri> and --type <name>, which a JSON document "
+                        + "cannot name for itself the way a .tn document does");
+            }
+            return null;
+        }
+        // Stdin has no name to classify by, so the binding is what says it is JSON: the flags exist for
+        // nothing else, a TSON document naming its own binding in its header.
+        boolean anyStdin = inputs.stream().anyMatch(input -> input instanceof ValidateInput.OfStdin);
+        if (!anyJson && !anyStdin) {
+            throw new UsageException("--schema and --type bind JSON inputs, and this run has none -- a .tn "
+                    + "document names its own schema and root type");
+        }
+        return new JsonBinding(schemaUri, rootType);
     }
 
     private static int runCompile(List<String> args) {

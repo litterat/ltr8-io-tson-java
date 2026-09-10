@@ -3,6 +3,7 @@ import io.ltr8.tson.base.ProcessorConfig;
 
 import io.ltr8.tson.base.source.SchemaAccess;
 import io.ltr8.tson.Tson;
+import io.ltr8.tson.json.Json;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.SchemaFetchException;
 import io.ltr8.tson.compiler.TsonDocumentPeek;
@@ -47,12 +48,20 @@ final class ValidateCommand {
     private ValidateCommand() {
     }
 
+    /** A run with no JSON in it -- every input is TSON text, naming its own schema and root type. */
+    static int run(List<ValidateInput> inputs, OutputFormat format, PolicyOptions policies) {
+        return run(inputs, format, policies, null);
+    }
+
     /**
+     * @param binding the schema and root type every JSON input is read against ([TSON-JSON] §3.4), or null
+     *                when the run holds no JSON
      * @return exit code: 0 every data file valid, 1 at least one invalid, 2 a usage/classification failure,
      *         69 a document whose schema no file here declares, 70 a document that could not be checked at
      *         all because a construct in its schema is a gap in this library ({@link TsonCli#exitCodeFor})
      */
-    static int run(List<ValidateInput> inputs, OutputFormat format, PolicyOptions policies) {
+    static int run(List<ValidateInput> inputs, OutputFormat format, PolicyOptions policies,
+                   JsonBinding binding) {
         Map<String, String> schemas = new HashMap<>();
         // The !!id each schema file declares, verbatim and in argument order -- what an unmatched
         // !!schema is reported against. Kept apart from the lookup map, whose keys are canonicalized
@@ -85,7 +94,10 @@ final class ValidateCommand {
         for (ValidateInput input : inputs) {
             // Standard input is a data document by definition -- classification opens the document a second
             // time, and a stream has nothing to reopen. See ValidateInput.
-            if (!(input instanceof ValidateInput.OfFile(Path file))) {
+            if (!(input instanceof ValidateInput.OfFile(Path file)) || JsonBinding.isJsonFile(input.name())) {
+                // A .json input is data in the other encoding and carries no header to classify by
+                // ([TSON-JSON] §3.1); stdin has no name at all. Neither is ever a schema document: schemas
+                // are TSON text, whichever encoding the data they govern arrives in.
                 dataInputs.add(input);
                 continue;
             }
@@ -129,6 +141,18 @@ final class ValidateCommand {
 
         // Every file's report is collected before anything is printed: the envelope's own verdict is the
         // AND across the files, so there is nothing to emit until the last one is in.
+        Json json = binding == null ? null
+                : Json.of(policies.applyTo(ProcessorConfig.defaults())).withSchemas(tson.schemaRegistry());
+        if (binding != null) {
+            // The binding is checked before any document is read, so a mistyped --schema or --type is a
+            // usage error where the person who typed it can act, rather than an identical-looking verdict
+            // per file. `Tson.resolve` registers, so the registry is what the JSON side then loads through.
+            int refused = bind(tson, json, binding, schemas, format, policy);
+            if (refused != 0) {
+                return refused;
+            }
+        }
+
         List<FileReport> reports = new ArrayList<>();
         for (ValidateInput dataInput : dataInputs) {
             List<CliDiagnostic> errors;
@@ -138,7 +162,9 @@ final class ValidateCommand {
             // catching it here would put that fault back into a per-file "invalid" verdict, which is what
             // it went out of its way to avoid. It propagates to TsonCli's fault handler instead.
             try (InputStream in = dataInput.open()) {
-                errors = tson.validate(in).stream().map(CliDiagnostic::from).toList();
+                errors = (isJson(dataInput, binding)
+                        ? json.validate(in, binding.schemaUri(), binding.rootType())
+                        : tson.validate(in)).stream().map(CliDiagnostic::from).toList();
             } catch (IOException e) {
                 errors = List.of(CliDiagnostic.minimal(Diagnostic.Code.VALIDATION_ERROR,
                         cannotRead(dataInput, e)));
@@ -166,6 +192,53 @@ final class ValidateCommand {
             return " (no schema files were given)";
         }
         return " (the schema files given declare: " + String.join(", ", declaredIds) + ")";
+    }
+
+    /**
+     * Whether this input is read as JSON. A {@code .json} name says so; standard input has no name, so the
+     * binding says so instead -- the two flags exist for nothing else, a TSON document naming its own.
+     */
+    private static boolean isJson(ValidateInput input, JsonBinding binding) {
+        return binding != null
+                && (JsonBinding.isJsonFile(input.name()) || input instanceof ValidateInput.OfStdin);
+    }
+
+    /**
+     * Resolves the bound schema and checks the root type, before any document is read.
+     *
+     * <p>Both failures are the command line's rather than a document's, and each prints as a run-level
+     * failure and exits 2: a schema identity no file on the command line declares, and a root type that
+     * schema does not declare. Reporting them per file instead would say the documents were invalid, which
+     * is a verdict on the wrong thing -- and would say it once per file for one typo.
+     */
+    private static int bind(Tson tson, Json json, JsonBinding binding, Map<String, String> schemas,
+                            OutputFormat format, CliPolicy policy) {
+        String identity = CanonicalIdentity.canonicalize(binding.schemaUri());
+        String text = schemas.get(identity);
+        if (text == null) {
+            System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_NOT_FOUND,
+                    "--schema \"" + binding.schemaUri() + "\": no schema file on the command line declares "
+                            + "that !!id")));
+            return 2;
+        }
+        try {
+            if (tson.schemaRegistry().getByCanonicalIdentity(identity).isEmpty()) {
+                tson.resolve(text);
+            }
+        } catch (RuntimeException e) {
+            System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.SCHEMA_ERROR,
+                    binding.schemaUri() + ": " + e.getMessage())));
+            return 2;
+        }
+        List<Diagnostic> named = json.validate("", binding.schemaUri(), binding.rootType());
+        if (named.stream().anyMatch(d -> d.code() == Diagnostic.Code.UNKNOWN_TYPE)) {
+            System.out.println(format.render(ValidationRun.failed(policy, Diagnostic.Code.UNKNOWN_TYPE,
+                    "--type \"" + binding.rootType() + "\": " + named.stream()
+                            .filter(d -> d.code() == Diagnostic.Code.UNKNOWN_TYPE)
+                            .findFirst().orElseThrow().message())));
+            return 2;
+        }
+        return 0;
     }
 
     /**

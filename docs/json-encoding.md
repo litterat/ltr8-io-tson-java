@@ -291,6 +291,52 @@ only strings there. Neither reader is wrong. §5.1 makes *which kinds reach a fa
 own — it is the whole of what `JsonAtomForm` decides — so this difference is by specification, and pinning it
 is what stops a later change quietly "fixing" it into agreement.
 
+## Binding a document, which is the one thing JSON cannot do for itself
+
+A TSON document names its own schema in its header and its own root type with a type-ref. A JSON document
+can do neither — `!!schema` is TSON text syntax — so [TSON-JSON] §3.4 gives it two routes and this stack
+implements the first: **out of band**, the application supplies both, and the document is then a bare value
+read directly at that type. The spec calls it "the expected production route", and the in-band route needs
+§3.3's annotation object, which arrives with §8.
+
+`Json.withSchemas(loader)` is where a schema identity becomes resolvable, and it takes a `TsonSchemaLoader` —
+`tson-schema`'s interface, so it costs no dependency. **Obtaining a schema is the TSON engine's job**, and
+that is a division of labour rather than a gap: a schema document is TSON text whichever encoding the data
+arrives in, so parsing, resolving and linking one belongs where that engine lives, and what crosses here is
+the linked result. An application reading both encodings resolves once through `Tson` and hands
+`tson.schemaRegistry()` over.
+
+From there it is the TSON facades' shape: `treeReader().withSchema(uri).readAs(source, rootType)`, with
+`JsonCompiledSchemaRegistry` caching the compiled readers per canonical identity, and `Json.validate(source,
+schemaUri, rootType)` as the collecting door the CLI runs through. **Failing to reach the schema is a
+diagnostic and never a verdict**: `SCHEMA_NOT_FOUND` for an identity the loader has none for, `UNKNOWN_TYPE`
+for a root type the schema does not declare, and `Code.verdict()` separates the first from anything the
+document did.
+
+### The CLI reads one filename, and §3.1 is why
+
+`tson validate` classifies TSON files by content and never by name — a header carrying `!!meta` is a schema.
+A `.json` input is classified by its extension instead, which §3.1 licenses outright: "No file extension of
+its own is defined: a JSON encoding of TSON data is a JSON file, and `.json` is its extension." The axis is
+the *encoding*, and the `!!id` rule says nothing about it.
+
+`--schema` and `--type` are one statement and are given together; they bind every JSON input in the run.
+Three things are usage errors rather than verdicts, because each is the command line's mistake and not a
+document's: half a binding, a `.json` input with no binding, and a binding with no JSON input to bind — the
+last on the same habit `PolicyOptions` already applies to a relaxation that scans nothing. A mistyped
+`--type` is one too, checked before any document is read, so one typo prints once at exit 2 rather than
+once per file at exit 1 saying the documents were wrong.
+
+Standard input has no name to classify by, so the binding is what marks it JSON. That is not a guess: the two
+flags exist for nothing else, a `.tn` document naming its own binding in its header.
+
+**One thing the CLI surfaced that the library owed.** `unknownTypeMessage` listed the namespace in order, and
+an `!!import` merges the imported entries *first* — so a schema declaring one type over core.tn reported
+"whose types are (void | boolean | integer | ... and 44 more)" and showed the author none of their own. It
+now leads with the entries this schema declares and the author wrote, filtering by the origin index and by
+having a source position (the same test that tells a minted entry from an authored one). Imported and minted
+names remain usable root types; the count that follows covers them.
+
 ## Aligned with JEP 540 — and only in the tree
 
 [JEP 540](https://openjdk.org/jeps/540) puts a simple JSON API in the JDK — `jdk.incubator.json`, JDK 28, not

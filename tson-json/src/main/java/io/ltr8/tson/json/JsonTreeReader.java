@@ -12,6 +12,8 @@ import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.json.tree.JsonValue;
 
 import java.io.InputStream;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Reads a JSON document into a {@link JsonValue} tree -- the peer of {@link JsonObjectReader}, and what
@@ -39,14 +41,28 @@ public final class JsonTreeReader {
     private final ProcessorPolicy policy;
     private final DiagnosticsReceiver receiver;
 
-    private JsonTreeReader(ProcessorPolicy policy, DiagnosticsReceiver receiver) {
+    /** Where a named schema is compiled from, or null for a reader that can name none. */
+    private final JsonCompiledSchemaRegistry schemas;
+
+    /** The schema this reader is bound to, or null until {@link #withSchema} names one. */
+    private final String schemaUri;
+
+    private JsonTreeReader(ProcessorPolicy policy, DiagnosticsReceiver receiver,
+                           JsonCompiledSchemaRegistry schemas, String schemaUri) {
         this.policy = policy;
         this.receiver = receiver;
+        this.schemas = schemas;
+        this.schemaUri = schemaUri;
     }
 
-    /** Under the processor's defaults, raising what it refuses. */
+    /** Under the processor's defaults, raising what it refuses. Schemaless: {@link #readAs} needs a schema. */
     public static JsonTreeReader standard() {
-        return new JsonTreeReader(ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing());
+        return new JsonTreeReader(ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing(), null, null);
+    }
+
+    /** Over {@code schemas} -- what {@code Json.withSchemas(...).treeReader()} hands back. */
+    static JsonTreeReader over(JsonCompiledSchemaRegistry schemas) {
+        return new JsonTreeReader(ProcessorPolicy.defaults(), DiagnosticsReceiver.throwing(), schemas, null);
     }
 
     /**
@@ -57,12 +73,31 @@ public final class JsonTreeReader {
      * {@code r.withProcessorPolicy(r.processorPolicy().withTokenPolicy(p))}.
      */
     public JsonTreeReader withProcessorPolicy(ProcessorPolicy policy) {
-        return new JsonTreeReader(policy, receiver);
+        return new JsonTreeReader(policy, receiver, schemas, schemaUri);
     }
 
     /** This reader routing its problems to {@code receiver} -- a new reader, leaving this one unchanged. */
     public JsonTreeReader withDiagnostics(DiagnosticsReceiver receiver) {
-        return new JsonTreeReader(policy, receiver);
+        return new JsonTreeReader(policy, receiver, schemas, schemaUri);
+    }
+
+    /**
+     * This reader bound to the schema {@code uri} names -- a new reader, leaving this one unchanged.
+     *
+     * <p>[TSON-JSON] §3.4's <b>out-of-band route</b>, which the spec calls "the expected production route":
+     * the application supplies the schema and the root type, and the document is then a bare value read
+     * directly at that type. A JSON document has no in-band channel for either -- {@code !!schema} is TSON
+     * text syntax -- so this is where the binding a TSON document carries in its own header comes from.
+     *
+     * <p>The schema is not resolved here: {@link #readAs} reaches for it, so a schema nothing would supply
+     * is a diagnostic on the read that needed it rather than an exception from the derivation that named it.
+     */
+    public JsonTreeReader withSchema(String uri) {
+        if (schemas == null) {
+            throw new IllegalStateException("this reader can name no schema -- one from Json.withSchemas(loader)"
+                    + ".treeReader() can, and a schemaless read is read(...) rather than readAs(...)");
+        }
+        return new JsonTreeReader(policy, receiver, schemas, Objects.requireNonNull(uri, "uri"));
     }
 
     /** Everything this reader will admit and spend, for a caller stating it beside a read's diagnostics. */
@@ -106,6 +141,80 @@ public final class JsonTreeReader {
         try {
             JsonReadContext ctx = JsonReadContext.of(events, receiver);
             JsonValue root = ENGINE.read(ctx);
+            if (!(events.next() instanceof JsonEvent.EndOfDocument)) {
+                throw new IllegalStateException("the stream produced events after the document's root value");
+            }
+            return root;
+        } catch (RuntimeException e) {
+            return readFailure(e);
+        }
+    }
+
+    // ── Reading against a schema ─────────────────────────────────────────
+
+    /** {@link #readAs(ByteSource, String)} over a string. */
+    public JsonValue readAs(String source, String rootType) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readAs(bytes, rootType);
+        }
+    }
+
+    /** {@link #readAs(ByteSource, String)} over a stream, which is not closed here. */
+    public JsonValue readAs(InputStream source, String rootType) {
+        try (ByteSource bytes = ByteSource.of(source)) {
+            return readAs(bytes, rootType);
+        }
+    }
+
+    /**
+     * Reads {@code source} against this reader's schema, at {@code rootType} -- [TSON-JSON] §3.4's
+     * out-of-band binding, and the whole of what a schema-directed read needs beyond the document.
+     *
+     * <p><b>Validation is the point and the tree is the by-product.</b> Each family's parser runs, which is
+     * what §5.1 makes the validation, and the document comes back as the JSON it was. A caller wanting a
+     * typed value is asking a different question and reads in bind mode.
+     *
+     * <p><b>Failing to reach the schema is a diagnostic, never an exception</b>, and never a verdict on the
+     * document: {@code SCHEMA_NOT_FOUND} for an identity the loader has none for, {@code UNKNOWN_TYPE} for a
+     * root type the schema does not declare. {@code Code.verdict()} is false for both, so a consumer routing
+     * on the code cannot mistake either for the document being wrong.
+     */
+    public JsonValue readAs(ByteSource source, String rootType) {
+        if (schemaUri == null) {
+            throw new IllegalStateException("no schema named -- readAs reads against one, so name it with "
+                    + "withSchema(uri); a schemaless read is read(...)");
+        }
+        Optional<JsonCompiledSchema> schema = schemas.get(schemaUri);
+        if (schema.isEmpty()) {
+            receiver.report(new Diagnostic(Optional.of(""), Optional.empty(), schemaUri,
+                    Diagnostic.Code.SCHEMA_NOT_FOUND, "no schema was supplied for \"" + schemaUri + "\"",
+                    "a schema this processor can obtain", schemaUri, Optional.empty(), Optional.empty()));
+            return null;
+        }
+        Optional<JsonTypeReader<?>> reader = schema.get().find(rootType);
+        if (reader.isEmpty()) {
+            receiver.report(new Diagnostic(Optional.of(""), Optional.empty(), schemaUri,
+                    Diagnostic.Code.UNKNOWN_TYPE, schema.get().unknownTypeMessage(rootType),
+                    schema.get().declaredTypeNames(), rootType, Optional.empty(), Optional.empty()));
+            return null;
+        }
+        return readAs(new JsonStream(source, policy, receiver), schema.get(), rootType, reader.get());
+    }
+
+    /**
+     * The framing, shared by every {@code readAs} above: the root value at its compiled reader, then the
+     * pull past it that rejects trailing content.
+     *
+     * <p>The root declaration is <b>seeded from the name the read entered through</b> rather than left to
+     * the reader to claim. The two differ whenever that name aliases something else, and a diagnostic naming
+     * the aliased type points the author at a file they did not write.
+     */
+    private JsonValue readAs(JsonEventSource events, JsonCompiledSchema schema, String rootType,
+                             JsonTypeReader<?> reader) {
+        try {
+            JsonReadContext ctx = JsonReadContext.of(events, receiver);
+            ctx = schema.rootDeclaration(rootType).map(ctx::underDeclaration).orElse(ctx);
+            JsonValue root = (JsonValue) reader.read(ctx);
             if (!(events.next() instanceof JsonEvent.EndOfDocument)) {
                 throw new IllegalStateException("the stream produced events after the document's root value");
             }

@@ -1,5 +1,8 @@
 package io.ltr8.tson.json;
 
+import java.util.List;
+import java.util.ArrayList;
+import io.ltr8.tson.schema.TsonSchemaLoader;
 import io.ltr8.bind.DataBindContext;
 import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.bind.AtomContext;
@@ -43,8 +46,12 @@ public final class Json {
 
     private final ProcessorConfig config;
 
-    private Json(ProcessorConfig config) {
+    /** Where a named schema comes from, or null for an instance that can name none. */
+    private final JsonCompiledSchemaRegistry schemas;
+
+    private Json(ProcessorConfig config, JsonCompiledSchemaRegistry schemas) {
         this.config = config;
+        this.schemas = schemas;
     }
 
     // ── The front door ───────────────────────────────────────────────────
@@ -71,12 +78,32 @@ public final class Json {
      * one statement, and stating it twice is two places for it to differ. A deployment reading both
      * encodings builds one {@code ProcessorConfig} and hands it to both.
      *
-     * <p>Not every setting reaches this encoding yet: the schema access waits on [TSON-JSON] §5-§8's
-     * schema-directed decode, which is the point at which a JSON document has a schema to obtain at all.
-     * Holding the whole value now is what stops that arriving as another setter.
+     * <p>What the config does <em>not</em> carry is where a schema comes from. Its {@code schemaAccess}
+     * states how schema <em>text</em> is fetched, and turning that text into a resolved schema is the TSON
+     * engine's -- so this encoding names an already-resolved one through {@link #withSchemas} instead. That
+     * is a division of labour rather than a gap: [TSON-JSON] §3.4 binds a document out of band, and a schema
+     * document is TSON text whichever encoding the data arrives in.
      */
     public static Json of(ProcessorConfig config) {
-        return new Json(Objects.requireNonNull(config, "config"));
+        return new Json(Objects.requireNonNull(config, "config"), null);
+    }
+
+    /**
+     * This instance able to <b>name</b> a schema -- never to author one, which is the split this encoding
+     * has by specification: [TSON-JSON] §3.4 binds a document out of band, and there is no such thing as a
+     * JSON schema document.
+     *
+     * <p><b>Obtaining a schema is the TSON engine's job, and that is why this costs no dependency.</b> A
+     * schema document is TSON text, so parsing, resolving and linking one belongs where that engine lives;
+     * what crosses here is a {@code TsonLinkedSchema}, a value model in {@code tson-schema}. An application
+     * reading both encodings resolves its schemas once through {@code Tson} and hands
+     * {@code tson.schemaRegistry()} -- or its own loader over one -- to this.
+     *
+     * <p>The compiled readers are cached per identity on the returned instance, so an application that names
+     * its schemas at startup pays the compile once and every read after is a lookup.
+     */
+    public Json withSchemas(TsonSchemaLoader loader) {
+        return new Json(config, JsonCompiledSchemaRegistry.tree(Objects.requireNonNull(loader, "loader")));
     }
 
     /**
@@ -103,9 +130,40 @@ public final class Json {
         return config.processorPolicy().limits();
     }
 
-    /** A reader producing a {@link JsonValue} tree, carrying this instance's policy and receiver. */
+    /**
+     * A reader producing a {@link JsonValue} tree, carrying this instance's policy.
+     *
+     * <p>Schema-aware when this instance was given a loader ({@link #withSchemas}): {@code
+     * treeReader().withSchema(uri).readAs(source, rootType)} is §3.4's out-of-band binding. Schemaless
+     * otherwise, and {@code read(...)} is the same either way.
+     */
     public JsonTreeReader treeReader() {
-        return JsonTreeReader.standard().withProcessorPolicy(config.processorPolicy());
+        JsonTreeReader reader = schemas == null ? JsonTreeReader.standard() : JsonTreeReader.over(schemas);
+        return reader.withProcessorPolicy(config.processorPolicy());
+    }
+
+    /**
+     * Validates {@code source} against {@code schemaUri}'s {@code rootType}, collecting every problem rather
+     * than ending at the first -- the peer of {@code Tson.validate}, and what {@code tson validate} runs a
+     * {@code .json} input through.
+     *
+     * <p>An empty list is a conforming document. Nothing is thrown for a document that does not conform, or
+     * for one that will not even parse: a collecting read returns nothing and the diagnostics say why.
+     *
+     * <p>The two arguments are the binding, and a JSON document cannot supply them itself (§3.4). Which is
+     * the whole difference from {@code Tson.validate}, whose documents name their own.
+     */
+    public List<Diagnostic> validate(InputStream source, String schemaUri, String rootType) {
+        List<Diagnostic> problems = new ArrayList<>();
+        treeReader().withDiagnostics(problems::add).withSchema(schemaUri).readAs(source, rootType);
+        return List.copyOf(problems);
+    }
+
+    /** {@link #validate(InputStream, String, String)} over a string. */
+    public List<Diagnostic> validate(String source, String schemaUri, String rootType) {
+        List<Diagnostic> problems = new ArrayList<>();
+        treeReader().withDiagnostics(problems::add).withSchema(schemaUri).readAs(source, rootType);
+        return List.copyOf(problems);
     }
 
     /** A reader producing a bound Java object, carrying this instance's binding, policy and receiver. */
