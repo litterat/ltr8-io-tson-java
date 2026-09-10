@@ -58,6 +58,11 @@ class CrossEncodingParityTest {
                 value: int32
                 ( min: int32 | max: int32 )
               }
+              counts    => { text => int32 }
+              by_number => { number => text }
+              by_date   => { date => number }
+              point     => { x: int32  y: int32 }
+              by_point  => { point => text }
             }
             """;
 
@@ -99,6 +104,21 @@ class CrossEncodingParityTest {
         List<Verdict> fromTson = tson(rootType, tsonBody);
         assertFalse(fromTson.isEmpty(), "the TSON side reported nothing, so this compares nothing");
         assertEquals(fromTson, json(rootType, jsonBody), "the two encodings disagree about this document");
+    }
+
+    /**
+     * As {@link #sameVerdict}, comparing the codes alone.
+     *
+     * <p>For a case where the two documents genuinely have different <em>shapes</em>, the data pointer is not
+     * a fact the two can agree on: §6.5's pairs form makes a compound-keyed map a JSON array of pairs, so a
+     * pointer into it names an entry index where the TSON map has a key. What still must agree is which rule
+     * fired.
+     */
+    private static void sameCodes(String rootType, String tsonBody, String jsonBody) {
+        List<Diagnostic.Code> fromTson = tson(rootType, tsonBody).stream().map(Verdict::code).toList();
+        assertFalse(fromTson.isEmpty(), "the TSON side reported nothing, so this compares nothing");
+        assertEquals(fromTson, json(rootType, jsonBody).stream().map(Verdict::code).toList(),
+                "the two encodings disagree about this document");
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {
@@ -226,6 +246,49 @@ class CrossEncodingParityTest {
         sameVerdict("bounded", """
                 { value: 1 }""", """
                 {"value": 1}""");
+    }
+
+    // ── §6.5 maps ────────────────────────────────────────────────────────
+
+    @Test
+    void aMapEntryValueOfTheWrongShape() {
+        sameVerdict("counts", """
+                { "a" => { b: 1 } }""", """
+                {"a": {"b": 1}}""");
+    }
+
+    /** An entry value absent where the map admits none: `_` in text, null in JSON, one verdict at one key. */
+    @Test
+    void anAbsentEntryValueWhereValuesAreRequired() {
+        sameVerdict("counts", """
+                { "a" => _ }""", """
+                {"a": null}""");
+    }
+
+    /** A member name the key type's own contract rejects -- §5.1's boundary applied to a key token. */
+    @Test
+    void aKeyTheContractRejects() {
+        sameVerdict("by_date", """
+                { "not-a-date" => 12.5 }""", """
+                {"not-a-date": 12.5}""");
+    }
+
+    // §6.5 says `1` and `1.0` under a `number` key are one key, and the two encodings disagree about it:
+    // `tson-compiler`'s ValueIdentity has no BigDecimal case, so the exact tier compares by scale there and
+    // the TSON reader accepts both spellings as two keys. That is the TSON side's defect, filed as issue
+    // #470 with its reproduction, and it reaches the FIXED check and set membership too. The case is left
+    // out rather than asserted as expected divergence: pinning a defect as agreed behaviour is how it
+    // becomes permanent. It joins this class when the fix lands.
+
+    /**
+     * A compound key takes §6.5's pairs form in JSON and the ordinary map form in text -- genuinely different
+     * document shapes -- so the codes must agree and the pointers cannot.
+     */
+    @Test
+    void twoSpellingsOfOneCompoundKey() {
+        sameCodes("by_point", """
+                { { x: 1  y: 2 } => "a"  { y: 2  x: 1 } => "b" }""", """
+                [[{"x": 1, "y": 2}, "a"], [{"y": 2, "x": 1}, "b"]]""");
     }
 
     @Test

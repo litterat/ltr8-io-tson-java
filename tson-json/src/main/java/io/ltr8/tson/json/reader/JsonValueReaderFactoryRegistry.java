@@ -66,6 +66,7 @@ public final class JsonValueReaderFactoryRegistry implements JsonValueReaderFact
         // so the same factory serves it and the body's own `unique_items` is what separates them.
         factories.put("set_type", JsonArrayTreeReader.FACTORY);
         factories.put("tuple", JsonTupleTreeReader.FACTORY);
+        factories.put("map", JsonMapTreeReader.FACTORY);
         return new JsonValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -85,7 +86,7 @@ public final class JsonValueReaderFactoryRegistry implements JsonValueReaderFact
         JsonValueReaderFactory factory = factories.get(name);
         if (factory == null) {
             throw new IllegalStateException("no JSON reader is registered for constructor '" + name
-                    + "' -- [TSON-JSON] §6.5 (maps) and §8 (discrimination) are not built yet");
+                    + "' -- [TSON-JSON] §8 (sums and discrimination) is not built yet");
         }
         return factory;
     }
