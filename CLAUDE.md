@@ -1235,7 +1235,16 @@ single-script name is refused with nothing mixed):
 |---|---|---|
 | Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (§11.4 declines the scope) |
 | Data (TSON) | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
-| Data (JSON) | `reader.DataClassObjectReader.checkNameHygiene` | one record's member names — the two per-name rules only |
+| Data (JSON), schemaless | `reader.DataClassObjectReader.checkNameHygiene` | one record's member names — the two per-name rules only |
+| Data (JSON), schema-directed | `reader.JsonNameHygiene`, from the record and choice readers | an **unmatched** member name; a `$type` naming nothing — the two per-name rules only |
+
+**The schema-directed reach is narrower than the schemaless one, and deliberately so** ([TSON-JSON] §9.4): a
+member name matching a declared field, or a `$type` naming a declared type, carries that declaration's own
+verdict, given when the schema loaded — so only an **unmatched** name is judged. The schemaless bind reader
+checks every name instead, and is right to: there the class is the schema and nothing judged its component
+names at load. **The order is load-bearing**: §8.2 before §6.1.1, because a refusal MUST NOT be reported in
+one of §8.1's four categories, and a look-alike field name told it is *unknown* is a verdict on the document
+for a policy rule — advice to add a field that is already declared, when the fix is one character.
 
 **JSON reaches fewer scopes, and the reason is §4.1 rather than an omission.** `{"a": 1}` is one syntax
 for a record and a map, so the position decides which — and only a reader holding one can say. The object

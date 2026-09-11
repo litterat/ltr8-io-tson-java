@@ -159,9 +159,11 @@ final class JsonChoiceTreeReader implements JsonTypeReader<JsonValue> {
         }
         String selected = variants.contains(tag.type()) ? tag.type() : variantAdmitting(tag.type());
         if (selected == null) {
-            ctx.field(JsonReservedMembers.TYPE).report(Diagnostic.Code.UNKNOWN_TYPE_REF,
-                    "'$type' names '%s', which is not a variant of '%s'".formatted(tag.type(), name),
-                    String.join(" | ", variants), tag.type());
+            if (!JsonNameHygiene.refuses(ctx, tag.type())) {
+                ctx.field(JsonReservedMembers.TYPE).report(Diagnostic.Code.UNKNOWN_TYPE_REF,
+                        "'$type' names '%s', which is not a variant of '%s'".formatted(tag.type(), name),
+                        String.join(" | ", variants), tag.type());
+            }
             JsonEventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
