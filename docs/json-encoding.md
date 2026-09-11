@@ -355,6 +355,44 @@ once**, from the in-progress compilation to the finished schema, because handing
 resolve would leak its mutable state past the compile. Only the edges that need a name at read time consult
 it — a subtype named by `$type`, and whatever §8's dispatch reaches.
 
+### Discrimination: two routes, and the table is built at schema load
+
+§8.2's predicate is the rule [TSON-SCHEMA] §5.4 requires each encoding to state over the resolver-derived
+`disjoint` fact, and it is closed: a value may omit its tag by exactly two routes and "MUST NOT be extended by
+implementation cleverness — no member-shape matching among record variants, no value-set separation, no trying
+variants in order." `JsonChoiceTreeReader` implements route 2 — disjoint plus class-stable, selecting on the
+arriving value's kind — and nothing more. Route 1, a declared `@discriminator`, is unbuilt, so a choice
+carrying one falls through to *the tag is REQUIRED*: the correct verdict for a reader without the route, and
+not a quiet approximation of it.
+
+**The verdict is computed once per choice, at compile time**, which is what §8.3 asks for in so many words —
+"the wire decision is then a table hit, not a per-value derivation". The table is empty exactly when the tag is
+required, so a read has one question to ask and the answer is a map lookup.
+
+**Both halves of route 2 are needed and neither implies the other.** `disjoint` guarantees at most one variant
+per class; class stability guarantees the arriving kind actually lands in its variant's class. Without the
+second, a `float64` variant still admitting `.nan` receives a JSON *string* (§5.4) and would dispatch as though
+a string variant had been chosen. The unstable set is closed to two members — that leak, and a map forced into
+pairs form — so the test is two cases rather than a survey, and narrowing `allow_nan`/`allow_infinity` restores
+route 2, which is the checkable reason §8.3 gives an API author to narrow.
+
+**`JsonDiscriminationClass` duplicates the TSON reader's derivation**, which lives in an unexported package.
+That is the parallel stack's cost showing up where it matters most, because the fact is derived from the schema
+alone — a choice dispatching one way in text and another in JSON would be pure drift. The parity test carries
+the cases.
+
+**A missing tag is `UNKNOWN_TYPE_REF`**, the code the TSON reader gives the same document. Read literally it is
+a poor fit — nothing unknown was written — and the closed `Code` enum has no member for "a required tag is
+missing", which `BACKLOG.md` records. §9.4 gives both encodings one vocabulary, so agreeing matters more than
+the name and the incumbent settles which member.
+
+**Two divergences the parity test pins as divergences**, both structural rather than drift. A **choice cannot
+be a root type in text**: the root type-ref is both the binding and, at a choice position, the variant tag, so
+`!scalars "hi"` is refused for naming the choice rather than a variant — while JSON binds out of band (§3.4),
+where a root type and a tag are separate statements. And a refusal about a tag lands at **different pointers**:
+`/outline/$type` in JSON, where the tag is a member with a location of its own, against `/outline` in text,
+where it is an annotation beside the value and the value's pointer is the nearest thing there is.
+
 ### The CLI reads one filename, and §3.1 is why
 
 `tson validate` classifies TSON files by content and never by name — a header carrying `!!meta` is a schema.

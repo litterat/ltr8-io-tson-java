@@ -67,6 +67,7 @@ public final class JsonValueReaderFactoryRegistry implements JsonValueReaderFact
         factories.put("set_type", JsonArrayTreeReader.FACTORY);
         factories.put("tuple", JsonTupleTreeReader.FACTORY);
         factories.put("map", JsonMapTreeReader.FACTORY);
+        factories.put("choice", JsonChoiceTreeReader.FACTORY);
         return new JsonValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
@@ -86,7 +87,7 @@ public final class JsonValueReaderFactoryRegistry implements JsonValueReaderFact
         JsonValueReaderFactory factory = factories.get(name);
         if (factory == null) {
             throw new IllegalStateException("no JSON reader is registered for constructor '" + name
-                    + "' -- [TSON-JSON] §8 (sums and discrimination) is not built yet");
+                    + "' -- [TSON-JSON] §8.5 (scoped positions, the open sum) is not built yet");
         }
         return factory;
     }

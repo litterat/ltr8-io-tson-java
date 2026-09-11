@@ -113,13 +113,15 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **No schema-directed decode of sums — §8.2–§8.4.** The discrimination predicate over the derived
-  `disjoint` fact: two routes to omit a tag and no third, and §8.3's class-stability verdict, which §8.3 says
-  a processor SHOULD compute per choice at schema load so the wire decision is a table hit. Then §8.4's
-  discriminated choices, where `@discriminator` gets its first consumer, and §8.5's scoped positions, which
-  are what will finally admit a `$schema` member. §3.2's reserved namespace and §3.3's annotation object are
-  built, so what is owed is the dispatch over them; `choice` and `scoped` compile to a `NOT_IMPLEMENTED`
-  reader meanwhile. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`, `JsonCompiledSchema`,
+- [ ] **No schema-directed decode of the open sum — §8.5, and §8.4's discriminated choices.** §8.5's scoped
+  positions are the open sum and what will finally admit a `$schema` member: the cell read off the members
+  present, EXTERN needing both `$schema` and `$type`, LOCAL taking `$type` alone, and a bare value a validation
+  error in every mode. §8.4 is route 1 of the predicate — `@discriminator`, whose first consumer this is, with
+  the value→variant table derived from the pins and never declared. §8.2's route 2 and §8.3's stability are
+  built, so a choice carrying a discriminator currently falls through to "the tag is REQUIRED", which is the
+  correct verdict for a reader without the route rather than an approximation of it. `scoped` compiles to a
+  `NOT_IMPLEMENTED` reader meanwhile. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`,
+  `JsonCompiledSchema`,
   `JsonSchemaCompiler`, its own factory registries — and `docs/json-encoding.md` carries why that is a deferral
   rather than a conclusion: the two disagreements that keep the *event* layers apart both dissolve above the
   schema, where the reader is the position, so one compiled schema over an encoding-neutral context stays a real
@@ -134,6 +136,14 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   `1` and `1.0` as two keys, a `set` of `number` admits both as two elements, and a field `= 1.0` turns away a
   document that writes `1`. The JSON side already carries the case, which is how the disagreement surfaced.
   The parity case is left out of that suite until this lands rather than pinned as expected divergence.
+
+- [ ] **`Diagnostic.Code` has no member for "a required tag is missing", and both encodings overload
+  `UNKNOWN_TYPE_REF`.** [TSON-JSON] §9.4 lists the condition in its own right ("missing required tags (§8.2)",
+  a validation error) and the closed enum has nothing for it, so `tson-compiler`'s choice reader reports a
+  value with no tag as `UNKNOWN_TYPE_REF` — accurate about the category and wrong read literally, since
+  nothing unknown was written and the tag is absent rather than unresolvable. `JsonChoiceTreeReader` matches
+  it, because §9.4 gives both encodings one vocabulary and the incumbent settles which member. A code of its
+  own touches `tson-base` and both readers together; the parity test is what stops them drifting meanwhile.
 
 - [ ] **The schema-directed JSON reader applies no name hygiene, so a look-alike member name is reported as a
   verdict** ([TSON-JSON] §9.4, which now states the rule; issue #476). Hygiene lives only on the schemaless

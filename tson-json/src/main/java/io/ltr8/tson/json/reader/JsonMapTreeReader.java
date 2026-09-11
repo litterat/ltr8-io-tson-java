@@ -79,21 +79,16 @@ final class JsonMapTreeReader implements JsonTypeReader<JsonValue> {
      * being listed: neither has a content grammar for a key token to face, and neither is a key any schema
      * has reason to declare.
      */
+    static boolean isObjectForm(TsonSchema schema, MapBody body) {
+        return scalarKeyParser(schema, body.keyType().name()).isPresent();
+    }
+
     private static Optional<AtomType<?>> scalarKeyParser(TsonSchema schema, String keyTypeName) {
-        String name = keyTypeName;
-        Top body = null;
-        for (int hops = 0; hops < MAX_REFERENCE_HOPS && body == null; hops++) {
-            TypeDefinition definition = schema.entries().get(name);
-            if (definition == null) {
-                throw new IllegalStateException("'" + name + "' is not declared -- linking should have refused this");
-            }
-            if (definition.body() instanceof Reference reference) {
-                name = reference.target().name();
-            } else {
-                body = definition.body();
-            }
-        }
-        return body instanceof Atom atom ? AtomParsers.forType(name, atom) : Optional.empty();
+        JsonTypes.Resolved terminal = JsonTypes.terminal(schema, keyTypeName).orElseThrow(() ->
+                new IllegalStateException("'" + keyTypeName + "' does not resolve -- linking should have refused it"));
+        return terminal.definition().body() instanceof Atom atom
+                ? AtomParsers.forType(terminal.name(), atom)
+                : Optional.empty();
     }
 
     private final String name;

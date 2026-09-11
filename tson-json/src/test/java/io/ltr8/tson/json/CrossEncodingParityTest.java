@@ -66,6 +66,12 @@ class CrossEncodingParityTest {
               employee  => person & { department: text }
               robot     => { serial: text }
               holder    => { who: person  labels: [text] }
+              scalars   => ( text | int32 | boolean )
+              circle    => { radius: float64 }
+              square    => { side: float64 }
+              shape     => ( circle | square )
+              picked    => { pick: scalars }
+              shaped    => { outline: shape }
             }
             """;
 
@@ -249,6 +255,78 @@ class CrossEncodingParityTest {
         sameVerdict("bounded", """
                 { value: 1 }""", """
                 {"value": 1}""");
+    }
+
+    // ── §8.2 discrimination: the derived `disjoint` fact, dispatched twice ──
+
+    // A choice is exercised at a *nested* position, not as a root type, and the reason is a genuine
+    // asymmetry rather than an oversight. In text the root type-ref is both the binding and, at a choice
+    // position, the variant tag -- so `!scalars "hi"` is refused ("'scalars' is not a declared variant of
+    // 'scalars'") and the document names `text` instead, leaving "the root is a scalars" with no carrier.
+    // JSON binds out of band (§3.4), so a root type and a tag are separate statements and `readAs(json,
+    // "scalars")` is ordinary. The *values* still agree; only the way the root type is stated differs, which
+    // is §3.4's business and differs there by design. A field position has a position in both, so that is
+    // where the predicate itself can be compared.
+
+    /**
+     * A disjoint, class-stable choice dispatches untagged in both encodings -- on [TSON-SCHEMA] §5.4's
+     * discrimination class in text, on the JSON value kind here. The class derivation is written twice (the
+     * TSON one lives in an unexported package), so this is the case where that duplication would show.
+     */
+    @Test
+    void aDisjointChoiceDispatchesUntaggedInBoth() {
+        bothAccept("picked", """
+                { pick: "hi" }""", """
+                {"pick": "hi"}""");
+        bothAccept("picked", """
+                { pick: 42 }""", """
+                {"pick": 42}""");
+        bothAccept("picked", """
+                { pick: true }""", """
+                {"pick": true}""");
+    }
+
+    /** The variant is selected, then validated as itself -- so an out-of-range value is refused in both. */
+    @Test
+    void theSelectedVariantIsValidatedInBoth() {
+        sameVerdict("picked", """
+                { pick: 99999999999 }""", """
+                {"pick": 99999999999}""");
+    }
+
+    /**
+     * Two record variants share the brace class, so the choice is not disjoint and neither encoding may
+     * recover the variant from the form: §8.2 forbids member-shape matching as explicitly as [TSON-SCHEMA]
+     * §5.4 does. `{"side": 1.0}` names only `square`'s field and is refused all the same.
+     */
+    @Test
+    void aNonDisjointChoiceIsRefusedUntaggedInBoth() {
+        sameCodes("shaped", """
+                { outline: { side: 1.0 } }""", """
+                {"outline": {"side": 1.0}}""");
+    }
+
+    /**
+     * A tag naming something that is no variant: checked rather than assumed to agree, and the codes do.
+     *
+     * <p>The pointers legitimately differ, which is why this compares codes alone: in JSON the tag <b>is a
+     * member</b> and has a location of its own, so the refusal lands at {@code /outline/$type}; in text it is
+     * an annotation beside the value, and the value's own pointer is the nearest thing there is. JSON's is
+     * the more useful of the two and names exactly what a sender would change.
+     */
+    @Test
+    void aTagNamingANonVariantIsRefusedByBoth() {
+        sameCodes("shaped", """
+                { outline: !person { name: "Ada"  labels: [] } }""", """
+                {"outline": {"$type": "person", "name": "Ada", "labels": []}}""");
+    }
+
+    /** And the tag makes it read: `!circle` in text, `$type` in JSON. */
+    @Test
+    void aTaggedVariantReadsInBoth() {
+        bothAccept("shaped", """
+                { outline: !circle { radius: 1.0 } }""", """
+                {"outline": {"$type": "circle", "radius": 1.0}}""");
     }
 
     // ── §6.1.5 subsumption: `!employee` in text, `$type` in JSON ────────
