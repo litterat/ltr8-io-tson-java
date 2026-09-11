@@ -113,13 +113,13 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **No schema-directed decode of sums — §8.** The discrimination predicate over the derived `disjoint`
-  fact: two routes to omit a tag and no third, §8.3's class-stability verdict computed per choice at schema
-  load, and §8.5's scoped positions. It brings the reserved member namespace (`$schema`/`$type`/`$value`,
-  §3.2/§3.3) and the annotation object with it, and is where `@discriminator` gets its first consumer.
-  `choice` and `scoped` compile to a `NOT_IMPLEMENTED` reader meanwhile, and a `$`-initial member at a record
-  position reports the same, the annotation object it belongs to being unbuilt. **The stack is `tson-json`'s
-  own all the way up** — `JsonTypeReader`, `JsonCompiledSchema`,
+- [ ] **No schema-directed decode of sums — §8.2–§8.4.** The discrimination predicate over the derived
+  `disjoint` fact: two routes to omit a tag and no third, and §8.3's class-stability verdict, which §8.3 says
+  a processor SHOULD compute per choice at schema load so the wire decision is a table hit. Then §8.4's
+  discriminated choices, where `@discriminator` gets its first consumer, and §8.5's scoped positions, which
+  are what will finally admit a `$schema` member. §3.2's reserved namespace and §3.3's annotation object are
+  built, so what is owed is the dispatch over them; `choice` and `scoped` compile to a `NOT_IMPLEMENTED`
+  reader meanwhile. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`, `JsonCompiledSchema`,
   `JsonSchemaCompiler`, its own factory registries — and `docs/json-encoding.md` carries why that is a deferral
   rather than a conclusion: the two disagreements that keep the *event* layers apart both dissolve above the
   schema, where the reader is the position, so one compiled schema over an encoding-neutral context stays a real
@@ -134,6 +134,15 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   `1` and `1.0` as two keys, a `set` of `number` admits both as two elements, and a field `= 1.0` turns away a
   document that writes `1`. The JSON side already carries the case, which is how the disagreement surfaced.
   The parity case is left out of that suite until this lands rather than pinned as expected divergence.
+
+- [ ] **Every schema-directed record read scans its object twice.** Recognising [TSON-JSON] §3.3's
+  annotation object means seeing member names, and §6.1.6 gives member order no meaning — so
+  `JsonRecordTreeReader` runs `JsonReservedMembers.scan` before every record, and the events it looked past
+  are replayed from a buffer rather than re-lexed. Correct, and unmeasured: `JsonAllocationHarnessTest` reads
+  schemalessly, so nothing says what the second pass costs per bound record. No shortcut is sound — peeking
+  the first member concludes nothing when order is free, and a redundant tag is admissible at any typed
+  position (§8.1) — so what is owed is the measurement first, and only then a decision about whether the
+  common case deserves a different shape.
 
 - [ ] **Bind mode has no schema-directed reader.** Tree mode validates and hands back the JSON; the other door
   — an HTTP service accepting both encodings and getting a Java object back — needs the same containers over a

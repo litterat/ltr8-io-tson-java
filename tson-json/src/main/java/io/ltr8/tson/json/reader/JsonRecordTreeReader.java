@@ -18,10 +18,12 @@ import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * A record as a JSON object: [TSON-JSON] §6.1. One member per present field, member name = field name, member
@@ -41,7 +43,8 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
 
     static final JsonValueReaderFactory FACTORY = (name, definition, context) -> {
         RecordBody body = (RecordBody) definition.body();
-        return new JsonRecordTreeReader(name, body, context, context.locationOf(name, definition));
+        return new JsonRecordTreeReader(name, body, definition.subtypes(), context,
+                context.locationOf(name, definition));
     };
 
     private final String name;
@@ -53,8 +56,16 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
     private final String declaredFields;
     private final JsonSchemaLocation schemaLocation;
 
-    private JsonRecordTreeReader(String name, RecordBody body, JsonValueReaderContext context,
-                                 JsonSchemaLocation schemaLocation) {
+    /** The names §6.1.5 admits at this position besides this entry's own: its subtypes, under [TSON-SCHEMA] §7.2. */
+    private final Set<String> subtypes;
+
+    /** How a named subtype's reader is reached at read time -- rebound to the finished schema by the compile. */
+    private final JsonTypeReaderResolver readerFor;
+
+    private JsonRecordTreeReader(String name, RecordBody body, Collection<String> subtypes,
+                                 JsonValueReaderContext context, JsonSchemaLocation schemaLocation) {
+        this.subtypes = Set.copyOf(subtypes);
+        this.readerFor = context.readers();
         this.name = name;
         this.fields = List.copyOf(body.fields());
         this.groups = List.copyOf(body.groups());
@@ -80,6 +91,17 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
     @Override
     public JsonValue read(JsonReadContext ctx) {
         ctx = ctx.inRecord(schemaLocation);
+        if (ctx.peek() instanceof JsonEvent.ObjectStart) {
+            JsonReservedMembers.Tag tag = JsonReservedMembers.scan(ctx);
+            if (tag.present() || tag.unknown() != null) {
+                return tagged(ctx, tag);
+            }
+        }
+        return readObject(ctx);
+    }
+
+    /** The object itself, reserved members already judged -- §6.1's whole reading, tag or no tag. */
+    private JsonValue readObject(JsonReadContext ctx) {
         JsonEvent first = ctx.next();
         if (!(first instanceof JsonEvent.ObjectStart)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' is a record, which takes a JSON object, and this is %s"
@@ -113,6 +135,106 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
             }
         }
         return new JsonObject(members);
+    }
+
+    /**
+     * An object the scan found reserved members on: [TSON-JSON] §3.3's annotation object, at a record
+     * position, which §6.1.5 makes the JSON spelling of {@code !employee} at a {@code person} field.
+     *
+     * <p><b>A tag is never wrong</b> (§8.1) -- a redundant {@code $type} restating this position's own type
+     * is admitted and changes nothing. What it may not do is name a type this position does not admit:
+     * {@code $type} MUST resolve and MUST be admissible under [TSON-SCHEMA] §7.2, so it names this entry or
+     * one of its subtypes and nothing else. The value then validates against the selected type in full.
+     */
+    private JsonValue tagged(JsonReadContext ctx, JsonReservedMembers.Tag tag) {
+        if (tag.unknown() != null) {
+            JsonReservedMembers.refuseUnknown(ctx, tag.unknown());
+            JsonEventSkip.nextValue(ctx);
+            return JsonNull.INSTANCE;
+        }
+        if (tag.schema()) {
+            // §8.5 admits `$schema` exactly where the position's effective type is a `scoped` instance
+            // holding EXTERN, or a container of one. A record position is not one, and §3.3 makes it a
+            // resolver error anywhere else -- a scope change the model never opted into.
+            ctx.field(JsonReservedMembers.SCHEMA).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
+                    "'$schema' opens a schema scope, which [TSON-SCHEMA] §7.8 admits only at a scoped position "
+                            + "-- '" + name + "' is a record", "no $schema at this position",
+                    JsonReservedMembers.SCHEMA);
+            JsonEventSkip.nextValue(ctx);
+            return JsonNull.INSTANCE;
+        }
+        if (tag.type() == null) {
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                    "this object carries this encoding's reserved members but no '$type' naming a type (§3.3)",
+                    "a '$type' member holding a type name", "no $type");
+            JsonEventSkip.nextValue(ctx);
+            return JsonNull.INSTANCE;
+        }
+        if (!name.equals(tag.type()) && !subtypes.contains(tag.type())) {
+            ctx.field(JsonReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+                    "'$type' names '%s', which is not admissible at a '%s' position -- a tag may name this type "
+                            .formatted(tag.type(), name) + "or one of its subtypes ([TSON-SCHEMA] §7.2)",
+                    admissible(), tag.type());
+            JsonEventSkip.nextValue(ctx);
+            return JsonNull.INSTANCE;
+        }
+        return tag.wrapper() ? wrapped(ctx, tag.type()) : inline(ctx, tag.type());
+    }
+
+    /**
+     * §3.3's inline form: the reserved members stand beside the record's own, and the record is the object
+     * minus them. A tag naming this entry reads here; one naming a subtype hands the whole object to that
+     * type's reader, which scans it again, finds its own name, and reads it inline.
+     */
+    private JsonValue inline(JsonReadContext ctx, String type) {
+        if (name.equals(type)) {
+            return readObject(ctx);
+        }
+        return (JsonValue) readerFor.resolve(type).read(ctx);
+    }
+
+    /**
+     * §3.3's wrapper form: the annotated value is the {@code $value} member, read at the type {@code $type}
+     * selected. "In wrapper form, any member other than the three reserved names is a resolver error -- the
+     * wrapper is apparatus, not a record, and admits nothing else."
+     *
+     * <p>Member order carries no meaning here either, so this walks the object rather than assuming
+     * {@code $value} last, and the value is read where it is found.
+     */
+    private JsonValue wrapped(JsonReadContext ctx, String type) {
+        ctx.next();   // ObjectStart
+        JsonValue value = null;
+        while (true) {
+            JsonEvent event = ctx.next();
+            if (event instanceof JsonEvent.ObjectEnd) {
+                if (value == null) {
+                    ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                            "this is an annotation object in wrapper form and carries no '$value' to annotate",
+                            "a '$value' member", "no $value");
+                    return JsonNull.INSTANCE;
+                }
+                return value;
+            }
+            if (!(event instanceof JsonEvent.MemberName member)) {
+                throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);
+            }
+            if (JsonReservedMembers.VALUE.equals(member.name())) {
+                value = (JsonValue) readerFor.resolve(type).read(ctx.field(JsonReservedMembers.VALUE));
+                continue;
+            }
+            if (!JsonReservedMembers.isReserved(member.name())) {
+                ctx.field(member.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
+                        "'%s' stands beside '$value' in an annotation object, which is apparatus and not a record "
+                                .formatted(member.name()) + "-- it admits the reserved members and nothing else "
+                                + "(§3.3)", String.join(" | ", JsonReservedMembers.RESERVED), member.name());
+            }
+            JsonEventSkip.nextValue(ctx.field(member.name()));
+        }
+    }
+
+    /** What a {@code $type} may name here, for a diagnostic's machine-readable {@code expected}. */
+    private String admissible() {
+        return subtypes.isEmpty() ? name : name + " | " + String.join(" | ", subtypes);
     }
 
     /** The member loop, ending at the object's own close. Each member is matched, then read or discarded. */
@@ -152,26 +274,18 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
      */
     private void unmatched(JsonReadContext ctx, String memberName) {
         JsonReadContext at = ctx.field(memberName);
-        if (memberName.startsWith("$")) {
-            if (RESERVED.contains(memberName)) {
-                at.report(Diagnostic.Code.NOT_IMPLEMENTED, "'%s' is this encoding's reserved namespace (§3.2) and "
-                        .formatted(memberName) + "the annotation object it belongs to (§3.3) is not implemented yet",
-                        "a member this encoding can read", memberName);
-            } else {
-                at.report(Diagnostic.Code.UNRECOGNIZED_FIELD, "'%s' begins with '$', which this encoding reserves "
-                        .formatted(memberName) + "(§3.2), and the reserved set is closed: "
-                        + String.join(" | ", RESERVED), String.join(" | ", RESERVED), memberName);
-            }
-        } else {
-            at.report(Diagnostic.Code.UNRECOGNIZED_FIELD, "unknown member '%s' on '%s' -- a record is closed under "
-                    .formatted(memberName, name) + "its type (§7.2), whose fields are (" + declaredFields + ")",
-                    declaredFields, memberName);
+        if (JsonReservedMembers.isReserved(memberName)) {
+            // §3.3: the record is the object minus its reserved members. Whether they were admissible here
+            // was settled by the scan before any member was read, so passing over one now is not a decision
+            // being skipped -- it is the decision already taken.
+            JsonEventSkip.nextValue(at);
+            return;
         }
+        at.report(Diagnostic.Code.UNRECOGNIZED_FIELD, "unknown member '%s' on '%s' -- a record is closed under "
+                .formatted(memberName, name) + "its type (§7.2), whose fields are (" + declaredFields + ")",
+                declaredFields, memberName);
         JsonEventSkip.nextValue(at);
     }
-
-    /** §3.2's closed set. Membership decides only which diagnostic a {@code $}-member draws, not whether it reads. */
-    private static final List<String> RESERVED = List.of("$schema", "$type", "$value");
 
     /**
      * One stated member, at its field. Null means the field is absent in decoded output -- §6.1.2's two

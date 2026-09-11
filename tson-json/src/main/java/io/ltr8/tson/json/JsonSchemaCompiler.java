@@ -1,5 +1,6 @@
 package io.ltr8.tson.json;
 
+import io.ltr8.tson.json.reader.JsonCompiledReaders;
 import io.ltr8.tson.json.reader.JsonDeferredReader;
 import io.ltr8.tson.json.reader.JsonErrorReader;
 import io.ltr8.tson.json.reader.JsonOpenTemplateReader;
@@ -55,7 +56,9 @@ public final class JsonSchemaCompiler {
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
         }
-        return new JsonCompiledSchema(linkedSchema, compilation.finished);
+        JsonCompiledSchema compiled = new JsonCompiledSchema(linkedSchema, compilation.finished);
+        compilation.readers.bind(compiled);
+        return compiled;
     }
 
     /** One compile's own state: what is finished, what is in flight, and the factories it dispatches through. */
@@ -66,6 +69,9 @@ public final class JsonSchemaCompiler {
         private final JsonValueReaderFactoryResolver factories;
         private final Map<String, JsonTypeReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
+
+        /** What a reader keeps for the edges that need a name at read time -- rebound once, when this ends. */
+        private final JsonCompiledReaders readers = new JsonCompiledReaders(this::resolve);
 
         Compilation(TsonLinkedSchema linked, JsonValueReaderFactoryResolver factories) {
             this.linked = linked;
@@ -101,7 +107,7 @@ public final class JsonSchemaCompiler {
         }
 
         private JsonTypeReader<?> build(String name, TypeDefinition definition) {
-            JsonValueReaderContext context = new JsonValueReaderContext(linked, this::resolve);
+            JsonValueReaderContext context = new JsonValueReaderContext(linked, readers);
             if (definition.kind() == TypeKind.TEMPLATE) {
                 // Before the body is looked at at all: a template's body is held unsubstituted text, so no
                 // factory could read it, and a template is not a type until it is applied ([TSON-SCHEMA] §5.10).

@@ -402,7 +402,13 @@ module has a real `module-info.java`; module names mirror each module's root exp
 - **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree, readers,
   writers, and its own schema-directed reader stack over them — `JsonTypeReader`/`JsonCompiledSchema`/
   `JsonSchemaCompiler`, with [TSON-JSON] §5's atoms, the whole of §6's containers and §7's absence
-  compiled in **tree mode**, and §8's sums reaching a `NOT_IMPLEMENTED` reader. **A schema is named, never
+  compiled in **tree mode**, plus §3.2's reserved namespace and §3.3's annotation object (so §6.1.5's
+  `$type` selects a subtype, the JSON spelling of `!employee` at a `person` field), and §8's sums reaching a
+  `NOT_IMPLEMENTED` reader. **Recognising an annotation object needs a rewindable lookahead** — §6.1.6 gives
+  member order no meaning, so `$type` may sit anywhere and the opening brace settles nothing; `lookingAhead`
+  scans member names, skips values, and replays from a buffer rather than re-lexing. It runs before every
+  record read, because §8.1 makes a redundant tag admissible at any typed position and no shortcut is sound;
+  `BACKLOG.md` carries the measurement that is owed. **A schema is named, never
   authored** — `Json.withSchemas(TsonSchemaLoader)` takes an already-resolved one, because a schema document
   is TSON text whichever encoding the data arrives in, so §3.4's out-of-band binding costs no dependency on
   that engine either; `treeReader().withSchema(uri).readAs(source, rootType)` and `Json.validate` are the

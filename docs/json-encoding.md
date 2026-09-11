@@ -313,6 +313,48 @@ diagnostic and never a verdict**: `SCHEMA_NOT_FOUND` for an identity the loader 
 for a root type the schema does not declare, and `Code.verdict()` separates the first from anything the
 document did.
 
+### The annotation object, and the lookahead it finally required
+
+TSON text attaches a type annotation beside a value; JSON has no beside, so §3.3's **annotation object** is
+the carrier — wrapper (`{"$type": "age", "$value": 42}`) or inline (`{"$type": "employee", "name": "Ada"}`,
+when the selected type reads the value as a record) — over §3.2's closed reserved set of `$schema`, `$type`
+and `$value`. §6.1.5 is what it buys at a record position: a tag naming a subtype, validated in full, which
+is the JSON spelling of `!employee` at a `person` field.
+
+**The class is `JsonReservedMembers`, not the spec's own noun, and the divergence is deliberate.** In this
+codebase `Annotation` means an `@name` annotation and nothing else — two dozen types say so, from the
+`tson-annotation` module through `Annotations`, `TsonAnnotation` and the `AnnotationStart`/`AnnotationEnd`
+events — and those have **no JSON carrier at all**: §4.3 declines one for v1 and makes encoding a value that
+carries them an encode error. A type named for §3.3 would be the single place the word meant something else,
+so it is named for the §3.2 namespace it scans and cites §3.3 throughout. The spec's noun is right for the
+spec, where `@name` annotations are §3.1's and no reader is looking at a Java identifier to tell them apart.
+
+**Recognising one needs a rewindable lookahead, and this is the position the parallel-stack decision
+predicted would need it.** §6.1.6 gives member order no meaning, so `$type` may sit anywhere in the object
+and the opening brace settles nothing — a schema-directed reader must read into a value before it knows
+which reader owns it. `JsonReadContext.lookingAhead` is the peer of the TSON context's: a probe runs against
+the cursor and every event it consumed is replayed from a buffer rather than re-lexed. The scan reads member
+*names* only, skipping values without materialising them.
+
+**It costs a second pass over each record's events**, replayed from memory rather than the lexer, and the
+scan runs before every record read because a redundant tag is admissible at any typed position (§8.1: "a tag
+is never wrong"). There is no sound shortcut: peeking the first member cannot conclude, because order is
+free. `BACKLOG.md` carries it as something to measure rather than something to assume.
+
+Two rules fall out of the scan and are worth naming because they look like omissions:
+
+- **The record reader passes over a reserved member silently.** By the time members are being read, the scan
+  has already judged them — an unknown `$name` refused, a `$schema` refused, a `$type` resolved against the
+  position. Passing over one is the decision already taken, not a decision skipped.
+- **`$schema` is refused everywhere this can reach.** §8.5 admits it only where the effective type is a
+  `scoped` instance holding EXTERN, and §3.3 makes it a resolver error anywhere else. That is the correct
+  verdict at every position built so far, and the scoped reader is what will admit it.
+
+`JsonCompiledReaders` arrives with this, and carries `tson-compiler`'s own hazard: it is **rebound exactly
+once**, from the in-progress compilation to the finished schema, because handing readers the compilation's
+resolve would leak its mutable state past the compile. Only the edges that need a name at read time consult
+it — a subtype named by `$type`, and whatever §8's dispatch reaches.
+
 ### The CLI reads one filename, and §3.1 is why
 
 `tson validate` classifies TSON files by content and never by name — a header carrying `!!meta` is a schema.

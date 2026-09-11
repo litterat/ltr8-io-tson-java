@@ -63,6 +63,9 @@ class CrossEncodingParityTest {
               by_date   => { date => number }
               point     => { x: int32  y: int32 }
               by_point  => { point => text }
+              employee  => person & { department: text }
+              robot     => { serial: text }
+              holder    => { who: person  labels: [text] }
             }
             """;
 
@@ -246,6 +249,32 @@ class CrossEncodingParityTest {
         sameVerdict("bounded", """
                 { value: 1 }""", """
                 {"value": 1}""");
+    }
+
+    // ── §6.1.5 subsumption: `!employee` in text, `$type` in JSON ────────
+
+    @Test
+    void aSubtypeSelectedAtAFieldPosition() {
+        bothAccept("holder", """
+                { who: !employee { name: "Ada"  department: "Engines"  labels: [] }  labels: [] }""", """
+                {"who": {"$type": "employee", "name": "Ada", "department": "Engines", "labels": []},\
+ "labels": []}""");
+    }
+
+    /** Without a tag the value is exactly the position's type -- no structural recovery, in either encoding. */
+    @Test
+    void anUntaggedSubtypeShapeIsRefusedByBoth() {
+        sameVerdict("holder", """
+                { who: { name: "Ada"  department: "Engines"  labels: [] }  labels: [] }""", """
+                {"who": {"name": "Ada", "department": "Engines", "labels": []}, "labels": []}""");
+    }
+
+    /** The selected type validates in full, so a field it adds and the document omits is still missing. */
+    @Test
+    void aTaggedSubtypeIsValidatedInFull() {
+        sameVerdict("holder", """
+                { who: !employee { name: "Ada"  labels: [] }  labels: [] }""", """
+                {"who": {"$type": "employee", "name": "Ada", "labels": []}, "labels": []}""");
     }
 
     // ── §6.5 maps ────────────────────────────────────────────────────────

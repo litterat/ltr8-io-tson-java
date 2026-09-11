@@ -6,7 +6,12 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * What a JSON read reports through, and where it is -- the peer of {@code tson-compiler}'s
@@ -49,6 +54,12 @@ public final class JsonReadContext {
         final DiagnosticsReceiver receiver;
         SourcePosition position;
         int reported;
+
+        /** Events a lookahead consumed and put back, served before the source is pulled again. */
+        final Deque<JsonEvent> rewound = new ArrayDeque<>();
+
+        /** Where a lookahead in progress collects what it consumes, or null when none is running. */
+        List<JsonEvent> recording;
 
         Cursor(JsonEventSource events, DiagnosticsReceiver receiver) {
             this.events = events;
@@ -93,13 +104,50 @@ public final class JsonReadContext {
     // ── The cursor ───────────────────────────────────────────────────────
 
     public JsonEvent peek() {
-        return cursor.events.peek();
+        return cursor.rewound.isEmpty() ? cursor.events.peek() : cursor.rewound.peekFirst();
     }
 
     public JsonEvent next() {
-        JsonEvent e = cursor.events.next();
+        JsonEvent e = cursor.rewound.isEmpty() ? cursor.events.next() : cursor.rewound.removeFirst();
         cursor.position = e.position();
+        if (cursor.recording != null) {
+            cursor.recording.add(e);
+        }
         return e;
+    }
+
+    /**
+     * Runs {@code lookahead} against this read's cursor and then rewinds every event it consumed, so
+     * whatever reads next sees a stream nothing has touched.
+     *
+     * <p><b>Why one event of peek is not enough.</b> {@link #peek()} answers "what is here". Recognising an
+     * annotation object ([TSON-JSON] §3.3) asks something else: whether this object carries any member of
+     * the reserved set, and §6.1.6 gives member order no meaning -- so {@code $type} may sit anywhere in it
+     * and the decision cannot be made from the opening brace. Reading the members to find out is not a
+     * substitute, because the reader that ends up building the value must see them all.
+     *
+     * <p>Consumed events are replayed from a buffer rather than re-lexed, so a lookahead costs what it
+     * looked past and never the document; a scan for reserved names skips values without materialising
+     * them, so what it looks past is one object's member names. {@link #position()} is deliberately left
+     * where the lookahead reached rather than restored: a caller looks ahead in order to say something
+     * about what it found, and that is where the saying belongs.
+     *
+     * <p>A static method taking the context rather than an instance method, so nothing about it has to be
+     * re-stated by a caller holding a derived copy: every copy shares one cursor, and this is the cursor's.
+     */
+    public static <T> T lookingAhead(JsonReadContext ctx, Function<JsonReadContext, T> lookahead) {
+        Cursor cursor = ctx.cursor;
+        List<JsonEvent> consumed = new ArrayList<>();
+        List<JsonEvent> outer = cursor.recording;
+        cursor.recording = consumed;
+        try {
+            return lookahead.apply(ctx);
+        } finally {
+            cursor.recording = outer;
+            for (int i = consumed.size() - 1; i >= 0; i--) {
+                cursor.rewound.addFirst(consumed.get(i));
+            }
+        }
     }
 
     /** Where the last event consumed began -- what a diagnostic points at. */
