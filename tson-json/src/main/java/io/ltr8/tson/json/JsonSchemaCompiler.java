@@ -1,13 +1,7 @@
 package io.ltr8.tson.json;
 
-import io.ltr8.tson.json.reader.JsonCompiledReaders;
-import io.ltr8.tson.json.reader.JsonDeferredReader;
-import io.ltr8.tson.json.reader.JsonErrorReader;
-import io.ltr8.tson.json.reader.JsonOpenTemplateReader;
-import io.ltr8.tson.json.reader.JsonValueReaderContext;
-import io.ltr8.tson.json.reader.JsonValueReaderFactory;
-import io.ltr8.tson.json.reader.JsonValueReaderFactoryRegistry;
-import io.ltr8.tson.json.reader.JsonValueReaderFactoryResolver;
+import io.ltr8.tson.json.reader.*;
+import io.ltr8.tson.json.reader.ValueReaderFactory;
 import io.ltr8.annotation.Typename;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
@@ -35,7 +29,7 @@ import java.util.Set;
  * the resolution, linking and registration that produce it are encoding-neutral and stay in {@code
  * tson-compiler}. Nothing here names a type from that engine.
  *
- * <p><b>A failure building one entry becomes a {@link JsonErrorReader}</b> rather than failing the compile:
+ * <p><b>A failure building one entry becomes a {@link ErrorReader}</b> rather than failing the compile:
  * the schema compiles, and reading a value against that one type reports {@code NOT_IMPLEMENTED} and skips
  * it. That is what keeps §6-§8's absence from costing a document every other verdict it was owed.
  */
@@ -46,12 +40,12 @@ public final class JsonSchemaCompiler {
 
     /** Compiles every entry in tree mode; the constructors this encoding cannot yet read become gaps. */
     public static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema) {
-        return compile(linkedSchema, JsonValueReaderFactoryRegistry.tree());
+        return compile(linkedSchema, ValueReaderFactoryRegistry.tree());
     }
 
     /** Compiles every entry, dispatching each resolved body to {@code factories} by its constructor name. */
     public static JsonCompiledSchema compile(TsonLinkedSchema linkedSchema,
-                                             JsonValueReaderFactoryResolver factories) {
+                                             ValueReaderFactoryResolver factories) {
         Compilation compilation = new Compilation(linkedSchema, factories);
         for (String name : linkedSchema.schema().entries().keySet()) {
             compilation.resolve(name);
@@ -66,14 +60,14 @@ public final class JsonSchemaCompiler {
 
         private final TsonLinkedSchema linked;
         private final TsonSchema schema;
-        private final JsonValueReaderFactoryResolver factories;
+        private final ValueReaderFactoryResolver factories;
         private final Map<String, JsonTypeReader<?>> finished = new LinkedHashMap<>();
         private final Set<String> building = new LinkedHashSet<>();
 
         /** What a reader keeps for the edges that need a name at read time -- rebound once, when this ends. */
-        private final JsonCompiledReaders readers = new JsonCompiledReaders(this::resolve);
+        private final CompiledReaders readers = new CompiledReaders(this::resolve);
 
-        Compilation(TsonLinkedSchema linked, JsonValueReaderFactoryResolver factories) {
+        Compilation(TsonLinkedSchema linked, ValueReaderFactoryResolver factories) {
             this.linked = linked;
             this.schema = linked.schema();
             this.factories = factories;
@@ -85,7 +79,7 @@ public final class JsonSchemaCompiler {
                 return done;
             }
             if (!building.add(name)) {
-                return new JsonDeferredReader(name, finished);
+                return new DeferredTypeReader(name, finished);
             }
             try {
                 TypeDefinition definition = schema.entries().get(name);
@@ -97,7 +91,7 @@ public final class JsonSchemaCompiler {
                 try {
                     built = build(name, definition);
                 } catch (RuntimeException e) {
-                    built = new JsonErrorReader(name, e);
+                    built = new ErrorReader(name, e);
                 }
                 finished.put(name, built);
                 return built;
@@ -107,11 +101,11 @@ public final class JsonSchemaCompiler {
         }
 
         private JsonTypeReader<?> build(String name, TypeDefinition definition) {
-            JsonValueReaderContext context = new JsonValueReaderContext(linked, readers);
+            ValueReaderContext context = new ValueReaderContext(linked, readers);
             if (definition.kind() == TypeKind.TEMPLATE) {
                 // Before the body is looked at at all: a template's body is held unsubstituted text, so no
                 // factory could read it, and a template is not a type until it is applied ([TSON-SCHEMA] §5.10).
-                return new JsonOpenTemplateReader(name, definition.parameters(),
+                return new OpenTemplateReader(name, definition.parameters(),
                         context.locationOf(name, definition));
             }
             Top body = definition.body();
@@ -121,7 +115,7 @@ public final class JsonSchemaCompiler {
                 // than walked on every value.
                 return resolve(reference.target().name());
             }
-            JsonValueReaderFactory factory = factories.resolve(constructorOf(body));
+            ValueReaderFactory factory = factories.resolve(constructorOf(body));
             return factory.create(name, definition, context);
         }
     }

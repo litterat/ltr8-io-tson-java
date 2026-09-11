@@ -22,7 +22,7 @@ import io.ltr8.tson.schema.meta.Top;
  * decoder preserve a number's digits and §5.3 preserves an exact value's digits and scale, so {@code 199.90}
  * must arrive at the parser as it was written.
  */
-enum JsonAtomForm {
+enum AtomForm {
 
     /** §5.2's boolean half -- the kernel's {@code boolean}, read as the member text {@code true}/{@code false}. */
     BOOLEAN,
@@ -52,7 +52,7 @@ enum JsonAtomForm {
      * of a family ({@code price => !decimal ^ { min: 0 }}) takes its parent's form without being listed
      * anywhere, and a family added to the vocabulary lands in the right branch by its body's own type.
      */
-    static JsonAtomForm of(Top body) {
+    static AtomForm of(Top body) {
         return switch (body) {
             case EnumBody ignored -> ENUM;
             case IntegerType ignored -> NUMBER;
@@ -70,7 +70,7 @@ enum JsonAtomForm {
      *
      * <p>JSON null is never admitted here and returns null for every form: §5 spends it as the absent
      * sentinel under §7's rules before any family rule applies, and the one position whose contract admits
-     * it has a reader of its own ({@link JsonVoidReader}).
+     * it has a reader of its own ({@link VoidReader}).
      */
     String contentOf(JsonEvent event) {
         return switch (event) {

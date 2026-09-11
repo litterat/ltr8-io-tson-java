@@ -8,7 +8,7 @@ import io.ltr8.tson.json.JsonTypeReader;
  * every read.
  */
 @FunctionalInterface
-public interface JsonTypeReaderResolver {
+public interface TypeReaderResolver {
 
     JsonTypeReader<?> resolve(String name);
 }

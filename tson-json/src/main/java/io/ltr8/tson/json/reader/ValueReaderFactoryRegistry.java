@@ -6,21 +6,21 @@ import java.util.Map;
 import java.util.function.UnaryOperator;
 
 /**
- * A {@code constructor name -> JsonValueReaderFactory} table, one per read mode. {@link #tree()} is the one
+ * A {@code constructor name -> ValueReaderFactory} table, one per read mode. {@link #tree()} is the one
  * instance today; bind mode joins it over the same containers.
  *
  * <p><b>The atom factories are shared and only the wrapper differs.</b> An atom reader produces its family's
  * natural host value whichever mode is compiling, so tree mode wraps each leaf to yield the node the document
- * carried instead ({@link JsonAtomTreeReader}) and changes nothing about what was parsed or refused. The modes
+ * carried instead ({@link TreeAtomReader}) and changes nothing about what was parsed or refused. The modes
  * genuinely diverge at the containers, which is why the split arrives with [TSON-JSON] §6.
  *
  * <p><b>An unregistered constructor is a gap, not a fault.</b> {@link #resolve} raises, {@code
- * JsonSchemaCompiler} catches, and the entry becomes a {@link JsonErrorReader} -- so a schema whose types this
+ * JsonSchemaCompiler} catches, and the entry becomes a {@link ErrorReader} -- so a schema whose types this
  * encoding cannot yet read still compiles, and each unreadable value costs a verdict on itself alone. That is
  * how §6-§8's absence is currently spelled, and it is the same shape [TSON-SCHEMA] §2.2.2's extension point
  * will keep using afterwards.
  */
-public final class JsonValueReaderFactoryRegistry implements JsonValueReaderFactoryResolver {
+public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
     /** The atom constructors meta-kernel.tn and meta.tn declare, in the order those documents declare them. */
     private static final List<String> ATOM_CONSTRUCTORS = List.of(
@@ -31,9 +31,9 @@ public final class JsonValueReaderFactoryRegistry implements JsonValueReaderFact
             "datetime_type", "duration_type", "period_type", "uuid_type", "complex_type", "mac_type",
             "email_type", "ipv4_type", "ipv6_type", "cidr4_type", "cidr6_type");
 
-    private final Map<String, JsonValueReaderFactory> factories;
+    private final Map<String, ValueReaderFactory> factories;
 
-    private JsonValueReaderFactoryRegistry(Map<String, JsonValueReaderFactory> factories) {
+    private ValueReaderFactoryRegistry(Map<String, ValueReaderFactory> factories) {
         this.factories = factories;
     }
 
@@ -46,8 +46,8 @@ public final class JsonValueReaderFactoryRegistry implements JsonValueReaderFact
      * each leaf to yield the node the document carried instead. It is also the registry that answers the
      * question a mode hides: <em>what did the parser produce</em>, which tree mode discards by design.
      */
-    public static JsonValueReaderFactoryRegistry atoms() {
-        return new JsonValueReaderFactoryRegistry(Map.copyOf(vocabulary(UnaryOperator.identity())));
+    public static ValueReaderFactoryRegistry atoms() {
+        return new ValueReaderFactoryRegistry(Map.copyOf(vocabulary(UnaryOperator.identity())));
     }
 
     /**
@@ -58,33 +58,33 @@ public final class JsonValueReaderFactoryRegistry implements JsonValueReaderFact
      * one: converting an encoding is a different operation from reading one, and a caller who wants a typed
      * value reads in bind mode, where a class says what to build.
      */
-    public static JsonValueReaderFactoryRegistry tree() {
-        Map<String, JsonValueReaderFactory> factories = vocabulary(JsonAtomTreeReader::over);
-        factories.put("record", JsonRecordTreeReader.FACTORY);
-        factories.put("array", JsonArrayTreeReader.FACTORY);
+    public static ValueReaderFactoryRegistry tree() {
+        Map<String, ValueReaderFactory> factories = vocabulary(TreeAtomReader::over);
+        factories.put("record", TreeRecordReader.FACTORY);
+        factories.put("array", TreeArrayReader.FACTORY);
         // A `set` resolves to an ArrayBody like `array` itself -- refinement never adds or removes a field --
         // so the same factory serves it and the body's own `unique_items` is what separates them.
-        factories.put("set_type", JsonArrayTreeReader.FACTORY);
-        factories.put("tuple", JsonTupleTreeReader.FACTORY);
-        factories.put("map", JsonMapTreeReader.FACTORY);
-        factories.put("choice", JsonChoiceTreeReader.FACTORY);
-        return new JsonValueReaderFactoryRegistry(Map.copyOf(factories));
+        factories.put("set_type", TreeArrayReader.FACTORY);
+        factories.put("tuple", TreeTupleReader.FACTORY);
+        factories.put("map", TreeMapReader.FACTORY);
+        factories.put("choice", TreeChoiceReader.FACTORY);
+        return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
     /** §5's atom constructors, each leaf passed through {@code leaf} so a mode can wrap what it produces. */
-    private static Map<String, JsonValueReaderFactory> vocabulary(UnaryOperator<JsonValueReaderFactory> leaf) {
-        Map<String, JsonValueReaderFactory> factories = new LinkedHashMap<>();
-        factories.put("unit", leaf.apply(JsonAtomReader.UNIT));
-        factories.put("enum", leaf.apply(JsonAtomReader.ENUM));
+    private static Map<String, ValueReaderFactory> vocabulary(UnaryOperator<ValueReaderFactory> leaf) {
+        Map<String, ValueReaderFactory> factories = new LinkedHashMap<>();
+        factories.put("unit", leaf.apply(AtomReader.UNIT));
+        factories.put("enum", leaf.apply(AtomReader.ENUM));
         for (String constructor : ATOM_CONSTRUCTORS) {
-            factories.put(constructor, leaf.apply(JsonAtomReader.ATOM));
+            factories.put(constructor, leaf.apply(AtomReader.ATOM));
         }
         return factories;
     }
 
     @Override
-    public JsonValueReaderFactory resolve(String name) {
-        JsonValueReaderFactory factory = factories.get(name);
+    public ValueReaderFactory resolve(String name) {
+        ValueReaderFactory factory = factories.get(name);
         if (factory == null) {
             throw new IllegalStateException("no JSON reader is registered for constructor '" + name
                     + "' -- [TSON-JSON] §8.5 (scoped positions, the open sum) is not built yet");

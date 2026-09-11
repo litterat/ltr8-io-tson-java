@@ -18,7 +18,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
-import io.ltr8.tson.json.JsonPosition;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
@@ -97,7 +96,7 @@ public final class DataClassObjectReader {
         JsonReadContext ctx = JsonReadContext.of(events, receiver);
         DataClass target = descriptorFor(ctx, targetClass);
         if (target == null) {
-            JsonEventSkip.value(ctx, ctx.next());
+            EventSkip.value(ctx, ctx.next());
             return null;
         }
         return targetClass.cast(bind(ctx, ctx.next(), target));
@@ -121,14 +120,14 @@ public final class DataClassObjectReader {
             case DataClassAnnotated annotated -> bindAnnotated(ctx, first, annotated);
             case DataClassUnion union -> {
                 reportUnion(ctx, union);
-                JsonEventSkip.value(ctx, first);
+                EventSkip.value(ctx, first);
                 yield null;
             }
             default -> {
                 ctx.report(Diagnostic.Code.NOT_IMPLEMENTED,
                         "no rule for reading " + target.getClass().getSimpleName(),
                         "a shape this reader binds", target.getClass().getSimpleName());
-                JsonEventSkip.value(ctx, first);
+                EventSkip.value(ctx, first);
                 yield null;
             }
         };
@@ -179,7 +178,7 @@ public final class DataClassObjectReader {
     private Object bindRecord(JsonReadContext ctx, JsonEvent first, DataClassRecord target) {
         if (!(first instanceof JsonEvent.ObjectStart)) {
             wrongShape(ctx, first, "an object", target.typeClass());
-            JsonEventSkip.value(ctx, first);
+            EventSkip.value(ctx, first);
             return null;
         }
         // Taken past the framing, matching RecordAbstractReader: what this record built is abandoned if
@@ -227,7 +226,7 @@ public final class DataClassObjectReader {
                                             declaredNames(fields, carrier)),
                             declaredNames(fields, carrier), member.name());
                 }
-                JsonEventSkip.value(ctx, ctx.next());
+                EventSkip.value(ctx, ctx.next());
                 continue;
             }
             if (seen[index]) {
@@ -369,7 +368,7 @@ public final class DataClassObjectReader {
     private Object bindArray(JsonReadContext ctx, JsonEvent first, DataClassArray target) {
         if (!(first instanceof JsonEvent.ArrayStart)) {
             wrongShape(ctx, first, "an array", target.typeClass());
-            JsonEventSkip.value(ctx, first);
+            EventSkip.value(ctx, first);
             return null;
         }
         int mark = ctx.reported();
@@ -409,7 +408,7 @@ public final class DataClassObjectReader {
     private Object bindTuple(JsonReadContext ctx, JsonEvent first, DataClassTuple target) {
         if (!(first instanceof JsonEvent.ArrayStart)) {
             wrongShape(ctx, first, "an array", target.typeClass());
-            JsonEventSkip.value(ctx, first);
+            EventSkip.value(ctx, first);
             return null;
         }
         int mark = ctx.reported();
@@ -430,7 +429,7 @@ public final class DataClassObjectReader {
                             slots.length + " elements", "more than " + slots.length);
                     reportedExtra = true;
                 }
-                JsonEventSkip.value(ctx, event);
+                EventSkip.value(ctx, event);
                 index++;
                 continue;
             }
@@ -460,7 +459,7 @@ public final class DataClassObjectReader {
     private Object bindMap(JsonReadContext ctx, JsonEvent first, DataClassMap target) {
         if (!(first instanceof JsonEvent.ObjectStart)) {
             wrongShape(ctx, first, "an object", target.typeClass());
-            JsonEventSkip.value(ctx, first);
+            EventSkip.value(ctx, first);
             return null;
         }
         if (!(target.keyDataClass() instanceof DataClassAtom key)) {
@@ -470,7 +469,7 @@ public final class DataClassObjectReader {
                             + "can spell -- §6.5's pairs form, which carries a compound key, is not read here")
                             .formatted(target.typeClass().getSimpleName()),
                     "a key type a member name can spell", target.keyDataClass().typeClass().getSimpleName());
-            JsonEventSkip.value(ctx, first);
+            EventSkip.value(ctx, first);
             return null;
         }
         // No name hygiene here, deliberately: §4.1 makes this position a map, so its member names are

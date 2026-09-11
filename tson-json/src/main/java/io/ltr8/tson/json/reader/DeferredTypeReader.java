@@ -14,12 +14,12 @@ import java.util.Map;
  * object reference at compile time, so a read never consults a name-keyed map except at the edge that closes
  * a loop.
  */
-public final class JsonDeferredReader implements JsonTypeReader<Object> {
+public final class DeferredTypeReader implements JsonTypeReader<Object> {
 
     private final String name;
     private final Map<String, JsonTypeReader<?>> finished;
 
-    public JsonDeferredReader(String name, Map<String, JsonTypeReader<?>> finished) {
+    public DeferredTypeReader(String name, Map<String, JsonTypeReader<?>> finished) {
         this.name = name;
         this.finished = finished;
     }

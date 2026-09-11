@@ -17,12 +17,12 @@ import io.ltr8.tson.json.JsonTypeReader;
  * afterwards, for [TSON-SCHEMA] §2.2.2's extension point: a meta-layer constructor this library has never
  * seen has no factory to dispatch to.
  */
-public final class JsonErrorReader implements JsonTypeReader<Object> {
+public final class ErrorReader implements JsonTypeReader<Object> {
 
     private final String name;
     private final RuntimeException cause;
 
-    public JsonErrorReader(String name, RuntimeException cause) {
+    public ErrorReader(String name, RuntimeException cause) {
         this.name = name;
         this.cause = cause;
     }
@@ -32,7 +32,7 @@ public final class JsonErrorReader implements JsonTypeReader<Object> {
         ctx.report(Diagnostic.Code.NOT_IMPLEMENTED, "'" + name + "' has no usable compiled reader -- the schema "
                 + "itself compiled fine, but nothing here can read a JSON value against this type: "
                 + cause.getMessage(), "a type this encoding can read", "");
-        JsonEventSkip.nextValue(ctx);
+        EventSkip.nextValue(ctx);
         return null;
     }
 }

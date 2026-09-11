@@ -15,9 +15,9 @@ import io.ltr8.tson.json.stream.JsonEvent;
  * refused anything deeper than the reader reads, and a skip that recursed would spend the stack twice for a
  * value being thrown away.
  */
-final class JsonEventSkip {
+final class EventSkip {
 
-    private JsonEventSkip() {
+    private EventSkip() {
     }
 
     /** Consumes the rest of the value {@code first} opened; a no-op when {@code first} was a scalar. */

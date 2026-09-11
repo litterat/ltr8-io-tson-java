@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * [TSON-JSON] §3.2's reserved namespace and §3.3's annotation object, at the position §6.1.5 defines them
  * for: a record, where {@code $type} is the JSON spelling of {@code !employee} at a {@code person} field.
  */
-class JsonReservedMembersTest {
+class JsonTaggedValueReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/tagged-1.tn"

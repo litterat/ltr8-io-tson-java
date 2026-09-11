@@ -241,12 +241,12 @@ value**, and a class is what says what to build. Converting an encoding is a thi
 neither. A `TsonValue`-producing JSON read would be that third thing wearing the first one's clothes.
 
 It also keeps the JEP 540 alignment true of the whole module rather than only its schemaless half, and it
-keeps `JsonAtomTreeReader` trivial: peek the event, let the family's reader consume and judge it, hand back
+keeps `TreeAtomReader` trivial: peek the event, let the family's reader consume and judge it, hand back
 the node the document carried.
 
 **What it costs is one kind of test.** With the host value discarded, "did `date` really parse this?" is
 unobservable from a clean tree read — the evidence is only the diagnostic on a *bad* value. So
-`JsonValueReaderFactoryRegistry.atoms()` stays: §5's vocabulary with no mode over it, which is what
+`ValueReaderFactoryRegistry.atoms()` stays: §5's vocabulary with no mode over it, which is what
 `JsonAtomReadTest` compiles against to assert what each parser produced. It is what the modes are built over,
 not a mode of its own.
 
@@ -288,7 +288,7 @@ becomes permanent.
 value *kinds* where TSON text has tokens: `name: 42` at a `text` field is the unquoted token `42`, whose
 content `text`'s contract accepts ([TSON-DATA] §5.2), while JSON's `42` is of the number kind and §5.6 admits
 only strings there. Neither reader is wrong. §5.1 makes *which kinds reach a family's parser* each encoding's
-own — it is the whole of what `JsonAtomForm` decides — so this difference is by specification, and pinning it
+own — it is the whole of what `AtomForm` decides — so this difference is by specification, and pinning it
 is what stops a later change quietly "fixing" it into agreement.
 
 ## Binding a document, which is the one thing JSON cannot do for itself
@@ -321,13 +321,32 @@ when the selected type reads the value as a record) — over §3.2's closed rese
 and `$value`. §6.1.5 is what it buys at a record position: a tag naming a subtype, validated in full, which
 is the JSON spelling of `!employee` at a `person` field.
 
-**The class is `JsonReservedMembers`, not the spec's own noun, and the divergence is deliberate.** In this
+**The class is `ReservedMembers`, not the spec's own noun, and the divergence is deliberate.** In this
 codebase `Annotation` means an `@name` annotation and nothing else — two dozen types say so, from the
 `tson-annotation` module through `Annotations`, `TsonAnnotation` and the `AnnotationStart`/`AnnotationEnd`
 events — and those have **no JSON carrier at all**: §4.3 declines one for v1 and makes encoding a value that
 carries them an encode error. A type named for §3.3 would be the single place the word meant something else,
 so it is named for the §3.2 namespace it scans and cites §3.3 throughout. The spec's noun is right for the
 spec, where `@name` annotations are §3.1's and no reader is looking at a Java identifier to tell them apart.
+
+## Naming inside `reader`: mode first, and no prefix
+
+The schema-directed readers are named **mode, then family, then form** — `TreeRecordReader`,
+`TreeMapObjectReader`, `TreeMapPairsReader` — so that bind mode lands as `BindRecordReader` beside its peer
+and a reader's mode is the first thing about it. That is the axis someone scans when adding a mode, and it is
+the axis a file listing then sorts by.
+
+**The `Json` prefix is dropped in `reader` and kept in the root**, which is `CLAUDE.md`'s rule applied rather
+than an exception to it: a prefix earns its keep disambiguating a name a *consumer* writes, and `reader` is
+unexported. The root package keeps it for exactly that reason — `JsonReadContext` beside a domain
+`ReadContext`, `JsonTypeReader` beside `TsonTypeReader`.
+
+The consequence worth having is that **thirteen of these now share a bare name with their `tson-compiler`
+counterpart**: `ErrorReader`, `OpenTemplateReader`, `EventSkip`, `CompiledReaders`, `DiscriminationClass`,
+`ValueReaderFactory`, `ValueReaderContext`, `ValueReaderFactoryResolver`, `ValueReaderFactoryRegistry`,
+`VoidReader`, `DeferredTypeReader`, `ReferenceChain`, `ValueIdentity`. The two stacks read as peers, and which TSON class
+a JSON class answers to is visible at a glance — which is what a parallel implementation wants and what the
+prefix was hiding. Nothing imports both, neither package being exported, so the shared names cost nothing.
 
 **Recognising one needs a rewindable lookahead, and this is the position the parallel-stack decision
 predicted would need it.** §6.1.6 gives member order no meaning, so `$type` may sit anywhere in the object
@@ -350,7 +369,7 @@ Two rules fall out of the scan and are worth naming because they look like omiss
   `scoped` instance holding EXTERN, and §3.3 makes it a resolver error anywhere else. That is the correct
   verdict at every position built so far, and the scoped reader is what will admit it.
 
-`JsonCompiledReaders` arrives with this, and carries `tson-compiler`'s own hazard: it is **rebound exactly
+`CompiledReaders` arrives with this, and carries `tson-compiler`'s own hazard: it is **rebound exactly
 once**, from the in-progress compilation to the finished schema, because handing readers the compilation's
 resolve would leak its mutable state past the compile. Only the edges that need a name at read time consult
 it — a subtype named by `$type`, and whatever §8's dispatch reaches.
@@ -358,8 +377,8 @@ it — a subtype named by `$type`, and whatever §8's dispatch reaches.
 ### The map form is chosen by the factory, not re-asked per value
 
 §6.5 selects between the object and pairs forms **by `K`, never by inspecting the value**, and that selection
-is therefore made once: `JsonMapTreeReader` is a sealed base over `JsonObjectMapReader` and
-`JsonPairsMapReader`, and the factory returns whichever the key type names. Neither subclass carries the
+is therefore made once: `TreeMapReader` is a sealed base over `TreeMapObjectReader` and
+`TreeMapPairsReader`, and the factory returns whichever the key type names. Neither subclass carries the
 other's state or a branch it never takes, and §4.1's "nothing is read speculatively" is structural rather than
 a thing the read remembers to honour. What stays on the base is what both forms share and nothing else: §6.5's
 entry-value rule, the size facets, and the test that picks between them — which §8.3 also asks, to judge
@@ -370,7 +389,7 @@ whether a map is class-stable.
 §8.2's predicate is the rule [TSON-SCHEMA] §5.4 requires each encoding to state over the resolver-derived
 `disjoint` fact, and it is closed: a value may omit its tag by exactly two routes and "MUST NOT be extended by
 implementation cleverness — no member-shape matching among record variants, no value-set separation, no trying
-variants in order." `JsonChoiceTreeReader` implements route 2 — disjoint plus class-stable, selecting on the
+variants in order." `TreeChoiceReader` implements route 2 — disjoint plus class-stable, selecting on the
 arriving value's kind — and nothing more. Route 1, a declared `@discriminator`, is unbuilt, so a choice
 carrying one falls through to *the tag is REQUIRED*: the correct verdict for a reader without the route, and
 not a quiet approximation of it.
@@ -386,7 +405,7 @@ a string variant had been chosen. The unstable set is closed to two members — 
 pairs form — so the test is two cases rather than a survey, and narrowing `allow_nan`/`allow_infinity` restores
 route 2, which is the checkable reason §8.3 gives an API author to narrow.
 
-**`JsonDiscriminationClass` duplicates the TSON reader's derivation**, which lives in an unexported package.
+**`DiscriminationClass` duplicates the TSON reader's derivation**, which lives in an unexported package.
 That is the parallel stack's cost showing up where it matters most, because the fact is derived from the schema
 alone — a choice dispatching one way in text and another in JSON would be pure drift. The parity test carries
 the cases.

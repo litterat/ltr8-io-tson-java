@@ -11,15 +11,18 @@ import java.util.Optional;
  * output states the chain the author wrote and a reader that wants the *shape* has to walk it.
  *
  * <p>One place, because three readers were walking it independently -- a field's stated value, a map's key
- * type, and now a choice variant's discrimination class -- and a chain walk that disagrees with itself about
+ * type, and a choice variant's discrimination class -- and a chain walk that disagrees with itself about
  * where a name lands is a bug no test would name.
+ *
+ * <p>Named for {@code tson-compiler}'s class of the same name, which does the same job over the same model:
+ * the two stacks are peers, and a reader who knows one should recognise the other without being told.
  */
-final class JsonTypes {
+final class ReferenceChain {
 
     /** Linking has already refused a cycle, so this bounds a fault rather than a document. */
     private static final int MAX_HOPS = 64;
 
-    private JsonTypes() {
+    private ReferenceChain() {
     }
 
     /**

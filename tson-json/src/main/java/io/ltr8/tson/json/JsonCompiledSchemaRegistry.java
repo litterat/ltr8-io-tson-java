@@ -1,8 +1,8 @@
 package io.ltr8.tson.json;
 
 import io.ltr8.tson.base.CanonicalIdentity;
-import io.ltr8.tson.json.reader.JsonValueReaderFactoryRegistry;
-import io.ltr8.tson.json.reader.JsonValueReaderFactoryResolver;
+import io.ltr8.tson.json.reader.ValueReaderFactoryRegistry;
+import io.ltr8.tson.json.reader.ValueReaderFactoryResolver;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchemaLoader;
 
@@ -31,10 +31,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class JsonCompiledSchemaRegistry {
 
     private final TsonSchemaLoader loader;
-    private final JsonValueReaderFactoryResolver factories;
+    private final ValueReaderFactoryResolver factories;
     private final Map<String, JsonCompiledSchema> compiled = new ConcurrentHashMap<>();
 
-    private JsonCompiledSchemaRegistry(TsonSchemaLoader loader, JsonValueReaderFactoryResolver factories) {
+    private JsonCompiledSchemaRegistry(TsonSchemaLoader loader, ValueReaderFactoryResolver factories) {
         this.loader = loader;
         this.factories = factories;
     }
@@ -42,7 +42,7 @@ public final class JsonCompiledSchemaRegistry {
     /** Tree mode over {@code loader}: a read validates and hands back the document. */
     public static JsonCompiledSchemaRegistry tree(TsonSchemaLoader loader) {
         return new JsonCompiledSchemaRegistry(Objects.requireNonNull(loader, "loader"),
-                JsonValueReaderFactoryRegistry.tree());
+                ValueReaderFactoryRegistry.tree());
     }
 
     /**

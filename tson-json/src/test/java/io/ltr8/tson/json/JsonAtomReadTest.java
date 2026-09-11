@@ -3,10 +3,9 @@ package io.ltr8.tson.json;
 import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
-import io.ltr8.tson.base.ProcessorConfig;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
-import io.ltr8.tson.json.reader.JsonValueReaderFactoryRegistry;
+import io.ltr8.tson.json.reader.ValueReaderFactoryRegistry;
 import io.ltr8.tson.json.stream.JsonStream;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import org.junit.jupiter.api.Test;
@@ -28,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * [TSON-JSON] §5: an atom-typed position, read from the JSON kinds its family admits.
  *
  * <p>The two halves under test are the two the design splits: <b>which JSON kinds reach the parser</b>, which
- * is this encoding's own ({@code JsonAtomForm}), and <b>what the parser then does with the content</b>, which
+ * is this encoding's own ({@code AtomForm}), and <b>what the parser then does with the content</b>, which
  * is the shared vocabulary's and must not differ from the TSON text reading of the same content (§5.1).
  */
 class JsonAtomReadTest {
@@ -63,7 +62,7 @@ class JsonAtomReadTest {
      * and hands back the JSON), which is exactly why the parsing contract is pinned here instead.
      */
     private static final JsonCompiledSchema COMPILED =
-            JsonSchemaCompiler.compile(TSON.resolve(SCHEMA), JsonValueReaderFactoryRegistry.atoms());
+            JsonSchemaCompiler.compile(TSON.resolve(SCHEMA), ValueReaderFactoryRegistry.atoms());
 
     /**
      * The kernel's own compiled readers. {@code value} and {@code identifier} are declared by meta-kernel.tn
@@ -73,7 +72,7 @@ class JsonAtomReadTest {
     private static final JsonCompiledSchema KERNEL = JsonSchemaCompiler.compile(
             TSON.schemaRegistry().get(TsonBundledSchemas.META_KERNEL_ID)
                     .orElseThrow(() -> new IllegalStateException("meta-kernel.tn is not registered")),
-            JsonValueReaderFactoryRegistry.atoms());
+            ValueReaderFactoryRegistry.atoms());
 
     /** One value read at {@code typeName}, with every problem collected rather than thrown. */
     private static Read read(String typeName, String json) {

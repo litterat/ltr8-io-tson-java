@@ -141,7 +141,7 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   `UNKNOWN_TYPE_REF`.** [TSON-JSON] §9.4 lists the condition in its own right ("missing required tags (§8.2)",
   a validation error) and the closed enum has nothing for it, so `tson-compiler`'s choice reader reports a
   value with no tag as `UNKNOWN_TYPE_REF` — accurate about the category and wrong read literally, since
-  nothing unknown was written and the tag is absent rather than unresolvable. `JsonChoiceTreeReader` matches
+  nothing unknown was written and the tag is absent rather than unresolvable. `TreeChoiceReader` matches
   it, because §9.4 gives both encodings one vocabulary and the incumbent settles which member. A code of its
   own touches `tson-base` and both readers together; the parity test is what stops them drifting meanwhile.
 
@@ -157,7 +157,7 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 
 - [ ] **Every schema-directed record read scans its object twice.** Recognising [TSON-JSON] §3.3's
   annotation object means seeing member names, and §6.1.6 gives member order no meaning — so
-  `JsonRecordTreeReader` runs `JsonReservedMembers.scan` before every record, and the events it looked past
+  `TreeRecordReader` runs `ReservedMembers.scan` before every record, and the events it looked past
   are replayed from a buffer rather than re-lexed. Correct, and unmeasured: `JsonAllocationHarnessTest` reads
   schemalessly, so nothing says what the second pass costs per bound record. No shortcut is sound — peeking
   the first member concludes nothing when order is free, and a redundant tag is admissible at any typed
@@ -168,7 +168,7 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   — an HTTP service accepting both encodings and getting a Java object back — needs the same containers over a
   `DataBindContext`, with the bind-agreement machinery `tson-compiler` carries (`BindMismatchException` at
   compile, `MissingBindingException` deferred to first read). The factory registry already takes a mode
-  (`JsonValueReaderFactoryRegistry.tree()` beside `atoms()`); what is owed is the second set of container
+  (`ValueReaderFactoryRegistry.tree()` beside `atoms()`); what is owed is the second set of container
   factories and the front-door surface that selects it.
 
 - [ ] **`@rest` still has no consumer, and the JSON record reader is the one that will judge it.** §6.2's

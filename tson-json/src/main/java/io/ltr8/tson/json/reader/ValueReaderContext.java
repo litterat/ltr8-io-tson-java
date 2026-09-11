@@ -7,9 +7,9 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
 
 /**
  * The compilation environment beyond one entry: the schema being compiled, and how a composite reaches the
- * readers for its own children. Handed to every {@link JsonValueReaderFactory}.
+ * readers for its own children. Handed to every {@link ValueReaderFactory}.
  */
-public record JsonValueReaderContext(TsonLinkedSchema linked, JsonTypeReaderResolver readers) {
+public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers) {
 
     public TsonSchema schema() {
         return linked.schema();

@@ -21,15 +21,15 @@ import java.util.Map;
  * is a JSON array of two-element arrays, which is the second of §8.3's class-stability leaks: a brace-class
  * type wearing bracket clothing.
  *
- * <p>A compound key compares as a value too, through {@link JsonValueIdentity}'s recursive reduction -- member
+ * <p>A compound key compares as a value too, through {@link ValueIdentity}'s recursive reduction -- member
  * order carries no meaning (§6.1.6) and a {@code JsonNumber} keeps its literal, so two objects §5.3 makes one
  * value would otherwise compare unequal.
  */
-final class JsonPairsMapReader extends JsonMapTreeReader {
+final class TreeMapPairsReader extends TreeMapReader {
 
     private final JsonTypeReader<?> keyReader;
 
-    JsonPairsMapReader(String name, MapBody body, JsonTypeReader<?> keyReader, JsonTypeReader<?> value,
+    TreeMapPairsReader(String name, MapBody body, JsonTypeReader<?> keyReader, JsonTypeReader<?> value,
                        JsonSchemaLocation schemaLocation) {
         super(name, body, value, schemaLocation);
         this.keyReader = keyReader;
@@ -64,7 +64,7 @@ final class JsonPairsMapReader extends JsonMapTreeReader {
                     "'%s' is in pairs form, whose every element is a two-element array, and this is %s"
                             .formatted(name, JsonAtoms.describe(opening)),
                     "a two-element array", JsonAtoms.describe(opening));
-            JsonEventSkip.value(at, opening);
+            EventSkip.value(at, opening);
             return null;
         }
         if (at.peek() instanceof JsonEvent.ArrayEnd) {
@@ -82,7 +82,7 @@ final class JsonPairsMapReader extends JsonMapTreeReader {
             return null;
         }
         JsonValue entry = entryValue(at.index(1), String.valueOf(index));
-        if (at.reported() == before && byIdentity.putIfAbsent(JsonValueIdentity.of(key), index) != null) {
+        if (at.reported() == before && byIdentity.putIfAbsent(ValueIdentity.of(key), index) != null) {
             at.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
                     "duplicate key in '%s' -- a map states each key at most once, and the repeat states an entry "
                             .formatted(name) + "for nothing",
@@ -94,7 +94,7 @@ final class JsonPairsMapReader extends JsonMapTreeReader {
             at.report(Diagnostic.Code.WRONG_ARITY, "'%s' is in pairs form and this entry has more than a key and "
                     .formatted(name) + "a value", "a two-element array", "a longer array");
             while (!(at.peek() instanceof JsonEvent.ArrayEnd)) {
-                JsonEventSkip.nextValue(at);
+                EventSkip.nextValue(at);
             }
         }
         at.next();   // the pair's own ArrayEnd

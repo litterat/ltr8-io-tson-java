@@ -28,10 +28,10 @@ import java.util.Optional;
  * reading speculatively. It also means neither subclass carries the other's state or a branch it never takes.
  *
  * <ul>
- *   <li>{@link JsonObjectMapReader} -- when {@code K} resolves to a type whose parsing contract reads token
+ *   <li>{@link TreeMapObjectReader} -- when {@code K} resolves to a type whose parsing contract reads token
  *       content: every atom family, every enum, and {@code identifier}. A JSON object, each member name a key
  *       token faced to {@code K}'s own contract.</li>
- *   <li>{@link JsonPairsMapReader} -- when {@code K} is anything else, the compound keys [TSON-DATA] §2.6
+ *   <li>{@link TreeMapPairsReader} -- when {@code K} is anything else, the compound keys [TSON-DATA] §2.6
  *       admits. A JSON array of two-element arrays, and the second of §8.3's class-stability leaks.</li>
  * </ul>
  *
@@ -39,16 +39,16 @@ import java.util.Optional;
  * {@code {text => text}} is an ordinary key. §8.3.1's carve-out is for a map standing as a choice variant and
  * belongs to the choice reader.
  */
-abstract sealed class JsonMapTreeReader implements JsonTypeReader<JsonValue>
-        permits JsonObjectMapReader, JsonPairsMapReader {
+abstract sealed class TreeMapReader implements JsonTypeReader<JsonValue>
+        permits TreeMapObjectReader, TreeMapPairsReader {
 
-    static final JsonValueReaderFactory FACTORY = (name, definition, context) -> {
+    static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         MapBody body = (MapBody) definition.body();
         JsonSchemaLocation at = context.locationOf(name, definition);
         JsonTypeReader<?> value = context.readers().resolve(body.valueType().name());
         Optional<AtomType<?>> key = scalarKeyParser(context.schema(), body.keyType().name());
-        return key.<JsonMapTreeReader>map(parser -> new JsonObjectMapReader(name, body, parser, value, at))
-                .orElseGet(() -> new JsonPairsMapReader(name, body,
+        return key.<TreeMapReader>map(parser -> new TreeMapObjectReader(name, body, parser, value, at))
+                .orElseGet(() -> new TreeMapPairsReader(name, body,
                         context.readers().resolve(body.keyType().name()), value, at));
     };
 
@@ -57,7 +57,7 @@ abstract sealed class JsonMapTreeReader implements JsonTypeReader<JsonValue>
     private final JsonTypeReader<?> value;
     private final JsonSchemaLocation schemaLocation;
 
-    JsonMapTreeReader(String name, MapBody body, JsonTypeReader<?> value, JsonSchemaLocation schemaLocation) {
+    TreeMapReader(String name, MapBody body, JsonTypeReader<?> value, JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.body = body;
         this.value = value;
@@ -79,7 +79,7 @@ abstract sealed class JsonMapTreeReader implements JsonTypeReader<JsonValue>
      * contract for exactly that reason.
      */
     private static Optional<AtomType<?>> scalarKeyParser(TsonSchema schema, String keyTypeName) {
-        JsonTypes.Resolved terminal = JsonTypes.terminal(schema, keyTypeName).orElseThrow(() ->
+        ReferenceChain.Resolved terminal = ReferenceChain.terminal(schema, keyTypeName).orElseThrow(() ->
                 new IllegalStateException("'" + keyTypeName + "' does not resolve -- linking should have refused it"));
         return terminal.definition().body() instanceof Atom atom
                 ? AtomParsers.forType(terminal.name(), atom)
@@ -129,7 +129,7 @@ abstract sealed class JsonMapTreeReader implements JsonTypeReader<JsonValue>
     final JsonValue wrongShape(JsonReadContext ctx, JsonEvent found, String expected) {
         ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' is a map, which in this schema takes %s, and this is %s"
                 .formatted(name, expected, JsonAtoms.describe(found)), expected, JsonAtoms.describe(found));
-        JsonEventSkip.value(ctx, found);
+        EventSkip.value(ctx, found);
         return JsonNull.INSTANCE;
     }
 }

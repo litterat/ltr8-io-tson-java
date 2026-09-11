@@ -23,9 +23,9 @@ import java.util.Optional;
  * verdict, given when the schema loaded. The schemaless bind reader checks every name instead, and is right
  * to: there the target class is the schema and nothing judged its component names at load.
  */
-final class JsonNameHygiene {
+final class NameHygiene {
 
-    private JsonNameHygiene() {
+    private NameHygiene() {
     }
 
     /**

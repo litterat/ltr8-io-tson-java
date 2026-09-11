@@ -15,12 +15,12 @@ import io.ltr8.tson.json.stream.JsonEvent;
  * {@code _} and nothing else at {@code void}, and this is where JSON-shaped data meets that rule. The one
  * place a second spelling of absence would be cheapest to admit is exactly here, and it is refused here too.
  */
-final class JsonVoidReader implements JsonTypeReader<Object> {
+final class VoidReader implements JsonTypeReader<Object> {
 
     private final String name;
     private final JsonSchemaLocation schemaLocation;
 
-    JsonVoidReader(String name, JsonSchemaLocation schemaLocation) {
+    VoidReader(String name, JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.schemaLocation = schemaLocation;
     }
@@ -37,7 +37,7 @@ final class JsonVoidReader implements JsonTypeReader<Object> {
                 "'%s' is void, whose only value is absence -- JSON null -- and this is %s"
                         .formatted(name, JsonAtoms.describe(event)),
                 "null", JsonAtoms.describe(event));
-        JsonEventSkip.value(ctx, event);
+        EventSkip.value(ctx, event);
         return null;
     }
 }

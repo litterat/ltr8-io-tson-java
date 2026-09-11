@@ -33,17 +33,17 @@ import java.util.Optional;
  * the cross-encoding parity test is what holds them to it -- a choice that dispatches one way in text and
  * another in JSON is the drift that matters most here, since the fact is derived from the schema alone.
  */
-enum JsonDiscriminationClass {
+enum DiscriminationClass {
 
     BOOLEAN, NUMBER, STRING, BRACE, BRACKET;
 
     /** The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none. */
-    static Optional<JsonDiscriminationClass> of(TsonSchema schema, String name) {
-        return JsonTypes.terminal(schema, name).map(JsonTypes.Resolved::definition)
-                .flatMap(JsonDiscriminationClass::classify);
+    static Optional<DiscriminationClass> of(TsonSchema schema, String name) {
+        return ReferenceChain.terminal(schema, name).map(ReferenceChain.Resolved::definition)
+                .flatMap(DiscriminationClass::classify);
     }
 
-    private static Optional<JsonDiscriminationClass> classify(TypeDefinition definition) {
+    private static Optional<DiscriminationClass> classify(TypeDefinition definition) {
         return switch (definition.body()) {
             case IntegerType ignored -> Optional.of(NUMBER);
             case DecimalType ignored -> Optional.of(NUMBER);
@@ -81,10 +81,10 @@ enum JsonDiscriminationClass {
      * shared one -- {@code [true false]} is BOOLEAN, {@code [RED GREEN]} is STRING -- and a mixed set has
      * none, which leaves it reachable only with a tag.
      */
-    private static Optional<JsonDiscriminationClass> ofEnum(EnumBody members) {
-        JsonDiscriminationClass common = null;
+    private static Optional<DiscriminationClass> ofEnum(EnumBody members) {
+        DiscriminationClass common = null;
         for (String member : members.members()) {
-            JsonDiscriminationClass memberClass = "true".equals(member) || "false".equals(member)
+            DiscriminationClass memberClass = "true".equals(member) || "false".equals(member)
                     ? BOOLEAN
                     : STRING;
             if (common == null) {
@@ -104,7 +104,7 @@ enum JsonDiscriminationClass {
      * a separate question: a string may be an approximate atom's special value and an array may be a map in
      * pairs form, but a class-stable variant set contains neither, so route 2 reads the kind straight.
      */
-    static Optional<JsonDiscriminationClass> ofKind(JsonEvent event) {
+    static Optional<DiscriminationClass> ofKind(JsonEvent event) {
         return switch (event) {
             case JsonEvent.BooleanValue ignored -> Optional.of(BOOLEAN);
             case JsonEvent.NumberValue ignored -> Optional.of(NUMBER);
@@ -132,9 +132,9 @@ enum JsonDiscriminationClass {
      * the object kind. A type with no class is not unstable -- it is unreachable by route 2 either way.
      */
     static boolean stable(TsonSchema schema, String name) {
-        return JsonTypes.terminal(schema, name).map(resolved -> switch (resolved.definition().body()) {
+        return ReferenceChain.terminal(schema, name).map(resolved -> switch (resolved.definition().body()) {
             case FloatType floats -> !floats.allowNan() && !floats.allowInfinity();
-            case MapBody map -> JsonMapTreeReader.isObjectForm(schema, map);
+            case MapBody map -> TreeMapReader.isObjectForm(schema, map);
             default -> true;
         }).orElse(true);
     }

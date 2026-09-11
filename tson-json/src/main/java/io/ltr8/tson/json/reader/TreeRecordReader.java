@@ -1,7 +1,6 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
@@ -39,11 +38,11 @@ import java.util.Set;
  * declared field is §6.1.1's closure error, full stop. That is the stricter reading and the correct one until
  * a consumer has shown what the directive's stated shape has to survive.
  */
-final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
+final class TreeRecordReader implements JsonTypeReader<JsonValue> {
 
-    static final JsonValueReaderFactory FACTORY = (name, definition, context) -> {
+    static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         RecordBody body = (RecordBody) definition.body();
-        return new JsonRecordTreeReader(name, body, definition.subtypes(), context,
+        return new TreeRecordReader(name, body, definition.subtypes(), context,
                 context.locationOf(name, definition));
     };
 
@@ -51,7 +50,7 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
     private final List<RecordField> fields;
     private final Map<String, Integer> index;
     private final List<JsonTypeReader<?>> readers;
-    private final List<JsonFieldValue> stated;
+    private final List<FieldValue> stated;
     private final List<FieldGroup> groups;
     private final String declaredFields;
     private final JsonSchemaLocation schemaLocation;
@@ -60,10 +59,10 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
     private final Set<String> subtypes;
 
     /** How a named subtype's reader is reached at read time -- rebound to the finished schema by the compile. */
-    private final JsonTypeReaderResolver readerFor;
+    private final TypeReaderResolver readerFor;
 
-    private JsonRecordTreeReader(String name, RecordBody body, Collection<String> subtypes,
-                                 JsonValueReaderContext context, JsonSchemaLocation schemaLocation) {
+    private TreeRecordReader(String name, RecordBody body, Collection<String> subtypes,
+                             ValueReaderContext context, JsonSchemaLocation schemaLocation) {
         this.subtypes = Set.copyOf(subtypes);
         this.readerFor = context.readers();
         this.name = name;
@@ -72,14 +71,14 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
         this.schemaLocation = schemaLocation;
         Map<String, Integer> byName = new LinkedHashMap<>();
         List<JsonTypeReader<?>> built = new ArrayList<>(fields.size());
-        List<JsonFieldValue> values = new ArrayList<>(fields.size());
+        List<FieldValue> values = new ArrayList<>(fields.size());
         for (int i = 0; i < fields.size(); i++) {
             RecordField field = fields.get(i);
             // §6.1.1: member names are NFC-normalized before matching, per [TSON-DATA] §7.2.1's resolver rule.
             byName.put(Nfc.of(field.name()), i);
             built.add(context.readers().resolve(field.type().name()));
             values.add(field.value()
-                    .map(token -> JsonFieldValue.of(context.schema(), field.type().name(), token))
+                    .map(token -> FieldValue.of(context.schema(), field.type().name(), token))
                     .orElse(null));
         }
         this.index = Map.copyOf(byName);
@@ -92,7 +91,7 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
     public JsonValue read(JsonReadContext ctx) {
         ctx = ctx.inRecord(schemaLocation);
         if (ctx.peek() instanceof JsonEvent.ObjectStart) {
-            JsonReservedMembers.Tag tag = JsonReservedMembers.scan(ctx);
+            ReservedMembers.Tag tag = ReservedMembers.scan(ctx);
             if (tag.present() || tag.unknown() != null) {
                 return tagged(ctx, tag);
             }
@@ -106,7 +105,7 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
         if (!(first instanceof JsonEvent.ObjectStart)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' is a record, which takes a JSON object, and this is %s"
                     .formatted(name, JsonAtoms.describe(first)), "a JSON object", JsonAtoms.describe(first));
-            JsonEventSkip.value(ctx, first);
+            EventSkip.value(ctx, first);
             return JsonNull.INSTANCE;
         }
         JsonValue[] values = new JsonValue[fields.size()];
@@ -146,44 +145,44 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
      * {@code $type} MUST resolve and MUST be admissible under [TSON-SCHEMA] §7.2, so it names this entry or
      * one of its subtypes and nothing else. The value then validates against the selected type in full.
      */
-    private JsonValue tagged(JsonReadContext ctx, JsonReservedMembers.Tag tag) {
+    private JsonValue tagged(JsonReadContext ctx, ReservedMembers.Tag tag) {
         if (tag.unknown() != null) {
-            JsonReservedMembers.refuseUnknown(ctx, tag.unknown());
-            JsonEventSkip.nextValue(ctx);
+            ReservedMembers.refuseUnknown(ctx, tag.unknown());
+            EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
         if (tag.schema()) {
             // §8.5 admits `$schema` exactly where the position's effective type is a `scoped` instance
             // holding EXTERN, or a container of one. A record position is not one, and §3.3 makes it a
             // resolver error anywhere else -- a scope change the model never opted into.
-            ctx.field(JsonReservedMembers.SCHEMA).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
+            ctx.field(ReservedMembers.SCHEMA).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
                     "'$schema' opens a schema scope, which [TSON-SCHEMA] §7.8 admits only at a scoped position "
                             + "-- '" + name + "' is a record", "no $schema at this position",
-                    JsonReservedMembers.SCHEMA);
-            JsonEventSkip.nextValue(ctx);
+                    ReservedMembers.SCHEMA);
+            EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
         if (tag.type() == null) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                     "this object carries this encoding's reserved members but no '$type' naming a type (§3.3)",
                     "a '$type' member holding a type name", "no $type");
-            JsonEventSkip.nextValue(ctx);
+            EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
         if (!name.equals(tag.type()) && !subtypes.contains(tag.type())) {
             // §9.4 reaches every `$type` too, and for the same reason: a look-alike type name is refused
             // rather than reported as naming nothing.
-            if (!JsonNameHygiene.refuses(ctx, tag.type())) {
-                ctx.field(JsonReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+            if (!NameHygiene.refuses(ctx, tag.type())) {
+                ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
                         "'$type' names '%s', which is not admissible at a '%s' position -- a tag may name this "
                                 .formatted(tag.type(), name) + "type or one of its subtypes ([TSON-SCHEMA] §7.2)",
                         admissible(), tag.type());
             }
-            JsonEventSkip.nextValue(ctx);
+            EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
         return tag.wrapper()
-                ? JsonReservedMembers.readWrapped(ctx, readerFor.resolve(tag.type()))
+                ? ReservedMembers.readWrapped(ctx, readerFor.resolve(tag.type()))
                 : inline(ctx, tag.type());
     }
 
@@ -241,23 +240,23 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
      */
     private void unmatched(JsonReadContext ctx, String memberName) {
         JsonReadContext at = ctx.field(memberName);
-        if (JsonReservedMembers.isReserved(memberName)) {
+        if (ReservedMembers.isReserved(memberName)) {
             // §3.3: the record is the object minus its reserved members. Whether they were admissible here
             // was settled by the scan before any member was read, so passing over one now is not a decision
             // being skipped -- it is the decision already taken.
-            JsonEventSkip.nextValue(at);
+            EventSkip.nextValue(at);
             return;
         }
         // §8.2 before §6.1.1, and the order is the point: a name-hygiene refusal MUST NOT be reported in one
         // of §8.1's four categories, so a look-alike field name is refused here rather than told it is
         // unknown -- which would be a verdict on the document for a policy rule, and would advise adding a
         // field that is already declared.
-        if (!JsonNameHygiene.refuses(ctx, memberName)) {
+        if (!NameHygiene.refuses(ctx, memberName)) {
             at.report(Diagnostic.Code.UNRECOGNIZED_FIELD, "unknown member '%s' on '%s' -- a record is closed "
                     .formatted(memberName, name) + "under its type (§7.2), whose fields are ("
                     + declaredFields + ")", declaredFields, memberName);
         }
-        JsonEventSkip.nextValue(at);
+        EventSkip.nextValue(at);
     }
 
     /**
@@ -291,7 +290,7 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
         fieldContext(ctx, at).report(Diagnostic.Code.FIELD_FIXED,
                 "'%s' is fixed to absent on '%s' and may only be omitted or written null".formatted(memberName, name),
                 "null", JsonAtoms.describe(event));
-        JsonEventSkip.value(ctx, event);
+        EventSkip.value(ctx, event);
         return null;
     }
 
@@ -344,7 +343,7 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
      */
     private JsonValue verifyFixed(JsonReadContext ctx, int at, String memberName) {
         RecordField field = fields.get(at);
-        JsonFieldValue pin = stated.get(at);
+        FieldValue pin = stated.get(at);
         JsonReadContext fieldCtx = fieldContext(ctx, at);
         JsonEvent event = ctx.peek();
         if (event instanceof JsonEvent.NullValue) {
@@ -373,7 +372,7 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
         } catch (RuntimeException ignored) {
             return written;   // already reported by the field's own reader
         }
-        if (!Objects.equals(JsonValueIdentity.of(value), JsonValueIdentity.of(pin.pinned()))) {
+        if (!Objects.equals(ValueIdentity.of(value), ValueIdentity.of(pin.pinned()))) {
             fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
                     "'%s' is fixed on '%s' and cannot be given another value -- the schema declares it with '=' "
                             .formatted(memberName, name) + "(fixed); for a default the data may override, use '~'",

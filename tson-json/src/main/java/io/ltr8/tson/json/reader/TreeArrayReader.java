@@ -32,11 +32,11 @@ import java.util.Set;
  * ([TSON-DATA] §2.9). Under {@code [T]} null at a slot is a validation error, as {@code _} is in text: it is
  * never a value (§7).
  */
-final class JsonArrayTreeReader implements JsonTypeReader<JsonValue> {
+final class TreeArrayReader implements JsonTypeReader<JsonValue> {
 
-    static final JsonValueReaderFactory FACTORY = (name, definition, context) -> {
+    static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         ArrayBody body = (ArrayBody) definition.body();
-        return new JsonArrayTreeReader(name, body, context.readers().resolve(body.elementType().name()),
+        return new TreeArrayReader(name, body, context.readers().resolve(body.elementType().name()),
                 context.locationOf(name, definition));
     };
 
@@ -45,8 +45,8 @@ final class JsonArrayTreeReader implements JsonTypeReader<JsonValue> {
     private final JsonTypeReader<?> element;
     private final JsonSchemaLocation schemaLocation;
 
-    private JsonArrayTreeReader(String name, ArrayBody body, JsonTypeReader<?> element,
-                                JsonSchemaLocation schemaLocation) {
+    private TreeArrayReader(String name, ArrayBody body, JsonTypeReader<?> element,
+                            JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.body = body;
         this.element = element;
@@ -60,7 +60,7 @@ final class JsonArrayTreeReader implements JsonTypeReader<JsonValue> {
         if (!(first instanceof JsonEvent.ArrayStart)) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' takes a JSON array, and this is %s"
                     .formatted(name, JsonAtoms.describe(first)), "a JSON array", JsonAtoms.describe(first));
-            JsonEventSkip.value(ctx, first);
+            EventSkip.value(ctx, first);
             return JsonNull.INSTANCE;
         }
         List<JsonValue> elements = new ArrayList<>();
@@ -88,7 +88,7 @@ final class JsonArrayTreeReader implements JsonTypeReader<JsonValue> {
             return JsonNull.INSTANCE;
         }
         JsonValue value = (JsonValue) element.read(at);
-        if (seen != null && !seen.add(JsonValueIdentity.of(value))) {
+        if (seen != null && !seen.add(ValueIdentity.of(value))) {
             at.report(Diagnostic.Code.TYPE_MISMATCH,
                     "'%s' is a set and this element repeats one already present".formatted(name),
                     "each element once", String.valueOf(value));

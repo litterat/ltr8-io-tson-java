@@ -14,12 +14,12 @@ import io.ltr8.tson.json.JsonTypeReader;
  * <p>Only the edges that need a name at read time consult this: a subtype named by {@code $type} (§6.1.5),
  * and whatever §8's dispatch reaches. Every other child reader is a real object reference wired at compile.
  */
-public final class JsonCompiledReaders implements JsonTypeReaderResolver {
+public final class CompiledReaders implements TypeReaderResolver {
 
-    private JsonTypeReaderResolver building;
+    private TypeReaderResolver building;
     private JsonCompiledSchema finished;
 
-    public JsonCompiledReaders(JsonTypeReaderResolver building) {
+    public CompiledReaders(TypeReaderResolver building) {
         this.building = building;
     }
 
