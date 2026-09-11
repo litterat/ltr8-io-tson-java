@@ -130,13 +130,6 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   `tson-atom` already re-exports that module, so what crosses is a value model and the pipeline producing it stays
   where it is.
 
-- [ ] **`ValueIdentity` has no `BigDecimal` case, so the exact tier compares by scale** (issue #470, found by
-  `CrossEncodingParityTest`). [TSON-SCHEMA] §5.5 puts scale outside a `number`'s value space and [TSON-JSON]
-  §5.3 states it outright, but `tson-compiler` compares with `BigDecimal.equals`: a `number`-keyed map admits
-  `1` and `1.0` as two keys, a `set` of `number` admits both as two elements, and a field `= 1.0` turns away a
-  document that writes `1`. The JSON side already carries the case, which is how the disagreement surfaced.
-  The parity case is left out of that suite until this lands rather than pinned as expected divergence.
-
 - [ ] **`Diagnostic.Code` has no member for "a required tag is missing", and both encodings overload
   `UNKNOWN_TYPE_REF`.** [TSON-JSON] §9.4 lists the condition in its own right ("missing required tags (§8.2)",
   a validation error) and the closed enum has nothing for it, so `tson-compiler`'s choice reader reports a
