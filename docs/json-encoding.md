@@ -344,7 +344,7 @@ unexported. The root package keeps it for exactly that reason — `JsonReadConte
 The consequence worth having is that **thirteen of these now share a bare name with their `tson-compiler`
 counterpart**: `ErrorReader`, `OpenTemplateReader`, `EventSkip`, `CompiledReaders`, `DiscriminationClass`,
 `ValueReaderFactory`, `ValueReaderContext`, `ValueReaderFactoryResolver`, `ValueReaderFactoryRegistry`,
-`VoidReader`, `DeferredReader`, `Types`, `ValueIdentity`. The two stacks read as peers, and which TSON class
+`VoidReader`, `DeferredTypeReader`, `ReferenceChain`, `ValueIdentity`. The two stacks read as peers, and which TSON class
 a JSON class answers to is visible at a glance — which is what a parallel implementation wants and what the
 prefix was hiding. Nothing imports both, neither package being exported, so the shared names cost nothing.
 

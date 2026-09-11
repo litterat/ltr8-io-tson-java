@@ -39,7 +39,7 @@ enum DiscriminationClass {
 
     /** The class {@code name} resolves to, following its reference chain, or empty for a type §5.4 gives none. */
     static Optional<DiscriminationClass> of(TsonSchema schema, String name) {
-        return Types.terminal(schema, name).map(Types.Resolved::definition)
+        return ReferenceChain.terminal(schema, name).map(ReferenceChain.Resolved::definition)
                 .flatMap(DiscriminationClass::classify);
     }
 
@@ -132,7 +132,7 @@ enum DiscriminationClass {
      * the object kind. A type with no class is not unstable -- it is unreachable by route 2 either way.
      */
     static boolean stable(TsonSchema schema, String name) {
-        return Types.terminal(schema, name).map(resolved -> switch (resolved.definition().body()) {
+        return ReferenceChain.terminal(schema, name).map(resolved -> switch (resolved.definition().body()) {
             case FloatType floats -> !floats.allowNan() && !floats.allowInfinity();
             case MapBody map -> TreeMapReader.isObjectForm(schema, map);
             default -> true;

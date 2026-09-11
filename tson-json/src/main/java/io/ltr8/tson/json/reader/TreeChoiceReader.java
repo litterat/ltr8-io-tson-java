@@ -69,7 +69,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
         this.byClass = routeTwo(context.schema(), body);
         Map<String, String> subtypes = new LinkedHashMap<>();
         for (TypeRef variant : body.variants()) {
-            Types.terminal(context.schema(), variant.name())
+            ReferenceChain.terminal(context.schema(), variant.name())
                     .ifPresent(resolved -> resolved.definition().subtypes()
                             .forEach(subtype -> subtypes.putIfAbsent(subtype, variant.name())));
         }

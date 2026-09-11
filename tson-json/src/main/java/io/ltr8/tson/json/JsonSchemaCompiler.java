@@ -79,7 +79,7 @@ public final class JsonSchemaCompiler {
                 return done;
             }
             if (!building.add(name)) {
-                return new DeferredReader(name, finished);
+                return new DeferredTypeReader(name, finished);
             }
             try {
                 TypeDefinition definition = schema.entries().get(name);

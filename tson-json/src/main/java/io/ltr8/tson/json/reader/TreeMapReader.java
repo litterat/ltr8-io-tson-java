@@ -79,7 +79,7 @@ abstract sealed class TreeMapReader implements JsonTypeReader<JsonValue>
      * contract for exactly that reason.
      */
     private static Optional<AtomType<?>> scalarKeyParser(TsonSchema schema, String keyTypeName) {
-        Types.Resolved terminal = Types.terminal(schema, keyTypeName).orElseThrow(() ->
+        ReferenceChain.Resolved terminal = ReferenceChain.terminal(schema, keyTypeName).orElseThrow(() ->
                 new IllegalStateException("'" + keyTypeName + "' does not resolve -- linking should have refused it"));
         return terminal.definition().body() instanceof Atom atom
                 ? AtomParsers.forType(terminal.name(), atom)
