@@ -425,12 +425,13 @@ module has a real `module-info.java`; module names mirror each module's root exp
   `Tson.standard()` for the unconfigured case.
 - **`tson-json`** — the JSON encoding ([TSON-JSON]): its own lexer, structural layer, tree, readers,
   writers, and its own schema-directed reader stack over them — `JsonTypeReader`/`JsonCompiledSchema`/
-  `JsonSchemaCompiler`, with [TSON-JSON] §5's atoms, the whole of §6's containers and §7's absence
-  compiled in **tree mode**, plus §3.2's reserved namespace and §3.3's annotation object (so §6.1.5's
-  `$type` selects a subtype, the JSON spelling of `!employee` at a `person` field), and §8's sums reaching a
-  `NOT_IMPLEMENTED` reader. **Recognising an annotation object needs a rewindable lookahead** — §6.1.6 gives
-  member order no meaning, so `$type` may sit anywhere and the opening brace settles nothing; `lookingAhead`
-  scans member names, skips values, and replays from a buffer rather than re-lexing. It runs before every
+  `JsonSchemaCompiler`, with [TSON-JSON] §5's atoms, the whole of §6's containers, §7's absence, §3.2's
+  reserved namespace and §3.3's annotation object (so §6.1.5's `$type` selects a subtype — the JSON
+  spelling of `!employee` at a `person` field), and §8.2's discrimination predicate over §8.3's class
+  stability, all compiled in **tree mode**; §8.5's scoped positions reach a `NOT_IMPLEMENTED` reader.
+  **Recognising an annotation object needs a rewindable lookahead** — §6.1.6 gives member order no meaning,
+  so `$type` may sit anywhere and the opening brace settles nothing; `lookingAhead` scans member names,
+  skips values, and replays from a buffer rather than re-lexing. It runs before every
   record read, because §8.1 makes a redundant tag admissible at any typed position and no shortcut is sound;
   `BACKLOG.md` carries the measurement that is owed. **A schema is named, never
   authored** — `Json.withSchemas(TsonSchemaLoader)` takes an already-resolved one, because a schema document

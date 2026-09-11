@@ -2,7 +2,10 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
+import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
+import io.ltr8.tson.json.tree.JsonNull;
+import io.ltr8.tson.json.tree.JsonValue;
 
 import java.util.List;
 
@@ -109,6 +112,49 @@ final class JsonReservedMembers {
                 }
             }
             JsonEventSkip.nextValue(ctx);
+        }
+    }
+
+    /**
+     * §3.3's wrapper form, read: the annotated value is the {@code $value} member, read at {@code target} --
+     * the reader for whatever {@code $type} selected. "In wrapper form, any member other than the three
+     * reserved names is a resolver error -- the wrapper is apparatus, not a record, and admits nothing else."
+     *
+     * <p>Member order carries no meaning here either (§6.1.6), so this walks the object rather than assuming
+     * {@code $value} last, and reads the value where it is found.
+     *
+     * <p>Shared by every position that can be tagged -- a record under subsumption (§6.1.5) and a choice
+     * variant (§8.1) -- because the wrapper is one form and a second reading of it is a second chance to
+     * disagree about what it admits.
+     */
+    static JsonValue readWrapped(JsonReadContext ctx, JsonTypeReader<?> target) {
+        ctx.next();   // ObjectStart
+        JsonValue value = null;
+        while (true) {
+            JsonEvent event = ctx.next();
+            if (event instanceof JsonEvent.ObjectEnd) {
+                if (value == null) {
+                    ctx.report(Diagnostic.Code.TYPE_MISMATCH,
+                            "this is an annotation object in wrapper form and carries no '$value' to annotate",
+                            "a '$value' member", "no $value");
+                    return JsonNull.INSTANCE;
+                }
+                return value;
+            }
+            if (!(event instanceof JsonEvent.MemberName member)) {
+                throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);
+            }
+            if (VALUE.equals(member.name())) {
+                value = (JsonValue) target.read(ctx.field(VALUE));
+                continue;
+            }
+            if (!isReserved(member.name())) {
+                ctx.field(member.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
+                        "'%s' stands beside '$value' in an annotation object, which is apparatus and not a record "
+                                .formatted(member.name()) + "-- it admits the reserved members and nothing else "
+                                + "(§3.3)", String.join(" | ", RESERVED), member.name());
+            }
+            JsonEventSkip.nextValue(ctx.field(member.name()));
         }
     }
 

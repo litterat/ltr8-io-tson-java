@@ -178,7 +178,9 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
             JsonEventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
-        return tag.wrapper() ? wrapped(ctx, tag.type()) : inline(ctx, tag.type());
+        return tag.wrapper()
+                ? JsonReservedMembers.readWrapped(ctx, readerFor.resolve(tag.type()))
+                : inline(ctx, tag.type());
     }
 
     /**
@@ -191,45 +193,6 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
             return readObject(ctx);
         }
         return (JsonValue) readerFor.resolve(type).read(ctx);
-    }
-
-    /**
-     * §3.3's wrapper form: the annotated value is the {@code $value} member, read at the type {@code $type}
-     * selected. "In wrapper form, any member other than the three reserved names is a resolver error -- the
-     * wrapper is apparatus, not a record, and admits nothing else."
-     *
-     * <p>Member order carries no meaning here either, so this walks the object rather than assuming
-     * {@code $value} last, and the value is read where it is found.
-     */
-    private JsonValue wrapped(JsonReadContext ctx, String type) {
-        ctx.next();   // ObjectStart
-        JsonValue value = null;
-        while (true) {
-            JsonEvent event = ctx.next();
-            if (event instanceof JsonEvent.ObjectEnd) {
-                if (value == null) {
-                    ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                            "this is an annotation object in wrapper form and carries no '$value' to annotate",
-                            "a '$value' member", "no $value");
-                    return JsonNull.INSTANCE;
-                }
-                return value;
-            }
-            if (!(event instanceof JsonEvent.MemberName member)) {
-                throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);
-            }
-            if (JsonReservedMembers.VALUE.equals(member.name())) {
-                value = (JsonValue) readerFor.resolve(type).read(ctx.field(JsonReservedMembers.VALUE));
-                continue;
-            }
-            if (!JsonReservedMembers.isReserved(member.name())) {
-                ctx.field(member.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
-                        "'%s' stands beside '$value' in an annotation object, which is apparatus and not a record "
-                                .formatted(member.name()) + "-- it admits the reserved members and nothing else "
-                                + "(§3.3)", String.join(" | ", JsonReservedMembers.RESERVED), member.name());
-            }
-            JsonEventSkip.nextValue(ctx.field(member.name()));
-        }
     }
 
     /** What a {@code $type} may name here, for a diagnostic's machine-readable {@code expected}. */
