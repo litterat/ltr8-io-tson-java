@@ -3,6 +3,7 @@ package io.ltr8.tson.json;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
 
@@ -10,6 +11,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -61,9 +63,13 @@ public final class JsonReadContext {
         /** Where a lookahead in progress collects what it consumes, or null when none is running. */
         List<JsonEvent> recording;
 
-        Cursor(JsonEventSource events, DiagnosticsReceiver receiver) {
+        /** [TSON-DATA] §8.2's identifier policy, for the read positions that carry a name. */
+        final UnicodePolicy identifierPolicy;
+
+        Cursor(JsonEventSource events, DiagnosticsReceiver receiver, UnicodePolicy identifierPolicy) {
             this.events = events;
             this.receiver = receiver;
+            this.identifierPolicy = identifierPolicy;
         }
     }
 
@@ -97,8 +103,30 @@ public final class JsonReadContext {
         this.pinnedPosition = pinnedPosition;
     }
 
+    /**
+     * A context over {@code events} that judges no name.
+     *
+     * <p><b>The default is "nothing" rather than [TSON-DATA] §8.2's recommended level, and that differs from
+     * the TSON context deliberately.</b> There, every name the stream carries is a name, so a policy is always
+     * applicable and defaulting to Highly Restrictive is right. Here it depends on the position: a JSON object
+     * is one syntax for a record and a map both (§4.1), so only a reader holding the position knows whether a
+     * member name is a field name or a key -- and a schemaless read holds no position at all, so it applies
+     * nothing. {@link #of(JsonEventSource, DiagnosticsReceiver, UnicodePolicy)} is what a read that does know.
+     */
     public static JsonReadContext of(JsonEventSource events, DiagnosticsReceiver receiver) {
-        return new JsonReadContext(new Cursor(events, receiver), null, null, null);
+        return of(events, receiver, UnicodePolicy.unrestricted());
+    }
+
+    /** As above, under {@code identifierPolicy} -- what a schema-directed read passes, knowing its positions. */
+    public static JsonReadContext of(JsonEventSource events, DiagnosticsReceiver receiver,
+                                     UnicodePolicy identifierPolicy) {
+        return new JsonReadContext(new Cursor(events, receiver,
+                Objects.requireNonNull(identifierPolicy, "identifierPolicy")), null, null, null);
+    }
+
+    /** The identifier policy this read judges names under -- [TSON-DATA] §8.2's, never a validity rule. */
+    public UnicodePolicy identifierPolicy() {
+        return cursor.identifierPolicy;
     }
 
     // ── The cursor ───────────────────────────────────────────────────────

@@ -355,6 +355,16 @@ once**, from the in-progress compilation to the finished schema, because handing
 resolve would leak its mutable state past the compile. Only the edges that need a name at read time consult
 it — a subtype named by `$type`, and whatever §8's dispatch reaches.
 
+### The map form is chosen by the factory, not re-asked per value
+
+§6.5 selects between the object and pairs forms **by `K`, never by inspecting the value**, and that selection
+is therefore made once: `JsonMapTreeReader` is a sealed base over `JsonObjectMapReader` and
+`JsonPairsMapReader`, and the factory returns whichever the key type names. Neither subclass carries the
+other's state or a branch it never takes, and §4.1's "nothing is read speculatively" is structural rather than
+a thing the read remembers to honour. What stays on the base is what both forms share and nothing else: §6.5's
+entry-value rule, the size facets, and the test that picks between them — which §8.3 also asks, to judge
+whether a map is class-stable.
+
 ### Discrimination: two routes, and the table is built at schema load
 
 §8.2's predicate is the rule [TSON-SCHEMA] §5.4 requires each encoding to state over the resolver-derived

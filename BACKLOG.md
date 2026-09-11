@@ -145,15 +145,15 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   it, because §9.4 gives both encodings one vocabulary and the incumbent settles which member. A code of its
   own touches `tson-base` and both readers together; the parity test is what stops them drifting meanwhile.
 
-- [ ] **The schema-directed JSON reader applies no name hygiene, so a look-alike member name is reported as a
-  verdict** ([TSON-JSON] §9.4, which now states the rule; issue #476). Hygiene lives only on the schemaless
-  bind path (`reader.DataClassObjectReader.checkNameHygiene`, where the target class plays the schema's part).
-  `JsonRecordTreeReader` has none — so a document sending `pаssword` with U+0430 against a record declaring
-  `password` matches no field and draws `UNRECOGNIZED_FIELD`, one of [TSON-DATA] §8.1's four categories, which
-  §8.2 forbids outright for these rules because they read data the UCD does not freeze. The order §9.4 fixes is
-  declared fields, then rest collection, then hygiene over what is left; only the last reaches the identifier
-  policy, which is why this is a narrow check and not a per-member cost. The `class2/schema/refused/` corpus
-  vectors are the precedent for what a refusal must and must not report.
+- [ ] **The look-alike rule reaches no JSON position, and whether it should is now a real question rather
+  than a settled one.** [TSON-DATA] §8.2's two per-name rules run at the schema-directed record and `$type`
+  positions, so the realistic attack — a homoglyph in a name that matches no declared field — is refused. The
+  third rule, `CONFUSABLE_NAMES`, is a property of a *set*, and `CLAUDE.md` records it as not reaching JSON
+  because a JSON object's members are keys until a position says otherwise. **A schema-directed record position
+  does say otherwise**, which is the fact that changed: its unmatched members are field names, so the set rule
+  could run over them as `SchemalessTreeReader` runs it for TSON. What it would add over the two per-name rules
+  is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
+  name — so this is a decision to take deliberately, not a gap to close by reflex.
 
 - [ ] **Every schema-directed record read scans its object twice.** Recognising [TSON-JSON] §3.3's
   annotation object means seeing member names, and §6.1.6 gives member order no meaning — so

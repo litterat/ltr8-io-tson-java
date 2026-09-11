@@ -171,10 +171,14 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
             return JsonNull.INSTANCE;
         }
         if (!name.equals(tag.type()) && !subtypes.contains(tag.type())) {
-            ctx.field(JsonReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
-                    "'$type' names '%s', which is not admissible at a '%s' position -- a tag may name this type "
-                            .formatted(tag.type(), name) + "or one of its subtypes ([TSON-SCHEMA] §7.2)",
-                    admissible(), tag.type());
+            // §9.4 reaches every `$type` too, and for the same reason: a look-alike type name is refused
+            // rather than reported as naming nothing.
+            if (!JsonNameHygiene.refuses(ctx, tag.type())) {
+                ctx.field(JsonReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+                        "'$type' names '%s', which is not admissible at a '%s' position -- a tag may name this "
+                                .formatted(tag.type(), name) + "type or one of its subtypes ([TSON-SCHEMA] §7.2)",
+                        admissible(), tag.type());
+            }
             JsonEventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
@@ -244,9 +248,15 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
             JsonEventSkip.nextValue(at);
             return;
         }
-        at.report(Diagnostic.Code.UNRECOGNIZED_FIELD, "unknown member '%s' on '%s' -- a record is closed under "
-                .formatted(memberName, name) + "its type (§7.2), whose fields are (" + declaredFields + ")",
-                declaredFields, memberName);
+        // §8.2 before §6.1.1, and the order is the point: a name-hygiene refusal MUST NOT be reported in one
+        // of §8.1's four categories, so a look-alike field name is refused here rather than told it is
+        // unknown -- which would be a verdict on the document for a policy rule, and would advise adding a
+        // field that is already declared.
+        if (!JsonNameHygiene.refuses(ctx, memberName)) {
+            at.report(Diagnostic.Code.UNRECOGNIZED_FIELD, "unknown member '%s' on '%s' -- a record is closed "
+                    .formatted(memberName, name) + "under its type (§7.2), whose fields are ("
+                    + declaredFields + ")", declaredFields, memberName);
+        }
         JsonEventSkip.nextValue(at);
     }
 

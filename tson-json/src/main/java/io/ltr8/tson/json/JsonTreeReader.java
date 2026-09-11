@@ -212,7 +212,9 @@ public final class JsonTreeReader {
     private JsonValue readAs(JsonEventSource events, JsonCompiledSchema schema, String rootType,
                              JsonTypeReader<?> reader) {
         try {
-            JsonReadContext ctx = JsonReadContext.of(events, receiver);
+            // The identifier policy reaches this read and not the schemaless one: a schema-directed reader
+            // holds the position, so it knows which member names are field names ([TSON-JSON] §9.4).
+            JsonReadContext ctx = JsonReadContext.of(events, receiver, policy.identifierPolicy());
             ctx = schema.rootDeclaration(rootType).map(ctx::underDeclaration).orElse(ctx);
             JsonValue root = (JsonValue) reader.read(ctx);
             if (!(events.next() instanceof JsonEvent.EndOfDocument)) {
