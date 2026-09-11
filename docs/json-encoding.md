@@ -321,6 +321,14 @@ when the selected type reads the value as a record) — over §3.2's closed rese
 and `$value`. §6.1.5 is what it buys at a record position: a tag naming a subtype, validated in full, which
 is the JSON spelling of `!employee` at a `person` field.
 
+**The class is `JsonReservedMembers`, not the spec's own noun, and the divergence is deliberate.** In this
+codebase `Annotation` means an `@name` annotation and nothing else — two dozen types say so, from the
+`tson-annotation` module through `Annotations`, `TsonAnnotation` and the `AnnotationStart`/`AnnotationEnd`
+events — and those have **no JSON carrier at all**: §4.3 declines one for v1 and makes encoding a value that
+carries them an encode error. A type named for §3.3 would be the single place the word meant something else,
+so it is named for the §3.2 namespace it scans and cites §3.3 throughout. The spec's noun is right for the
+spec, where `@name` annotations are §3.1's and no reader is looking at a Java identifier to tell them apart.
+
 **Recognising one needs a rewindable lookahead, and this is the position the parallel-stack decision
 predicted would need it.** §6.1.6 gives member order no meaning, so `$type` may sit anywhere in the object
 and the opening brace settles nothing — a schema-directed reader must read into a value before it knows

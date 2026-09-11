@@ -7,8 +7,18 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import java.util.List;
 
 /**
- * [TSON-JSON] §3.3's annotation object: the JSON carrier for a type annotation, which TSON text attaches
- * beside a value and JSON has no beside for.
+ * [TSON-JSON] §3.2's reserved member namespace, and the scan that asks which of it an object carries.
+ *
+ * <p><b>The spec calls the construct an "annotation object" (§3.3) and this class does not</b>, because in
+ * this codebase {@code Annotation} means an {@code @name} annotation and nothing else -- two dozen types say
+ * so, from the {@code tson-annotation} module through {@code Annotations}, {@code TsonAnnotation} and the
+ * {@code AnnotationStart}/{@code AnnotationEnd} events. Those have no JSON carrier at all: §4.3 declines one
+ * for v1 and makes encoding a value that carries them an encode error. A class named for §3.3 would be the
+ * one place the word meant something else, so it is named for the namespace it scans and cites §3.3
+ * throughout.
+ *
+ * <p>What §3.3 defines is the JSON carrier for a type annotation and a schema scope -- what TSON text
+ * attaches beside a value, and JSON has no beside for.
  *
  * <p>Two forms. The <b>wrapper</b> is an object whose members are reserved only, with {@code $value} present
  * -- {@code {"$type": "age", "$value": 42}} -- and carries an annotation for a value of any shape. The
@@ -23,7 +33,7 @@ import java.util.List;
  * skipping values without materialising them, and rewinds -- so the read that follows sees a stream nothing
  * has touched. It costs one pass over the object's events, replayed from a buffer rather than re-lexed.
  */
-final class JsonAnnotationObject {
+final class JsonReservedMembers {
 
     /** §3.2's closed set. Membership is what a {@code $}-initial name is tested against, and there is no fourth. */
     static final String TYPE = "$type";
@@ -31,7 +41,7 @@ final class JsonAnnotationObject {
     static final String SCHEMA = "$schema";
     static final List<String> RESERVED = List.of(SCHEMA, TYPE, VALUE);
 
-    private JsonAnnotationObject() {
+    private JsonReservedMembers() {
     }
 
     /**
@@ -55,7 +65,7 @@ final class JsonAnnotationObject {
      * from here: a scan is a question, and what a wrong answer means depends on the position that asked.
      */
     static Tag scan(JsonReadContext ctx) {
-        return JsonReadContext.lookingAhead(ctx, JsonAnnotationObject::read);
+        return JsonReadContext.lookingAhead(ctx, JsonReservedMembers::read);
     }
 
     private static Tag read(JsonReadContext ctx) {

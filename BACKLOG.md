@@ -137,7 +137,7 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 
 - [ ] **Every schema-directed record read scans its object twice.** Recognising [TSON-JSON] §3.3's
   annotation object means seeing member names, and §6.1.6 gives member order no meaning — so
-  `JsonRecordTreeReader` runs `JsonAnnotationObject.scan` before every record, and the events it looked past
+  `JsonRecordTreeReader` runs `JsonReservedMembers.scan` before every record, and the events it looked past
   are replayed from a buffer rather than re-lexed. Correct, and unmeasured: `JsonAllocationHarnessTest` reads
   schemalessly, so nothing says what the second pass costs per bound record. No shortcut is sound — peeking
   the first member concludes nothing when order is free, and a redundant tag is admissible at any typed

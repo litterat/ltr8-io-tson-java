@@ -92,7 +92,7 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
     public JsonValue read(JsonReadContext ctx) {
         ctx = ctx.inRecord(schemaLocation);
         if (ctx.peek() instanceof JsonEvent.ObjectStart) {
-            JsonAnnotationObject.Tag tag = JsonAnnotationObject.scan(ctx);
+            JsonReservedMembers.Tag tag = JsonReservedMembers.scan(ctx);
             if (tag.present() || tag.unknown() != null) {
                 return tagged(ctx, tag);
             }
@@ -146,9 +146,9 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
      * {@code $type} MUST resolve and MUST be admissible under [TSON-SCHEMA] §7.2, so it names this entry or
      * one of its subtypes and nothing else. The value then validates against the selected type in full.
      */
-    private JsonValue tagged(JsonReadContext ctx, JsonAnnotationObject.Tag tag) {
+    private JsonValue tagged(JsonReadContext ctx, JsonReservedMembers.Tag tag) {
         if (tag.unknown() != null) {
-            JsonAnnotationObject.refuseUnknown(ctx, tag.unknown());
+            JsonReservedMembers.refuseUnknown(ctx, tag.unknown());
             JsonEventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
@@ -156,10 +156,10 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
             // §8.5 admits `$schema` exactly where the position's effective type is a `scoped` instance
             // holding EXTERN, or a container of one. A record position is not one, and §3.3 makes it a
             // resolver error anywhere else -- a scope change the model never opted into.
-            ctx.field(JsonAnnotationObject.SCHEMA).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
+            ctx.field(JsonReservedMembers.SCHEMA).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
                     "'$schema' opens a schema scope, which [TSON-SCHEMA] §7.8 admits only at a scoped position "
                             + "-- '" + name + "' is a record", "no $schema at this position",
-                    JsonAnnotationObject.SCHEMA);
+                    JsonReservedMembers.SCHEMA);
             JsonEventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
@@ -171,7 +171,7 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
             return JsonNull.INSTANCE;
         }
         if (!name.equals(tag.type()) && !subtypes.contains(tag.type())) {
-            ctx.field(JsonAnnotationObject.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
+            ctx.field(JsonReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
                     "'$type' names '%s', which is not admissible at a '%s' position -- a tag may name this type "
                             .formatted(tag.type(), name) + "or one of its subtypes ([TSON-SCHEMA] §7.2)",
                     admissible(), tag.type());
@@ -218,15 +218,15 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
             if (!(event instanceof JsonEvent.MemberName member)) {
                 throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);
             }
-            if (JsonAnnotationObject.VALUE.equals(member.name())) {
-                value = (JsonValue) readerFor.resolve(type).read(ctx.field(JsonAnnotationObject.VALUE));
+            if (JsonReservedMembers.VALUE.equals(member.name())) {
+                value = (JsonValue) readerFor.resolve(type).read(ctx.field(JsonReservedMembers.VALUE));
                 continue;
             }
-            if (!JsonAnnotationObject.isReserved(member.name())) {
+            if (!JsonReservedMembers.isReserved(member.name())) {
                 ctx.field(member.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
                         "'%s' stands beside '$value' in an annotation object, which is apparatus and not a record "
                                 .formatted(member.name()) + "-- it admits the reserved members and nothing else "
-                                + "(§3.3)", String.join(" | ", JsonAnnotationObject.RESERVED), member.name());
+                                + "(§3.3)", String.join(" | ", JsonReservedMembers.RESERVED), member.name());
             }
             JsonEventSkip.nextValue(ctx.field(member.name()));
         }
@@ -274,7 +274,7 @@ final class JsonRecordTreeReader implements JsonTypeReader<JsonValue> {
      */
     private void unmatched(JsonReadContext ctx, String memberName) {
         JsonReadContext at = ctx.field(memberName);
-        if (JsonAnnotationObject.isReserved(memberName)) {
+        if (JsonReservedMembers.isReserved(memberName)) {
             // §3.3: the record is the object minus its reserved members. Whether they were admissible here
             // was settled by the scan before any member was read, so passing over one now is not a decision
             // being skipped -- it is the decision already taken.
