@@ -37,8 +37,9 @@ copy. `spec/` holds local snapshots of the current revision for quick reference:
 `spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core}.tn` (the spec's own bundled schema
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not a
-source of truth — with one standing exception: the three `.tn` schemas are **packaged from here at build
-time**, so they are the live copies rather than a snapshot. They carry **Revision 35 identities** —
+source of truth — with **two** standing exceptions. The three `.tn` schemas are **packaged from here at build
+time**, so they are the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in
+place**: see "Part 3 is drafted here" below. They carry **Revision 35 identities** —
 `https://tson.io/2026/35/m/*.tn`, the published revision's own. `spec/` holds Revision 35 of both parts, whose
 §13.2 table names those same identities and is stamped from these bytes — so the table is neither a revision
 behind nor stale, and **§13.2 is a fourth pin to move** whenever the artifacts change.
@@ -111,6 +112,29 @@ watch for and flag:
 When you find one: say so in conversation, and record it in `SPEC-FEEDBACK.md` (spec section, concrete
 description, the interpretation this implementation chose and why, suggested resolution). Don't silently
 pick an interpretation — a resolved ambiguity is invisible again three sessions later unless written down.
+
+**Part 3 is drafted here, so edit `spec/tson-part3-json.md` directly as you go.** [TSON-JSON] is a very early
+draft and this implementation exists to validate it, which makes the loop tighter than for Parts 1 and 2: a
+finding becomes a **spec change in the same session**, in place, with git history as its record — not a
+register entry waiting for someone else's adjudication. Parts 1 and 2 keep the register, because their current
+revision is published and this implementation *proposes* changes to them rather than making them; Part 3 has
+no published revision to be behind, so there is nothing to propose against.
+
+What that changes in practice:
+
+- **A Part 3 finding does not go in `SPEC-FEEDBACK.md`.** Fix §N and say so in the commit. An entry spanning
+  Part 3 and an earlier part stays in the register, and says which half is which.
+- **Edit the prose, not just a note beside it.** An underspecification is closed by stating the rule; an
+  overclaim by correcting the sentence. Where the choice is genuinely open, state the rule *and* why the
+  alternative was not taken, so the author is reading a decision rather than a shrug.
+- **Cite the section, not this implementation.** The document never mentions this codebase, a Java type, or a
+  test. What running code buys is confidence that a rule is implementable and that its consequences were
+  followed; the document states the rule.
+- **The obligation runs the other way too.** Implementing a section is when its wording gets its only real
+  reading — so a section you build against and leave unedited is a section you are asserting is right.
+- **Keep it to what implementation taught you.** A Part 3 edit should trace to something the code forced a
+  decision about. Rewriting prose that no reader tripped over is churn in a document someone else is also
+  editing.
 A finding still open is cited by number (`SPEC-FEEDBACK.md` #N); once the spec carries the rule, the
 citations name the section instead.
 

@@ -24,7 +24,19 @@ pointer to one: where an entry proposes a design this implementation has built, 
 what is running, and what is not, so that a reviewer editing the spec needs nothing beside it. **Where the
 evidence is a consumer of this library rather than this library** — #1 and #2 were found building the HTTP
 layer in `ltr8-io-tson-java-http`, and this register is the collection point for all of it — the entry says so
-and states what is running there on the same terms. **Cite the spec, not the argument that got it there:**
+and states what is running there on the same terms.
+
+**Part 3 is not in this register.** [TSON-JSON] is an early draft this implementation exists to validate, and
+`spec/tson-part3-json.md` is edited **directly** as findings arise — so a Part 3 finding becomes a spec change
+in the same session, with git history as its record, rather than an entry waiting for adjudication. Two
+entries that were Part 3's (#6, §9.4's name-hygiene reach, and #9, §6.5's map-form test against the kernel's
+`value`) are gone for that reason and their rules are in the document. **The numbers are not reused and the
+gaps are left** — the register renumbers only when a revision closes, so that a citation written against the
+open set stays valid until then. What stays here is Parts 1 and 2, whose current
+revision is published and whose changes this implementation proposes rather than makes. An entry spanning both
+stays, and says which half is which.
+
+**Cite the spec, not the argument that got it there:**
 `docs/` and the Javadoc name the section that requires a behaviour, and a `SPEC-FEEDBACK.md #N` citation is
 for an entry below, where there is no section to point at yet. When an entry closes, its citations become spec
 citations and the entry is deleted — nothing here is an archive.
@@ -451,56 +463,6 @@ is not an identifier does, since a reader today has to derive it from §7.7 and 
 answer is "nothing in this encoding can declare it".
 
 
-## 6. §9.4 does not say whether a JSON member name is judged by the identifier policy or merely inherits a verdict, and the homoglyph case decides it
-
-**Documents:** [TSON-JSON] §9.4; [TSON-DATA] §8.2; [TSON-JSON] §6.1.1, §6.2.
-**Kind:** ambiguity — two readings, one of which reports a policy refusal as a verdict.
-
-§9.4 states the name-hygiene layer's reach in one sentence:
-
-> the **identifier policy** reaches every member name read as a field name and every `$type` (both
-> identifiers, matched against declared names, so a data document inherits the declaration's verdict)
-
-The parenthetical carries two readings, and they differ in behaviour rather than in emphasis:
-
-1. **Inheritance only.** A member name is matched against the declared names, which were judged when the
-   schema loaded; nothing is judged at read time. A name matching nothing is an ordinary closure error
-   (§6.1.1) or a rest entry (§6.2).
-2. **The policy runs, and inheritance is why it is usually cheap.** A member name matching a declared field
-   has already passed; one matching nothing is tested before it is reported.
-
-**Reading 1 reports a refusal as a verdict, so reading 2 must be right.** Take a record declaring `password`
-and a document sending `pаssword` with U+0430 CYRILLIC SMALL LETTER A. Under reading 1 the name matches no
-declared field, so it is `UNRECOGNIZED_FIELD` — a validation error, one of [TSON-DATA] §8.1's four
-categories. §8.2 requires the opposite in as many words: a name-hygiene refusal "MUST NOT be reported in any
-of the four categories", because the rules read data the UCD does not freeze and so may not decide validity.
-Reading 1 therefore makes the encoding refuse a document under a §8.1 category for a §8.2 rule, in exactly
-the case §8.2's look-alike rule exists for.
-
-**The interpretation this implementation will take** is reading 2, with the reach stated precisely, since it
-is narrower than it first appears: the identifier policy's whole job at the JSON data layer is a member name
-matching **no** declared field in a record with **no** rest field. A name matching a declared field inherits;
-a name reaching §6.2's collect rule is a **map key**, which §9.4 itself puts under the *token* policy, not
-this one. So the order is declared fields, then rest collection, then hygiene — and only the last reaches the
-policy.
-
-That ordering matters beyond the wording, and is worth stating in §6.2 rather than leaving to be derived: it
-is what lets a converted schema's `@rest` tail carry ordinary foreign JSON whose member names were never
-declared, without meeting an identifier rule at all. Getting it the other way round — hygiene before
-collection — would refuse ordinary JSON under a rule that exists only where names are declared.
-
-**Suggested resolution.** Replace §9.4's parenthetical with the reach and the order:
-
-> the **identifier policy** reaches every `$type`, and every member name read as a field name that matches no
-> declared field of the position's type and is not collected by a rest field (§6.2) — a member name matching
-> a declared field carries that declaration's verdict, and a collected member is a map key, under the token
-> policy. A look-alike member name MUST be refused under §8.2 rather than reported as a closure violation.
-
-One consequence worth stating alongside it: a JSON document read with **no** schema binding is outside this
-document (§3.4) and applies neither policy. Its member names are data, not names, and there is no declaration
-for them to be look-alikes of.
-
-
 ## 7. §4.1 has no term for a position typed by a host type, so a binding processor has no rule to follow
 
 **Documents:** [TSON-DATA] §4.1, §4.2, §4.4; [TSON-SCHEMA] §4.2; [TSON-JSON] §4.1, §5.7.
@@ -607,66 +569,3 @@ unquoted `true`, so the annotation is never *needed* — then §5 should say so,
 would remove `text` (§4.4 already recovers a string) and §5.5 explicitly keeps that one: the annotation
 exists to **assert** the case where it is in doubt, which is exactly what a quoted `"true"` at a boolean
 position is.
-
-## 9. §6.5's map-form test is stated over the type hierarchy where it means content grammar, and `value` falls the wrong way
-
-**Documents:** [TSON-JSON] §6.5 (the two map forms), §5.7 (`void`, `value`, scoped positions); [TSON-SCHEMA]
-§4.2, §5.2; [TSON-DATA] §2.9.
-**Kind:** underspecification — a case the prose does not address where an implementation must still pick
-something, and where two implementations would pick differently with equal justification.
-
-§6.5 selects a map's JSON form from its key type, and the test is a single clause: **object form** "when `K`
-resolves, after following its reference chain, to an **atom-family instance or an enum**: the types a single
-scalar token denotes directly, the same line [TSON-SCHEMA] §5.2 draws for value modifiers"; **pairs form**
-"when `K` is anything else". The split is exclusive and decidable at schema load, which is right — §4.1
-forbids reading speculatively, so the position must be settled before the value is touched.
-
-**The clause is stated over a position in the type hierarchy, and the property it means to test is a content
-grammar.** Those coincide for every family but the kernel's `unit`, whose three instances are all
-atom-family instances ([TSON-SCHEMA] §4.2 dispatches them on the declaration's own name, their resolved
-shapes being identical) and are three different things at a key position:
-
-- **`identifier`** is a scalar token type. Object form, plainly, and the member name faces its profile.
-- **`void`** has absence as its sole value, and [TSON-DATA] §2.9 forbids an absent key — so a `void`-keyed
-  map is uninhabited and no reader ever reaches the question. Harmless either way.
-- **`value`** is the one that decides the clause. Its inhabitants span four JSON kinds — §5.7 reads a
-  boolean as a boolean, a number without fraction or exponent as an integer, one with either as a float, and
-  a string as a string — and **JSON member names are only ever strings**. So object form re-types every key:
-  a decoded key could never be a boolean or a number, and `1` and `"1"` would arrive as one key.
-
-**That last consequence contradicts two rules §6.5 itself states.** Identity under a declared key type is
-"over its value space ([TSON-SCHEMA] §5.5)", and a form that can only produce strings does not have `value`'s
-value space to compare over. And "a member name `K`'s contract rejects is a resolver error" presumes a
-contract that reads token content, which is exactly what `value` does not have — §5.7 gives it a reading by
-*kind*, this encoding's own, invoking none of [TSON-DATA] §4.
-
-**The cross-reference nearly answers it and does not quite.** §5.2's line — which fields may carry a `~`/`=`
-value — excludes `void` and the scoped instances, and [TSON-SCHEMA] §5.2 makes that a rule about the field's
-own declared type. But it is a rule about *carrying a literal in a schema*, not about *spelling a key on the
-wire*, and the two exclusions are not the same set: `value` is admissible under one reading of §5.2's line
-and is precisely the case §6.5 cannot afford to admit.
-
-**The interpretation this implementation chose** is pairs form for `value`, on the ground that it has no
-content grammar for a key token to face: `JsonMapTreeReader` selects object form exactly when the resolved
-key body is an `Atom` **and** the shared atom vocabulary answers with a parser for it, which is true of every
-family, every enum and `identifier`, and false for `value` and `void`. Pairs form then reads each key as an
-ordinary `value` position, so a boolean key stays a boolean and `1` and `"1"` stay two keys — `value`'s value
-space preserved, which is what §6.5's identity rule asks for. The cost is that a `value`-keyed map is
-bracket-shaped where a reader might expect braces; the alternative silently re-types every key it carries.
-
-**Scope, stated so the priority is visible.** `value` is meta-kernel's and core.tn does not re-export it, so
-no user schema can declare such a map — the case arises only inside a meta-schema, and neither meta-kernel.tn
-nor meta.tn declares one today (both their maps are `type_name`- and `uri`-keyed, squarely object form). This
-is a rule the series should state rather than a defect biting anyone. It is worth stating all the same,
-because [TSON-SCHEMA] §2.2.2 makes the meta layer the format's extension point: a processor must compile
-whatever constructor an extension meta-schema declares, and "atom-family instance" is the kind of phrase two
-implementations read differently with no vector able to catch it.
-
-**Suggested resolution.** State the object-form test as a property of the key type's **parsing contract**
-rather than of its position in the hierarchy: object form when `K` resolves to a type whose contract reads
-*token content* — every atom family, every enum, and `identifier` — and pairs form otherwise, `value` and
-`void` included. One added clause in §6.5 naming the two exclusions and why (`value` is read by kind and not
-by content, §5.7; `void` has no value a key could be, [TSON-DATA] §2.9) would close it. If instead `value`
-is meant to take object form and be read as text there, §6.5 should say so outright and §5.7 should note that
-a key position is the one place `value`'s four-kind reading does not apply — because that is a real exception
-to a rule stated without one, and it is not derivable from either section as written.

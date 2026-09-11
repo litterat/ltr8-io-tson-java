@@ -135,6 +135,16 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   document that writes `1`. The JSON side already carries the case, which is how the disagreement surfaced.
   The parity case is left out of that suite until this lands rather than pinned as expected divergence.
 
+- [ ] **The schema-directed JSON reader applies no name hygiene, so a look-alike member name is reported as a
+  verdict** ([TSON-JSON] §9.4, which now states the rule; issue #476). Hygiene lives only on the schemaless
+  bind path (`reader.DataClassObjectReader.checkNameHygiene`, where the target class plays the schema's part).
+  `JsonRecordTreeReader` has none — so a document sending `pаssword` with U+0430 against a record declaring
+  `password` matches no field and draws `UNRECOGNIZED_FIELD`, one of [TSON-DATA] §8.1's four categories, which
+  §8.2 forbids outright for these rules because they read data the UCD does not freeze. The order §9.4 fixes is
+  declared fields, then rest collection, then hygiene over what is left; only the last reaches the identifier
+  policy, which is why this is a narrow check and not a per-member cost. The `class2/schema/refused/` corpus
+  vectors are the precedent for what a refusal must and must not report.
+
 - [ ] **Every schema-directed record read scans its object twice.** Recognising [TSON-JSON] §3.3's
   annotation object means seeing member names, and §6.1.6 gives member order no meaning — so
   `JsonRecordTreeReader` runs `JsonReservedMembers.scan` before every record, and the events it looked past
