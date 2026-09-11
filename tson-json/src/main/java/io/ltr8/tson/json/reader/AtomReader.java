@@ -21,7 +21,7 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * <p><b>The split of labour is §5.1's and is the whole of the design.</b> This encoding adds no atom grammar:
  * a string's content faces the same parser, the same acceptance set and the same error split as the
  * equivalent TSON token, so the two encodings cannot disagree about whether {@code "2026-07-01"} is a
- * {@code date}. What is this encoding's own is {@link JsonAtomForm} -- which of JSON's kinds reach the parser
+ * {@code date}. What is this encoding's own is {@link AtomForm} -- which of JSON's kinds reach the parser
  * -- and nothing else.
  *
  * <p><b>Contract rejection and constraint violation stay apart</b>, and neither is decided here: {@link
@@ -29,24 +29,24 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * ATOM_CONSTRAINT_VIOLATION}, which is §5.1's split ("contract rejection is a resolver error; constraint
  * violation after parsing is a validation error") applied by the same code that applies it for TSON text.
  */
-final class JsonAtomReader<T> implements JsonTypeReader<T> {
+final class AtomReader<T> implements JsonTypeReader<T> {
 
     /**
      * Every atom constructor but {@code unit}. The family's parser comes from the declared name and the
      * resolved body together -- {@code AtomParsers} is the one index both encodings ask, so there is never a
      * second opinion about which parser reads which body.
      */
-    static final JsonValueReaderFactory ATOM = JsonAtomReader::of;
+    static final ValueReaderFactory ATOM = AtomReader::of;
 
     /**
      * §5.2's enums, with {@code boolean} taken off the general path so it reads a real {@code Boolean} rather
      * than the text {@code "true"}. The general rule still decides the <em>form</em>; only the host value
      * differs, exactly as it does on the TSON side.
      */
-    static final JsonValueReaderFactory ENUM = (name, definition, context) -> "boolean".equals(name)
-            ? new JsonAtomReader<>(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
+    static final ValueReaderFactory ENUM = (name, definition, context) -> "boolean".equals(name)
+            ? new AtomReader<>(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
                     () -> new IllegalStateException("the built-in vocabulary has no 'boolean'")),
-                    JsonAtomForm.BOOLEAN, context.locationOf(name, definition))
+                    AtomForm.BOOLEAN, context.locationOf(name, definition))
             : of(name, definition, context);
 
     /**
@@ -55,28 +55,28 @@ final class JsonAtomReader<T> implements JsonTypeReader<T> {
      * the three are the encoding's rather than the vocabulary's, and §5.7 is where JSON states its own
      * readings of them.
      */
-    static final JsonValueReaderFactory UNIT = (name, definition, context) -> switch (name) {
-        case "void" -> new JsonVoidReader(name, context.locationOf(name, definition));
-        case "value" -> new JsonValuePositionReader(name, context.locationOf(name, definition));
+    static final ValueReaderFactory UNIT = (name, definition, context) -> switch (name) {
+        case "void" -> new VoidReader(name, context.locationOf(name, definition));
+        case "value" -> new ValuePositionReader(name, context.locationOf(name, definition));
         default -> of(name, definition, context);
     };
 
     private final String name;
     private final AtomType<T> parser;
-    private final JsonAtomForm form;
+    private final AtomForm form;
     private final JsonSchemaLocation schemaLocation;
 
-    private JsonAtomReader(String name, AtomType<T> parser, JsonAtomForm form, JsonSchemaLocation schemaLocation) {
+    private AtomReader(String name, AtomType<T> parser, AtomForm form, JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.parser = parser;
         this.form = form;
         this.schemaLocation = schemaLocation;
     }
 
-    private static JsonTypeReader<?> of(String name, TypeDefinition definition, JsonValueReaderContext context) {
+    private static JsonTypeReader<?> of(String name, TypeDefinition definition, ValueReaderContext context) {
         AtomType<?> parser = AtomParsers.forType(name, definition.body()).orElseThrow(() -> new IllegalStateException(
                 "'" + name + "' is registered as an atom but its body has no parser: " + definition.body()));
-        return new JsonAtomReader<>(name, parser, JsonAtomForm.of(definition.body()), context.locationOf(name, definition));
+        return new AtomReader<>(name, parser, AtomForm.of(definition.body()), context.locationOf(name, definition));
     }
 
     @Override
@@ -91,7 +91,7 @@ final class JsonAtomReader<T> implements JsonTypeReader<T> {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' takes %s, and this is %s"
                     .formatted(name, form.describe(), JsonAtoms.describe(event)),
                     form.describe(), JsonAtoms.describe(event));
-            JsonEventSkip.value(ctx, event);
+            EventSkip.value(ctx, event);
             return null;
         }
         try {

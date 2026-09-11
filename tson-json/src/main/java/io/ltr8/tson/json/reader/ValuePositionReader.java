@@ -27,14 +27,14 @@ import java.math.BigInteger;
  * token and not a scope, so {@code $schema} at one is a resolver error ([TSON-SCHEMA] §7.8); nothing here
  * admits an object at all, which is that rule already met.
  */
-final class JsonValuePositionReader implements JsonTypeReader<Object> {
+final class ValuePositionReader implements JsonTypeReader<Object> {
 
     private static final String EXPECTED = "a JSON boolean, number, or string";
 
     private final String name;
     private final JsonSchemaLocation schemaLocation;
 
-    JsonValuePositionReader(String name, JsonSchemaLocation schemaLocation) {
+    ValuePositionReader(String name, JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.schemaLocation = schemaLocation;
     }
@@ -58,7 +58,7 @@ final class JsonValuePositionReader implements JsonTypeReader<Object> {
             default -> {
                 ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' is a value, which takes %s, and this is %s"
                         .formatted(name, EXPECTED, JsonAtoms.describe(event)), EXPECTED, JsonAtoms.describe(event));
-                JsonEventSkip.value(ctx, event);
+                EventSkip.value(ctx, event);
                 return null;
             }
         }

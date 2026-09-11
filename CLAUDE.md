@@ -443,7 +443,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   schema-directed read hands back a `JsonValue`, never a `TsonValue`**: the parsers run, which is the
   validation, and the host value is discarded — tree mode answers *does this conform* and bind mode
   answers *give me the value*, so converting an encoding belongs to neither. What that costs is one kind
-  of test, which is why `JsonValueReaderFactoryRegistry.atoms()` (§5's vocabulary with no mode over it)
+  of test, which is why `ValueReaderFactoryRegistry.atoms()` (§5's vocabulary with no mode over it)
   stays as the registry the parsing contract is pinned against. Two copies of the field-state rules are
   what the parallel stack buys, and `CrossEncodingParityTest` is the guard §9.4 makes obligatory — same
   schema, same document in both encodings, same `Diagnostic.Code` and same RFC 6901 pointer, over the
@@ -465,9 +465,13 @@ module has a real `module-info.java`; module names mirror each module's root exp
   document and the collector says why, and problems come from one closed `Code` vocabulary across both encodings
   (§9.4). There is no `JsonParseException`: the stack raises `tson-base`'s shared `ParseException` beneath the
   readers and `JsonDiagnostics` classifies it, the peer of `TsonDiagnostics` and separate for the reason that
-  class's own note gives: each encoding owns the switch over its own exceptions. **`Json` is the prefix here, on `Tson`'s own
-  terms** — the names a consumer writes are the JDK's, so this module keeps them rather than minting a second
-  vocabulary for one hierarchy. **The write side is the read side's inverse and no more**:
+  class's own note gives: each encoding owns the switch over its own exceptions. **`Json` is the prefix here,
+  on `Tson`'s own terms** — the names a consumer writes are the JDK's, so this module keeps them rather than minting a second
+  vocabulary for one hierarchy. **In the exported packages only**: `reader` is unexported, so its types are
+  bare like `tson-compiler`'s, and thirteen of them share a name with their counterpart there, which is what
+  makes the two stacks legible as peers. Its schema-directed readers are named **mode first** —
+  `TreeRecordReader`, `TreeMapObjectReader` — so bind mode lands as `BindRecordReader` beside its peer.
+  **The write side is the read side's inverse and no more**:
   `JsonTreeWriter`/`JsonObjectWriter` over `JsonDataEmitter` (the push peer of `JsonStream`, which owns the
   separators so no walk places its own) and their `writer`-package engines. The **tree** round trip is total
   — RFC 8259 has six kinds and one spelling each, and `JsonNumber` holds the literal, so §5.3's digits and
@@ -1236,7 +1240,7 @@ single-script name is refused with nothing mixed):
 | Schema | `TsonSchemaLinker.checkNames` | §11.4's four, plus a template's parameters (§11.4 declines the scope) |
 | Data (TSON) | `DefaultTsonReadContext` + `SchemalessTreeReader` | a type-ref/annotation name; one record's field names |
 | Data (JSON), schemaless | `reader.DataClassObjectReader.checkNameHygiene` | one record's member names — the two per-name rules only |
-| Data (JSON), schema-directed | `reader.JsonNameHygiene`, from the record and choice readers | an **unmatched** member name; a `$type` naming nothing — the two per-name rules only |
+| Data (JSON), schema-directed | `reader.NameHygiene`, from the record and choice readers | an **unmatched** member name; a `$type` naming nothing — the two per-name rules only |
 
 **The schema-directed reach is narrower than the schemaless one, and deliberately so** ([TSON-JSON] §9.4): a
 member name matching a declared field, or a `$type` naming a declared type, carries that declaration's own

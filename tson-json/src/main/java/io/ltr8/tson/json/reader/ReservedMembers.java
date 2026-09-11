@@ -36,7 +36,7 @@ import java.util.List;
  * skipping values without materialising them, and rewinds -- so the read that follows sees a stream nothing
  * has touched. It costs one pass over the object's events, replayed from a buffer rather than re-lexed.
  */
-final class JsonReservedMembers {
+final class ReservedMembers {
 
     /** §3.2's closed set. Membership is what a {@code $}-initial name is tested against, and there is no fourth. */
     static final String TYPE = "$type";
@@ -44,7 +44,7 @@ final class JsonReservedMembers {
     static final String SCHEMA = "$schema";
     static final List<String> RESERVED = List.of(SCHEMA, TYPE, VALUE);
 
-    private JsonReservedMembers() {
+    private ReservedMembers() {
     }
 
     /**
@@ -68,7 +68,7 @@ final class JsonReservedMembers {
      * from here: a scan is a question, and what a wrong answer means depends on the position that asked.
      */
     static Tag scan(JsonReadContext ctx) {
-        return JsonReadContext.lookingAhead(ctx, JsonReservedMembers::read);
+        return JsonReadContext.lookingAhead(ctx, ReservedMembers::read);
     }
 
     private static Tag read(JsonReadContext ctx) {
@@ -111,7 +111,7 @@ final class JsonReservedMembers {
                     default -> unknown = unknown == null ? name : unknown;
                 }
             }
-            JsonEventSkip.nextValue(ctx);
+            EventSkip.nextValue(ctx);
         }
     }
 
@@ -154,7 +154,7 @@ final class JsonReservedMembers {
                                 .formatted(member.name()) + "-- it admits the reserved members and nothing else "
                                 + "(§3.3)", String.join(" | ", RESERVED), member.name());
             }
-            JsonEventSkip.nextValue(ctx.field(member.name()));
+            EventSkip.nextValue(ctx.field(member.name()));
         }
     }
 

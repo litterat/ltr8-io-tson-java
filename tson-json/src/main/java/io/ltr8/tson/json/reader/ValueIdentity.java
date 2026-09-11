@@ -9,7 +9,6 @@ import io.ltr8.tson.json.tree.JsonValue;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.nio.ByteBuffer;
 import java.time.OffsetDateTime;
@@ -30,9 +29,9 @@ import java.time.ZoneOffset;
  * <p>The peer of {@code tson-compiler}'s {@code ValueIdentity}, and one whose two copies must agree: a
  * duplicate key and a contradicted FIXED value are the same question in both encodings.
  */
-final class JsonValueIdentity {
+final class ValueIdentity {
 
-    private JsonValueIdentity() {
+    private ValueIdentity() {
     }
 
     static Object of(Object decoded) {
@@ -59,7 +58,7 @@ final class JsonValueIdentity {
         return switch (node) {
             case JsonNumber number -> number.toBigDecimal().stripTrailingZeros();
             case JsonString string -> Nfc.of(string.value());
-            case JsonArray array -> array.elements().stream().map(JsonValueIdentity::ofNode).toList();
+            case JsonArray array -> array.elements().stream().map(ValueIdentity::ofNode).toList();
             case JsonObject object -> {
                 Map<Object, Object> members = new LinkedHashMap<>();
                 object.members().forEach((key, value) -> members.put(Nfc.of(key), ofNode(value)));

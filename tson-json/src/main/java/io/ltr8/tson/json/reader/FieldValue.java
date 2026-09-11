@@ -28,14 +28,14 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * <p>[TSON-SCHEMA] §5.2 confines a {@code ~}/{@code =} value to an atom- or enum-typed field, which is what
  * makes one parser and one form enough here.
  */
-record JsonFieldValue(AtomType<?> parser, JsonAtomForm form, Object pinned, JsonValue node, String text) {
+record FieldValue(AtomType<?> parser, AtomForm form, Object pinned, JsonValue node, String text) {
 
     /**
      * Resolves {@code token} against the field's declared type. Raises if the type is not one an atom parser
      * answers for -- the kernel's {@code value} and {@code void}, which have no content grammar of their own
      * -- so the entry becomes a gap rather than compiling a check it could not perform.
      */
-    static JsonFieldValue of(TsonSchema schema, String fieldTypeName, Token token) {
+    static FieldValue of(TsonSchema schema, String fieldTypeName, Token token) {
         String name = fieldTypeName;
         Top body = null;
         for (int hops = 0; hops < MAX_REFERENCE_HOPS; hops++) {
@@ -56,9 +56,9 @@ record JsonFieldValue(AtomType<?> parser, JsonAtomForm form, Object pinned, Json
         }
         AtomType<?> parser = AtomParsers.forType(name, atom).orElseThrow(() -> new IllegalStateException(
                 "'" + fieldTypeName + "' carries a schema-stated value but has no parser to read it with"));
-        JsonAtomForm form = JsonAtomForm.of(atom);
+        AtomForm form = AtomForm.of(atom);
         Object pinned = parser.read(token.text());
-        return new JsonFieldValue(parser, form, pinned, node(form, pinned, token.text()), token.text());
+        return new FieldValue(parser, form, pinned, node(form, pinned, token.text()), token.text());
     }
 
     /** How many reference hops before this gives up; linking has already refused a cycle, so this is a guard. */
@@ -73,7 +73,7 @@ record JsonFieldValue(AtomType<?> parser, JsonAtomForm form, Object pinned, Json
      * exception and keeps its token: the token <em>is</em> the spelling there, which is what a {@code bytes}
      * default in base64 needs.
      */
-    private static JsonValue node(JsonAtomForm form, Object value, String text) {
+    private static JsonValue node(AtomForm form, Object value, String text) {
         return switch (form) {
             case BOOLEAN -> JsonBoolean.of(Boolean.parseBoolean(text));
             case NUMBER -> new JsonNumber(String.valueOf(value));

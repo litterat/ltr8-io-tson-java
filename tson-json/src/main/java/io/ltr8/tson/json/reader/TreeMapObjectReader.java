@@ -27,11 +27,11 @@ import java.util.Map;
  * spellings of one octet string under a {@code bytes} key are one key. The repeat is the §7.7 error, and the
  * entry it would have added lands under the first spelling with the later value -- one key, one entry.
  */
-final class JsonObjectMapReader extends JsonMapTreeReader {
+final class TreeMapObjectReader extends TreeMapReader {
 
     private final AtomType<?> keyParser;
 
-    JsonObjectMapReader(String name, MapBody body, AtomType<?> keyParser, JsonTypeReader<?> value,
+    TreeMapObjectReader(String name, MapBody body, AtomType<?> keyParser, JsonTypeReader<?> value,
                         JsonSchemaLocation schemaLocation) {
         super(name, body, value, schemaLocation);
         this.keyParser = keyParser;
@@ -66,7 +66,7 @@ final class JsonObjectMapReader extends JsonMapTreeReader {
                 // reported again as a repeat of the first.
                 continue;
             }
-            String slot = byIdentity.putIfAbsent(JsonValueIdentity.of(key), member.name());
+            String slot = byIdentity.putIfAbsent(ValueIdentity.of(key), member.name());
             if (slot != null) {
                 at.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
                         "duplicate key '%s' in '%s' -- a map states each key at most once, and the repeat states "

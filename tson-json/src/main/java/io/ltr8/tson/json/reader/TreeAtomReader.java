@@ -23,23 +23,23 @@ import io.ltr8.tson.json.tree.JsonValue;
  * {@code tson-compiler}'s tree mode gives ({@code TsonAbsent}) in the same position, which is what keeps one
  * schema giving one shape of answer over both encodings.
  */
-final class JsonAtomTreeReader implements JsonTypeReader<JsonValue> {
+final class TreeAtomReader implements JsonTypeReader<JsonValue> {
 
     /** Wraps any atom-family factory so its leaf yields the node the document carried. */
-    static JsonValueReaderFactory over(JsonValueReaderFactory delegate) {
-        return (name, definition, context) -> new JsonAtomTreeReader(delegate.create(name, definition, context));
+    static ValueReaderFactory over(ValueReaderFactory delegate) {
+        return (name, definition, context) -> new TreeAtomReader(delegate.create(name, definition, context));
     }
 
     private final JsonTypeReader<?> delegate;
 
-    private JsonAtomTreeReader(JsonTypeReader<?> delegate) {
+    private TreeAtomReader(JsonTypeReader<?> delegate) {
         this.delegate = delegate;
     }
 
     @Override
     public JsonValue read(JsonReadContext ctx) {
         JsonEvent event = ctx.peek();
-        JsonValue node = JsonNodes.scalar(event);
+        JsonValue node = Nodes.scalar(event);
         int before = ctx.reported();
         delegate.read(ctx);
         // A composite where a scalar was due: the delegate reported it and consumed the whole value, so there

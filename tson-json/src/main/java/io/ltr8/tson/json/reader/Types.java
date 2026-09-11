@@ -14,12 +14,12 @@ import java.util.Optional;
  * type, and now a choice variant's discrimination class -- and a chain walk that disagrees with itself about
  * where a name lands is a bug no test would name.
  */
-final class JsonTypes {
+final class Types {
 
     /** Linking has already refused a cycle, so this bounds a fault rather than a document. */
     private static final int MAX_HOPS = 64;
 
-    private JsonTypes() {
+    private Types() {
     }
 
     /**

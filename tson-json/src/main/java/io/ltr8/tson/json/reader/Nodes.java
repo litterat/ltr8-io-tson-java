@@ -15,9 +15,9 @@ import io.ltr8.tson.json.tree.JsonValue;
  * preserve a number's digits and §5.3 preserves an exact value's digits and scale, so {@code 199.90} must
  * come back out as it went in.
  */
-final class JsonNodes {
+final class Nodes {
 
-    private JsonNodes() {
+    private Nodes() {
     }
 
     /** The node {@code event} carries, or null when {@code event} opens a composite or ends one. */
