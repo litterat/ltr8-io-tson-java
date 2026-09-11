@@ -380,12 +380,22 @@ class CrossEncodingParityTest {
                 {"not-a-date": 12.5}""");
     }
 
-    // §6.5 says `1` and `1.0` under a `number` key are one key, and the two encodings disagree about it:
-    // `tson-compiler`'s ValueIdentity has no BigDecimal case, so the exact tier compares by scale there and
-    // the TSON reader accepts both spellings as two keys. That is the TSON side's defect, filed as issue
-    // #470 with its reproduction, and it reaches the FIXED check and set membership too. The case is left
-    // out rather than asserted as expected divergence: pinning a defect as agreed behaviour is how it
-    // becomes permanent. It joins this class when the fix lands.
+    /**
+     * §6.5: identity is over the key type's value space, so {@code 1} and {@code 1.0} under a {@code number}
+     * key are one key in both encodings.
+     *
+     * <p>This case was held out of the suite while the TSON reader disagreed — its {@code ValueIdentity} had
+     * no {@code BigDecimal} case, so the exact tier compared by scale there (issue #470). Pinning that as
+     * expected divergence is how a defect becomes permanent, so it waited instead, and it is here now that
+     * both encodings answer alike.
+     */
+    @Test
+    void twoSpellingsOfOneKey() {
+        sameVerdict("by_number", """
+                { 1 => "a"  1.0 => "b" }""", """
+                {"1": "a", "1.0": "b"}""");
+    }
+
 
     /**
      * A compound key takes §6.5's pairs form in JSON and the ordinary map form in text -- genuinely different

@@ -275,14 +275,16 @@ FIXED check, group multiplicity, container size and arity. The **atom vocabulary
 implementation both encodings call, so its acceptance sets and its split between contract rejection and
 constraint violation cannot drift, and asserting them here would test the shared code twice.
 
-**It has since found a defect in the incumbent, which is the outcome a parity guard is least likely to be
-built for and most valuable for.** `tson-compiler`'s `ValueIdentity` folds five families into their value
-space and has no `BigDecimal` case, so the exact tier compares with scale: a `number`-keyed map admits `1` and
-`1.0` as two keys, and a field `= 1.0` turns away a document that writes `1`. [TSON-SCHEMA] §5.5 and
-[TSON-JSON] §5.3 both put scale outside the value. The JSON reader already had the case, so the disagreement
-surfaced the moment maps landed — filed as issue #470, with the parity case left out of the suite until the
-fix lands rather than pinned as expected divergence, since pinning a defect as agreed behaviour is how it
-becomes permanent.
+**It found a defect in the incumbent, which is the outcome a parity guard is least likely to be built for and
+most valuable for.** `tson-compiler`'s `ValueIdentity` folded four host types into their value space and had
+no `BigDecimal` case, so the exact tier compared with scale: a `number`-keyed map admitted `1` and `1.0` as
+two keys, a `set` of `number` admitted both, and a field `= 1.0` turned away a document writing `1` —
+refusing a conforming document rather than admitting a malformed one, which is the worse direction of the
+two. [TSON-SCHEMA] §5.5 and [TSON-JSON] §5.3 both put scale outside the value. The JSON reader already had
+the case, so the disagreement surfaced the moment maps landed.
+
+The parity case was **held out of the suite until the TSON side was fixed**, rather than pinned as expected
+divergence — pinning a defect as agreed behaviour is how it becomes permanent. It is in the suite now.
 
 **Between those two sits one legitimate divergence, and the test asserts it as a divergence.** JSON has six
 value *kinds* where TSON text has tokens: `name: 42` at a `text` field is the unquoted token `42`, whose
