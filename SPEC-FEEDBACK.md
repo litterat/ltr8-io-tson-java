@@ -1018,9 +1018,19 @@ and the pins are pairwise distinct as tuples, compared as *values* — `= 255` a
 and `= 1.0`. A family is re-judged whenever any part of it is local, so an importer adding an unpinned member, or
 one colliding with an imported pin, is refused by the schema that added it.
 
-What is **not** running is the reading. No encoding dispatches on a member, so a sealed family validates like any
-record and every document still carries its tag; the inhabitance and identity rules above are stated rather than
-measured. The kernel's own three schemas resolve, link and compile unchanged — every record OPEN, every field not
+**JSON reads a family**, which is the half this design exists for: `record.extension` picks the reader when the
+schema compiles, so an ABSTRACT position requires its tag and decodes no member, a SEALED one places the value by
+reading its discriminators, and OPEN and FINAL share the concrete reader — a FINAL record's admissible tag set is
+empty by construction rather than by a check. The mapping is derived once at compile time and keyed by what the
+pins compare as, so a schema pinning `= 0xFF` selects on a document writing `255`; a table keyed on tokens reads
+that as unmatched. The selected member then re-reads the whole object, which re-verifies the pin as an ordinary
+FIXED check and makes the dispatch read and the validation read agree by construction.
+
+What is **not** running is the TSON side, so **the two encodings currently disagree about a sealed family** — JSON
+places a value by its members where TSON text still reads the base as a plain record. §9.4 forbids that, and it is
+a gap in this implementation rather than a divergence from the design; the parity cases land with the TSON reader,
+having nothing to compare before it. The inhabitance and identity rules above are stated rather than measured. The
+kernel's own three schemas resolve, link and compile unchanged — every record OPEN, every field not
 a discriminator — which is the evidence that the fields cost nothing where nothing uses them.
 
 **Suggested resolution.** Add `extension: record_extension_type ~ OPEN` over `[ABSTRACT SEALED FINAL OPEN]` to the

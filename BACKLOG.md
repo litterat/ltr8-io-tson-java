@@ -85,9 +85,10 @@ test puts its fact in the kernel, and its work is under "Discriminated record fa
 `SPEC-FEEDBACK.md` #10 and #11 carry the design and the arguments; this is the build order. A record states how
 it may be realised, a field of an abstract record may be a discriminator, and a position typed by such a record
 recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). The kernel
-carries both facts, meta.tn declares the four marks, the resolver lowers them into the body, and the linker
-refuses a family the closure contradicts. What is left is reading one: no encoding dispatches on a member yet,
-so a sealed family validates like any record and every document still needs its tag. Work lands on
+carries both facts, meta.tn declares the four marks, the resolver lowers them into the body, the linker refuses
+a family the closure contradicts, and **JSON reads one** — a value at a sealed position is placed by its own
+members, with no tag anywhere. What is left is the TSON side, which still reads a sealed base as a plain record,
+so the two encodings disagree until it lands. Work lands on
 `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
 - [ ] **`@abstract` on a template.** Meaningful and refused as a gap today: §5.10 holds a template's body as
@@ -124,10 +125,10 @@ so a sealed family validates like any record and every document still needs its 
 - [ ] **The remaining corpus vectors.** `class2/link/` is done — ten vectors over the closure checks, the
   FINAL refusal and the subtraction that is *not* refused. What is left is `class2/schema/` for the resolved
   output of each `extension` member and a discriminator field, and `class2/validate/` for the dispatch, the
-  missing member, the unmatched value and the disagreeing tag — the second of which has to wait for a reader
-  to dispatch at all. The corpus's own sidecar schemas need no change — these are ordinary
-  vectors — and the JSON side is covered by `CrossEncodingParityTest`, which §9.4 makes obligatory here since
-  both encodings state the same refusals.
+  missing member, the unmatched value and the disagreeing tag. The corpus's own sidecar schemas need no
+  change — these are ordinary vectors. `class2/validate/` reaches both encodings, so it lands with the TSON
+  reader rather than before it: a vector the JSON stack passes and the TSON one cannot is a corpus that
+  reports this repo's own gap as a conformance failure.
 
 ## JSON encoding
 

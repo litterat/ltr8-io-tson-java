@@ -389,6 +389,43 @@ a thing the read remembers to honour. What stays on the base is what both forms 
 entry-value rule, the size facets, and the test that picks between them — which §8.3 also asks, to judge
 whether a map is class-stable.
 
+### A record position gets the reader its extension fact earns
+
+§6.1.5 gives an untagged object three readings, decided by the position's own `record.extension`
+([TSON-SCHEMA] §5.2) — so the record factory picks a reader **once, when the schema compiles**, and no value
+pays for a branch it will never take.
+
+- **OPEN and FINAL** share `TreeRecordReader`, because they read identically. The difference is only which
+  names a tag may carry, which is the subtype set, and a FINAL record's is empty *by construction* rather
+  than by a check — nothing asks whether the record is final, and the "admissible" list a diagnostic prints
+  is right without asking.
+- **ABSTRACT** gets `TreeAbstractReader`, which decodes no member at all: `$type` is REQUIRED, the failure
+  lands before the object's shape is consulted, and the base itself is not admissible — a tag naming it is an
+  error where a concrete position would take one as a redundant restatement.
+- **SEALED** gets `TreeSealedReader`, which reads the discriminator members and looks the value up.
+
+**The mapping is derived once and never at read time.** Each member's pins are decoded at construction, at
+the fields' declared types *in the base* — the one set known before a member is selected — and keyed by what
+they compare as (`ValueIdentity`). So a read is one map lookup, and both sides of the comparison went through
+the same parser: a schema pinning `= 0xFF` selects on a document writing `255`, which §4.3 makes the same
+integer. A table keyed on tokens would read that as unmatched.
+
+**One scan, not two.** `ReservedMembers.scanFor` captures the reserved members *and* the named selectors in
+the single lookahead the position was going to make anyway — §6.1.6 gives member order no meaning, so the
+selector may arrive after the members it selects, and a reader that decided on the opening brace or the first
+member could not read that at all.
+
+**The selected member re-reads the whole object**, which is what makes the dispatch read and the validation
+read agree by construction: the pin is re-verified as an ordinary FIXED check rather than trusted from the
+scan. A deeper `$type` wins over the dispatched member (§6.1.5's "deeper than one level"), and a tag that
+contradicts it is a refusal rather than a precedence question.
+
+**What is specialised beyond the dispatch** is what the compiler already knows and the reader was re-deriving:
+a record with no field group skips the group pass entirely (§5.11's groups are the exception, and the pass
+indexes every member of every group). The larger one is still owed — the annotation-object lookahead runs
+before *every* record read because §8.1 admits a redundant tag anywhere, and fusing it into the member loop
+with a rewind only where a `$`-initial name actually appears is the measurement `BACKLOG.md` carries.
+
 ### Discrimination: two routes, and the table is built at schema load
 
 §8.2's predicate is the rule [TSON-SCHEMA] §5.4 requires each encoding to state over the resolver-derived
