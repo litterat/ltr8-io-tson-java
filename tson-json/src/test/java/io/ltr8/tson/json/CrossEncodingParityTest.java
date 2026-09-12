@@ -210,7 +210,7 @@ class CrossEncodingParityTest {
 
     /**
      * The tag's <em>spelling</em> is the one thing that legitimately differs here -- {@code !cat} against
-     * {@code "$type": "cat"} -- which is why {@code FamilyDiagnostics} keeps it out of the message and spends
+     * {@code "$type": "cat"} -- which is why {@code RecordExtensionDiagnostics} keeps it out of the message and spends
      * it in {@code actual}, the component this comparison excludes.
      */
     @Test

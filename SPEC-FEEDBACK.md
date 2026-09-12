@@ -1028,7 +1028,7 @@ FIXED check and makes the dispatch read and the validation read agree by constru
 
 **The text encoding reads one too**, on the same terms and from the same rules: one dispatcher per position for
 both read modes, the discriminator fields found by a rewinding lookahead because a record's fields have no
-significant order, and the four refusals taken from the one `FamilyDiagnostics` both stacks hold. A
+significant order, and the four refusals taken from the one `RecordExtensionDiagnostics` both stacks hold. A
 cross-encoding parity test compares code, data pointer, `expected` and prose for every rule they share, and
 passes — which is the evidence §9.4 asks for and not merely a claim that two readers were written from one
 design. What is left is what the family means to the machinery around it: the inhabitance and identity rules

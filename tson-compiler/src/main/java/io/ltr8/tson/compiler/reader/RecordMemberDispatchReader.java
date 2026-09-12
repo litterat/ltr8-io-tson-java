@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
-import io.ltr8.tson.base.diagnostics.FamilyDiagnostics;
+import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -70,7 +70,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private final Map<List<Object>, String> members;
     private final Map<String, Set<String>> deeper;
     private final TsonTypeReaderResolver readerFor;
-    private final FamilyDiagnostics family;
+    private final RecordExtensionDiagnostics extension;
     private final String pinned;
 
     RecordMemberDispatchReader(String name, String displayName, RecordBody body, Set<String> subtypes,
@@ -98,7 +98,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         }
         this.pinned = members.keySet().stream().map(RecordMemberDispatchReader::render)
                 .reduce((a, b) -> a + " | " + b).orElse("(none)");
-        this.family = new FamilyDiagnostics(displayName, String.join(" | ", subtypes));
+        this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
     private static Selector selectorOf(RecordField field, Map<String, TypeDefinition> entries) {
@@ -137,7 +137,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances. A sealed base has none, so naming it selects nothing -- and letting it through
             // would hand the member's reader a tag its own §7.2 guard must refuse, one position too late.
-            ctx.report(family.tagNamesTheBase(TAG));
+            ctx.report(extension.tagNamesTheBase(TAG));
             EventSkip.dataValue(ctx);
             return null;
         }
@@ -149,14 +149,14 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
                 // Never a fallback to the tag: the selector is a REQUIRED field of the base, so a value
                 // without it is invalid on §5.2's ordinary terms, and reading the tag instead would make one
                 // family dispatch two ways.
-                ctx.field(selector.name()).report(family.discriminatorMissing(selector.name()));
+                ctx.field(selector.name()).report(extension.discriminatorMissing(selector.name()));
                 EventSkip.dataValue(ctx);
                 return null;
             }
             Object decoded = decode(selector, value.text(), value.form());
             if (decoded == null) {
                 ctx.field(selector.name())
-                        .report(family.unmatchedDiscriminator(selector.name(), value.text(), pinned));
+                        .report(extension.unmatchedDiscriminator(selector.name(), value.text(), pinned));
                 EventSkip.dataValue(ctx);
                 return null;
             }
@@ -164,12 +164,12 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
         }
         String selected = members.get(key);
         if (selected == null) {
-            ctx.report(family.unmatchedDiscriminator(named(), render(key), pinned));
+            ctx.report(extension.unmatchedDiscriminator(named(), render(key), pinned));
             EventSkip.dataValue(ctx);
             return null;
         }
         if (tag.isPresent() && !deeper.getOrDefault(selected, Set.of()).contains(tag.get())) {
-            ctx.report(family.tagContradictsDiscriminator(TAG, tag.get(), selected));
+            ctx.report(extension.tagContradictsDiscriminator(TAG, tag.get(), selected));
             EventSkip.dataValue(ctx);
             return null;
         }

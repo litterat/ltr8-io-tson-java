@@ -3,7 +3,13 @@ package io.ltr8.tson.base.diagnostics;
 import io.ltr8.tson.base.Diagnostic;
 
 /**
- * What a subtype family's rules say when a document breaks one -- stated once, for every encoding.
+ * What {@code record.extension} obliges of a <em>document</em>, said once for every encoding -- the read-time
+ * half of the fact, where {@code tson-compiler}'s {@code RecordExtension} is the load-time half.
+ *
+ * <p>Named for the kernel field rather than for the shape it produces. "Family" is the design's word for what
+ * an ABSTRACT or SEALED record and its subtypes amount to, and it reads well in prose, but nothing in the
+ * vocabulary is called that: an author arriving from {@code record_extension_type} would not find these rules
+ * under it, and the checker that enforces the same fact at schema load already carries the field's own name.
  *
  * <p>A record states how it may be realised ([TSON-SCHEMA] §5.2), and two of the four members change how a
  * position typed by it is read. At an <b>ABSTRACT</b> position the record has no direct instances, so the tag
@@ -23,7 +29,7 @@ import io.ltr8.tson.base.Diagnostic;
  * @param typeName the family's base, as the author wrote it
  * @param members  what a tag may name here, joined for a closed-list diagnostic -- the base and its subtypes
  */
-public record FamilyDiagnostics(String typeName, String members) {
+public record RecordExtensionDiagnostics(String typeName, String members) {
 
     /**
      * An ABSTRACT position with no tag. The failure lands before the members are read: the record has no

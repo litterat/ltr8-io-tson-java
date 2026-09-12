@@ -4,7 +4,7 @@ import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.Diagnostic;
-import io.ltr8.tson.base.diagnostics.FamilyDiagnostics;
+import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.json.JsonReadContext;
@@ -73,7 +73,7 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
 
     private final TypeReaderResolver readerFor;
     private final JsonSchemaLocation schemaLocation;
-    private final FamilyDiagnostics family;
+    private final RecordExtensionDiagnostics extension;
     private final RecordDiagnostics rules;
     private final String pinned;
 
@@ -109,7 +109,7 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
         }
         this.pinned = members.keySet().stream().map(TreeRecordSealedReader::render).reduce((a, b) -> a + " | " + b)
                 .orElse("(none)");
-        this.family = new FamilyDiagnostics(displayName, String.join(" | ", subtypes));
+        this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
     private static Selector selectorOf(RecordField field, TsonSchema schema) {
@@ -169,13 +169,13 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
                 // Never a fallback to the tag: the selector is a REQUIRED field of the base, so a value
                 // without it is invalid on §5.2's ordinary terms, and reading the tag instead would make one
                 // family dispatch two ways.
-                ctx.field(selector.name()).report(family.discriminatorMissing(selector.name()));
+                ctx.field(selector.name()).report(extension.discriminatorMissing(selector.name()));
                 EventSkip.nextValue(ctx);
                 return JsonNull.INSTANCE;
             }
             Object decoded = decode(selector, value);
             if (decoded == null) {
-                ctx.field(selector.name()).report(family.unmatchedDiscriminator(
+                ctx.field(selector.name()).report(extension.unmatchedDiscriminator(
                         selector.name(), JsonAtoms.describe(value), pinned));
                 EventSkip.nextValue(ctx);
                 return JsonNull.INSTANCE;
@@ -184,14 +184,14 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
         }
         String selected = members.get(key);
         if (selected == null) {
-            ctx.report(family.unmatchedDiscriminator(named(), render(key), pinned));
+            ctx.report(extension.unmatchedDiscriminator(named(), render(key), pinned));
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
         if (tag.type() != null && tag.type().equals(baseName)) {
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances, and a sealed base has none: naming it selects nothing.
-            ctx.report(family.tagNamesTheBase(ReservedMembers.TYPE));
+            ctx.report(extension.tagNamesTheBase(ReservedMembers.TYPE));
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
@@ -200,7 +200,7 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
             // encodings to one pointer for a rule, and TSON's tag is an annotation with no pointer step of
             // its own -- so a rule they share can only be located where they both have a location. §3.3's
             // reserved members are apparatus rather than data in any case, which is the same conclusion.
-            ctx.report(family.tagContradictsDiscriminator(ReservedMembers.TYPE, tag.type(), selected));
+            ctx.report(extension.tagContradictsDiscriminator(ReservedMembers.TYPE, tag.type(), selected));
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
@@ -215,7 +215,7 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
     /** §3.3's wrapper form at a sealed position: `$type` places the value and `$value` holds it. */
     private JsonValue wrapped(JsonReadContext ctx, ReservedMembers.Tag tag) {
         if (tag.type() == null) {
-            ctx.report(family.tagRequired(ReservedMembers.TYPE));
+            ctx.report(extension.tagRequired(ReservedMembers.TYPE));
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
@@ -224,7 +224,7 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
                 ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
                         "'$type' names '%s', which is not a member of the sealed '%s'"
                                 .formatted(tag.type(), displayName),
-                        family.members(), tag.type());
+                        extension.members(), tag.type());
             }
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;

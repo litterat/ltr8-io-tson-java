@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.diagnostics.FamilyDiagnostics;
+import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -26,7 +26,7 @@ import java.util.Set;
  *
  * <p>{@link NamedDispatchReader} is deliberately <em>not</em> reused, close as the shape is: its verdicts are
  * a choice's, and [TSON-JSON] §9.4 binds a family's to the ones the JSON stack gives -- which is what {@link
- * FamilyDiagnostics} exists to hold. Sharing the dispatch would have meant sharing the wording with §8.2's
+ * RecordExtensionDiagnostics} exists to hold. Sharing the dispatch would have meant sharing the wording with §8.2's
  * rule, which is a different rule.
  */
 final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumption.Applied {
@@ -39,21 +39,21 @@ final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumpti
 
     private final Set<String> subtypes;
     private final TsonTypeReaderResolver readerFor;
-    private final FamilyDiagnostics family;
+    private final RecordExtensionDiagnostics extension;
 
     RecordTagDispatchReader(String name, String displayName, Set<String> subtypes,
                              TsonTypeReaderResolver readerFor) {
         this.baseName = name;
         this.subtypes = subtypes;
         this.readerFor = readerFor;
-        this.family = new FamilyDiagnostics(displayName, String.join(" | ", subtypes));
+        this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
     @Override
     public Object read(TsonReadContext ctx) {
         Optional<String> tag = EventSkip.typeRefAhead(ctx);
         if (tag.isEmpty()) {
-            ctx.report(family.tagRequired(TAG));
+            ctx.report(extension.tagRequired(TAG));
             EventSkip.dataValue(ctx);
             return null;
         }
@@ -61,8 +61,8 @@ final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumpti
             // The base itself is not admissible, which is the whole of what ABSTRACT means -- so a tag naming
             // it is refused here where a concrete position takes one as a redundant restatement (§8.1). It
             // gets its own wording because the remedy differs: the tag is not wrong about the position.
-            ctx.report(tag.get().equals(baseName) ? family.tagNamesTheBase(TAG)
-                    : family.notASubtype(TAG, tag.get()));
+            ctx.report(tag.get().equals(baseName) ? extension.tagNamesTheBase(TAG)
+                    : extension.notASubtype(TAG, tag.get()));
             EventSkip.dataValue(ctx);
             return null;
         }

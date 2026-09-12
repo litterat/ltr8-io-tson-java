@@ -1,6 +1,6 @@
 package io.ltr8.tson.json.reader;
 
-import io.ltr8.tson.base.diagnostics.FamilyDiagnostics;
+import io.ltr8.tson.base.diagnostics.RecordExtensionDiagnostics;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
@@ -31,7 +31,7 @@ final class TreeRecordAbstractReader implements JsonTypeReader<JsonValue> {
     private final Set<String> subtypes;
     private final TypeReaderResolver readerFor;
     private final JsonSchemaLocation schemaLocation;
-    private final FamilyDiagnostics family;
+    private final RecordExtensionDiagnostics extension;
     private final RecordDiagnostics rules;
 
     TreeRecordAbstractReader(String name, String displayName, Set<String> subtypes,
@@ -43,7 +43,7 @@ final class TreeRecordAbstractReader implements JsonTypeReader<JsonValue> {
         this.readerFor = readerFor;
         this.schemaLocation = schemaLocation;
         this.rules = rules;
-        this.family = new FamilyDiagnostics(displayName, String.join(" | ", subtypes));
+        this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
 
     @Override
@@ -63,7 +63,7 @@ final class TreeRecordAbstractReader implements JsonTypeReader<JsonValue> {
         if (tag.type() == null) {
             // Before the members: §6.1.5 is explicit that nothing about the object's shape is consulted, so
             // an abstract position with no tag fails whatever it holds.
-            ctx.report(family.tagRequired(ReservedMembers.TYPE));
+            ctx.report(extension.tagRequired(ReservedMembers.TYPE));
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
@@ -72,8 +72,8 @@ final class TreeRecordAbstractReader implements JsonTypeReader<JsonValue> {
             // refuses a tag naming it, where a concrete position would take one as a redundant restatement.
             // Located at the value rather than at `/$type`, for the reason TreeRecordSealedReader gives.
             if (!NameHygiene.refuses(ctx, tag.type())) {
-                ctx.report(tag.type().equals(baseName) ? family.tagNamesTheBase(ReservedMembers.TYPE)
-                        : family.notASubtype(ReservedMembers.TYPE, tag.type()));
+                ctx.report(tag.type().equals(baseName) ? extension.tagNamesTheBase(ReservedMembers.TYPE)
+                        : extension.notASubtype(ReservedMembers.TYPE, tag.type()));
             }
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;

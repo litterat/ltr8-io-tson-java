@@ -416,7 +416,7 @@ said which member this is.
 
 **`NamedDispatchReader` is not reused**, close as the shape is. Its verdicts are a choice's, and
 [TSON-JSON] §9.4 binds a family's to the ones the JSON stack gives — which is what `base.diagnostics`'
-`FamilyDiagnostics` holds, and what `CrossEncodingParityTest` compares.
+`RecordExtensionDiagnostics` holds, and what `CrossEncodingParityTest` compares.
 
 **The pin table is derived at construction**, keyed by what the pins compare as (`ValueIdentity`), and both
 sides go through one parser: a schema pinning `= "dog"` matches an unquoted `dog`, and `= 0xFF` matches `255`.
