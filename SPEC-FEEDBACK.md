@@ -1011,12 +1011,17 @@ they lower under a meta declaring none of them, where an ordinary unknown name i
 while lowering: two definition marks on one declaration, a mark carrying a value, and a definition mark on a
 non-record. A template carrying one is a gap, its body being held until materialisation closes it.
 
-What is **not** running is everything that acts on what the marks state. No load-time check reads the closure, so
-a `@sealed` record with no discriminator, an `@abstract` record with one, a subtype that pins nothing and two
-subtypes that pin the same value all load clean; no reader dispatches on a member; and the inhabitance and
-identity rules above are stated rather than measured. The kernel's own three schemas resolve, link and compile
-unchanged — every record OPEN, every field not a discriminator — which is the evidence that the fields cost
-nothing where nothing uses them.
+**The load-time checks run too**, one pass in the linker beside the disjointness derivation: nothing may compose
+or refine onto a FINAL record while §5.9 subtraction stays admissible; a sealed record's selectors are REQUIRED,
+no group member, and typed by an atom or an enum; every member of the closure pins each selector `REQUIRED_FIXED`;
+and the pins are pairwise distinct as tuples, compared as *values* — `= 255` and `= 0xFF` collide, and so do `= 1`
+and `= 1.0`. A family is re-judged whenever any part of it is local, so an importer adding an unpinned member, or
+one colliding with an imported pin, is refused by the schema that added it.
+
+What is **not** running is the reading. No encoding dispatches on a member, so a sealed family validates like any
+record and every document still carries its tag; the inhabitance and identity rules above are stated rather than
+measured. The kernel's own three schemas resolve, link and compile unchanged — every record OPEN, every field not
+a discriminator — which is the evidence that the fields cost nothing where nothing uses them.
 
 **Suggested resolution.** Add `extension: record_extension_type ~ OPEN` over `[ABSTRACT SEALED FINAL OPEN]` to the
 kernel's `record` and `discriminator: boolean ~ false` to its `record_field`, stating the four members' meanings and
