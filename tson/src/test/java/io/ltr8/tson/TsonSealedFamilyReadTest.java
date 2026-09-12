@@ -37,7 +37,8 @@ class TsonSealedFamilyReadTest {
               frame => @sealed { @discriminator opcode: int32  payload: text }
               ping => frame & { opcode: = 0xFF  seq: int32 }
 
-              holder => { p: pet  s: shape? }
+              holder => { p: pet  s: shape?  u: unpeopled? }
+              unpeopled => @abstract { a: int32 }
               frame_holder => { f: frame }
             }
             """;
@@ -178,6 +179,28 @@ class TsonSealedFamilyReadTest {
                 .contains("selects nothing -- it is abstract"));
     }
 
+    /**
+     * <b>An empty family is a read-time diagnostic and never a load-time refusal.</b> §3.3.4 makes {@code
+     * subtypes} open across schemas, so a library declaring an abstract base for its importers to extend is
+     * empty in its own closure and complete in every consumer's -- which is the shape an abstract base most
+     * exists for. Refusing it at link would make the library unpublishable.
+     *
+     * <p>What the reader owes is a message that names the remedy. The one this replaced offered {@code one of
+     * ()} -- an empty list presented as a choice, an instruction no sender can follow.
+     */
+    @Test
+    void anEmptyFamilyNamesTheMissingImportRatherThanOfferingAnEmptyChoice() {
+        String refusal = message("!holder { p: { pet_type: dog  name: Rex  breed: corgi }  u: { a: 1 } }");
+        assertTrue(refusal.contains("no schema in this closure declares a subtype of 'unpeopled'"), refusal);
+        assertTrue(!refusal.contains("one of ()"), refusal);
+    }
+
+    /** And the schema itself loads: the base is a library declaration, not a defect. */
+    @Test
+    void aBaseWithNoSubtypesStillLoads() {
+        assertEquals(List.of(), Tson.standard().validateSchema(SCHEMA));
+    }
+
     // ── The value that comes back ────────────────────────────────────────
 
     /** Tree mode returns the selected member's own value, so what was dispatched is observable. */
@@ -188,4 +211,5 @@ class TsonSealedFamilyReadTest {
         assertEquals("Tom", read.at("/p/name").asString().orElseThrow());
         assertTrue(read.at("/p/indoor").asBoolean().orElseThrow());
     }
+
 }

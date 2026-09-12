@@ -91,36 +91,31 @@ its own members, with no tag anywhere, and `CrossEncodingParityTest` holds the t
 refusal they share. What is left is what a family means to the machinery around it. Work lands on
 `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
-- [ ] **`@abstract` on a template.** Meaningful and refused as a gap today: §5.10 holds a template's body as
-  text until materialisation closes it, and the mark does not travel. `result => <T> @abstract { … }` with
-  `ok => <T> result<T> & { … }` is the shape a host language spells `abstract class Result<T>`, and the
-  composition half already resolves — only the fact is dropped. `TemplateMaterialiser` must carry it onto the
-  entry it mints, which is where the closed `RecordBody` first exists. `@sealed` and `@final` are **not** part
-  of this: they are claims over a set of subtypes a template does not have, and are a resolver error
-  (`SPEC-FEEDBACK.md` #11). Inhabitance is what needs care — an abstract instantiation is inhabited only where
-  some schema also wrote a subtype's application, so `TypeInhabitance` sees a thinner family than the
-  declarations suggest, and the diagnostic should say which application is missing rather than that the type is
-  uninhabited.
+- [ ] **A closed application of a subtype template has no IS-A edge to its supertype's**, and `@abstract` on a
+  template waits on it. Carrying the mark is the easy half and was measured: adding `extension` to the held
+  wire form and splicing it into a held `!record` application does travel, and `result<text>` comes back
+  ABSTRACT. It buys nothing, because the family is empty and always will be —
+
+      result => @abstract <T> { payload: T }
+      ok     => <T> result<T> & { note: text }
+      holder => { r: result<text>  o: ok<text> }
+
+  resolves to `result_text_…` and `ok_text_…` with **`supertypes=[]` on both**. §5.10's composition onto an
+  *open* application contributes the operand's fields and not its name, a template being no type
+  (`OpenOperandCompositionTest` pins exactly this), and nothing re-establishes the edge once both sides close.
+  So every abstract instantiation is an empty family, and the mark makes the position unusable rather than
+  useful. The gap error it currently gets is the honest one and stays until this is fixed.
+
+  What is owed is the edge: when materialisation closes `ok<text>`, its operand `result<text>` is a type and
+  should be its supertype. That is a §5.10 semantics question and not a mark question, which is why it is its
+  own entry now. `@sealed` and `@final` on a template stay a resolver error whatever happens here — they are
+  claims over a set of subtypes a template does not have (`SPEC-FEEDBACK.md` #11).
 
 - [ ] **`extension` participates in §8.2 identity.** An abstract, a sealed, a concrete and a final `pet` admit
   different values, so they are different types and the fact belongs in the identity a resolved entry is keyed
   on. `extension` is written rather than derived — each definition mark names its member, and the body
   condition is the check on the mark rather than its source — so there is nothing to compute here, only a
   component to include.
-
-- [ ] **An empty family is a read-time diagnostic, and `TypeInhabitance` must be kept away from it.** An
-  ABSTRACT or SEALED record with no subtype in the closure admits nothing, and it is tempting to have §5.10.1's
-  productivity rule refuse it at load. **That would be wrong**, and the case that shows it is the ordinary one:
-  a base schema declares `response => @abstract { … }` and a field typed `response`, and the schemas that
-  import it declare the subtypes. §3.3.4 makes `subtypes` open across schemas, so the family is empty in the
-  declaring schema's own closure and complete in every consumer's — refusing at link would make a library
-  schema unpublishable, and it is the one shape an abstract base is *for*. So inhabitance keeps its current
-  reading and gains no case for `extension`.
-
-  What is left is the diagnostic, which today is bad: a value at such a position gets `must name its type --
-  one of ()`, an empty list offered as a choice. It should say that no schema in this closure declares a
-  subtype of the base, which names the remedy — import the schema that does — rather than presenting an
-  impossible instruction.
 
 - [ ] **The remaining corpus vectors.** `class2/link/` is done — ten vectors over the closure checks, the
   FINAL refusal and the subtraction that is *not* refused. What is left is `class2/schema/` for the resolved

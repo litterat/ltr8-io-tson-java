@@ -37,10 +37,32 @@ public record RecordExtensionDiagnostics(String typeName, String members) {
      * consulted.
      */
     public Refusal tagRequired(String tagSpelling) {
+        return members.isEmpty() ? emptyFamily(tagSpelling)
+                : new Refusal(Diagnostic.Code.TYPE_MISMATCH,
+                        "'%s' is abstract and has no direct instances, so a value here must name its type -- "
+                                .formatted(typeName) + "one of (%s)".formatted(members),
+                        members, "(no " + tagSpelling + ")");
+    }
+
+    /**
+     * An ABSTRACT or SEALED position whose family is <b>empty in this closure</b>: the base has no direct
+     * instances and no schema here declares a subtype, so nothing can stand at the position.
+     *
+     * <p><b>Not a defect in the schema that declared the base.</b> §3.3.4 makes {@code subtypes} open across
+     * schemas, and a library declaring {@code response => @abstract { … }} for its importers to extend is the
+     * shape an abstract base most exists for -- empty in its own closure and complete in each consumer's. So
+     * this is a read-time diagnostic and never a load-time refusal, and it names the remedy accordingly: the
+     * document is being read against a closure that is missing an import, not against a broken schema.
+     *
+     * <p>The message it replaces offered {@code one of ()} -- an empty list presented as a choice, which is an
+     * instruction no sender can follow.
+     */
+    private Refusal emptyFamily(String tagSpelling) {
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
-                "'%s' is abstract and has no direct instances, so a value here must name its type -- one of (%s)"
-                        .formatted(typeName, members),
-                members, "(no " + tagSpelling + ")");
+                "no schema in this closure declares a subtype of '%s', and it is abstract, so nothing can "
+                        .formatted(typeName) + "stand here -- the schema that declares its subtypes is not "
+                        + "among those this document's own schema imports",
+                "a subtype of '" + typeName + "'", "(no " + tagSpelling + ", and none to name)");
     }
 
     /**
@@ -88,6 +110,9 @@ public record RecordExtensionDiagnostics(String typeName, String members) {
      * never written down anywhere they could go and read it.
      */
     public Refusal unmatchedDiscriminator(String selector, String found, String pinned) {
+        if (members.isEmpty()) {
+            return emptyFamily(found);
+        }
         return new Refusal(Diagnostic.Code.TYPE_MISMATCH,
                 "no member of '%s' pins %s to %s -- a sealed family is selected by that value, and this one "
                         .formatted(typeName, selector, found) + "matches none of (%s)".formatted(pinned),

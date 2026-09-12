@@ -955,10 +955,11 @@ closure and complete in each consumer's — and it is the *consumer's* documents
 library's. Rejecting at load would make the library unpublishable for having deferred exactly what it meant to
 defer.
 
-So the rule stays as it is and `extension` adds no case to it. What an empty family needs instead is a
-diagnostic at the position, when a document reaches one: today it is told to name a type "one of ()", an empty
-list offered as a choice. It should say that no schema in this closure declares a subtype of the base, which
-names the remedy — import the schema that does — rather than presenting an impossible instruction.
+So the rule stays as it is and `extension` adds no case to it. What an empty family gets instead is a
+diagnostic at the position, when a document reaches one: **running**, and it names the remedy — no schema in
+this closure declares a subtype of the base, so the schema that does is missing from the imports. What it
+replaced offered "one of ()", an empty list presented as a choice, which is an instruction no sender can
+follow.
 
 **The member is never inherited, and there is no transition table.** A subtype states its own: `dog_type => pet &
 { … }` is OPEN by default whether `pet` is SEALED or OPEN, and it must be — otherwise no concrete subtype of an
@@ -1039,8 +1040,7 @@ significant order, and the four refusals taken from the one `RecordExtensionDiag
 cross-encoding parity test compares code, data pointer, `expected` and prose for every rule they share, and
 passes — which is the evidence §9.4 asks for and not merely a claim that two readers were written from one
 design. What is left is what the family means to the machinery around it: §8.2 identity does not yet carry
-`extension`, and an empty family reaches a document as an unhelpful "one of ()" rather than as the missing
-import it is. The kernel's own three schemas resolve, link and compile unchanged —
+`extension`. The kernel's own three schemas resolve, link and compile unchanged —
 every record OPEN, every field not a discriminator — which is the evidence that the fields cost nothing where
 nothing uses them.
 
