@@ -1034,11 +1034,10 @@ public final class TsonSchemaLinker {
         checkCoherent(body);
         switch (body) {
             case RecordBody r -> {
-                for (String supertype : r.supertypes()) {
-                    if (!namespace.containsKey(supertype)) {
-                        throw new SchemaValidationException(
-                                "'" + entryName + "' has an unresolved supertype '" + supertype + "'");
-                    }
+                // A reference channel like the field types beside it: the body's lineage may be written as
+                // an application, so arity and nested arguments are checked here rather than the name alone.
+                for (TypeRef supertype : r.supertypes()) {
+                    validateTypeRef(supertype, namespace, ownParameters, entryName, " supertype");
                 }
                 for (RecordField field : r.fields()) {
                     validateTypeRef(field.type(), namespace, ownParameters, entryName,

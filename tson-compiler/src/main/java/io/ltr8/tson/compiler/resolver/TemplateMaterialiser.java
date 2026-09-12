@@ -534,10 +534,72 @@ final class TemplateMaterialiser {
     private TypeDefinition closeHeldRecord(String head, TypeDefinition template, HeldBody open,
             List<TypeArgument> arguments, Map<String, TypeArgument> bindings) {
         Closed closed = closeHeld(head, template, open, bindings);
+        Top body = fixRoutedValues(closed.body());
         return new TypeDefinition(Optional.of(new TypeRef(head, arguments)),
                 kindOfClosed(closed.body()),
-                template.supertypes(), template.subtypes(),
-                fixRoutedValues(closed.body()));
+                contractOf(template, open, body), template.subtypes(),
+                body);
+    }
+
+    /**
+     * The closed entry's IS-A contract (§8.1's {@code type_definition.supertypes}): the template's own chain,
+     * plus every parent that was still an <em>application</em> when the template was written.
+     *
+     * <p>A template's chain is settled at its declaration, where a parent applied to its own parameter denotes
+     * no entry -- {@code result<T>} is not a type and nothing can be IS-A one, so it contributes no name
+     * there. Once the arguments arrive it does denote one, and this is where that edge is minted: {@code
+     * ok<text>} IS-A {@code result<text>} and not {@code result<int32>}, which is the whole reason the body
+     * carries the parent as a reference rather than as a name.
+     *
+     * <p><b>Which parents those were is read off the held body, not off the closed one.</b> Closing reduces
+     * an application to a bare name, so afterwards a parent that was written {@code result<T>} and one
+     * written {@code account} are the same shape -- and the difference decides whether an edge is minted or
+     * an already-revoked one is resurrected: §5.9 subtraction empties the contract while the body keeps its
+     * named lineage. The two lists are index-aligned, substitution and closing both mapping elementwise, so
+     * the held body's own supertype elements answer it exactly.
+     */
+    private List<String> contractOf(TypeDefinition template, HeldBody open, Top body) {
+        if (!(body instanceof RecordBody record) || record.supertypes().isEmpty()) {
+            return template.supertypes();
+        }
+        List<Boolean> applied = appliedParents(open);
+        List<String> contract = new ArrayList<>(template.supertypes());
+        Set<String> seen = new LinkedHashSet<>(contract);
+        for (int i = 0; i < record.supertypes().size(); i++) {
+            if (i >= applied.size() || !applied.get(i)) {
+                continue;
+            }
+            String parent = record.supertypes().get(i).name();
+            if (!seen.add(parent)) {
+                continue;
+            }
+            contract.add(parent);
+            TypeDefinition closedParent = materialised.get(parent);
+            if (closedParent == null) {
+                closedParent = namespace.getTypeDefinition(parent);
+            }
+            if (closedParent != null) {
+                for (String ancestor : closedParent.supertypes()) {
+                    if (seen.add(ancestor)) {
+                        contract.add(ancestor);
+                    }
+                }
+            }
+        }
+        return List.copyOf(contract);
+    }
+
+    /** Which of a held body's supertype elements were written as applications -- a record rather than a token. */
+    private static List<Boolean> appliedParents(HeldBody open) {
+        if (!(open.application().coreValue() instanceof RecordValue held)) {
+            return List.of();
+        }
+        return WireForm.field(held, WireForm.SUPERTYPES)
+                .filter(ArrayValue.class::isInstance)
+                .map(ArrayValue.class::cast)
+                .map(array -> array.elements().stream()
+                        .map(element -> element.value().coreValue() instanceof RecordValue).toList())
+                .orElse(List.of());
     }
 
     /**

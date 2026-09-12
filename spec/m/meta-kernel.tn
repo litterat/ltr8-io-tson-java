@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=565ea7d483597c24efa86ce409ffacd4bd6d92938a24253fee89e7a05a45e815"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=0162a483fe6f35714eb192907d81a22cc282f79bfd904b8932b3c859bf063ead"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -484,6 +484,19 @@
     it: the other products are constructors, and a constructor's
     instances are the closed forms a schema writes rather than a
     family an author extends.
+
+    `record.supertypes` holds type_ref and not type_name, because a
+    supertype may be written as an application. Inside a held
+    template body a parent may still be open — `<T> result<T> & {
+    ... }` — and a name cannot carry the arguments that say which
+    instantiation is meant. On the reference channel it is
+    substituted and closed with every other reference the body
+    holds, so `ok<text>` reaches an IS-A edge to `result<text>` and
+    not to `result<int32>`. A closed supertype carries no arguments
+    and is written as a bare token, so this is the same spelling a
+    name had. The derived index `type_definition.supertypes` stays
+    type_name: it is computed once every parent is a type, and a
+    template never is ([TSON-SCHEMA] §5.10).
     """
   record => product & {
     access_pattern:  product_access_type = NAMED
@@ -491,7 +504,7 @@
     fields:          [record_field]
     groups:          [field_group]?
     extension:       record_extension_type ~ OPEN
-    supertypes:      [type_name]?
+    supertypes:      [type_ref]?
   }
 
   array => product & {

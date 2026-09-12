@@ -342,13 +342,15 @@ class DefinitionResolverTest {
 
         // atom, sum: empty trailing body, no fields inherited from top (which has none) -- just the composition itself.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] extension: \"OPEN\" } }", write(atom));
+                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [] groups: [] "
+                + "extension: \"OPEN\" } }", write(atom));
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] extension: \"OPEN\" } }", write(sum));
+                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [] groups: [] "
+                + "extension: \"OPEN\" } }", write(sum));
 
         // product: two brand-new fields added by the trailing body (top contributes none).
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ \"top\" ] fields: [ "
+                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
                 + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } state: \"REQUIRED\" "
                 + "discriminator: false } "
                 + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } state: \"REQUIRED\" "
@@ -357,7 +359,7 @@ class DefinitionResolverTest {
 
         // reference: one brand-new field.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ \"top\" ] fields: [ "
+                + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
                 + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" discriminator: false } "
                 + "] groups: [] extension: \"OPEN\" } }", write(reference));
     }
@@ -379,7 +381,7 @@ class DefinitionResolverTest {
         assertEquals(List.of("atom", "top"), integerType.supertypes());
 
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"atom\" ] fields: [ "
+                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
                         + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } state: \"OPTIONAL\" "
                         + "discriminator: false } "
                         + "{ name: \"min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
@@ -732,7 +734,7 @@ class DefinitionResolverTest {
         assertEquals(List.of("product", "top"), array.supertypes());
         assertEquals("{ "
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"product\" ] fields: [ "
+                        + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" discriminator: false value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
@@ -768,7 +770,7 @@ class DefinitionResolverTest {
         assertEquals(List.of("product", "top"), map.supertypes());
         assertEquals("{ "
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"product\" ] fields: [ "
+                        + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" discriminator: false value: NAMED } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
@@ -819,7 +821,7 @@ class DefinitionResolverTest {
         TypeDefinition production = resolver.resolve(schemaMap.declarations().get("production"));
 
         assertEquals("{ supertypes: [ \"config\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"config\" ] fields: [ "
+                        + "body: !record { supertypes: [ { name: \"config\" arguments: [] } ] fields: [ "
                         + "{ name: \"host\" type: { name: \"text\" arguments: [] } state: \"REQUIRED_FIXED\" "
                         + "discriminator: false "
                         + "value: \"prod.example.com\" } "
@@ -938,7 +940,7 @@ class DefinitionResolverTest {
         assertTrue(enumDef.supertypes().contains("top"), "a constructor: IS-A top");
         assertEquals(List.of("atom", "top"), enumDef.supertypes());
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
-                        + "body: !record { supertypes: [ \"atom\" ] fields: [ "
+                        + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } state: \"REQUIRED\" "
                         + "discriminator: false } "
                         + "] groups: [] extension: \"OPEN\" } }",
@@ -2047,7 +2049,7 @@ class DefinitionResolverTest {
         TypeDefinition subtracted = entries.get("account_public");
         assertEquals(List.of("name", "email"), fieldNames(subtracted));
         assertEquals(List.of(), subtracted.supertypes());              // contract: broken
-        assertEquals(List.of("account"), bodyOf(subtracted).supertypes()); // lineage: kept
+        assertEquals(List.of(TypeRef.of("account")), bodyOf(subtracted).supertypes()); // lineage: kept
         assertEquals(TypeKind.PRODUCT, subtracted.kind());
         // the source is untouched -- removal builds a new field list, it does not edit the supertype's
         assertEquals(List.of("name", "email", "password"), fieldNames(entries.get("account")));
@@ -2068,7 +2070,7 @@ class DefinitionResolverTest {
         // inherited in supertype order (minus the removal), then the body's genuinely new field
         assertEquals(List.of("name", "email", "badge_id", "badge"), fieldNames(staff));
         assertEquals(List.of(), staff.supertypes());
-        assertEquals(List.of("account", "user"), bodyOf(staff).supertypes());
+        assertEquals(List.of(TypeRef.of("account"), TypeRef.of("user")), bodyOf(staff).supertypes());
     }
 
     /** A body entry may tighten a field that survives the removal -- §5.9's own {@code account_view}. */

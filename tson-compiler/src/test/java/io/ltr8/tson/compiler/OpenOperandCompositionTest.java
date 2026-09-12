@@ -20,12 +20,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Composing and refining against a template application that is <b>still open</b> -- one applied to the
  * absorbing declaration's own parameter, so it denotes no entry: {@code vip => <T> customer & box<T>}.
  *
- * <p><b>Nothing here needs materialisation, which is the point.</b> The operand's body is held, so its field
- * set is known while the application is open; substituting its parameters with the arguments as written
- * yields a held record still carrying them, and absorbing that is an ordinary flattened record that mentions
- * {@code T}. What the operand does <em>not</em> contribute is its own name: a template is not a type (§5.10),
- * so nothing can be IS-A one. Its ancestors are types and do come through, which is what keeps a declaration
- * composing {@code box<T>} usable where {@code box}'s own {@code base} is expected.
+ * <p><b>The fields need no materialisation, which is why absorption happens here.</b> The operand's body is
+ * held, so its field set is known while the application is open; substituting its parameters with the
+ * arguments as written yields a held record still carrying them, and absorbing that is an ordinary flattened
+ * record that mentions {@code T}.
+ *
+ * <p><b>The IS-A edge is the half that has to wait.</b> A template is not a type (§5.10), so the open
+ * declaration's contract index names {@code customer} and {@code box}'s own ancestors and never {@code box}
+ * -- there is no instantiation of it yet to be IS-A. What the declaration <em>can</em> do is keep the
+ * application: {@code record.supertypes} is a reference channel, so {@code box<T>} is written into the held
+ * body and closes with everything else in it. {@code vip<text>} is therefore IS-A {@code box<text>} and not
+ * {@code box<int32>}, which a name-level edge to {@code box} could not have distinguished.
  *
  * <p><b>The membership table is the real claim</b>, since a schema-driven read admits a value by the IS-A
  * index and nothing else. For {@code base => { tag }}, {@code box => <T> base & { value: T }} and
@@ -35,15 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <tr><th>declared</th><th>admits it</th><th>why</th></tr>
  * <tr><td>{@code [customer]}</td><td>yes</td><td>composed directly</td></tr>
  * <tr><td>{@code [base]}</td><td>yes</td><td>carried through the open operand</td></tr>
- * <tr><td>{@code [box<text>]}</td><td><b>no</b></td><td>deliberate -- see below</td></tr>
+ * <tr><td>{@code [box<text>]}</td><td>yes</td><td>the application closed with the body that held it</td></tr>
  * </table>
- *
- * <p>The third row is what flattening at the declaration costs. The application is absorbed away here, so
- * when {@code vip<text>} is minted nothing remains that says "close {@code box<text>} too, and index against
- * the entry that mints" -- where the hand-written {@code customer & box<text>} names that entry and gets the
- * edge. Accepted rather than worked around: {@code box<T>} was never a type in {@code vip}'s declaration, so
- * {@code vip} claimed IS-A with no instantiation of it in particular. Pinned below so the day it changes is a
- * decision rather than a surprise.
  */
 class OpenOperandCompositionTest {
 
@@ -132,19 +130,36 @@ class OpenOperandCompositionTest {
     }
 
     /**
-     * Row three, and the one deliberate no. Flattening at the declaration absorbs the application away, so
-     * the closed composition is not indexed under the closed operand -- where the hand-written
-     * {@code customer & box<text>} would be. Changing this means keeping the application until the absorbing
-     * declaration closes, which is a different design and not a fix to this one.
+     * Row three, and the one that needs both sides closed. The hand-written {@code customer & box<text>}
+     * gets this edge at its declaration; here it is minted when {@code vip<text>} closes, off the
+     * application the held body kept -- and it lands on the same entry, which is what makes the two
+     * spellings one type rather than two that happen to have equal fields.
      */
     @Test
-    void aClosedApplicationOfTheCompositionIsNotIndexedUnderTheClosedOperand() {
+    void aClosedApplicationOfTheCompositionIsIndexedUnderTheClosedOperand() {
         TsonCompiledSchema compiled = compile(LATTICE);
         String vipText = aliasTarget(compiled, "vip_text");
         String boxText = aliasTarget(compiled, "text_box");
 
-        assertFalse(compiled.schema().entries().get(boxText).subtypes().contains(vipText),
+        assertTrue(compiled.schema().entries().get(boxText).subtypes().contains(vipText),
                 () -> boxText + ": " + compiled.schema().entries().get(boxText).subtypes());
+        assertTrue(compiled.schema().entries().get(vipText).supertypes().contains(boxText),
+                () -> vipText + ": " + compiled.schema().entries().get(vipText).supertypes());
+    }
+
+    /**
+     * The edge an argument list decides. {@code vip<text>} is IS-A {@code box<text>} and no other
+     * instantiation of {@code box} -- the reason the parent is carried as a reference rather than as the
+     * head name §5.8 describes, which would have been true of every instantiation at once.
+     */
+    @Test
+    void theEdgeIsToTheInstantiationTheArgumentsName() {
+        TsonCompiledSchema compiled = compile(LATTICE + "      int_box  => box<int32>\n");
+        String vipText = aliasTarget(compiled, "vip_text");
+        String intBox = aliasTarget(compiled, "int_box");
+
+        assertFalse(compiled.schema().entries().get(intBox).subtypes().contains(vipText),
+                () -> intBox + ": " + compiled.schema().entries().get(intBox).subtypes());
     }
 
     /** §5.7 against an open source: the same absorption, and the same two omissions. */
@@ -159,7 +174,8 @@ class OpenOperandCompositionTest {
 
         TypeDefinition vip = compiled.schema().entries().get("vip");
         assertEquals(List.of("base"), vip.supertypes(),
-                () -> "box is not a type and contributes no name; its own base does: " + vip.supertypes());
+                () -> "box is not a type and contributes no name to the open entry's contract index; its "
+                        + "own base does: " + vip.supertypes());
         assertTrue(vip.source().isEmpty(),
                 () -> "an open source names no entry, so there is none to record: " + vip.source());
 

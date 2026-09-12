@@ -269,8 +269,13 @@ class Class2ConformanceSuiteTest {
         if (hasField(expected, "subtypes")) {
             for (RecordValue claim : Sidecar.fieldRecordArray(expected, "subtypes")) {
                 String name = fieldText(claim, "name");
-                assertEquals(new TreeSet<>(fieldTextArray(claim, "subtypes")),
-                        new TreeSet<>(definitionOf(entries, name).subtypes()),
+                // Normalised on both sides, and on both ends of the claim: a subtype family over template
+                // instantiations names minted entries at the index *and* inside it (RUNNER.md rule 6, which
+                // reaches "a list of names a sidecar states").
+                assertEquals(new TreeSet<>(fieldTextArray(claim, "subtypes").stream()
+                                .map(ResolvedForm::withoutHash).toList()),
+                        new TreeSet<>(definitionOf(entries, name).subtypes().stream()
+                                .map(ResolvedForm::withoutHash).toList()),
                         "§8.2 subtypes index of " + name);
             }
         }
@@ -278,10 +283,14 @@ class Class2ConformanceSuiteTest {
 
     private static TypeDefinition definitionOf(Map<String, TypeDefinition> entries, String name) {
         TypeDefinition definition = entries.get(name);
-        if (definition == null) {
-            throw new AssertionError("the linked namespace binds no entry '" + name + "'");
+        if (definition != null) {
+            return definition;
         }
-        return definition;
+        String wanted = ResolvedForm.withoutHash(name);
+        return entries.entrySet().stream()
+                .filter(entry -> ResolvedForm.withoutHash(entry.getKey()).equals(wanted))
+                .map(Map.Entry::getValue).findFirst()
+                .orElseThrow(() -> new AssertionError("the linked namespace binds no entry '" + name + "'"));
     }
 
     // ── Validate-layer vectors: data against a schema that loaded ────────

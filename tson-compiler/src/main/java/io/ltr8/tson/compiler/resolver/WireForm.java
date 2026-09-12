@@ -190,8 +190,10 @@ final class WireForm {
         }
         List<RecordValue.Field> binding = new ArrayList<>();
         if (!body.supertypes().isEmpty()) {
+            // Through refValue like every other reference: a closed parent is a bare token and only a parent
+            // still applied to a parameter carries `arguments`, which is what lets substitution close it.
             binding.add(new RecordValue.Field(SUPERTYPES, scoped(new ArrayValue(body.supertypes().stream()
-                    .map(supertype -> scoped(new TokenValue(supertype, TokenForm.UNQUOTED))).toList()))));
+                    .map(supertype -> scoped(refValue(supertype))).toList()))));
         }
         binding.add(new RecordValue.Field(FIELDS, scoped(new ArrayValue(fields))));
         if (!groups.isEmpty()) {

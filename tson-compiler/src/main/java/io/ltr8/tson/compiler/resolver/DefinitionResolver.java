@@ -1146,7 +1146,7 @@ final class DefinitionResolver {
      */
     private TypeDefinition resolveComposition(String name, ConstructionDef construction,
                                                List<String> parameters) {
-        List<String> directSupertypes = new ArrayList<>();
+        List<io.ltr8.tson.schema.meta.TypeRef> directSupertypes = new ArrayList<>();
         List<String> transitiveSupertypes = new ArrayList<>();
         Set<String> seenTransitive = new HashSet<>();
         List<RecordField> fields = new ArrayList<>();
@@ -1162,6 +1162,16 @@ final class DefinitionResolver {
                 OpenOperand operand = openOperand(name, generic, parameters, "supertype");
                 for (String ancestor : operand.ancestors()) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
+                }
+                // The application itself goes into the body, arguments and all. It contributes no name to the
+                // contract index -- `result` is a template and nothing is IS-A one -- but `record.supertypes`
+                // is a reference channel, so materialisation substitutes and closes it with the rest of the
+                // held body and the closed entry gets the edge to `result<text>` that this one cannot state.
+                // A removal revokes IS-A for every parent (§5.9) and there is nothing here to keep as
+                // lineage: a name kept in the body is inert, where an application closes into a live edge.
+                if (construction.removal().isEmpty()) {
+                    directSupertypes.add(new io.ltr8.tson.schema.meta.TypeRef(generic.name(),
+                            typeArguments(name, generic)));
                 }
                 absorb(name, operand.body(), fields, groups, seenFieldNames, inheritedFieldIndex);
                 continue;
@@ -1199,7 +1209,7 @@ final class DefinitionResolver {
                         + "read across). Compose with the head it derives from");
             }
 
-            directSupertypes.add(supertypeName);
+            directSupertypes.add(new io.ltr8.tson.schema.meta.TypeRef(supertypeName, List.of()));
             addIfAbsent(transitiveSupertypes, seenTransitive, supertypeName);
             for (String ancestor : supertypeDef.supertypes()) {
                 addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
@@ -1537,13 +1547,14 @@ final class DefinitionResolver {
      * moment every other application in the absorbing declaration's body does. Both are the absorbing
      * declaration's own materialisation, one pass later.
      *
-     * <p><b>What this cannot give back is one IS-A edge</b>, and it is structural rather than a choice
-     * deferred: the application is flattened away here, so when the absorbing declaration is closed nothing
-     * remains that says "close {@code box&lt;text&gt;} too, and index against the entry that mints". So
-     * {@code vip&lt;text&gt;} stands where {@code customer} and {@code base} are expected and not where
-     * {@code box&lt;text&gt;} is, though the hand-written {@code customer & box&lt;text&gt;} does. Accepted:
-     * {@code box&lt;T&gt;} was never a type in that declaration, so it claimed IS-A with no instantiation of
-     * it in particular.
+     * <p><b>The IS-A edge to the operand itself is minted one pass later, not here.</b> This declaration
+     * cannot state it -- there is no instantiation of {@code box} yet to be IS-A -- so what it does instead
+     * is keep the application: {@code record.supertypes} is a reference channel, so {@code box&lt;T&gt;} is
+     * written into the held body and closes with everything else in it, and
+     * {@link TemplateMaterialiser#contractOf} folds the closed name into the instantiation's contract index.
+     * That is why the parent is carried as a reference and not as the head name §5.8 describes: an edge to
+     * {@code box} would hold of {@code box&lt;int32&gt;} as much as of {@code box&lt;text&gt;}, and only one
+     * of those admits a {@code vip&lt;text&gt;}.
      */
     private OpenOperand openOperand(String name, GenericRef application, List<String> typeParams, String position) {
         String head = application.name();

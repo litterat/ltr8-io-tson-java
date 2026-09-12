@@ -504,13 +504,20 @@ recorded open form, and replacing the application with a reference to the entry 
     `record` constructor, that is an ordinary field set whose types mention a parameter, which is what a
     template's fields are anyway. Inner applications are deliberately left unclosed: they close when the
     absorbing declaration does, one pass later.
-    - **The operand contributes its own supertypes and not its own name.** `box` is a template and §5.10
-      makes a template no type, so nothing can be IS-A one; `box`'s own `base` is a type and its fields
-      arrived, so that edge is real. The cost is one row of the substitutability table: a closed
-      `vip<text>` stands where `customer` and `base` are expected but **not** where `box<text>` is, though
-      the hand-written `customer & box<text>` does — the application is flattened away here, so nothing
-      remains to say "close `box<text>` too, and index against the entry that mints".
-      `OpenOperandCompositionTest` pins all three rows, the deliberate no included.
+    - **The operand contributes no name to the open entry's contract index, and the application to its
+      body.** `box` is a template and §5.10 makes a template no type, so `vip`'s own `supertypes` names
+      `customer` and `box`'s ancestors and never `box` itself. The edge to the operand cannot be stated
+      until there is an instantiation to state it about, so what the declaration keeps instead is the
+      application: `record.supertypes` is typed `[type_ref]`, so `box<T>` is written into the held body and
+      substituted and closed with everything else in it, and `TemplateMaterialiser.contractOf` folds the
+      closed name — plus its own chain — into the instantiation's contract index. A closed `vip<text>`
+      therefore stands where `customer`, `base` **and** `box<text>` are expected, on the same entry the
+      hand-written `customer & box<text>` reaches. **Which parents were applications is read off the held
+      body, not off the closed one**, since closing reduces an application to a bare name and §5.9
+      subtraction keeps named lineage in a body whose contract was emptied — resurrecting that is what the
+      distinction prevents. `OpenOperandCompositionTest` pins all three rows and the argument specificity:
+      the edge is to `box<text>` and not to `box<int32>`, which is why the parent is carried as a reference
+      rather than as the head name §5.8 describes.
     - **An argument that is itself an application survives whole.** Substitution writes a bound reference
       through `WireForm.refValue` — positionally when it carries no arguments, in `type_ref`'s record
       form when it does — so `box<inner<T>>` keeps `inner<T>` and the absorbing declaration's own

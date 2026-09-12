@@ -1057,3 +1057,88 @@ preserved and that their names are reserved; state the two marks as each other's
 `@discriminator` requiring `@sealed`, `@abstract` forbidding a discriminator — and say that the redundancy is for
 the author rather than the resolver; correct §6's validity claim; and settle the field and enum names, which is the
 one part this entry does not.
+
+---
+
+## 12. §5.8's name-level supertype edge cannot place a closed subtype application, and `[type_name]` cannot carry one
+
+**Documents:** [TSON-SCHEMA] §5.8 ("Parameterized references", and the *Resolution* paragraph under it), §5.9
+(removal), §5.10 (a template is not a type), §7.2 (subsumption), §8.1 (`record.supertypes`,
+`type_definition.supertypes`), §8.2 (identity of a minted instantiation).
+**Kind:** defect in a stated rule, plus the one-word kernel change that fixes it. The design is built and
+running.
+
+**The rule as stated.** §5.8's *Parameterized references* paragraph says:
+
+> The `supertypes` lists record the head names only (`[customer box]`) — they are name-level IS-A indexes
+> (§8.1) — while the applied form, arguments included, lives in the entry's `source` and in the absorbed
+> fields, which carry the parameters through ordinary type channels. Parameterized substitutability is
+> therefore a two-part check: the name-level edge via `supertypes`, and binding agreement via the bodies.
+
+**Why the head name cannot do the work.** Take the shape the rule is written for — a base template with
+subtype templates over it, which is how a generic result or response type is written:
+
+```
+result => <T> { payload: T }
+ok     => <T> result<T> & { note: text }
+err    => <T> result<T> & { reason: text }
+holder => { r: result<text> }
+```
+
+The position at `holder.r` is typed by the entry `result<text>` materialises to, because §5.10 makes a
+template no type and §8.3 flattens the use site onto the instantiation. So the question §7.2 asks at that
+position is *which entries are IS-A this instantiation*. A head name answers it twice over wrongly: `result`
+is a name no position is ever typed by, so the edge points at nothing the check is asking about; and it holds
+of every instantiation at once, so it cannot tell `ok<text>` — which belongs there — from `ok<int32>`, which
+does not. The second half of the rule, "binding agreement via the bodies", is what would have to carry the
+whole decision, at every position, by comparing argument lists at read time; and it is unimplementable at the
+one place it matters, because by the time both sides are closed neither body mentions an argument list any
+more. Both are ordinary records with substituted field types.
+
+**And `[type_name]` cannot hold the alternative.** The edge that is wanted is to `result<text>`, which is an
+application while the subtype template is open, and §8.1 types both supertype lists `[type_name]`. So the
+information has nowhere to live: this implementation dropped the parent at `ok`'s declaration, where the
+composition is flattened, and had nothing left to substitute when `ok<text>` closed. Both instantiations
+resolved with empty `supertypes` and empty `subtypes` — two unrelated entries — and a document tagging an
+`ok<text>` at a `result<text>` position was told the position's type "has no subtypes", one line after the
+author declared two.
+
+**What is running.** One kernel change: `record.supertypes` is typed `[type_ref]` rather than `[type_name]`.
+That is the whole of it, and everything else follows from what a reference channel already gets.
+
+- **The body keeps the application.** `ok`'s held body is `!record { supertypes: [ result<T> ] fields: [ … ] }`
+  where before it was the flattened field list alone.
+- **Substitution and closing reach it for free**, being the same walk that closes an application in a field
+  slot: `result<T>` becomes `result<text>` and then the entry that mints, in the pass that closes the rest of
+  the body. Reference validation and arity checking reach it on the same terms.
+- **`type_definition.supertypes` is unchanged and stays `[type_name]`.** It is the derived transitive index,
+  computed once every parent is a type, and a template never is. The closed parent's name and its own chain
+  are folded into it when the instantiation closes.
+- **A closed supertype writes as a bare token**, since an argumentless `type_ref` has that spelling
+  everywhere. So resolved output for every schema that has no open parent is byte-identical to what
+  `[type_name]` produced, the kernel's own three schemas included.
+
+`ok<text>` is now IS-A `result<text>` and not `result<int32>`; the base instantiation indexes both subtype
+instantiations; a chain of three accumulates; and a concrete ancestor of the base still arrives beside the
+closed application.
+
+**§5.9 is the one interaction.** Subtraction revokes IS-A for every parent while the body keeps its named
+lineage, and a name kept there is inert. An *application* kept there is not — it would close into a live edge
+one pass later — so a removal drops it rather than keeping it, and the closed entry gets the empty contract
+§5.9 requires. That also settles how a resolver tells the two apart after closing, when an application has
+been reduced to a bare name and looks like any other lineage entry: it reads which parents were applications
+off the held body, whose elements are index-aligned with the closed ones.
+
+**The identity rule needs no change.** §8.2 keys a minted instantiation on the application recorded in
+`source`, so the parent moving into the body does not move the name; and two instantiations of one template
+with different parents cannot arise, the parent being the template's and not the argument's.
+
+**Suggested resolution.** Type `record.supertypes` `[type_ref]` in §8.1's kernel listing, and replace §5.8's
+*Parameterized references* paragraph: a supertype is recorded as a type-ref, which carries arguments while the
+composing declaration is open and is substituted and closed with the rest of its held body (§5.10); the
+derived `type_definition.supertypes` records names, being computed once every parent is a type. State that
+the edge a closed application mints is to the instantiation its own arguments name, so §7.2 needs no
+second check and no comparison of bodies — the name-level index answers on its own, which is what every
+other position already relies on. State the §5.9 interaction: a removal drops an open application from the
+lineage it keeps for names, because the two behave differently once the entry closes. Drop the "two-part
+check" sentence; there is no second part left for it to name.
