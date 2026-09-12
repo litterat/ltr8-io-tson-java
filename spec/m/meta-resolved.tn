@@ -377,18 +377,31 @@
     body: !reference { target: void }
   }
 
+  @doc:"Declares a record ABSTRACT. A consumed mark: lowered into record.extension."
+  abstract => @annotation !type_definition {
+    source: void
+    body: !reference { target: void }
+  }
+
+  @doc:"Declares a record FINAL. A consumed mark, on @abstract's terms."
+  final => @annotation !type_definition {
+    source: void
+    body: !reference { target: void }
+  }
+
   @doc:"""
-    Names the field a member-dispatching encoding selects a choice's
-    variant on. A checked annotation: no decode force, load-time force.
+    Marks the field a sealed family dispatches on. A consumed mark:
+    lowered into record_field.discriminator, with load-time checks.
     """
   discriminator => @annotation !type_definition {
-    source: field_name
-    body: !reference { target: field_name }
+    source: void
+    body: !reference { target: void }
   }
 
   @doc:"""
     Designates the field an encoding that flattens is meant to flatten.
-    A checked annotation on the same terms as @discriminator.
+    A representation directive: no decode force in the model, load-time
+    force.
     """
   rest => @annotation !type_definition {
     source: void

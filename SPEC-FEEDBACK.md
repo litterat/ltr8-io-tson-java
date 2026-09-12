@@ -938,11 +938,14 @@ since a construct that the resolver reads, that is absent from output, and that 
 positions, so a schema cannot mean something else by them; and resolved output carries the body member and not the
 mark, so there is one carrier for the fact and §8.1's no-hoisting question does not arise.
 
-**What is running:** the two kernel fields. `record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]`,
-`record.extension: record_extension_type ~ OPEN` and `record_field.discriminator: boolean ~ false` are declared in
-this implementation's meta-kernel and bound by its value model, so a resolved schema carries both facts and the
-kernel's own three schemas resolve, link and compile against them unchanged — every record OPEN, every field not a
-discriminator. Nothing yet *sets* either: the three marks are still unread, the load-time checks are unwritten,
+**What is running:** the two kernel fields and the three marks' declarations.
+`record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
+and `record_field.discriminator: boolean ~ false` are declared in this implementation's meta-kernel and bound by
+its value model, so a resolved schema carries both facts and the kernel's own three schemas resolve, link and
+compile against them unchanged — every record OPEN, every field not a discriminator. meta.tn declares `abstract`,
+`final` and `discriminator`, all three `@annotation void`, so an author can write the marks and they resolve;
+`@discriminator` has moved off `field_name`, so its old choice-level spelling is now refused at the annotation's
+own type. Nothing yet reads a mark or sets a field: the lowering is unwritten, the load-time checks are unwritten,
 SEALED is never derived, and no reader dispatches on a member. The inhabitance rule above is stated rather than
 measured.
 

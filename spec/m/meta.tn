@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta.tn?sha256=3c8cd64fbf937d942a12b8b8890110e03c50fe66e007440b0ddb9e6cc67be094"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=52589b247453b4b935c6d5c8129e4c9cb32ec17220824e93d0acb8e647b9052d"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=565ea7d483597c24efa86ce409ffacd4bd6d92938a24253fee89e7a05a45e815"
 !!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=565ea7d483597c24efa86ce409ffacd4bd6d92938a24253fee89e7a05a45e815"
 @doc:"""
@@ -46,8 +46,9 @@
 
   Plus annotation types — the classifying markers `ordered`,
   `bounded`, `exact`, `numeric`; the checked assertion `disjoint`;
-  the representation directives `rest` and `discriminator`; and the
-  documentary `deprecated`, `since`, `todo`,
+  the representation directive `rest`; the consumed marks `abstract`,
+  `final` and `discriminator`; and the documentary `deprecated`,
+  `since`, `todo`,
   `lang`, `title`, `examples`, `read_only`, `write_only`. Annotation
   types must reside in the governing target's namespace (per Part 2
   §6); placing them in meta makes them reachable from core and from
@@ -65,6 +66,19 @@
   same stance governs the type docs: a value space is described
   without reference to any encoding, and where a doc mentions how
   TSON text spells a value it says so by name.
+
+  The consumed marks are the exception that proves the rule, and they
+  are not annotations in that sense. `abstract`, `final` and
+  `discriminator` each state a fact about the type — which values a
+  position typed by the record admits — so erasing one would change
+  what conforms. They are therefore lowered into the kernel's own
+  `record.extension` and `record_field.discriminator` at resolution
+  and do not survive into resolved output: there is no annotation
+  left to erase, and one carrier holds each fact. The annotation
+  spelling is an interim, and Part 2 §12.1 should eventually spell
+  the three as syntax; until then their names are reserved at the
+  positions they mark, so a schema may not mean something else by
+  them.
 
   Constructors that bind to a governing specification compose with
   the kernel's atom_specification mixin and pin the spec field with
@@ -620,32 +634,69 @@
   write_only => @annotation void
 
   @doc:"""
-    Names the field a member-dispatching encoding selects a choice's
-    variant on. A representation directive: force in the class of
-    encodings that dispatch a choice on a member, none in the model —
-    a discriminated choice admits exactly the variants it admitted,
-    and an encoding that tags variants (TSON text, with `!variant` at
-    every non-disjoint choice) keeps its tags. It also carries
-    load-time force, on `@disjoint`'s verified-or-error precedent
-    ([TSON-SCHEMA] §5.4).
+    Declares a record ABSTRACT: it has no instances of its own, so a
+    value at a position typed by it is a value of some subtype
+    ([TSON-SCHEMA] §5.2). A bare presence marker like `@numeric`,
+    consumed into `record.extension` and gone from resolved output.
 
-    Checked at schema load, two outcomes and no third: every variant is
-    a record declaring the named field; that field is REQUIRED_FIXED in
-    every variant (never REQUIRED_DEFAULT — a default is omissible and
-    so cannot dispatch); and the fixed values are pairwise distinct.
-    `field_name` is an identifier, so a non-name spelling fails at the
-    annotation's own type.
+    With at least one `@discriminator` field the record derives
+    SEALED instead, which is the case that makes the subtype
+    recoverable from the value's own members rather than from a tag.
+    Abstractness is never inherited: a subtype is OPEN unless it says
+    otherwise, since carrying the mark downward would leave a family
+    with no concrete member at all. `@abstract` with `@final` on one
+    declaration is a schema-load error.
     """
-  discriminator => @annotation field_name
+  abstract => @annotation void
+
+  @doc:"""
+    Declares a record FINAL: it has instances and admits no subtype.
+    Naming it as the source of a composition or a refinement is a
+    schema-load error, in the declaring schema and in any schema that
+    imports it. A bare presence marker, on `@abstract`'s terms, and
+    consumed into `record.extension` the same way.
+
+    Subtraction stays admissible against a FINAL record —
+    [TSON-SCHEMA] §5.9 empties `supertypes` and mints no IS-A edge,
+    which is the only thing FINAL constrains.
+    """
+  final => @annotation void
+
+  @doc:"""
+    Marks the field a sealed family dispatches on. A bare presence
+    marker like `@numeric`, written on a field of an `@abstract`
+    record, which thereby derives SEALED: a position typed by that
+    record recovers the subtype from this field's value.
+
+    Not a representation directive, and this is what tells the two
+    apart — a directive's force is confined to the encodings that
+    claim it, where this decides which values the position admits in
+    every encoding and in the model. So it is consumed into
+    `record_field.discriminator` rather than carried, and erasing it
+    would change what conforms.
+
+    Checked at schema load, over the linked closure: the field is
+    REQUIRED, is no member of a field group, is typed by an atom or
+    an enum, and carries no value of its own — [TSON-SCHEMA] §5.7's
+    identity diagonal forbids the base pinning what its subtypes each
+    pin differently. Every subtype restates it REQUIRED_FIXED, never
+    REQUIRED_DEFAULT, a default being omissible and so unable to
+    dispatch. More than one discriminator field is admitted; what
+    must be pairwise distinct is then the tuple of pins in the base's
+    declaration order, compared under each field type's own equality
+    rather than by token.
+    """
+  discriminator => @annotation void
 
   @doc:"""
     Designates the field an encoding that flattens is meant to flatten
     — the map-typed field a record's undeclared entries live in, a
     record being closed under its type ([TSON-SCHEMA] §7.2). A
-    representation directive on `@discriminator`'s terms: force in the
-    class of encodings that flatten, none in the model. Checked at
-    schema load: the field's type resolves to a text-keyed map, and at
-    most one field per composed chain carries the mark.
+    representation directive: force in the class of encodings that
+    flatten, none in the model, and a schema with it erased admits
+    exactly the same values. Checked at schema load: the field's type
+    resolves to a text-keyed map, and at most one field per composed
+    chain carries the mark.
     """
   rest => @annotation void
 }

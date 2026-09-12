@@ -84,24 +84,19 @@ test puts its fact in the kernel, and its work is under "Discriminated record fa
 
 `SPEC-FEEDBACK.md` #10 and #11 carry the design and the arguments; this is the build order. A record states how
 it may be realised, a field of an abstract record may be a discriminator, and a position typed by such a record
-recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). Nothing below
-is built. Work lands on `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
+recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). The kernel
+carries both facts and meta.tn declares the three marks; nothing yet reads a mark or acts on a fact. Work lands
+on `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
-- [ ] **The two kernel fields.** `record_extension_type => [ABSTRACT SEALED FINAL OPEN]` and
-  `record.extension: record_extension_type ~ OPEN` in meta-kernel.tn, with `record_field.discriminator:
-  boolean ~ false` beside them. `schema.meta.Record` and `schema.meta.RecordField` gain the components **in the
-  same commit**: strict binding compares a compiled schema against its class at bind-mode compile, so a kernel
-  field with no component fails the compile rather than a test, and the message names it. Schema text moving
-  means the three digests move, so `scripts/restamp-bundled-schemas.sh` and Part 2 §13.2 ride along, and the
-  three `*-resolved.tn` fixtures gain the new members wherever they are not at their defaults.
-
-- [ ] **The three marks lower into the body.** `@abstract` and `@final` at the definition, `@discriminator` on a
-  field, each **consumed** by the resolver into `record.extension` / `record_field.discriminator` rather than
-  preserved in §8.1's author-annotation channel — so resolved output carries one carrier per fact and §8.1's
-  no-hoisting question does not arise. The three names are reserved at their positions: a schema may not mean
-  something else by them. §6 honours a checked annotation at either declaration position, so the key spelling
-  must lower identically to the value spelling. The annotation shape is the interim and §12.1 spells them
-  eventually; what that costs is one more reason to keep the lowering in one place.
+- [ ] **The three marks lower into the body.** The declarations are in meta.tn (`abstract`, `final` and
+  `discriminator`, all `@annotation void`); what is left is the lowering. Each must be **consumed** by the
+  resolver into `record.extension` / `record_field.discriminator` rather than preserved in §8.1's
+  author-annotation channel — so resolved output carries one carrier per fact and §8.1's no-hoisting question
+  does not arise. Until it is, a mark resolves, sits in the annotation channel and does nothing, which is a
+  schema that says `@abstract` and is not. The three names are reserved at their positions: a schema may not
+  mean something else by them. §6 honours a checked annotation at either declaration position, so the key
+  spelling must lower identically to the value spelling. The annotation shape is the interim and §12.1 spells
+  them eventually; what that costs is one more reason to keep the lowering in one place.
 
 - [ ] **The load-time checks, over the linked closure.** One pass, in `TsonSchemaLinker` beside
   `ChoiceDisjointness`. On the record: composing or refining onto a **FINAL** record is a resolver error, in the
