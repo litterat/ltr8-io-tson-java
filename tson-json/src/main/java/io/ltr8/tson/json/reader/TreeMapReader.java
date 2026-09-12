@@ -3,6 +3,7 @@ package io.ltr8.tson.json.reader;
 import io.ltr8.tson.atom.AtomParsers;
 import io.ltr8.tson.atom.AtomType;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.diagnostics.MapDiagnostics;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
@@ -54,12 +55,16 @@ abstract sealed class TreeMapReader implements JsonTypeReader<JsonValue>
 
     final String name;
     final MapBody body;
+
+    /** This map's rules, shared with the TSON reader ([TSON-JSON] §9.4). */
+    final MapDiagnostics rules;
     private final JsonTypeReader<?> value;
     private final JsonSchemaLocation schemaLocation;
 
     TreeMapReader(String name, MapBody body, JsonTypeReader<?> value, JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.body = body;
+        this.rules = new MapDiagnostics(name);
         this.value = value;
         this.schemaLocation = schemaLocation;
     }
@@ -103,9 +108,7 @@ abstract sealed class TreeMapReader implements JsonTypeReader<JsonValue>
         if (at.peek() instanceof JsonEvent.NullValue) {
             at.next();
             if (body.state() == ElementState.REQUIRED) {
-                at.report(Diagnostic.Code.FIELD_REQUIRED,
-                        "'%s' entry '%s' is absent, but values are required".formatted(name, keySegment),
-                        "a value", "(absent)");
+                at.report(rules.absentEntryValue(keySegment, ABSENT));
             }
             return JsonNull.INSTANCE;
         }
@@ -115,21 +118,19 @@ abstract sealed class TreeMapReader implements JsonTypeReader<JsonValue>
     /** §6.5: size facets count entries -- an entry with an absent value is an entry. */
     final void checkSize(JsonReadContext ctx, int count) {
         BigInteger size = BigInteger.valueOf(count);
-        body.minItems().filter(min -> size.compareTo(min) < 0).ifPresent(min -> ctx.report(
-                Diagnostic.Code.TYPE_MISMATCH,
-                "'%s' takes at least %s entries, and this has %d".formatted(name, min, count),
-                ">= " + min, String.valueOf(count)));
-        body.maxItems().filter(max -> size.compareTo(max) > 0).ifPresent(max -> ctx.report(
-                Diagnostic.Code.TYPE_MISMATCH,
-                "'%s' takes at most %s entries, and this has %d".formatted(name, max, count),
-                "<= " + max, String.valueOf(count)));
+        body.minItems().filter(min -> size.compareTo(min) < 0)
+                .ifPresent(min -> ctx.report(rules.tooFewEntries(min, count)));
+        body.maxItems().filter(max -> size.compareTo(max) > 0)
+                .ifPresent(max -> ctx.report(rules.tooManyEntries(max, count)));
     }
 
     /** The value was not the shape this form takes -- the schema chose the form, so the document is wrong. */
-    final JsonValue wrongShape(JsonReadContext ctx, JsonEvent found, String expected) {
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' is a map, which in this schema takes %s, and this is %s"
-                .formatted(name, expected, JsonAtoms.describe(found)), expected, JsonAtoms.describe(found));
+    final JsonValue wrongShape(JsonReadContext ctx, JsonEvent found) {
+        ctx.report(rules.notAMap(JsonAtoms.describe(found)));
         EventSkip.value(ctx, found);
         return JsonNull.INSTANCE;
     }
+
+    /** How a JSON document spells absence (§7), for the `actual` of a rule about an entry value's state. */
+    static final String ABSENT = "null";
 }

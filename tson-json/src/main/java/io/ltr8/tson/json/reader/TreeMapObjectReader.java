@@ -41,7 +41,7 @@ final class TreeMapObjectReader extends TreeMapReader {
     JsonValue readEntries(JsonReadContext ctx) {
         JsonEvent first = ctx.next();
         if (!(first instanceof JsonEvent.ObjectStart)) {
-            return wrongShape(ctx, first, "a JSON object");
+            return wrongShape(ctx, first);
         }
         Map<String, JsonValue> entries = new LinkedHashMap<>();
         Map<Object, String> byIdentity = new HashMap<>();
@@ -68,10 +68,7 @@ final class TreeMapObjectReader extends TreeMapReader {
             }
             String slot = byIdentity.putIfAbsent(ValueIdentity.of(key), member.name());
             if (slot != null) {
-                at.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
-                        "duplicate key '%s' in '%s' -- a map states each key at most once, and the repeat states "
-                                .formatted(member.name(), name) + "an entry for nothing",
-                        "each key stated once", "'" + member.name() + "' stated again");
+                at.report(rules.duplicateKey(member.name()));
             }
             entries.put(slot != null ? slot : member.name(), entry);
         }

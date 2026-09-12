@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.diagnostics.TupleDiagnostics;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -49,6 +50,12 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
     final List<CompiledSlot> slots;
     final SchemaLocation schemaLocation;
 
+    /** This tuple's rules, shared with the JSON reader ([TSON-JSON] §9.4). */
+    final TupleDiagnostics rules;
+
+    /** How a TSON text document spells absence ([TSON-DATA] §2.9), for a position's state rule. */
+    private static final String ABSENT = "_";
+
     TupleAbstractReader(String name, String displayName, TupleBody body, TsonTypeReaderResolver resolver,
                          SchemaLocation schemaLocation) {
         this(name, displayName, body, resolver, schemaLocation, position -> null, AnnotationTypes.DISCARDED);
@@ -74,6 +81,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
         }
         this.slots = slots;
         this.schemaLocation = schemaLocation;
+        this.rules = new TupleDiagnostics(displayName, slots.size());
     }
 
     /**
@@ -89,8 +97,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
             return true;
         }
         TsonEvent e = ctx.peek();
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH, "expected a tuple (array-shaped) for '" + displayName + "', found " + TypeRefCheck.describe(e),
-                "a tuple (array-shaped)", TypeRefCheck.describe(e));
+        ctx.report(rules.notATuple(TypeRefCheck.describe(e)));
         EventSkip.coreValue(ctx);
         return false;
     }
@@ -109,9 +116,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
         while (!(ctx.peek() instanceof ArrayEnd)) {
             if (index >= slots.size()) {
                 if (!reportedExtra) {
-                    ctx.report(Diagnostic.Code.WRONG_ARITY,
-                            "'" + displayName + "' has " + slots.size() + " positions, found more than " + slots.size() + " elements",
-                            slots.size() + " elements", "more than " + slots.size());
+                    ctx.report(rules.tooManyElements());
                     reportedExtra = true;
                 }
                 EventSkip.scopedValue(ctx);
@@ -129,9 +134,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
         }
         ctx.next(); // ArrayEnd
         if (index < slots.size()) {
-            ctx.report(Diagnostic.Code.WRONG_ARITY,
-                    "'" + displayName + "' has " + slots.size() + " positions, found only " + index + " elements",
-                    slots.size() + " elements", String.valueOf(index));
+            ctx.report(rules.tooFewElements(index));
         }
         return result;
     }
@@ -139,9 +142,7 @@ abstract class TupleAbstractReader<T> implements TsonTypeReader<T> {
     private Object defaultOrRequire(CompiledSlot slot, int index, TsonReadContext ctx) {
         ctx.next(); // consume the AbsentEvent regardless of REQUIRED/OPTIONAL
         if (slot.schema().state() == ElementState.REQUIRED) {
-            ctx.index(index).report(Diagnostic.Code.FIELD_REQUIRED,
-                    "'" + displayName + "' position [" + index + "] is absent, but this position is required",
-                    "a value", "(absent)");
+            ctx.index(index).report(rules.absentPosition(index, ABSENT));
         }
         return null;
     }

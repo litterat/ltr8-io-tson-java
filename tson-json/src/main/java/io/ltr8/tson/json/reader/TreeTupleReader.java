@@ -1,6 +1,7 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.diagnostics.TupleDiagnostics;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
@@ -41,12 +42,16 @@ final class TreeTupleReader implements JsonTypeReader<JsonValue> {
     private final List<JsonTypeReader<?>> slots;
     private final JsonSchemaLocation schemaLocation;
 
+    /** This tuple's rules, shared with the TSON reader ([TSON-JSON] §9.4). */
+    private final TupleDiagnostics rules;
+
     private TreeTupleReader(String name, TupleBody body, List<JsonTypeReader<?>> slots,
                             JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.body = body;
         this.slots = List.copyOf(slots);
         this.schemaLocation = schemaLocation;
+        this.rules = new TupleDiagnostics(name, slots.size());
     }
 
     @Override
@@ -54,8 +59,7 @@ final class TreeTupleReader implements JsonTypeReader<JsonValue> {
         ctx = ctx.underDeclaration(schemaLocation);
         JsonEvent first = ctx.next();
         if (!(first instanceof JsonEvent.ArrayStart)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' is a tuple, which takes a JSON array, and this is %s"
-                    .formatted(name, JsonAtoms.describe(first)), "a JSON array", JsonAtoms.describe(first));
+            ctx.report(rules.notATuple(JsonAtoms.describe(first)));
             EventSkip.value(ctx, first);
             return JsonNull.INSTANCE;
         }
@@ -73,23 +77,22 @@ final class TreeTupleReader implements JsonTypeReader<JsonValue> {
             elements.add(readSlot(at, slot));
         }
         ctx.next();   // ArrayEnd
-        if (elements.size() != slots.size()) {
-            ctx.report(Diagnostic.Code.WRONG_ARITY,
-                    "'%s' is a tuple of exactly %d elements, and this has %d"
-                            .formatted(name, slots.size(), elements.size()),
-                    slots.size() + " elements", elements.size() + " elements");
+        if (elements.size() > slots.size()) {
+            ctx.report(rules.tooManyElements());
+        } else if (elements.size() < slots.size()) {
+            ctx.report(rules.tooFewElements(elements.size()));
         }
         return new JsonArray(elements);
     }
+
+    /** How a JSON document spells absence (§7), for the `actual` of a rule about a position's state. */
+    private static final String ABSENT = "null";
 
     private JsonValue readSlot(JsonReadContext at, int slot) {
         if (at.peek() instanceof JsonEvent.NullValue) {
             at.next();
             if (body.elements().get(slot).state() == ElementState.REQUIRED) {
-                at.report(Diagnostic.Code.FIELD_REQUIRED,
-                        "position %d of '%s' admits no absent value, and JSON null is this encoding's spelling of "
-                                .formatted(slot, name) + "the absent sentinel (§7)",
-                        "a value at this position", "null");
+                at.report(rules.absentPosition(slot, ABSENT));
             }
             return JsonNull.INSTANCE;
         }

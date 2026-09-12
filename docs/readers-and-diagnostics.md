@@ -707,6 +707,22 @@ they had forgotten a field they could see themselves writing. §5.2's rule is th
 position the schema always fills, so the document stated something and is not missing it. TSON's fall-through
 to the missing-field message was the defect; it now reports the rule the document actually broke.
 
+**Five families state their rules here**: records, arrays and sets (one class, a set being an array that
+refuses a repeat), tuples, and maps. Choices wait for [TSON-JSON] §8.5 — `tson-compiler` states its dispatch
+diagnostics parameterised over a "candidate noun" so one class serves a choice *and* a scoped position, and
+aligning before the JSON side has the second position would be aligning against a shape about to change.
+
+**What the wider pass taught, beyond the record family's finding.** Two boundary calls turned out to be
+finer than "the schema's nouns":
+
+- **"The absent sentinel" is the schema's noun and stays in the prose**; only the *spelling* is the format's.
+  The first draft removed both and had to be walked back — [TSON-DATA] §2.9 names the concept, and a message
+  that will not say it loses the word the spec uses for the thing it is refusing.
+- **A message about a value renders the value, not the wire form.** A set duplicate reads `'a'` and not
+  `'"a"'`. That is harder on the JSON side than it sounds, because tree mode discards the host value by
+  design — so `Nodes.rendered` answers from the node instead, which is the same question the TSON reader's
+  `Rendered.value` answers from the host value.
+
 **What is deliberately not shared** is any rule one encoding has and the other has not: JSON's reserved member
 namespace (§3.2) and TSON's positional record form have no counterpart across the wire, so each stays with the
 reader that owns it. A shared class that grew those would be a second switch responsible for rules it cannot

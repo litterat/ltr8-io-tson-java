@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.diagnostics.ArrayDiagnostics;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -54,6 +55,9 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
     final TsonTypeReader<?> elementParser;
     final SchemaLocation schemaLocation;
 
+    /** This array's rules, shared with the JSON reader ([TSON-JSON] §9.4). */
+    final ArrayDiagnostics rules;
+
     ArrayAbstractReader(String name, String displayName, ArrayBody body, TsonTypeReaderResolver resolver,
                          SchemaLocation schemaLocation) {
         this(name, displayName, body, resolver.resolve(body.elementType().name()), schemaLocation);
@@ -72,6 +76,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         this.body = body;
         this.elementParser = elementParser;
         this.schemaLocation = schemaLocation;
+        this.rules = new ArrayDiagnostics(displayName);
     }
 
     /**
@@ -88,9 +93,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
             return true;
         }
         TsonEvent e = ctx.peek();
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                "expected an array for '" + displayName + "', found " + TypeRefCheck.describe(e),
-                "an array", TypeRefCheck.describe(e));
+        ctx.report(rules.notAnArray(TypeRefCheck.describe(e)));
         EventSkip.coreValue(ctx);
         return false;
     }
@@ -114,10 +117,7 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
             Object decoded = ctx.peek() instanceof AbsentEvent ? defaultOrRequire(index, ctx)
                     : elementParser.read(ctx.index(index));
             if (seen != null && !seen.add(ValueIdentity.of(decoded))) {
-                ctx.index(index).report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + displayName + "' requires unique elements, '" + Rendered.value(decoded)
-                                + "' appears more than once",
-                        "a value not already present in this array", Rendered.value(decoded));
+                ctx.index(index).report(rules.repeatedElement(Rendered.value(decoded)));
             }
             sink.accept(decoded);
             index++;
@@ -126,12 +126,13 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         validateSize(index, ctx);
     }
 
+    /** How a TSON text document spells absence ([TSON-DATA] §2.9), for the `actual` of an element-state rule. */
+    private static final String ABSENT = "_";
+
     private Object defaultOrRequire(int index, TsonReadContext ctx) {
         ctx.next(); // consume the AbsentEvent regardless of REQUIRED/OPTIONAL
         if (body.state() == ElementState.REQUIRED) {
-            ctx.index(index).report(Diagnostic.Code.FIELD_REQUIRED,
-                    "'" + displayName + "' element [" + index + "] is absent, but elements are required",
-                    "a value", "(absent)");
+            ctx.index(index).report(rules.absentElement(index, ABSENT));
         }
         return null;
     }
@@ -155,17 +156,13 @@ abstract class ArrayAbstractReader<T> implements TsonTypeReader<T> {
         if (minItems.isPresent()) {
             BigInteger min = minItems.get();
             if (actual.compareTo(min) < 0) {
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + displayName + "' has " + size + " elements, fewer than the minimum " + min,
-                        "at least " + min + " elements", String.valueOf(size));
+                ctx.report(rules.tooFewElements(min, size));
             }
         }
         if (maxItems.isPresent()) {
             BigInteger max = maxItems.get();
             if (actual.compareTo(max) > 0) {
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + displayName + "' has " + size + " elements, more than the maximum " + max,
-                        "at most " + max + " elements", String.valueOf(size));
+                ctx.report(rules.tooManyElements(max, size));
             }
         }
     }

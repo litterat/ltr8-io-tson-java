@@ -130,14 +130,18 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   `tson-atom` already re-exports that module, so what crosses is a value model and the pipeline producing it stays
   where it is.
 
-- [ ] **Only the record family states its rules from `base.diagnostics`.** `RecordDiagnostics` proved the
-  shape — one class per family, prose in the schema's vernacular, `actual` left to the encoding — and the
-  parity test now compares `code`, path, `expected` and `message` for every rule it covers. The other families
-  are a mechanical follow: arrays and sets (§6.3's element state, size facets, set duplicates), tuples (§6.4's
-  arity), maps (§6.5's entry value, key contract, duplicate keys), and choices (§8.2's missing tag, §8.1's tag
-  naming nothing). Each is worth doing with its parity cases upgraded to `sameRule` in the same pass, since
-  that is what stops the two readers drifting again — and the record pass found a real disagreement the moment
-  the comparison got stronger, so the others should be assumed to hold some too.
+- [ ] **The choice family does not state its rules from `base.diagnostics`, and is waiting on §8.5.** Records,
+  arrays, sets, tuples and maps do. Choices are entangled: `tson-compiler` states its dispatch diagnostics in
+  `NamedDispatchReader`, parameterised over a "candidate noun" so one class serves both a choice and a scoped
+  position, while `tson-json` has choice-specific wording and no scoped reader at all. Aligning now would
+  align against a shape about to change, so it waits for [TSON-JSON] §8.5 — at which point both stacks have
+  the same two positions and the shared class can be parameterised the same way.
+
+- [ ] **A JSON diagnostic names a resolver-minted type by its hash** (issue #482). `EntryDisplayName` renders
+  a minted entry as the sugar that produced it, so TSON says `'[text]'` where JSON says
+  `'array_text_4cc4a482'` — a name in neither the author's schema nor the sender's document. The class is ~108
+  lines depending on nothing but `schema.meta`, so the fix is a **move** to `tson-schema` rather than a copy.
+  Two parity cases sit on the weaker comparison until it lands, with the issue named where they sit.
 
 - [ ] **`Diagnostic.Code` has no member for "a required tag is missing", and both encodings overload
   `UNKNOWN_TYPE_REF`.** [TSON-JSON] §9.4 lists the condition in its own right ("missing required tags (§8.2)",
