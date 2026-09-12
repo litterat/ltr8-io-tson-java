@@ -981,17 +981,24 @@ notation in the same document as the fields, and the split closes with the annot
 where it stands. Moving the declarations into the kernel meanwhile would put author-written vocabulary beside
 `synthetic`, which is the resolver's own, and buy nothing a reader can observe.
 
-**What is running:** the two kernel fields and the four marks' declarations.
+**What is running:** the two kernel fields, the four marks, and the lowering.
 `record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
-and `record_field.discriminator: boolean ~ false` are declared in this implementation's meta-kernel and bound by
-its value model, so a resolved schema carries both facts and the kernel's own three schemas resolve, link and
-compile against them unchanged — every record OPEN, every field not a discriminator. meta.tn declares `abstract`,
-`sealed`, `final` and `discriminator`, all four `@annotation void`, so an author can write the marks and they
-resolve; `@discriminator` has moved off `field_name`, so its old choice-level spelling is now refused at the
-annotation's own type. Nothing yet reads a mark or sets a field: the lowering is unwritten, the load-time checks
-are unwritten,
-SEALED is never derived, and no reader dispatches on a member. The inhabitance rule above is stated rather than
-measured.
+and `record_field.discriminator: boolean ~ false` are in this implementation's meta-kernel and bound by its value
+model. meta.tn declares `abstract`, `sealed`, `final` and `discriminator`, all four `@annotation void`;
+`@discriminator` has moved off `field_name`, so its old choice-level spelling is refused at the annotation's own
+type. **The resolver consumes all four into the body** — the definition mark once, after the body is built, so a
+fresh record, a composition and a refinement cannot disagree about it, and both annotation positions lower
+identically. They are matched by name and never resolved against the governing meta, which is what reserves them:
+they lower under a meta declaring none of them, where an ordinary unknown name is the author's error. Refused
+while lowering: two definition marks on one declaration, a mark carrying a value, and a definition mark on a
+non-record. A template carrying one is a gap, its body being held until materialisation closes it.
+
+What is **not** running is everything that acts on what the marks state. No load-time check reads the closure, so
+a `@sealed` record with no discriminator, an `@abstract` record with one, a subtype that pins nothing and two
+subtypes that pin the same value all load clean; no reader dispatches on a member; and the inhabitance and
+identity rules above are stated rather than measured. The kernel's own three schemas resolve, link and compile
+unchanged — every record OPEN, every field not a discriminator — which is the evidence that the fields cost
+nothing where nothing uses them.
 
 **Suggested resolution.** Add `extension: record_extension_type ~ OPEN` over `[ABSTRACT SEALED FINAL OPEN]` to the
 kernel's `record` and `discriminator: boolean ~ false` to its `record_field`, stating the four members' meanings and

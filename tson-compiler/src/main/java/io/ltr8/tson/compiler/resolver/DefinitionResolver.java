@@ -323,8 +323,46 @@ final class DefinitionResolver {
         if (declarationPosition.isPresent()) {
             resolved = resolved.withPosition(declarationPosition);
         }
-        Annotations annotations = annotationsOf(declaration.name(), declaration.typeDefAnnotations());
+        resolved = withExtension(declaration, resolved);
+        Annotations annotations = annotationsOf(declaration.name(),
+                DefinitionMarks.consumed(declaration.typeDefAnnotations()));
         return annotations.isEmpty() ? resolved : resolved.withAnnotations(annotations);
+    }
+
+    /**
+     * A declaration's own {@code @abstract}/{@code @sealed}/{@code @final} lowered into {@code
+     * record.extension} ({@link DefinitionMarks}) -- the resolved definition unchanged where none is written,
+     * every record being OPEN by default.
+     *
+     * <p><b>Applied here rather than where the body is built</b>, because every route to a record body reaches
+     * this method and none of them owns the mark: a fresh record, a composition and a refinement each build
+     * their own {@code RecordBody}, and a mark read three times is a mark two of them can disagree about. It
+     * is also what makes the rule that extensibility is never inherited fall out rather than need stating --
+     * a composition's body is built OPEN from its operands and the mark, if any, is this declaration's own.
+     *
+     * <p>A mark on anything but a record is the author's error. A template is the one case worth its own
+     * wording: its body is held as text until materialisation ([TSON-SCHEMA] §5.10), so there is no record to
+     * mark yet, and carrying the fact through closing is not built.
+     */
+    private TypeDefinition withExtension(SchemaMap.Declaration declaration, TypeDefinition resolved) {
+        Optional<RecordExtensionType> extension = DefinitionMarks.extension(declaration.name(),
+                declaration.nameAnnotations(), declaration.typeDefAnnotations());
+        if (extension.isEmpty()) {
+            return resolved;
+        }
+        if (resolved.body() instanceof io.ltr8.tson.schema.meta.TemplateBody) {
+            throw new UnsupportedOperationException("'" + declaration.name()
+                    + "': a template cannot yet state how it may be realised -- its body is held until"
+                    + " materialisation closes it, and the mark does not travel with it");
+        }
+        if (!(resolved.body() instanceof RecordBody record)) {
+            throw new SchemaValidationException("'" + declaration.name()
+                    + "': only a record states how it may be realised -- this entry's body is "
+                    + resolved.body().getClass().getSimpleName() + " ([TSON-SCHEMA] §5.2)");
+        }
+        return new TypeDefinition(resolved.source(), resolved.kind(), resolved.supertypes(),
+                resolved.subtypes(), new RecordBody(record.supertypes(), record.fields(), record.groups(),
+                        extension.get()), resolved.position(), resolved.annotations());
     }
 
     /**
@@ -1738,8 +1776,15 @@ final class DefinitionResolver {
      * erase what it does not mention.
      */
     private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
-        Annotations own = annotationsOf(field.name(), field.annotations());
+        Annotations own = annotationsOf(field.name(), DefinitionMarks.consumed(field.annotations()));
+        // A restatement inherits the mark it does not repeat, on the annotation-merge rule's own logic: a
+        // tightening entry states what it tightens, and §5.7's modifier-only spelling has no annotation
+        // position at all, so an entry that mentions nothing must not be able to erase what it does not
+        // mention. Which field a family dispatches on is exactly such a fact.
+        boolean discriminator = DefinitionMarks.discriminates(field.name(), field.annotations())
+                || inherited.map(RecordField::discriminator).orElse(false);
         return resolveFieldEntry(field, parameters, inherited)
+                .withDiscriminator(discriminator)
                 .withAnnotations(inherited.map(source -> merged(own, source.annotations())).orElse(own));
     }
 

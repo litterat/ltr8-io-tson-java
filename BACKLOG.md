@@ -85,23 +85,17 @@ test puts its fact in the kernel, and its work is under "Discriminated record fa
 `SPEC-FEEDBACK.md` #10 and #11 carry the design and the arguments; this is the build order. A record states how
 it may be realised, a field of an abstract record may be a discriminator, and a position typed by such a record
 recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). The kernel
-carries both facts and meta.tn declares the four marks; nothing yet reads a mark or acts on a fact. Work lands
-on `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
-
-- [ ] **The four marks lower into the body.** The declarations are in meta.tn (`abstract`, `sealed`, `final` and
-  `discriminator`, all `@annotation void`); what is left is the lowering. Each must be **consumed** by the
-  resolver into `record.extension` / `record_field.discriminator` rather than preserved in §8.1's
-  author-annotation channel — so resolved output carries one carrier per fact and §8.1's no-hoisting question
-  does not arise. Until it is, a mark resolves, sits in the annotation channel and does nothing, which is a
-  schema that says `@abstract` and is not. The four names are reserved at their positions: a schema may not
-  mean something else by them. §6 honours a checked annotation at either declaration position, so the key
-  spelling must lower identically to the value spelling. The annotation shape is the interim and §12.1 spells
-  them eventually; what that costs is one more reason to keep the lowering in one place.
+carries both facts, meta.tn declares the four marks, and the resolver lowers them into the body. What is left
+is acting on what they state: nothing checks a family and nothing dispatches on a member, so a schema may still
+declare a sealed family with no discriminator, or a subtype that pins nothing, and load clean. Work lands on
+`r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
 - [ ] **The load-time checks, over the linked closure.** One pass, in `TsonSchemaLinker` beside
-  `ChoiceDisjointness`. On the record: composing or refining onto a **FINAL** record is a resolver error, in the
-  declaring schema and in any that imports it — while §5.9 subtraction is admissible, minting no IS-A edge; and
-  two definition marks on one declaration is an error, whichever two. On the annotated field: its type resolves,
+  `ChoiceDisjointness`. What the resolver already refuses while lowering is the part that is local to one
+  declaration and answerable without a namespace: two definition marks on one declaration, a mark carrying a
+  value, and a definition mark on something that is not a record. Everything below needs the closure. On the
+  record: composing or refining onto a **FINAL** record is a resolver error, in the declaring schema and in any
+  that imports it — while §5.9 subtraction is admissible, minting no IS-A edge. On the annotated field: its type resolves,
   after its reference chain, to an atom-family instance or an enum (§5.2 grants that only to a field *carrying*
   a value, and the base's field carries none, so it must be checked here); its state is exactly REQUIRED, not
   OPTIONAL, FIXED or DEFAULT; it is **not a group member**, checked against the resolved `groups` list rather

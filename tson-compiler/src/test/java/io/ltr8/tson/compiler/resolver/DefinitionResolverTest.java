@@ -24,6 +24,7 @@ import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RegexType;
 import io.ltr8.tson.schema.meta.UriType;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.base.SchemaValidationException;
@@ -2188,6 +2189,117 @@ class DefinitionResolverTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> resolver.resolve(schemaMap.declarations().get("atom")));
         assertTrue(thrown.getMessage().contains("names no type this schema declares or imports"),
+                thrown.getMessage());
+    }
+
+    // ── The four marks lower into the body (§5.2, SPEC-FEEDBACK #10/#11) ──
+
+    /**
+     * Both marks reach the body: {@code @sealed} into {@code record.extension}, {@code @discriminator} into
+     * the field it stands on.
+     *
+     * <p>That they lower <em>without</em> the governing meta declaring them is a different property and is
+     * not shown here -- this harness builds a resolver with no {@code AnnotationValueReader}, so it never
+     * checks an annotation name against the meta at all. {@code
+     * TsonSchemaResolverCompiledMetaSchemaTest.theMarksLowerUnderAMetaThatDeclaresNoneOfThem} is where that
+     * one is pinned, against a resolver that does check.
+     */
+    @Test
+    void aSealedRecordLowersBothMarksIntoTheBody() {
+        RecordBody body = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel(
+                "pet => @sealed { @discriminator pet_type: text  name: text }").body());
+
+        assertEquals(RecordExtensionType.SEALED, body.extension());
+        assertTrue(body.fields().get(0).discriminator(), "the marked field discriminates");
+        assertFalse(body.fields().get(1).discriminator(), "an unmarked field does not");
+    }
+
+    /** Consumed, not preserved: §8.1's author-annotation channel carries neither, so one carrier holds each fact. */
+    @Test
+    void aLoweredMarkLeavesNothingInTheAnnotationChannel() {
+        TypeDefinition pet = resolveSnippetsAgainstMetaKernel(
+                "pet => @sealed { @discriminator pet_type: text  name: text }");
+        RecordBody body = assertInstanceOf(RecordBody.class, pet.body());
+
+        assertTrue(pet.annotations().isEmpty(), "the definition mark is gone from the channel");
+        assertTrue(body.fields().get(0).annotations().isEmpty(), "and so is the field mark");
+    }
+
+    /** §6 honours a checked annotation at either declaration position, so the two spellings must agree. */
+    @Test
+    void theKeySpellingLowersLikeTheValueSpelling() {
+        RecordBody beforeTheName = assertInstanceOf(RecordBody.class,
+                resolveSnippetsAgainstMetaKernel("@abstract shape => { kind: text }").body());
+        RecordBody afterTheArrow = assertInstanceOf(RecordBody.class,
+                resolveSnippetsAgainstMetaKernel("shape => @abstract { kind: text }").body());
+
+        assertEquals(RecordExtensionType.ABSTRACT, beforeTheName.extension());
+        assertEquals(beforeTheName.extension(), afterTheArrow.extension());
+    }
+
+    /** The default, and the overwhelming majority: a record that says nothing is OPEN. */
+    @Test
+    void anUnmarkedRecordIsOpenAndNoFieldDiscriminates() {
+        RecordBody body = assertInstanceOf(RecordBody.class,
+                resolveSnippetsAgainstMetaKernel("plain => { a: text  b: text }").body());
+
+        assertEquals(RecordExtensionType.OPEN, body.extension());
+        assertFalse(body.fields().stream().anyMatch(RecordField::discriminator));
+    }
+
+    /**
+     * Extensibility is never inherited, so a subtype of a marked base is OPEN unless it says otherwise --
+     * otherwise no concrete subtype of an abstract base could exist. The mark is read once, at the
+     * declaration that wrote it.
+     */
+    @Test
+    void aSubtypeOfASealedBaseIsOpenUnlessItSaysOtherwise() {
+        RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
+                pet => @sealed { @discriminator pet_type: text  name: text }
+                dog => pet & { pet_type: = "dog"  breed: text }""").body());
+
+        assertEquals(RecordExtensionType.OPEN, dog.extension());
+    }
+
+    /**
+     * A restatement inherits the mark it does not repeat, on the annotation-merge rule's own logic (§5.7):
+     * a tightening entry states what it tightens, and the modifier-only spelling has no annotation position
+     * at all, so an entry that mentions nothing must not erase what it does not mention.
+     */
+    @Test
+    void aRestatedFieldKeepsTheDiscriminatorItDoesNotRepeat() {
+        RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
+                pet => @sealed { @discriminator pet_type: text  name: text }
+                dog => pet & { pet_type: = "dog"  breed: text }""").body());
+
+        RecordField pinned = dog.fields().stream().filter(f -> f.name().equals("pet_type")).findFirst()
+                .orElseThrow();
+        assertTrue(pinned.discriminator(), "the pin restates the field and must not drop what marks it");
+        assertEquals(FieldState.REQUIRED_FIXED, pinned.state());
+    }
+
+    /** Three alternatives, never companions: a record states how it may be realised once. */
+    @Test
+    void twoDefinitionMarksOnOneDeclarationAreRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("@abstract x => @final { a: text }"));
+        assertTrue(thrown.getMessage().contains("on one declaration"), thrown.getMessage());
+    }
+
+    /** Each mark is declared {@code void}: a value states one for a type that admits none. */
+    @Test
+    void aMarkTakesNoValue() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("x => @sealed:\"yes\" { a: text }"));
+        assertTrue(thrown.getMessage().contains("takes no value"), thrown.getMessage());
+    }
+
+    /** Only a record has an extension fact to state; the mark has nowhere to land on anything else. */
+    @Test
+    void aDefinitionMarkOnANonRecordIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("x => @abstract !enum [A B]"));
+        assertTrue(thrown.getMessage().contains("only a record states how it may be realised"),
                 thrown.getMessage());
     }
 
