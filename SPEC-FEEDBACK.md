@@ -569,3 +569,135 @@ unquoted `true`, so the annotation is never *needed* — then §5 should say so,
 would remove `text` (§4.4 already recovers a string) and §5.5 explicitly keeps that one: the annotation
 exists to **assert** the case where it is in doubt, which is exactly what a quoted `"true"` at a boolean
 position is.
+
+---
+
+## 10. `@discriminator` is scoped to choices, where its mechanism cannot reach; it belongs to subtype families
+
+**Documents:** [TSON-SCHEMA] §6 (`@discriminator`, `@rest`), §5.4 (choices, `@disjoint`), §5.7 (the refinement
+transition table), §5.8 (composition), §5.11 (field groups), §7.2 (subsumption); [TSON-JSON] §6.1.5
+(subsumption), §8.2 (the discrimination predicate), §8.4 (discriminated choices).
+**Kind:** design proposal, plus two underspecifications in the check list §6 does state.
+
+**What §6 already states, so that what is proposed against it is visible.** `discriminator => @annotation
+field_name` stands on a **choice** declaration and names the field a member-dispatching encoding selects the
+variant on. Four checks are stated: `field_name` is an `identifier`, from the annotation's own type; every
+variant is a record declaring the named field; that field is `REQUIRED_FIXED` in every variant, never
+`REQUIRED_DEFAULT`; and the fixed values are pairwise distinct. §6 also refuses to *derive* the field, because
+"with two `REQUIRED_FIXED` fields in every variant a derivation picks arbitrarily or picks both, and either way
+couples the wire to a pin the author fixed for an unrelated reason." **That refusal is right and this entry
+does not reopen it** — the coupling is concrete, [TSON-JSON] §8.4 making the selected member non-elidable, so a
+pin an author fixed as a version marker would silently become mandatory on the wire. What follows is a
+proposal about the annotation's *target*, not about deriving it.
+
+**The proposal: the target is a subtype family, not a choice.** The annotation moves to the field, in the base
+type of a composed family, and is bare:
+
+```
+pet      => { pet_type: @discriminator text  name: text }
+dog_type => pet & { pet_type: = "dog"  breed: text }
+cat_type => pet & { pet_type: = "cat"  indoor: boolean }
+```
+
+A position typed `pet` — or `[pet]` — then admits any subtype under §7.2, and the `pet_type` member recovers
+which. An explicit choice `( dog_type | cat_type )` is **out of scope** and keeps the variant tag it has today.
+
+**The reason is structural, not a simplification.** `@discriminator` marks a *field*, so it can only exist where
+the position has an expected record type whose fields a decoder knows before it dispatches. At a choice position
+there is no such type: recovering one would mean computing the variants' common supertype, a derivation the
+language does not have and should not gain. §6's present spelling works around the absence by naming the field
+on the choice instead — which is why the field name has to be written out at all, and why §6's check must speak
+of "every variant ... declaring the named field": nothing in the choice framing relates the variants, so the field
+may be declared independently in each, under a different type in each. Moving the mark to the base makes it one
+declaration the subtypes refine, and the relation between them is what §5.8 already guarantees.
+
+**Five consequences, each an improvement on the present shape.**
+
+1. **The two annotations §6 introduces together become one shape.** `@rest` is a bare `void` marker on a field;
+   `@discriminator` becomes `discriminator => @annotation void`, a bare marker on a field. The `field_name`
+   parameter disappears, and with it the only place in the series where an annotation names a field by string.
+2. **It is the shape converted contracts arrive in.** OpenAPI's `discriminator` sits on the *base* schema with
+   subtypes composing it, which is this arrangement and not the choice one. A converted contract lands on the
+   mechanism directly.
+3. **The open-world argument strengthens §6's refusal to derive, and makes the annotation constitutive.**
+   A choice's variant list is closed and local, so a derivation over it can never be invalidated from outside.
+   `subtypes` is **open** (§8.2): another schema may `!!import` `pet` and declare a third subtype. A derived
+   discriminator would let that import silently flip the family from discriminated to not, breaking every
+   existing producer with no diagnostic anywhere. Declared on the base, the mark is an obligation that
+   propagates: a new subtype failing to pin the field is a resolver error **in the importing schema**, which is
+   the schema that broke it. This makes `@discriminator` unlike `@disjoint` — it is not an assertion about a
+   fact the resolver derives anyway, it is the declaration that creates the obligation, in the manner of `@rest`.
+4. **The mechanism becomes encoding-neutral, which is where §6's own framing wants it.** At a `pet`-typed field
+   in text, a value is likewise exactly `pet` without `!dog_type`, so structural recovery of the subtype is
+   available to both encodings from one rule. §6's "neither needed by TSON text" holds only for the choice
+   framing. The *fact* is then Part 2's and the *claim* is per-encoding, which is exactly §6's representation-
+   directive rule: force confined to the encodings that claim it. Whether text claims it is a separate decision
+   — the conservative answer is that text keeps its annotation, §6.1.5's counterpart being "required exactly
+   when informative" — and nothing in the check list depends on the answer.
+5. **The hardest check becomes free.** Across a choice's variants the discriminator field's declared type must be
+   *checked* uniform, because a decoder has to parse the arriving member before it knows the variant and so cannot
+   let the parser depend on it — a check §6's list does not state, and which this proposal removes the need for
+   rather than adds. Across a composed family the type is uniform **by construction**: it is the base's, reached
+   through §5.7's elided type-ref (`pet_type: = "dog"`), and a subtype narrowing it narrows a subset. The decoder
+   parses with the base's declared type, which is the one type it knows before dispatch, and the rule is total.
+
+**§5.7 forces the arrangement into one shape.** The identity diagonal states that a `REQUIRED_FIXED` restatement
+MUST NOT change the value, so the base cannot pin the field: were `pet` to declare `pet_type: text = "pet"`, no
+subtype could pin its own value. The base therefore declares it `REQUIRED` and unpinned, and each subtype
+tightens REQUIRED → REQUIRED_FIXED, which the table allows. There is no other arrangement, and the prose should
+say so rather than leave an author to discover it from a transition-table error.
+
+**The one question this entry does not answer.** Because the base's field is unpinned, `pet` is instantiable and
+its `pet_type` admits any text. So what is `{ "pet_type": "dgo", … }` at a `pet` position?
+
+- **Open base** — an unmatched value reads as a plain `pet`. No new concept, and record closure (§7.2) usually
+  catches it downstream as an unrecognized field; but the diagnostic then names `breed` where the fault is one
+  character in `pet_type`, and a subtype adding no fields of its own is not caught at all.
+- **Abstract base** — an unmatched value is a validation error naming the received value and the pinned
+  alternatives, which is what [TSON-JSON] §8.4's draft already prescribes for choices. The cost is one new
+  semantic: `@discriminator` makes its base abstract at every position, the base having no pin of its own to be
+  selected by.
+
+**The recommendation is the abstract base**, on two grounds: the author of such a hierarchy already believes the
+base is not a thing, and the value of member dispatch is largely the diagnostic it produces when a producer gets
+the tag wrong. It should be stated as a consequence of the mark, not left to fall out.
+
+**The check list, restated for the family.** At the base: the annotated field's declared type resolves, after its
+reference chain, to an atom-family instance or an enum — *not* free here, because §5.2 grants that only to a field
+carrying a value and the base's field carries none; its state is exactly REQUIRED, neither OPTIONAL (the base
+could omit it), FIXED (nothing could override it) nor DEFAULT (a document could); it is not a group member; and at
+most one field per composed chain carries the mark, well-defined by §5.8's restated-field rule exactly as §6
+already argues for `@rest`. Over the linked closure: every entry in `subtypes`, transitively, pins the field
+`REQUIRED_FIXED`; and the pins are pairwise distinct.
+
+**Two underspecifications in the list §6 states today, which survive the move.**
+
+- **"Pairwise distinct" does not say under what relation.** §5.5's value-space clause makes scale a spelling and
+  [TSON-DATA] §4.3 makes `255` and `0xFF` one value, so `= 255` and `= 0xFF` are one pin and `= 1` and `= 1.0`
+  are one pin, while text pins compare NFC-normalised (§7.5). An implementation comparing tokens accepts a schema
+  whose dispatch table is not a function. The relation is the field type's own equality contract, and the rule
+  should name it.
+- **A group member can carry the mark, reachable only through refinement.** §5.11 makes the value modifiers parse
+  errors on a member and flattens every member to `state: OPTIONAL`, so the source syntax cannot express it — but
+  §5.11's refinement rules let an inherited member be tightened to a REQUIRED family, and explicitly contemplate
+  one member of a group being there. So the check is needed and must consult the resolved `groups` list; an
+  implementation reading the declaration concludes it is impossible.
+
+**Two consequences to state in prose rather than check.** A family discriminates **one level**: a subtype of a
+subtype inherits its parent's pin and §5.7 forbids changing it, so it dispatches to its parent and relies on
+§7.2 plus the encoding's tag for the rest — the same conclusion [TSON-JSON] §8.4 already reaches for subtypes of
+variants. And a second `@discriminator` on an intermediate type is the nesting escape hatch, which this proposal
+deliberately leaves out of the first design.
+
+**What is running:** nothing. This implementation has built [TSON-JSON] §8.2's route 2 (kind disjointness over
+class stability) and §6.1.5's `$type` subtype selection in tree mode, and the load-time checks §6 states
+have never had a consumer — which is what surfaced the scoping question before any of it was built. The
+[TSON-JSON] half of the change is this implementation's to make in place (§6.1.5's "there is no structural
+recovery of `S`" is the sentence that moves, and §8.4 largely goes with it), and is held pending the
+abstract-base decision, which changes what that sentence says.
+
+**Suggested resolution.** Retarget §6's `@discriminator` from a choice declaration to a record field, as a bare
+`void` marker beside `@rest`, with the check list above and the §5.7 arrangement stated; name the equality
+relation for pin distinctness and add the group-member check; state the abstract-base rule as a consequence of
+the mark. Leave §5.4 untouched but add a pointer from it, since an author reaching for member dispatch at a
+choice is an author who wants the composed family or the labelled form of §5.11.
