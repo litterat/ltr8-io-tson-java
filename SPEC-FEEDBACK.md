@@ -595,7 +595,7 @@ proposal about the annotation's *target*, not about deriving it.
 type of a composed family, and is bare:
 
 ```
-pet      => { pet_type: @discriminator text  name: text }
+pet      => @sealed { @discriminator pet_type: text  name: text }
 dog_type => pet & { pet_type: = "dog"  breed: text }
 cat_type => pet & { pet_type: = "cat"  indoor: boolean }
 ```
@@ -670,7 +670,7 @@ contract, and its inheritance-style usage maps onto this proposal mechanically:
 
 | OpenAPI | TSON |
 |---|---|
-| `discriminator.propertyName: petType` on the base | `pet_type: @discriminator text` on the base record |
+| `discriminator.propertyName: petType` on the base | `@discriminator pet_type: text` on the base record |
 | a subtype's `allOf: [$ref base, {…}]` | `dog_type => pet & { … }` |
 | `mapping: { dog: '#/…/Dog' }` | `dog_type => pet & { pet_type: = "dog" }` |
 | no `mapping` — the implicit value is the schema name | `pet_type: = "Dog"`, the name as written |
@@ -688,7 +688,7 @@ type is named `dog_type` by the ordinary identifier conversion.
 
 **One shape does not convert, and the gap is worth stating.** OpenAPI also admits a `discriminator` on a schema whose
 composition is `oneOf` with no shared base. There is no base record for the mark to stand on, so a converter must
-either synthesise one — mint `pet => { pet_type: @discriminator text }` and compose each variant onto it, making
+either synthesise one — mint `pet => @sealed { @discriminator pet_type: text }` and compose each variant onto it, making
 explicit a relationship the contract left implicit — or fall back to `$type` and lose member dispatch. Synthesis is
 the better answer and is mechanical, but a converter taking it should say so, since it adds a type the author did not
 write. Two further contracts are refused rather than converted: a `mapping` not covering every variant (the pins must
@@ -713,21 +713,31 @@ character in `pet_type`, and a subtype adding no fields of its own is not caught
 the annotation**, so taking it forces a kernel change; #11 is that change, and the base is SEALED there.
 
 **On the name.** The field mark is not `@sealed`. It stands on a *field* — it is `@rest`'s shape, which is
-consequence 1 — and `pet_type: @sealed text` describes the field's type rather than the family; moving it to the
+consequence 1 — and `@sealed pet_type: text` describes the field rather than the family; moving it to the
 declaration to fix that reintroduces either the field-name string this proposal removes or the derivation §6
 refused. The two facts are separable in any case: a family may want the closed-set claim while its wire form stays
-`$type`, which is why #11 carries them as distinct members of one enum, ABSTRACT and SEALED, with SEALED derived
-from this mark's presence rather than written. `discriminator` is also the word an author converting a contract
-will search for. The name is not idle: #11 spends it at the *declaration*, where `@sealed` asserts that this
-mark is somewhere in the body.
+`$type`, which is why #11 carries them as distinct members of one enum, ABSTRACT and SEALED. `discriminator` is
+also the word an author converting a contract will search for. The name is not idle: #11 spends it at the
+*declaration*, where `@sealed` is the member's own mark and requires that this one appear in the body.
 
-**The check list, restated for the family.** At the base: the annotated field's declared type resolves, after its
+**The check list, restated for the family.** At the base: the declaration carries `@sealed` — the mark and the
+mark on the field are each other's condition, below; the annotated field's declared type resolves, after its
 reference chain, to an atom-family instance or an enum — *not* free here, because §5.2 grants that only to a field
 carrying a value and the base's field carries none; its state is exactly REQUIRED, neither OPTIONAL (the base
-could omit it), FIXED (nothing could override it) nor DEFAULT (a document could); it is not a group member; and at
-most one field per composed chain carries the mark, well-defined by §5.8's restated-field rule exactly as §6
-already argues for `@rest`. Over the linked closure: every entry in `subtypes`, transitively, pins the field
+could omit it), FIXED (nothing could override it) nor DEFAULT (a document could); and it is not a group member.
+Which fields carry the mark is well defined over a composed chain by §5.8's restated-field rule, exactly as §6
+already argues for `@rest` — what differs is that `@rest` admits one such field and a family admits several, the
+tuple case below. Over the linked closure: every entry in `subtypes`, transitively, pins each marked field
 `REQUIRED_FIXED`; and the pins are pairwise distinct.
+
+**The two marks are each other's condition, and that is a deliberate redundancy.** `@discriminator` on a field
+requires `@sealed` on the declaration, and `@abstract` on a declaration forbids `@discriminator` anywhere in its
+body. Neither check is load-bearing for the resolver — with one rule the other fact follows — and that is the
+point: it is the author who is being checked, not the schema. A family is either tag-dispatched or
+member-dispatched, the two admit different documents, and the difference is one word at the top of a declaration
+and one word deep inside it. Requiring both means the two words cannot drift apart silently, in either direction:
+adding the field to an `@abstract` base fails, and removing it from a `@sealed` one fails. The cost is a word an
+author must write twice; what it buys is that the intent is stated where each half of it is read.
 
 **Two underspecifications in the list §6 states today, which survive the move.**
 
@@ -854,36 +864,42 @@ working as written. `@discriminator` had that standing only while text declined 
   behaviour today, and the default.
 - **ABSTRACT** — no direct instances: no value's effective type is this record, and a position typed by it admits
   exactly its subtypes, each selected by the tag (`$type` in JSON, `!dog_type` in text), which is therefore
-  REQUIRED at the position.
+  REQUIRED at the position. No field of it may be a discriminator: that is SEALED's case, and the two marks are
+  each other's condition (#10).
 - **SEALED** — ABSTRACT plus member dispatch: the record carries one or more discriminator fields (#10) and a
   position typed by it selects the subtype by reading them. **The tag is optional at a SEALED position and MUST
   agree where written** — in both encodings, which is the standing [TSON-JSON] §8.4 already gives `$type`.
 - **FINAL** — direct instances, and nothing may be a subtype: composition or refinement naming it is a resolver
   error, in the declaring schema and in any schema that imports it.
 
-**Four marks in, two kernel fields out.** The author writes `@abstract`, `@sealed` or `@final` at the definition
-(`pet => @abstract { … }`; §6 honours a checked annotation at either position, so the key spelling lowers
-identically) and `@discriminator` on a field. **SEALED is still derived rather than declared** — ABSTRACT with at
-least one discriminator field, both facts of the body — in the manner of `choice.disjoint` (§5.4): a fact the
-resolver computes from what the body holds and the body records, so a reader has one lookup rather than a scan. Two
-load errors fall out of the derivation rather than needing rules of their own: a discriminator field on a record
-that is not abstract, and two definition marks on one declaration.
+**Four marks in, two kernel fields out.** The author writes exactly one of `@abstract`, `@sealed` and `@final` at
+the definition (`pet => @sealed { … }`; §6 honours a checked annotation at either position, so the key spelling
+lowers identically), or none, and `@discriminator` on a field. Each mark names its member, and `extension` is a
+function of which mark was written — OPEN where none was. Two definition marks on one declaration is a load error,
+whichever two.
 
-**`@sealed` is the derivation's assertion, and `@disjoint` is its precedent.** It means ABSTRACT and asserts that
-the derivation will reach SEALED, so it is refuted — a schema-load error — exactly when no field of the record
-carries `@discriminator`; where it holds, and where it is absent, the resolver derives what it would have derived
-anyway. It is `@abstract`'s alternative and not its companion: an author writes one definition mark, and the
-stronger one demands the stronger body. Two marks would be two carriers for one fact, which is what the enum
-exists to avoid.
+**The member is written and the body must agree, which is not where this started.** An earlier draft derived
+SEALED — ABSTRACT with at least one discriminator field, both facts of the body — in the manner of
+`choice.disjoint` (§5.4). The two marks make that redundant, and deliberately: `@discriminator` on a field
+**requires** `@sealed` on the declaration, and `@abstract` **forbids** a discriminator anywhere in its body, so
+the mark and the body condition imply each other and either could be dropped. Neither is, and the reason is not
+the resolver's. A family is tag-dispatched or member-dispatched, the two admit different documents, and under a
+derivation the whole difference is one word buried in a field list. Requiring the pair means the two halves cannot
+drift apart in either direction: adding the field to an `@abstract` base fails, and removing it from a `@sealed`
+one fails. The cost is a word written twice.
 
-The check it adds is one, and the value is not in that check's own difficulty. A subtype that forgets its pin is
-refused whether or not the base is marked, the closure rule being unconditional. What only the mark catches is
-the **base** losing its `@discriminator` in a later edit: the family degrades SEALED → ABSTRACT, the tag turns
-REQUIRED at every position typed by it, and every untagged document in the world stops validating — with nothing
-failing in the schema that changed. `@sealed` makes that edit fail where it is made. This is `@disjoint`'s own
-argument (§5.4): the derivation is total, so the assertion can only agree or fire, and what it buys is that
-someone else's change cannot quietly invalidate the intent. It also forces the thought at the point of authorship —
-is this family still member-dispatched? — which a derived fact never does.
+`@disjoint` is the nearest precedent and the analogy is now partial, which is worth stating rather than glossing.
+`disjoint` is genuinely computed and the assertion is pure — absent, present-and-verified, present-and-refuted, and
+the fact is the same in all three. `@sealed` carries ABSTRACT as well as asserting, and its absence is not silent:
+a discriminator field without it is an error, where a non-disjoint choice without `@disjoint` is ordinary. What the
+two share is the shape of the value — the check can only agree or fire, and what it buys is that someone else's
+later edit cannot quietly invalidate the intent.
+
+What the pair catches that a derivation could not is the **base** losing its `@discriminator`. Under a derivation
+the family would degrade SEALED → ABSTRACT: the tag turns REQUIRED at every position typed by it, every untagged
+document in the world stops validating, and nothing fails in the schema that changed. The marks make that edit
+fail where it is made. A subtype that forgets its pin needs no mark to be caught — the closure rule is
+unconditional — so this is the one failure the redundancy is actually for.
 
 **Why the member carries it rather than the derivation.** ABSTRACT and SEALED differ in the *reading rule* and not
 only in bookkeeping — at ABSTRACT the tag is required, at SEALED it is optional and asserting — so a compiler
@@ -962,7 +978,8 @@ its value model, so a resolved schema carries both facts and the kernel's own th
 compile against them unchanged — every record OPEN, every field not a discriminator. meta.tn declares `abstract`,
 `sealed`, `final` and `discriminator`, all four `@annotation void`, so an author can write the marks and they
 resolve; `@discriminator` has moved off `field_name`, so its old choice-level spelling is now refused at the
-annotation's own type. Nothing yet reads a mark or sets a field: the lowering is unwritten, the load-time checks are unwritten,
+annotation's own type. Nothing yet reads a mark or sets a field: the lowering is unwritten, the load-time checks
+are unwritten,
 SEALED is never derived, and no reader dispatches on a member. The inhabitance rule above is stated rather than
 measured.
 
@@ -971,6 +988,7 @@ kernel's `record` and `discriminator: boolean ~ false` to its `record_field`, st
 their two reading rules, the derivation of SEALED and the two load errors it yields, #10's checks over the
 discriminator field, the FINAL check over composition and refinement, the subtraction exemption and why it is not one,
 the inhabitance rule, the absence of any transition table, and the identity consequence; state that the marks are
-consumed rather than preserved and that their names are reserved; state `@sealed` as the derivation's assertion on
-§5.4's `@disjoint` precedent, refuted where no field is a discriminator; correct §6's validity claim; and settle the
-field and enum names, which is the one part this entry does not.
+consumed rather than preserved and that their names are reserved; state the two marks as each other's condition —
+`@discriminator` requiring `@sealed`, `@abstract` forbidding a discriminator — and say that the redundancy is for
+the author rather than the resolver; correct §6's validity claim; and settle the field and enum names, which is the
+one part this entry does not.

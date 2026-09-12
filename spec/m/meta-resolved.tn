@@ -384,8 +384,8 @@
   }
 
   @doc:"""
-    Declares a record ABSTRACT and asserts it is SEALED. A consumed
-    mark, refuted where no field carries @discriminator.
+    Declares a record SEALED. A consumed mark: at least one field
+    MUST carry @discriminator, and @abstract forbids one.
     """
   sealed => @annotation !type_definition {
     source: void

@@ -106,19 +106,21 @@ on `r2026-36-proposal`, the two kernel fields being what takes it off a Revision
   a value, and the base's field carries none, so it must be checked here); its state is exactly REQUIRED, not
   OPTIONAL, FIXED or DEFAULT; it is **not a group member**, checked against the resolved `groups` list rather
   than the source, since §5.11 refinement is what reaches that state and the declaration cannot express it; and
-  a record carrying a discriminator field MUST be ABSTRACT, §5.7's identity diagonal forbidding the base pinning
-  it. `@sealed` is refuted where no field of the record is a discriminator — the derivation being total, that is
-  its only outcome besides silence (§5.4's `@disjoint` precedent), and it is what makes a later edit that removes
-  the base's `@discriminator` fail at the schema that changed rather than at every reader of an untagged
-  document. Over the closure: every entry in `subtypes`, transitively, pins each discriminator `REQUIRED_FIXED`, and
-  the pins are **pairwise distinct as tuples** in the base's declaration order. Distinctness is under the field
+  and the record must be SEALED, §5.7's identity diagonal forbidding the base pinning what its subtypes each pin
+  differently. **The two marks are each other's condition**: `@discriminator` on a field requires `@sealed` on the
+  declaration, and `@abstract` forbids a discriminator anywhere in its body. Neither check is load-bearing —
+  with one rule the other fact follows — and both are kept because it is the author being checked: the halves
+  cannot drift apart in either direction, so removing a base's last `@discriminator` fails at the schema that
+  changed rather than at every reader of an untagged document. Over the closure: every entry in `subtypes`,
+  transitively, pins each discriminator `REQUIRED_FIXED`, and the pins are **pairwise distinct as tuples** in
+  the base's declaration order. Distinctness is under the field
   type's own equality contract and not token equality — `= 255` and `= 0xFF` are one pin (§4.3), `= 1` and
   `= 1.0` are one (§5.5), text pins compare NFC-normalised — so `ValueIdentity` is what answers it and a
   comparison of tokens accepts a schema whose dispatch table is not a function.
 
-- [ ] **SEALED is derived, and two facts the existing machinery must learn.** `extension` is SEALED exactly when
-  the record is ABSTRACT and some field is a discriminator, computed from the body alone and recorded there, in
-  the manner of `choice.disjoint` (§5.4) — so a reader has one lookup rather than a scan. Inhabitance follows:
+- [ ] **Two facts the existing machinery must learn.** `extension` is written rather than derived — each
+  definition mark names its member, and the body condition is the check on the mark rather than its source (the
+  entry above) — so what is left here is what reads it. Inhabitance follows:
   a FINAL or OPEN record is inhabited as any record is, an ABSTRACT or SEALED one exactly when at least one
   subtype is, which needs `TypeInhabitance`'s least fixed point to learn the union rather than gain an
   exemption. And `extension` participates in §8.2 identity — an abstract, sealed, concrete and final `pet` admit

@@ -55,10 +55,10 @@ public final class TsonBundledSchemas {
     public static final String META_KERNEL_SHA256 = "565ea7d483597c24efa86ce409ffacd4bd6d92938a24253fee89e7a05a45e815";
 
     /** meta's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/meta.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String META_SHA256 = "95e8b75de1ca92a01de4e7b39ca4f612a4dd658f38affe34ceba8290fddbad93";
+    public static final String META_SHA256 = "3a22498a2f2aa2ffa00f39985196f433c108a670bac54076ed5917571bf70908";
 
     /** core's own published content-hash digest -- the {@code ?sha256=} on {@code spec/m/core.tn}'s {@code !!id}. See {@link #META_KERNEL_SHA256}. */
-    public static final String CORE_SHA256 = "0600d94811f79dc6f73b78c896f2739547359b6eff21825e8725db387bbb59dd";
+    public static final String CORE_SHA256 = "77991ecdd344339dd17f44ab8fc6713d38d3ad988e047066e7f1e0f717ce96c2";
 
     private static final Map<String, String> RESOURCES = Map.of(
             META_KERNEL_ID, "/meta-kernel.tn",
