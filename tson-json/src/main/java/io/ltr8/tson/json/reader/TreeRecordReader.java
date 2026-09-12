@@ -42,10 +42,31 @@ import java.util.Set;
  */
 final class TreeRecordReader implements JsonTypeReader<JsonValue> {
 
+    /**
+     * <b>Which reader a record position gets is decided here, once, from {@code record.extension}</b>
+     * ([TSON-SCHEMA] §5.2) -- §6.1.5's three readings are three readers rather than three branches taken on
+     * every value. ABSTRACT and SEALED positions do not read a record at all: they place the value and hand
+     * the object to the member's own reader, so they carry no field list, no group list and no default
+     * table, and this class never asks whether it is abstract.
+     *
+     * <p>OPEN and FINAL share this reader because they read identically -- the difference is only which names
+     * a tag may carry, which is the subtype set, and a FINAL record's is empty by construction rather than by
+     * a check.
+     */
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         RecordBody body = (RecordBody) definition.body();
-        return new TreeRecordReader(name, EntryDisplayName.of(name, definition, context.schema().entries()),
-                body, definition.subtypes(), context, context.locationOf(name, definition));
+        String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
+        JsonSchemaLocation location = context.locationOf(name, definition);
+        RecordDiagnostics rules = new RecordDiagnostics(displayName,
+                body.fields().stream().map(RecordField::name).reduce((a, b) -> a + " | " + b).orElse(""));
+        return switch (body.extension()) {
+            case ABSTRACT -> new TreeRecordAbstractReader(name, displayName,
+                    Set.copyOf(definition.subtypes()), context.readers(), location, rules);
+            case SEALED -> new TreeRecordSealedReader(name, displayName, body,
+                    Set.copyOf(definition.subtypes()), context, location, rules);
+            case OPEN, FINAL -> new TreeRecordReader(name, displayName, body, definition.subtypes(), context,
+                    location);
+        };
     };
 
     private final String name;
@@ -54,6 +75,14 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
     private final List<JsonTypeReader<?>> readers;
     private final List<FieldValue> stated;
     private final List<FieldGroup> groups;
+
+    /**
+     * Whether this record has any field group at all, decided when the schema compiles. §5.11's groups are
+     * the exception rather than the rule, and the pass they need walks every member of every group and
+     * indexes each -- work a record without one should not carry to the position where it is skipped.
+     */
+    private final boolean hasGroups;
+
     private final String declaredFields;
 
     /** What this record's rules say when a document breaks one -- shared with the TSON reader ([TSON-JSON] §9.4). */
@@ -82,6 +111,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         this.name = name;
         this.fields = List.copyOf(body.fields());
         this.groups = List.copyOf(body.groups());
+        this.hasGroups = !this.groups.isEmpty();
         this.schemaLocation = schemaLocation;
         Map<String, Integer> byName = new LinkedHashMap<>();
         List<JsonTypeReader<?>> built = new ArrayList<>(fields.size());
@@ -126,7 +156,9 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         boolean[] seen = new boolean[fields.size()];
         readMembers(ctx, values, seen);
         fillAbsent(ctx.withPosition(first.position()), values, seen);
-        validateGroups(ctx.withPosition(first.position()), seen);
+        if (hasGroups) {
+            validateGroups(ctx.withPosition(first.position()), seen);
+        }
         return assemble(values);
     }
 
@@ -160,21 +192,9 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
      * one of its subtypes and nothing else. The value then validates against the selected type in full.
      */
     private JsonValue tagged(JsonReadContext ctx, ReservedMembers.Tag tag) {
-        if (tag.unknown() != null) {
-            ReservedMembers.refuseUnknown(ctx, tag.unknown());
-            EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
-        }
-        if (tag.schema()) {
-            // §8.5 admits `$schema` exactly where the position's effective type is a `scoped` instance
-            // holding EXTERN, or a container of one. A record position is not one, and §3.3 makes it a
-            // resolver error anywhere else -- a scope change the model never opted into.
-            ctx.field(ReservedMembers.SCHEMA).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
-                    "'$schema' opens a schema scope, which [TSON-SCHEMA] §7.8 admits only at a scoped position "
-                            + "-- '" + displayName + "' is a record", "no $schema at this position",
-                    ReservedMembers.SCHEMA);
-            EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
+        JsonValue refused = Tags.refuseMisuse(ctx, tag, displayName);
+        if (refused != null) {
+            return refused;
         }
         if (tag.type() == null) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,

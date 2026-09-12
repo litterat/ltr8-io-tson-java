@@ -85,9 +85,10 @@ test puts its fact in the kernel, and its work is under "Discriminated record fa
 `SPEC-FEEDBACK.md` #10 and #11 carry the design and the arguments; this is the build order. A record states how
 it may be realised, a field of an abstract record may be a discriminator, and a position typed by such a record
 recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). The kernel
-carries both facts, meta.tn declares the four marks, the resolver lowers them into the body, and the linker
-refuses a family the closure contradicts. What is left is reading one: no encoding dispatches on a member yet,
-so a sealed family validates like any record and every document still needs its tag. Work lands on
+carries both facts, meta.tn declares the four marks, the resolver lowers them into the body, the linker refuses
+a family the closure contradicts, and **both encodings read one** — a value at a sealed position is placed by
+its own members, with no tag anywhere, and `CrossEncodingParityTest` holds the two to one wording for every
+refusal they share. What is left is what a family means to the machinery around it. Work lands on
 `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
 - [ ] **`@abstract` on a template.** Meaningful and refused as a gap today: §5.10 holds a template's body as
@@ -109,25 +110,12 @@ so a sealed family validates like any record and every document still needs its 
   exemption. And `extension` participates in §8.2 identity — an abstract, sealed, concrete and final `pet` admit
   different values and are different types.
 
-- [ ] **The dispatch reader, in both stacks.** At a SEALED position the reader takes the discriminator members
-  at the fields' declared types **in the base** — the one set known before dispatch — forms the value or the
-  tuple, and selects; the matched subtype then validates the whole value, re-verifying each pin as an ordinary
-  FIXED check so the dispatch read and the validation read agree by construction. A missing member is a
-  validation error, never a fallback to the tag; an unmatched value names what arrived and should name the
-  pinned alternatives. At an ABSTRACT position the tag is REQUIRED and the failure lands before the members are
-  read. Structurally this is a choice reader keyed on a value rather than a type name, so it sits beside
-  `ChoiceReader`/`TreeChoiceReader` rather than being a new kind; the tag is optional-and-asserting at SEALED in
-  **both** encodings, which is what a shared diagnostics family in `base.diagnostics` should state once. A
-  family dispatches one level — a sub-subtype inherits its parent's pin and §5.7 forbids changing it — so
-  deeper types dispatch to the parent and rely on the tag.
-
 - [ ] **The remaining corpus vectors.** `class2/link/` is done — ten vectors over the closure checks, the
   FINAL refusal and the subtraction that is *not* refused. What is left is `class2/schema/` for the resolved
   output of each `extension` member and a discriminator field, and `class2/validate/` for the dispatch, the
-  missing member, the unmatched value and the disagreeing tag — the second of which has to wait for a reader
-  to dispatch at all. The corpus's own sidecar schemas need no change — these are ordinary
-  vectors — and the JSON side is covered by `CrossEncodingParityTest`, which §9.4 makes obligatory here since
-  both encodings state the same refusals.
+  missing member, the unmatched value, the disagreeing tag and the tag that names the base. The corpus's own
+  sidecar schemas need no change — these are ordinary vectors, and both encodings read a family now, so
+  nothing blocks the `validate/` half any longer.
 
 ## JSON encoding
 

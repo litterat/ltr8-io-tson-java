@@ -1018,10 +1018,23 @@ and the pins are pairwise distinct as tuples, compared as *values* — `= 255` a
 and `= 1.0`. A family is re-judged whenever any part of it is local, so an importer adding an unpinned member, or
 one colliding with an imported pin, is refused by the schema that added it.
 
-What is **not** running is the reading. No encoding dispatches on a member, so a sealed family validates like any
-record and every document still carries its tag; the inhabitance and identity rules above are stated rather than
-measured. The kernel's own three schemas resolve, link and compile unchanged — every record OPEN, every field not
-a discriminator — which is the evidence that the fields cost nothing where nothing uses them.
+**JSON reads a family**, which is the half this design exists for: `record.extension` picks the reader when the
+schema compiles, so an ABSTRACT position requires its tag and decodes no member, a SEALED one places the value by
+reading its discriminators, and OPEN and FINAL share the concrete reader — a FINAL record's admissible tag set is
+empty by construction rather than by a check. The mapping is derived once at compile time and keyed by what the
+pins compare as, so a schema pinning `= 0xFF` selects on a document writing `255`; a table keyed on tokens reads
+that as unmatched. The selected member then re-reads the whole object, which re-verifies the pin as an ordinary
+FIXED check and makes the dispatch read and the validation read agree by construction.
+
+**The text encoding reads one too**, on the same terms and from the same rules: one dispatcher per position for
+both read modes, the discriminator fields found by a rewinding lookahead because a record's fields have no
+significant order, and the four refusals taken from the one `RecordExtensionDiagnostics` both stacks hold. A
+cross-encoding parity test compares code, data pointer, `expected` and prose for every rule they share, and
+passes — which is the evidence §9.4 asks for and not merely a claim that two readers were written from one
+design. What is left is what the family means to the machinery around it: the inhabitance and identity rules
+above are stated rather than measured. The kernel's own three schemas resolve, link and compile unchanged —
+every record OPEN, every field not a discriminator — which is the evidence that the fields cost nothing where
+nothing uses them.
 
 **Suggested resolution.** Add `extension: record_extension_type ~ OPEN` over `[ABSTRACT SEALED FINAL OPEN]` to the
 kernel's `record` and `discriminator: boolean ~ false` to its `record_field`, stating the four members' meanings and

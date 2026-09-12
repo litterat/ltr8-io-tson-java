@@ -40,6 +40,20 @@ public final class Subsumption {
     }
 
     /**
+     * A reader that already decides §7.2 at its own position, so {@link #guard} must leave it alone.
+     * Wrapping one would put a second dispatcher in front of it -- and the outer one would win, taking the
+     * tag before the inner reader could weigh it against anything else.
+     *
+     * <p>A marker rather than a list of types in {@code guard}, because the property is the reader's own and
+     * the next one to have it should not have to find that check. Four readers carry it: the two {@code
+     * Variant*Reader}s, which are the guard itself, and the two record dispatchers, whose rule is
+     * <em>stricter</em> than §7.2 -- at a sealed position a sibling's tag is admissible under §7.2 and still
+     * wrong, because the members have already said which member this is.
+     */
+    public interface Applied {
+    }
+
+    /**
      * {@code reader} guarded by §7.2, or {@code reader} unchanged where the rule does not apply or something
      * already applies it -- a record with subtypes arrives already wrapped by its own factory, and wrapping
      * twice would report the same refusal from two places.
@@ -49,7 +63,7 @@ public final class Subsumption {
         if (!(definition.body() instanceof Atom || definition.body() instanceof Product)) {
             return reader;
         }
-        if (reader instanceof VariantSchemaReader || reader instanceof VariantBindReader) {
+        if (reader instanceof Applied) {
             return reader;
         }
         return new VariantSchemaReader(name, selfNames(name, namesMeaning), reader, definition.subtypes(),

@@ -41,7 +41,7 @@ import java.util.Set;
  * is what this used to do, left the reader that builds the value unable to see them, and re-attaching
  * afterwards could only put them back on a {@code TsonValue}.
  */
-final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renamed {
+final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renamed, Subsumption.Applied {
 
     private final String name;
     private final TsonTypeReader<?> ownParser;

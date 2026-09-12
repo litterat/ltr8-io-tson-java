@@ -7,7 +7,12 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonValue;
 
+import io.ltr8.tson.base.unicode.Nfc;
+
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * [TSON-JSON] §3.2's reserved member namespace, and the scan that asks which of it an object carries.
@@ -62,18 +67,43 @@ final class ReservedMembers {
     }
 
     /**
+     * What one scan found: the reserved members, and the scalar events of whichever named members the caller
+     * asked for. A sealed position needs both -- §6.1.5 selects on the discriminator members and §8.1 admits
+     * a tag beside them -- and asking twice would walk the object twice for one question.
+     *
+     * @param tag       §3.3's answer, as {@link #scan} gives it
+     * @param selectors the first event of each requested member that was present, by member name; a member
+     *                  whose value is not a scalar is absent here, having no event a parser could read
+     */
+    record Scan(Tag tag, Map<String, JsonEvent> selectors) {
+    }
+
+    /**
      * Reads {@code ctx}'s object far enough to say whether it is an annotation object, then rewinds.
      *
      * <p>The caller must have established that an {@code ObjectStart} is at the cursor. Nothing is reported
      * from here: a scan is a question, and what a wrong answer means depends on the position that asked.
      */
     static Tag scan(JsonReadContext ctx) {
-        return JsonReadContext.lookingAhead(ctx, ReservedMembers::read);
+        return JsonReadContext.lookingAhead(ctx, ctx2 -> read(ctx2, Set.of()).tag());
     }
 
-    private static Tag read(JsonReadContext ctx) {
+    /**
+     * {@link #scan}, additionally capturing the scalar value of every member named in {@code wanted} -- one
+     * pass for a position that dispatches on members (§6.1.5) and must still see a tag (§8.1).
+     *
+     * <p><b>The names are NFC-normalised on the way in</b>, as every member-name comparison in this encoding
+     * is ([TSON-DATA] §2.5): a selector written in a decomposed form is the same field, and dispatching on
+     * the byte spelling would miss it.
+     */
+    static Scan scanFor(JsonReadContext ctx, Set<String> wanted) {
+        return JsonReadContext.lookingAhead(ctx, ctx2 -> read(ctx2, wanted));
+    }
+
+    private static Scan read(JsonReadContext ctx, Set<String> wanted) {
+        Map<String, JsonEvent> selectors = wanted.isEmpty() ? Map.of() : new LinkedHashMap<>();
         if (!(ctx.next() instanceof JsonEvent.ObjectStart)) {
-            return Tag.NONE;
+            return new Scan(Tag.NONE, selectors);
         }
         boolean present = false;
         boolean wrapper = false;
@@ -83,14 +113,24 @@ final class ReservedMembers {
         while (true) {
             JsonEvent event = ctx.next();
             if (event instanceof JsonEvent.ObjectEnd) {
-                return present || unknown != null
+                return new Scan(present || unknown != null
                         ? new Tag(present, type, wrapper, schema, unknown)
-                        : Tag.NONE;
+                        : Tag.NONE, selectors);
             }
             if (!(event instanceof JsonEvent.MemberName member)) {
-                return Tag.NONE;
+                return new Scan(Tag.NONE, selectors);
             }
             String name = member.name();
+            if (!wanted.isEmpty() && wanted.contains(Nfc.of(name))) {
+                // Scalars only: a selector is typed by an atom or an enum ([TSON-SCHEMA] §5.2, checked at
+                // schema load), so one event holds the whole value. Anything else is left absent here and
+                // meets the selected member's own field rules on the read that follows.
+                JsonEvent value = ctx.peek();
+                if (value instanceof JsonEvent.StringValue || value instanceof JsonEvent.NumberValue
+                        || value instanceof JsonEvent.BooleanValue) {
+                    selectors.putIfAbsent(Nfc.of(name), value);
+                }
+            }
             if (name.startsWith("$")) {
                 switch (name) {
                     case TYPE -> {
