@@ -51,13 +51,17 @@ import java.util.Set;
  * read and the validation read agree by construction -- the selected member re-reads the whole object,
  * including the member that selected it.
  */
-final class TreeSealedReader implements JsonTypeReader<JsonValue> {
+final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
 
     /** One discriminator field of the base: the member name, and the parser its declared type gives. */
     private record Selector(String name, AtomType<?> parser, AtomForm form) {
     }
 
     private final String displayName;
+
+    /** The base's own name, which a tag may restate: §8.1 admits a redundant tag at any typed position. */
+    private final String baseName;
+
     private final List<Selector> selectors;
     private final Set<String> selectorNames;
 
@@ -73,8 +77,10 @@ final class TreeSealedReader implements JsonTypeReader<JsonValue> {
     private final RecordDiagnostics rules;
     private final String pinned;
 
-    TreeSealedReader(String displayName, RecordBody body, Set<String> subtypes, ValueReaderContext context,
-                      JsonSchemaLocation schemaLocation, RecordDiagnostics rules) {
+    TreeRecordSealedReader(String name, String displayName, RecordBody body, Set<String> subtypes,
+                           ValueReaderContext context, JsonSchemaLocation schemaLocation,
+                           RecordDiagnostics rules) {
+        this.baseName = name;
         this.displayName = displayName;
         this.readerFor = context.readers();
         this.schemaLocation = schemaLocation;
@@ -101,7 +107,7 @@ final class TreeSealedReader implements JsonTypeReader<JsonValue> {
             under.addAll(definition.subtypes());
             deeper.put(subtype, under);
         }
-        this.pinned = members.keySet().stream().map(TreeSealedReader::render).reduce((a, b) -> a + " | " + b)
+        this.pinned = members.keySet().stream().map(TreeRecordSealedReader::render).reduce((a, b) -> a + " | " + b)
                 .orElse("(none)");
         this.family = new FamilyDiagnostics(displayName, String.join(" | ", subtypes));
     }
@@ -182,9 +188,19 @@ final class TreeSealedReader implements JsonTypeReader<JsonValue> {
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
+        if (tag.type() != null && tag.type().equals(baseName)) {
+            // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
+            // direct instances, and a sealed base has none: naming it selects nothing.
+            ctx.report(family.tagNamesTheBase(ReservedMembers.TYPE));
+            EventSkip.nextValue(ctx);
+            return JsonNull.INSTANCE;
+        }
         if (tag.type() != null && !deeper.getOrDefault(selected, Set.of()).contains(tag.type())) {
-            ctx.field(ReservedMembers.TYPE).report(
-                    family.tagContradictsDiscriminator(ReservedMembers.TYPE, tag.type(), selected));
+            // Located at the value and not at `/$type`, though the member is right there. §9.4 holds both
+            // encodings to one pointer for a rule, and TSON's tag is an annotation with no pointer step of
+            // its own -- so a rule they share can only be located where they both have a location. §3.3's
+            // reserved members are apparatus rather than data in any case, which is the same conclusion.
+            ctx.report(family.tagContradictsDiscriminator(ReservedMembers.TYPE, tag.type(), selected));
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }

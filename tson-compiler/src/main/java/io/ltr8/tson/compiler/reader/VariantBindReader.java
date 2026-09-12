@@ -59,7 +59,7 @@ import java.util.Optional;
  * framing here instead, which is what reaching past the annotations to the type-ref used to require, left
  * the reader that actually builds the value unable to see annotations written on it.
  */
-final class VariantBindReader implements TsonTypeReader<Object> {
+final class VariantBindReader implements TsonTypeReader<Object>, Subsumption.Applied {
 
     private final String name;
     private final TsonTypeReader<?> ownParser;

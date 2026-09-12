@@ -386,6 +386,43 @@ belief, over the bind path:
   document's cost and most of *that* is one `InputStreamReader` per read — fixed cost, unrelated to
   document size, tracked in `BACKLOG.md`.
 
+## A record position gets the reader its extension fact earns (`RecordDispatch`)
+
+`record.extension` ([TSON-SCHEMA] §5.2) decides how a position typed by a record is read, and it is decided
+**once, when the schema compiles** — `RecordDispatch.over` decorates whichever mode's record factory is in
+play, so ABSTRACT and SEALED positions never reach it.
+
+- **OPEN and FINAL** are the mode's own reader, unchanged. They read identically; the difference is which
+  names a tag may carry, and a FINAL record's subtype set is empty by construction rather than by a check.
+- **ABSTRACT** is `RecordTagDispatchReader`: the `!name` annotation is the only selector and is required, and
+  the failure lands before the record's shape is consulted.
+- **SEALED** is `RecordMemberDispatchReader`: the discriminator fields are read and the value looked up.
+
+**One reader for both modes**, on `ChoiceReader`'s reasoning — dispatch reads the type-ref without consuming
+it, so the member's own reader takes the whole data-value and does with it whatever that mode does everywhere
+else. Neither dispatcher carries a field list, a group list or a default table, because neither decodes a
+field.
+
+**Named for the dispatch rather than the member**, because `*AbstractReader` is already this package's name
+for the shared base of a kind's two mode readers, four classes deep; `*DispatchReader` is the established
+name for a reader that resolves another and hands the value on (`NamedDispatchReader`).
+
+**Both are `Subsumption.Applied`, and that is load-bearing.** `Subsumption.guard` wraps every Atom or Product
+reader in a `VariantSchemaReader` so §7.2 reaches every position — and wrapping a dispatcher puts a second
+dispatcher in front of it, which wins. A sealed position read through the guard takes `!cat` and hands the
+value to `cat` before the members are consulted; the marker is what stops it. The family's rule is *stricter*
+than §7.2 in any case: a sibling's tag is admissible under §7.2 and still wrong, the members having already
+said which member this is.
+
+**`NamedDispatchReader` is not reused**, close as the shape is. Its verdicts are a choice's, and
+[TSON-JSON] §9.4 binds a family's to the ones the JSON stack gives — which is what `base.diagnostics`'
+`FamilyDiagnostics` holds, and what `CrossEncodingParityTest` compares.
+
+**The pin table is derived at construction**, keyed by what the pins compare as (`ValueIdentity`), and both
+sides go through one parser: a schema pinning `= "dog"` matches an unquoted `dog`, and `= 0xFF` matches `255`.
+The scan for the selectors is a `lookingAhead` and rewinds, because a record's fields have no significant
+order — the selector may arrive after the fields it selects.
+
 ## Name hygiene on the read path ([TSON-DATA] §8.2)
 
 **An unbindable target class is `BIND_MISMATCH`, not `SCHEMA_ERROR`.** A class `tson-bind` cannot analyse

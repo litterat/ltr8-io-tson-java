@@ -72,6 +72,13 @@ class CrossEncodingParityTest {
               shape     => ( circle | square )
               picked    => { pick: scalars }
               shaped    => { outline: shape }
+              pet       => @sealed { @discriminator pet_type: text  name: text }
+              dog       => pet & { pet_type: = "dog"  breed: text }
+              cat       => pet & { pet_type: = "cat"  indoor: boolean }
+              figure    => @abstract { area: int32 }
+              disc      => figure & { side: int32 }
+              kennel    => { p: pet }
+              gallery   => { f: figure }
             }
             """;
 
@@ -158,6 +165,78 @@ class CrossEncodingParityTest {
         static Rule of(Diagnostic d) {
             return new Rule(d.code(), d.path().orElse("?"), d.expected(), d.message());
         }
+    }
+
+    // ── Subtype families ([TSON-SCHEMA] §5.2, [TSON-JSON] §6.1.5) ────────
+
+    /**
+     * <b>The headline, and the reason the design exists.</b> A sealed family's value is placed by the members
+     * it already carries, so neither encoding needs a tag -- the TSON is the TSON anyone would write and the
+     * JSON is the JSON anyone would write, and they are the same value.
+     *
+     * <p>Read at a <em>field</em> position deliberately. TSON names a document's root type with its own
+     * type-ref, so a sealed root necessarily carries {@code !pet} where JSON's root type arrives out of band
+     * (§3.4) and carries nothing -- comparing those would be comparing the two encodings' root conventions
+     * rather than their reading of a family.
+     */
+    @Test
+    void aSealedFamilyIsTagFreeInBothEncodings() {
+        bothAccept("kennel", "{ p: { pet_type: dog  name: Rex  breed: corgi } }",
+                """
+                        {"p": {"pet_type": "dog", "name": "Rex", "breed": "corgi"}}""");
+    }
+
+    /** And the selection is a selection: the other pin reaches the other member's fields. */
+    @Test
+    void theOtherPinSelectsTheOtherMemberInBoth() {
+        bothAccept("kennel", "{ p: { pet_type: cat  name: Tom  indoor: true } }",
+                """
+                        {"p": {"pet_type": "cat", "name": "Tom", "indoor": true}}""");
+    }
+
+    @Test
+    void aMissingDiscriminatorIsOneRuleInBoth() {
+        sameRule("kennel", "{ p: { name: Rex  breed: corgi } }",
+                """
+                        {"p": {"name": "Rex", "breed": "corgi"}}""");
+    }
+
+    @Test
+    void aDiscriminatorNoMemberPinsIsOneRuleInBoth() {
+        sameRule("kennel", "{ p: { pet_type: dgo  name: Rex } }",
+                """
+                        {"p": {"pet_type": "dgo", "name": "Rex"}}""");
+    }
+
+    /**
+     * The tag's <em>spelling</em> is the one thing that legitimately differs here -- {@code !cat} against
+     * {@code "$type": "cat"} -- which is why {@code FamilyDiagnostics} keeps it out of the message and spends
+     * it in {@code actual}, the component this comparison excludes.
+     */
+    @Test
+    void aTagContradictingTheDiscriminatorIsOneRuleInBoth() {
+        sameRule("kennel", "{ p: !cat { pet_type: dog  name: Rex  breed: corgi } }",
+                """
+                        {"p": {"$type": "cat", "pet_type": "dog", "name": "Rex", "breed": "corgi"}}""");
+    }
+
+    @Test
+    void anAbstractPositionRequiresItsTagInBoth() {
+        sameRule("gallery", "{ f: { area: 4 } }", """
+                {"f": {"area": 4}}""");
+    }
+
+    /** The base has no direct instances, so naming it is an error in both -- not a redundant restatement. */
+    @Test
+    void aTagNamingTheAbstractBaseIsOneRuleInBoth() {
+        sameRule("gallery", "{ f: !figure { area: 4 } }", """
+                {"f": {"$type": "figure", "area": 4}}""");
+    }
+
+    @Test
+    void anAbstractPositionTakesTheTaggedSubtypeInBoth() {
+        bothAccept("gallery", "{ f: !disc { area: 4  side: 2 } }", """
+                {"f": {"$type": "disc", "area": 4, "side": 2}}""");
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {

@@ -173,7 +173,7 @@ class JsonSealedFamilyReadTest {
     @Test
     void anAbstractPositionRefusesATagNamingTheBase() {
         assertTrue(message("""
-                {"$type": "shape", "area": 4}""", "shape").contains("is not a subtype of the abstract"));
+                {"$type": "shape", "area": 4}""", "shape").contains("selects nothing -- it is abstract"));
     }
 
     // ── Nested, which is where the design earns its keep ─────────────────

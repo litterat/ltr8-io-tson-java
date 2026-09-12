@@ -22,7 +22,10 @@ import java.util.Set;
  * reader. Deciding that once, when the schema compiles, is what the extension fact is for -- a concrete
  * record's reader never asks whether it is abstract, and this one never carries a field list it cannot use.
  */
-final class TreeAbstractReader implements JsonTypeReader<JsonValue> {
+final class TreeRecordAbstractReader implements JsonTypeReader<JsonValue> {
+
+    /** The base's own name -- naming it is refused with its own rule, the remedy differing (§8.1). */
+    private final String baseName;
 
     private final String displayName;
     private final Set<String> subtypes;
@@ -31,8 +34,10 @@ final class TreeAbstractReader implements JsonTypeReader<JsonValue> {
     private final FamilyDiagnostics family;
     private final RecordDiagnostics rules;
 
-    TreeAbstractReader(String displayName, Set<String> subtypes, TypeReaderResolver readerFor,
-                        JsonSchemaLocation schemaLocation, RecordDiagnostics rules) {
+    TreeRecordAbstractReader(String name, String displayName, Set<String> subtypes,
+                             TypeReaderResolver readerFor, JsonSchemaLocation schemaLocation,
+                             RecordDiagnostics rules) {
+        this.baseName = name;
         this.displayName = displayName;
         this.subtypes = subtypes;
         this.readerFor = readerFor;
@@ -65,12 +70,10 @@ final class TreeAbstractReader implements JsonTypeReader<JsonValue> {
         if (!subtypes.contains(tag.type())) {
             // The base itself is not admissible here, which is the whole of what ABSTRACT means -- so this
             // refuses a tag naming it, where a concrete position would take one as a redundant restatement.
+            // Located at the value rather than at `/$type`, for the reason TreeRecordSealedReader gives.
             if (!NameHygiene.refuses(ctx, tag.type())) {
-                ctx.field(ReservedMembers.TYPE).report(io.ltr8.tson.base.Diagnostic.Code.TYPE_MISMATCH,
-                        "'$type' names '%s', which is not a subtype of the abstract '%s' -- a value here is a "
-                                .formatted(tag.type(), displayName) + "value of one of its subtypes "
-                                + "([TSON-SCHEMA] §5.2, §7.2)",
-                        String.join(" | ", subtypes), tag.type());
+                ctx.report(tag.type().equals(baseName) ? family.tagNamesTheBase(ReservedMembers.TYPE)
+                        : family.notASubtype(ReservedMembers.TYPE, tag.type()));
             }
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;

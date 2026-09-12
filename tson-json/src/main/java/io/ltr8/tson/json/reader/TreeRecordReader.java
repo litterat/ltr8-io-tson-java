@@ -60,10 +60,10 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         RecordDiagnostics rules = new RecordDiagnostics(displayName,
                 body.fields().stream().map(RecordField::name).reduce((a, b) -> a + " | " + b).orElse(""));
         return switch (body.extension()) {
-            case ABSTRACT -> new TreeAbstractReader(displayName, Set.copyOf(definition.subtypes()),
-                    context.readers(), location, rules);
-            case SEALED -> new TreeSealedReader(displayName, body, Set.copyOf(definition.subtypes()), context,
-                    location, rules);
+            case ABSTRACT -> new TreeRecordAbstractReader(name, displayName,
+                    Set.copyOf(definition.subtypes()), context.readers(), location, rules);
+            case SEALED -> new TreeRecordSealedReader(name, displayName, body,
+                    Set.copyOf(definition.subtypes()), context, location, rules);
             case OPEN, FINAL -> new TreeRecordReader(name, displayName, body, definition.subtypes(), context,
                     location);
         };
