@@ -131,10 +131,11 @@ work, and the first is the largest single obstacle to the stated goal.
    `discriminator` there is no in-band selector, and §8.2 requires the tag. JSON Schema validates such a union
    by *trying each branch*, which §8.2 forbids in as many words ("no trying variants in order"). Existing
    documents carry nothing to dispatch on, so this is a genuine wall: the converter finds a discriminator or
-   reports.
+   reports. A `oneOf` that *does* carry one converts to a sealed record family rather than to a choice —
+   §6.1.5, where member dispatch lives — which is the shape the contract already had.
 4. **Enum members must be identifiers.** `"in-progress"` converts; `"not found"` does not. The fallback is a
-   `text` refinement with a pattern, which costs the enum its discrimination class and so costs §8.2 route 2
-   a variant it could have dispatched on.
+   `text` refinement with a pattern, which costs the enum its discrimination class and so costs §8.2's untagged
+   route a variant it could have dispatched on.
 5. **Required-but-nullable.** `required: [x]` beside `type: [X, "null"]` has no TSON spelling — present with
    an absent value is not a state (§7.3), and OPTIONAL would *weaken* the source contract. Drop-with-report,
    per the companion note's list D.
@@ -218,7 +219,9 @@ encodings genuinely share and what each owns is worth **finding** from two worki
 from one and then discovered wrong through the one consumer that has to bend around it. Consolidating two
 implementations that both pass their tests is cheap and safe; unpicking a shared contract that was wrong is
 neither. The same discipline governs `@discriminator` and `@rest`, which stay unbuilt until this reader is
-what exercises them.
+what exercises them. `@discriminator`'s target moved while it was unbuilt, from a choice declaration to a
+field of an abstract record (`SPEC-FEEDBACK.md` #10, #11) — which is the discipline paying: nothing had been
+written against the shape that turned out to be wrong.
 
 **It also costs nothing structurally, which is what makes the deferral free.** `TsonLinkedSchema` is a record
 in `tson-schema`, a module requiring only `tson-base`, and `tson-atom` already re-exports it — so compiling
@@ -391,10 +394,12 @@ whether a map is class-stable.
 §8.2's predicate is the rule [TSON-SCHEMA] §5.4 requires each encoding to state over the resolver-derived
 `disjoint` fact, and it is closed: a value may omit its tag by exactly two routes and "MUST NOT be extended by
 implementation cleverness — no member-shape matching among record variants, no value-set separation, no trying
-variants in order." `TreeChoiceReader` implements route 2 — disjoint plus class-stable, selecting on the
-arriving value's kind — and nothing more. Route 1, a declared `@discriminator`, is unbuilt, so a choice
-carrying one falls through to *the tag is REQUIRED*: the correct verdict for a reader without the route, and
-not a quiet approximation of it.
+variants in order." `TreeChoiceReader` implements the whole of it — disjoint plus class-stable, selecting on
+the arriving value's kind. §8.2 has one condition and no second route: **member dispatch is not a choice
+mechanism**, a choice position having no expected record type whose selector fields a decoder could know
+before reading. It belongs to a sealed record family (§6.1.5), where the position does, and that is unbuilt —
+so a record family declaring a discriminator currently reads as an ordinary record, and a choice of records
+requires the tag, which is the correct verdict rather than a quiet approximation of a route.
 
 **The verdict is computed once per choice, at compile time**, which is what §8.3 asks for in so many words —
 "the wire decision is then a table hit, not a per-value derivation". The table is empty exactly when the tag is
@@ -836,8 +841,8 @@ writes neither by its family.
 
 **Two things are refused rather than approximated, both because the reader could not take them back:**
 
-- **a choice.** §8.2 admits an untagged one by a declared discriminator or by class-stable disjoint
-  variants, both facts a *schema* states; a Java union states neither. This is the exact mirror of the
+- **a choice.** §8.2 admits an untagged one only by class-stable disjoint variants, a fact a *schema*
+  states; a Java union states nothing of the kind. This is the exact mirror of the
   reader's own refusal, and writing one would produce a document this library cannot read.
 - **a host value with no JSON spelling**, and a map whose key type a member name cannot spell — the write
   side of the reader's own `BIND_MISMATCH` on the same shape.
@@ -935,11 +940,11 @@ is the difference between a document read wholly and one read partly. The accomm
 schema-directed decode, where a schema can say which members are a tail and which are a mistake, and not
 here, where the only two options are drop and refuse.
 
-**A union target is refused, with the reason.** §8.2 admits a tag-free choice by exactly two routes — a
-declared discriminator, or a derived disjointness fact over class-stable variants — and forbids extending
-them ("no trying variants in order", which is how JSON Schema validates a `oneOf`). A Java union states
-neither, so there is nothing to dispatch on and inventing a rule would be inventing the one §8.2 rules
-out. The message says so rather than failing obscurely.
+**A union target is refused, with the reason.** §8.2 admits a tag-free choice by exactly one condition — a
+derived disjointness fact over class-stable variants — and forbids extending it ("no trying variants in
+order", which is how JSON Schema validates a `oneOf`). A Java union states no such fact, so there is nothing
+to dispatch on and inventing a rule would be inventing the one §8.2 rules out. The message says so rather
+than failing obscurely.
 
 **Numbers convert exactly or error** (§3.1's "error, never round silently"): every integral narrowing
 runs off one `BigDecimal`, so `1.5` and `2147483648` both fail at an `int` rather than truncating or

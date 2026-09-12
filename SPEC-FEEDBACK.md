@@ -758,9 +758,9 @@ deliberately leaves out of the first design.
 **What is running:** nothing. This implementation has built [TSON-JSON] §8.2's route 2 (kind disjointness over
 class stability) and §6.1.5's `$type` subtype selection in tree mode, and the load-time checks §6 states
 have never had a consumer — which is what surfaced the scoping question before any of it was built. The
-[TSON-JSON] half of the change is this implementation's to make in place (§6.1.5's "there is no structural
-recovery of `S`" is the sentence that moves, and §8.4 largely goes with it). Both questions that held it are
-settled — the base is abstract, and text claims member dispatch — so what remains is the writing.
+[TSON-JSON] half of the change is made: §6.1.5 now reads the untagged object by the position's own extension
+fact, §8.2 is one condition rather than two, §8.4 states why a choice has no discriminator, and §1.6 records
+the Part 2 dependency as proposed rather than landed.
 
 **Suggested resolution.** Retarget §6's `@discriminator` from a choice declaration to a record field, as a bare
 `void` marker beside `@rest`, with the check list above and the §5.7 arrangement stated; name the equality
