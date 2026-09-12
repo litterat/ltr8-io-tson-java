@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
 import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -134,6 +135,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
      */
     private final String declaredFields;
 
+    /** What this record's rules say when a document breaks one -- shared with the JSON reader ([TSON-JSON] §9.4). */
+    private final RecordDiagnostics rules;
+
     RecordAbstractReader(String name, String displayName, RecordBody body, FieldReaders readers,
                           SchemaLocation schemaLocation) {
         this.name = name;
@@ -168,6 +172,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         this.fixedCheck = fixedChecks;
         this.positionalFieldIndex = bareRequiredCount == 1 ? solePositionalField : -1;
         this.declaredFields = fields.stream().map(field -> field.schema().name()).collect(Collectors.joining(" | "));
+        this.rules = new RecordDiagnostics(displayName, declaredFields);
     }
 
     /**
@@ -234,9 +239,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         if (positionalFieldIndex >= 0) {
             return new ShapeResult(Shape.POSITIONAL, anchor);
         }
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                "expected a record for '" + displayName + "', found " + TypeRefCheck.describe(e),
-                "a record", TypeRefCheck.describe(e));
+        ctx.report(rules.notARecord(TypeRefCheck.describe(e)));
         EventSkip.coreValue(ctx);
         return new ShapeResult(Shape.MISMATCH, anchor);
     }
@@ -270,20 +273,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             Integer schemaIndex = fieldIndex.get(fieldName.name());
             if (schemaIndex == null) {
                 if (!nameRefused) {
-                    ctx.field(fieldName.name()).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
-                            "unknown field '" + fieldName.name() + "' on '" + displayName + "' -- a record is closed "
-                                    + "under its type (§7.2), whose fields are (" + declaredFields + ")",
-                            declaredFields, fieldName.name());
+                    ctx.field(fieldName.name()).report(rules.unrecognizedField(fieldName.name()));
                 }
                 EventSkip.scopedValue(ctx);
                 continue;
             }
             if (seen[schemaIndex]) {
                 ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position())
-                        .report(Diagnostic.Code.DUPLICATE_FIELD,
-                        "duplicate field '" + fieldName.name() + "' on '" + displayName + "' -- a record states each "
-                                + "field at most once (§2.5), and the repeat states a value for nothing",
-                        "each field stated once", "'" + fieldName.name() + "' stated again");
+                        .report(rules.duplicateField(fieldName.name()));
             }
             if (fixedCheck[schemaIndex] != null) {
                 // A FIXED field's value comes from the schema, never the data -- but the data may still
@@ -326,6 +323,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         return seen;
     }
 
+    /** How a TSON text document spells absence ([TSON-DATA] §2.9), for the `actual` of a field-state rule. */
+    private static final String ABSENT = "_";
+
     static boolean isFixed(FieldState state) {
         return state == FieldState.REQUIRED_FIXED || state == FieldState.OPTIONAL_FIXED;
     }
@@ -351,13 +351,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
             String members = String.join(" | ", group.members());
             if (present > 1) {
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "at most one of (" + members + ") may be present for '" + displayName + "', found " + present,
-                        "at most one of (" + members + ")", present + " present");
+                ctx.report(rules.groupAdmitsAtMostOne(members, present));
             } else if (group.state() == ElementState.REQUIRED && present == 0) {
-                ctx.report(Diagnostic.Code.FIELD_REQUIRED,
-                        "exactly one of (" + members + ") must be present for '" + displayName + "'",
-                        "one of (" + members + ")", "none present");
+                ctx.report(rules.groupRequiresOne(members));
             }
         }
     }
@@ -388,13 +384,18 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             return statedAbsentValue();
         }
         if (schema.state() == FieldState.REQUIRED_DEFAULT) {
-            ctx.schemaField(schema.name(), schema.position()).report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
-                    "'" + schema.name() + "' on '" + displayName + "' is always filled from the schema and cannot be "
-                            + "written '_' -- omit the field to take its default (§5.2)",
-                    "the field omitted, or a value for '" + schema.name() + "'", "_");
+            ctx.schemaField(schema.name(), schema.position())
+                    .report(rules.absenceAtDefaultedField(schema.name(), ABSENT));
             return precomputedValue[schemaIndex];
         }
-        return valueForAbsentField(schemaIndex, ctx);
+        // REQUIRED, the only state left: the document *stated* absence, so it is not missing. Delegating to
+        // valueForAbsentField reported "missing required field", which tells an author they forgot a field
+        // they can see themselves writing -- §5.2's rule is that `_` asserts absence at a position the schema
+        // always fills, and that is what the diagnostic should say. Both FIXED states reach verifyFixed
+        // instead and never arrive here.
+        ctx.schemaField(schema.name(), schema.position())
+                .report(rules.absenceAtRequiredField(schema.name(), ABSENT));
+        return null;
     }
 
     /**
@@ -427,9 +428,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         RecordField schema = fields.get(schemaIndex).schema();
         return switch (schema.state()) {
             case REQUIRED -> {
-                ctx.schemaField(schema.name(), schema.position()).report(Diagnostic.Code.FIELD_REQUIRED,
-                        "missing required field '" + schema.name() + "' for '" + displayName + "'",
-                        "a value for '" + schema.name() + "'", "(absent)");
+                ctx.schemaField(schema.name(), schema.position())
+                        .report(rules.missingRequiredField(schema.name()));
                 yield null;
             }
             case OPTIONAL -> null;
@@ -473,18 +473,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         if (ctx.peek() instanceof AbsentEvent) {
             ctx.next();
             if (schema.state() == FieldState.REQUIRED_FIXED) {
-                fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
-                        "'" + fieldName + "' is fixed on '" + displayName + "' and cannot be absent",
-                        String.valueOf(check.value()), "_");
+                fieldCtx.report(rules.fixedFieldAbsent(fieldName, String.valueOf(check.value()), ABSENT));
                 return;
             }
             return; // OPTIONAL_FIXED, valued or `= _`: absence is exactly what it permits
         }
         if (check.mustBeAbsent()) {
             EventSkip.scopedValue(ctx);
-            fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
-                    "'" + fieldName + "' is fixed to absent on '" + displayName + "' and may only be omitted or "
-                            + "written as '_'", "_", "a value");
+            fieldCtx.report(rules.fixedToAbsentFieldValued(fieldName, ABSENT, "a value"));
             return;
         }
         int before = ctx.reported();
@@ -498,11 +494,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             return;
         }
         if (!Objects.equals(ValueIdentity.of(written), ValueIdentity.of(check.value()))) {
-            fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
-                    "'" + fieldName + "' is fixed on '" + displayName + "' and cannot be given another value -- the "
-                            + "schema declares it with '=' (fixed); for a default the data may override, "
-                            + "use '~'",
-                    Rendered.value(check.value()), Rendered.value(written));
+            fieldCtx.report(rules.fixedFieldContradicted(fieldName, Rendered.value(check.value()),
+                    Rendered.value(written)));
             return;
         }
         // The precomputed value, which is the same one an omitted FIXED field gets -- whether the document

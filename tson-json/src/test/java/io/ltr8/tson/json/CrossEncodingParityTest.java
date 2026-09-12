@@ -93,6 +93,10 @@ class CrossEncodingParityTest {
     }
 
     private static List<Verdict> json(String rootType, String body) {
+        return Verdict.of(jsonDiagnostics(rootType, body));
+    }
+
+    private static List<Diagnostic> jsonDiagnostics(String rootType, String body) {
         List<Diagnostic> problems = new ArrayList<>();
         DiagnosticsReceiver receiver = problems::add;
         try (ByteSource bytes = ByteSource.of(body)) {
@@ -101,7 +105,7 @@ class CrossEncodingParityTest {
             ctx = COMPILED.rootDeclaration(rootType).map(ctx::underDeclaration).orElse(ctx);
             COMPILED.get(rootType).read(ctx);
         }
-        return Verdict.of(problems);
+        return List.copyOf(problems);
     }
 
     /**
@@ -128,6 +132,32 @@ class CrossEncodingParityTest {
         assertFalse(fromTson.isEmpty(), "the TSON side reported nothing, so this compares nothing");
         assertEquals(fromTson, json(rootType, jsonBody).stream().map(Verdict::code).toList(),
                 "the two encodings disagree about this document");
+    }
+
+    /**
+     * The strongest comparison, for a rule both encodings now state from one place
+     * ({@code base.diagnostics}): the code, the data pointer, the machine-readable {@code expected}, <b>and
+     * the prose</b>.
+     *
+     * <p>Comparing the message is what makes the shared rule load-bearing rather than decorative — without
+     * it the two readers could hold the same class and still phrase a refusal two ways. {@code actual} is
+     * deliberately excluded: it echoes what the document literally held, so {@code _} there and {@code null}
+     * here is right, that component being data rather than prose.
+     */
+    private static void sameRule(String rootType, String tsonBody, String jsonBody) {
+        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
+        assertFalse(fromTson.isEmpty(), "the TSON side reported nothing, so this compares nothing");
+        List<Diagnostic> fromJson = jsonDiagnostics(rootType, jsonBody);
+        assertEquals(fromTson.stream().map(Rule::of).toList(), fromJson.stream().map(Rule::of).toList(),
+                "the two encodings state this rule differently");
+    }
+
+    /** A rule as both encodings must state it: which rule, where in the data, the constraint, and the prose. */
+    private record Rule(Diagnostic.Code code, String path, String expected, String message) {
+
+        static Rule of(Diagnostic d) {
+            return new Rule(d.code(), d.path().orElse("?"), d.expected(), d.message());
+        }
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {
@@ -172,28 +202,28 @@ class CrossEncodingParityTest {
 
     @Test
     void aMissingRequiredField() {
-        sameVerdict("person", """
+        sameRule("person", """
                 { labels: [] }""", """
                 {"labels": []}""");
     }
 
     @Test
     void aFieldTheTypeDoesNotDeclare() {
-        sameVerdict("person", """
+        sameRule("person", """
                 { name: "Ada"  labels: []  shoe_size: 9 }""", """
                 {"name": "Ada", "labels": [], "shoe_size": 9}""");
     }
 
     @Test
     void aFieldStatedTwice() {
-        sameVerdict("person", """
+        sameRule("person", """
                 { name: "Ada"  name: "Grace"  labels: [] }""", """
                 {"name": "Ada", "name": "Grace", "labels": []}""");
     }
 
     @Test
     void aContradictedFixedValue() {
-        sameVerdict("person", """
+        sameRule("person", """
                 { name: "Ada"  kind: "robot"  labels: [] }""", """
                 {"name": "Ada", "kind": "robot", "labels": []}""");
     }
@@ -201,7 +231,7 @@ class CrossEncodingParityTest {
     /** The absent sentinel at a field that admits none: `_` in text, null in JSON, one verdict. */
     @Test
     void theAbsentSentinelAtARequiredField() {
-        sameVerdict("person", """
+        sameRule("person", """
                 { name: _  labels: [] }""", """
                 {"name": null, "labels": []}""");
     }
@@ -209,7 +239,7 @@ class CrossEncodingParityTest {
     /** §6.1.2: at REQUIRED_DEFAULT the fix is omission, and stating absence is refused in both encodings. */
     @Test
     void theAbsentSentinelAtADefaultedField() {
-        sameVerdict("person", """
+        sameRule("person", """
                 { name: "Ada"  tries: _  labels: [] }""", """
                 {"name": "Ada", "tries": null, "labels": []}""");
     }
@@ -252,7 +282,7 @@ class CrossEncodingParityTest {
 
     @Test
     void aRequiredGroupWithNoMemberPresent() {
-        sameVerdict("bounded", """
+        sameRule("bounded", """
                 { value: 1 }""", """
                 {"value": 1}""");
     }
@@ -342,7 +372,7 @@ class CrossEncodingParityTest {
     /** Without a tag the value is exactly the position's type -- no structural recovery, in either encoding. */
     @Test
     void anUntaggedSubtypeShapeIsRefusedByBoth() {
-        sameVerdict("holder", """
+        sameRule("holder", """
                 { who: { name: "Ada"  department: "Engines"  labels: [] }  labels: [] }""", """
                 {"who": {"name": "Ada", "department": "Engines", "labels": []}, "labels": []}""");
     }
@@ -410,7 +440,7 @@ class CrossEncodingParityTest {
 
     @Test
     void aRequiredGroupWithTwoMembersPresent() {
-        sameVerdict("bounded", """
+        sameRule("bounded", """
                 { value: 1  min: 0  max: 9 }""", """
                 {"value": 1, "min": 0, "max": 9}""");
     }

@@ -3,6 +3,7 @@ package io.ltr8.tson.json;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.SourcePosition;
+import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.stream.JsonEventSource;
@@ -292,6 +293,17 @@ public final class JsonReadContext {
      * {@code schemaIdIfKnown()} and the {@code Optional} rather than by remembering which convention each
      * component uses.
      */
+    /**
+     * Hands one of a family's rules to this read's receiver, located here.
+     *
+     * <p>The rule states four of a {@link Diagnostic}'s nine components and this context supplies the other
+     * five ({@code base.diagnostics}), so the unpacking lives here rather than in each reader -- one place
+     * adds a location, so one place takes a {@link Refusal} apart.
+     */
+    public void report(Refusal refusal) {
+        report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
+    }
+
     public void report(Diagnostic.Code code, String message, String expected, String actual) {
         cursor.reported++;
         cursor.receiver.report(new Diagnostic(Optional.of(path()),

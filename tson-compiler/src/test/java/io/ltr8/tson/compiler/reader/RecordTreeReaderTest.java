@@ -307,7 +307,10 @@ class RecordTreeReaderTest {
         assertEquals(BigInteger.valueOf(7), read(compiled, "{}").get("value"));
 
         ReadException thrown = assertThrows(ReadException.class, () -> read(compiled, "{ value: _ }"));
-        assertTrue(thrown.getMessage().contains("cannot be written '_'"), thrown.getMessage());
+        // The rule is stated in the schema's vernacular, shared with the JSON reader, so the prose says
+        // "absent" rather than this encoding's spelling of it; `_` rides in the diagnostic's `actual`.
+        assertTrue(thrown.getMessage().contains("cannot be written as absent"), thrown.getMessage());
+        assertEquals("_", thrown.diagnostic().actual());
 
         DiagnosticsCollector problems = new DiagnosticsCollector();
         assertEquals(BigInteger.valueOf(7), read(compiled, "{ value: _ }", problems).get("value"));

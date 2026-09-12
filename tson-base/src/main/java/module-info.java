@@ -64,6 +64,19 @@ module io.ltr8.tson.base {
     exports io.ltr8.tson.base.io;
 
     /**
+     * What a rule says when a document breaks it -- stated once, for every encoding. [TSON-JSON] §9.4 gives
+     * both encodings one diagnostic vocabulary and adds no category of its own, so a document wrong in one is
+     * wrong in the other for the same stated reason; the {@code code} and the machine-readable {@code
+     * expected} are what a consumer routes on, and two independently-written readers agreeing about them was
+     * previously a matter of one having been copied from the other.
+     *
+     * <p>The prose is the <b>schema's</b> vernacular rather than any format's -- a record has fields whether
+     * a member or a {@code name:} carried one -- because it is the schema that refused the document. What the
+     * document literally held rides in {@code actual}, which is data and stays the encoding's.
+     */
+    exports io.ltr8.tson.base.diagnostics;
+
+    /**
      * What this processor will admit as a name and spend on a document -- {@code ProcessorPolicy} and the
      * two it composes, {@code UnicodePolicy} (§8.2's levels) and {@code LimitsPolicy} (§9.1's bounds).
      * One package because a deployment states one policy, and §8.2 requires a relaxation be code rather

@@ -311,6 +311,16 @@ module has a real `module-info.java`; module names mirror each module's root exp
   to a Java object and has never heard of a schema — system-library standing, like the `java.net.http` this
   module already rests on. The property that matters is unchanged: nothing here knows what a TSON document or
   a JSON one looks like.
+  **`io.ltr8.tson.base.diagnostics`** is what a **rule** says when a document breaks one — `Refusal`, the four
+  `Diagnostic` components a rule determines (code, message, `expected`, `actual`), and a class per family
+  stating them once for every encoding. §9.4 makes that an obligation rather than a tidiness: one vocabulary
+  across both encodings, so a document wrong in one is wrong in the other for the same stated reason, and the
+  `code` and `expected` a consumer routes on cannot be left to two readers agreeing by having been copied.
+  **The prose is the schema's vernacular** — a record has *fields* in both encodings, absence is *absent*
+  rather than `_` or `null` — because it is the schema that refused the document; the encoding's own spelling
+  rides in `actual`, which is data. That split is what the parity test compares: code, path, `expected` and
+  `message`, never `actual`. `RecordDiagnostics` is the family that proves the shape; the rest follow. What
+  stays with each reader is any rule the other encoding has no counterpart for.
   **`io.ltr8.tson.base.io`** is where a document's bytes come from and go — `ByteSource` and `ByteSink`,
   one pair for both encodings because [TSON-JSON] §3.1 makes the JSON lexer decode UTF-8 from bytes exactly
   as [TSON-DATA] §9.1 makes the TSON one. **Bytes, never characters**: §7.1 forbids substituting on
