@@ -1,6 +1,7 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.diagnostics.ArrayDiagnostics;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
@@ -45,12 +46,16 @@ final class TreeArrayReader implements JsonTypeReader<JsonValue> {
     private final JsonTypeReader<?> element;
     private final JsonSchemaLocation schemaLocation;
 
+    /** This array's rules, shared with the TSON reader ([TSON-JSON] §9.4). */
+    private final ArrayDiagnostics rules;
+
     private TreeArrayReader(String name, ArrayBody body, JsonTypeReader<?> element,
                             JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.body = body;
         this.element = element;
         this.schemaLocation = schemaLocation;
+        this.rules = new ArrayDiagnostics(name);
     }
 
     @Override
@@ -58,30 +63,26 @@ final class TreeArrayReader implements JsonTypeReader<JsonValue> {
         ctx = ctx.underDeclaration(schemaLocation);
         JsonEvent first = ctx.next();
         if (!(first instanceof JsonEvent.ArrayStart)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' takes a JSON array, and this is %s"
-                    .formatted(name, JsonAtoms.describe(first)), "a JSON array", JsonAtoms.describe(first));
+            ctx.report(rules.notAnArray(JsonAtoms.describe(first)));
             EventSkip.value(ctx, first);
             return JsonNull.INSTANCE;
         }
         List<JsonValue> elements = new ArrayList<>();
         Set<Object> seen = body.uniqueItems() ? new LinkedHashSet<>() : null;
         while (!(ctx.peek() instanceof JsonEvent.ArrayEnd)) {
-            JsonReadContext at = ctx.index(elements.size());
-            elements.add(readElement(at, seen));
+            int index = elements.size();
+            elements.add(readElement(ctx.index(index), index, seen));
         }
         ctx.next();   // ArrayEnd
         checkSize(ctx, elements.size());
         return new JsonArray(elements);
     }
 
-    private JsonValue readElement(JsonReadContext at, Set<Object> seen) {
+    private JsonValue readElement(JsonReadContext at, int index, Set<Object> seen) {
         if (at.peek() instanceof JsonEvent.NullValue) {
             at.next();
             if (body.state() == ElementState.REQUIRED) {
-                at.report(Diagnostic.Code.FIELD_REQUIRED,
-                        "'%s' takes no absent element, and JSON null is this encoding's spelling of the absent "
-                                .formatted(name) + "sentinel (§7) -- declare it '[T?]' to admit one",
-                        "a value at this slot", "null");
+                at.report(rules.absentElement(index, ABSENT));
             }
             // The slot exists and counts either way, so the placeholder stays in the tree rather than
             // shifting every later element's index against the document ([TSON-DATA] §2.9).
@@ -89,9 +90,7 @@ final class TreeArrayReader implements JsonTypeReader<JsonValue> {
         }
         JsonValue value = (JsonValue) element.read(at);
         if (seen != null && !seen.add(ValueIdentity.of(value))) {
-            at.report(Diagnostic.Code.TYPE_MISMATCH,
-                    "'%s' is a set and this element repeats one already present".formatted(name),
-                    "each element once", String.valueOf(value));
+            at.report(rules.repeatedElement(Nodes.rendered(value)));
         }
         return value;
     }
@@ -103,15 +102,14 @@ final class TreeArrayReader implements JsonTypeReader<JsonValue> {
      * same rule. The two must agree: [TSON-JSON] §9.4 gives both encodings one closed vocabulary, and a
      * consumer routing on the code would otherwise see one document refused two different ways.
      */
+    /** How a JSON document spells absence (§7), for the `actual` of a rule about an element's state. */
+    private static final String ABSENT = "null";
+
     private void checkSize(JsonReadContext ctx, int count) {
         BigInteger size = BigInteger.valueOf(count);
-        body.minItems().filter(min -> size.compareTo(min) < 0).ifPresent(min -> ctx.report(
-                Diagnostic.Code.TYPE_MISMATCH,
-                "'%s' takes at least %s elements, and this has %d".formatted(name, min, count),
-                ">= " + min, String.valueOf(count)));
-        body.maxItems().filter(max -> size.compareTo(max) > 0).ifPresent(max -> ctx.report(
-                Diagnostic.Code.TYPE_MISMATCH,
-                "'%s' takes at most %s elements, and this has %d".formatted(name, max, count),
-                "<= " + max, String.valueOf(count)));
+        body.minItems().filter(min -> size.compareTo(min) < 0)
+                .ifPresent(min -> ctx.report(rules.tooFewElements(min, count)));
+        body.maxItems().filter(max -> size.compareTo(max) > 0)
+                .ifPresent(max -> ctx.report(rules.tooManyElements(max, count)));
     }
 }

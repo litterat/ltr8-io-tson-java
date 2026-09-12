@@ -39,7 +39,7 @@ final class TreeMapPairsReader extends TreeMapReader {
     JsonValue readEntries(JsonReadContext ctx) {
         JsonEvent first = ctx.next();
         if (!(first instanceof JsonEvent.ArrayStart)) {
-            return wrongShape(ctx, first, "a JSON array of two-element arrays");
+            return wrongShape(ctx, first);
         }
         List<JsonValue> entries = new ArrayList<>();
         Map<Object, Integer> byIdentity = new HashMap<>();
@@ -83,10 +83,7 @@ final class TreeMapPairsReader extends TreeMapReader {
         }
         JsonValue entry = entryValue(at.index(1), String.valueOf(index));
         if (at.reported() == before && byIdentity.putIfAbsent(ValueIdentity.of(key), index) != null) {
-            at.report(Diagnostic.Code.DUPLICATE_MAP_KEY,
-                    "duplicate key in '%s' -- a map states each key at most once, and the repeat states an entry "
-                            .formatted(name) + "for nothing",
-                    "each key stated once", String.valueOf(key));
+            at.report(rules.duplicateKey(String.valueOf(key)));
         }
         if (!(at.peek() instanceof JsonEvent.ArrayEnd)) {
             // More than two elements. One diagnostic for the entry, then the rest discarded: there is no

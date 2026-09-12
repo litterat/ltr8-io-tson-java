@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.diagnostics.MapDiagnostics;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
@@ -68,6 +69,12 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
     final TsonTypeReader<?> valueParser;
     final SchemaLocation schemaLocation;
 
+    /** This map's rules, shared with the JSON reader ([TSON-JSON] §9.4). */
+    final MapDiagnostics rules;
+
+    /** How a TSON text document spells absence ([TSON-DATA] §2.9), for a key's or entry value's state rule. */
+    private static final String ABSENT = "_";
+
     MapAbstractReader(String name, String displayName, MapBody body, TsonTypeReaderResolver resolver,
                        SchemaLocation schemaLocation) {
         this(name, displayName, body, resolver.resolve(body.keyType().name()),
@@ -88,6 +95,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
         this.keyParser = keyParser;
         this.valueParser = valueParser;
         this.schemaLocation = schemaLocation;
+        this.rules = new MapDiagnostics(displayName);
     }
 
     /**
@@ -112,9 +120,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             validateSize(0, ctx);
             return Shape.EMPTY;
         }
-        ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                "expected a map for '" + displayName + "', found " + TypeRefCheck.describe(e),
-                "a map", TypeRefCheck.describe(e));
+        ctx.report(rules.notAMap(TypeRefCheck.describe(e)));
         EventSkip.coreValue(ctx);
         return Shape.MISMATCH;
     }
@@ -139,9 +145,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             TsonEvent keyPeek = ctx.peek();
             if (keyPeek instanceof AbsentEvent) {
                 ctx.next(); // the absent key itself
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + displayName + "': the absent sentinel '_' must not appear as a map key (§2.9)",
-                        "a real map key, never the absent sentinel '_'", "_");
+                ctx.report(rules.absentKey(ABSENT));
                 ctx.next(); // MapArrow
                 EventSkip.scopedValue(ctx); // no meaningful key to associate the value with -- discard it
                 count++;
@@ -151,10 +155,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
             int before = ctx.reported();
             Object key = keyParser.read(ctx.field(keySegment));
             if (ctx.reported() == before && !seen.add(ValueIdentity.of(key))) {
-                ctx.field(keySegment).report(Diagnostic.Code.DUPLICATE_MAP_KEY,
-                        "duplicate key '" + keySegment + "' in '" + displayName + "' -- a map states each key at most "
-                                + "once (§2.6), and the repeat states an entry for nothing",
-                        "each key stated once", "'" + keySegment + "' stated again");
+                ctx.field(keySegment).report(rules.duplicateKey(keySegment));
             }
             ctx.next(); // MapArrow
             SchemaRef push = ScopePush.notAdmitted(ctx, valueParser);
@@ -186,9 +187,7 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
         if (ctx.peek() instanceof AbsentEvent) {
             ctx.next(); // consumed regardless of REQUIRED/OPTIONAL, so the entry keeps its place either way
             if (body.state() == ElementState.REQUIRED) {
-                ctx.field(keySegment).report(Diagnostic.Code.FIELD_REQUIRED,
-                        "'" + displayName + "' entry '" + keySegment + "' is absent, but values are required",
-                        "a value", "(absent)");
+                ctx.field(keySegment).report(rules.absentEntryValue(keySegment, ABSENT));
             }
             return null;
         }
@@ -222,17 +221,13 @@ abstract class MapAbstractReader<T> implements TsonTypeReader<T> {
         if (minItems.isPresent()) {
             BigInteger min = minItems.get();
             if (actual.compareTo(min) < 0) {
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + displayName + "' has " + size + " entries, fewer than the minimum " + min,
-                        "at least " + min + " entries", String.valueOf(size));
+                ctx.report(rules.tooFewEntries(min, size));
             }
         }
         if (maxItems.isPresent()) {
             BigInteger max = maxItems.get();
             if (actual.compareTo(max) > 0) {
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'" + displayName + "' has " + size + " entries, more than the maximum " + max,
-                        "at most " + max + " entries", String.valueOf(size));
+                ctx.report(rules.tooManyEntries(max, size));
             }
         }
     }
