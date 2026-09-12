@@ -88,7 +88,8 @@ recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5,
 carries both facts, meta.tn declares the four marks, the resolver lowers them into the body, the linker refuses
 a family the closure contradicts, and **both encodings read one** — a value at a sealed position is placed by
 its own members, with no tag anywhere, and `CrossEncodingParityTest` holds the two to one wording for every
-refusal they share. What is left is what a family means to the machinery around it. Work lands on
+refusal they share. The corpus states all three layers of it, so another implementation is held to the same
+rules. One entry is left, and it is not really the family's. Work lands on
 `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
 - [ ] **A closed application of a subtype template has no IS-A edge to its supertype's**, and `@abstract` on a
@@ -119,13 +120,6 @@ refusal they share. What is left is what a family means to the machinery around 
   template instantiation can carry a non-OPEN extension at all. Java-level equality is already right, the
   member being a `RecordBody` component with no `equals` override, so what is owed is only that the wire form
   carry it — which is the same line the held body needs above, and is free once that is written.
-
-- [ ] **The remaining corpus vectors.** `class2/link/` is done — ten vectors over the closure checks, the
-  FINAL refusal and the subtraction that is *not* refused. What is left is `class2/schema/` for the resolved
-  output of each `extension` member and a discriminator field, and `class2/validate/` for the dispatch, the
-  missing member, the unmatched value, the disagreeing tag and the tag that names the base. The corpus's own
-  sidecar schemas need no change — these are ordinary vectors, and both encodings read a family now, so
-  nothing blocks the `validate/` half any longer.
 
 ## JSON encoding
 
