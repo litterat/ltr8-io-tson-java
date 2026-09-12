@@ -1039,8 +1039,10 @@ both read modes, the discriminator fields found by a rewinding lookahead because
 significant order, and the four refusals taken from the one `RecordExtensionDiagnostics` both stacks hold. A
 cross-encoding parity test compares code, data pointer, `expected` and prose for every rule they share, and
 passes — which is the evidence §9.4 asks for and not merely a claim that two readers were written from one
-design. What is left is what the family means to the machinery around it: §8.2 identity does not yet carry
-`extension`. The kernel's own three schemas resolve, link and compile unchanged —
+design. §8.2 identity does not yet carry `extension`, and cannot yet be made to: only a template instantiation
+can mint an entry that holds a non-OPEN one — no synthetic is ever a record — and a mark on a template is
+refused or gapped, so the collision the rule prevents is currently unreachable. It becomes one line the moment
+a template can be abstract. The kernel's own three schemas resolve, link and compile unchanged —
 every record OPEN, every field not a discriminator — which is the evidence that the fields cost nothing where
 nothing uses them.
 

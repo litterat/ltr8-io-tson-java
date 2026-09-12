@@ -111,11 +111,14 @@ refusal they share. What is left is what a family means to the machinery around 
   own entry now. `@sealed` and `@final` on a template stay a resolver error whatever happens here — they are
   claims over a set of subtypes a template does not have (`SPEC-FEEDBACK.md` #11).
 
-- [ ] **`extension` participates in §8.2 identity.** An abstract, a sealed, a concrete and a final `pet` admit
-  different values, so they are different types and the fact belongs in the identity a resolved entry is keyed
-  on. `extension` is written rather than derived — each definition mark names its member, and the body
-  condition is the check on the mark rather than its source — so there is nothing to compute here, only a
-  component to include.
+  **Two instantiations differing only in `extension` must not collide**, and that lands here rather than
+  standing on its own, because here is the only place it can arise. §8.2 keys a minted entry on a structural
+  hash over its binding record (`DerivedName.canonicalBinding`), and an abstract `pet` and a concrete one
+  admit different values — so the member has to be inside what the hash covers. Nothing else can reach it: no
+  synthetic is ever a record, a bare record body being unspellable at a type position (§5.2), so only a
+  template instantiation can carry a non-OPEN extension at all. Java-level equality is already right, the
+  member being a `RecordBody` component with no `equals` override, so what is owed is only that the wire form
+  carry it — which is the same line the held body needs above, and is free once that is written.
 
 - [ ] **The remaining corpus vectors.** `class2/link/` is done — ten vectors over the closure checks, the
   FINAL refusal and the subtraction that is *not* refused. What is left is `class2/schema/` for the resolved
