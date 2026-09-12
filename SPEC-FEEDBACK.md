@@ -767,12 +767,12 @@ reaching for member dispatch at a choice is an author who wants the composed fam
 
 ---
 
-## 11. A record cannot say it has no direct instances, and the discriminated base is the case that needs it
+## 11. A record cannot say who may instantiate or extend it, and the discriminated base is the case that forces it
 
 **Documents:** [TSON-SCHEMA] §4.1 (base kinds), §5.2, §5.7 (the transition table), §5.8 (composition), §5.10.1
 (productivity and inhabitance), §6 (what an annotation may do), §7.2 (subsumption), §8.1 (resolved output), §8.2
 (identity), §12.1 (the schema grammar); [TSON-JSON] §6.1.5. Reads with #10, and is useful without it.
-**Kind:** design proposal — one kernel addition, with two questions left open.
+**Kind:** design proposal — one kernel field and the enum it takes, with two questions left open.
 
 **What forces it.** §6 gives the criterion for annotation-hood in its own words: "a schema with every annotation
 erased admits exactly the same values." Run that erasure separately on the two halves of #10's mark and they come
@@ -789,34 +789,63 @@ inhabitance changing, which no directive licenses and no encoding owns. **So the
 discriminator value MUST fail is the decision that puts a fact in the kernel**, and nothing short of it does — a
 family content to read an unrecognised tag as its base needs no change here at all.
 
+**FINAL falls to the same test.** Erase a mark that forbids subtypes and a position typed by that record admits
+values it did not admit, in every encoding and in the model. Whatever carries these two facts, it is not an
+annotation.
+
 **A finding that stands on its own.** §6 claims `@discriminator` changes no value's validity, and argues it by
 writing "a discriminated choice admits exactly the variants it admitted" — *variants*, where the criterion it is
 answering is about *values*. In JSON, erasing the mark invalidates every untagged document at that choice. The
 directive bullet covers the behaviour; the sentence does not, and should say which category the mark's force
 falls in rather than deny it has any.
 
-**The proposal.** `record` gains one field:
+**The proposal.** `record` gains one field, and the kernel one enum:
 
 ```
+record_extensibility => [ABSTRACT OPEN FINAL]
+
 record => product & {
   access_pattern:  product_access_type = NAMED
   size_type:       product_size_type = FIXED
   fields:          [record_field]
   groups:          [field_group]?
-  abstract:        boolean ~ false
+  extensibility:   record_extensibility ~ OPEN
   supertypes:      [type_name]?
 }
 ```
 
-`boolean ~ false` rather than `boolean?`, matching the style `array` already sets with `unordered` and
-`unique_items`: it is a two-valued fact of every record, so an absent state would be a third spelling meaning
-what `false` means, and §8.1's convention omits a field at its default from output regardless. `groups?` is the
-shape precedent — a record-level fact carried in the body, which source syntax lowers into rather than the
-author writing the constructor form.
+**One enum and not two booleans**, because the property is two questions — may this record have direct instances,
+may it have subtypes — whose fourth combination (neither) is uninhabited. Two booleans would make that state
+writable and leave a rule to forbid it; one enum makes it unrepresentable, which is the same move §5.4 makes in
+putting `disjoint` on the choice body so that "recorded on every choice and on nothing else" is structural rather
+than a rule a document could break. `~ OPEN` rather than optional follows the style `array` sets with `unordered`
+and `unique_items`, and §8.1 omits a field at its default from output regardless. `groups?` is the shape
+precedent — a record-level fact carried in the body, which source syntax lowers into rather than the author
+writing the constructor form.
 
-**What it means.** An abstract record has **no direct instances**: no value's effective type is that record, and
-a position typed by it admits exactly the values of its subtypes. It is a type in every other respect —
-referenced, composed onto, refined, and contributing its fields to every subtype.
+**What each member means.** **ABSTRACT** — no direct instances: no value's effective type is this record, and a
+position typed by it admits exactly the values of its subtypes. **OPEN** — the state every record has today:
+direct instances, and any schema in the closure may compose or refine onto it. **FINAL** — direct instances, and
+nothing may be a subtype: composition or refinement naming it is a resolver error, in the declaring schema or in
+any schema that imports it. An ABSTRACT or FINAL record is a type in every other respect — referenced, and in the
+abstract case composed onto, and contributing its fields to every subtype.
+
+**Subtraction is unaffected by FINAL, and the reason is worth stating** because it reads like an exception and is
+not one. §5.9's removal clause empties the resulting entry's `supertypes`: the product of a subtraction is not a
+subtype of its source and cannot stand at its positions. FINAL constrains the IS-A set, which subtraction never
+joins, so `-` off a FINAL record is admissible and yields an unrelated type that happens to share a field list.
+The same reasoning admits nothing else: composition and refinement both mint an IS-A edge and are both refused.
+
+**FINAL says what `subtypes` cannot.** The derived `subtypes` index (§8.2) distinguishes no subtypes *here* from
+no subtypes *ever*, because another schema may always import and extend. FINAL is that distinction, and it is the
+fact a consumer needs before it treats a record as a leaf. It is also what a host generator needs: Java requires
+every permitted subtype of a `sealed` interface to declare `final`, `sealed` or `non-sealed`, so a generator
+emitting #10's hierarchy has to know which of those a leaf is and today has nowhere to read it from.
+
+**A naming note that reaches back to #10.** `final` is the word Java, Kotlin and Scala use for this; **C# spells
+it `sealed`**, where Java's `sealed` means the closed-permits-set concept of #10 instead. The word means two
+different things in two major languages, which is one more reason #10's mark is not named `@sealed` and this
+member is not either.
 
 **It is useful without #10, which is why the fact is separate from the mark.** An abstract base whose wire form
 is the ordinary tag is a complete design: at a `pet` position a JSON value carries `$type` (§6.1.5) and a text
@@ -828,23 +857,29 @@ a model fact back under an annotation.
 **So the mark does not set it, and the check runs the other way.** `@discriminator` on a field MUST NOT make its
 record abstract — an annotation that did would be the erasure violation this entry exists to avoid. The author
 declares both, and the load-time check is the converse: **a record carrying a discriminator field MUST be
-abstract**, since §5.7's identity diagonal forbids the base pinning that field (#10) and an unpinned
+ABSTRACT**, since §5.7's identity diagonal forbids the base pinning that field (#10) and an unpinned
 discriminator on an instantiable base is a hole in the dispatch table. The diagnostic names the marker to add.
 
-**Inhabitance is where the existing machinery does the work.** An abstract record is inhabited exactly when at
-least one of its subtypes is. §5.10.1's least fixed point then needs no new rule and no exemption: an abstract
-base with no subtypes is uninhabited and is rejected as any other uninhabited entry is. **What that forbids is
-worth naming** — a schema declaring an abstract base purely for *importing* schemas to extend, with no subtype of
-its own. The pattern is not so much lost as never working: a document governed by the declaring schema could
-never produce a value at such a position, its vocabulary being that schema's namespace one hop (§3.3.4), so the
-rejection lands exactly on the dead type.
+**Inhabitance is where the existing machinery does the work.** A FINAL record is inhabited as any record is; an
+ABSTRACT one is inhabited exactly when at least one of its subtypes is. §5.10.1's least fixed point then needs no
+new rule and no exemption for either, and an abstract base with no subtypes is uninhabited and rejected as any
+other uninhabited entry is. **What that forbids is worth naming** — a schema declaring an abstract base purely for
+*importing* schemas to extend, with no subtype of its own. The pattern is not so much lost as never working: a
+document governed by the declaring schema could never produce a value at such a position, its vocabulary being
+that schema's namespace one hop (§3.3.4), so the rejection lands exactly on the dead type.
 
-**Refinement is one-way.** A refinement may take a record concrete → abstract, which removes its direct instances
-and is therefore a narrowing; abstract → concrete adds values and is a resolver error. That is §5.7's "refinement
-can only restrict" applied to the new field, and wants a row rather than a new principle.
 
-**Identity and output.** `abstract` participates in §8.2 identity — an abstract `pet` and a concrete one admit
-different values and are different types — and in resolved output follows §8.1's convention, omitted at default.
+**Extensibility is never inherited, and there is no transition table.** A subtype states its own: `dog_type =>
+pet & { … }` is OPEN by default whether `pet` is ABSTRACT or OPEN, and it must be — otherwise no concrete subtype
+of an abstract base could exist, which is every subtype there is. §5.7's transition table governs *field states*,
+whose values a refinement inherits and may only tighten; extensibility is a property of the declaration and
+nothing propagates it. The whole of the rule is therefore two lines: composing or refining onto a FINAL record is
+a resolver error, and every other declaration states its own member, defaulting to OPEN. A body restating it in
+the constructor form states the refined entry's own value and constrains its source not at all.
+
+**Identity and output.** `extensibility` participates in §8.2 identity — an abstract `pet`, a concrete one and a
+final one admit different values and are different types — and in resolved output follows §8.1's convention,
+omitted at default.
 
 **Open question 1 — the spelling, and whether the discriminator should join it.** `abstract` needs a source form;
 the constructor form (`!record { … abstract: true }`) exists and nobody writes it. Three candidates, none
@@ -878,10 +913,12 @@ step. Against those, forbidding it costs a check and a justification where admit
 recommendation is to admit it in the model and let tooling defined over one tag say so — but the first design
 should make that call explicitly rather than inherit it.
 
-**What is running:** nothing. `abstract` is not in this implementation's kernel, `@discriminator` has no consumer,
-and the inhabitance rule above is stated rather than measured.
+**What is running:** nothing. No extensibility fact is in this implementation's kernel, `@discriminator` has no
+consumer, and the inhabitance rule above is stated rather than measured.
 
-**Suggested resolution.** Add `abstract: boolean ~ false` to the kernel's `record`, stating the meaning, the
-inhabitance rule, the one-way refinement transition and the identity consequence; state the check that a record
-carrying a discriminator field MUST be abstract, and state explicitly that the mark does not derive it; correct
-§6's validity claim; and choose a source spelling, which is the one part this entry deliberately does not settle.
+**Suggested resolution.** Add `extensibility: record_extensibility ~ OPEN` to the kernel's `record`, stating the
+three members' meanings, the FINAL check over composition and refinement, the subtraction exemption and why it is
+not one, the inhabitance rule, the absence of any transition table, and the identity consequence; state the check
+that a record carrying a discriminator field MUST be ABSTRACT, and state explicitly that the mark does not derive
+it; correct §6's validity claim; and choose a source spelling, which is the one part this entry deliberately does
+not settle.
