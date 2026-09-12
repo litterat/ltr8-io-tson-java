@@ -12,6 +12,15 @@ import io.ltr8.tson.base.Diagnostic;
  * {@code tson-atom}'s {@code AtomRefusal} is the same shape reached from the other direction -- it
  * classifies a family's own exception -- and the two agreeing is not a coincidence.
  *
+ * <p><b>A distinct type rather than a half-built {@link Diagnostic}, and the difference is what the compiler
+ * can catch.</b> A {@code Diagnostic} with its five location components empty is a valid-looking value that
+ * nothing should ever hand to a {@link io.ltr8.tson.base.DiagnosticsReceiver}, and with nine components
+ * nothing would notice if someone did. A {@code Refusal} cannot be reported at all: the only thing that
+ * accepts one is a read context, which is the only thing that knows where it happened.
+ *
+ * <p><b>The unpacking lives on the read contexts, not in the readers</b> -- {@code report(Refusal)} on each --
+ * so one place adds a location and one place takes this apart, however many families come to state rules.
+ *
  * @param code     which rule fired, from [TSON-DATA] §8.1's closed vocabulary. What a consumer routes on.
  * @param message  the rule in prose, in the <b>schema's</b> vernacular -- see {@link RecordDiagnostics}.
  * @param expected the constraint that was not met, machine-readable. The schema's, so it agrees everywhere.

@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler;
 
 import io.ltr8.tson.base.*;
+import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.compiler.stream.TsonEvent;
 import io.ltr8.tson.compiler.stream.TsonEventSource;
@@ -141,6 +142,18 @@ public interface TsonReadContext {
      * fate -- a fail-fast receiver throws {@link ReadException} from here and never returns.
      */
     void report(Diagnostic.Code code, String message, String expected, String actual);
+
+    /**
+     * Hands one of a family's rules to this read's receiver, located here.
+     *
+     * <p>The rule states four of a {@link Diagnostic}'s nine components and this context supplies the other
+     * five ({@code base.diagnostics}), so the unpacking lives here rather than in each reader -- one place
+     * adds a location, so one place takes a {@link Refusal} apart.
+     */
+    default void report(Refusal refusal) {
+        report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
+    }
+
 
     // A [TSON-DATA] §8.2 name-hygiene refusal reports through this same method, and has no channel of its
     // own: what distinguishes it is its `code` (CONFUSABLE_NAMES / RESTRICTED_CHARACTER / RESTRICTED_SCRIPT,

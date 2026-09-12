@@ -3,7 +3,6 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.base.policy.UnicodePolicy;
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
-import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.compiler.Position;
 import io.ltr8.tson.compiler.SchemaLocation;
 import io.ltr8.tson.compiler.TsonReadContext;
@@ -240,7 +239,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         if (positionalFieldIndex >= 0) {
             return new ShapeResult(Shape.POSITIONAL, anchor);
         }
-        report(ctx, rules.notARecord(TypeRefCheck.describe(e)));
+        ctx.report(rules.notARecord(TypeRefCheck.describe(e)));
         EventSkip.coreValue(ctx);
         return new ShapeResult(Shape.MISMATCH, anchor);
     }
@@ -274,14 +273,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             Integer schemaIndex = fieldIndex.get(fieldName.name());
             if (schemaIndex == null) {
                 if (!nameRefused) {
-                    report(ctx.field(fieldName.name()), rules.unrecognizedField(fieldName.name()));
+                    ctx.field(fieldName.name()).report(rules.unrecognizedField(fieldName.name()));
                 }
                 EventSkip.scopedValue(ctx);
                 continue;
             }
             if (seen[schemaIndex]) {
-                report(ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position()),
-                        rules.duplicateField(fieldName.name()));
+                ctx.schemaField(fieldName.name(), fields.get(schemaIndex).schema().position())
+                        .report(rules.duplicateField(fieldName.name()));
             }
             if (fixedCheck[schemaIndex] != null) {
                 // A FIXED field's value comes from the schema, never the data -- but the data may still
@@ -324,11 +323,6 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         return seen;
     }
 
-    /** Hands one of the record's rules to {@code ctx}, which supplies where it happened. */
-    private static void report(TsonReadContext ctx, Refusal refusal) {
-        ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
-    }
-
     /** How a TSON text document spells absence ([TSON-DATA] §2.9), for the `actual` of a field-state rule. */
     private static final String ABSENT = "_";
 
@@ -357,9 +351,9 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             }
             String members = String.join(" | ", group.members());
             if (present > 1) {
-                report(ctx, rules.groupAdmitsAtMostOne(members, present));
+                ctx.report(rules.groupAdmitsAtMostOne(members, present));
             } else if (group.state() == ElementState.REQUIRED && present == 0) {
-                report(ctx, rules.groupRequiresOne(members));
+                ctx.report(rules.groupRequiresOne(members));
             }
         }
     }
@@ -390,8 +384,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             return statedAbsentValue();
         }
         if (schema.state() == FieldState.REQUIRED_DEFAULT) {
-            report(ctx.schemaField(schema.name(), schema.position()),
-                    rules.absenceAtDefaultedField(schema.name(), ABSENT));
+            ctx.schemaField(schema.name(), schema.position())
+                    .report(rules.absenceAtDefaultedField(schema.name(), ABSENT));
             return precomputedValue[schemaIndex];
         }
         // REQUIRED, the only state left: the document *stated* absence, so it is not missing. Delegating to
@@ -399,8 +393,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         // they can see themselves writing -- §5.2's rule is that `_` asserts absence at a position the schema
         // always fills, and that is what the diagnostic should say. Both FIXED states reach verifyFixed
         // instead and never arrive here.
-        report(ctx.schemaField(schema.name(), schema.position()),
-                rules.absenceAtRequiredField(schema.name(), ABSENT));
+        ctx.schemaField(schema.name(), schema.position())
+                .report(rules.absenceAtRequiredField(schema.name(), ABSENT));
         return null;
     }
 
@@ -434,8 +428,8 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         RecordField schema = fields.get(schemaIndex).schema();
         return switch (schema.state()) {
             case REQUIRED -> {
-                report(ctx.schemaField(schema.name(), schema.position()),
-                        rules.missingRequiredField(schema.name()));
+                ctx.schemaField(schema.name(), schema.position())
+                        .report(rules.missingRequiredField(schema.name()));
                 yield null;
             }
             case OPTIONAL -> null;
@@ -479,14 +473,14 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
         if (ctx.peek() instanceof AbsentEvent) {
             ctx.next();
             if (schema.state() == FieldState.REQUIRED_FIXED) {
-                report(fieldCtx, rules.fixedFieldAbsent(fieldName, String.valueOf(check.value()), ABSENT));
+                fieldCtx.report(rules.fixedFieldAbsent(fieldName, String.valueOf(check.value()), ABSENT));
                 return;
             }
             return; // OPTIONAL_FIXED, valued or `= _`: absence is exactly what it permits
         }
         if (check.mustBeAbsent()) {
             EventSkip.scopedValue(ctx);
-            report(fieldCtx, rules.fixedToAbsentFieldValued(fieldName, ABSENT, "a value"));
+            fieldCtx.report(rules.fixedToAbsentFieldValued(fieldName, ABSENT, "a value"));
             return;
         }
         int before = ctx.reported();
@@ -500,7 +494,7 @@ abstract class RecordAbstractReader<T> implements TsonTypeReader<T> {
             return;
         }
         if (!Objects.equals(ValueIdentity.of(written), ValueIdentity.of(check.value()))) {
-            report(fieldCtx, rules.fixedFieldContradicted(fieldName, Rendered.value(check.value()),
+            fieldCtx.report(rules.fixedFieldContradicted(fieldName, Rendered.value(check.value()),
                     Rendered.value(written)));
             return;
         }

@@ -2,7 +2,6 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
-import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
@@ -93,11 +92,6 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         this.rules = new RecordDiagnostics(name, declaredFields);
     }
 
-    /** Hands one of the record's rules to {@code ctx}, which supplies where it happened. */
-    private static void report(JsonReadContext ctx, Refusal refusal) {
-        ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
-    }
-
     @Override
     public JsonValue read(JsonReadContext ctx) {
         ctx = ctx.inRecord(schemaLocation);
@@ -114,7 +108,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
     private JsonValue readObject(JsonReadContext ctx) {
         JsonEvent first = ctx.next();
         if (!(first instanceof JsonEvent.ObjectStart)) {
-            report(ctx, rules.notARecord(JsonAtoms.describe(first)));
+            ctx.report(rules.notARecord(JsonAtoms.describe(first)));
             EventSkip.value(ctx, first);
             return JsonNull.INSTANCE;
         }
@@ -232,7 +226,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             if (seen[at]) {
                 // §3.1: a repeated member name is an error at the repeated occurrence. The later value still
                 // wins, so the record comes back whole and the diagnostic is what says the document was wrong.
-                report(fieldContext(ctx, at), rules.duplicateField(memberName));
+                fieldContext(ctx, at).report(rules.duplicateField(memberName));
             }
             seen[at] = true;
             values[at] = readField(ctx, at, memberName);
@@ -259,7 +253,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         // unknown -- which would be a verdict on the document for a policy rule, and would advise adding a
         // field that is already declared.
         if (!NameHygiene.refuses(ctx, memberName)) {
-            report(at, rules.unrecognizedField(memberName));
+            at.report(rules.unrecognizedField(memberName));
         }
         EventSkip.nextValue(at);
     }
@@ -292,7 +286,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             return JsonNull.INSTANCE;
         }
         JsonEvent event = ctx.next();
-        report(fieldContext(ctx, at), rules.fixedToAbsentFieldValued(memberName, ABSENT,
+        fieldContext(ctx, at).report(rules.fixedToAbsentFieldValued(memberName, ABSENT,
                 JsonAtoms.describe(event)));
         EventSkip.value(ctx, event);
         return null;
@@ -314,14 +308,14 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             case OPTIONAL -> null;
             case OPTIONAL_FIXED -> null;
             case REQUIRED, REQUIRED_FIXED -> {
-                report(fieldContext(ctx, at), rules.absenceAtRequiredField(memberName, ABSENT));
+                fieldContext(ctx, at).report(rules.absenceAtRequiredField(memberName, ABSENT));
                 yield null;
             }
             // §6.1.2: "at REQUIRED_DEFAULT the fix is omission, which injects the default". Injecting here
             // anyway would substitute a value the document explicitly disclaimed, so the default is still
             // what the field decodes to and only the verdict changes.
             case REQUIRED_DEFAULT -> {
-                report(fieldContext(ctx, at), rules.absenceAtDefaultedField(memberName, ABSENT));
+                fieldContext(ctx, at).report(rules.absenceAtDefaultedField(memberName, ABSENT));
                 yield stated.get(at).node();
             }
         };
@@ -347,7 +341,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         if (event instanceof JsonEvent.NullValue) {
             ctx.next();
             if (field.state() == FieldState.REQUIRED_FIXED) {
-                report(fieldCtx, rules.fixedFieldAbsent(memberName, String.valueOf(pin.pinned()), ABSENT));
+                fieldCtx.report(rules.fixedFieldAbsent(memberName, String.valueOf(pin.pinned()), ABSENT));
                 return null;
             }
             return null;   // OPTIONAL_FIXED: absence is exactly what it permits
@@ -369,7 +363,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             return written;   // already reported by the field's own reader
         }
         if (!Objects.equals(ValueIdentity.of(value), ValueIdentity.of(pin.pinned()))) {
-            report(fieldCtx, rules.fixedFieldContradicted(memberName, pin.text(), content));
+            fieldCtx.report(rules.fixedFieldContradicted(memberName, pin.text(), content));
         }
         // The schema's value, which is what an omitted FIXED member gets too: whether the document stated it
         // decides nothing about what the field holds (§6.1.3).
@@ -387,7 +381,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             }
             RecordField field = fields.get(i);
             switch (field.state()) {
-                case REQUIRED -> report(fieldContext(ctx, i), rules.missingRequiredField(field.name()));
+                case REQUIRED -> fieldContext(ctx, i).report(rules.missingRequiredField(field.name()));
                 // §6.1.3: a missing member at REQUIRED_DEFAULT or REQUIRED_FIXED injects, so decoded output
                 // is fully populated. OPTIONAL and OPTIONAL_FIXED are never injected -- an omitted
                 // OPTIONAL_FIXED field stays absent rather than materialising a value nobody wrote.
@@ -413,9 +407,9 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             }
             String members = String.join(" | ", group.members());
             if (present > 1) {
-                report(ctx, rules.groupAdmitsAtMostOne(members, present));
+                ctx.report(rules.groupAdmitsAtMostOne(members, present));
             } else if (group.state() == ElementState.REQUIRED && present == 0) {
-                report(ctx, rules.groupRequiresOne(members));
+                ctx.report(rules.groupRequiresOne(members));
             }
         }
     }
