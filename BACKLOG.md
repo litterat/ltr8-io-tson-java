@@ -102,13 +102,25 @@ refusal they share. What is left is what a family means to the machinery around 
   declarations suggest, and the diagnostic should say which application is missing rather than that the type is
   uninhabited.
 
-- [ ] **Two facts the existing machinery must learn.** `extension` is written rather than derived — each
-  definition mark names its member, and the body condition is the check on the mark rather than its source (the
-  entry above) — so what is left here is what reads it. Inhabitance follows:
-  a FINAL or OPEN record is inhabited as any record is, an ABSTRACT or SEALED one exactly when at least one
-  subtype is, which needs `TypeInhabitance`'s least fixed point to learn the union rather than gain an
-  exemption. And `extension` participates in §8.2 identity — an abstract, sealed, concrete and final `pet` admit
-  different values and are different types.
+- [ ] **`extension` participates in §8.2 identity.** An abstract, a sealed, a concrete and a final `pet` admit
+  different values, so they are different types and the fact belongs in the identity a resolved entry is keyed
+  on. `extension` is written rather than derived — each definition mark names its member, and the body
+  condition is the check on the mark rather than its source — so there is nothing to compute here, only a
+  component to include.
+
+- [ ] **An empty family is a read-time diagnostic, and `TypeInhabitance` must be kept away from it.** An
+  ABSTRACT or SEALED record with no subtype in the closure admits nothing, and it is tempting to have §5.10.1's
+  productivity rule refuse it at load. **That would be wrong**, and the case that shows it is the ordinary one:
+  a base schema declares `response => @abstract { … }` and a field typed `response`, and the schemas that
+  import it declare the subtypes. §3.3.4 makes `subtypes` open across schemas, so the family is empty in the
+  declaring schema's own closure and complete in every consumer's — refusing at link would make a library
+  schema unpublishable, and it is the one shape an abstract base is *for*. So inhabitance keeps its current
+  reading and gains no case for `extension`.
+
+  What is left is the diagnostic, which today is bad: a value at such a position gets `must name its type --
+  one of ()`, an empty list offered as a choice. It should say that no schema in this closure declares a
+  subtype of the base, which names the remedy — import the schema that does — rather than presenting an
+  impossible instruction.
 
 - [ ] **The remaining corpus vectors.** `class2/link/` is done — ten vectors over the closure checks, the
   FINAL refusal and the subtraction that is *not* refused. What is left is `class2/schema/` for the resolved

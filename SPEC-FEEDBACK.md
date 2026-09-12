@@ -945,13 +945,20 @@ fact a consumer needs before it treats a record as a leaf. It is also what a hos
 every permitted subtype of a `sealed` interface to declare `final`, `sealed` or `non-sealed`, so a generator
 emitting #10's hierarchy has to know which of those a leaf is and today has nowhere to read it from.
 
-**Inhabitance is where the existing machinery does the work.** A FINAL or OPEN record is inhabited as any record
-is; an ABSTRACT or SEALED one is inhabited exactly when at least one of its subtypes is. §5.10.1's least fixed
-point then needs no new rule and no exemption, and an abstract base with no subtypes is uninhabited and rejected
-as any other uninhabited entry is. **What that forbids is worth naming** — a schema declaring an abstract base
-purely for *importing* schemas to extend, with no subtype of its own. The pattern is not so much lost as never
-working: a document governed by the declaring schema could never produce a value at such a position, its
-vocabulary being that schema's namespace one hop (§3.3.4), so the rejection lands exactly on the dead type.
+**Inhabitance must be left alone, and the tempting rule is wrong.** It reads well: a FINAL or OPEN record is
+inhabited as any record is, an ABSTRACT or SEALED one exactly when one of its subtypes is, and §5.10.1's least
+fixed point then rejects an abstract base with no subtypes as it rejects any other uninhabited entry. **Do not
+adopt it.** The case it refuses is the one an abstract base most exists for: a library schema declaring
+`response => @abstract { … }` and a field typed `response`, with every subtype supplied by the schemas that
+import it. §3.3.4 makes `subtypes` open across schemas, so that family is empty in the declaring schema's own
+closure and complete in each consumer's — and it is the *consumer's* documents that are written, never the
+library's. Rejecting at load would make the library unpublishable for having deferred exactly what it meant to
+defer.
+
+So the rule stays as it is and `extension` adds no case to it. What an empty family needs instead is a
+diagnostic at the position, when a document reaches one: today it is told to name a type "one of ()", an empty
+list offered as a choice. It should say that no schema in this closure declares a subtype of the base, which
+names the remedy — import the schema that does — rather than presenting an impossible instruction.
 
 **The member is never inherited, and there is no transition table.** A subtype states its own: `dog_type => pet &
 { … }` is OPEN by default whether `pet` is SEALED or OPEN, and it must be — otherwise no concrete subtype of an
@@ -1031,8 +1038,9 @@ both read modes, the discriminator fields found by a rewinding lookahead because
 significant order, and the four refusals taken from the one `RecordExtensionDiagnostics` both stacks hold. A
 cross-encoding parity test compares code, data pointer, `expected` and prose for every rule they share, and
 passes — which is the evidence §9.4 asks for and not merely a claim that two readers were written from one
-design. What is left is what the family means to the machinery around it: the inhabitance and identity rules
-above are stated rather than measured. The kernel's own three schemas resolve, link and compile unchanged —
+design. What is left is what the family means to the machinery around it: §8.2 identity does not yet carry
+`extension`, and an empty family reaches a document as an unhelpful "one of ()" rather than as the missing
+import it is. The kernel's own three schemas resolve, link and compile unchanged —
 every record OPEN, every field not a discriminator — which is the evidence that the fields cost nothing where
 nothing uses them.
 
@@ -1040,7 +1048,8 @@ nothing uses them.
 kernel's `record` and `discriminator: boolean ~ false` to its `record_field`, stating the four members' meanings and
 their two reading rules, the derivation of SEALED and the two load errors it yields, #10's checks over the
 discriminator field, the FINAL check over composition and refinement, the subtraction exemption and why it is not one,
-the inhabitance rule, the absence of any transition table, and the identity consequence; state that a template may
+the reason inhabitance gains no case for it, the absence of any transition table, and the identity consequence;
+state that a template may
 be abstract and may not be sealed or final, with the reason; state that the marks are consumed rather than
 preserved and that their names are reserved; state the two marks as each other's condition —
 `@discriminator` requiring `@sealed`, `@abstract` forbidding a discriminator — and say that the redundancy is for
