@@ -634,20 +634,22 @@ resolver error of consequence 3.
 
 **Five consequences, each an improvement on the present shape.**
 
-1. **The two annotations §6 introduces together become one shape.** `@rest` is a bare `void` marker on a field;
-   `@discriminator` becomes `discriminator => @annotation void`, a bare marker on a field. The `field_name`
-   parameter disappears, and with it the only place in the series where an annotation names a field by string.
+1. **The mark becomes a bare marker on a field**, `@rest`'s shape rather than `@rest`'s standing — the
+   `field_name` parameter disappears, and with it the only place in the series where an annotation names a field
+   by string. Where the fact then *lives* is #11's question, and its answer is `record_field.discriminator`: the
+   spelling is annotation-shaped and the resolver consumes it into the body, so the two marks §6 introduces
+   together end up in different places, `@rest` genuinely an annotation and this one not.
 2. **It is the shape converted contracts arrive in.** OpenAPI's `discriminator` sits on the *base* schema with
    subtypes composing it, which is this arrangement and not the choice one. A converted contract lands on the
    mechanism directly.
-3. **The open-world argument strengthens §6's refusal to derive, and makes the annotation constitutive.**
+3. **The open-world argument strengthens §6's refusal to derive, and makes the mark constitutive.**
    A choice's variant list is closed and local, so a derivation over it can never be invalidated from outside.
    `subtypes` is **open** (§8.2): another schema may `!!import` `pet` and declare a third subtype. A derived
    discriminator would let that import silently flip the family from discriminated to not, breaking every
    existing producer with no diagnostic anywhere. Declared on the base, the mark is an obligation that
    propagates: a new subtype failing to pin the field is a resolver error **in the importing schema**, which is
-   the schema that broke it. This makes `@discriminator` unlike `@disjoint` — it is not an assertion about a
-   fact the resolver derives anyway, it is the declaration that creates the obligation, in the manner of `@rest`.
+   the schema that broke it. This makes `@discriminator` unlike `@disjoint` — it is not an assertion about a fact
+   the resolver derives anyway, it is the declaration that creates the obligation.
 4. **The mechanism is encoding-neutral, and both encodings claim it.** At a `pet`-typed field in text a value is
    likewise exactly `pet` without `!dog_type`, so structural recovery of the subtype is available to both
    encodings from one rule, and §6's "neither needed by TSON text" holds only for the choice framing. **In text
@@ -783,10 +785,14 @@ Reads with #10, and is useful without it.
 erased admits exactly the same values." Run that erasure separately on the two halves of #10's mark and they come
 apart.
 
-*Member dispatch* fails the letter of the criterion and is licensed anyway: erase it and every untagged document
-at the position becomes invalid, which is exactly what §6's representation-directive bullet admits — "a document
-in a directed encoding may not be readable without it; in every other encoding, and in the model, it changes
-nothing."
+*Member dispatch* fails it too, and the escape §6 offers has run out. The representation-directive bullet
+licenses a mark whose force is "confined to the encodings that claim it" — "a document in a directed encoding may
+not be readable without it; in every other encoding, and in the model, it changes nothing." That held while text
+kept `!variant` at a discriminated position. It does not hold now that text reads a sealed position by the member
+too ([TSON-JSON] §6.1.5): with every encoding claiming the directive there is no *other* encoding left for it to
+change nothing in, and erasing the mark makes a document invalid wherever it is written. A mark that survives no
+erasure in any encoding is not distinguishable from one that changes the model, whatever it does to the value
+space.
 
 *Instantiability is not readability.* Erase a mark that forbids direct instances and `pet` has instances again, in
 every encoding and in the model: `{ "pet_type": "dgo", "name": "rex" }` stops being an error and becomes a valid
@@ -797,11 +803,12 @@ puts a fact in the kernel**, and nothing short of it does.
 
 **A finding that stands on its own.** §6 claims `@discriminator` changes no value's validity, and argues it by
 writing "a discriminated choice admits exactly the variants it admitted" — *variants*, where the criterion it is
-answering is about *values*. In JSON, erasing the mark invalidates every untagged document at that choice. The
-directive bullet covers the behaviour; the sentence does not, and should say which category the mark's force
-falls in rather than deny it has any.
+answering is about *values*. Erasing the mark invalidates every untagged document at that
+position, and once text dispatches on the member too there is no encoding in which it does not. The sentence
+should be deleted rather than repaired: the mark's force is not in either of the two categories §6 admits, which
+is the finding, and the fact belongs in the kernel where erasure cannot reach it.
 
-**The proposal.** `record` gains one field, and the kernel one enum:
+**The proposal.** `record` gains one field, `record_field` gains one, and the kernel one enum:
 
 ```
 record_extension_type => [ABSTRACT SEALED FINAL OPEN]
@@ -814,7 +821,31 @@ record => product & {
   extension:       record_extension_type ~ OPEN
   supertypes:      [type_name]?
 }
+
+record_field => {
+  name:           field_name
+  type:           type_ref
+  state:          field_state ~ REQUIRED
+  discriminator:  boolean ~ false
+  value:          value?
+}
 ```
+
+**`record_field.discriminator` and not an annotation, on three arguments that converge.** The erasure test above
+is the first. The second is compilation: a discriminator field is read as a dispatch key rather than as an
+ordinary field, and is non-elidable on the wire, in *both* encodings — a property of the field in the type
+system, not of one encoding's projection of it. The third is the one the design forces on itself: `extension` is
+SEALED exactly when the record is abstract and some field is a discriminator, so a kernel body field's value
+would otherwise be a function of the annotation channel. Beyond the layering inversion, §6 resolves an annotation
+one hop against the governing meta — so a schema whose meta does not declare `discriminator` could never reach
+SEALED, making a kernel member's reachable values depend on which meta-schema governs the document. With the
+field in the body the derivation reads the body alone, and every schema can express it exactly as every schema
+can already express `state` and `value`.
+
+**`@rest` stays an annotation, and the contrast is now sharp.** §6 introduced the two together as checked
+annotations; the erasure test separates them. Erase `@rest` and the text and CBOR encodings are untouched — they
+write the map nested — so its force really is confined to the encodings that claim it, which is §6's bullet
+working as written. `@discriminator` had that standing only while text declined the directive.
 
 **The four members.**
 
@@ -829,13 +860,13 @@ record => product & {
 - **FINAL** — direct instances, and nothing may be a subtype: composition or refinement naming it is a resolver
   error, in the declaring schema and in any schema that imports it.
 
-**Three marks in, four members out.** The author writes `@abstract` or `@final` at the definition
-(`pet => @abstract { … }`; §6 honours a checked annotation at either position, so the key spelling lowers
-identically) and `@discriminator` on a field. **SEALED is derived and never written** — ABSTRACT with at least one
-discriminator field — in the manner of `choice.disjoint` (§5.4): a fact the resolver computes and the body
-records, so a reader has one lookup where it would otherwise have a scan. Two load errors fall out of the
-derivation rather than needing rules of their own: a discriminator field on a record that is not abstract, and
-`@abstract` with `@final` on one declaration.
+**Three marks in, two kernel fields out.** The author writes `@abstract` or `@final` at the definition (`pet =>
+@abstract { … }`; §6 honours a checked annotation at either position, so the key spelling lowers identically) and
+`@discriminator` on a field. **SEALED is derived and never written** — ABSTRACT with at least one discriminator field,
+both facts of the body — in the manner of `choice.disjoint` (§5.4): a fact the resolver computes from what the body
+holds and the body records, so a reader has one lookup rather than a scan. Two load errors fall out of the derivation
+rather than needing rules of their own: a discriminator field on a record that is not abstract, and `@abstract` with
+`@final` on one declaration.
 
 **Why the member carries it rather than the derivation.** ABSTRACT and SEALED differ in the *reading rule* and not
 only in bookkeeping — at ABSTRACT the tag is required, at SEALED it is optional and asserting — so a compiler
@@ -896,22 +927,24 @@ sense but reading badly under the `_type` suffix; `derivation`, accurate but les
 vocabulary; `instantiation`, which names the ABSTRACT axis and says nothing about FINAL; and `record_kind`,
 refused outright because §4.1 has already given "kind" to the four base kinds.
 
-**The spelling is provisional, and deliberately so.** The three marks are annotation-shaped for now — `@abstract`
-and `@final` at the definition, `@discriminator` on a field — and all three are **consumed by the resolver into
-the body** rather than preserved in §8.1's author-annotation channel. That consumption is what keeps §6's
-criterion intact: a mark that lowers into the type is syntax wearing annotation clothing, not an annotation that
-changes validity. It is also what makes the arrangement temporary, since a construct that the resolver reads, that
-is absent from output, and that no schema may redefine is a construct §12.1 should eventually spell. Two things
-the interim needs stated: the three names are **reserved** at their positions, so a schema cannot mean something
-else by them; and resolved output carries the body member and not the mark, so there is one carrier for the fact
-and §8.1's no-hoisting question does not arise.
+**The spelling is provisional, and deliberately so.** The three marks are annotation-shaped for now — `@abstract` and
+`@final` at the definition, `@discriminator` on a field — and all three are **consumed by the resolver into the body**
+rather than preserved in §8.1's author-annotation channel: the first two into `record.extension`, the third into
+`record_field.discriminator`. Consumption is the whole of what makes the interim legitimate — a mark that lowers into
+the type is syntax wearing annotation clothing, and none of the three is an annotation in §6's sense once it lands.
+One of these *preserved* would be the erasure violation twice over. It is also what makes the arrangement temporary,
+since a construct that the resolver reads, that is absent from output, and that no schema may redefine is a construct
+§12.1 should eventually spell. Two things the interim needs stated: the three names are **reserved** at their
+positions, so a schema cannot mean something else by them; and resolved output carries the body member and not the
+mark, so there is one carrier for the fact and §8.1's no-hoisting question does not arise.
 
 **What is running:** nothing. No extension fact is in this implementation's kernel, `@discriminator` has no
 consumer, and the inhabitance rule above is stated rather than measured.
 
 **Suggested resolution.** Add `extension: record_extension_type ~ OPEN` over `[ABSTRACT SEALED FINAL OPEN]` to the
-kernel's `record`, stating the four members' meanings and their two reading rules, the derivation of SEALED and
-the two load errors it yields, the FINAL check over composition and refinement, the subtraction exemption and why
-it is not one, the inhabitance rule, the absence of any transition table, and the identity consequence; state that
-the marks are consumed rather than preserved and that their names are reserved; correct §6's validity claim; and
-settle the field and enum names, which is the one part this entry does not.
+kernel's `record` and `discriminator: boolean ~ false` to its `record_field`, stating the four members' meanings and
+their two reading rules, the derivation of SEALED and the two load errors it yields, #10's checks over the
+discriminator field, the FINAL check over composition and refinement, the subtraction exemption and why it is not one,
+the inhabitance rule, the absence of any transition table, and the identity consequence; state that the marks are
+consumed rather than preserved and that their names are reserved; correct §6's validity claim; and settle the field
+and enum names, which is the one part this entry does not.
