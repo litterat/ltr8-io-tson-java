@@ -16,13 +16,19 @@ import java.util.List;
  * components yet (only a bare, always-present {@code List} does), so there's no wrapper available
  * to opt into the omit-when-absent behavior non-list optional fields already get for free.
  *
+ * <p><b>{@code extension} states how the record may be realised</b> ({@link RecordExtensionType}) and is
+ * {@link RecordExtensionType#OPEN} unless the record says otherwise. It is a kernel field rather than a
+ * preserved annotation because it decides which values a position typed by this record admits, so erasing
+ * it would change the type. Only {@code record} carries one: the other products are constructors, and a
+ * constructor's instances are the closed forms a schema writes rather than a family an author extends.
+ *
  * <p>Named {@code RecordBody}, not {@code Record} -- the kernel's own constructor is literally
  * called {@code record}, but a Java class named {@code Record} would collide, confusingly, with
  * {@code java.lang.Record} (the very language feature every type in this model is built from).
  */
 @Typename(name = "record")
-public record RecordBody(List<String> supertypes, List<RecordField> fields, List<FieldGroup> groups)
-        implements Product {
+public record RecordBody(List<String> supertypes, List<RecordField> fields, List<FieldGroup> groups,
+                          RecordExtensionType extension) implements Product {
 
     /**
      * <b>Absent and empty are the same list</b> for the two the kernel makes optional ({@code supertypes:
@@ -39,8 +45,8 @@ public record RecordBody(List<String> supertypes, List<RecordField> fields, List
         groups = groups == null ? List.of() : List.copyOf(groups);
     }
 
-    /** A fresh record body: no supertypes, no field groups, just plain fields. */
+    /** A fresh record body: no supertypes, no field groups, just plain fields, extensible. */
     public static RecordBody of(List<RecordField> fields) {
-        return new RecordBody(List.of(), fields, List.of());
+        return new RecordBody(List.of(), fields, List.of(), RecordExtensionType.OPEN);
     }
 }

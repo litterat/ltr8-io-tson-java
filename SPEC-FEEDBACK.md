@@ -938,8 +938,13 @@ since a construct that the resolver reads, that is absent from output, and that 
 positions, so a schema cannot mean something else by them; and resolved output carries the body member and not the
 mark, so there is one carrier for the fact and §8.1's no-hoisting question does not arise.
 
-**What is running:** nothing. No extension fact is in this implementation's kernel, `@discriminator` has no
-consumer, and the inhabitance rule above is stated rather than measured.
+**What is running:** the two kernel fields. `record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]`,
+`record.extension: record_extension_type ~ OPEN` and `record_field.discriminator: boolean ~ false` are declared in
+this implementation's meta-kernel and bound by its value model, so a resolved schema carries both facts and the
+kernel's own three schemas resolve, link and compile against them unchanged — every record OPEN, every field not a
+discriminator. Nothing yet *sets* either: the three marks are still unread, the load-time checks are unwritten,
+SEALED is never derived, and no reader dispatches on a member. The inhabitance rule above is stated rather than
+measured.
 
 **Suggested resolution.** Add `extension: record_extension_type ~ OPEN` over `[ABSTRACT SEALED FINAL OPEN]` to the
 kernel's `record` and `discriminator: boolean ~ false` to its `record_field`, stating the four members' meanings and

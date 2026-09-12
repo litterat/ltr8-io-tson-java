@@ -54,7 +54,7 @@ final class MetaRefs {
         return switch (body) {
             case RecordBody record -> new RecordBody(record.supertypes(),
                     record.fields().stream().map(field -> field.withType(map.apply(field.type()))).toList(),
-                    record.groups());
+                    record.groups(), record.extension());
             case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.state(),
                     array.unordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(map.apply(mapBody.keyType()), map.apply(mapBody.valueType()),

@@ -440,7 +440,8 @@ class TsonSchemaLinkerTest {
         Map<String, TypeDefinition> entries = new LinkedHashMap<>();
         entries.put("thing", TypeDefinition.product(new RecordBody(List.of(),
                 List.of(RecordField.required("a", TypeRef.of("thing"))),
-                List.of(new FieldGroup(List.of("not_a_real_field"), io.ltr8.tson.schema.meta.ElementState.OPTIONAL)))));
+                List.of(new FieldGroup(List.of("not_a_real_field"), io.ltr8.tson.schema.meta.ElementState.OPTIONAL)),
+                io.ltr8.tson.schema.meta.RecordExtensionType.OPEN)));
 
         assertThrows(SchemaValidationException.class, () -> TsonSchemaLinker.link(schemaOf(entries), null));
     }

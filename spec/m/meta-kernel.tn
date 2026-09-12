@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=28c3c7f4ad339d77e74626f8b54ddb337b95d0ef9f4c11e95723cd79a7d60a39"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=565ea7d483597c24efa86ce409ffacd4bd6d92938a24253fee89e7a05a45e815"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -377,6 +377,27 @@
   element_state       => !enum [REQUIRED OPTIONAL]
 
   @doc:"""
+    How a record may be realised ([TSON-SCHEMA] §5.2). OPEN is the
+    ordinary case and the default: the record has instances of its own
+    and may be composed onto or refined. ABSTRACT has no instances of
+    its own, so a value at a position typed by it is a value of some
+    subtype. SEALED is ABSTRACT with at least one discriminator field,
+    which makes the subtype recoverable from the value's own members;
+    it is derived from the body rather than stated, in the manner of
+    `choice.disjoint`. FINAL has instances and admits no subtype: no
+    composition or refinement may name it as a source. Subtraction
+    stays admissible against a FINAL record — §5.9 empties
+    `supertypes` and mints no IS-A edge, which is the only thing FINAL
+    constrains.
+
+    Extensibility is never inherited. A subtype of an ABSTRACT or
+    SEALED record is OPEN unless it says otherwise, since a rule
+    carrying abstractness downward would leave the family with no
+    concrete member at all.
+    """
+  record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]
+
+  @doc:"""
     Annotation type markers. `synthetic` is resolver-attached and derived:
     discarded and recomputed on ingest ([TSON-SCHEMA] §6, §8.1), and marks a
     resolver-materialised synthetic entry at its schema-map key (§8.2).
@@ -403,12 +424,24 @@
     and where it is paid: a parametric `= P` is REQUIRED with the
     parameter in `value`, and becomes REQUIRED_FIXED when
     substitution makes the value concrete.
+
+    `discriminator` marks the field a sealed family dispatches on.
+    It is a fact about the type and not a directive: a position
+    typed by the enclosing record recovers the subtype from this
+    field's value in every encoding, so erasing it would change
+    which values are admitted. The field is REQUIRED, is no member
+    of a field group, is typed by an atom or an enum, and carries
+    no value of its own — the base cannot pin what its subtypes
+    each pin differently (§5.7). Each subtype restates it
+    REQUIRED_FIXED, and the pins are pairwise distinct under the
+    field type's own equality.
     """
   record_field => {
-    name:   field_name
-    type:   type_ref
-    state:  field_state ~ REQUIRED
-    value:  value?
+    name:           field_name
+    type:           type_ref
+    state:          field_state ~ REQUIRED
+    discriminator:  boolean ~ false
+    value:          value?
   }
 
   tuple_element => {
@@ -445,12 +478,19 @@
     before the body is read against this vocabulary. `map.state`
     governs the entry value, as `array.state` governs the element;
     a map key can never be absent.
+
+    `record.extension` states how the record may be realised, and
+    is OPEN unless the record says otherwise. Only `record` carries
+    it: the other products are constructors, and a constructor's
+    instances are the closed forms a schema writes rather than a
+    family an author extends.
     """
   record => product & {
     access_pattern:  product_access_type = NAMED
     size_type:       product_size_type = FIXED
     fields:          [record_field]
     groups:          [field_group]?
+    extension:       record_extension_type ~ OPEN
     supertypes:      [type_name]?
   }
 

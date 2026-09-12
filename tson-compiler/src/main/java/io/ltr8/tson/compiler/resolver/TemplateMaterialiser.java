@@ -607,7 +607,7 @@ final class TemplateMaterialiser {
                 .map(field -> field.state() == FieldState.REQUIRED && field.value().isPresent()
                         ? field.withState(FieldState.REQUIRED_FIXED)
                         : field)
-                .toList(), record.groups());
+                .toList(), record.groups(), record.extension());
     }
 
     /**
