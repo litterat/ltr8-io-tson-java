@@ -84,43 +84,43 @@ test puts its fact in the kernel, and its work is under "Discriminated record fa
 
 `SPEC-FEEDBACK.md` #10 and #11 carry the design and the arguments; this is the build order. A record states how
 it may be realised, a field of an abstract record may be a discriminator, and a position typed by such a record
-recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). Nothing below
-is built. Work lands on `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
+recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). The kernel
+carries both facts and meta.tn declares the four marks; nothing yet reads a mark or acts on a fact. Work lands
+on `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
-- [ ] **The two kernel fields.** `record_extension_type => [ABSTRACT SEALED FINAL OPEN]` and
-  `record.extension: record_extension_type ~ OPEN` in meta-kernel.tn, with `record_field.discriminator:
-  boolean ~ false` beside them. `schema.meta.Record` and `schema.meta.RecordField` gain the components **in the
-  same commit**: strict binding compares a compiled schema against its class at bind-mode compile, so a kernel
-  field with no component fails the compile rather than a test, and the message names it. Schema text moving
-  means the three digests move, so `scripts/restamp-bundled-schemas.sh` and Part 2 §13.2 ride along, and the
-  three `*-resolved.tn` fixtures gain the new members wherever they are not at their defaults.
-
-- [ ] **The three marks lower into the body.** `@abstract` and `@final` at the definition, `@discriminator` on a
-  field, each **consumed** by the resolver into `record.extension` / `record_field.discriminator` rather than
-  preserved in §8.1's author-annotation channel — so resolved output carries one carrier per fact and §8.1's
-  no-hoisting question does not arise. The three names are reserved at their positions: a schema may not mean
-  something else by them. §6 honours a checked annotation at either declaration position, so the key spelling
-  must lower identically to the value spelling. The annotation shape is the interim and §12.1 spells them
-  eventually; what that costs is one more reason to keep the lowering in one place.
+- [ ] **The four marks lower into the body.** The declarations are in meta.tn (`abstract`, `sealed`, `final` and
+  `discriminator`, all `@annotation void`); what is left is the lowering. Each must be **consumed** by the
+  resolver into `record.extension` / `record_field.discriminator` rather than preserved in §8.1's
+  author-annotation channel — so resolved output carries one carrier per fact and §8.1's no-hoisting question
+  does not arise. Until it is, a mark resolves, sits in the annotation channel and does nothing, which is a
+  schema that says `@abstract` and is not. The four names are reserved at their positions: a schema may not
+  mean something else by them. §6 honours a checked annotation at either declaration position, so the key
+  spelling must lower identically to the value spelling. The annotation shape is the interim and §12.1 spells
+  them eventually; what that costs is one more reason to keep the lowering in one place.
 
 - [ ] **The load-time checks, over the linked closure.** One pass, in `TsonSchemaLinker` beside
   `ChoiceDisjointness`. On the record: composing or refining onto a **FINAL** record is a resolver error, in the
   declaring schema and in any that imports it — while §5.9 subtraction is admissible, minting no IS-A edge; and
-  `@abstract` with `@final` on one declaration is an error. On the annotated field: its declared type resolves,
+  two definition marks on one declaration is an error, whichever two. On the annotated field: its type resolves,
   after its reference chain, to an atom-family instance or an enum (§5.2 grants that only to a field *carrying*
   a value, and the base's field carries none, so it must be checked here); its state is exactly REQUIRED, not
   OPTIONAL, FIXED or DEFAULT; it is **not a group member**, checked against the resolved `groups` list rather
   than the source, since §5.11 refinement is what reaches that state and the declaration cannot express it; and
-  a record carrying a discriminator field MUST be ABSTRACT, §5.7's identity diagonal forbidding the base pinning
-  it. Over the closure: every entry in `subtypes`, transitively, pins each discriminator `REQUIRED_FIXED`, and
-  the pins are **pairwise distinct as tuples** in the base's declaration order. Distinctness is under the field
+  and the record must be SEALED, §5.7's identity diagonal forbidding the base pinning what its subtypes each pin
+  differently. **The two marks are each other's condition**: `@discriminator` on a field requires `@sealed` on the
+  declaration, and `@abstract` forbids a discriminator anywhere in its body. Neither check is load-bearing —
+  with one rule the other fact follows — and both are kept because it is the author being checked: the halves
+  cannot drift apart in either direction, so removing a base's last `@discriminator` fails at the schema that
+  changed rather than at every reader of an untagged document. Over the closure: every entry in `subtypes`,
+  transitively, pins each discriminator `REQUIRED_FIXED`, and the pins are **pairwise distinct as tuples** in
+  the base's declaration order. Distinctness is under the field
   type's own equality contract and not token equality — `= 255` and `= 0xFF` are one pin (§4.3), `= 1` and
   `= 1.0` are one (§5.5), text pins compare NFC-normalised — so `ValueIdentity` is what answers it and a
   comparison of tokens accepts a schema whose dispatch table is not a function.
 
-- [ ] **SEALED is derived, and two facts the existing machinery must learn.** `extension` is SEALED exactly when
-  the record is ABSTRACT and some field is a discriminator, computed from the body alone and recorded there, in
-  the manner of `choice.disjoint` (§5.4) — so a reader has one lookup rather than a scan. Inhabitance follows:
+- [ ] **Two facts the existing machinery must learn.** `extension` is written rather than derived — each
+  definition mark names its member, and the body condition is the check on the mark rather than its source (the
+  entry above) — so what is left here is what reads it. Inhabitance follows:
   a FINAL or OPEN record is inhabited as any record is, an ABSTRACT or SEALED one exactly when at least one
   subtype is, which needs `TypeInhabitance`'s least fixed point to learn the union rather than gain an
   exemption. And `extension` participates in §8.2 identity — an abstract, sealed, concrete and final `pet` admit

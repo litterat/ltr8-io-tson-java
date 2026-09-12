@@ -112,7 +112,7 @@ class ChoiceUntaggedRecoveryTest {
     @Test
     void aNonScalarVariantKeepsTheTagRequired() {
         variant("int32", TypeKind.ATOM, new IntegerType(new IntegerSize(32, true)));
-        variant("point", TypeKind.PRODUCT, new RecordBody(List.of(), List.of(), List.of()));
+        variant("point", TypeKind.PRODUCT, RecordBody.of(List.of()));
         // Disjoint (different kinds), but a record isn't a base-type-class scalar -- no structural recovery here.
         TsonTypeReader<?> reader = choice(Optional.of(true), "int32", "point");
 

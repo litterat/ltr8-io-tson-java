@@ -100,9 +100,11 @@ class DefinitionResolverTest {
     private static final String EXPECTED_INTEGER_SIZE =
             "{ supertypes: [] subtypes: [] "
                     + "body: !record { supertypes: [] fields: [ "
-                    + "{ name: \"bits\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" } "
-                    + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } state: \"REQUIRED\" } "
-                    + "] groups: [] } }";
+                    + "{ name: \"bits\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" "
+                    + "discriminator: false } "
+                    + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } state: \"REQUIRED\" "
+                    + "discriminator: false } "
+                    + "] groups: [] extension: \"OPEN\" } }";
 
     /**
      * The same shape as the real fixture resolves it. meta-kernel types {@code bits} as a count rather than
@@ -308,7 +310,7 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.PRODUCT, top.kind());
         assertEquals(List.of(), top.supertypes());
         assertEquals("{ supertypes: [] subtypes: [] "
-                + "body: !record { supertypes: [] fields: [] groups: [] } }", write(top));
+                + "body: !record { supertypes: [] fields: [] groups: [] extension: \"OPEN\" } }", write(top));
     }
 
     @Test
@@ -339,22 +341,24 @@ class DefinitionResolverTest {
 
         // atom, sum: empty trailing body, no fields inherited from top (which has none) -- just the composition itself.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] } }", write(atom));
+                + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] extension: \"OPEN\" } }", write(atom));
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
-                + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] } }", write(sum));
+                + "body: !record { supertypes: [ \"top\" ] fields: [] groups: [] extension: \"OPEN\" } }", write(sum));
 
         // product: two brand-new fields added by the trailing body (top contributes none).
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ \"top\" ] fields: [ "
-                + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } state: \"REQUIRED\" } "
-                + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } state: \"REQUIRED\" } "
-                + "] groups: [] } }", write(product));
+                + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } state: \"REQUIRED\" "
+                + "discriminator: false } "
+                + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } state: \"REQUIRED\" "
+                + "discriminator: false } "
+                + "] groups: [] extension: \"OPEN\" } }", write(product));
 
         // reference: one brand-new field.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ \"top\" ] fields: [ "
-                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
-                + "] groups: [] } }", write(reference));
+                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" discriminator: false } "
+                + "] groups: [] extension: \"OPEN\" } }", write(reference));
     }
 
     // ── Field groups (§5.11) + constructor flag + OPTIONAL fields: integer_type ──
@@ -375,17 +379,24 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"atom\" ] fields: [ "
-                        + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } state: \"OPTIONAL\" } ] "
+                        + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "{ name: \"min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "{ name: \"max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } ] "
                         + "groups: [ "
                         + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "
                         + "{ members: [ \"max\" \"exclusive_max\" ] state: \"OPTIONAL\" } "
-                        + "] } }",
+                        + "] extension: \"OPEN\" } }",
                 write(integerType));
     }
 
@@ -548,9 +559,11 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"first\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" } "
-                        + "{ name: \"second\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" } "
-                        + "] groups: [] } }",
+                        + "{ name: \"first\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" "
+                        + "discriminator: false } "
+                        + "{ name: \"second\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" "
+                        + "discriminator: false } "
+                        + "] groups: [] extension: \"OPEN\" } }",
                 write(pair));
     }
 
@@ -614,10 +627,12 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
+                        + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" "
+                        + "discriminator: false } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "discriminator: false "
                         + "value: REQUIRED } "
-                        + "] groups: [] } }",
+                        + "] groups: [] extension: \"OPEN\" } }",
                 write(tupleElement));
     }
 
@@ -634,10 +649,12 @@ class DefinitionResolverTest {
 
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
-                        + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } state: \"REQUIRED\" } "
+                        + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } state: \"REQUIRED\" "
+                        + "discriminator: false } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "discriminator: false "
                         + "value: REQUIRED } "
-                        + "] groups: [] } }",
+                        + "] groups: [] extension: \"OPEN\" } }",
                 write(fieldGroup));
     }
 
@@ -650,8 +667,8 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
-                        + "] groups: [] } }",
+                        + "state: \"REQUIRED_FIXED\" discriminator: false value: INDEX } "
+                        + "] groups: [] extension: \"OPEN\" } }",
                 write(pinned));
     }
 
@@ -716,20 +733,22 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"product\" ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
+                        + "state: \"REQUIRED_FIXED\" discriminator: false value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
+                        + "state: \"REQUIRED_FIXED\" discriminator: false value: VARIABLE } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "state: \"REQUIRED\" discriminator: false } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
+                        + "state: \"REQUIRED_DEFAULT\" discriminator: false value: REQUIRED } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: false } "
+                        + "state: \"REQUIRED_DEFAULT\" discriminator: false value: false } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: false } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "] groups: [] } }",
+                        + "state: \"REQUIRED_DEFAULT\" discriminator: false value: false } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "] groups: [] extension: \"OPEN\" } }",
                 write(array));
     }
 
@@ -750,18 +769,20 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"product\" ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: NAMED } "
+                        + "state: \"REQUIRED_FIXED\" discriminator: false value: NAMED } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
+                        + "state: \"REQUIRED_FIXED\" discriminator: false value: VARIABLE } "
                         + "{ name: \"key_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "state: \"REQUIRED\" discriminator: false } "
                         + "{ name: \"value_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "state: \"REQUIRED\" discriminator: false } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "] groups: [] } }",
+                        + "state: \"REQUIRED_DEFAULT\" discriminator: false value: REQUIRED } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "] groups: [] extension: \"OPEN\" } }",
                 write(map));
     }
 
@@ -799,9 +820,11 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"config\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"config\" ] fields: [ "
                         + "{ name: \"host\" type: { name: \"text\" arguments: [] } state: \"REQUIRED_FIXED\" "
+                        + "discriminator: false "
                         + "value: \"prod.example.com\" } "
-                        + "{ name: \"port\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" } "
-                        + "] groups: [] } }",
+                        + "{ name: \"port\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" "
+                        + "discriminator: false } "
+                        + "] groups: [] extension: \"OPEN\" } }",
                 write(production));
     }
 
@@ -854,20 +877,22 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
+                        + "state: \"REQUIRED_FIXED\" discriminator: false value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
+                        + "state: \"REQUIRED_FIXED\" discriminator: false value: VARIABLE } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" } "
+                        + "state: \"REQUIRED\" discriminator: false } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: REQUIRED } "
+                        + "state: \"REQUIRED_FIXED\" discriminator: false value: REQUIRED } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: true } "
+                        + "state: \"REQUIRED_FIXED\" discriminator: false value: true } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" value: true } "
-                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" value: 1 } "
-                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" } "
-                        + "] groups: [] } }",
+                        + "state: \"REQUIRED_FIXED\" discriminator: false value: true } "
+                        + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
+                        + "discriminator: false value: 1 } "
+                        + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
+                        + "discriminator: false } "
+                        + "] groups: [] extension: \"OPEN\" } }",
                 write(set));
     }
 
@@ -913,8 +938,9 @@ class DefinitionResolverTest {
         assertEquals(List.of("atom", "top"), enumDef.supertypes());
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ \"atom\" ] fields: [ "
-                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } state: \"REQUIRED\" } "
-                        + "] groups: [] } }",
+                        + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } state: \"REQUIRED\" "
+                        + "discriminator: false } "
+                        + "] groups: [] extension: \"OPEN\" } }",
                 write(enumDef));
     }
 

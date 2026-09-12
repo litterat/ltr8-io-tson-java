@@ -92,7 +92,7 @@ class EntryDisplayNameTest {
                 new TypeArgument.Value(new Token("3", Token.Form.UNQUOTED))));
 
         assertEquals("paged<order, 3>",
-                EntryDisplayName.of("paged_order_3_abc", synthetic(new RecordBody(List.of(), List.of(), List.of()), application)));
+                EntryDisplayName.of("paged_order_3_abc", synthetic(RecordBody.of(List.of()), application)));
     }
 
     /** A construction's source is a bare constructor name, which is not an application and renders as the body. */
@@ -105,6 +105,6 @@ class EntryDisplayNameTest {
     /** No sugar spelling and no application: the name, honestly, rather than something invented. */
     @Test
     void anythingElseFallsBackToTheName() {
-        assertEquals("mystery", EntryDisplayName.of("mystery", synthetic(new RecordBody(List.of(), List.of(), List.of()))));
+        assertEquals("mystery", EntryDisplayName.of("mystery", synthetic(RecordBody.of(List.of()))));
     }
 }

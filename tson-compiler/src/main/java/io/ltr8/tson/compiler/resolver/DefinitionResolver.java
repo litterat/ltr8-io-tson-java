@@ -36,6 +36,7 @@ import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.Product;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.Sum;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -1167,7 +1168,7 @@ final class DefinitionResolver {
         checkGroupPresence(name, fields, groups);
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
-        RecordBody body = new RecordBody(directSupertypes, fields, groups);
+        RecordBody body = new RecordBody(directSupertypes, fields, groups, RecordExtensionType.OPEN);
         // §5.9: subtraction breaks IS-A. The contract index (type_definition.supertypes) is emptied while the
         // body keeps `directSupertypes` as authorial lineage (record.supertypes) -- the distinction §7.2's
         // subsumption rule reads, so a subtracted type does not stand where its source is expected. `kind` is
@@ -1406,7 +1407,7 @@ final class DefinitionResolver {
         checkGroupPresence(name, fields, groups);
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
-        RecordBody body = new RecordBody(List.of(), fields, groups);
+        RecordBody body = new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN);
         return new TypeDefinition(source, kind, transitiveSupertypes,
                 List.of(), body);
     }
@@ -1575,7 +1576,7 @@ final class DefinitionResolver {
         for (RecordEntry entry : entries) {
             resolveEntry(null, entry, fields, groups, seenFieldNames, Map.of(), parameters);
         }
-        return new RecordBody(List.of(), fields, groups);
+        return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN);
     }
 
     /**
@@ -1813,7 +1814,7 @@ final class DefinitionResolver {
         // fixed until the value is concrete -- and that is what FieldModifiers decides.
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), optional, field.modifier(), parameters);
-        return new RecordField(field.name(), type, resolved.state(),
+        return new RecordField(field.name(), type, resolved.state(), false,
                 resolved.value().map(DefinitionResolver::toMetaToken), Annotations.empty(),
                 positions.of(field));
     }

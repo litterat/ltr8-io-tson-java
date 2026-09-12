@@ -314,6 +314,12 @@
     body: !enum { members: [REQUIRED OPTIONAL] }
   }
 
+  @doc:"How a record may be realised (Part 2 Section 5.2)."
+  record_extension_type => !type_definition {
+    source: enum
+    body: !enum { members: [ABSTRACT SEALED FINAL OPEN] }
+  }
+
   @doc:"Annotation type markers."
   annotation => @annotation !type_definition {
     source: void
@@ -338,10 +344,11 @@
   @doc:"Supporting records."
   record_field => !type_definition {
     body: !record { fields: [
-      !record_field { name: name         type: field_name }
-      !record_field { name: type         type: type_ref }
-      !record_field { name: state        type: field_state  state: REQUIRED_DEFAULT  value: REQUIRED }
-      !record_field { name: value        type: value  state: OPTIONAL }
+      !record_field { name: name           type: field_name }
+      !record_field { name: type           type: type_ref }
+      !record_field { name: state          type: field_state  state: REQUIRED_DEFAULT  value: REQUIRED }
+      !record_field { name: discriminator  type: boolean  state: REQUIRED_DEFAULT  value: false }
+      !record_field { name: value          type: value  state: OPTIONAL }
     ] }
   }
 
@@ -368,6 +375,7 @@
       !record_field { name: size_type       type: product_size_type    state: REQUIRED_FIXED  value: FIXED }
       !record_field { name: fields          type: array_record_field_xxhash }
       !record_field { name: groups          type: array_field_group_xxhash  state: OPTIONAL }
+      !record_field { name: extension       type: record_extension_type  state: REQUIRED_DEFAULT  value: OPEN }
       !record_field { name: supertypes      type: array_type_name_xxhash  state: OPTIONAL }
     ] }
   }
