@@ -12,6 +12,7 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonValue;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.MapBody;
@@ -46,10 +47,13 @@ abstract sealed class TreeMapReader implements JsonTypeReader<JsonValue>
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         MapBody body = (MapBody) definition.body();
         JsonSchemaLocation at = context.locationOf(name, definition);
+        // The name the author wrote, not the entry the resolver minted: `{text => int32}` rather than a
+        // content-derived `map_text_int32_...`, which appears in neither the schema nor the document.
+        String shown = EntryDisplayName.of(name, definition, context.schema().entries());
         JsonTypeReader<?> value = context.readers().resolve(body.valueType().name());
         Optional<AtomType<?>> key = scalarKeyParser(context.schema(), body.keyType().name());
-        return key.<TreeMapReader>map(parser -> new TreeMapObjectReader(name, body, parser, value, at))
-                .orElseGet(() -> new TreeMapPairsReader(name, body,
+        return key.<TreeMapReader>map(parser -> new TreeMapObjectReader(shown, body, parser, value, at))
+                .orElseGet(() -> new TreeMapPairsReader(shown, body,
                         context.readers().resolve(body.keyType().name()), value, at));
     };
 

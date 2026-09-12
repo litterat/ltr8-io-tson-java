@@ -16,7 +16,7 @@ import io.ltr8.tson.compiler.atom.TokenAtomType;
 import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.base.unicode.IdentifierProfile;
 import io.ltr8.tson.base.unicode.ConfusableNames;
-import io.ltr8.tson.compiler.reader.EntryDisplayName;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.BytesType;

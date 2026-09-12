@@ -9,6 +9,7 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonValue;
 import io.ltr8.tson.schema.TsonSchema;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ChoiceBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -42,7 +43,8 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
 
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         ChoiceBody body = (ChoiceBody) definition.body();
-        return new TreeChoiceReader(name, body, context, context.locationOf(name, definition));
+        return new TreeChoiceReader(EntryDisplayName.of(name, definition, context.schema().entries()), body,
+                context, context.locationOf(name, definition));
     };
 
     private final String name;

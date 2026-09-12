@@ -1,13 +1,5 @@
-package io.ltr8.tson.compiler.reader;
+package io.ltr8.tson.schema.meta;
 
-import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TupleElement;
-import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.math.BigInteger;
 import java.util.Map;

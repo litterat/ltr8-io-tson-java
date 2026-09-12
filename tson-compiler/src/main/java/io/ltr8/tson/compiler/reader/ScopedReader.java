@@ -9,6 +9,7 @@ import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.stream.EventSkip;
 import io.ltr8.tson.compiler.stream.SchemaRef;
 import io.ltr8.tson.base.CanonicalIdentity;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ScopeKind;
 import io.ltr8.tson.schema.meta.Scoped;
 import io.ltr8.tson.tree.TsonScopedValue;

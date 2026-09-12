@@ -1,18 +1,6 @@
-package io.ltr8.tson.compiler.reader;
+package io.ltr8.tson.schema.meta;
 
-import io.ltr8.tson.schema.meta.ArrayBody;
-import io.ltr8.tson.schema.meta.ChoiceBody;
-import io.ltr8.tson.schema.meta.ElementState;
-import io.ltr8.tson.schema.meta.MapBody;
-import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.base.SourcePosition;
-import io.ltr8.tson.schema.meta.Token;
-import io.ltr8.tson.schema.meta.TupleBody;
-import io.ltr8.tson.schema.meta.TupleElement;
-import io.ltr8.tson.schema.meta.TypeArgument;
-import io.ltr8.tson.schema.meta.TypeDefinition;
-import io.ltr8.tson.schema.meta.TypeKind;
-import io.ltr8.tson.schema.meta.TypeRef;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigInteger;
