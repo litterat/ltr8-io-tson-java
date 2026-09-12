@@ -41,6 +41,9 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   (reverse of `supertypes`); (3) **derive `disjoint`** for every choice entry (`ChoiceDisjointness`, §5.4) —
   total and two-valued, detailed under "The disjointness derivation" below, so a linked choice always
   carries the fact;
+  (3a) **check what `record.extension` obliges** (`RecordExtension`, §5.2) — that nothing composes onto a
+  FINAL record, that a sealed family's selectors are usable and its members pin them distinctly, and that
+  `@sealed` and `@discriminator` agree; detailed below;
   (4) **validate** every reference
   resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter);
   **a reference to a DATA-kinded entry is refused** — §8.1's schema map holds only type definitions, so an
@@ -241,6 +244,38 @@ for a defect in the schema, at a line the data's author does not control.
   different problem. The check runs after that validation for exactly this reason.
 - **Scope is structural.** An atom whose own facets admit nothing (`int8 ^ { min: 300 }`) is uninhabited too,
   but that is its constraint family's question, next to `AtomNarrowing` (`BACKLOG.md`).
+
+## What `record.extension` obliges (`RecordExtension`, §5.2, §5.7, §5.9)
+
+A checker rather than a derivation, and `ChoiceDisjointness`'s peer in shape: it takes the merged namespace
+and the local names and hands back violations, leaving reporting to the linker. The fact itself is written
+by the author's mark and lowered by the resolver (`docs/schema-resolution.md`); what is left is whether the
+rest of the closure agrees with it.
+
+- **Why the linker and not the resolver.** Every rule needs a namespace the declaration does not have. FINAL
+  constrains whoever composes onto it, which may be another schema; the family rules range over `subtypes`,
+  which nothing populates until linking; and a selector's type has to be followed to the end of its
+  reference chain. What is local — two definition marks on one declaration, a mark carrying a value, a mark
+  on a non-record — the resolver already refused while lowering.
+- **The FINAL check reads `TypeDefinition.supertypes`, never `RecordBody.supertypes`.** §5.9's subtraction
+  empties the contract index and leaves the body's authorial lineage in place, minting no IS-A edge — which
+  is the only thing FINAL constrains. Reading the body's list instead refuses the one operation §5.9 admits
+  against a final type, and no *invalid* case would show it; the corpus carries a `valid` vector for exactly
+  that reason.
+- **A marked field is the declaration's own only if no sealed supertype declares it.** §5.8 flattens an
+  inherited field whole, the mark included, so a subtype's copy of its base's selector is indistinguishable
+  here from one the subtype wrote. Without the distinction the rule "a discriminator requires `@sealed`"
+  refuses every subtype of every sealed family — which it did, until the first end-to-end test.
+- **A family is re-judged whenever any part of it is local**, base or subtype, which is not the same as
+  judging local entries. §3.3.4 makes `subtypes` open across schemas, so an importer really can add a
+  member: the new sibling can collide with an imported one, and only a closure holding both can see it.
+- **Pins compare as values through `ValueIdentity`**, which is why that class is visible outside its own
+  package. §4.3 makes `= 255` and `= 0xFF` one pin and §5.5 makes `= 1` and `= 1.0` one, so a comparison of
+  tokens accepts a schema whose dispatch table is not a function. They are read **at the base's declared
+  type**, which is [TSON-JSON] §6.1.5's dispatch rule: those are the types known before a subtype is
+  selected, so distinctness is judged in the terms a decoder will compare in.
+- **Group membership is reported instead of the state rule, not beside it.** §5.11 forces a member OPTIONAL,
+  so both would fire and the second would name the symptom. One mistake, one verdict.
 
 ## The disjointness derivation (`ChoiceDisjointness`, `reader/DiscriminationClass`)
 

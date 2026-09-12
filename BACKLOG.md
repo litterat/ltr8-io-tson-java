@@ -85,9 +85,9 @@ test puts its fact in the kernel, and its work is under "Discriminated record fa
 `SPEC-FEEDBACK.md` #10 and #11 carry the design and the arguments; this is the build order. A record states how
 it may be realised, a field of an abstract record may be a discriminator, and a position typed by such a record
 recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). The kernel
-carries both facts, meta.tn declares the four marks, and the resolver lowers them into the body. What is left
-is acting on what they state: nothing checks a family and nothing dispatches on a member, so a schema may still
-declare a sealed family with no discriminator, or a subtype that pins nothing, and load clean. Work lands on
+carries both facts, meta.tn declares the four marks, the resolver lowers them into the body, and the linker
+refuses a family the closure contradicts. What is left is reading one: no encoding dispatches on a member yet,
+so a sealed family validates like any record and every document still needs its tag. Work lands on
 `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
 - [ ] **`@abstract` on a template.** Meaningful and refused as a gap today: §5.10 holds a template's body as
@@ -100,28 +100,6 @@ declare a sealed family with no discriminator, or a subtype that pins nothing, a
   some schema also wrote a subtype's application, so `TypeInhabitance` sees a thinner family than the
   declarations suggest, and the diagnostic should say which application is missing rather than that the type is
   uninhabited.
-
-- [ ] **The load-time checks, over the linked closure.** One pass, in `TsonSchemaLinker` beside
-  `ChoiceDisjointness`. What the resolver already refuses while lowering is the part that is local to one
-  declaration and answerable without a namespace: two definition marks on one declaration, a mark carrying a
-  value, and a definition mark on something that is not a record. Everything below needs the closure. On the
-  record: composing or refining onto a **FINAL** record is a resolver error, in the declaring schema and in any
-  that imports it — while §5.9 subtraction is admissible, minting no IS-A edge. On the annotated field: its type resolves,
-  after its reference chain, to an atom-family instance or an enum (§5.2 grants that only to a field *carrying*
-  a value, and the base's field carries none, so it must be checked here); its state is exactly REQUIRED, not
-  OPTIONAL, FIXED or DEFAULT; it is **not a group member**, checked against the resolved `groups` list rather
-  than the source, since §5.11 refinement is what reaches that state and the declaration cannot express it; and
-  and the record must be SEALED, §5.7's identity diagonal forbidding the base pinning what its subtypes each pin
-  differently. **The two marks are each other's condition**: `@discriminator` on a field requires `@sealed` on the
-  declaration, and `@abstract` forbids a discriminator anywhere in its body. Neither check is load-bearing —
-  with one rule the other fact follows — and both are kept because it is the author being checked: the halves
-  cannot drift apart in either direction, so removing a base's last `@discriminator` fails at the schema that
-  changed rather than at every reader of an untagged document. Over the closure: every entry in `subtypes`,
-  transitively, pins each discriminator `REQUIRED_FIXED`, and the pins are **pairwise distinct as tuples** in
-  the base's declaration order. Distinctness is under the field
-  type's own equality contract and not token equality — `= 255` and `= 0xFF` are one pin (§4.3), `= 1` and
-  `= 1.0` are one (§5.5), text pins compare NFC-normalised — so `ValueIdentity` is what answers it and a
-  comparison of tokens accepts a schema whose dispatch table is not a function.
 
 - [ ] **Two facts the existing machinery must learn.** `extension` is written rather than derived — each
   definition mark names its member, and the body condition is the check on the mark rather than its source (the
@@ -143,10 +121,11 @@ declare a sealed family with no discriminator, or a subtype that pins nothing, a
   family dispatches one level — a sub-subtype inherits its parent's pin and §5.7 forbids changing it — so
   deeper types dispatch to the parent and rely on the tag.
 
-- [ ] **Corpus vectors, in the same session as the resolver work.** `class2/schema/` for the resolved output of
-  each `extension` member and a discriminator field; `class2/link/` for the closure checks, the FINAL refusal
-  and the subtraction that is *not* refused; `class2/validate/` for the dispatch, the missing member, the
-  unmatched value and the disagreeing tag. The corpus's own sidecar schemas need no change — these are ordinary
+- [ ] **The remaining corpus vectors.** `class2/link/` is done — ten vectors over the closure checks, the
+  FINAL refusal and the subtraction that is *not* refused. What is left is `class2/schema/` for the resolved
+  output of each `extension` member and a discriminator field, and `class2/validate/` for the dispatch, the
+  missing member, the unmatched value and the disagreeing tag — the second of which has to wait for a reader
+  to dispatch at all. The corpus's own sidecar schemas need no change — these are ordinary
   vectors — and the JSON side is covered by `CrossEncodingParityTest`, which §9.4 makes obligatory here since
   both encodings state the same refusals.
 

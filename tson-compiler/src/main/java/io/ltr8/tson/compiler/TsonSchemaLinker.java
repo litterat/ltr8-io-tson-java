@@ -597,6 +597,7 @@ public final class TsonSchemaLinker {
         }
 
         checkEveryEntryIsInhabited(schema, merged, localNames, receiver);
+        checkRecordExtension(schema, merged, localNames, receiver);
 
         AnnotatedMap<String, TypeDefinition> annotated = withNameAnnotations(merged, schema, loader);
         checkDisjointAssertions(schema, annotated, localNames, receiver);
@@ -637,6 +638,26 @@ public final class TsonSchemaLinker {
                     + ", and nothing in that chain can be left out or left empty (§5.10.1). A recursion "
                     + "terminates only where it reaches a base case -- an optional field, a possibly-empty "
                     + "container, or a choice variant that does not recur");
+        }
+    }
+
+    /**
+     * What each {@code record.extension} member obliges of the rest of the closure ({@link RecordExtension}) --
+     * that nothing composes onto a FINAL record, that a sealed family's selectors are usable and its members
+     * pin them distinctly, and that the two marks agree with each other.
+     *
+     * <p><b>Runs on the merged map rather than the annotated one</b>, unlike {@link #checkDisjointAssertions}:
+     * the marks are consumed into the body by the resolver, so there is no annotation left to consult and the
+     * pass needs only what {@code subtypes} population has already put in place.
+     *
+     * <p>Reporting stays here because {@link RecordExtension} hands back the entry each violation belongs to
+     * and nothing else -- a checker that knew about {@code DiagnosticsReceiver} would be a checker two callers
+     * could not share, and it is already the shape {@link ChoiceDisjointness} keeps.
+     */
+    private static void checkRecordExtension(TsonSchema schema, Map<String, TypeDefinition> merged,
+                                              Set<String> localNames, DiagnosticsReceiver receiver) {
+        for (RecordExtension.Violation violation : RecordExtension.check(merged, localNames)) {
+            report(receiver, schema, violation.entry(), merged.get(violation.entry()), violation.message());
         }
     }
 

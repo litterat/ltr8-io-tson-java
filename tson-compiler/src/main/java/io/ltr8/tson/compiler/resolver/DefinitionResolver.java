@@ -2025,8 +2025,18 @@ final class DefinitionResolver {
         return true;
     }
 
+    /**
+     * §12.1 gives a group member its own annotation position ({@code group-member = *annotation field-name ws
+     * ":" ws type-ref}), and it is read here on {@link #resolveField}'s terms: the marks are consumed and
+     * everything else reaches the annotation channel. Dropping them would make {@code @discriminator} on a
+     * member vanish rather than be refused, which is the silence the lowering exists to remove -- and would
+     * lose the member's `@doc` with it. The state is §5.11's own: members are uniformly OPTIONAL, presence
+     * governed by the group.
+     */
     private RecordField resolveGroupMember(GroupDef.Member member) {
         return new RecordField(member.name(), resolveTypeRef(member.typeRef()), FieldState.OPTIONAL,
+                DefinitionMarks.discriminates(member.name(), member.annotations()), Optional.empty(),
+                annotationsOf(member.name(), DefinitionMarks.consumed(member.annotations())),
                 Optional.empty());
     }
 
