@@ -712,7 +712,8 @@ its `pet_type` admits any text. So what is `{ "pet_type": "dgo", … }` at a `pe
 **The recommendation is the abstract base**, on three grounds: the target shape has no instance of the base, a
 `sealed interface` not being a value; OpenAPI's bases are abstract by convention, so a converted contract expects
 it; and the value of member dispatch is largely the diagnostic it produces when a producer gets the tag wrong. It
-should be stated as a consequence of the mark rather than left to fall out.
+should be stated as a consequence of the mark rather than left to fall out. **The fact cannot ride the annotation,**
+and #11 is the kernel change that taking it forces.
 
 **On the name.** `@sealed` was considered and not taken. The mark stands on a *field* — it is `@rest`'s shape, which
 is consequence 1 — and `pet_type: @sealed text` describes the field's type rather than the family; moving it to the
@@ -754,8 +755,8 @@ deliberately leaves out of the first design.
 class stability) and §6.1.5's `$type` subtype selection in tree mode, and the load-time checks §6 states
 have never had a consumer — which is what surfaced the scoping question before any of it was built. The
 [TSON-JSON] half of the change is this implementation's to make in place (§6.1.5's "there is no structural
-recovery of `S`" is the sentence that moves, and §8.4 largely goes with it), and is held pending the
-abstract-base decision, which changes what that sentence says.
+recovery of `S`" is the sentence that moves, and §8.4 largely goes with it). The abstract-base question is
+settled — abstract — and carried into #11; what still holds the edit is the spelling that entry leaves open.
 
 **Suggested resolution.** Retarget §6's `@discriminator` from a choice declaration to a record field, as a bare
 `void` marker beside `@rest`, with the check list above and the §5.7 arrangement stated; name the equality
@@ -763,3 +764,124 @@ relation for pin distinctness and add the group-member check; state the abstract
 the mark, and say what the shape is for — a sealed hierarchy in a host language — since that is what makes totality
 and abstractness rules rather than preferences. Leave §5.4 untouched but add a pointer from it, since an author
 reaching for member dispatch at a choice is an author who wants the composed family or the labelled form of §5.11.
+
+---
+
+## 11. A record cannot say it has no direct instances, and the discriminated base is the case that needs it
+
+**Documents:** [TSON-SCHEMA] §4.1 (base kinds), §5.2, §5.7 (the transition table), §5.8 (composition), §5.10.1
+(productivity and inhabitance), §6 (what an annotation may do), §7.2 (subsumption), §8.1 (resolved output), §8.2
+(identity), §12.1 (the schema grammar); [TSON-JSON] §6.1.5. Reads with #10, and is useful without it.
+**Kind:** design proposal — one kernel addition, with two questions left open.
+
+**What forces it.** §6 gives the criterion for annotation-hood in its own words: "a schema with every annotation
+erased admits exactly the same values." Run that erasure separately on the two halves of #10's mark and they come
+apart.
+
+*Member dispatch* fails the letter of the criterion and is licensed anyway: erase it and every untagged JSON
+document at the position becomes invalid, which is exactly what §6's representation-directive bullet admits — "a
+document in a directed encoding may not be readable without it; in every other encoding, and in the model, it
+changes nothing." Dispatch is a projection concern and the annotation is its right home.
+
+*Abstractness is not readability.* Erase the mark and `pet` has instances again, in every encoding and in the
+model: `{ "pet_type": "dgo", "name": "rex" }` stops being an error and becomes a valid `pet`. That is the type's
+inhabitance changing, which no directive licenses and no encoding owns. **So the decision that an unmatched
+discriminator value MUST fail is the decision that puts a fact in the kernel**, and nothing short of it does — a
+family content to read an unrecognised tag as its base needs no change here at all.
+
+**A finding that stands on its own.** §6 claims `@discriminator` changes no value's validity, and argues it by
+writing "a discriminated choice admits exactly the variants it admitted" — *variants*, where the criterion it is
+answering is about *values*. In JSON, erasing the mark invalidates every untagged document at that choice. The
+directive bullet covers the behaviour; the sentence does not, and should say which category the mark's force
+falls in rather than deny it has any.
+
+**The proposal.** `record` gains one field:
+
+```
+record => product & {
+  access_pattern:  product_access_type = NAMED
+  size_type:       product_size_type = FIXED
+  fields:          [record_field]
+  groups:          [field_group]?
+  abstract:        boolean ~ false
+  supertypes:      [type_name]?
+}
+```
+
+`boolean ~ false` rather than `boolean?`, matching the style `array` already sets with `unordered` and
+`unique_items`: it is a two-valued fact of every record, so an absent state would be a third spelling meaning
+what `false` means, and §8.1's convention omits a field at its default from output regardless. `groups?` is the
+shape precedent — a record-level fact carried in the body, which source syntax lowers into rather than the
+author writing the constructor form.
+
+**What it means.** An abstract record has **no direct instances**: no value's effective type is that record, and
+a position typed by it admits exactly the values of its subtypes. It is a type in every other respect —
+referenced, composed onto, refined, and contributing its fields to every subtype.
+
+**It is useful without #10, which is why the fact is separate from the mark.** An abstract base whose wire form
+is the ordinary tag is a complete design: at a `pet` position a JSON value carries `$type` (§6.1.5) and a text
+value `!dog_type`, and an untagged value is an error because there is no `pet` for it to be. That is a sealed
+hierarchy dispatched by type name, and it is what a TSON-text contract wants, no discriminator member existing
+or being needed. Deriving abstractness from the discriminator would make that design unspellable, and would put
+a model fact back under an annotation.
+
+**So the mark does not set it, and the check runs the other way.** `@discriminator` on a field MUST NOT make its
+record abstract — an annotation that did would be the erasure violation this entry exists to avoid. The author
+declares both, and the load-time check is the converse: **a record carrying a discriminator field MUST be
+abstract**, since §5.7's identity diagonal forbids the base pinning that field (#10) and an unpinned
+discriminator on an instantiable base is a hole in the dispatch table. The diagnostic names the marker to add.
+
+**Inhabitance is where the existing machinery does the work.** An abstract record is inhabited exactly when at
+least one of its subtypes is. §5.10.1's least fixed point then needs no new rule and no exemption: an abstract
+base with no subtypes is uninhabited and is rejected as any other uninhabited entry is. **What that forbids is
+worth naming** — a schema declaring an abstract base purely for *importing* schemas to extend, with no subtype of
+its own. The pattern is not so much lost as never working: a document governed by the declaring schema could
+never produce a value at such a position, its vocabulary being that schema's namespace one hop (§3.3.4), so the
+rejection lands exactly on the dead type.
+
+**Refinement is one-way.** A refinement may take a record concrete → abstract, which removes its direct instances
+and is therefore a narrowing; abstract → concrete adds values and is a resolver error. That is §5.7's "refinement
+can only restrict" applied to the new field, and wants a row rather than a new principle.
+
+**Identity and output.** `abstract` participates in §8.2 identity — an abstract `pet` and a concrete one admit
+different values and are different types — and in resolved output follows §8.1's convention, omitted at default.
+
+**Open question 1 — the spelling, and whether the discriminator should join it.** `abstract` needs a source form;
+the constructor form (`!record { … abstract: true }`) exists and nobody writes it. Three candidates, none
+recommended here: a modifier at the body position (`pet => abstract { … }`, costing §12.1 a production and a
+reserved word in a position that today takes a type-ref); a kernel marker composed as a supertype (`pet =>
+abstract & { … }`, costing no grammar at all but putting a non-type in `supertypes`); or a sigil. **The same
+question stands over `@discriminator`.** #10 keeps it an annotation and the analysis above says it may remain one,
+its force being a projection, which is what §6's directive category is for. But a schema then carries two marks
+that must agree, one syntax and one annotation, and an author reading `pet_type: @discriminator text` beside an
+abstractness marker written some other way may reasonably ask why. Making both syntax is coherent; making both
+annotations is not, abstractness being a model fact. This entry states the constraint and leaves the choice open.
+
+**Open question 2 — more than one discriminator field.** The mechanism admits it and the checks generalise with
+no special case: the pins are **pairwise distinct as tuples**, taken in the base's declaration order, which is
+well defined precisely because the base declares the fields. A 2×2 family is then spellable —
+
+```
+shape        => abstract { dim: @discriminator text  kind: @discriminator text  volume: float64? }
+flat_circle  => shape & { dim: = "2d"  kind: = "circle"  radius: float64 }
+solid_sphere => shape & { dim: = "3d"  kind: = "sphere"  radius: float64 }
+```
+
+— and the decode is still one test: read the marked members in any order (§6.1.6 giving member order no meaning),
+form the tuple, look it up. A combination the table does not hold is the ordinary unmatched-value error, so a
+partially covered matrix fails per document rather than at load, which is the right place for it — the cross
+product is rarely the intended family. Two things argue the other way, neither fatal. **The interop story is
+single-field**: OpenAPI has one `propertyName`, so a multi-field family neither converts from a contract nor
+converts to one, and #10's conversion is defined over the single-field case. **The codegen story is single-tag**:
+#10's sealed hierarchy is exhaustively switched on one tag, where a pair needs a record pattern or a flattening
+step. Against those, forbidding it costs a check and a justification where admitting it costs a tuple key. The
+recommendation is to admit it in the model and let tooling defined over one tag say so — but the first design
+should make that call explicitly rather than inherit it.
+
+**What is running:** nothing. `abstract` is not in this implementation's kernel, `@discriminator` has no consumer,
+and the inhabitance rule above is stated rather than measured.
+
+**Suggested resolution.** Add `abstract: boolean ~ false` to the kernel's `record`, stating the meaning, the
+inhabitance rule, the one-way refinement transition and the identity consequence; state the check that a record
+carrying a discriminator field MUST be abstract, and state explicitly that the mark does not derive it; correct
+§6's validity claim; and choose a source spelling, which is the one part this entry deliberately does not settle.
