@@ -29,8 +29,8 @@ class SparseMemberSetTest {
     private static final String ID = "https://example.test/ports-1.tn";
     private static final String SCHEMA = """
             !!id:"https://example.test/ports-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               port => !integer ^ { members: [80 443 8080] }
               price => !number ^ { members: [1 2.50] }
@@ -126,8 +126,8 @@ class SparseMemberSetTest {
     private static String schemaDeclaring(String body) {
         return """
                 !!id:"https://example.test/one-1.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 { t => %s }
                 """.formatted(body);
     }

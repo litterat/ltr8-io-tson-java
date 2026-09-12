@@ -41,8 +41,8 @@ class PerFieldSchemaPositionTest {
     private static List<Diagnostic> read(String declarations, String data) {
         String schema = """
                 !!id:"https://example.test/pos.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                 %s
                 }

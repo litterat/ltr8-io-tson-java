@@ -44,8 +44,8 @@ class JsonNameHygieneTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/hygiene-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               account => { password: text  note: text? }
               circle  => { radius: float64 }

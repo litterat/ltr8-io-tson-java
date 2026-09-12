@@ -196,7 +196,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
             {
               void => !unit {}
             }
@@ -230,7 +230,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
     }
 
     private static final String MINI_DOCUMENT_NO_ID = """
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
             {
               void => !unit {}
             }
@@ -249,7 +249,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_ID = """
             !!id:"mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
             {
               void => !unit {}
             }
@@ -267,7 +267,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_MALFORMED_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
             !!import:"meta-kernel.tn"
             {
               void => !unit {}
@@ -286,8 +286,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_MERGED = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
             {
               my_type => atom & {}
             }
@@ -319,8 +319,8 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_IMPORT_COLLIDES_WITH_LOCAL = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
             {
               void => !unit {}
             }
@@ -342,9 +342,9 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
 
     private static final String MINI_DOCUMENT_DIAMOND_IMPORT = """
             !!id:"https://example.test/mini.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/36/m/meta.tn"
             {
               placeholder => unit
             }
@@ -416,7 +416,7 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
         TsonCompiledSchemaLoader loader = registry;
 
         SchemaFetchException thrown = assertThrows(SchemaFetchException.class,
-                () -> loader.loadMeta("https://tson.io/2026/35/m/meta.tn"));
+                () -> loader.loadMeta("https://tson.io/2026/36/m/meta.tn"));
         assertTrue(thrown.getMessage().contains("no fetch capability"));
     }
 

@@ -31,7 +31,7 @@ the shared conformance vectors both are tested against are
 **Versioning is `0.<spec revision>.<patch>`.** `0.35.x` implements the **2026 Revision 35** spec series,
 whose text is not published yet — the linked Part 1 and Part 2 below are Revision 34, the latest that is.
 A new revision moves the minor, and the spec is a working draft with no compatibility guarantee between
-revisions — so a schema `!!id` pinned at `https://tson.io/2026/35/m/core.tn` is revision-specific and
+revisions — so a schema `!!id` pinned at `https://tson.io/2026/36/m/core.tn` is revision-specific and
 must match the library's own revision.
 
 > **Not on Maven Central**, deliberately — publishing needs signed artifacts and a fuller POM, which is a
@@ -94,9 +94,9 @@ import io.ltr8.tson.tree.TsonValue;
 Tson tson = Tson.standard();   // bootstraps meta-kernel, meta.tn and core.tn
 
 String schema = """
-        !!id:"https://example.com/2026/35/app/order-1.tn"
-        !!meta:"https://tson.io/2026/35/m/meta.tn"
-        !!import:"https://tson.io/2026/35/m/core.tn"
+        !!id:"https://example.com/2026/36/app/order-1.tn"
+        !!meta:"https://tson.io/2026/36/m/meta.tn"
+        !!import:"https://tson.io/2026/36/m/core.tn"
         {
           order => {
             order_id: int32
@@ -109,7 +109,7 @@ String schema = """
 tson.resolve(schema);                 // registers it under its own !!id
 
 TsonValue value = tson.treeReader()
-        .withSchema("https://example.com/2026/35/app/order-1.tn")
+        .withSchema("https://example.com/2026/36/app/order-1.tn")
         .readAs("""
                 { order_id: 1042  customer: "Ada Lovelace"  placed: !date 2026-07-01  total: 149.95 }""",
                 "order");
@@ -481,8 +481,8 @@ issues still open against the current revision, and `STATUS.md` the implemented/
 
 ## Specification
 
-- Part 1 — Text Data Format: https://tson.io/raw/2026/35/tson-part1-data.md
-- Part 2 — Type System and Schema: https://tson.io/raw/2026/35/tson-part2-schema.md
+- Part 1 — Text Data Format: https://tson.io/raw/2026/36/tson-part1-data.md
+- Part 2 — Type System and Schema: https://tson.io/raw/2026/36/tson-part2-schema.md
 
 Both are working revisions and change without compatibility guarantees. Re-fetch and check the revision
 number at the top rather than trusting a cached copy.

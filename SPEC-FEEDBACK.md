@@ -2,7 +2,7 @@
 
 Issues, ambiguities, and inconsistencies found in the TSON spec while building this implementation.
 See `CLAUDE.md` for why this file exists and when to add to it. Spec quotes below are from
-2026 Revision 35 — Part 1 (https://tson.io/raw/2026/35/tson-part1-data.md) unless noted otherwise.
+2026 Revision 35 — Part 1 (https://tson.io/raw/2026/36/tson-part1-data.md) unless noted otherwise.
 
 Format per entry: spec section, the problem, the interpretation this implementation chose, and a
 suggested resolution where there is one.
@@ -298,7 +298,7 @@ investigation before anything is built against it.**
 Publishing is not what stands in the way, and saying so matters because the reason first given here was that
 it was. It read: every route changes the meta-kernel, the kernel is a published hash-pinned artifact
 ([TSON-SCHEMA] §10, §13.2), and nothing can be built without minting digests for a document nobody has
-published. That constraint is gone. This branch moved all three companion artifacts to `/2026/35/`
+published. That constraint is gone. This branch moved all three companion artifacts to `/2026/36/`
 identities precisely so that a revision's own proposals could be built against artifacts named for it, and
 every built proposal Revision 35 adopted — the `scoped` constructor, the `bytes` redesign, the temporal
 split, `members` on the numeric tiers, the two checked annotations — landed on that basis.

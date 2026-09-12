@@ -59,8 +59,8 @@ class MetaLayerDataConstructorTest {
     /** (1) The meta-layer schema. `~data &`: an operation describes an endpoint, not a data value. */
     private static final String META_HTTP_SCHEMA = """
             !!id:"https://example.test/meta-http.tn"
-            !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
-            !!import:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/36/m/meta.tn"
             {
               operation => data & {
                 path:     text
@@ -123,7 +123,7 @@ class MetaLayerDataConstructorTest {
         DOCUMENTS.put(id, """
                 !!id:"%s"
                 !!meta:"https://example.test/meta-http.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                   search_request  => { q: text }
                   search_response => { hits: [text] }

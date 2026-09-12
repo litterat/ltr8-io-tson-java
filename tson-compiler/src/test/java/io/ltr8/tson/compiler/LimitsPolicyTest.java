@@ -76,7 +76,7 @@ class LimitsPolicyTest {
     /** A schema document is untrusted input too, and reaches the bound through the same shared stream. */
     @Test
     void aSchemaDocumentIsBoundedTheSameWay() {
-        String schema = "!!meta:\"https://tson.io/2026/35/m/meta.tn\"\n{ deep => " + nested(PAST_THE_STACK) + " }";
+        String schema = "!!meta:\"https://tson.io/2026/36/m/meta.tn\"\n{ deep => " + nested(PAST_THE_STACK) + " }";
 
         assertThrows(LimitExceededException.class,
                 () -> new TsonSchemaParser(schema).parseSchemaDocument());

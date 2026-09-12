@@ -151,7 +151,7 @@ class DefinitionResolverTest {
     @Test
     void resolvesAFreshRecordWithPlainRequiredFields() throws DataBindException {
         SchemaDocument doc = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { integer_size => { bits: integer  signed: boolean } }""").parseSchemaDocument();
         SchemaMap.Declaration declaration = doc.body().declarations().get("integer_size");
 
@@ -176,7 +176,7 @@ class DefinitionResolverTest {
         // resolving a whole document, in source order, is this loop, matching
         // SchemaResolver#resolveSchema's own production loop.
         SchemaDocument doc = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   integer_size => { bits: integer  signed: boolean }
                   point => { x: integer  y: integer }
@@ -203,7 +203,7 @@ class DefinitionResolverTest {
     @Test
     void structureNamespaceOverloadsAreInertUntilInstanceAtomRefinementDispatchExists() throws DataBindException {
         SchemaDocument doc = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   integer_size => { bits: integer  signed: boolean }
                   point => { x: integer  y: integer }
@@ -563,7 +563,7 @@ class DefinitionResolverTest {
     @Test
     void resolvesACompositionTemplateAsAHeldFlattenedRecord() throws DataBindException {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   base => {}
                   box => <T> base & { value: T }
@@ -770,7 +770,7 @@ class DefinitionResolverTest {
         // "count" is inherited REQUIRED; tightening it to OPTIONAL is not a permitted transition
         // (§5.7's table: REQUIRED -> OPTIONAL is an error).
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   base => { count: integer }
                   loosened => base & { count: integer? }
@@ -787,7 +787,7 @@ class DefinitionResolverTest {
         // "field: = value" with no type-ref restated inherits the source declaration's type
         // (§5.7's "Elided type-refs"), tightening only the value/state.
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   config => { host: text  port: integer }
                   production => config & { host: = "prod.example.com" }
@@ -880,7 +880,7 @@ class DefinitionResolverTest {
     @Test
     void refinementRejectsABodyFieldThatAddsRatherThanTightens() throws IOException {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   base => { count: integer }
                   refined => base ^ { extra: text }
@@ -1046,7 +1046,7 @@ class DefinitionResolverTest {
     @Test
     void resolvesRegexAndUriInstancesWithEveryComposedFieldBound() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { plain_regex   => !regex_type {}
                   bounded_regex => !regex_type { max_length: 40 }
                   plain_uri     => !uri_type {}
@@ -1113,7 +1113,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1128,7 +1128,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> metaKernelEntries = MetaKernelBootstrapResolver.getMetaKernelSchema().entries();
         DefinitionResolver metaKernelBackedResolver = new DefinitionResolver(NEVER_CALLED, EMPTY_NAMESPACE, metaKernelEntries::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { bad => !top ^ { x: integer } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1167,7 +1167,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelEntries);
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   int8    => !integer ^ { size: { bits: 8  signed: true } }
                   bounded => !int8 ^ { min: -100  max: 100 }
@@ -1210,7 +1210,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   uint8       => !integer ^ { size: { bits: 8  signed: false } }
                   percent     => !integer ^ { min: 0  max: 100 }
@@ -1243,7 +1243,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   percent  => !integer ^ { min: 0  max: 100 }
                   restated => !percent ^ { max: 100 }
@@ -1286,7 +1286,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   emptyByRefinement  => !integer ^ { min: 10  max: 3 }
                   emptyByApplication => !integer_type { min: 10  max: 3 }
@@ -1338,7 +1338,7 @@ class DefinitionResolverTest {
         DefinitionResolver resolver = definitionResolverFor(metaTn1Parser, namespace::get);
         namespace.put("float32", resolver.resolve(schemaMapFromCoreFixture().declarations().get("float32")));
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
                 { probability => !float32 ^ { min: 0.0  max: 1.0 } }""").parseSchemaDocument().body();
 
         TypeDefinition probability = resolver.resolve(schemaMap.declarations().get("probability"));
@@ -1360,7 +1360,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   short_text  => !text ^ { min_length: 1  max_length: 10 }
                   shorter     => !short_text ^ { max_length: 5 }
@@ -1390,7 +1390,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { bad => !integer ^ { min: "abc" } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1415,7 +1415,7 @@ class DefinitionResolverTest {
         Map<String, TypeDefinition> chainNamespace = new LinkedHashMap<>(metaKernelParser.schema().entries());
         DefinitionResolver instanceResolver = definitionResolverFor(metaKernelParser, chainNamespace::get);
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { quantity_t => !integer ^ { minimum: 1  maximum: 100 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1433,7 +1433,7 @@ class DefinitionResolverTest {
     @Test
     void aMetaReaderFailureThatIsNotAReadDiagnosticStaysALibraryGap() {
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { bad => !integer ^ { min: 1 } }""").parseSchemaDocument().body();
         Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernelCompiled().schema().entries());
         DefinitionResolver gapResolver = new DefinitionResolver(NEVER_CALLED, namespace::get, namespace::get);
@@ -1454,7 +1454,7 @@ class DefinitionResolverTest {
         // an instance" (the constructor-rejection test above), which requires `I` to resolve first.
         TsonCompiledMetaSchema metaKernelParser = metaKernelCompiled();
         SchemaMap schemaMap = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { bad => !integer_type ^ { min: 1 } }""").parseSchemaDocument().body();
 
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
@@ -1562,7 +1562,7 @@ class DefinitionResolverTest {
      */
     private TypeDefinition resolveSnippet(String declaration) {
         SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { %s }""".formatted(declaration)).parseSchemaDocument();
         TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
         SchemaMap schemaMap = SchemaDesugarer.desugar(document, Set.of()).body();
@@ -1972,7 +1972,7 @@ class DefinitionResolverTest {
     private TypeDefinition resolveSnippetsAgainstMetaKernel(String body) {
         TsonCompiledMetaSchema metaKernel = metaKernelCompiled();
         SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { %s }""".formatted(body)).parseSchemaDocument();
         Map<String, TypeDefinition> namespace = new LinkedHashMap<>(metaKernel.schema().entries());
         TypeDefinition last = null;
@@ -1990,7 +1990,7 @@ class DefinitionResolverTest {
     /** Resolves a whole hand-written schema body in declaration order, so a later entry can compose with an earlier one. */
     private Map<String, TypeDefinition> resolveAll(String body) {
         SchemaDocument document = new TsonSchemaParser("""
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
                 { %s }""".formatted(body)).parseSchemaDocument();
         for (SchemaMap.Declaration declaration : document.body().declarations().values()) {
             resolved.put(declaration.name(), resolver.resolve(declaration));

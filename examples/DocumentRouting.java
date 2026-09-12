@@ -25,7 +25,7 @@ void main() {
     // A schema document says so with !!meta -- the same peek classifies it.
     TsonDocumentHeader schema = TsonDocumentPeek.of("""
             !!id:"https://example.com/order-2.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
             { order => { id: int32 } }""").header();
     IO.println("schema document? " + schema.isSchemaDocument() + " (meta " + schema.meta().orElseThrow() + ")");
 
