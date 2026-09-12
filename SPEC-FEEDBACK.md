@@ -576,7 +576,8 @@ position is.
 
 **Documents:** [TSON-SCHEMA] §6 (`@discriminator`, `@rest`), §5.4 (choices, `@disjoint`), §5.7 (the refinement
 transition table), §5.8 (composition), §5.11 (field groups), §7.2 (subsumption); [TSON-JSON] §6.1.5
-(subsumption), §8.2 (the discrimination predicate), §8.4 (discriminated choices).
+(subsumption), §8.2 (the discrimination predicate), §8.4 (discriminated choices). Also OpenAPI 3.1's
+`discriminator`, which the proposal is a conversion target for.
 **Kind:** design proposal, plus two underspecifications in the check list §6 does state.
 
 **What §6 already states, so that what is proposed against it is visible.** `discriminator => @annotation
@@ -611,6 +612,26 @@ of "every variant ... declaring the named field": nothing in the choice framing 
 may be declared independently in each, under a different type in each. Moving the mark to the base makes it one
 declaration the subtypes refine, and the relation between them is what §5.8 already guarantees.
 
+**What the shape is, in host-language terms.** A base that cannot be instantiated, a closed set of subtypes each
+identified by one constant field, and a consumer that switches exhaustively over them: this is a **sealed**
+**hierarchy** — Java's `sealed interface` over records, Kotlin's `sealed class`, Scala's `sealed trait`, Swift and
+Rust enums with payloads, and closest of all TypeScript's discriminated union, where each member types the tag
+field as a literal (`pet_type: "dog"`) and the compiler's exhaustiveness check *is* dispatch on the pin. Saying so
+is not decoration: it settles two things the proposal otherwise leaves to taste.
+
+- **The base is abstract**, because the target shape has no instance of it — a `sealed interface` is not a value.
+- **The derived mapping must be total over `subtypes`**, because an exhaustive switch is sound only if every member
+  of the family is reachable from the tag. That is why the check is "every subtype pins it" rather than "the pins
+  that exist are distinct".
+
+**Sealed relative to a governing schema, which is the unit that matters.** §7.2's subsumption and the derived
+`subtypes` index are open *across* schemas: an importing schema may declare a further subtype. Within one governing
+namespace they are not — a data document's vocabulary is its `!!schema`'s namespace, one hop (§3.3.4) — so the
+family a document can name is fixed, and that is exactly the unit a code generator emits a `permits` clause from.
+An importing schema adding a subtype is emitting a larger sealed hierarchy of its own, which is correct: a different
+contract has a different exhaustive set, and the obligation it inherits is to pin the discriminator, enforced by the
+resolver error of consequence 3.
+
 **Five consequences, each an improvement on the present shape.**
 
 1. **The two annotations §6 introduces together become one shape.** `@rest` is a bare `void` marker on a field;
@@ -641,6 +662,36 @@ declaration the subtypes refine, and the relation between them is what §5.8 alr
    through §5.7's elided type-ref (`pet_type: = "dog"`), and a subtype narrowing it narrows a subset. The decoder
    parses with the base's declared type, which is the one type it knows before dispatch, and the rule is total.
 
+**The OpenAPI conversion, stated.** OpenAPI 3.1's `discriminator` is the most widely deployed polymorphic JSON
+contract, and its inheritance-style usage maps onto this proposal mechanically:
+
+| OpenAPI | TSON |
+|---|---|
+| `discriminator.propertyName: petType` on the base | `pet_type: @discriminator text` on the base record |
+| a subtype's `allOf: [$ref base, {…}]` | `dog_type => pet & { … }` |
+| `mapping: { dog: '#/…/Dog' }` | `dog_type => pet & { pet_type: = "dog" }` |
+| no `mapping` — the implicit value is the schema name | `pet_type: = "Dog"`, the name as written |
+| the base abstract by convention | the base abstract by the mark |
+
+**The mapping table evaporates into the pins**, which is the conversion's value rather than a side effect: OpenAPI's
+table is a second artifact that can disagree with the schemas it names, and after conversion there is nothing left
+to disagree. The direction back out is the same derivation run forwards — `mapping` is reconstructed from the pins —
+so a TSON schema can serve an OpenAPI document without the table ever being authored.
+
+Two properties make the conversion faithful rather than approximate. The pin is a **value**, so a mapping key that is
+not an identifier survives (`"dog-v2"`, `"urn:acme:dog"`), where any route dispatching on the *type name* would have
+to rename the wire; and the pin keeps the contract's own spelling, so `Dog` stays `"Dog"` on the wire while the TSON
+type is named `dog_type` by the ordinary identifier conversion.
+
+**One shape does not convert, and the gap is worth stating.** OpenAPI also admits a `discriminator` on a schema whose
+composition is `oneOf` with no shared base. There is no base record for the mark to stand on, so a converter must
+either synthesise one — mint `pet => { pet_type: @discriminator text }` and compose each variant onto it, making
+explicit a relationship the contract left implicit — or fall back to `$type` and lose member dispatch. Synthesis is
+the better answer and is mechanical, but a converter taking it should say so, since it adds a type the author did not
+write. Two further contracts are refused rather than converted: a `mapping` not covering every variant (the pins must
+be total, which is the drift the conversion removes), and a discriminator nested at a second level, which the
+one-level rule below leaves out of the first design.
+
 **§5.7 forces the arrangement into one shape.** The identity diagonal states that a `REQUIRED_FIXED` restatement
 MUST NOT change the value, so the base cannot pin the field: were `pet` to declare `pet_type: text = "pet"`, no
 subtype could pin its own value. The base therefore declares it `REQUIRED` and unpinned, and each subtype
@@ -658,9 +709,19 @@ its `pet_type` admits any text. So what is `{ "pet_type": "dgo", … }` at a `pe
   semantic: `@discriminator` makes its base abstract at every position, the base having no pin of its own to be
   selected by.
 
-**The recommendation is the abstract base**, on two grounds: the author of such a hierarchy already believes the
-base is not a thing, and the value of member dispatch is largely the diagnostic it produces when a producer gets
-the tag wrong. It should be stated as a consequence of the mark, not left to fall out.
+**The recommendation is the abstract base**, on three grounds: the target shape has no instance of the base, a
+`sealed interface` not being a value; OpenAPI's bases are abstract by convention, so a converted contract expects
+it; and the value of member dispatch is largely the diagnostic it produces when a producer gets the tag wrong. It
+should be stated as a consequence of the mark rather than left to fall out.
+
+**On the name.** `@sealed` was considered and not taken. The mark stands on a *field* — it is `@rest`'s shape, which
+is consequence 1 — and `pet_type: @sealed text` describes the field's type rather than the family; moving it to the
+declaration to fix that reintroduces either the field-name string this proposal removes or the derivation §6 refused.
+`sealed` also overclaims, the family being closed within a governing namespace and extensible by an importing schema
+where a reader of the word expects a permits list closed absolutely. And the two facts are separable: a family may
+want the closed-set claim for code generation while its wire form stays `$type`, so a declaration-level `@sealed`
+would be a second annotation about host projection rather than a rename of this one. `discriminator` is also the word
+an author converting a contract will search for.
 
 **The check list, restated for the family.** At the base: the annotated field's declared type resolves, after its
 reference chain, to an atom-family instance or an enum — *not* free here, because §5.2 grants that only to a field
@@ -699,5 +760,6 @@ abstract-base decision, which changes what that sentence says.
 **Suggested resolution.** Retarget §6's `@discriminator` from a choice declaration to a record field, as a bare
 `void` marker beside `@rest`, with the check list above and the §5.7 arrangement stated; name the equality
 relation for pin distinctness and add the group-member check; state the abstract-base rule as a consequence of
-the mark. Leave §5.4 untouched but add a pointer from it, since an author reaching for member dispatch at a
-choice is an author who wants the composed family or the labelled form of §5.11.
+the mark, and say what the shape is for — a sealed hierarchy in a host language — since that is what makes totality
+and abstractness rules rather than preferences. Leave §5.4 untouched but add a pointer from it, since an author
+reaching for member dispatch at a choice is an author who wants the composed family or the labelled form of §5.11.
