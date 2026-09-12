@@ -64,15 +64,11 @@ own prose (which had gone stale on it):
 **no** decode force and load-time force, verified against a fact the resolver derives, two outcomes and no
 third — verified silently, or a resolver error at schema load. §6 also settles what this implementation had to
 guess at: a checked annotation is an assertion in *either* declaration position and a processor MUST consult
-both spellings, which is what `@disjoint` already does. Each of the two below is declared in meta.tn and
-neither is checked, so both are advisory today where §6 says they carry force. Both are also re-checked on
-ingest (§8.1), which is a second call site for whatever the load-time check becomes.
+both spellings, which is what `@disjoint` already does. `@rest` is declared in meta.tn and is not checked, so
+it is advisory today where §6 says it carries force; it is also re-checked on ingest (§8.1), which is a second
+call site for whatever the load-time check becomes. `@discriminator` is **not** in this category — the erasure
+test puts its fact in the kernel, and its work is under "Discriminated record families" below.
 
-- [ ] **`@discriminator` is not checked.** Three checks at schema load, over the choice the annotation marks
-  (§6): every variant is a record declaring the named field; that field is `REQUIRED_FIXED` in every variant,
-  never `REQUIRED_DEFAULT`; and the fixed values are pairwise distinct. The annotation's own type does the
-  fourth — `field_name` is an `identifier`, so a non-name spelling already fails where the annotation value is
-  read. Nothing about a value's validity moves: a discriminated choice admits exactly the variants it admitted.
 - [ ] **`@rest` is not checked.** Two checks: the annotated field's type resolves to a text-keyed map, and at
   most one field per composed chain carries the mark — the chain being countable since §5.8's restated-field
   rule merges annotations rather than dropping them, which this implementation already applies.
@@ -84,14 +80,80 @@ ingest (§8.1), which is a second call site for whatever the load-time check bec
   resolver's own) and the comparison should drop it structurally, before rendering, the way it already drops
   `kind`. `CLAUDE.md`'s traps list carries the hazard meanwhile.
 
+## Discriminated record families
+
+`SPEC-FEEDBACK.md` #10 and #11 carry the design and the arguments; this is the build order. A record states how
+it may be realised, a field of an abstract record may be a discriminator, and a position typed by such a record
+recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). Nothing below
+is built. Work lands on `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
+
+- [ ] **The two kernel fields.** `record_extension_type => [ABSTRACT SEALED FINAL OPEN]` and
+  `record.extension: record_extension_type ~ OPEN` in meta-kernel.tn, with `record_field.discriminator:
+  boolean ~ false` beside them. `schema.meta.Record` and `schema.meta.RecordField` gain the components **in the
+  same commit**: strict binding compares a compiled schema against its class at bind-mode compile, so a kernel
+  field with no component fails the compile rather than a test, and the message names it. Schema text moving
+  means the three digests move, so `scripts/restamp-bundled-schemas.sh` and Part 2 §13.2 ride along, and the
+  three `*-resolved.tn` fixtures gain the new members wherever they are not at their defaults.
+
+- [ ] **The three marks lower into the body.** `@abstract` and `@final` at the definition, `@discriminator` on a
+  field, each **consumed** by the resolver into `record.extension` / `record_field.discriminator` rather than
+  preserved in §8.1's author-annotation channel — so resolved output carries one carrier per fact and §8.1's
+  no-hoisting question does not arise. The three names are reserved at their positions: a schema may not mean
+  something else by them. §6 honours a checked annotation at either declaration position, so the key spelling
+  must lower identically to the value spelling. The annotation shape is the interim and §12.1 spells them
+  eventually; what that costs is one more reason to keep the lowering in one place.
+
+- [ ] **The load-time checks, over the linked closure.** One pass, in `TsonSchemaLinker` beside
+  `ChoiceDisjointness`. On the record: composing or refining onto a **FINAL** record is a resolver error, in the
+  declaring schema and in any that imports it — while §5.9 subtraction is admissible, minting no IS-A edge; and
+  `@abstract` with `@final` on one declaration is an error. On the annotated field: its declared type resolves,
+  after its reference chain, to an atom-family instance or an enum (§5.2 grants that only to a field *carrying*
+  a value, and the base's field carries none, so it must be checked here); its state is exactly REQUIRED, not
+  OPTIONAL, FIXED or DEFAULT; it is **not a group member**, checked against the resolved `groups` list rather
+  than the source, since §5.11 refinement is what reaches that state and the declaration cannot express it; and
+  a record carrying a discriminator field MUST be ABSTRACT, §5.7's identity diagonal forbidding the base pinning
+  it. Over the closure: every entry in `subtypes`, transitively, pins each discriminator `REQUIRED_FIXED`, and
+  the pins are **pairwise distinct as tuples** in the base's declaration order. Distinctness is under the field
+  type's own equality contract and not token equality — `= 255` and `= 0xFF` are one pin (§4.3), `= 1` and
+  `= 1.0` are one (§5.5), text pins compare NFC-normalised — so `ValueIdentity` is what answers it and a
+  comparison of tokens accepts a schema whose dispatch table is not a function.
+
+- [ ] **SEALED is derived, and two facts the existing machinery must learn.** `extension` is SEALED exactly when
+  the record is ABSTRACT and some field is a discriminator, computed from the body alone and recorded there, in
+  the manner of `choice.disjoint` (§5.4) — so a reader has one lookup rather than a scan. Inhabitance follows:
+  a FINAL or OPEN record is inhabited as any record is, an ABSTRACT or SEALED one exactly when at least one
+  subtype is, which needs `TypeInhabitance`'s least fixed point to learn the union rather than gain an
+  exemption. And `extension` participates in §8.2 identity — an abstract, sealed, concrete and final `pet` admit
+  different values and are different types.
+
+- [ ] **The dispatch reader, in both stacks.** At a SEALED position the reader takes the discriminator members
+  at the fields' declared types **in the base** — the one set known before dispatch — forms the value or the
+  tuple, and selects; the matched subtype then validates the whole value, re-verifying each pin as an ordinary
+  FIXED check so the dispatch read and the validation read agree by construction. A missing member is a
+  validation error, never a fallback to the tag; an unmatched value names what arrived and should name the
+  pinned alternatives. At an ABSTRACT position the tag is REQUIRED and the failure lands before the members are
+  read. Structurally this is a choice reader keyed on a value rather than a type name, so it sits beside
+  `ChoiceReader`/`TreeChoiceReader` rather than being a new kind; the tag is optional-and-asserting at SEALED in
+  **both** encodings, which is what a shared diagnostics family in `base.diagnostics` should state once. A
+  family dispatches one level — a sub-subtype inherits its parent's pin and §5.7 forbids changing it — so
+  deeper types dispatch to the parent and rely on the tag.
+
+- [ ] **Corpus vectors, in the same session as the resolver work.** `class2/schema/` for the resolved output of
+  each `extension` member and a discriminator field; `class2/link/` for the closure checks, the FINAL refusal
+  and the subtraction that is *not* refused; `class2/validate/` for the dispatch, the missing member, the
+  unmatched value and the disagreeing tag. The corpus's own sidecar schemas need no change — these are ordinary
+  vectors — and the JSON side is covered by `CrossEncodingParityTest`, which §9.4 makes obligatory here since
+  both encodings state the same refusals.
+
 ## JSON encoding
 
 [TSON-SCHEMA] §6 makes this a spec obligation rather than an interop nicety, and `meta.tn` states it directly: "No
 encoding is privileged — TSON text is one member of the text class, beside JSON — so a directive binds every encoding
-in its class, and a document in a directed encoding may not be readable without it." Two representation directives are
-declared on those terms and neither has a consumer, because TSON text tags its choice variants with `!variant` and
-never flattens — so it cannot exercise `@discriminator` or `@rest` at all. A JSON front end is what puts that half of
-§6 under test, and is expected to move both: a directive with no consumer has never had its shape checked against one.
+in its class, and a document in a directed encoding may not be readable without it." `@rest` is declared on those
+terms and has no consumer, because TSON text never flattens — so it cannot exercise the directive at all, and a JSON
+front end is what puts that half of §6 under test. Expect it to move: a directive with no consumer has never had its
+shape checked against one. `@discriminator` was declared beside it and left the category — the same test showed its
+force reaches every encoding, which is what put the fact in the kernel instead (`SPEC-FEEDBACK.md` #11).
 
 - [ ] **A JSON document has no in-band way to name its schema — §3.4's second route.** The out-of-band route
   is built (`Json.withSchemas`, `treeReader().withSchema(uri).readAs(...)`, and `tson validate --schema --type`),
@@ -113,14 +175,12 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
-- [ ] **No schema-directed decode of the open sum — §8.5, and §8.4's discriminated choices.** §8.5's scoped
-  positions are the open sum and what will finally admit a `$schema` member: the cell read off the members
-  present, EXTERN needing both `$schema` and `$type`, LOCAL taking `$type` alone, and a bare value a validation
-  error in every mode. §8.4 is route 1 of the predicate — `@discriminator`, whose first consumer this is, with
-  the value→variant table derived from the pins and never declared. §8.2's route 2 and §8.3's stability are
-  built, so a choice carrying a discriminator currently falls through to "the tag is REQUIRED", which is the
-  correct verdict for a reader without the route rather than an approximation of it. `scoped` compiles to a
-  `NOT_IMPLEMENTED` reader meanwhile. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`,
+- [ ] **No schema-directed decode of the open sum — §8.5.** §8.5's scoped positions are the open sum and what
+  will finally admit a `$schema` member: the cell read off the members present, EXTERN needing both `$schema`
+  and `$type`, LOCAL taking `$type` alone, and a bare value a validation error in every mode. `scoped` compiles
+  to a `NOT_IMPLEMENTED` reader meanwhile. §8.2's predicate is one condition and is built whole; the member
+  dispatch that used to be its second route is §6.1.5's and belongs to a record family, tracked under
+  "Discriminated record families". **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`,
   `JsonCompiledSchema`,
   `JsonSchemaCompiler`, its own factory registries — and `docs/json-encoding.md` carries why that is a deferral
   rather than a conclusion: the two disagreements that keep the *event* layers apart both dissolve above the
@@ -187,17 +247,6 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   that produced it; this stack has no counterpart. Owed with the facade, which is what will seed the root for a
   real read rather than a test doing it.
 
-- [ ] **Nothing dispatches a choice on `@discriminator`, and the JSON reader is what settles its shape.** meta.tn
-  declares it as naming "the field a member-dispatching encoding selects a choice's variant on", with force in that
-  class of encodings and none in the model, and states three load-time checks — but no encoding in the class exists,
-  so neither the semantics nor the checks have been exercised by anything. A `choice`-typed position is unreachable
-  from JSON without it, which makes the JSON reader the annotation's first consumer and the first real test of
-  whether dispatch on a flat `REQUIRED_FIXED` field carries the cases JSON actually presents. **A change to the
-  annotation is an expected output of this work, not a failure of it** — it goes to `SPEC-FEEDBACK.md` against the
-  current revision, the same way anything else this implementation is first to exercise does. What the reader owes
-  beyond the dispatch is the verdict for a JSON-facing choice carrying no mark. The three load-time checks are a
-  prerequisite, tracked under "Checked annotations".
-
 - [ ] **Nothing flattens on `@rest`, unexercised for the same reason.** meta.tn declares it for "an encoding that
   flattens" — the map-typed field a record's undeclared entries live in, a record being closed under its type
   ([TSON-SCHEMA] §7.2) — which TSON text never is. A JSON reader is where an undeclared member either lands in the
@@ -220,10 +269,11 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
 - [ ] **`STRUCTURED-OUTPUT.md`'s JSON section predates `@discriminator` and the void-variant rule, and holds items
   belonging here.** It asks what a position typed `(T | void)` does with JSON `null`, which
   `TsonSchemaLinker.checkVariantsAreNotVoid` answers by refusing that position outright (§5.4). It also records
-  untagged-union dispatch as undesigned and wanting a new meta.tn vocabulary addition — which is **not** simply
-  superseded: `@discriminator` is the mechanism in place, the section's own dependent-typing proposal (an enum member
-  carrying a per-member type association) is the alternative it is being tested against, and the annotation is
-  unexercised, so the section should record that pairing rather than drop either half. The engineering items above
+  untagged-union dispatch as undesigned and wanting a new meta.tn vocabulary addition — which the sealed record
+  family answers, and the section should say so: the mechanism is a discriminator field on an abstract base
+  (`SPEC-FEEDBACK.md` #10, #11), not a choice-level mark, so the section's own dependent-typing proposal (an enum
+  member carrying a per-member type association) is the shape that was *not* taken and the reason belongs beside
+  it — a sibling tag needs the value of one field to type another. The engineering items above
   stay only here.
 
 ## Write side
