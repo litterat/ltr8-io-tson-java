@@ -676,6 +676,42 @@ catch it ahead of the `RuntimeException` that reaches the other. The CLI still *
 here they can act (`--max-depth`, or a smaller document). It is the one place the two diverge, and
 `TsonCli.exitCodeFor` says so.
 
+### Where a rule is stated: `base.diagnostics`
+
+A `Diagnostic` has nine components and they come from two places. Four are the **rule's** — which rule fired,
+what it says, the constraint that was not met, and what the document held instead. Five are the **read's** —
+the RFC 6901 path, the schema identity and pointer, and both positions. No rule knows the second set and no
+read knows the first, which is why `io.ltr8.tson.base.diagnostics` holds the rule half as a value (`Refusal`)
+and every reader supplies where it happened.
+
+**Why it is shared, and why that is an obligation rather than a tidiness.** [TSON-JSON] §9.4 gives both
+encodings one diagnostic vocabulary and adds no category of its own, so a document wrong in one encoding is
+wrong in the other for the same stated reason. The `code` and the machine-readable `expected` are what a
+consumer routes on — and before this, two independently written record readers agreed about them only because
+one had been copied from the other. Nothing held them there.
+
+**The prose is the schema's vernacular, not the format's.** A record has *fields* in both encodings, even
+though JSON's own word for what carries one is a member; absence is *absent* rather than `_` or `null`. The
+reason is consistency about the thing being described: it is the **schema** that refused the document, so the
+schema's nouns explain it, and a reader who moves between encodings learns one vocabulary. The encoding's own
+spelling is not lost — it rides in `actual`, which echoes what the document literally held and is data rather
+than prose.
+
+That split tells the parity test exactly what to compare: **code, path, `expected` and `message`** for a
+shared rule, and never `actual`, where `_` on one side and `null` on the other is correct.
+
+**What the sharing found, on the first run.** For absence written at a REQUIRED field the two readers were
+choosing *different rules* for one document: JSON said "'name' on 'person' admits no absence", TSON said
+"missing required field 'name'". Same code, same pointer, same `expected` — and TSON's prose told an author
+they had forgotten a field they could see themselves writing. §5.2's rule is that `_` asserts absence at a
+position the schema always fills, so the document stated something and is not missing it. TSON's fall-through
+to the missing-field message was the defect; it now reports the rule the document actually broke.
+
+**What is deliberately not shared** is any rule one encoding has and the other has not: JSON's reserved member
+namespace (§3.2) and TSON's positional record form have no counterpart across the wire, so each stays with the
+reader that owns it. A shared class that grew those would be a second switch responsible for rules it cannot
+name — the same failure `TsonDiagnostics`/`JsonDiagnostics` were split to avoid.
+
 ### When a fact earns a component
 
 Every component is now a location, and the rule that keeps it that way is one line: **carry a fact as a

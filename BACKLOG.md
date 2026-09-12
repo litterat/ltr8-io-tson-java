@@ -130,6 +130,15 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   `tson-atom` already re-exports that module, so what crosses is a value model and the pipeline producing it stays
   where it is.
 
+- [ ] **Only the record family states its rules from `base.diagnostics`.** `RecordDiagnostics` proved the
+  shape — one class per family, prose in the schema's vernacular, `actual` left to the encoding — and the
+  parity test now compares `code`, path, `expected` and `message` for every rule it covers. The other families
+  are a mechanical follow: arrays and sets (§6.3's element state, size facets, set duplicates), tuples (§6.4's
+  arity), maps (§6.5's entry value, key contract, duplicate keys), and choices (§8.2's missing tag, §8.1's tag
+  naming nothing). Each is worth doing with its parity cases upgraded to `sameRule` in the same pass, since
+  that is what stops the two readers drifting again — and the record pass found a real disagreement the moment
+  the comparison got stronger, so the others should be assumed to hold some too.
+
 - [ ] **`Diagnostic.Code` has no member for "a required tag is missing", and both encodings overload
   `UNKNOWN_TYPE_REF`.** [TSON-JSON] §9.4 lists the condition in its own right ("missing required tags (§8.2)",
   a validation error) and the closed enum has nothing for it, so `tson-compiler`'s choice reader reports a

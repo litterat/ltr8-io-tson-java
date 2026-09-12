@@ -1,6 +1,8 @@
 package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
+import io.ltr8.tson.base.diagnostics.Refusal;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
@@ -53,6 +55,9 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
     private final List<FieldValue> stated;
     private final List<FieldGroup> groups;
     private final String declaredFields;
+
+    /** What this record's rules say when a document breaks one -- shared with the TSON reader ([TSON-JSON] §9.4). */
+    private final RecordDiagnostics rules;
     private final JsonSchemaLocation schemaLocation;
 
     /** The names §6.1.5 admits at this position besides this entry's own: its subtypes, under [TSON-SCHEMA] §7.2. */
@@ -85,6 +90,12 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         this.readers = List.copyOf(built);
         this.stated = new ArrayList<>(values);
         this.declaredFields = fields.stream().map(RecordField::name).reduce((a, b) -> a + " | " + b).orElse("");
+        this.rules = new RecordDiagnostics(name, declaredFields);
+    }
+
+    /** Hands one of the record's rules to {@code ctx}, which supplies where it happened. */
+    private static void report(JsonReadContext ctx, Refusal refusal) {
+        ctx.report(refusal.code(), refusal.message(), refusal.expected(), refusal.actual());
     }
 
     @Override
@@ -103,8 +114,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
     private JsonValue readObject(JsonReadContext ctx) {
         JsonEvent first = ctx.next();
         if (!(first instanceof JsonEvent.ObjectStart)) {
-            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'%s' is a record, which takes a JSON object, and this is %s"
-                    .formatted(name, JsonAtoms.describe(first)), "a JSON object", JsonAtoms.describe(first));
+            report(ctx, rules.notARecord(JsonAtoms.describe(first)));
             EventSkip.value(ctx, first);
             return JsonNull.INSTANCE;
         }
@@ -222,10 +232,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             if (seen[at]) {
                 // §3.1: a repeated member name is an error at the repeated occurrence. The later value still
                 // wins, so the record comes back whole and the diagnostic is what says the document was wrong.
-                fieldContext(ctx, at).report(Diagnostic.Code.DUPLICATE_FIELD,
-                        "duplicate member '%s' on '%s' -- a record states each field at most once, and the "
-                                .formatted(memberName, name) + "repeat states a value for nothing",
-                        "each member stated once", "'" + memberName + "' stated again");
+                report(fieldContext(ctx, at), rules.duplicateField(memberName));
             }
             seen[at] = true;
             values[at] = readField(ctx, at, memberName);
@@ -252,9 +259,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         // unknown -- which would be a verdict on the document for a policy rule, and would advise adding a
         // field that is already declared.
         if (!NameHygiene.refuses(ctx, memberName)) {
-            at.report(Diagnostic.Code.UNRECOGNIZED_FIELD, "unknown member '%s' on '%s' -- a record is closed "
-                    .formatted(memberName, name) + "under its type (§7.2), whose fields are ("
-                    + declaredFields + ")", declaredFields, memberName);
+            report(at, rules.unrecognizedField(memberName));
         }
         EventSkip.nextValue(at);
     }
@@ -287,9 +292,8 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             return JsonNull.INSTANCE;
         }
         JsonEvent event = ctx.next();
-        fieldContext(ctx, at).report(Diagnostic.Code.FIELD_FIXED,
-                "'%s' is fixed to absent on '%s' and may only be omitted or written null".formatted(memberName, name),
-                "null", JsonAtoms.describe(event));
+        report(fieldContext(ctx, at), rules.fixedToAbsentFieldValued(memberName, ABSENT,
+                JsonAtoms.describe(event)));
         EventSkip.value(ctx, event);
         return null;
     }
@@ -310,20 +314,14 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             case OPTIONAL -> null;
             case OPTIONAL_FIXED -> null;
             case REQUIRED, REQUIRED_FIXED -> {
-                fieldContext(ctx, at).report(Diagnostic.Code.FIELD_REQUIRED,
-                        "'%s' on '%s' admits no absence, and JSON null is this encoding's spelling of the absent "
-                                .formatted(memberName, name) + "sentinel (§7)",
-                        "a value for '" + memberName + "'", "null");
+                report(fieldContext(ctx, at), rules.absenceAtRequiredField(memberName, ABSENT));
                 yield null;
             }
             // §6.1.2: "at REQUIRED_DEFAULT the fix is omission, which injects the default". Injecting here
             // anyway would substitute a value the document explicitly disclaimed, so the default is still
             // what the field decodes to and only the verdict changes.
             case REQUIRED_DEFAULT -> {
-                fieldContext(ctx, at).report(Diagnostic.Code.ATOM_CONSTRAINT_VIOLATION,
-                        "'%s' on '%s' is always filled from the schema and cannot be written null -- omit the "
-                                .formatted(memberName, name) + "member to take its default (§6.1.3)",
-                        "the member omitted, or a value for '" + memberName + "'", "null");
+                report(fieldContext(ctx, at), rules.absenceAtDefaultedField(memberName, ABSENT));
                 yield stated.get(at).node();
             }
         };
@@ -349,9 +347,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         if (event instanceof JsonEvent.NullValue) {
             ctx.next();
             if (field.state() == FieldState.REQUIRED_FIXED) {
-                fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
-                        "'%s' is fixed on '%s' and cannot be absent".formatted(memberName, name),
-                        String.valueOf(pin.pinned()), "null");
+                report(fieldCtx, rules.fixedFieldAbsent(memberName, String.valueOf(pin.pinned()), ABSENT));
                 return null;
             }
             return null;   // OPTIONAL_FIXED: absence is exactly what it permits
@@ -373,10 +369,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             return written;   // already reported by the field's own reader
         }
         if (!Objects.equals(ValueIdentity.of(value), ValueIdentity.of(pin.pinned()))) {
-            fieldCtx.report(Diagnostic.Code.FIELD_FIXED,
-                    "'%s' is fixed on '%s' and cannot be given another value -- the schema declares it with '=' "
-                            .formatted(memberName, name) + "(fixed); for a default the data may override, use '~'",
-                    pin.text(), content);
+            report(fieldCtx, rules.fixedFieldContradicted(memberName, pin.text(), content));
         }
         // The schema's value, which is what an omitted FIXED member gets too: whether the document stated it
         // decides nothing about what the field holds (§6.1.3).
@@ -394,9 +387,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             }
             RecordField field = fields.get(i);
             switch (field.state()) {
-                case REQUIRED -> fieldContext(ctx, i).report(Diagnostic.Code.FIELD_REQUIRED,
-                        "missing required member '%s' for '%s'".formatted(field.name(), name),
-                        "a value for '" + field.name() + "'", "(absent)");
+                case REQUIRED -> report(fieldContext(ctx, i), rules.missingRequiredField(field.name()));
                 // §6.1.3: a missing member at REQUIRED_DEFAULT or REQUIRED_FIXED injects, so decoded output
                 // is fully populated. OPTIONAL and OPTIONAL_FIXED are never injected -- an omitted
                 // OPTIONAL_FIXED field stays absent rather than materialising a value nobody wrote.
@@ -422,13 +413,9 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             }
             String members = String.join(" | ", group.members());
             if (present > 1) {
-                ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                        "at most one of (%s) may be present for '%s', found %d".formatted(members, name, present),
-                        "at most one of (" + members + ")", present + " present");
+                report(ctx, rules.groupAdmitsAtMostOne(members, present));
             } else if (group.state() == ElementState.REQUIRED && present == 0) {
-                ctx.report(Diagnostic.Code.FIELD_REQUIRED,
-                        "exactly one of (%s) must be present for '%s'".formatted(members, name),
-                        "one of (" + members + ")", "none present");
+                report(ctx, rules.groupRequiresOne(members));
             }
         }
     }
@@ -436,6 +423,9 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
     private JsonReadContext fieldContext(JsonReadContext ctx, int at) {
         return ctx.schemaField(fields.get(at).name(), fields.get(at).position());
     }
+
+    /** How a JSON document spells absence (§7), for the `actual` of a rule about a field's state. */
+    private static final String ABSENT = "null";
 
     private static boolean isFixed(FieldState state) {
         return state == FieldState.REQUIRED_FIXED || state == FieldState.OPTIONAL_FIXED;
