@@ -12,6 +12,7 @@ import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
 import io.ltr8.tson.compiler.atom.RawTokenParser;
 import io.ltr8.tson.compiler.atom.ValueParser;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.*;
 
 import java.lang.reflect.RecordComponent;

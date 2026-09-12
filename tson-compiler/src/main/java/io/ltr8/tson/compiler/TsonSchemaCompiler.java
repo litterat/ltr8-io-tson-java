@@ -4,6 +4,7 @@ import io.ltr8.tson.base.BindMismatchException;
 import io.ltr8.tson.base.MissingBindingException;
 import io.ltr8.tson.compiler.reader.*;
 import io.ltr8.tson.compiler.reader.DeferredTypeReader;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;

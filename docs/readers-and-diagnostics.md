@@ -723,6 +723,15 @@ finer than "the schema's nouns":
   design — so `Nodes.rendered` answers from the node instead, which is the same question the TSON reader's
   `Rendered.value` answers from the host value.
 
+**A type names itself by what the author wrote, in both encodings.** `EntryDisplayName` lives in
+`schema.meta` — beside the model it renders, and depending on nothing else — so both stacks reach it. A
+resolver-minted entry shows as the sugar or application that produced it (`[text]`, `box<text>`), told apart
+from an authored one by having no source position. Before the move it was `tson-compiler`'s, and a JSON
+diagnostic named the synthetic entry by its content-derived hash: `'array_text_4cc4a482'`, a name in neither
+the author's schema nor the sender's document. The record reader carries the display name *beside* its own
+name rather than instead of it, because a `$type` resolves against the entry while a message names the
+author's spelling — one place the two genuinely differ.
+
 **What is deliberately not shared** is any rule one encoding has and the other has not: JSON's reserved member
 namespace (§3.2) and TSON's positional record form have no counterpart across the wire, so each stays with the
 reader that owns it. A shared class that grew those would be a second switch responsible for rules it cannot

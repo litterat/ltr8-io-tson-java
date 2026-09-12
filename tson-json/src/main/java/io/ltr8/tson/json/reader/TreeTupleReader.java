@@ -10,6 +10,7 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.tree.JsonArray;
 import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonValue;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.TupleBody;
 import io.ltr8.tson.schema.meta.TupleElement;
@@ -34,7 +35,8 @@ final class TreeTupleReader implements JsonTypeReader<JsonValue> {
         for (TupleElement element : body.elements()) {
             slots.add(context.readers().resolve(element.elementType().name()));
         }
-        return new TreeTupleReader(name, body, slots, context.locationOf(name, definition));
+        return new TreeTupleReader(EntryDisplayName.of(name, definition, context.schema().entries()), body,
+                slots, context.locationOf(name, definition));
     };
 
     private final String name;

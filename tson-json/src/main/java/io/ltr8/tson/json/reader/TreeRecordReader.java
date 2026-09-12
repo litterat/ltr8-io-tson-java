@@ -11,6 +11,7 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonObject;
 import io.ltr8.tson.json.tree.JsonValue;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
@@ -43,8 +44,8 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
 
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         RecordBody body = (RecordBody) definition.body();
-        return new TreeRecordReader(name, body, definition.subtypes(), context,
-                context.locationOf(name, definition));
+        return new TreeRecordReader(name, EntryDisplayName.of(name, definition, context.schema().entries()),
+                body, definition.subtypes(), context, context.locationOf(name, definition));
     };
 
     private final String name;
@@ -65,8 +66,17 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
     /** How a named subtype's reader is reached at read time -- rebound to the finished schema by the compile. */
     private final TypeReaderResolver readerFor;
 
-    private TreeRecordReader(String name, RecordBody body, Collection<String> subtypes,
+    /**
+     * What this type is called in a message: the name the author wrote, where {@link #name} is the entry a
+     * {@code $type} resolves against. The two differ for an entry the resolver minted -- a record template's
+     * instantiation shows as {@code box<text>} rather than by a content-derived name that appears in neither
+     * the author's schema nor the sender's document.
+     */
+    private final String displayName;
+
+    private TreeRecordReader(String name, String displayName, RecordBody body, Collection<String> subtypes,
                              ValueReaderContext context, JsonSchemaLocation schemaLocation) {
+        this.displayName = displayName;
         this.subtypes = Set.copyOf(subtypes);
         this.readerFor = context.readers();
         this.name = name;
@@ -89,7 +99,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         this.readers = List.copyOf(built);
         this.stated = new ArrayList<>(values);
         this.declaredFields = fields.stream().map(RecordField::name).reduce((a, b) -> a + " | " + b).orElse("");
-        this.rules = new RecordDiagnostics(name, declaredFields);
+        this.rules = new RecordDiagnostics(displayName, declaredFields);
     }
 
     @Override
@@ -161,7 +171,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             // resolver error anywhere else -- a scope change the model never opted into.
             ctx.field(ReservedMembers.SCHEMA).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
                     "'$schema' opens a schema scope, which [TSON-SCHEMA] §7.8 admits only at a scoped position "
-                            + "-- '" + name + "' is a record", "no $schema at this position",
+                            + "-- '" + displayName + "' is a record", "no $schema at this position",
                     ReservedMembers.SCHEMA);
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
@@ -179,7 +189,8 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             if (!NameHygiene.refuses(ctx, tag.type())) {
                 ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
                         "'$type' names '%s', which is not admissible at a '%s' position -- a tag may name this "
-                                .formatted(tag.type(), name) + "type or one of its subtypes ([TSON-SCHEMA] §7.2)",
+                                .formatted(tag.type(), displayName)
+                                + "type or one of its subtypes ([TSON-SCHEMA] §7.2)",
                         admissible(), tag.type());
             }
             EventSkip.nextValue(ctx);

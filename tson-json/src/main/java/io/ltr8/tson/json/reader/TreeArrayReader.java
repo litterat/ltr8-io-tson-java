@@ -10,6 +10,7 @@ import io.ltr8.tson.json.stream.JsonEvent;
 import io.ltr8.tson.json.tree.JsonArray;
 import io.ltr8.tson.json.tree.JsonNull;
 import io.ltr8.tson.json.tree.JsonValue;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ArrayBody;
 import io.ltr8.tson.schema.meta.ElementState;
 
@@ -37,8 +38,8 @@ final class TreeArrayReader implements JsonTypeReader<JsonValue> {
 
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         ArrayBody body = (ArrayBody) definition.body();
-        return new TreeArrayReader(name, body, context.readers().resolve(body.elementType().name()),
-                context.locationOf(name, definition));
+        return new TreeArrayReader(EntryDisplayName.of(name, definition, context.schema().entries()), body,
+                context.readers().resolve(body.elementType().name()), context.locationOf(name, definition));
     };
 
     private final String name;

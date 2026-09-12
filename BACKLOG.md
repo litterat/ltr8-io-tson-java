@@ -137,12 +137,6 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   align against a shape about to change, so it waits for [TSON-JSON] §8.5 — at which point both stacks have
   the same two positions and the shared class can be parameterised the same way.
 
-- [ ] **A JSON diagnostic names a resolver-minted type by its hash** (issue #482). `EntryDisplayName` renders
-  a minted entry as the sugar that produced it, so TSON says `'[text]'` where JSON says
-  `'array_text_4cc4a482'` — a name in neither the author's schema nor the sender's document. The class is ~108
-  lines depending on nothing but `schema.meta`, so the fix is a **move** to `tson-schema` rather than a copy.
-  Two parity cases sit on the weaker comparison until it lands, with the issue named where they sit.
-
 - [ ] **`Diagnostic.Code` has no member for "a required tag is missing", and both encodings overload
   `UNKNOWN_TYPE_REF`.** [TSON-JSON] §9.4 lists the condition in its own right ("missing required tags (§8.2)",
   a validation error) and the closed enum has nothing for it, so `tson-compiler`'s choice reader reports a

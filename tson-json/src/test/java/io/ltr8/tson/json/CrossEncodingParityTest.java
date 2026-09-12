@@ -251,17 +251,10 @@ class CrossEncodingParityTest {
                 {"name": "Ada", "labels": ["x", [2]]}""");
     }
 
-    // Two cases below stay on `sameVerdict` rather than `sameRule`, and the reason is issue #482 rather than
-    // a difference either encoding is entitled to. A resolver-minted type -- the synthetic entry `[text]`
-    // lifts to -- is named by `EntryDisplayName` on the TSON side and by its hash on this one, so the prose
-    // reads `'[text]'` there and `'array_text_4cc4a482'` here. The codes and pointers agree; only the name
-    // does not. They move up when #482 lands, which is a move of that class to `tson-schema` rather than a
-    // second copy of it.
-
     /** An absent element where the array admits none: `_` in text, null in JSON, one verdict at one index. */
     @Test
     void anAbsentElementInARequiredElementArray() {
-        sameVerdict("person", """
+        sameRule("person", """
                 { name: "Ada"  labels: [ "x", _ ] }""", """
                 {"name": "Ada", "labels": ["x", null]}""");
     }
@@ -275,7 +268,7 @@ class CrossEncodingParityTest {
 
     @Test
     void aRepeatedSetElement() {
-        sameVerdict("unique", """
+        sameRule("unique", """
                 [ "a", "a" ]""", """
                 ["a", "a"]""");
     }
