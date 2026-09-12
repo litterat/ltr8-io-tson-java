@@ -16,6 +16,14 @@ import java.util.List;
  * components yet (only a bare, always-present {@code List} does), so there's no wrapper available
  * to opt into the omit-when-absent behavior non-list optional fields already get for free.
  *
+ * <p><b>{@code supertypes} is typed {@code [type_ref]}, not {@code [type_name]}</b>, because a supertype may
+ * be written as an application. Inside a held template body a parent may still be open -- {@code <T> result<T>
+ * & { ... }} -- and a name cannot carry the arguments that say which instantiation is meant. Being a reference
+ * puts it on the channel {@code MetaRefs} already walks, so substitution and closing reach it with everything
+ * else the body holds. A closed supertype carries no arguments and writes as a bare token, which is the
+ * spelling a name had. The derived index {@code TypeDefinition.supertypes} stays a name list: it is computed
+ * once every parent is a type, and a template never is (§5.10).
+ *
  * <p><b>{@code extension} states how the record may be realised</b> ({@link RecordExtensionType}) and is
  * {@link RecordExtensionType#OPEN} unless the record says otherwise. It is a kernel field rather than a
  * preserved annotation because it decides which values a position typed by this record admits, so erasing
@@ -27,12 +35,12 @@ import java.util.List;
  * {@code java.lang.Record} (the very language feature every type in this model is built from).
  */
 @Typename(name = "record")
-public record RecordBody(List<String> supertypes, List<RecordField> fields, List<FieldGroup> groups,
+public record RecordBody(List<TypeRef> supertypes, List<RecordField> fields, List<FieldGroup> groups,
                           RecordExtensionType extension) implements Product {
 
     /**
      * <b>Absent and empty are the same list</b> for the two the kernel makes optional ({@code supertypes:
-     * [type_name]?}, {@code groups: [field_group]?}): a body resolved from source arrives with an empty
+     * [type_ref]?}, {@code groups: [field_group]?}): a body resolved from source arrives with an empty
      * list where one bound from a resolved-form document that omits the field arrives with {@code null},
      * and no rule distinguishes "no supertypes stated" from "an empty supertypes list". {@code fields} is
      * required and is deliberately not guarded -- an absent required field is a violation the reader

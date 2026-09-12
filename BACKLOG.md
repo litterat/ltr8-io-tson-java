@@ -89,28 +89,20 @@ carries both facts, meta.tn declares the four marks, the resolver lowers them in
 a family the closure contradicts, and **both encodings read one** — a value at a sealed position is placed by
 its own members, with no tag anywhere, and `CrossEncodingParityTest` holds the two to one wording for every
 refusal they share. The corpus states all three layers of it, so another implementation is held to the same
-rules. One entry is left, and it is not really the family's. Work lands on
+rules. Work lands on
 `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
-- [ ] **A closed application of a subtype template has no IS-A edge to its supertype's**, and `@abstract` on a
-  template waits on it. Carrying the mark is the easy half and was measured: adding `extension` to the held
-  wire form and splicing it into a held `!record` application does travel, and `result<text>` comes back
-  ABSTRACT. It buys nothing, because the family is empty and always will be —
+- [ ] **`@abstract` on a template is refused as a gap, and the edge it waited on is now there.** Carrying the
+  mark was measured and travels: adding `extension` to the held wire form and splicing it into a held
+  `!record` application brings `result<text>` back ABSTRACT. What made it useless was that the family was
+  always empty — a closed subtype application had no IS-A edge to its base's — and that is fixed, so
 
       result => @abstract <T> { payload: T }
       ok     => <T> result<T> & { note: text }
-      holder => { r: result<text>  o: ok<text> }
 
-  resolves to `result_text_…` and `ok_text_…` with **`supertypes=[]` on both**. §5.10's composition onto an
-  *open* application contributes the operand's fields and not its name, a template being no type
-  (`OpenOperandCompositionTest` pins exactly this), and nothing re-establishes the edge once both sides close.
-  So every abstract instantiation is an empty family, and the mark makes the position unusable rather than
-  useful. The gap error it currently gets is the honest one and stays until this is fixed.
-
-  What is owed is the edge: when materialisation closes `ok<text>`, its operand `result<text>` is a type and
-  should be its supertype. That is a §5.10 semantics question and not a mark question, which is why it is its
-  own entry now. `@sealed` and `@final` on a template stay a resolver error whatever happens here — they are
-  claims over a set of subtypes a template does not have (`SPEC-FEEDBACK.md` #11).
+  now has a family to be abstract over. What is left is the mark itself: the held wire form does not carry
+  `extension`, so the gap error stands. `@sealed` and `@final` on a template stay a resolver error whatever
+  happens here — they are claims over a set of subtypes a template does not have (`SPEC-FEEDBACK.md` #11).
 
   **Two instantiations differing only in `extension` must not collide**, and that lands here rather than
   standing on its own, because here is the only place it can arise. §8.2 keys a minted entry on a structural
@@ -120,6 +112,16 @@ rules. One entry is left, and it is not really the family's. Work lands on
   template instantiation can carry a non-OPEN extension at all. Java-level equality is already right, the
   member being a `RecordBody` component with no `equals` override, so what is owed is only that the wire form
   carry it — which is the same line the held body needs above, and is free once that is written.
+
+- [ ] **An alias naming a subtype is refused at a subsumption position.** `VariantSchemaReader` matches the
+  written type-ref against `subtypeNames`, a set of entry names, where the position's *own* aliases are
+  handled (`selfNames`) and a subtype's are not — so `alias => sub` reaching a `base` position is
+  `UNKNOWN_TYPE_REF`, with no template anywhere in sight. §7.2 compares "after reference flattening of both",
+  which says the alias and its target are one type at either end of the comparison, not only at the position's.
+  **It is what stands between the parameterised IS-A edge and a document that can use it**: a materialised
+  instantiation's name is implementation-chosen and non-normative (§8.2), so an alias is the only way an
+  author can write `!ok<text>` at all, and today it is refused. Fixing it means folding each subtype's own
+  aliases into the set the same walk already builds for `selfNames`.
 
 ## JSON encoding
 

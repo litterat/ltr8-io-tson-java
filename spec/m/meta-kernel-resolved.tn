@@ -376,7 +376,7 @@
       !record_field { name: fields          type: array_record_field_xxhash }
       !record_field { name: groups          type: array_field_group_xxhash  state: OPTIONAL }
       !record_field { name: extension       type: record_extension_type  state: REQUIRED_DEFAULT  value: OPEN }
-      !record_field { name: supertypes      type: array_type_name_xxhash  state: OPTIONAL }
+      !record_field { name: supertypes      type: array_type_ref_xxhash   state: OPTIONAL }
     ] }
   }
 

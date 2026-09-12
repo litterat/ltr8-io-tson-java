@@ -1423,10 +1423,12 @@ compatibility).
   `NOT_IMPLEMENTED` is reachable from a schema any more**, the pipeline reporting `SCHEMA_ERROR` for
   everything it refuses. A parameterized supertype resolves (`vip => <T> customer & box<T>` absorbs the
   operand's fields while the application is open, the operand contributing its own supertypes but not its
-  name, a template being no type), and so does an argument that is itself an application (`box<inner<T>>` —
+  name to the open entry's contract index, a template being no type -- while `record.supertypes`, typed
+  `[type_ref]`, keeps the application itself, so closing mints the edge to `box<text>` and not to
+  `box<int32>`), and so does an argument that is itself an application (`box<inner<T>>` —
   substitution writes a bound reference through `WireForm.refValue`, which spells one carrying
-  arguments in `type_ref`'s record form). `OpenOperandCompositionTest` pins both, including the two IS-A
-  edges an open operand does and does not give. `DefinitionResolver`'s Javadoc is the exact current boundary.
+  arguments in `type_ref`'s record form). `OpenOperandCompositionTest` pins the substitutability table and
+  `SubtypeTemplateFamilyTest` the family a base template and its subtype templates close into. `DefinitionResolver`'s Javadoc is the exact current boundary.
   Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
   **No gap reaches a read either**, `scoped` having been the last: every constructor

@@ -35,9 +35,10 @@ final class MetaRefs {
     /**
      * Every {@link TypeRef} a definition holds, mapped -- {@code source}, and whatever its body carries.
      *
-     * <p>{@code supertypes} is a name list rather than a type-ref channel and is deliberately not
-     * covered: a composition operand is a named reference or an application (§5.7, §5.8), so a supertype
-     * names a declared or an <em>instantiation</em> entry, never a synthetic one.
+     * <p>{@code type_definition.supertypes} is a name list rather than a type-ref channel and is not
+     * covered: it is the derived transitive index, computed once every parent is a type, so a name there
+     * denotes a declared or an <em>instantiation</em> entry and never a synthetic one. The body's own
+     * {@code record.supertypes} <em>is</em> a reference channel and is mapped with the rest.
      */
     static TypeDefinition mapRefs(TypeDefinition definition, UnaryOperator<TypeRef> map) {
         Optional<TypeRef> source = definition.source().map(map);
@@ -52,7 +53,7 @@ final class MetaRefs {
      */
     static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map) {
         return switch (body) {
-            case RecordBody record -> new RecordBody(record.supertypes(),
+            case RecordBody record -> new RecordBody(record.supertypes().stream().map(map).toList(),
                     record.fields().stream().map(field -> field.withType(map.apply(field.type()))).toList(),
                     record.groups(), record.extension());
             case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.state(),
