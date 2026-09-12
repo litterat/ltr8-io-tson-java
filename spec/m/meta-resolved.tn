@@ -383,6 +383,15 @@
     body: !reference { target: void }
   }
 
+  @doc:"""
+    Declares a record ABSTRACT and asserts it is SEALED. A consumed
+    mark, refuted where no field carries @discriminator.
+    """
+  sealed => @annotation !type_definition {
+    source: void
+    body: !reference { target: void }
+  }
+
   @doc:"Declares a record FINAL. A consumed mark, on @abstract's terms."
   final => @annotation !type_definition {
     source: void

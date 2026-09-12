@@ -85,15 +85,15 @@ test puts its fact in the kernel, and its work is under "Discriminated record fa
 `SPEC-FEEDBACK.md` #10 and #11 carry the design and the arguments; this is the build order. A record states how
 it may be realised, a field of an abstract record may be a discriminator, and a position typed by such a record
 recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). The kernel
-carries both facts and meta.tn declares the three marks; nothing yet reads a mark or acts on a fact. Work lands
+carries both facts and meta.tn declares the four marks; nothing yet reads a mark or acts on a fact. Work lands
 on `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
-- [ ] **The three marks lower into the body.** The declarations are in meta.tn (`abstract`, `final` and
+- [ ] **The four marks lower into the body.** The declarations are in meta.tn (`abstract`, `sealed`, `final` and
   `discriminator`, all `@annotation void`); what is left is the lowering. Each must be **consumed** by the
   resolver into `record.extension` / `record_field.discriminator` rather than preserved in §8.1's
   author-annotation channel — so resolved output carries one carrier per fact and §8.1's no-hoisting question
   does not arise. Until it is, a mark resolves, sits in the annotation channel and does nothing, which is a
-  schema that says `@abstract` and is not. The three names are reserved at their positions: a schema may not
+  schema that says `@abstract` and is not. The four names are reserved at their positions: a schema may not
   mean something else by them. §6 honours a checked annotation at either declaration position, so the key
   spelling must lower identically to the value spelling. The annotation shape is the interim and §12.1 spells
   them eventually; what that costs is one more reason to keep the lowering in one place.
@@ -101,13 +101,16 @@ on `r2026-36-proposal`, the two kernel fields being what takes it off a Revision
 - [ ] **The load-time checks, over the linked closure.** One pass, in `TsonSchemaLinker` beside
   `ChoiceDisjointness`. On the record: composing or refining onto a **FINAL** record is a resolver error, in the
   declaring schema and in any that imports it — while §5.9 subtraction is admissible, minting no IS-A edge; and
-  `@abstract` with `@final` on one declaration is an error. On the annotated field: its declared type resolves,
+  two definition marks on one declaration is an error, whichever two. On the annotated field: its type resolves,
   after its reference chain, to an atom-family instance or an enum (§5.2 grants that only to a field *carrying*
   a value, and the base's field carries none, so it must be checked here); its state is exactly REQUIRED, not
   OPTIONAL, FIXED or DEFAULT; it is **not a group member**, checked against the resolved `groups` list rather
   than the source, since §5.11 refinement is what reaches that state and the declaration cannot express it; and
   a record carrying a discriminator field MUST be ABSTRACT, §5.7's identity diagonal forbidding the base pinning
-  it. Over the closure: every entry in `subtypes`, transitively, pins each discriminator `REQUIRED_FIXED`, and
+  it. `@sealed` is refuted where no field of the record is a discriminator — the derivation being total, that is
+  its only outcome besides silence (§5.4's `@disjoint` precedent), and it is what makes a later edit that removes
+  the base's `@discriminator` fail at the schema that changed rather than at every reader of an untagged
+  document. Over the closure: every entry in `subtypes`, transitively, pins each discriminator `REQUIRED_FIXED`, and
   the pins are **pairwise distinct as tuples** in the base's declaration order. Distinctness is under the field
   type's own equality contract and not token equality — `= 255` and `= 0xFF` are one pin (§4.3), `= 1` and
   `= 1.0` are one (§5.5), text pins compare NFC-normalised — so `ValueIdentity` is what answers it and a

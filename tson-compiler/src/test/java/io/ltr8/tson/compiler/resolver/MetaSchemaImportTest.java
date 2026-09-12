@@ -100,7 +100,7 @@ class MetaSchemaImportTest {
         // all eight occurrences, since identical forms share a name. Its sibling sugar `[type_name]` adds
         // nothing here, because the meta-kernel already declares that same form and an import in scope is
         // referenced rather than redeclared.
-        assertEquals(47, meta.entries().size(), "expected every meta.tn declaration to resolve");
+        assertEquals(48, meta.entries().size(), "expected every meta.tn declaration to resolve");
 
         TsonLinkedSchema registered = registry.register(TsonSchemaLinker.link(meta, registry));
 

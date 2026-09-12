@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta.tn?sha256=52589b247453b4b935c6d5c8129e4c9cb32ec17220824e93d0acb8e647b9052d"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=95e8b75de1ca92a01de4e7b39ca4f612a4dd658f38affe34ceba8290fddbad93"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=565ea7d483597c24efa86ce409ffacd4bd6d92938a24253fee89e7a05a45e815"
 !!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=565ea7d483597c24efa86ce409ffacd4bd6d92938a24253fee89e7a05a45e815"
 @doc:"""
@@ -47,7 +47,7 @@
   Plus annotation types — the classifying markers `ordered`,
   `bounded`, `exact`, `numeric`; the checked assertion `disjoint`;
   the representation directive `rest`; the consumed marks `abstract`,
-  `final` and `discriminator`; and the documentary `deprecated`,
+  `sealed`, `final` and `discriminator`; and the documentary `deprecated`,
   `since`, `todo`,
   `lang`, `title`, `examples`, `read_only`, `write_only`. Annotation
   types must reside in the governing target's namespace (per Part 2
@@ -68,7 +68,7 @@
   TSON text spells a value it says so by name.
 
   The consumed marks are the exception that proves the rule, and they
-  are not annotations in that sense. `abstract`, `final` and
+  are not annotations in that sense. `abstract`, `sealed`, `final` and
   `discriminator` each state a fact about the type — which values a
   position typed by the record admits — so erasing one would change
   what conforms. They are therefore lowered into the kernel's own
@@ -76,7 +76,7 @@
   and do not survive into resolved output: there is no annotation
   left to erase, and one carrier holds each fact. The annotation
   spelling is an interim, and Part 2 §12.1 should eventually spell
-  the three as syntax; until then their names are reserved at the
+  the four as syntax; until then their names are reserved at the
   positions they mark, so a schema may not mean something else by
   them.
 
@@ -641,7 +641,9 @@
 
     With at least one `@discriminator` field the record derives
     SEALED instead, which is the case that makes the subtype
-    recoverable from the value's own members rather than from a tag.
+    recoverable from the value's own members rather than from a tag;
+    `@sealed` is the mark that asserts that outcome rather than
+    leaving it derived.
     Abstractness is never inherited: a subtype is OPEN unless it says
     otherwise, since carrying the mark downward would leave a family
     with no concrete member at all. `@abstract` with `@final` on one
@@ -650,11 +652,34 @@
   abstract => @annotation void
 
   @doc:"""
+    Declares a record ABSTRACT and asserts that it is SEALED — that
+    some field of it carries `@discriminator`. `@abstract`'s
+    alternative and not its companion: one definition mark per
+    declaration, and this is the one that demands the stronger body.
+
+    An assertion checked against a derived fact, on `@disjoint`'s
+    terms ([TSON-SCHEMA] §5.4). The derivation is total, so there is
+    no unprovable state: no discriminator field is a schema-load
+    error; a discriminator field, or the mark's absence, is silent
+    and derives what it would have derived anyway.
+
+    What it is for is the edit nobody is present for. Remove the
+    `@discriminator` from a family's base and the family degrades to
+    ABSTRACT: the tag turns REQUIRED at every position typed by it,
+    and every untagged document stops validating, with nothing
+    failing in the schema that changed. The mark makes that edit fail
+    where it is made. A subtype that forgets its pin needs no mark to
+    be caught — that rule is unconditional.
+    """
+  sealed => @annotation void
+
+  @doc:"""
     Declares a record FINAL: it has instances and admits no subtype.
     Naming it as the source of a composition or a refinement is a
     schema-load error, in the declaring schema and in any schema that
     imports it. A bare presence marker, on `@abstract`'s terms, and
-    consumed into `record.extension` the same way.
+    consumed into `record.extension` the same way. Two definition
+    marks on one declaration is a schema-load error, whichever two.
 
     Subtraction stays admissible against a FINAL record —
     [TSON-SCHEMA] §5.9 empties `supertypes` and mints no IS-A edge,
@@ -664,9 +689,9 @@
 
   @doc:"""
     Marks the field a sealed family dispatches on. A bare presence
-    marker like `@numeric`, written on a field of an `@abstract`
-    record, which thereby derives SEALED: a position typed by that
-    record recovers the subtype from this field's value.
+    marker like `@numeric`, written on a field of an `@abstract` or
+    `@sealed` record, which thereby derives SEALED: a position typed
+    by that record recovers the subtype from this field's value.
 
     Not a representation directive, and this is what tells the two
     apart — a directive's force is confined to the encodings that

@@ -1698,8 +1698,8 @@ The whitespace requirement before removal `-` is a lexer fact restated as a rule
 | TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/35/tson-part1-data |
 | TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/35/tson-guide |
 | meta-kernel.tn | TSON Meta-Kernel (companion artifact) | https://tson.io/2026/36/m/meta-kernel.tn?sha256=565ea7d483597c24efa86ce409ffacd4bd6d92938a24253fee89e7a05a45e815 |
-| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/36/m/meta.tn?sha256=3c8cd64fbf937d942a12b8b8890110e03c50fe66e007440b0ddb9e6cc67be094 |
-| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/36/m/core.tn?sha256=69ce9f02f6a68851a7daabac8677ca38c4f9030ffd3b60bbaceed2bb65332144 |
+| meta.tn | TSON Meta-Schema (companion artifact) | https://tson.io/2026/36/m/meta.tn?sha256=95e8b75de1ca92a01de4e7b39ca4f612a4dd658f38affe34ceba8290fddbad93 |
+| core.tn | TSON Core Type Library (companion artifact) | https://tson.io/2026/36/m/core.tn?sha256=0600d94811f79dc6f73b78c896f2739547359b6eff21825e8725db387bbb59dd |
 
 ### 13.3 Informative References
 

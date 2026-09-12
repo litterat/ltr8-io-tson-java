@@ -718,7 +718,8 @@ declaration to fix that reintroduces either the field-name string this proposal 
 refused. The two facts are separable in any case: a family may want the closed-set claim while its wire form stays
 `$type`, which is why #11 carries them as distinct members of one enum, ABSTRACT and SEALED, with SEALED derived
 from this mark's presence rather than written. `discriminator` is also the word an author converting a contract
-will search for.
+will search for. The name is not idle: #11 spends it at the *declaration*, where `@sealed` asserts that this
+mark is somewhere in the body.
 
 **The check list, restated for the family.** At the base: the annotated field's declared type resolves, after its
 reference chain, to an atom-family instance or an enum — *not* free here, because §5.2 grants that only to a field
@@ -860,13 +861,29 @@ working as written. `@discriminator` had that standing only while text declined 
 - **FINAL** — direct instances, and nothing may be a subtype: composition or refinement naming it is a resolver
   error, in the declaring schema and in any schema that imports it.
 
-**Three marks in, two kernel fields out.** The author writes `@abstract` or `@final` at the definition (`pet =>
-@abstract { … }`; §6 honours a checked annotation at either position, so the key spelling lowers identically) and
-`@discriminator` on a field. **SEALED is derived and never written** — ABSTRACT with at least one discriminator field,
-both facts of the body — in the manner of `choice.disjoint` (§5.4): a fact the resolver computes from what the body
-holds and the body records, so a reader has one lookup rather than a scan. Two load errors fall out of the derivation
-rather than needing rules of their own: a discriminator field on a record that is not abstract, and `@abstract` with
-`@final` on one declaration.
+**Four marks in, two kernel fields out.** The author writes `@abstract`, `@sealed` or `@final` at the definition
+(`pet => @abstract { … }`; §6 honours a checked annotation at either position, so the key spelling lowers
+identically) and `@discriminator` on a field. **SEALED is still derived rather than declared** — ABSTRACT with at
+least one discriminator field, both facts of the body — in the manner of `choice.disjoint` (§5.4): a fact the
+resolver computes from what the body holds and the body records, so a reader has one lookup rather than a scan. Two
+load errors fall out of the derivation rather than needing rules of their own: a discriminator field on a record
+that is not abstract, and two definition marks on one declaration.
+
+**`@sealed` is the derivation's assertion, and `@disjoint` is its precedent.** It means ABSTRACT and asserts that
+the derivation will reach SEALED, so it is refuted — a schema-load error — exactly when no field of the record
+carries `@discriminator`; where it holds, and where it is absent, the resolver derives what it would have derived
+anyway. It is `@abstract`'s alternative and not its companion: an author writes one definition mark, and the
+stronger one demands the stronger body. Two marks would be two carriers for one fact, which is what the enum
+exists to avoid.
+
+The check it adds is one, and the value is not in that check's own difficulty. A subtype that forgets its pin is
+refused whether or not the base is marked, the closure rule being unconditional. What only the mark catches is
+the **base** losing its `@discriminator` in a later edit: the family degrades SEALED → ABSTRACT, the tag turns
+REQUIRED at every position typed by it, and every untagged document in the world stops validating — with nothing
+failing in the schema that changed. `@sealed` makes that edit fail where it is made. This is `@disjoint`'s own
+argument (§5.4): the derivation is total, so the assertion can only agree or fire, and what it buys is that
+someone else's change cannot quietly invalidate the intent. It also forces the thought at the point of authorship —
+is this family still member-dispatched? — which a derived fact never does.
 
 **Why the member carries it rather than the derivation.** ABSTRACT and SEALED differ in the *reading rule* and not
 only in bookkeeping — at ABSTRACT the tag is required, at SEALED it is optional and asserting — so a compiler
@@ -927,25 +944,25 @@ sense but reading badly under the `_type` suffix; `derivation`, accurate but les
 vocabulary; `instantiation`, which names the ABSTRACT axis and says nothing about FINAL; and `record_kind`,
 refused outright because §4.1 has already given "kind" to the four base kinds.
 
-**The spelling is provisional, and deliberately so.** The three marks are annotation-shaped for now — `@abstract` and
-`@final` at the definition, `@discriminator` on a field — and all three are **consumed by the resolver into the body**
-rather than preserved in §8.1's author-annotation channel: the first two into `record.extension`, the third into
-`record_field.discriminator`. Consumption is the whole of what makes the interim legitimate — a mark that lowers into
-the type is syntax wearing annotation clothing, and none of the three is an annotation in §6's sense once it lands.
-One of these *preserved* would be the erasure violation twice over. It is also what makes the arrangement temporary,
-since a construct that the resolver reads, that is absent from output, and that no schema may redefine is a construct
-§12.1 should eventually spell. Two things the interim needs stated: the three names are **reserved** at their
-positions, so a schema cannot mean something else by them; and resolved output carries the body member and not the
-mark, so there is one carrier for the fact and §8.1's no-hoisting question does not arise.
+**The spelling is provisional, and deliberately so.** The four marks are annotation-shaped for now — `@abstract`,
+`@sealed` and `@final` at the definition, `@discriminator` on a field — and all four are **consumed by the resolver
+into the body** rather than preserved in §8.1's author-annotation channel: the first three into `record.extension`,
+the last into `record_field.discriminator`. Consumption is the whole of what makes the interim legitimate — a mark
+that lowers into the type is syntax wearing annotation clothing, and none of the four is an annotation in §6's sense
+once it lands. One of these *preserved* would be the erasure violation twice over. It is also what makes the
+arrangement temporary, since a construct that the resolver reads, that is absent from output, and that no schema may
+redefine is a construct §12.1 should eventually spell. Two things the interim needs stated: the four names are
+**reserved** at their positions, so a schema cannot mean something else by them; and resolved output carries the body
+member and not the mark, so there is one carrier for the fact and §8.1's no-hoisting question does not arise.
 
-**What is running:** the two kernel fields and the three marks' declarations.
+**What is running:** the two kernel fields and the four marks' declarations.
 `record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
 and `record_field.discriminator: boolean ~ false` are declared in this implementation's meta-kernel and bound by
 its value model, so a resolved schema carries both facts and the kernel's own three schemas resolve, link and
 compile against them unchanged — every record OPEN, every field not a discriminator. meta.tn declares `abstract`,
-`final` and `discriminator`, all three `@annotation void`, so an author can write the marks and they resolve;
-`@discriminator` has moved off `field_name`, so its old choice-level spelling is now refused at the annotation's
-own type. Nothing yet reads a mark or sets a field: the lowering is unwritten, the load-time checks are unwritten,
+`sealed`, `final` and `discriminator`, all four `@annotation void`, so an author can write the marks and they
+resolve; `@discriminator` has moved off `field_name`, so its old choice-level spelling is now refused at the
+annotation's own type. Nothing yet reads a mark or sets a field: the lowering is unwritten, the load-time checks are unwritten,
 SEALED is never derived, and no reader dispatches on a member. The inhabitance rule above is stated rather than
 measured.
 
@@ -954,5 +971,6 @@ kernel's `record` and `discriminator: boolean ~ false` to its `record_field`, st
 their two reading rules, the derivation of SEALED and the two load errors it yields, #10's checks over the
 discriminator field, the FINAL check over composition and refinement, the subtraction exemption and why it is not one,
 the inhabitance rule, the absence of any transition table, and the identity consequence; state that the marks are
-consumed rather than preserved and that their names are reserved; correct §6's validity claim; and settle the field
-and enum names, which is the one part this entry does not.
+consumed rather than preserved and that their names are reserved; state `@sealed` as the derivation's assertion on
+§5.4's `@disjoint` precedent, refuted where no field is a discriminator; correct §6's validity claim; and settle the
+field and enum names, which is the one part this entry does not.
