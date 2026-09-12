@@ -85,13 +85,13 @@ class TsonDocumentPeekTest {
     void classifiesASchemaDocumentByItsMeta() {
         TsonDocumentHeader header = peek("""
                 !!id:"https://example.com/order.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 { order => { id: int32 } }
                 """);
 
         assertTrue(header.isSchemaDocument());
-        assertEquals(Optional.of("https://tson.io/2026/35/m/meta.tn"), header.meta());
+        assertEquals(Optional.of("https://tson.io/2026/36/m/meta.tn"), header.meta());
         assertEquals(Optional.of("https://example.com/order.tn"), header.id());
         assertEquals(Optional.empty(), header.schema());
     }

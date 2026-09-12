@@ -25,9 +25,9 @@ import io.ltr8.tson.base.SchemaValidationException;
  */
 class SharedInstantiationTest {
 
-    private static final String META = "https://tson.io/2026/35/m/meta.tn";
-    private static final String CORE = "https://tson.io/2026/35/m/core.tn";
-    private static final String KERNEL = "https://tson.io/2026/35/m/meta-kernel.tn";
+    private static final String META = "https://tson.io/2026/36/m/meta.tn";
+    private static final String CORE = "https://tson.io/2026/36/m/core.tn";
+    private static final String KERNEL = "https://tson.io/2026/36/m/meta-kernel.tn";
 
     /**
      * meta.tn closes {@code set<value>} itself; this schema imports meta.tn and closes it again. Both mint

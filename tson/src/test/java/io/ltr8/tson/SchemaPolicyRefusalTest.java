@@ -36,8 +36,8 @@ class SchemaPolicyRefusalTest {
     private static List<Diagnostic> refusals(String declarations) {
         List<Diagnostic> problems = Tson.standard().validateSchema("""
                 !!id:"https://example.test/refusal.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 {
                 %s
                 }
@@ -112,8 +112,8 @@ class SchemaPolicyRefusalTest {
 
         assertEquals(Diagnostic.Code.RESTRICTED_SCRIPT, tson.validateSchema("""
                 !!id:"https://example.test/refusal-policy.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 { p%sy => text }
                 """.formatted(CYR_A)).getFirst().code());
 

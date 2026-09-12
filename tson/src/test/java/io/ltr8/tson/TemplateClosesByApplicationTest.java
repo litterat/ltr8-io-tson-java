@@ -44,8 +44,8 @@ class TemplateClosesByApplicationTest {
     private static String meta(String extraDeclarations) {
         return """
                 !!id:"https://example.test/m.tn"
-                !!meta:"https://tson.io/2026/35/m/meta-kernel.tn"
-                !!import:"https://tson.io/2026/35/m/meta-kernel.tn"
+                !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
+                !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
                 {
                   base       => {}
                   my_bounded => <N> array ^ { max_items: = N }

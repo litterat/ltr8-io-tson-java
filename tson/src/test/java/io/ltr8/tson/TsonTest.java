@@ -28,8 +28,8 @@ class TsonTest {
 
     private static final String TINY_DOCUMENT = """
             !!id:"https://example.test/tson-test.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               my_int => int32
               my_percentage => !positive_integer ^ { max: 100 }
@@ -49,7 +49,7 @@ class TsonTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> tson.resolve("""
                         !!id:"https://example.test/oops.tn"
-                        !!meta:"https://tson.io/2026/35/m/core.tn"
+                        !!meta:"https://tson.io/2026/36/m/core.tn"
                         {
                           my_thing => uuid
                         }

@@ -31,8 +31,8 @@ class NetworkFacetsTest {
 
     private static final String SCHEMA = """
             !!id:"%s"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               private_v4 => !ipv4 ^ { within: ["10.0.0.0/8" "192.168.0.0/16"]  excluding: ["10.1.0.0/16"] }
               subnet     => !cidr4 ^ { within: ["10.0.0.0/8"]  excluding: ["10.1.0.0/16"] }
@@ -119,8 +119,8 @@ class NetworkFacetsTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.standard().resolve("""
                         !!id:"https://example.test/bad-network.tn"
-                        !!meta:"https://tson.io/2026/35/m/meta.tn"
-                        !!import:"https://tson.io/2026/35/m/core.tn"
+                        !!meta:"https://tson.io/2026/36/m/meta.tn"
+                        !!import:"https://tson.io/2026/36/m/core.tn"
                         { oops => !ipv4 ^ { within: ["10.0.0.0" "not-a-network"] } }
                         """));
 
@@ -138,8 +138,8 @@ class NetworkFacetsTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.standard().resolve("""
                         !!id:"https://example.test/empty-network-pair.tn"
-                        !!meta:"https://tson.io/2026/35/m/meta.tn"
-                        !!import:"https://tson.io/2026/35/m/core.tn"
+                        !!meta:"https://tson.io/2026/36/m/meta.tn"
+                        !!import:"https://tson.io/2026/36/m/core.tn"
                         { oops => !ipv4 ^ { within: ["10.0.0.0/8"]  excluding: ["10.0.0.0/9" "10.128.0.0/9"] } }
                         """));
 
@@ -156,8 +156,8 @@ class NetworkFacetsTest {
         SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
                 () -> Tson.standard().resolve("""
                         !!id:"https://example.test/empty-network-bound.tn"
-                        !!meta:"https://tson.io/2026/35/m/meta.tn"
-                        !!import:"https://tson.io/2026/35/m/core.tn"
+                        !!meta:"https://tson.io/2026/36/m/meta.tn"
+                        !!import:"https://tson.io/2026/36/m/core.tn"
                         { oops => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]
                                              max_prefix: 24 } }
                         """));
@@ -171,8 +171,8 @@ class NetworkFacetsTest {
         Tson tson = Tson.standard();
         tson.resolve("""
                 !!id:"https://example.test/inhabited-network-bound.tn"
-                !!meta:"https://tson.io/2026/35/m/meta.tn"
-                !!import:"https://tson.io/2026/35/m/core.tn"
+                !!meta:"https://tson.io/2026/36/m/meta.tn"
+                !!import:"https://tson.io/2026/36/m/core.tn"
                 { ok => !cidr4 ^ { within: ["10.0.0.0/24"]  excluding: ["10.0.0.5/32"]  max_prefix: 25 }
                   holder => { n: ok? } }
                 """);

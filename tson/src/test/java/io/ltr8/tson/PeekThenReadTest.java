@@ -43,15 +43,15 @@ class PeekThenReadTest {
 
     private static final String V1_SCHEMA = """
             !!id:"https://example.test/order-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             { order => { sku: text  quantity: int32  code: int32 } }
             """;
 
     private static final String V2_SCHEMA = """
             !!id:"https://example.test/order-2.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             { order => { sku: text  quantity: int32  currency: text } }
             """;
 

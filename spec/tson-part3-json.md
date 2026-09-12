@@ -122,8 +122,8 @@ A schema exercising a sealed record family, defaults, optional fields, and a non
 
 ```
 !!id:"https://example.com/pets.tn"
-!!meta:"https://tson.io/2026/35/m/meta.tn"
-!!import:"https://tson.io/2026/35/m/core.tn"
+!!meta:"https://tson.io/2026/36/m/meta.tn"
+!!import:"https://tson.io/2026/36/m/core.tn"
 {
   pet => @abstract { pet_type: @discriminator text  name: text  nickname: text? }
   cat => pet & { pet_type: = cat  hunting_skill: text ~ lazy }
@@ -645,10 +645,10 @@ The atom parsing contracts this document reaches through §5.1 carry their own n
 
 | Reference | Title | URL |
 |-----------|-------|-----|
-| TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/35/tson-part1-data |
-| TSON-SCHEMA | TSON Part 2: Type System and Schema | https://tson.io/2026/35/tson-part2-schema |
-| TSON-CBOR | TSON Part 4: CBOR Encoding | https://tson.io/2026/35/tson-part4-cbor |
-| TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/35/tson-guide |
+| TSON-DATA | TSON Part 1: Text Data Format | https://tson.io/2026/36/tson-part1-data |
+| TSON-SCHEMA | TSON Part 2: Type System and Schema | https://tson.io/2026/36/tson-part2-schema |
+| TSON-CBOR | TSON Part 4: CBOR Encoding | https://tson.io/2026/36/tson-part4-cbor |
+| TSON-GUIDE | TSON Developer Guide (non-normative) | https://tson.io/2026/36/tson-guide |
 
 ### 11.3 Informative References
 

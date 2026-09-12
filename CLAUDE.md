@@ -27,9 +27,9 @@ A from-scratch Java implementation of TSON (Typed Schema Object Notation), built
 spec series (2026 revision):
 
 - Part 1 — lexer, structural grammar, base type resolution, built-in type vocabulary:
-  https://tson.io/raw/2026/35/tson-part1-data.md
+  https://tson.io/raw/2026/36/tson-part1-data.md
 - Part 2 — schema grammar, type system, resolution, linking, compilation:
-  https://tson.io/raw/2026/35/tson-part2-schema.md
+  https://tson.io/raw/2026/36/tson-part2-schema.md
 
 The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
 doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
@@ -39,10 +39,12 @@ documents — the meta-kernel bootstrap layer, the meta-schema built on it, and 
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not a
 source of truth — with **two** standing exceptions. The three `.tn` schemas are **packaged from here at build
 time**, so they are the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in
-place**: see "Part 3 is drafted here" below. They carry **Revision 35 identities** —
-`https://tson.io/2026/35/m/*.tn`, the published revision's own. `spec/` holds Revision 35 of both parts, whose
-§13.2 table names those same identities and is stamped from these bytes — so the table is neither a revision
-behind nor stale, and **§13.2 is a fourth pin to move** whenever the artifacts change.
+place**: see "Part 3 is drafted here" below. On this branch they carry **Revision 36 identities** —
+`https://tson.io/2026/36/m/*.tn`, the proposing revision's own, per the from-the-start rule below. `spec/` holds
+**Revision 35** of Parts 1 and 2, which are the published cache and are not edited here; what moved in Part 2 is
+§13.2's three artifact rows alone, so the table still names the bytes beside it and stays checkable, while its
+Part 1 and Guide rows stay at the revision those documents actually are. **§13.2 is a fourth pin to move**
+whenever the artifacts change.
 `scripts/restamp-bundled-schemas.sh` does not know about it: the script covers the repo's own pins, and the
 spec document is a cache it does not write, so §13.2 is the one that has to be re-stamped by hand and is
 therefore the one that silently drifts. `tson hash spec/m/<name>.tn` is the check. The divergences earlier
@@ -71,13 +73,19 @@ so a change that moves those counts wants looking at rather than renumbering. Ke
 `.tn` beside them; both have drifted before.
 
 **`main` is the reference implementation of the published revision, which is Revision 35.** Each published
-revision's implementation stays reachable at the point it was the whole of `main`: `r2026-32`, `r2026-34`.
-The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling corpus branch of
-the same name and `SUITE_PIN` following it — where the register's entries state what is *running* rather
+revision's implementation stays reachable at the point it was the whole of `main`, by tag: `r2026-32`,
+`r2026-34`. The work for a revision happens on a proposal branch — `r2026-NN-proposal`, with a sibling corpus
+branch of the same name and `SUITE_PIN` following it — where the register's entries state what is *running* rather
 than what is *proposed*, the branch being the argument. It merges when the spec lands and not before, since
 merging a divergence early costs `main` the one signal it exists to give. The bundled schemas carry the
 revision's own identities from the start, so a content change lands on artifacts named for the revision
 proposing it rather than being re-identified at the end.
+
+**The open proposal is `r2026-36-proposal`, and this is it.** What takes the work off `main` is that the
+discriminated-family design (`SPEC-FEEDBACK.md` #10, #11) needs two kernel fields — `record.extension` and
+`record_field.discriminator` — so it is a meta-kernel change and no longer a Revision 35 feature. Work lands
+here through ordinary PR branches off this one. `main` stays the Revision 35 reference until the spec catches
+up, at which point this merges.
 
 **Nothing here is frozen, and nothing is owed to a user who does not exist.** The spec is a working
 revision, this is its first implementation, and the artifact has no published releases and no remote
@@ -226,7 +234,7 @@ keeps it apart. The exception classification itself is unchanged and is what pic
 `DefinitionResolver`'s Javadoc lists the exact current boundary.
 
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets
-`https://tson.io/2026/35/ltr8/<group>/<name>-<version>.tn` — `/2026/35` is the spec revision, `ltr8` the
+`https://tson.io/2026/36/ltr8/<group>/<name>-<version>.tn` — `/2026/36` is the spec revision, `ltr8` the
 publishing org, `<group>` the subsystem (`cli`), `<name>-<version>` the schema name with a trailing
 integer version. **The version is bumped on a release, not on a change.** §10's immutability rule binds a
 *published* identity: once a release ships carrying the schema, the document under that `!!id` is fixed and
@@ -1362,7 +1370,7 @@ No system Gradle — always use the wrapper:
 ```
 ./gradlew build                   # also builds the javadoc/sources jars, so doclint runs under `build`
 ./gradlew test
-./gradlew publishToMavenLocal     # installs every module into ~/.m2 as io.ltr8:<module>:0.35.0-SNAPSHOT
+./gradlew publishToMavenLocal     # installs every module into ~/.m2 as io.ltr8:<module>:0.36.0-SNAPSHOT
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.lexer.LexerTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.TsonDataParserTest"
 ./gradlew :tson-compiler:test --tests "io.ltr8.tson.compiler.ConformanceSuiteTest"  # class1; skipped unless ../../ltr8-io-tson-test-suite exists
@@ -1398,7 +1406,7 @@ flags for when the next question is "where".
 **Publishing is packaging, not release.** Every subproject applies `maven-publish` with a `mavenJava`
 publication (the `java` component plus sources and javadoc jars) and a POM carrying name/description/
 url/licence, so `publishToMavenLocal` gives another project on the same machine an ordinary
-`io.ltr8:tson:0.35.0-SNAPSHOT` dependency instead of an included build. **No remote repository is
+`io.ltr8:tson:0.36.0-SNAPSHOT` dependency instead of an included build. **No remote repository is
 configured, deliberately** — Maven Central needs signed artifacts and a POM with scm/developers, and
 publishing under a name is not a decision the build should make quietly. The jars carry real
 `module-info.class`es, so a consumer works on the class path or the module path; `tson-annotation` and

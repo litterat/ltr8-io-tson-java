@@ -23,8 +23,8 @@ class JsonTaggedValueReadTest {
 
     private static final String SCHEMA = """
             !!id:"https://example.test/tagged-1.tn"
-            !!meta:"https://tson.io/2026/35/m/meta.tn"
-            !!import:"https://tson.io/2026/35/m/core.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
             {
               person   => { name: text }
               employee => person & { department: text }
