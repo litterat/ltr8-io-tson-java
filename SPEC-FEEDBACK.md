@@ -971,6 +971,16 @@ redefine is a construct §12.1 should eventually spell. Two things the interim n
 **reserved** at their positions, so a schema cannot mean something else by them; and resolved output carries the body
 member and not the mark, so there is one carrier for the fact and §8.1's no-hoisting question does not arise.
 
+**The interim splits the fact across two layers, which syntax is what resolves.** `record_extension_type` and the
+two fields are the kernel's, since the body they sit in is; the four marks are declared in the meta-schema, beside
+`@discriminator`'s old home and on `@doc`'s reachability terms. So the enum a mark names lives one layer below the
+mark. Nothing breaks — an annotation resolves one hop against the governing meta (§3.3.3) and the meta imports the
+kernel, so a schema governed by either finds all four — but a reader is entitled to ask why a kernel fact is spelled
+by a meta-schema name. The answer is that the spelling is the part that moves: §12.1 spelling the marks puts the
+notation in the same document as the fields, and the split closes with the annotations rather than being repaired
+where it stands. Moving the declarations into the kernel meanwhile would put author-written vocabulary beside
+`synthetic`, which is the resolver's own, and buy nothing a reader can observe.
+
 **What is running:** the two kernel fields and the four marks' declarations.
 `record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
 and `record_field.discriminator: boolean ~ false` are declared in this implementation's meta-kernel and bound by
