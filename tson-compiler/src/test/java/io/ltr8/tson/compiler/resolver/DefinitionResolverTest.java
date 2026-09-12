@@ -2294,6 +2294,37 @@ class DefinitionResolverTest {
         assertTrue(thrown.getMessage().contains("takes no value"), thrown.getMessage());
     }
 
+    /**
+     * <b>A template may not be sealed or final</b>, and it is the spec that refuses it rather than this
+     * resolver falling short: both are claims about <em>other</em> declarations, and §8.2's {@code subtypes}
+     * indexes entries, so an instantiation entry exists only where some schema writes that application. The
+     * claim's subject would be whichever applications a closure happens to contain.
+     */
+    @Test
+    void aTemplateCannotBeSealedOrFinal() {
+        for (String mark : List.of("sealed", "final")) {
+            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                    () -> resolveSnippetsAgainstMetaKernel(
+                            "box => @" + mark + " <T> { @discriminator kind: identifier  v: T }"),
+                    mark);
+            assertTrue(thrown.getMessage().contains("states a closed set of subtypes"), thrown.getMessage());
+        }
+    }
+
+    /**
+     * <b>{@code @abstract} on a template is a gap and not a refusal</b>, the asymmetry being the marks' own:
+     * it constrains the marked type alone -- no direct instances -- which holds of every instantiation
+     * identically, so {@code result => <T> @abstract { … }} is meaningful and is what a host language spells
+     * {@code abstract class Result<T>}. What is missing is that §5.10 holds the body as text until
+     * materialisation closes it, and the fact does not travel ({@code BACKLOG.md}).
+     */
+    @Test
+    void aTemplateCannotYetBeAbstract() {
+        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("box => @abstract <T> { v: T }"));
+        assertTrue(thrown.getMessage().contains("cannot yet be abstract"), thrown.getMessage());
+    }
+
     /** Only a record has an extension fact to state; the mark has nowhere to land on anything else. */
     @Test
     void aDefinitionMarkOnANonRecordIsRefused() {

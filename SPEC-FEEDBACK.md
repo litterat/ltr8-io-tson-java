@@ -901,6 +901,24 @@ document in the world stops validating, and nothing fails in the schema that cha
 fail where it is made. A subtype that forgets its pin needs no mark to be caught — the closure rule is
 unconditional — so this is the one failure the redundancy is actually for.
 
+**A template may be abstract and may not be sealed or final, and the asymmetry is the marks' own.** §5.10 makes
+a template not a type: only an application is, and each application mints its own entry. ABSTRACT constrains the
+marked type alone — no direct instances — which is true of every instantiation identically and needs nothing else
+known, so `result => <T> @abstract { … }` with `ok => <T> result<T> & { … }` is meaningful and is the shape a host
+language spells `abstract class Result<T>`. SEALED and FINAL are claims about *other* declarations — that every
+subtype pins distinctly, that nothing composes onto this one — and a template has no set for such a claim to range
+over. `subtypes` is an index over entries (§8.2), and an instantiation entry exists only where some schema writes
+that application, so the claim's subject would be assembled from whichever applications a closure happens to
+contain: `ok<T>` composing onto `result<T>` puts nothing in `result<text>`'s index unless someone also writes
+`ok<text>`, and writing it in a fourth schema would change the family without touching its declaration. **Both
+marks are therefore a resolver error on a template**, and `@abstract` is not.
+
+The disanalogy with the host language is worth stating, because the host language is where the intuition comes
+from: Java's `sealed abstract class Result<T> permits Ok, Err` has one class carrying one permits list, and its
+sealing is over classes rather than parameterisations. A TSON template has no such single carrier — there is no
+entry for "the generic type", only one per application — which is the same fact from the other end. An author
+wanting a sealed generic family seals a closed declaration and parameterises below it.
+
 **Why the member carries it rather than the derivation.** ABSTRACT and SEALED differ in the *reading rule* and not
 only in bookkeeping — at ABSTRACT the tag is required, at SEALED it is optional and asserting — so a compiler
 reads one member and knows which reader to build, where a three-member enum would leave that difference to be
@@ -1004,8 +1022,9 @@ nothing where nothing uses them.
 kernel's `record` and `discriminator: boolean ~ false` to its `record_field`, stating the four members' meanings and
 their two reading rules, the derivation of SEALED and the two load errors it yields, #10's checks over the
 discriminator field, the FINAL check over composition and refinement, the subtraction exemption and why it is not one,
-the inhabitance rule, the absence of any transition table, and the identity consequence; state that the marks are
-consumed rather than preserved and that their names are reserved; state the two marks as each other's condition —
+the inhabitance rule, the absence of any transition table, and the identity consequence; state that a template may
+be abstract and may not be sealed or final, with the reason; state that the marks are consumed rather than
+preserved and that their names are reserved; state the two marks as each other's condition —
 `@discriminator` requiring `@sealed`, `@abstract` forbidding a discriminator — and say that the redundancy is for
 the author rather than the resolver; correct §6's validity claim; and settle the field and enum names, which is the
 one part this entry does not.

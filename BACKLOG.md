@@ -90,6 +90,17 @@ is acting on what they state: nothing checks a family and nothing dispatches on 
 declare a sealed family with no discriminator, or a subtype that pins nothing, and load clean. Work lands on
 `r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
 
+- [ ] **`@abstract` on a template.** Meaningful and refused as a gap today: §5.10 holds a template's body as
+  text until materialisation closes it, and the mark does not travel. `result => <T> @abstract { … }` with
+  `ok => <T> result<T> & { … }` is the shape a host language spells `abstract class Result<T>`, and the
+  composition half already resolves — only the fact is dropped. `TemplateMaterialiser` must carry it onto the
+  entry it mints, which is where the closed `RecordBody` first exists. `@sealed` and `@final` are **not** part
+  of this: they are claims over a set of subtypes a template does not have, and are a resolver error
+  (`SPEC-FEEDBACK.md` #11). Inhabitance is what needs care — an abstract instantiation is inhabited only where
+  some schema also wrote a subtype's application, so `TypeInhabitance` sees a thinner family than the
+  declarations suggest, and the diagnostic should say which application is missing rather than that the type is
+  uninhabited.
+
 - [ ] **The load-time checks, over the linked closure.** One pass, in `TsonSchemaLinker` beside
   `ChoiceDisjointness`. What the resolver already refuses while lowering is the part that is local to one
   declaration and answerable without a namespace: two definition marks on one declaration, a mark carrying a

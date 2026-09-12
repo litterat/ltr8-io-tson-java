@@ -340,9 +340,15 @@ final class DefinitionResolver {
      * is also what makes the rule that extensibility is never inherited fall out rather than need stating --
      * a composition's body is built OPEN from its operands and the mark, if any, is this declaration's own.
      *
-     * <p>A mark on anything but a record is the author's error. A template is the one case worth its own
-     * wording: its body is held as text until materialisation ([TSON-SCHEMA] §5.10), so there is no record to
-     * mark yet, and carrying the fact through closing is not built.
+     * <p>A mark on anything but a record is the author's error, and a template is refused on two different
+     * footings. {@code @sealed} and {@code @final} are claims about <em>other</em> declarations -- that every
+     * subtype pins distinctly, that nothing composes onto it -- and a template has no set for such a claim to
+     * range over: {@code subtypes} indexes entries, an instantiation entry exists only where some schema wrote
+     * that application, so the claim's subject would be assembled from whichever applications happen to have
+     * been written and a new one elsewhere would silently change it. That is a schema error. {@code @abstract}
+     * constrains the marked type alone -- no direct instances, true of every instantiation identically -- so it
+     * is meaningful on a template and merely not built: the body is held as text until materialisation closes
+     * it (§5.10) and the fact does not travel with it.
      */
     private TypeDefinition withExtension(SchemaMap.Declaration declaration, TypeDefinition resolved) {
         Optional<RecordExtensionType> extension = DefinitionMarks.extension(declaration.name(),
@@ -351,9 +357,17 @@ final class DefinitionResolver {
             return resolved;
         }
         if (resolved.body() instanceof io.ltr8.tson.schema.meta.TemplateBody) {
+            if (extension.get() != RecordExtensionType.ABSTRACT) {
+                throw new SchemaValidationException("'" + declaration.name() + "': '@"
+                        + extension.get().name().toLowerCase(java.util.Locale.ROOT)
+                        + "' states a closed set of subtypes, which a template has none of -- each application"
+                        + " mints its own entry with its own subtypes index, so the claim would range over"
+                        + " whichever applications a closure happens to write. Mark a closed declaration"
+                        + " instead ([TSON-SCHEMA] §5.2, §5.10)");
+            }
             throw new UnsupportedOperationException("'" + declaration.name()
-                    + "': a template cannot yet state how it may be realised -- its body is held until"
-                    + " materialisation closes it, and the mark does not travel with it");
+                    + "': a template cannot yet be abstract -- its body is held until materialisation closes"
+                    + " it, and the mark does not travel with it");
         }
         if (!(resolved.body() instanceof RecordBody record)) {
             throw new SchemaValidationException("'" + declaration.name()

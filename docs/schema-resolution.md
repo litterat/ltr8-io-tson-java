@@ -50,9 +50,13 @@ are kept in step deliberately.
   it: a fresh record, a composition and a refinement each mint their own `RecordBody`, and a mark read three
   times is a mark two of them can disagree about — applying it once is also what makes "extensibility is never
   inherited" fall out rather than need stating, a composition's body arriving OPEN from its operands. A mark on
-  a non-record is the author's error; on a **template** it is a gap, the body being held as text until
-  materialisation closes it (§5.10) and the fact not travelling with it. A restated field keeps a
-  discriminator it does not repeat, on the annotation-merge rule's own logic below.
+  a non-record is the author's error, and a **template** is refused on two footings: `@sealed` and `@final` are
+  claims about other declarations, and §8.2's `subtypes` indexes entries, so an instantiation entry exists only
+  where some schema writes that application and the claim would range over whichever ones a closure happens to
+  contain — a schema error; `@abstract` constrains the marked type alone, holds of every instantiation
+  identically, and is merely a gap, the body being held as text until materialisation closes it (§5.10) and the
+  fact not travelling with it. A restated field keeps a discriminator it does not repeat, on the
+  annotation-merge rule's own logic below.
 - **A restated field's annotations merge over the inherited ones, restatement first** (`resolveField`/`merged`).
   §5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one, and neither says what
   becomes of the field's annotations; a resolver's two paths gave two answers, an inherited field being absorbed

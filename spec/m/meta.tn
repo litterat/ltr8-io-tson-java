@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta.tn?sha256=3a22498a2f2aa2ffa00f39985196f433c108a670bac54076ed5917571bf70908"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=498f0ccd66d289fbbe9a9f60ef966b7504bbe50b3aa21c2423a0d531ae629ddd"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=565ea7d483597c24efa86ce409ffacd4bd6d92938a24253fee89e7a05a45e815"
 !!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=565ea7d483597c24efa86ce409ffacd4bd6d92938a24253fee89e7a05a45e815"
 @doc:"""
@@ -655,9 +655,10 @@
     Declares a record SEALED: abstract, and dispatched on its own
     members rather than on a tag. **At least one field of it MUST
     carry `@discriminator`**, and a `@sealed` record with none is a
-    schema-load error. `@abstract`'s alternative and not its
-    companion — one definition mark per declaration, and this is the
-    one that demands the stronger body.
+    schema-load error. The declaration MUST be closed: a template
+    cannot be sealed, for the reason `@final` gives. `@abstract`'s
+    alternative and not its companion — one definition mark per
+    declaration, and this is the one that demands the stronger body.
 
     The requirement runs both ways with `@discriminator`'s own, and
     neither is load-bearing for the resolver: with one rule the other
@@ -685,6 +686,17 @@
     Subtraction stays admissible against a FINAL record —
     [TSON-SCHEMA] §5.9 empties `supertypes` and mints no IS-A edge,
     which is the only thing FINAL constrains.
+
+    **The declaration MUST be closed.** `@final` and `@sealed` are
+    claims about other declarations — that nothing composes onto
+    this one, that every subtype pins distinctly — and a template
+    has no set for such a claim to range over. `subtypes` indexes
+    entries; an instantiation entry exists only where some schema
+    writes that application (§5.10), so the claim would be assembled
+    from whichever applications a closure happens to contain and
+    writing one more elsewhere would change it. `@abstract` is not
+    refused on the same footing: it constrains the marked type alone,
+    and holds of every instantiation identically.
     """
   final => @annotation void
 
