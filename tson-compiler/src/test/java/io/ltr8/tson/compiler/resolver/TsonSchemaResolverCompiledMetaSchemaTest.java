@@ -15,6 +15,8 @@ import io.ltr8.tson.base.CanonicalIdentity;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.TsonSchemaRegistry;
 import io.ltr8.tson.base.SchemaValidationException;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.Unit;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -228,6 +231,57 @@ class TsonSchemaResolverCompiledMetaSchemaTest {
                 () -> resolver.resolveSchema(miniDocument));
         assertTrue(thrown.getMessage().contains("meta.tn"));
     }
+
+    /**
+     * The four marks are consumed before the governing meta is consulted, so they lower under a meta that
+     * declares none of them -- meta-kernel here, where {@code sealed} and {@code discriminator} are meta.tn's.
+     * That is what "reserved" means in the interim (SPEC-FEEDBACK #11): a meta-schema cannot give the names
+     * another meaning, and §12.1 spelling the four as syntax is the arrangement this approximates.
+     *
+     * <p>Non-vacuous, and {@link #anOrdinaryUnknownAnnotationIsStillTheAuthorsError} is why: the same document
+     * shape with a name that is <em>not</em> a mark fails at exactly the check these bypass.
+     */
+    @Test
+    void theMarksLowerUnderAMetaThatDeclaresNoneOfThem() {
+        SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
+        TsonSchema resolved = resolver.resolveSchema(new TsonSchemaParser(KERNEL_GOVERNED_MARKS)
+                .parseSchemaDocument());
+
+        RecordBody pet = assertInstanceOf(RecordBody.class, resolved.entries().get("pet").body());
+        assertEquals(RecordExtensionType.SEALED, pet.extension());
+        assertTrue(pet.fields().get(0).discriminator());
+        assertTrue(resolved.entries().get("pet").annotations().isEmpty(), "consumed, not preserved");
+    }
+
+    /** The check the marks bypass, shown still firing for a name that is not one. */
+    @Test
+    void anOrdinaryUnknownAnnotationIsStillTheAuthorsError() {
+        SchemaResolver resolver = new SchemaResolver(loadMetaKernelAndMeta());
+        SchemaDocument document = new TsonSchemaParser(KERNEL_GOVERNED_UNKNOWN_MARK).parseSchemaDocument();
+
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolver.resolveSchema(document));
+        assertTrue(thrown.getMessage().contains("does not name a type in the governing meta-schema"),
+                thrown.getMessage());
+    }
+
+    private static final String KERNEL_GOVERNED_MARKS = """
+            !!id:"https://example.test/marks.tn"
+            !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            {
+              pet => @sealed { @discriminator pet_type: identifier  nick: identifier }
+            }
+            """;
+
+    private static final String KERNEL_GOVERNED_UNKNOWN_MARK = """
+            !!id:"https://example.test/unknown-mark.tn"
+            !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
+            !!import:"https://tson.io/2026/36/m/meta-kernel.tn"
+            {
+              pet => @totally_unknown_xyz { nick: identifier }
+            }
+            """;
 
     private static final String MINI_DOCUMENT_NO_ID = """
             !!meta:"https://tson.io/2026/36/m/meta.tn"

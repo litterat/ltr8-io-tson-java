@@ -39,6 +39,24 @@ are kept in step deliberately.
   `=>` that land on the `TypeDefinition`, and the ones before the name that land on the entry's key — and
   `SchemaResolver` catches the second set's failures itself, since that loop runs outside the memoized getter
   that catches the first set's.
+- **Four marks are consumed before any of that runs** (`DefinitionMarks`). `@abstract`, `@sealed` and `@final`
+  at a declaration lower into `record.extension`; `@discriminator` on a field lowers into
+  `record_field.discriminator`. None reaches the annotation channel, so one carrier holds each fact and §6's
+  no-hoisting question does not arise. **They are matched by name and never resolved**, which is what reserves
+  them: an ordinary annotation means whatever the governing meta says, and these are taken before the meta is
+  consulted, so a meta-schema cannot give them another meaning — meta.tn declares all four anyway, which is
+  what documents them and reserves the names there too. Each is refused a value, being declared `void`. The
+  definition mark is applied in `resolve`, after the body is built and not inside whichever `resolve*` built
+  it: a fresh record, a composition and a refinement each mint their own `RecordBody`, and a mark read three
+  times is a mark two of them can disagree about — applying it once is also what makes "extensibility is never
+  inherited" fall out rather than need stating, a composition's body arriving OPEN from its operands. A mark on
+  a non-record is the author's error, and a **template** is refused on two footings: `@sealed` and `@final` are
+  claims about other declarations, and §8.2's `subtypes` indexes entries, so an instantiation entry exists only
+  where some schema writes that application and the claim would range over whichever ones a closure happens to
+  contain — a schema error; `@abstract` constrains the marked type alone, holds of every instantiation
+  identically, and is merely a gap, the body being held as text until materialisation closes it (§5.10) and the
+  fact not travelling with it. A restated field keeps a discriminator it does not repeat, on the
+  annotation-merge rule's own logic below.
 - **A restated field's annotations merge over the inherited ones, restatement first** (`resolveField`/`merged`).
   §5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one, and neither says what
   becomes of the field's annotations; a resolver's two paths gave two answers, an inherited field being absorbed

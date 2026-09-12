@@ -84,6 +84,12 @@ public record RecordField(String name, TypeRef type, FieldState state, boolean d
         return new RecordField(name, type, state, discriminator, value, annotations, position);
     }
 
+    /** A copy of this field with {@code discriminator} replaced -- every other component unchanged, as {@link #withType}. */
+    public RecordField withDiscriminator(boolean discriminator) {
+        return discriminator == this.discriminator ? this
+                : new RecordField(name, type, state, discriminator, value, annotations, position);
+    }
+
     /** A copy of this field with {@code state} replaced -- every other component unchanged, as {@link #withType}. */
     public RecordField withState(FieldState state) {
         return new RecordField(name, type, state, discriminator, value, annotations, position);

@@ -901,6 +901,24 @@ document in the world stops validating, and nothing fails in the schema that cha
 fail where it is made. A subtype that forgets its pin needs no mark to be caught — the closure rule is
 unconditional — so this is the one failure the redundancy is actually for.
 
+**A template may be abstract and may not be sealed or final, and the asymmetry is the marks' own.** §5.10 makes
+a template not a type: only an application is, and each application mints its own entry. ABSTRACT constrains the
+marked type alone — no direct instances — which is true of every instantiation identically and needs nothing else
+known, so `result => <T> @abstract { … }` with `ok => <T> result<T> & { … }` is meaningful and is the shape a host
+language spells `abstract class Result<T>`. SEALED and FINAL are claims about *other* declarations — that every
+subtype pins distinctly, that nothing composes onto this one — and a template has no set for such a claim to range
+over. `subtypes` is an index over entries (§8.2), and an instantiation entry exists only where some schema writes
+that application, so the claim's subject would be assembled from whichever applications a closure happens to
+contain: `ok<T>` composing onto `result<T>` puts nothing in `result<text>`'s index unless someone also writes
+`ok<text>`, and writing it in a fourth schema would change the family without touching its declaration. **Both
+marks are therefore a resolver error on a template**, and `@abstract` is not.
+
+The disanalogy with the host language is worth stating, because the host language is where the intuition comes
+from: Java's `sealed abstract class Result<T> permits Ok, Err` has one class carrying one permits list, and its
+sealing is over classes rather than parameterisations. A TSON template has no such single carrier — there is no
+entry for "the generic type", only one per application — which is the same fact from the other end. An author
+wanting a sealed generic family seals a closed declaration and parameterises below it.
+
 **Why the member carries it rather than the derivation.** ABSTRACT and SEALED differ in the *reading rule* and not
 only in bookkeeping — at ABSTRACT the tag is required, at SEALED it is optional and asserting — so a compiler
 reads one member and knows which reader to build, where a three-member enum would leave that difference to be
@@ -981,24 +999,32 @@ notation in the same document as the fields, and the split closes with the annot
 where it stands. Moving the declarations into the kernel meanwhile would put author-written vocabulary beside
 `synthetic`, which is the resolver's own, and buy nothing a reader can observe.
 
-**What is running:** the two kernel fields and the four marks' declarations.
+**What is running:** the two kernel fields, the four marks, and the lowering.
 `record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
-and `record_field.discriminator: boolean ~ false` are declared in this implementation's meta-kernel and bound by
-its value model, so a resolved schema carries both facts and the kernel's own three schemas resolve, link and
-compile against them unchanged — every record OPEN, every field not a discriminator. meta.tn declares `abstract`,
-`sealed`, `final` and `discriminator`, all four `@annotation void`, so an author can write the marks and they
-resolve; `@discriminator` has moved off `field_name`, so its old choice-level spelling is now refused at the
-annotation's own type. Nothing yet reads a mark or sets a field: the lowering is unwritten, the load-time checks
-are unwritten,
-SEALED is never derived, and no reader dispatches on a member. The inhabitance rule above is stated rather than
-measured.
+and `record_field.discriminator: boolean ~ false` are in this implementation's meta-kernel and bound by its value
+model. meta.tn declares `abstract`, `sealed`, `final` and `discriminator`, all four `@annotation void`;
+`@discriminator` has moved off `field_name`, so its old choice-level spelling is refused at the annotation's own
+type. **The resolver consumes all four into the body** — the definition mark once, after the body is built, so a
+fresh record, a composition and a refinement cannot disagree about it, and both annotation positions lower
+identically. They are matched by name and never resolved against the governing meta, which is what reserves them:
+they lower under a meta declaring none of them, where an ordinary unknown name is the author's error. Refused
+while lowering: two definition marks on one declaration, a mark carrying a value, and a definition mark on a
+non-record. A template carrying one is a gap, its body being held until materialisation closes it.
+
+What is **not** running is everything that acts on what the marks state. No load-time check reads the closure, so
+a `@sealed` record with no discriminator, an `@abstract` record with one, a subtype that pins nothing and two
+subtypes that pin the same value all load clean; no reader dispatches on a member; and the inhabitance and
+identity rules above are stated rather than measured. The kernel's own three schemas resolve, link and compile
+unchanged — every record OPEN, every field not a discriminator — which is the evidence that the fields cost
+nothing where nothing uses them.
 
 **Suggested resolution.** Add `extension: record_extension_type ~ OPEN` over `[ABSTRACT SEALED FINAL OPEN]` to the
 kernel's `record` and `discriminator: boolean ~ false` to its `record_field`, stating the four members' meanings and
 their two reading rules, the derivation of SEALED and the two load errors it yields, #10's checks over the
 discriminator field, the FINAL check over composition and refinement, the subtraction exemption and why it is not one,
-the inhabitance rule, the absence of any transition table, and the identity consequence; state that the marks are
-consumed rather than preserved and that their names are reserved; state the two marks as each other's condition —
+the inhabitance rule, the absence of any transition table, and the identity consequence; state that a template may
+be abstract and may not be sealed or final, with the reason; state that the marks are consumed rather than
+preserved and that their names are reserved; state the two marks as each other's condition —
 `@discriminator` requiring `@sealed`, `@abstract` forbidding a discriminator — and say that the redundancy is for
 the author rather than the resolver; correct §6's validity claim; and settle the field and enum names, which is the
 one part this entry does not.
