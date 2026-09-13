@@ -79,6 +79,7 @@ class CrossEncodingParityTest {
               disc      => figure & { side: int32 }
               kennel    => { p: pet }
               gallery   => { f: figure }
+              garage    => { r: robot }
             }
             """;
 
@@ -165,6 +166,29 @@ class CrossEncodingParityTest {
         static Rule of(Diagnostic d) {
             return new Rule(d.code(), d.path().orElse("?"), d.expected(), d.message());
         }
+    }
+
+    // ── §7.2 subsumption ─────────────────────────────────────────────────
+
+    /**
+     * A tag naming a type the position does not admit. One rule, and the two encodings had been giving it two
+     * codes -- {@code UNKNOWN_TYPE_REF} in TSON text against {@code TYPE_MISMATCH} here -- which also put it
+     * in two of §8.1's categories, {@code resolver} against {@code validation}, for one verdict. There was no
+     * parity case for it, and that absence is how they drifted.
+     */
+    @Test
+    void aTagNamingAnInadmissibleTypeIsOneRuleInBoth() {
+        sameRule("holder", """
+                { who: !robot { serial: "x" }  labels: [] }""", """
+                {"who":{"$type":"robot","serial":"x"},"labels":[]}""");
+    }
+
+    /** The same rule where the position's type has no subtypes at all, whose remedy differs. */
+    @Test
+    void aTagAtAPositionWithNoSubtypesIsOneRuleInBoth() {
+        sameRule("garage", """
+                { r: !person { name: "Ada"  labels: [] } }""", """
+                {"r":{"$type":"person","name":"Ada","labels":[]}}""");
     }
 
     // ── Subtype families ([TSON-SCHEMA] §5.2, [TSON-JSON] §6.1.5) ────────

@@ -327,7 +327,9 @@ module has a real `module-info.java`; module names mirror each module's root exp
   **The prose is the schema's vernacular** — a record has *fields* in both encodings, absence is *absent*
   rather than `_` or `null` — because it is the schema that refused the document; the encoding's own spelling
   rides in `actual`, which is data. That split is what the parity test compares: code, path, `expected` and
-  `message`, never `actual`. `RecordDiagnostics` is the family that proves the shape; the rest follow. What
+  `message`, never `actual`. `RecordDiagnostics` is the family that proves the shape; the rest follow —
+  `SubsumptionDiagnostics` sits beside it rather than inside it because §7.2's rule governs every atom and
+  product position and not records alone. What
   stays with each reader is any rule the other encoding has no counterpart for.
   **`io.ltr8.tson.base.io`** is where a document's bytes come from and go — `ByteSource` and `ByteSink`,
   one pair for both encodings because [TSON-JSON] §3.1 makes the JSON lexer decode UTF-8 from bytes exactly
@@ -930,7 +932,15 @@ a location this really emits, not an absence; the three components where `""` re
 renderer asks rather than remembering which convention each component uses. `expected` carries the
 **constraint that failed** — `<= 100`, `one of (A, B, C)` — from `AtomTypeException`'s six-shape
 vocabulary, never the type's name; the name leads
-`message` instead. The base-syntax exceptions keep their position out of `getMessage()` (it is in
+`message` instead.
+**`UNKNOWN_TYPE_REF` means the written name denotes nothing** and nothing else — three sites, all of them a
+name that resolves to no entry (`TypeRefCheck`, `AnnotationCapture`). A name that *does* resolve and is
+merely not admissible where it stands is `TYPE_MISMATCH`: §7.2 subsumption, a choice's variant membership, a
+union's member test, a type-ref naming a template — and so is a position whose **required** selector is
+absent, no type being established either way, which is why "a required tag is missing" needs no member of its
+own. The line decides §8.1's category as well as the name (`validation` against `resolver`), so conflating
+them misfiles the verdict; two pairs of readers had each agreed internally and disagreed with the
+other. The base-syntax exceptions keep their position out of `getMessage()` (it is in
 `position()`, and in `toString()` for a stack trace) so a diagnostic states it once. A read's schema end is
 one `SchemaLocation` (id + pointer + position) **accumulated as the read descends**, not claimed by whichever
 reader is innermost: the pointer is the path taken (`/person/age`), never the leaf it resolves to (`/int32` in
@@ -1002,7 +1012,7 @@ selection / Unicode policy / resource limits orthogonal; derived
 readers share the original's compiled-schema registry. Failures reaching or resolving the schema are
 diagnostics, not exceptions. A schemaless read still checks type-refs (`TypeRefCheck`: built-in name →
 must satisfy the atom; names-the-target → accepted, bind only; else `UNKNOWN_TYPE_REF` — a reader policy,
-a reader policy where §7.1 asks only that an unresolved annotation be treated as informational). Both tree
+where §7.1 asks only that an unresolved annotation be treated as informational). Both tree
 paths capture wire annotations; a schema-driven read also type-checks
 annotation *names* against the governing schema (§1.3's Class 2 bullet) — **wherever they are written, not only where the
 reader keeps them**, since whether a bound class has an `Annotations` carrier is no part of whether the

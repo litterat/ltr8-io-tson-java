@@ -86,7 +86,7 @@ final class VariantBindReader implements TsonTypeReader<Object>, Subsumption.App
         }
         String ref = typeRef.get();
         if (!isMember(ref)) {
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "'" + ref + "' is not a member of the union '" + name
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "'" + ref + "' is not a member of the union '" + name
                             + "' binds against " + describeMembers(),
                     "one of " + describeMembers(), ref);
             EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable

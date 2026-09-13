@@ -24,8 +24,12 @@ import java.util.Set;
  */
 final class TreeRecordAbstractReader implements JsonTypeReader<JsonValue> {
 
-    /** The base's own name -- naming it is refused with its own rule, the remedy differing (§8.1). */
-    private final String baseName;
+    /**
+     * Every written name that means the base -- its own, and any alias whose chain ends at it. Naming it is
+     * refused with its own rule, the remedy differing (§8.1), and an alias names it exactly as much (§7.2's
+     * "after reference flattening of both").
+     */
+    private final Set<String> selfNames;
 
     private final String displayName;
     private final Set<String> subtypes;
@@ -34,10 +38,10 @@ final class TreeRecordAbstractReader implements JsonTypeReader<JsonValue> {
     private final RecordExtensionDiagnostics extension;
     private final RecordDiagnostics rules;
 
-    TreeRecordAbstractReader(String name, String displayName, Set<String> subtypes,
+    TreeRecordAbstractReader(Set<String> selfNames, String displayName, Set<String> subtypes,
                              TypeReaderResolver readerFor, JsonSchemaLocation schemaLocation,
                              RecordDiagnostics rules) {
-        this.baseName = name;
+        this.selfNames = Set.copyOf(selfNames);
         this.displayName = displayName;
         this.subtypes = subtypes;
         this.readerFor = readerFor;
@@ -72,7 +76,7 @@ final class TreeRecordAbstractReader implements JsonTypeReader<JsonValue> {
             // refuses a tag naming it, where a concrete position would take one as a redundant restatement.
             // Located at the value rather than at `/$type`, for the reason TreeRecordSealedReader gives.
             if (!NameHygiene.refuses(ctx, tag.type())) {
-                ctx.report(tag.type().equals(baseName) ? extension.tagNamesTheBase(ReservedMembers.TYPE)
+                ctx.report(selfNames.contains(tag.type()) ? extension.tagNamesTheBase(ReservedMembers.TYPE)
                         : extension.notASubtype(ReservedMembers.TYPE, tag.type()));
             }
             EventSkip.nextValue(ctx);

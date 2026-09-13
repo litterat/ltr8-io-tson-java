@@ -326,6 +326,17 @@ when the selected type reads the value as a record) — over §3.2's closed rese
 and `$value`. §6.1.5 is what it buys at a record position: a tag naming a subtype, validated in full, which
 is the JSON spelling of `!employee` at a `person` field.
 
+**A `$type` is matched after reference flattening, on both sides** ([TSON-SCHEMA] §7.2's own words), and that
+reaches every position here that compares a written name against a set: a plain record's own name and its
+subtypes, an abstract base's subtypes, a sealed base's own name and the deeper names each dispatched member
+admits, and a choice's variants and their subtypes. One index answers it — `ReferenceChain.namesMeaning`,
+built once per compile and held by `ValueReaderContext`, the inverse of the chain walk beside it — because
+the alternative is each reader deciding for itself and the set of positions that flatten becoming whichever
+ones someone remembered. §9.4 makes the agreement with TSON text obligatory rather than tidy: the same alias
+names the same type in both, and `Subsumption.admitting` is the peer function on that side. What it is
+load-bearing for is a template instantiation, whose entry name is minted and non-normative (§8.2) — an alias
+is the only name a document has for one.
+
 **The class is `ReservedMembers`, not the spec's own noun, and the divergence is deliberate.** In this
 codebase `Annotation` means an `@name` annotation and nothing else — two dozen types say so, from the
 `tson-annotation` module through `Annotations`, `TsonAnnotation` and the `AnnotationStart`/`AnnotationEnd`
@@ -454,10 +465,11 @@ That is the parallel stack's cost showing up where it matters most, because the 
 alone — a choice dispatching one way in text and another in JSON would be pure drift. The parity test carries
 the cases.
 
-**A missing tag is `UNKNOWN_TYPE_REF`**, the code the TSON reader gives the same document. Read literally it is
-a poor fit — nothing unknown was written — and the closed `Code` enum has no member for "a required tag is
-missing", which `BACKLOG.md` records. §9.4 gives both encodings one vocabulary, so agreeing matters more than
-the name and the incumbent settles which member.
+**A missing tag is `TYPE_MISMATCH`**, the code the TSON reader gives the same document. The closed `Code`
+enum has no member for "a required tag is missing" and needs none: a tag that is required and absent
+establishes no type, which is what the code says, where `UNKNOWN_TYPE_REF` would claim a name denoted nothing
+and there is no name at all. That is also what the family readers already gave `tagRequired`, so one rule now
+has one code across both encodings and both readings of a record position.
 
 **Two divergences the parity test pins as divergences**, both structural rather than drift. A **choice cannot
 be a root type in text**: the root type-ref is both the binding and, at a choice position, the variant tag, so
@@ -1044,7 +1056,7 @@ name policy yet.
 
 Codes come from the same closed vocabulary the TSON readers use — §9.4 adds no category of its own — so
 `TYPE_MISMATCH`, `FIELD_REQUIRED`, `UNRECOGNIZED_FIELD`, `DUPLICATE_FIELD`, `DUPLICATE_MAP_KEY`,
-`WRONG_ARITY`, `ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`, `UNKNOWN_TYPE_REF` for a union with no selector, and
+`WRONG_ARITY`, `ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`, `TYPE_MISMATCH` again for a union with no selector, and
 **`BIND_MISMATCH`** for a class this context cannot analyse or cannot receive a JSON object's keys into.
 That last one is deliberately **not a verdict**: nothing about the document is being asserted by it, which
 is what a caller routing on `Code.verdict()` needs to be able to tell.

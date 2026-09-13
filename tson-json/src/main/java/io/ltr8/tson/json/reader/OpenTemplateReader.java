@@ -29,7 +29,7 @@ public final class OpenTemplateReader implements JsonTypeReader<Object> {
     @Override
     public Object read(JsonReadContext ctx) {
         ctx = ctx.underDeclaration(schemaLocation);
-        ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, message(), "a type, not a template", name);
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, message(), "a type, not a template", name);
         EventSkip.nextValue(ctx);
         return null;
     }

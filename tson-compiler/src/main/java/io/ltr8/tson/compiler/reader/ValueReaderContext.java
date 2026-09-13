@@ -7,6 +7,9 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
+import java.util.Map;
+import java.util.Set;
+
 /**
  * The compilation environment a {@link ValueReaderFactory} builds within, beyond its own entry's {@code
  * name}/{@code definition} (which stay direct {@code create} arguments): the whole {@link #linked} schema
@@ -21,7 +24,18 @@ import io.ltr8.tson.schema.meta.TypeDefinition;
  * scope push resolves a schema the <em>document</em> names, so {@link ScopedReader} is given where to go and
  * ask rather than an answer. Every other factory ignores it.
  */
-public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers, ForeignSchemas foreign) {
+public record ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers, ForeignSchemas foreign,
+                                 Map<String, Set<String>> namesMeaning) {
+
+    /**
+     * The index derived rather than supplied -- for a caller with no compilation around it. A compile passes
+     * its own, built once: {@link Subsumption#namesMeaning} walks every entry's reference chain, so deriving
+     * it per factory would be the schema's size squared for an answer that does not change.
+     */
+    public ValueReaderContext(TsonLinkedSchema linked, TsonTypeReaderResolver readers, ForeignSchemas foreign) {
+        this(linked, readers, foreign, Subsumption.namesMeaning(linked.schema().entries()));
+    }
+
 
     /** The resolved schema being compiled -- what a factory reaching a sibling entry wants. */
     public TsonSchema schema() {

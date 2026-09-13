@@ -49,7 +49,7 @@ public final class OpenTemplateReader implements TsonTypeReader<Object> {
     public Object read(TsonReadContext ctx) {
         ctx = ctx.underDeclaration(schemaLocation);
         // Reported before anything is consumed, so the data position is the type-ref the author wrote.
-        ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, message(), "a type, not a template", "!" + name);
+        ctx.report(Diagnostic.Code.TYPE_MISMATCH, message(), "a type, not a template", "!" + name);
         EventSkip.dataValue(ctx);
         return null;
     }

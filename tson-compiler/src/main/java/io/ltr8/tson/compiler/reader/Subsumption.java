@@ -7,7 +7,9 @@ import io.ltr8.tson.schema.meta.Atom;
 import io.ltr8.tson.schema.meta.Product;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -66,18 +68,35 @@ public final class Subsumption {
         if (reader instanceof Applied) {
             return reader;
         }
-        return new VariantSchemaReader(name, selfNames(name, namesMeaning), reader, definition.subtypes(),
-                resolver);
+        return dispatching(name, definition, reader, namesMeaning, resolver);
+    }
+
+    /**
+     * The dispatcher itself, for a record factory that builds one directly rather than having {@link #guard}
+     * wrap it -- a record whose type has subtypes, where the factory holds the entry's own reader and the
+     * guard would only find an {@link Applied} it must leave alone.
+     *
+     * <p><b>It exists so that both routes to a dispatcher expand the same two name sets.</b> They did not:
+     * the guard's route flattened aliases and the factory's did not, so an alias for the position's own type
+     * was admitted at a leaf record and refused at one that happened to have a subtype -- the same schema,
+     * the same rule, two answers decided by which construction site the entry reached.
+     */
+    public static TsonTypeReader<?> dispatching(String name, TypeDefinition definition,
+                                                TsonTypeReader<?> ownParser,
+                                                Map<String, Set<String>> namesMeaning,
+                                                TsonTypeReaderResolver resolver) {
+        return new VariantSchemaReader(name, admitting(List.of(name), namesMeaning), ownParser,
+                admitting(definition.subtypes(), namesMeaning), resolver);
     }
 
     /**
      * For each entry, the written names that mean it: the chain-end of every name in {@code entries},
      * grouped. **Built once per compile**, because it is a property of the schema and not of the entry being
-     * guarded -- {@code selfNames} used to answer the same question by scanning every entry again for every
-     * entry compiled, which is the schema's size squared for a fact that does not change between calls.
+     * guarded -- answering it per entry meant scanning every entry again for every entry compiled, which is
+     * the schema's size squared for a fact that does not change between calls.
      *
      * <p>An entry with no aliases is absent rather than present-and-singleton: the overwhelming majority,
-     * and {@link #selfNames} adds the name itself anyway.
+     * and {@link #admitting} adds the name itself anyway.
      */
     public static Map<String, Set<String>> namesMeaning(Map<String, TypeDefinition> entries) {
         Map<String, Set<String>> index = new LinkedHashMap<>();
@@ -91,20 +110,28 @@ public final class Subsumption {
     }
 
     /**
-     * The written names that mean {@code name}: itself, plus every {@code REFERENCE} entry whose chain ends
-     * at it. §7.2 compares "after reference flattening of <b>both</b>", and an alias and its target are one
-     * type -- so {@code !created} at a {@code created}-typed position names the position's own type even
-     * though the reader running there belongs to the instantiation {@code created} aliases. Fixed at compile
-     * time, because the reader cannot know which of its aliases a given position was written as.
+     * Each of {@code names} with every {@code REFERENCE} entry whose chain ends at it. §7.2 compares "after
+     * reference flattening of <b>both</b>", and an alias and its target are one type -- so {@code !created}
+     * at a {@code created}-typed position names the position's own type even though the reader running there
+     * belongs to the instantiation {@code created} aliases, and {@code !ok_of_text} at a {@code result<text>}
+     * position names a subtype even though the entry it aliases is one the resolver minted.
+     *
+     * <p><b>Both ends of the comparison need it, which is why this is one function and not two.</b> The
+     * position's own type and each of its subtypes are matched against a written name by the same rule, and
+     * an implementation applying it to only one of them refuses an alias in exactly the places an author has
+     * no other name to write: a materialised entry's own name is implementation-chosen (§8.2), so an alias is
+     * how a template instantiation is named at all.
+     *
+     * <p><b>The alias is kept rather than reduced to its target.</b> A reference entry compiles to its
+     * target's reader named for the entry doing the referring ({@code UseSite.named}), so dispatching on the
+     * written name runs the same reader and reports under the name the author typed.
      */
-    private static Set<String> selfNames(String name, Map<String, Set<String>> namesMeaning) {
-        Set<String> aliases = namesMeaning.get(name);
-        if (aliases == null) {
-            return Set.of(name);
+    public static Set<String> admitting(Collection<String> names, Map<String, Set<String>> namesMeaning) {
+        Set<String> admitted = new LinkedHashSet<>();
+        for (String name : names) {
+            admitted.add(name);
+            admitted.addAll(namesMeaning.getOrDefault(name, Set.of()));
         }
-        Set<String> names = new LinkedHashSet<>();
-        names.add(name);
-        names.addAll(aliases);
-        return names;
+        return admitted;
     }
 }

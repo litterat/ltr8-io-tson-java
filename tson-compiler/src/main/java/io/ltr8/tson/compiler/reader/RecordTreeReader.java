@@ -51,7 +51,7 @@ final class RecordTreeReader extends RecordAbstractReader<TsonValue> {
             if (typeDefinition.subtypes().isEmpty()) {
                 return ownParser;
             }
-            return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver);
+            return Subsumption.dispatching(name, typeDefinition, ownParser, context.namesMeaning(), resolver);
         }
     }
 

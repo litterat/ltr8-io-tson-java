@@ -242,8 +242,30 @@ public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, 
     public enum Code {
         FIELD_REQUIRED,
         FIELD_FIXED,
+
+        /**
+         * The value's type is not one the position takes. That covers a written type annotation naming a type
+         * the position does not admit ([TSON-SCHEMA] §7.2's subsumption rule, a choice's variant membership
+         * and a union's alike) and a position where a selector is <b>required</b> and absent, since no type
+         * is established either way.
+         *
+         * <p><b>The line against {@link #UNKNOWN_TYPE_REF} is whether the written name resolves.</b> Here it
+         * does, and what fails is admissibility -- a verdict on the document read against a schema that
+         * loaded, so [TSON-DATA] §8.1's {@code validation} category. It is worth stating because the two are
+         * easy to conflate and a consumer routes on the difference: one says "correct the name", the other
+         * says "this name means nothing here".
+         */
         TYPE_MISMATCH,
         WRONG_ARITY,
+
+        /**
+         * The written name denotes nothing -- a type-ref or an annotation naming no type the governing schema
+         * declares, or, on the schemaless path, one linking to nothing at all. §8.1's {@code resolver}
+         * category, an unresolved reference being what that category is for.
+         *
+         * <p>A name that <em>does</em> resolve and is merely not admissible at its position is {@link
+         * #TYPE_MISMATCH}, not this.
+         */
         UNKNOWN_TYPE_REF,
         ATOM_FORM_INVALID,
         ATOM_CONSTRAINT_VIOLATION,

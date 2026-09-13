@@ -134,9 +134,10 @@ class JsonChoiceReadTest {
     void aNonDisjointChoiceRequiresATag() {
         Diagnostic refusal = read("shape", """
                 {"radius": 1.0}""").refusal();
-        // UNKNOWN_TYPE_REF, matching the TSON reader for the same document -- §9.4 gives both encodings one
-        // vocabulary, and the enum has no member for "a required tag is missing" (BACKLOG).
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, refusal.code());
+        // TYPE_MISMATCH, matching the TSON reader for the same document -- §9.4 gives both encodings one
+        // vocabulary. A required tag that is absent establishes no type, which is what the code says;
+        // UNKNOWN_TYPE_REF would claim a name denoted nothing, and there is no name here at all.
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
         assertTrue(refusal.message().contains("$type"), refusal.message());
         assertTrue(refusal.message().contains("circle"), refusal.message());
     }
@@ -146,7 +147,7 @@ class JsonChoiceReadTest {
     void nothingMatchesARecordVariantByItsMembers() {
         // `{"side": 1.0}` is unambiguous to a human -- only `square` declares `side` -- and §8.2 forbids
         // recovering the variant that way, because that is the cleverness the closed predicate excludes.
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, read("shape", """
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, read("shape", """
                 {"side": 1.0}""").refusal().code());
     }
 
@@ -181,7 +182,7 @@ class JsonChoiceReadTest {
     void aTagNamingSomethingThatIsNoVariantIsRefused() {
         Diagnostic refusal = read("shape", """
                 {"$type": "holder", "pick": 1}""").refusal();
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, refusal.code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
         assertTrue(refusal.expected().contains("circle"), refusal.expected());
     }
 
@@ -202,7 +203,7 @@ class JsonChoiceReadTest {
     @Test
     void anApproximateVariantAdmittingSpecialsIsNotClassStable() {
         Diagnostic refusal = read("loose", "1.5").refusal();
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, refusal.code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
         assertTrue(refusal.message().contains("$type"), "route 2 must be unavailable: " + refusal.message());
     }
 
