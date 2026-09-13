@@ -406,6 +406,19 @@ and recurse; and it is **transparent to `UseSite` renaming and to bind-mode cont
 which look at the reader it wraps — the first or a diagnostic names the entry instead of the author's
 alias, the second or a bound `Map` field silently loses its rebinding.
 
+**"Both" is both ends of the comparison, and the subtype end is the one that matters most.** The aliases of
+the position's own type and the aliases of each of its subtypes are flattened by one function
+(`Subsumption.admitting`), reached by one dispatcher builder (`Subsumption.dispatching`) that both routes to
+a `VariantSchemaReader` go through — the guard's, and the record factories' for a type that has subtypes.
+They did not: the guard's route flattened and the factories' did not, so the same alias was admitted at a
+leaf record and refused at one that happened to have a subtype, decided by which construction site the entry
+reached. The subtype end is where it is load-bearing rather than tidy: a materialised entry's name is
+implementation-chosen and non-normative (§8.2), so an alias is the *only* name a document has for a template
+instantiation, and without it a subtype-template family exists in the index with no member anything can
+write. **The alias is admitted rather than reduced to its target** — a reference entry compiles to its
+target's reader named for the referring entry, so dispatching on the written name runs the same reader and
+reports under the name the author typed.
+
 **Which names mean an entry is one index, built once per compile** (`Subsumption.namesMeaning`, held by
 `Compilation`). It is a property of the schema, not of the entry being guarded — the names whose *chain*
 ends at that entry, transitively, so a two-hop alias counts. Answering it per entry meant scanning every

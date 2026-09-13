@@ -59,8 +59,11 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
 
     private final String displayName;
 
-    /** The base's own name, which a tag may restate: §8.1 admits a redundant tag at any typed position. */
-    private final String baseName;
+    /**
+     * Every written name that means the base, which a tag may restate: §8.1 admits a redundant tag at any
+     * typed position, and §7.2 compares after flattening, so an alias restates it too.
+     */
+    private final Set<String> selfNames;
 
     private final List<Selector> selectors;
     private final Set<String> selectorNames;
@@ -77,10 +80,10 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
     private final RecordDiagnostics rules;
     private final String pinned;
 
-    TreeRecordSealedReader(String name, String displayName, RecordBody body, Set<String> subtypes,
+    TreeRecordSealedReader(Set<String> selfNames, String displayName, RecordBody body, Set<String> subtypes,
                            ValueReaderContext context, JsonSchemaLocation schemaLocation,
                            RecordDiagnostics rules) {
-        this.baseName = name;
+        this.selfNames = Set.copyOf(selfNames);
         this.displayName = displayName;
         this.readerFor = context.readers();
         this.schemaLocation = schemaLocation;
@@ -105,7 +108,7 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
             Set<String> under = new LinkedHashSet<>();
             under.add(subtype);
             under.addAll(definition.subtypes());
-            deeper.put(subtype, under);
+            deeper.put(subtype, context.admitting(under));
         }
         this.pinned = members.keySet().stream().map(TreeRecordSealedReader::render).reduce((a, b) -> a + " | " + b)
                 .orElse("(none)");
@@ -188,7 +191,7 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
-        if (tag.type() != null && tag.type().equals(baseName)) {
+        if (tag.type() != null && selfNames.contains(tag.type())) {
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances, and a sealed base has none: naming it selects nothing.
             ctx.report(extension.tagNamesTheBase(ReservedMembers.TYPE));

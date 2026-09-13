@@ -531,7 +531,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 RecordBindReader ownParser = new RecordBindReader(name, EntryDisplayName.of(name, typeDefinition),
                         body, record, resolver, context,
                         context.locationOf(name, typeDefinition), AnnotationTypes.of(context));
-                return new VariantSchemaReader(name, ownParser, typeDefinition.subtypes(), resolver);
+                return Subsumption.dispatching(name, typeDefinition, ownParser, context.namesMeaning(), resolver);
             }
 
             throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()

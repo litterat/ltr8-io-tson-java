@@ -60,16 +60,25 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         RecordDiagnostics rules = new RecordDiagnostics(displayName,
                 body.fields().stream().map(RecordField::name).reduce((a, b) -> a + " | " + b).orElse(""));
         return switch (body.extension()) {
-            case ABSTRACT -> new TreeRecordAbstractReader(name, displayName,
-                    Set.copyOf(definition.subtypes()), context.readers(), location, rules);
-            case SEALED -> new TreeRecordSealedReader(name, displayName, body,
+            case ABSTRACT -> new TreeRecordAbstractReader(context.admitting(List.of(name)), displayName,
+                    context.admitting(definition.subtypes()), context.readers(), location, rules);
+            // The sealed reader takes its subtypes raw: it maps each member's pins to that member, so an
+            // alias is not a second member. Where it compares a written tag it admits aliases (`deeper`).
+            case SEALED -> new TreeRecordSealedReader(context.admitting(List.of(name)), displayName, body,
                     Set.copyOf(definition.subtypes()), context, location, rules);
-            case OPEN, FINAL -> new TreeRecordReader(name, displayName, body, definition.subtypes(), context,
-                    location);
+            case OPEN, FINAL -> new TreeRecordReader(name, context.admitting(List.of(name)), displayName, body,
+                    context.admitting(definition.subtypes()), context, location);
         };
     };
 
     private final String name;
+
+    /**
+     * Every written name that means this entry: its own, and any alias whose chain ends at it. §7.2 compares
+     * "after reference flattening of both", so a tag spelling an alias names this type and reads here.
+     */
+    private final Set<String> selfNames;
+
     private final List<RecordField> fields;
     private final Map<String, Integer> index;
     private final List<JsonTypeReader<?>> readers;
@@ -103,12 +112,14 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
      */
     private final String displayName;
 
-    private TreeRecordReader(String name, String displayName, RecordBody body, Collection<String> subtypes,
-                             ValueReaderContext context, JsonSchemaLocation schemaLocation) {
+    private TreeRecordReader(String name, Collection<String> selfNames, String displayName, RecordBody body,
+                             Collection<String> subtypes, ValueReaderContext context,
+                             JsonSchemaLocation schemaLocation) {
         this.displayName = displayName;
         this.subtypes = Set.copyOf(subtypes);
         this.readerFor = context.readers();
         this.name = name;
+        this.selfNames = Set.copyOf(selfNames);
         this.fields = List.copyOf(body.fields());
         this.groups = List.copyOf(body.groups());
         this.hasGroups = !this.groups.isEmpty();
@@ -203,7 +214,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
-        if (!name.equals(tag.type()) && !subtypes.contains(tag.type())) {
+        if (!selfNames.contains(tag.type()) && !subtypes.contains(tag.type())) {
             // §9.4 reaches every `$type` too, and for the same reason: a look-alike type name is refused
             // rather than reported as naming nothing.
             if (!NameHygiene.refuses(ctx, tag.type())) {
@@ -227,7 +238,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
      * type's reader, which scans it again, finds its own name, and reads it inline.
      */
     private JsonValue inline(JsonReadContext ctx, String type) {
-        if (name.equals(type)) {
+        if (selfNames.contains(type)) {
             return readObject(ctx);
         }
         return (JsonValue) readerFor.resolve(type).read(ctx);

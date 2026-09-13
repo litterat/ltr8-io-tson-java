@@ -113,15 +113,18 @@ rules. Work lands on
   member being a `RecordBody` component with no `equals` override, so what is owed is only that the wire form
   carry it — which is the same line the held body needs above, and is free once that is written.
 
-- [ ] **An alias naming a subtype is refused at a subsumption position.** `VariantSchemaReader` matches the
-  written type-ref against `subtypeNames`, a set of entry names, where the position's *own* aliases are
-  handled (`selfNames`) and a subtype's are not — so `alias => sub` reaching a `base` position is
-  `UNKNOWN_TYPE_REF`, with no template anywhere in sight. §7.2 compares "after reference flattening of both",
-  which says the alias and its target are one type at either end of the comparison, not only at the position's.
-  **It is what stands between the parameterised IS-A edge and a document that can use it**: a materialised
-  instantiation's name is implementation-chosen and non-normative (§8.2), so an alias is the only way an
-  author can write `!ok<text>` at all, and today it is refused. Fixing it means folding each subtype's own
-  aliases into the set the same walk already builds for `selfNames`.
+- [ ] **The two encodings give §7.2's subsumption refusal different codes, and §9.4 says they may not.** A
+  type annotation naming an entry that is neither the position's type nor one of its subtypes is
+  `UNKNOWN_TYPE_REF` in TSON text (`VariantSchemaReader`) and `TYPE_MISMATCH` in JSON (`TreeRecordReader`),
+  with different prose — one rule, two answers, where §9.4 requires one `Diagnostic.Code`, one pointer, one
+  `expected` and one message. They also land in different §8.1 categories as a result, `resolver` against
+  `validation`, so the corpus states one of them per encoding for a rule that has one verdict.
+  `TYPE_MISMATCH` is the code to converge on: the name resolves, and what fails is that the type it names is
+  not admissible here — where `UNKNOWN_TYPE_REF` says the name denotes nothing, which stays right for the
+  schemaless reader's own check (`TypeRefCheck`) and for a reference that really is unresolved. Moving it
+  means the refusal changes category too, which is the correct one for a read-time verdict against a schema
+  that loaded, and touches `preservingUnknownTypeRefs`, the corpus vectors stating `resolver` for this rule,
+  and `CrossEncodingParityTest`, which has no case for it — that absence is how the two drifted.
 
 ## JSON encoding
 

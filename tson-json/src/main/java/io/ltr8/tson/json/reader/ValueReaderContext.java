@@ -5,14 +5,32 @@ import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+
 /**
  * The compilation environment beyond one entry: the schema being compiled, and how a composite reaches the
  * readers for its own children. Handed to every {@link ValueReaderFactory}.
  */
-public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers) {
+public record ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers,
+                                 Map<String, Set<String>> namesMeaning) {
+
+    /**
+     * The alias index derived rather than supplied. A compile passes its own, built once: deriving it per
+     * factory walks every reference chain again for every entry.
+     */
+    public ValueReaderContext(TsonLinkedSchema linked, TypeReaderResolver readers) {
+        this(linked, readers, ReferenceChain.namesMeaning(linked.schema()));
+    }
 
     public TsonSchema schema() {
         return linked.schema();
+    }
+
+    /** Each of {@code names} with every alias that means it -- what a written {@code $type} is matched against. */
+    public Set<String> admitting(Collection<String> names) {
+        return ReferenceChain.admitting(names, namesMeaning);
     }
 
     /**

@@ -16,6 +16,7 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 
 /**
@@ -62,17 +63,24 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
      */
     private final Map<String, String> bySubtype;
 
+    /**
+     * The variant names a written {@code $type} may spell: each variant, and every alias whose chain ends at
+     * it. {@link #variants} stays the declared list, which is what a diagnostic names.
+     */
+    private final Set<String> admittedVariants;
+
     private TreeChoiceReader(String name, ChoiceBody body, ValueReaderContext context,
                              JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.variants = body.variants().stream().map(TypeRef::name).toList();
+        this.admittedVariants = context.admitting(this.variants);
         this.schemaLocation = schemaLocation;
         this.readerFor = context.readers();
         this.byClass = routeTwo(context.schema(), body);
         Map<String, String> subtypes = new LinkedHashMap<>();
         for (TypeRef variant : body.variants()) {
             ReferenceChain.terminal(context.schema(), variant.name())
-                    .ifPresent(resolved -> resolved.definition().subtypes()
+                    .ifPresent(resolved -> context.admitting(resolved.definition().subtypes())
                             .forEach(subtype -> subtypes.putIfAbsent(subtype, variant.name())));
         }
         this.bySubtype = Map.copyOf(subtypes);
@@ -159,7 +167,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
-        String selected = variants.contains(tag.type()) ? tag.type() : variantAdmitting(tag.type());
+        String selected = admittedVariants.contains(tag.type()) ? tag.type() : variantAdmitting(tag.type());
         if (selected == null) {
             if (!NameHygiene.refuses(ctx, tag.type())) {
                 ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.UNKNOWN_TYPE_REF,

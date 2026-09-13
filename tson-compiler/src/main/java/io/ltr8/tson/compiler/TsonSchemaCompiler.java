@@ -238,7 +238,7 @@ public final class TsonSchemaCompiler {
                 // every other entry is dispatched on. See OpenTemplateReader for why the refusal is the
                 // entry's own reader rather than a check at the root.
                 return new OpenTemplateReader(name, definition.parameters(),
-                        new ValueReaderContext(linked, readers, foreign).locationOf(name, definition));
+                        new ValueReaderContext(linked, readers, foreign, namesMeaning).locationOf(name, definition));
             }
             Top body = definition.body();
             if (body instanceof Reference r) {
@@ -250,7 +250,8 @@ public final class TsonSchemaCompiler {
                 return UseSite.named(resolve(r.target().name()), EntryDisplayName.of(name, definition));
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
-            TsonTypeReader<?> built = factory.create(name, definition, new ValueReaderContext(linked, readers, foreign));
+            TsonTypeReader<?> built = factory.create(name, definition,
+                    new ValueReaderContext(linked, readers, foreign, namesMeaning));
             // §7.2's subsumption rule, applied at every position it governs rather than only where a record
             // happened to have subtypes -- see Subsumption for which kinds it deliberately leaves alone.
             return Subsumption.guard(name, definition, built, namesMeaning, readers);

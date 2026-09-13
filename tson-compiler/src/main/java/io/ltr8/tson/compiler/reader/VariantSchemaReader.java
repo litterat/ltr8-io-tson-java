@@ -49,11 +49,6 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
     private final Set<String> subtypeNames;
     private final TsonTypeReaderResolver resolver;
 
-    VariantSchemaReader(String name, TsonTypeReader<?> ownParser, Collection<String> subtypeNames,
-                        TsonTypeReaderResolver resolver) {
-        this(name, Set.of(name), ownParser, subtypeNames, resolver);
-    }
-
     /**
      * {@code selfNames} are the written names that mean <em>this</em> type and so read through
      * {@code ownParser} rather than dispatching: the entry's own name, plus any alias that flattens to it.

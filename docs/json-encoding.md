@@ -326,6 +326,17 @@ when the selected type reads the value as a record) — over §3.2's closed rese
 and `$value`. §6.1.5 is what it buys at a record position: a tag naming a subtype, validated in full, which
 is the JSON spelling of `!employee` at a `person` field.
 
+**A `$type` is matched after reference flattening, on both sides** ([TSON-SCHEMA] §7.2's own words), and that
+reaches every position here that compares a written name against a set: a plain record's own name and its
+subtypes, an abstract base's subtypes, a sealed base's own name and the deeper names each dispatched member
+admits, and a choice's variants and their subtypes. One index answers it — `ReferenceChain.namesMeaning`,
+built once per compile and held by `ValueReaderContext`, the inverse of the chain walk beside it — because
+the alternative is each reader deciding for itself and the set of positions that flatten becoming whichever
+ones someone remembered. §9.4 makes the agreement with TSON text obligatory rather than tidy: the same alias
+names the same type in both, and `Subsumption.admitting` is the peer function on that side. What it is
+load-bearing for is a template instantiation, whose entry name is minted and non-normative (§8.2) — an alias
+is the only name a document has for one.
+
 **The class is `ReservedMembers`, not the spec's own noun, and the divergence is deliberate.** In this
 codebase `Annotation` means an `@name` annotation and nothing else — two dozen types say so, from the
 `tson-annotation` module through `Annotations`, `TsonAnnotation` and the `AnnotationStart`/`AnnotationEnd`
