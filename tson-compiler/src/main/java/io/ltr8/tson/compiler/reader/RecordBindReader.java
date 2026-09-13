@@ -515,7 +515,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
 
             if (dataClass instanceof DataClassUnion union) {
                 TsonTypeReader<?> noOwnData = ctx -> {
-                    ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
+                    ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                             "'" + name + "' has no data of its own to bind -- provide an explicit type annotation "
                                     + "(!typeName) naming one of its subtypes " + typeDefinition.subtypes(),
                             "an explicit type annotation naming one of " + typeDefinition.subtypes(), "(none)");

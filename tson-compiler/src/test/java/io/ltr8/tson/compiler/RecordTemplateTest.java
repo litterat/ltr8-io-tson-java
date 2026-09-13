@@ -701,7 +701,8 @@ class RecordTemplateTest {
         assertNull(value);
         assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
         Diagnostic problem = problems.diagnostics().get(0);
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, problem.code());
+        // The name resolves -- to a template, which is not a type, so it is not admissible here.
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
         assertTrue(problem.message().contains("'paged' is a template taking 1 type argument [T]"),
                 problem.message());
         assertTrue(problem.message().contains("my_type => paged<...>"), "the route out of it: " + problem.message());

@@ -465,10 +465,11 @@ That is the parallel stack's cost showing up where it matters most, because the 
 alone — a choice dispatching one way in text and another in JSON would be pure drift. The parity test carries
 the cases.
 
-**A missing tag is `UNKNOWN_TYPE_REF`**, the code the TSON reader gives the same document. Read literally it is
-a poor fit — nothing unknown was written — and the closed `Code` enum has no member for "a required tag is
-missing", which `BACKLOG.md` records. §9.4 gives both encodings one vocabulary, so agreeing matters more than
-the name and the incumbent settles which member.
+**A missing tag is `TYPE_MISMATCH`**, the code the TSON reader gives the same document. The closed `Code`
+enum has no member for "a required tag is missing" and needs none: a tag that is required and absent
+establishes no type, which is what the code says, where `UNKNOWN_TYPE_REF` would claim a name denoted nothing
+and there is no name at all. That is also what the family readers already gave `tagRequired`, so one rule now
+has one code across both encodings and both readings of a record position.
 
 **Two divergences the parity test pins as divergences**, both structural rather than drift. A **choice cannot
 be a root type in text**: the root type-ref is both the binding and, at a choice position, the variant tag, so
@@ -1055,7 +1056,7 @@ name policy yet.
 
 Codes come from the same closed vocabulary the TSON readers use — §9.4 adds no category of its own — so
 `TYPE_MISMATCH`, `FIELD_REQUIRED`, `UNRECOGNIZED_FIELD`, `DUPLICATE_FIELD`, `DUPLICATE_MAP_KEY`,
-`WRONG_ARITY`, `ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`, `UNKNOWN_TYPE_REF` for a union with no selector, and
+`WRONG_ARITY`, `ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`, `TYPE_MISMATCH` again for a union with no selector, and
 **`BIND_MISMATCH`** for a class this context cannot analyse or cannot receive a JSON object's keys into.
 That last one is deliberately **not a verdict**: nothing about the document is being asserted by it, which
 is what a caller routing on `Code.verdict()` needs to be able to tell.

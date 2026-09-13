@@ -147,8 +147,8 @@ class DispatchedAnnotationTest {
                 !holder { thing: @note:"why" !square { side: "3" } }""");
 
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
-        // TYPE_MISMATCH: §7.2's subsumption refusal, where the name resolves and the type it names is not
-        // admissible here. The union case below keeps UNKNOWN_TYPE_REF, membership being a different relation.
+        // TYPE_MISMATCH: the name resolves and the type it names is not admissible here. UNKNOWN_TYPE_REF
+        // means a name denoting nothing, which this is not.
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.diagnostics().getFirst().code());
         assertNull(root.get("thing").asString().orElse(null));
     }
@@ -161,7 +161,7 @@ class DispatchedAnnotationTest {
                 !!schema:"https://example.test/dispatch-1.tn"
                 !holder { thing: @note:"why" !square { side: "3" } }""", Holder.class);
 
-        assertEquals(List.of(Diagnostic.Code.UNKNOWN_TYPE_REF),
+        assertEquals(List.of(Diagnostic.Code.TYPE_MISMATCH),
                 problems.diagnostics().stream().map(Diagnostic::code).toList());
     }
 }

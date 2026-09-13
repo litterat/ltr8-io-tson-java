@@ -161,7 +161,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
             return JsonNull.INSTANCE;
         }
         if (tag.type() == null) {
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                     "this object carries this encoding's reserved members but no '$type' naming a variant of '"
                             + name + "' (§3.3)", "a '$type' member holding a variant name", "no $type");
             EventSkip.nextValue(ctx);
@@ -170,7 +170,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
         String selected = admittedVariants.contains(tag.type()) ? tag.type() : variantAdmitting(tag.type());
         if (selected == null) {
             if (!NameHygiene.refuses(ctx, tag.type())) {
-                ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.UNKNOWN_TYPE_REF,
+                ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
                         "'$type' names '%s', which is not a variant of '%s'".formatted(tag.type(), name),
                         String.join(" | ", variants), tag.type());
             }
@@ -213,7 +213,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
                     "'%s' admits no absence, and JSON null is this encoding's spelling of the absent sentinel (§7)"
                             .formatted(name), "a value of one of (" + String.join(" | ", variants) + ")", "null");
         } else if (byClass.isEmpty()) {
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF,
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                     "'%s' cannot be discriminated from the JSON form alone, so a value here carries a '$type' "
                             .formatted(name) + "naming its variant (§8.2) -- its variants are ("
                             + String.join(" | ", variants) + ")",

@@ -932,7 +932,15 @@ a location this really emits, not an absence; the three components where `""` re
 renderer asks rather than remembering which convention each component uses. `expected` carries the
 **constraint that failed** — `<= 100`, `one of (A, B, C)` — from `AtomTypeException`'s six-shape
 vocabulary, never the type's name; the name leads
-`message` instead. The base-syntax exceptions keep their position out of `getMessage()` (it is in
+`message` instead.
+**`UNKNOWN_TYPE_REF` means the written name denotes nothing** and nothing else — three sites, all of them a
+name that resolves to no entry (`TypeRefCheck`, `AnnotationCapture`). A name that *does* resolve and is
+merely not admissible where it stands is `TYPE_MISMATCH`: §7.2 subsumption, a choice's variant membership, a
+union's member test, a type-ref naming a template — and so is a position whose **required** selector is
+absent, no type being established either way, which is why "a required tag is missing" needs no member of its
+own. The line decides §8.1's category as well as the name (`validation` against `resolver`), so conflating
+them misfiles the verdict; two pairs of readers had each agreed internally and disagreed with the
+other. The base-syntax exceptions keep their position out of `getMessage()` (it is in
 `position()`, and in `toString()` for a stack trace) so a diagnostic states it once. A read's schema end is
 one `SchemaLocation` (id + pointer + position) **accumulated as the read descends**, not claimed by whichever
 reader is innermost: the pointer is the path taken (`/person/age`), never the leaf it resolves to (`/int32` in
@@ -1004,7 +1012,7 @@ selection / Unicode policy / resource limits orthogonal; derived
 readers share the original's compiled-schema registry. Failures reaching or resolving the schema are
 diagnostics, not exceptions. A schemaless read still checks type-refs (`TypeRefCheck`: built-in name →
 must satisfy the atom; names-the-target → accepted, bind only; else `UNKNOWN_TYPE_REF` — a reader policy,
-a reader policy where §7.1 asks only that an unresolved annotation be treated as informational). Both tree
+where §7.1 asks only that an unresolved annotation be treated as informational). Both tree
 paths capture wire annotations; a schema-driven read also type-checks
 annotation *names* against the governing schema (§1.3's Class 2 bullet) — **wherever they are written, not only where the
 reader keeps them**, since whether a bound class has an `Annotations` carrier is no part of whether the

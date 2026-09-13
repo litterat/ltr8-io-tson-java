@@ -113,16 +113,6 @@ rules. Work lands on
   member being a `RecordBody` component with no `equals` override, so what is owed is only that the wire form
   carry it — which is the same line the held body needs above, and is free once that is written.
 
-- [ ] **A choice variant and a union member refuse a written name as `UNKNOWN_TYPE_REF`, where §7.2's
-  subsumption refusal is now `TYPE_MISMATCH`.** `NamedDispatchReader`, `VariantBindReader` and JSON's
-  `TreeChoiceReader` all say a name that *resolves* is unknown, which is what §7.2's refusal stopped saying:
-  the name denotes something, and what fails is that it is not a member here. The two encodings agree with
-  each other on it, so no §9.4 parity rule forces the change and nothing is silently broken — what is left is
-  one implementation giving two answers to "the written name resolves and is not admissible", decided by
-  whether the position is a record or a choice. Converging them means the refusal moves to §8.1's
-  `validation` category, which is the right one for a read-time verdict, and wants a shared diagnostics class
-  the way `SubsumptionDiagnostics` is one.
-
 ## JSON encoding
 
 [TSON-SCHEMA] §6 makes this a spec obligation rather than an interop nicety, and `meta.tn` states it directly: "No
@@ -174,14 +164,6 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   position, while `tson-json` has choice-specific wording and no scoped reader at all. Aligning now would
   align against a shape about to change, so it waits for [TSON-JSON] §8.5 — at which point both stacks have
   the same two positions and the shared class can be parameterised the same way.
-
-- [ ] **`Diagnostic.Code` has no member for "a required tag is missing", and both encodings overload
-  `UNKNOWN_TYPE_REF`.** [TSON-JSON] §9.4 lists the condition in its own right ("missing required tags (§8.2)",
-  a validation error) and the closed enum has nothing for it, so `tson-compiler`'s choice reader reports a
-  value with no tag as `UNKNOWN_TYPE_REF` — accurate about the category and wrong read literally, since
-  nothing unknown was written and the tag is absent rather than unresolvable. `TreeChoiceReader` matches
-  it, because §9.4 gives both encodings one vocabulary and the incumbent settles which member. A code of its
-  own touches `tson-base` and both readers together; the parity test is what stops them drifting meanwhile.
 
 - [ ] **The look-alike rule reaches no JSON position, and whether it should is now a real question rather
   than a settled one.** [TSON-DATA] §8.2's two per-name rules run at the schema-directed record and `$type`

@@ -649,14 +649,14 @@ public final class DataClassObjectReader {
         Optional<String> typeRef = EventSkip.annotationsAndTypeRef(ctx);
         if (typeRef.isEmpty()) {
             TsonEvent e = ctx.peek();
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "union type " + dataClass.typeClass()
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "union type " + dataClass.typeClass()
                     + " requires a type annotation (!typeName) to disambiguate members", "a !typeName", TypeRefCheck.describe(e));
             EventSkip.coreValue(ctx);
             return null;
         }
         Class<?> member = resolveUnionMember(dataClass, typeRef.get());
         if (member == null) {
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, "no member of union " + dataClass.typeClass()
+            ctx.report(Diagnostic.Code.TYPE_MISMATCH, "no member of union " + dataClass.typeClass()
                     + " matches type name '" + typeRef.get() + "'",
                     "one of " + describeMembers(dataClass), typeRef.get());
             EventSkip.coreValue(ctx);

@@ -421,14 +421,23 @@ said which member this is.
 **§7.2's own refusal is shared on the same terms** (`base.diagnostics`' `SubsumptionDiagnostics`), and it had
 to be: the two encodings were giving one rule two codes — `UNKNOWN_TYPE_REF` here against `TYPE_MISMATCH` in
 JSON — which put it in two of §8.1's categories, `resolver` against `validation`, for one verdict. There was
-no parity case for it, and that absence is how they drifted. **`TYPE_MISMATCH` is the one that survives**: the
-written name resolves, and what fails is that the type it names is not admissible at this position, which is
-a read-time verdict against a schema that loaded. `UNKNOWN_TYPE_REF` keeps its literal meaning — a name
-denoting nothing — which is the schemaless reader's own check (`TypeRefCheck`) and a genuinely unresolved
-reference. **The refusal is located at the value, not at the tag**: TSON's annotation has no pointer step of
-its own, and §9.4 wants one pointer for a rule they share, so JSON reports at the value too. It sits beside
-`RecordDiagnostics` rather than inside it because the rule governs every atom and product position — an
-array, a map and a tuple refuse a wrong annotation on these same terms.
+no parity case for it, and that absence is how they drifted. It sits beside `RecordDiagnostics` rather than
+inside it because the rule governs every atom and product position — an array, a map and a tuple refuse a
+wrong annotation on these same terms. **The refusal is located at the value, not at the tag**: TSON's
+annotation has no pointer step of its own, and §9.4 wants one pointer for a rule they share, so JSON reports
+at the value too.
+
+**Which is one instance of a line that now runs through the whole vocabulary.** `UNKNOWN_TYPE_REF` means the
+written name *denotes nothing* — the schemaless reader's own check (`TypeRefCheck`) and an annotation naming
+no type the governing schema declares (`AnnotationCapture`), which are the only three sites left. Everything
+where a name resolves and is merely not admissible is `TYPE_MISMATCH`: §7.2 subsumption, a choice's variant
+membership, a union's member test, a type-ref naming a template. So is a position where a **required**
+selector is absent, since no type is established either way — which is what the family readers already gave
+`tagRequired`, and what makes "a required tag is missing" need no member of its own. The distinction is what
+a consumer routes on: one says *correct the name*, the other says *this name means nothing here*. It also
+decides §8.1's category, `validation` against `resolver`, so getting it wrong misfiles the verdict as well as
+misnaming it — which is exactly what had happened, twice, in two different pairs of readers that each agreed
+internally.
 
 **The pin table is derived at construction**, keyed by what the pins compare as (`ValueIdentity`), and both
 sides go through one parser: a schema pinning `= "dog"` matches an unquoted `dog`, and `= 0xFF` matches `255`.
