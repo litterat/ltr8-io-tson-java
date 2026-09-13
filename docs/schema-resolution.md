@@ -50,13 +50,26 @@ are kept in step deliberately.
   it: a fresh record, a composition and a refinement each mint their own `RecordBody`, and a mark read three
   times is a mark two of them can disagree about — applying it once is also what makes "extensibility is never
   inherited" fall out rather than need stating, a composition's body arriving OPEN from its operands. A mark on
-  a non-record is the author's error, and a **template** is refused on two footings: `@sealed` and `@final` are
+  a non-record is the author's error. A **template** takes exactly one of them: `@sealed` and `@final` are
   claims about other declarations, and §8.2's `subtypes` indexes entries, so an instantiation entry exists only
   where some schema writes that application and the claim would range over whichever ones a closure happens to
-  contain — a schema error; `@abstract` constrains the marked type alone, holds of every instantiation
-  identically, and is merely a gap, the body being held as text until materialisation closes it (§5.10) and the
-  fact not travelling with it. A restated field keeps a discriminator it does not repeat, on the
-  annotation-merge rule's own logic below.
+  contain — a schema error; `@abstract` constrains the marked type alone and holds of every instantiation
+  identically, so it travels. **It is spliced into the held body rather than set on a `RecordBody`**
+  (`WireForm.heldWithExtension`), because by the time a declaration's annotations are read the body is text:
+  §5.2's `{ x: T }` is rewritten to `!record { … }` at desugar and a composition or refinement template is held
+  by `holdIfOpen` one phase later, so neither producer has the mark in hand. Stating `extension: ABSTRACT` in
+  that text is enough — materialisation reads the closed body back through the `record` constructor's own
+  reader, so nothing in the closing path knows the member exists. An open body applying anything but `record`
+  has no such member and is refused, named by the constructor it applies. A restated field keeps a
+  discriminator it does not repeat, on the annotation-merge rule's own logic below.
+- **The family an abstract template is abstract over is the one §5.8's reference-valued `supertypes` builds.**
+  `result => @abstract <T> { payload: T }` with `ok => <T> result<T> & { note: text }` closes at `result<text>`
+  to an ABSTRACT entry whose `subtypes` holds `ok<text>` and not `ok<int32>` — the edge being to the
+  instantiation the arguments name. Marking a template whose family could never be populated would be marking a
+  type nothing can ever stand at, which is why the two landed together (`AbstractTemplateFamilyTest`).
+  **Every entry in such a family is minted**, so §8.2 makes every name in it non-normative and an alias is the
+  only spelling a document has for a member *or* for the base — which is what makes §7.2's flattening
+  load-bearing at both record dispatchers rather than only at the concrete record readers (`RecordDispatch`).
 - **A restated field's annotations merge over the inherited ones, restatement first** (`resolveField`/`merged`).
   §5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one, and neither says what
   becomes of the field's annotations; a resolver's two paths gave two answers, an inherited field being absorbed

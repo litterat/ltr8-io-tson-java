@@ -34,16 +34,22 @@ final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumpti
     /** How this encoding spells a tag, for the {@code actual} of a rule whose message may not name it. */
     private static final String TAG = "!type annotation";
 
-    /** The base's own name -- naming it is refused with its own rule, the remedy differing (§8.1). */
-    private final String baseName;
+    /**
+     * Every written name that means the base -- its own, and any alias whose chain ends at it. Naming it is
+     * refused with its own rule, the remedy differing (§8.1), and an alias names it exactly as much (§7.2's
+     * "after reference flattening of both").
+     */
+    private final Set<String> selfNames;
 
+    /** The same for each subtype: what a tag may spell to select it, the entry's own name among them. */
     private final Set<String> subtypes;
+
     private final TsonTypeReaderResolver readerFor;
     private final RecordExtensionDiagnostics extension;
 
-    RecordTagDispatchReader(String name, String displayName, Set<String> subtypes,
+    RecordTagDispatchReader(Set<String> selfNames, String displayName, Set<String> subtypes,
                              TsonTypeReaderResolver readerFor) {
-        this.baseName = name;
+        this.selfNames = Set.copyOf(selfNames);
         this.subtypes = subtypes;
         this.readerFor = readerFor;
         this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
@@ -61,7 +67,7 @@ final class RecordTagDispatchReader implements TsonTypeReader<Object>, Subsumpti
             // The base itself is not admissible, which is the whole of what ABSTRACT means -- so a tag naming
             // it is refused here where a concrete position takes one as a redundant restatement (§8.1). It
             // gets its own wording because the remedy differs: the tag is not wrong about the position.
-            ctx.report(tag.get().equals(baseName) ? extension.tagNamesTheBase(TAG)
+            ctx.report(selfNames.contains(tag.get()) ? extension.tagNamesTheBase(TAG)
                     : extension.notASubtype(TAG, tag.get()));
             EventSkip.dataValue(ctx);
             return null;

@@ -78,8 +78,15 @@ class CrossEncodingParityTest {
               figure    => @abstract { area: int32 }
               disc      => figure & { side: int32 }
               kennel    => { p: pet }
+              dog_of    => dog
+              pet_of    => pet
               gallery   => { f: figure }
               garage    => { r: robot }
+              outcome    => @abstract <T> { code: T }
+              won        => <T> outcome<T> & { prize: text }
+              outcome_of => outcome<text>
+              won_of     => won<text>
+              ledger     => { o: outcome<text> }
             }
             """;
 
@@ -261,6 +268,54 @@ class CrossEncodingParityTest {
     void anAbstractPositionTakesTheTaggedSubtypeInBoth() {
         bothAccept("gallery", "{ f: !disc { area: 4  side: 2 } }", """
                 {"f": {"$type": "disc", "area": 4, "side": 2}}""");
+    }
+
+    /**
+     * A tag at a sealed position may only agree with what the members already decided (§5.2), and "agree" is
+     * a comparison of names -- so it flattens at both ends like every other §7.2 comparison. An alias of the
+     * selected member agrees; an alias of the base selects nothing, exactly as the base's own name does.
+     */
+    @Test
+    void anAliasOfASealedMemberAgreesInBoth() {
+        bothAccept("kennel", "{ p: !dog_of { pet_type: \"dog\"  name: \"Rex\"  breed: \"lab\" } }", """
+                {"p": {"$type": "dog_of", "pet_type": "dog", "name": "Rex", "breed": "lab"}}""");
+    }
+
+    @Test
+    void anAliasOfASealedBaseSelectsNothingInBoth() {
+        sameRule("kennel", "{ p: !pet_of { pet_type: \"dog\"  name: \"Rex\"  breed: \"lab\" } }", """
+                {"p": {"$type": "pet_of", "pet_type": "dog", "name": "Rex", "breed": "lab"}}""");
+    }
+
+    /**
+     * The same family over a <b>template</b>: {@code outcome<text>} is abstract and {@code won<text>} is its
+     * one member. Every entry in it is minted, and §8.2 makes a minted name non-normative -- so the alias is
+     * the only name either document has for the member, and both encodings have to flatten it (§7.2's "after
+     * reference flattening of both"). TSON text did not, and the two stacks disagreed about every value in
+     * such a family.
+     */
+    @Test
+    void anAliasOfATemplateFamilyMemberSelectsItInBoth() {
+        bothAccept("ledger", "{ o: !won_of { code: \"c\"  prize: \"p\" } }", """
+                {"o": {"$type": "won_of", "code": "c", "prize": "p"}}""");
+    }
+
+    /** And an alias of the <em>base</em> selects nothing in both, which is the other end of the same set. */
+    @Test
+    void anAliasOfATemplateFamilyBaseSelectsNothingInBoth() {
+        sameRule("ledger", "{ o: !outcome_of { code: \"c\" } }", """
+                {"o": {"$type": "outcome_of", "code": "c"}}""");
+    }
+
+    /**
+     * The untagged case over a template family, which compares the two {@code expected} lists as well as the
+     * prose -- so a stack flattening aliases on one side of the comparison and not the other is caught by
+     * what it offers the author, not only by what it admits.
+     */
+    @Test
+    void anAbstractTemplatePositionRequiresItsTagInBoth() {
+        sameRule("ledger", "{ o: { code: \"c\"  prize: \"p\" } }", """
+                {"o": {"code": "c", "prize": "p"}}""");
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {

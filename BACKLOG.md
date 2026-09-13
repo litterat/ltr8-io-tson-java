@@ -80,39 +80,6 @@ test puts its fact in the kernel, and its work is under "Discriminated record fa
   resolver's own) and the comparison should drop it structurally, before rendering, the way it already drops
   `kind`. `CLAUDE.md`'s traps list carries the hazard meanwhile.
 
-## Discriminated record families
-
-`SPEC-FEEDBACK.md` #10 and #11 carry the design and the arguments; this is the build order. A record states how
-it may be realised, a field of an abstract record may be a discriminator, and a position typed by such a record
-recovers the subtype from the member in **both** encodings ([TSON-JSON] §6.1.5, already written). The kernel
-carries both facts, meta.tn declares the four marks, the resolver lowers them into the body, the linker refuses
-a family the closure contradicts, and **both encodings read one** — a value at a sealed position is placed by
-its own members, with no tag anywhere, and `CrossEncodingParityTest` holds the two to one wording for every
-refusal they share. The corpus states all three layers of it, so another implementation is held to the same
-rules. Work lands on
-`r2026-36-proposal`, the two kernel fields being what takes it off a Revision 35 `main`.
-
-- [ ] **`@abstract` on a template is refused as a gap, and the edge it waited on is now there.** Carrying the
-  mark was measured and travels: adding `extension` to the held wire form and splicing it into a held
-  `!record` application brings `result<text>` back ABSTRACT. What made it useless was that the family was
-  always empty — a closed subtype application had no IS-A edge to its base's — and that is fixed, so
-
-      result => @abstract <T> { payload: T }
-      ok     => <T> result<T> & { note: text }
-
-  now has a family to be abstract over. What is left is the mark itself: the held wire form does not carry
-  `extension`, so the gap error stands. `@sealed` and `@final` on a template stay a resolver error whatever
-  happens here — they are claims over a set of subtypes a template does not have (`SPEC-FEEDBACK.md` #11).
-
-  **Two instantiations differing only in `extension` must not collide**, and that lands here rather than
-  standing on its own, because here is the only place it can arise. §8.2 keys a minted entry on a structural
-  hash over its binding record (`DerivedName.canonicalBinding`), and an abstract `pet` and a concrete one
-  admit different values — so the member has to be inside what the hash covers. Nothing else can reach it: no
-  synthetic is ever a record, a bare record body being unspellable at a type position (§5.2), so only a
-  template instantiation can carry a non-OPEN extension at all. Java-level equality is already right, the
-  member being a `RecordBody` component with no `equals` override, so what is owed is only that the wire form
-  carry it — which is the same line the held body needs above, and is free once that is written.
-
 ## JSON encoding
 
 [TSON-SCHEMA] §6 makes this a spec obligation rather than an interop nicety, and `meta.tn` states it directly: "No

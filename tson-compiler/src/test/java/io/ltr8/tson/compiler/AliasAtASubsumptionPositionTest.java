@@ -136,6 +136,43 @@ class AliasAtASubsumptionPositionTest {
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, refused.code());
     }
 
+    // ── The two family dispatchers (§5.2) ───────────────────────────────
+
+    /**
+     * A <b>sealed</b> family selects its member by reading the value's own discriminator, and a tag there may
+     * only agree (§5.2). "Agree" is a comparison of names, so it flattens like every other: an alias of the
+     * selected member says what the members already said.
+     */
+    private static final String SEALED = """
+              pet    => @sealed { @discriminator kind: text  name: text }
+              dog    => pet & { kind: = "dog"  breed: text }
+              d_of   => dog
+              p_of   => pet
+              kennel => { p: pet }
+            """;
+
+    @Test
+    void anAliasOfTheSelectedMemberAgreesWithASealedFamilysDiscriminator() {
+        read(SEALED, "kennel", """
+                { p: !d_of { kind: "dog"  name: "Rex"  breed: "lab" } }
+                """).accepted();
+    }
+
+    /**
+     * And an alias of the sealed <em>base</em> selects nothing, which is the base's own rule reached through
+     * a second name. Without flattening it fell past that rule into the member dispatch and was refused for
+     * contradicting a discriminator it never disagreed with -- the wrong verdict, with the wrong remedy.
+     */
+    @Test
+    void anAliasOfASealedBaseSelectsNothing() {
+        Diagnostic refused = read(SEALED, "kennel", """
+                { p: !p_of { kind: "dog"  name: "Rex"  breed: "lab" } }
+                """).refusal();
+
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refused.code());
+        assertTrue(refused.message().contains("selects nothing"), refused.message());
+    }
+
     /**
      * The case the rule exists for: a subtype template's instantiation, whose entry name the resolver minted
      * and no author can write. The alias is the only name there is.

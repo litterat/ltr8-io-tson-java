@@ -62,8 +62,12 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private record Selector(String name, AtomType<?> parser) {
     }
 
-    /** The base's own name, which a tag may restate: §8.1 admits a redundant tag at any typed position. */
-    private final String baseName;
+    /**
+     * Every written name that means the base -- its own, and any alias whose chain ends at it (§7.2's "after
+     * reference flattening of both"). §8.1 admits a redundant tag at any typed position; a sealed base is
+     * where that stops, and the refusal has to reach every spelling of it.
+     */
+    private final Set<String> selfNames;
 
     private final List<Selector> selectors;
     private final Set<String> selectorNames;
@@ -73,9 +77,11 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private final RecordExtensionDiagnostics extension;
     private final String pinned;
 
-    RecordMemberDispatchReader(String name, String displayName, RecordBody body, Set<String> subtypes,
-                                Map<String, TypeDefinition> entries, TsonTypeReaderResolver readerFor) {
-        this.baseName = name;
+    RecordMemberDispatchReader(Set<String> selfNames, String displayName, RecordBody body,
+                                Set<String> subtypes, ValueReaderContext context,
+                                TsonTypeReaderResolver readerFor) {
+        Map<String, TypeDefinition> entries = context.schema().entries();
+        this.selfNames = Set.copyOf(selfNames);
         this.readerFor = readerFor;
         this.selectors = body.fields().stream().filter(RecordField::discriminator)
                 .map(field -> selectorOf(field, entries)).toList();
@@ -94,7 +100,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
             Set<String> under = new LinkedHashSet<>();
             under.add(subtype);
             under.addAll(definition.subtypes());
-            deeper.put(subtype, under);
+            deeper.put(subtype, Subsumption.admitting(under, context.namesMeaning()));
         }
         this.pinned = members.keySet().stream().map(RecordMemberDispatchReader::render)
                 .reduce((a, b) -> a + " | " + b).orElse("(none)");
@@ -133,7 +139,7 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     @Override
     public Object read(TsonReadContext ctx) {
         Optional<String> tag = EventSkip.typeRefAhead(ctx);
-        if (tag.filter(baseName::equals).isPresent()) {
+        if (tag.filter(selfNames::contains).isPresent()) {
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances. A sealed base has none, so naming it selects nothing -- and letting it through
             // would hand the member's reader a tag its own §7.2 guard must refuse, one position too late.

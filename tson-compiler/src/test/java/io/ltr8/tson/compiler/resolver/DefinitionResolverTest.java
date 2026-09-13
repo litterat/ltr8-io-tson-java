@@ -2314,17 +2314,22 @@ class DefinitionResolverTest {
     }
 
     /**
-     * <b>{@code @abstract} on a template is a gap and not a refusal</b>, the asymmetry being the marks' own:
-     * it constrains the marked type alone -- no direct instances -- which holds of every instantiation
-     * identically, so {@code result => <T> @abstract { … }} is meaningful and is what a host language spells
-     * {@code abstract class Result<T>}. What is missing is that §5.10 holds the body as text until
-     * materialisation closes it, and the fact does not travel ({@code BACKLOG.md}).
+     * <b>{@code @abstract} is the one mark a template takes</b>, the asymmetry being the marks' own: it
+     * constrains the marked type alone -- no direct instances -- which holds of every instantiation
+     * identically, so {@code result => @abstract <T> { … }} is meaningful and is what a host language spells
+     * {@code abstract class Result<T>}. §5.10 holds the body as text, so the mark is stated <em>in</em> that
+     * text and travels with it; {@code SubtypeTemplateFamilyTest} is where the closed end is checked.
      */
     @Test
-    void aTemplateCannotYetBeAbstract() {
-        UnsupportedOperationException thrown = assertThrows(UnsupportedOperationException.class,
-                () -> resolveSnippetsAgainstMetaKernel("box => @abstract <T> { v: T }"));
-        assertTrue(thrown.getMessage().contains("cannot yet be abstract"), thrown.getMessage());
+    void aTemplateIsAbstractByStatingTheMarkInItsHeldBody() {
+        TypeDefinition box = resolveSnippetsAgainstMetaKernel("box => @abstract <T> { v: T }");
+
+        assertInstanceOf(TemplateBody.class, box.body());
+        assertTrue(((TemplateBody) box.body()).template().contains("extension:"),
+                () -> "the mark has to be in the text, there being nowhere else: "
+                        + ((TemplateBody) box.body()).template());
+        assertTrue(((TemplateBody) box.body()).template().contains("ABSTRACT"),
+                () -> ((TemplateBody) box.body()).template());
     }
 
     /** Only a record has an extension fact to state; the mark has nowhere to land on anything else. */
@@ -2334,6 +2339,19 @@ class DefinitionResolverTest {
                 () -> resolveSnippetsAgainstMetaKernel("x => @abstract !enum [A B]"));
         assertTrue(thrown.getMessage().contains("only a record states how it may be realised"),
                 thrown.getMessage());
+    }
+
+    /**
+     * And nor does an <em>open</em> non-record, which is the same rule read off the held body: a template
+     * whose body applies {@code array} has no {@code extension} member for the mark to be stated in.
+     */
+    @Test
+    void aDefinitionMarkOnANonRecordTemplateIsRefused() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel("x => @abstract <T> !array { element_type: T }"));
+        assertTrue(thrown.getMessage().contains("only a record states how it may be realised"),
+                thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("applies '!array'"), thrown.getMessage());
     }
 
     private static String readFixture() throws IOException {

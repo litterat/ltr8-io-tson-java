@@ -14,6 +14,7 @@ import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeArgument;
@@ -83,6 +84,12 @@ final class WireForm {
     static final String TYPE = "type";
     static final String STATE = "state";
     static final String SUPERTYPES = "supertypes";
+
+    /**
+     * {@code record.extension} -- how the record may be realised (§5.2). Written only where it is not
+     * {@code OPEN}, the constructor's own default, so a held body states a mark exactly when one was made.
+     */
+    static final String EXTENSION = "extension";
 
     // ── Building blocks ──────────────────────────────────────────────────────────────────────────
 
@@ -200,6 +207,30 @@ final class WireForm {
             binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));
         }
         return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(binding));
+    }
+
+    /**
+     * A held {@code !record { … }} with {@code extension} stated -- §5.2's mark on a <b>template</b>, which
+     * is where a body is text by the time the mark is read.
+     *
+     * <p><b>Applied to the held form rather than written by {@link #heldRecord}.</b> A mark belongs to the
+     * declaration and not to the body: a plain record template is held by {@code SchemaDesugarer} where
+     * §5.2 rewrites {@code { x: T }}, and a composition or refinement template by {@code
+     * DefinitionResolver.holdIfOpen} one phase later, so neither producer has the mark in hand and both
+     * reach the same shape once they are done. One function over the result is what keeps the member's
+     * spelling in one place across the two.
+     *
+     * <p>{@code OPEN} states nothing, being the constructor's own default -- so a held body carries the
+     * member exactly when a mark was made, and the text of every template written before this existed is
+     * unchanged.
+     */
+    static DataValue heldWithExtension(DataValue held, RecordExtensionType extension) {
+        if (extension == RecordExtensionType.OPEN || !(held.coreValue() instanceof RecordValue binding)) {
+            return held;
+        }
+        List<RecordValue.Field> members = new ArrayList<>(binding.fields());
+        members.add(nameField(EXTENSION, extension.name()));
+        return new DataValue(held.annotations(), held.typeRef(), new RecordValue(members));
     }
 
     /** A resolved annotation carrier back in wire form, its bound value unbound by the caller's writer. */

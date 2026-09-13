@@ -3,6 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.RecordBody;
 
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -17,6 +18,12 @@ import java.util.Set;
  * <p>OPEN and FINAL share that concrete reader because they read identically. The difference between them is
  * only which names a tag may carry -- the subtype set -- and a FINAL record's is empty by construction, so
  * nothing asks whether a record is final and no reader carries a check for it.
+ *
+ * <p><b>Both dispatchers compare a written tag against flattened names</b> ({@link Subsumption#admitting}),
+ * §7.2 comparing "after reference flattening of both". It is not a nicety here: a family whose base is a
+ * template has minted entries for every member, and §8.2 makes a minted name non-normative -- so an alias is
+ * the only name a document has for {@code ok<text>}, and a dispatcher matching raw subtype names would refuse
+ * every value in such a family.
  */
 final class RecordDispatch {
 
@@ -30,11 +37,14 @@ final class RecordDispatch {
                 return concrete.create(name, definition, context);
             }
             String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
-            Set<String> subtypes = Set.copyOf(definition.subtypes());
+            Set<String> selfNames = Subsumption.admitting(List.of(name), context.namesMeaning());
             return switch (body.extension()) {
-                case ABSTRACT -> new RecordTagDispatchReader(name, displayName, subtypes, context.readers());
-                case SEALED -> new RecordMemberDispatchReader(name, displayName, body, subtypes,
-                        context.schema().entries(), context.readers());
+                case ABSTRACT -> new RecordTagDispatchReader(selfNames, displayName,
+                        Subsumption.admitting(definition.subtypes(), context.namesMeaning()), context.readers());
+                // The sealed reader takes its subtypes raw: it maps each member's pins to that member, so an
+                // alias is not a second member. Where it compares a written tag it admits aliases (`deeper`).
+                case SEALED -> new RecordMemberDispatchReader(selfNames, displayName, body,
+                        Set.copyOf(definition.subtypes()), context, context.readers());
                 case OPEN, FINAL -> concrete.create(name, definition, context);
             };
         };
