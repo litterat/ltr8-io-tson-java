@@ -133,7 +133,7 @@ class AliasAtASubsumptionPositionTest {
                 { r: !a_of { only: "x" } }
                 """).refusal();
 
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, refused.code());
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refused.code());
     }
 
     /**

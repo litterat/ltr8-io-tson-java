@@ -2,6 +2,7 @@ package io.ltr8.tson.json.reader;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.base.diagnostics.RecordDiagnostics;
+import io.ltr8.tson.base.diagnostics.SubsumptionDiagnostics;
 import io.ltr8.tson.base.unicode.Nfc;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonSchemaLocation;
@@ -96,6 +97,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
 
     /** What this record's rules say when a document breaks one -- shared with the TSON reader ([TSON-JSON] §9.4). */
     private final RecordDiagnostics rules;
+    private final SubsumptionDiagnostics subsumption;
     private final JsonSchemaLocation schemaLocation;
 
     /** The names §6.1.5 admits at this position besides this entry's own: its subtypes, under [TSON-SCHEMA] §7.2. */
@@ -141,6 +143,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         this.stated = new ArrayList<>(values);
         this.declaredFields = fields.stream().map(RecordField::name).reduce((a, b) -> a + " | " + b).orElse("");
         this.rules = new RecordDiagnostics(displayName, declaredFields);
+        this.subsumption = new SubsumptionDiagnostics(displayName);
     }
 
     @Override
@@ -218,11 +221,12 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             // §9.4 reaches every `$type` too, and for the same reason: a look-alike type name is refused
             // rather than reported as naming nothing.
             if (!NameHygiene.refuses(ctx, tag.type())) {
-                ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
-                        "'$type' names '%s', which is not admissible at a '%s' position -- a tag may name this "
-                                .formatted(tag.type(), displayName)
-                                + "type or one of its subtypes ([TSON-SCHEMA] §7.2)",
-                        admissible(), tag.type());
+                // At the value, not at `/$type`, though the member is right there: §9.4 holds both encodings
+                // to one pointer for a rule they share, and TSON's tag is an annotation with no pointer step
+                // of its own. §3.3's reserved members are apparatus rather than data, which agrees. The
+                // family readers already locate their tag refusals here.
+                ctx.report(subtypes.isEmpty() ? subsumption.noSubtypeToName(tag.type())
+                        : subsumption.notAdmissible(tag.type(), admissible()));
             }
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;

@@ -327,7 +327,9 @@ module has a real `module-info.java`; module names mirror each module's root exp
   **The prose is the schema's vernacular** — a record has *fields* in both encodings, absence is *absent*
   rather than `_` or `null` — because it is the schema that refused the document; the encoding's own spelling
   rides in `actual`, which is data. That split is what the parity test compares: code, path, `expected` and
-  `message`, never `actual`. `RecordDiagnostics` is the family that proves the shape; the rest follow. What
+  `message`, never `actual`. `RecordDiagnostics` is the family that proves the shape; the rest follow —
+  `SubsumptionDiagnostics` sits beside it rather than inside it because §7.2's rule governs every atom and
+  product position and not records alone. What
   stays with each reader is any rule the other encoding has no counterpart for.
   **`io.ltr8.tson.base.io`** is where a document's bytes come from and go — `ByteSource` and `ByteSink`,
   one pair for both encodings because [TSON-JSON] §3.1 makes the JSON lexer decode UTF-8 from bytes exactly

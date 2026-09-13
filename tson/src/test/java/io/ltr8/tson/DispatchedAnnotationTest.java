@@ -147,7 +147,9 @@ class DispatchedAnnotationTest {
                 !holder { thing: @note:"why" !square { side: "3" } }""");
 
         assertEquals(1, problems.diagnostics().size(), problems.diagnostics().toString());
-        assertEquals(Diagnostic.Code.UNKNOWN_TYPE_REF, problems.diagnostics().getFirst().code());
+        // TYPE_MISMATCH: §7.2's subsumption refusal, where the name resolves and the type it names is not
+        // admissible here. The union case below keeps UNKNOWN_TYPE_REF, membership being a different relation.
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, problems.diagnostics().getFirst().code());
         assertNull(root.get("thing").asString().orElse(null));
     }
 

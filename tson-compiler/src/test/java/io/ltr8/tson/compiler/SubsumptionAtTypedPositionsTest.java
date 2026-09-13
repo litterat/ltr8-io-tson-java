@@ -62,9 +62,10 @@ class SubsumptionAtTypedPositionsTest {
     /** An atom position: the case that reported this, and the one no dispatcher ever guarded. */
     @Test
     void anUnrelatedTypeIsRefusedAtAnAtomPosition() {
-        // `text` does carry a subtype here (core's `non_empty_text`), so this takes the "not a known
-        // subtype" wording -- the point is that an atom position now refuses at all, which it never did.
-        assertTrue(refused("{ t: !uuid \"x\" " + REST + " }").contains("'uuid' is not a known subtype of 'text'"));
+        // `text` does carry a subtype here (core's `non_empty_text`), so this takes the wording that names
+        // them -- the point is that an atom position now refuses at all, which it never did.
+        assertTrue(refused("{ t: !uuid \"x\" " + REST + " }")
+                .contains("'uuid' is not admissible at a 'text' position"));
         assertTrue(refused("{ t: !nosuch \"x\" " + REST + " }").contains("'nosuch'"));
     }
 
@@ -83,7 +84,7 @@ class SubsumptionAtTypedPositionsTest {
         TsonCompiledSchema compiled = compile("  base => { name: text }\n  h => { f: base }");
         assertTrue(assertThrows(ReadException.class,
                 () -> compiled.get("h").read(TestDocuments.document("{ f: !nosuch { name: \"x\" } }")))
-                .getMessage().contains("'nosuch' is not valid at a 'base' position"));
+                .getMessage().contains("'nosuch' is not admissible at a 'base' position"));
     }
 
     /** The positive path, which always worked and must keep working: a declared subtype is admitted... */

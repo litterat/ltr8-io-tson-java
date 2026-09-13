@@ -418,6 +418,18 @@ said which member this is.
 [TSON-JSON] §9.4 binds a family's to the ones the JSON stack gives — which is what `base.diagnostics`'
 `RecordExtensionDiagnostics` holds, and what `CrossEncodingParityTest` compares.
 
+**§7.2's own refusal is shared on the same terms** (`base.diagnostics`' `SubsumptionDiagnostics`), and it had
+to be: the two encodings were giving one rule two codes — `UNKNOWN_TYPE_REF` here against `TYPE_MISMATCH` in
+JSON — which put it in two of §8.1's categories, `resolver` against `validation`, for one verdict. There was
+no parity case for it, and that absence is how they drifted. **`TYPE_MISMATCH` is the one that survives**: the
+written name resolves, and what fails is that the type it names is not admissible at this position, which is
+a read-time verdict against a schema that loaded. `UNKNOWN_TYPE_REF` keeps its literal meaning — a name
+denoting nothing — which is the schemaless reader's own check (`TypeRefCheck`) and a genuinely unresolved
+reference. **The refusal is located at the value, not at the tag**: TSON's annotation has no pointer step of
+its own, and §9.4 wants one pointer for a rule they share, so JSON reports at the value too. It sits beside
+`RecordDiagnostics` rather than inside it because the rule governs every atom and product position — an
+array, a map and a tuple refuse a wrong annotation on these same terms.
+
 **The pin table is derived at construction**, keyed by what the pins compare as (`ValueIdentity`), and both
 sides go through one parser: a schema pinning `= "dog"` matches an unquoted `dog`, and `= 0xFF` matches `255`.
 The scan for the selectors is a `lookingAhead` and rewinds, because a record's fields have no significant

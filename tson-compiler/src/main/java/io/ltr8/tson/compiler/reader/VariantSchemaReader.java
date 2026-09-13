@@ -1,6 +1,6 @@
 package io.ltr8.tson.compiler.reader;
 
-import io.ltr8.tson.base.Diagnostic;
+import io.ltr8.tson.base.diagnostics.SubsumptionDiagnostics;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
@@ -48,6 +48,7 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
     private final Set<String> selfNames;
     private final Set<String> subtypeNames;
     private final TsonTypeReaderResolver resolver;
+    private final SubsumptionDiagnostics rules;
 
     /**
      * {@code selfNames} are the written names that mean <em>this</em> type and so read through
@@ -62,6 +63,7 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
         this.ownParser = ownParser;
         this.subtypeNames = Set.copyOf(subtypeNames);
         this.resolver = resolver;
+        this.rules = new SubsumptionDiagnostics(name);
     }
 
     /**
@@ -93,6 +95,11 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
         return new VariantSchemaReader(name, selfNames, renameable.renamed(displayName), subtypeNames, resolver);
     }
 
+    /** Every name a tag may carry here: the position's own type, then its subtypes -- §9.4's shared spelling. */
+    private String admissible() {
+        return name + " | " + String.join(" | ", subtypeNames);
+    }
+
     @Override
     public Object read(TsonReadContext ctx) {
         Optional<String> typeRef = EventSkip.typeRefAhead(ctx);
@@ -101,12 +108,8 @@ final class VariantSchemaReader implements TsonTypeReader<Object>, UseSite.Renam
         }
         String ref = typeRef.get();
         if (!subtypeNames.contains(ref)) {
-            ctx.report(Diagnostic.Code.UNKNOWN_TYPE_REF, subtypeNames.isEmpty()
-                            ? "'" + ref + "' is not valid at a '" + name + "' position -- a type annotation "
-                                    + "must name the position's own type, which has no subtypes (§7.2)"
-                            : "'" + ref + "' is not a known subtype of '" + name + "' -- expected one of "
-                                    + subtypeNames,
-                    subtypeNames.isEmpty() ? "'" + name + "'" : "one of " + subtypeNames, ref);
+            ctx.report(subtypeNames.isEmpty() ? rules.noSubtypeToName(ref)
+                    : rules.notAdmissible(ref, admissible()));
             EventSkip.dataValue(ctx); // framing included: nothing consumed it, this value being unreadable
             return null;
         }
