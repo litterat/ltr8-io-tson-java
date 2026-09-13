@@ -904,9 +904,15 @@ unconditional — so this is the one failure the redundancy is actually for.
 **A template may be abstract and may not be sealed or final, and the asymmetry is the marks' own.** §5.10 makes
 a template not a type: only an application is, and each application mints its own entry. ABSTRACT constrains the
 marked type alone — no direct instances — which is true of every instantiation identically and needs nothing else
-known, so `result => <T> @abstract { … }` with `ok => <T> result<T> & { … }` is meaningful and is the shape a host
-language spells `abstract class Result<T>`. SEALED and FINAL are claims about *other* declarations — that every
-subtype pins distinctly, that nothing composes onto this one — and a template has no set for such a claim to range
+known, so `result => @abstract <T> { … }` with `ok => <T> result<T> & { … }` is meaningful and is the shape a host
+language spells `abstract class Result<T>`. **This is running.** §5.10 holds an open entry's body as the
+application written out, so the mark is stated inside that text and materialisation reads it back through the
+`record` constructor's own reader: closing `result<text>` yields an ABSTRACT entry, and the family it is abstract
+over is the one §5.8's reference-valued `supertypes` builds — `ok<text>` is a member of `result<text>`'s and not
+of `result<int32>`'s. The mark is written **before** the parameter list, §12.1 putting a declaration's
+annotations ahead of the type-def that the parameters open. SEALED and FINAL are claims about *other*
+declarations — that every subtype pins distinctly, that nothing composes onto this one — and a template has no
+set for such a claim to range
 over. `subtypes` is an index over entries (§8.2), and an instantiation entry exists only where some schema writes
 that application, so the claim's subject would be assembled from whichever applications a closure happens to
 contain: `ok<T>` composing onto `result<T>` puts nothing in `result<text>`'s index unless someone also writes

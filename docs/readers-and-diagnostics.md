@@ -414,6 +414,15 @@ value to `cat` before the members are consulted; the marker is what stops it. Th
 than §7.2 in any case: a sibling's tag is admissible under §7.2 and still wrong, the members having already
 said which member this is.
 
+**Both compare a written tag against flattened names** (`Subsumption.admitting`), §7.2 comparing "after
+reference flattening of both": the base's own set, which decides the `tagNamesTheBase` refusal, and each
+member's, which decides selection. Skipping it is not a lost nicety but a family nothing can name — a family
+whose base is a **template** has a minted entry for the base and for every member, and §8.2 makes a minted
+name non-normative, so an alias is the only spelling either end has. It was skipped: the concrete record
+readers were flattened and the two dispatchers were not, so a subtype-template family read in JSON and was
+refused in TSON text — the same schema, the same document, two answers. `CrossEncodingParityTest` carries both
+ends of it now.
+
 **`NamedDispatchReader` is not reused**, close as the shape is. Its verdicts are a choice's, and
 [TSON-JSON] §9.4 binds a family's to the ones the JSON stack gives — which is what `base.diagnostics`'
 `RecordExtensionDiagnostics` holds, and what `CrossEncodingParityTest` compares.

@@ -340,15 +340,26 @@ final class DefinitionResolver {
      * is also what makes the rule that extensibility is never inherited fall out rather than need stating --
      * a composition's body is built OPEN from its operands and the mark, if any, is this declaration's own.
      *
-     * <p>A mark on anything but a record is the author's error, and a template is refused on two different
-     * footings. {@code @sealed} and {@code @final} are claims about <em>other</em> declarations -- that every
-     * subtype pins distinctly, that nothing composes onto it -- and a template has no set for such a claim to
-     * range over: {@code subtypes} indexes entries, an instantiation entry exists only where some schema wrote
-     * that application, so the claim's subject would be assembled from whichever applications happen to have
-     * been written and a new one elsewhere would silently change it. That is a schema error. {@code @abstract}
-     * constrains the marked type alone -- no direct instances, true of every instantiation identically -- so it
-     * is meaningful on a template and merely not built: the body is held as text until materialisation closes
-     * it (§5.10) and the fact does not travel with it.
+     * <p><b>A template takes {@code @abstract} and refuses the other two.</b> {@code @abstract} constrains the
+     * marked type alone -- no direct instances, true of every instantiation identically -- so it is stated in
+     * the held body and closing carries it through: every application of {@code result} mints an abstract
+     * entry, and the family it is abstract over is the one the closed applications of its subtype templates
+     * join (§5.8, {@code SubtypeTemplateFamilyTest}). {@code @sealed} and {@code @final} are claims about
+     * <em>other</em> declarations -- that every subtype pins distinctly, that nothing composes onto it -- and
+     * a template has no set for such a claim to range over: {@code subtypes} indexes entries, an instantiation
+     * entry exists only where some schema wrote that application, so the claim's subject would be assembled
+     * from whichever applications happen to have been written and a new one elsewhere would silently change
+     * it. That is a schema error ({@code SPEC-FEEDBACK.md} #11).
+     *
+     * <p><b>An open body is text by the time the mark is read, so the mark is spliced rather than set.</b>
+     * Both routes to an open record body -- {@code SchemaDesugarer} rewriting {@code { x: T }} where §5.2
+     * says it denotes {@code !record { … }}, and {@link #holdIfOpen} for a composition or refinement -- have
+     * finished before a declaration's annotations are looked at, so there is no {@code RecordBody} left to
+     * rebuild. {@link WireForm#heldWithExtension} states the member on the held form instead, which is the
+     * same one place the rest of the held spelling lives.
+     *
+     * <p>A mark on anything else is the author's error, an open one named by the constructor its held body
+     * applies: {@code TemplateBody} is the Java shape of every open form alike and would name none of them.
      */
     private TypeDefinition withExtension(SchemaMap.Declaration declaration, TypeDefinition resolved) {
         Optional<RecordExtensionType> extension = DefinitionMarks.extension(declaration.name(),
@@ -356,7 +367,7 @@ final class DefinitionResolver {
         if (extension.isEmpty()) {
             return resolved;
         }
-        if (resolved.body() instanceof io.ltr8.tson.schema.meta.TemplateBody) {
+        if (resolved.body() instanceof TemplateBody open) {
             if (extension.get() != RecordExtensionType.ABSTRACT) {
                 throw new SchemaValidationException("'" + declaration.name() + "': '@"
                         + extension.get().name().toLowerCase(java.util.Locale.ROOT)
@@ -365,9 +376,7 @@ final class DefinitionResolver {
                         + " whichever applications a closure happens to write. Mark a closed declaration"
                         + " instead ([TSON-SCHEMA] §5.2, §5.10)");
             }
-            throw new UnsupportedOperationException("'" + declaration.name()
-                    + "': a template cannot yet be abstract -- its body is held until materialisation closes"
-                    + " it, and the mark does not travel with it");
+            return abstractTemplate(declaration.name(), resolved, open);
         }
         if (!(resolved.body() instanceof RecordBody record)) {
             throw new SchemaValidationException("'" + declaration.name()
@@ -377,6 +386,23 @@ final class DefinitionResolver {
         return new TypeDefinition(resolved.source(), resolved.kind(), resolved.supertypes(),
                 resolved.subtypes(), new RecordBody(record.supertypes(), record.fields(), record.groups(),
                         extension.get()), resolved.position(), resolved.annotations());
+    }
+
+    /**
+     * {@code resolved} with {@code @abstract} stated in its held body. Refused where the body applies
+     * anything but {@code record}: an array or a choice has no {@code extension} member to state it in, and
+     * an alias states nothing of its own -- {@code @abstract <B> pair<uuid, B>} would be a claim about
+     * {@code pair}, made by a declaration that merely names it.
+     */
+    private static TypeDefinition abstractTemplate(String name, TypeDefinition resolved, TemplateBody open) {
+        HeldBody held = HeldBody.of(open);
+        if (!WireForm.RECORD.equals(held.application().typeRef().orElse(null))) {
+            throw new SchemaValidationException("'" + name + "': only a record states how it may be realised"
+                    + " -- this entry's body applies '!" + held.application().typeRef().orElse("?")
+                    + "' ([TSON-SCHEMA] §5.2)");
+        }
+        return resolved.withBody(HeldBody.held(open.parameters(),
+                WireForm.heldWithExtension(held.application(), RecordExtensionType.ABSTRACT)));
     }
 
     /**

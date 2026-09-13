@@ -1437,8 +1437,13 @@ compatibility).
   `[type_ref]`, keeps the application itself, so closing mints the edge to `box<text>` and not to
   `box<int32>`), and so does an argument that is itself an application (`box<inner<T>>` —
   substitution writes a bound reference through `WireForm.refValue`, which spells one carrying
-  arguments in `type_ref`'s record form). `OpenOperandCompositionTest` pins the substitutability table and
-  `SubtypeTemplateFamilyTest` the family a base template and its subtype templates close into. `DefinitionResolver`'s Javadoc is the exact current boundary.
+  arguments in `type_ref`'s record form). **A template may be `@abstract`**, the mark being stated in the held
+  body's own text (`extension: ABSTRACT`) and read back by the `record` constructor's reader when the body
+  closes, so every instantiation is abstract over the family the edge above builds; `@sealed` and `@final`
+  stay a resolver error there, having no set of subtypes to range over (`SPEC-FEEDBACK.md` #11).
+  `OpenOperandCompositionTest` pins the substitutability table,
+  `SubtypeTemplateFamilyTest` the family a base template and its subtype templates close into, and
+  `AbstractTemplateFamilyTest` the mark over that family. `DefinitionResolver`'s Javadoc is the exact current boundary.
   Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
   schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
   **No gap reaches a read either**, `scoped` having been the last: every constructor
