@@ -686,6 +686,29 @@ not an identifier survives (`"dog-v2"`, `"urn:acme:dog"`), where any route dispa
 to rename the wire; and the pin keeps the contract's own spelling, so `Dog` stays `"Dog"` on the wire while the TSON
 type is named `dog_type` by the ordinary identifier conversion.
 
+**Both layouts fall out of one mechanism, and a template spells the second.** The arrangement above puts a
+subtype's own fields beside the discriminator — *internally tagged*, in the vocabulary serde's four shapes gave
+the problem — and one base serves the *adjacently* tagged layout just as well, where each member carries the
+tag and a single payload field:
+
+```
+msg    => @sealed { @discriminator kind: text }
+msg_of => <T, V> msg & { kind: = T  body: V }
+ping   => msg_of<"ping", ping_body>
+pong   => msg_of<"pong", [pong_body]>
+```
+
+Dispatch is the same rule in both — read the discriminator, select the member, re-verify the pin as an ordinary
+FIXED check — so this needs nothing added to the design; what the envelope buys is a payload that need not be a
+record, `pong` carrying a list where the flat layout can only add fields. **This is running**: the family loads,
+an untagged document places itself by `kind` in both encodings, the payload validates against the selected
+member's own type, and a bound read yields the Java sealed hierarchy (`Channel[m=Ping[body=PingBody[seq=1]]]`).
+Two things are worth stating in the prose rather than left to be discovered. The base **cannot require** the
+payload field — its members have no common payload type, so nothing declarable at the base constrains them, and
+`pet: top` is the candidate and #13's open question. And the template here is the subtype *factory* and never
+the base: the base stays a closed declaration, which is what §5.10 requires today and what #13 proposes to
+relax.
+
 **One shape does not convert, and the gap is worth stating.** OpenAPI also admits a `discriminator` on a schema whose
 composition is `oneOf` with no shared base. There is no base record for the mark to stand on, so a converter must
 either synthesise one — mint `pet => @sealed { @discriminator pet_type: text }` and compose each variant onto it, making
@@ -1321,3 +1344,55 @@ are keyed on the position rather than on the mark — so a discriminated family 
 the members unchanged. Correct #11's blanket refusal: SEALED is admissible on a template whose members are
 its applications, FINAL is not, and the reason FINAL is not should be the one above rather than the set-membership
 argument, which does not apply.
+
+---
+
+## 14. §8.2 makes a derived name the resolver's, and nothing says what a consumer may do with one
+
+**Documents:** [TSON-SCHEMA] §8.2 (identity, internal names, `source`), §5.10 (materialisation), §8.1 (resolved
+output), §8.3 (a reference is a hop); [TSON-JSON] §3.3 (`$type`). Reads with #13.
+**Kind:** underspecification — one clearly stated fact whose consequences for consumers are unstated, where an
+implementation must pick something and a wrong pick is invisible until someone tries to write a configuration.
+
+**What §8.2 states.** A synthetic or instantiation entry's name is resolver-chosen, fresh by construction,
+disjoint from declared names and unreachable from source; identity is keyed on the form, an instantiation's on
+the application recorded in `source`. All of that is about the *resolver*. Three questions a consumer asks are
+left open, and they are not hypothetical — this implementation answered each one wrongly first.
+
+- **May a document name one?** A minted name is a valid `identifier` and is present in the namespace a
+  processor resolves against, so nothing in the series refuses `!box_text_04117bb4` in text. The name is
+  implementation-chosen, so such a document is portable to no other processor. **The [TSON-JSON] half is
+  now stated** — §3.3 makes `$type` name a declared type and requires a decoder to reject a materialised
+  entry's name rather than resolve it for being present — and the text encoding needs the same sentence,
+  which is §8.2's to give since the fact it turns on is §8.2's.
+- **May a consumer contract be keyed on one?** A binding map, a generated class table, a configuration file.
+  It must not: the spelling is not stable across implementations, and within one it moves whenever the form's
+  content does. What a contract keys on is a name some declaration gave the application — §8.3's alias — and
+  a processor holding both SHOULD prefer the declared one wherever it shows a name or accepts one.
+- **How does a consumer recover the applications of one template?** By `source`: an instantiation records the
+  head and arguments, so the group is a walk over entries and needs no index. Stating it matters because it is
+  what makes "a template is not a type" workable for a code generator — the family a host language spells
+  `Result<T>` is exactly that group, and a generator that cannot recover it must either monomorphise blindly
+  or give up.
+
+**What the silence cost here, measured.** This implementation's derived names are content hashes
+(`box_text_04117bb4`, `msg_of_ping_ping_body_d8846fd5`). A bind lookup asked for the minted name, so a binding
+map for a schema using templates could not be written at all and a generator could not emit one; and a
+schema-load diagnostic printed minted names, pointing an author at declarations they had never written
+(`'pet_of_cat_int32_1c52dc45' and 'pet_of_cat_text_48ad744f' pin the discriminator of 'pet' …`). Both were read
+as ordinary bugs rather than as one missing rule, which is the signature of an underspecification: each surface
+that shows or accepts a name picks for itself, and they disagree.
+
+**What is running:** the three answers above. A lookup and a message both resolve under the name the author
+wrote, falling back to the entry's own, and only for a *derived* entry — an entry with a source position was
+declared, so an alias never redirects it. `source` grouping is what the measurements in #13 rest on: within one
+schema a direct definition and a field use of one application reach one entry, and across schemas two documents
+that never meet reach the same one, which is the property a content-addressed name exists for and the reason it
+must stay internal rather than becoming a consumer's key.
+
+**Suggested resolution.** In §8.2, after the internal-name rules, state the three consequences: a derived name
+is not nameable from data in any encoding (with [TSON-JSON] §3.3 as the worked case, and the same rule for
+text's type-ref); no consumer contract may require one, the declared alias being what a processor shows and
+accepts where both exist; and the applications of one template are recoverable from `source`, which is the
+provenance a generator needs. None of the three changes what a resolver produces — they say what may be done
+with what it produces, which is the half §8.2 currently leaves to be guessed.
