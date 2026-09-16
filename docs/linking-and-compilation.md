@@ -524,6 +524,24 @@ keeps `TsonValue` free for `tson-tree`'s own root type (`BACKLOG.md`).
   record's container-typed fields) differ per mode. `ValueReaderFactoryResolver` (the `constructor
   name → factory` dispatch interface) lives in the unexported `reader` package — a consumer picks a mode
   by which registry they hold, never by naming it.
+- **A bind lookup asks under the name the author wrote.** An entry a template application materialised is
+  named by content (§8.2 — resolver-chosen, fresh, unreachable from source), so a binding map cannot be keyed
+  on one: the hash is not knowable when the map is written, and a generator emitting bindings cannot invent
+  it. `ValueReaderContext.bindingNamesFor` inverts §8.3's alias hop — the entries that name a target through
+  a `REFERENCE` body, in declaration order, then the entry's own name — and `RecordBindReader` and
+  `TupleBindReader` try them in that order, so `ping => msg_of<"ping", ping_body>` binds under `ping`.
+  **Only a derived entry is reached this way**, which is the test `EntryDisplayName` already applies: an entry
+  with a source position was declared, so its own name is the one the author wrote and an alias naming it must
+  never redirect its binding. The index is built once per compile beside `namesMeaning`, for that one's
+  reason — a property of the schema, not of the entry being looked up. A failure keeps the **first**
+  candidate's cause, the author-written name's, so a class that was mapped and then failed analysis is not
+  masked by "the minted name is unbound"; `MissingBindingException` carries that cause rather than only its
+  text, which is what makes an erased component (`no valid data conversion for class java.lang.Object`)
+  visible from an ordinary read.
+- **A family check names its members the same way.** `RecordExtension`'s pin-collision message renders each
+  colliding member through `EntryDisplayName`, so a family whose members are template applications reports
+  `pet_of<cat, int32>` rather than `pet_of_cat_int32_1c52dc45` — a name that points at no declaration an
+  author can open. The blame still rides the real entry name, which is what locates the violation.
 
 ## Untagged labelled choices (`reader/GroupUnionBindReader`)
 

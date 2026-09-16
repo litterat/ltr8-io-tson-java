@@ -39,4 +39,13 @@ public class BindMismatchException extends RuntimeException {
     public BindMismatchException(String message) {
         super(message);
     }
+
+    /**
+     * The same, keeping what the bind engine said. A mismatch reported without its cause names the type and
+     * nothing about the class -- and the account of <em>which</em> component could not be bound is the half a
+     * caller can act on.
+     */
+    public BindMismatchException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

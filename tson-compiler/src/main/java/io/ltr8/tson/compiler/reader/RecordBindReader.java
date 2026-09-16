@@ -499,7 +499,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 throw new IllegalArgumentException(
                         "'" + name + "' is not record-shaped: " + typeDefinition.body());
             }
-            DataClass dataClass = descriptorFor(name);
+            DataClass dataClass = descriptorFor(name, typeDefinition, context);
 
             if (typeDefinition.subtypes().isEmpty()) {
                 Map<String, DataClassRecord> labelled = labelledChoice(body, dataClass);
@@ -524,7 +524,8 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 // Membership is decided through this context's own binder, which is the only thing that
                 // knows a schema name is not always its class's own (set -> ArrayBody, and the rest of §5's
                 // array family with it). Unresolvable is not an error here -- it just is not a member.
-                return new VariantBindReader(name, noOwnData, union, resolver, this::boundClassOrNull);
+                return new VariantBindReader(name, noOwnData, union, resolver,
+                        member -> boundClassOrNull(member, context));
             }
 
             if (dataClass instanceof DataClassRecord record) {
@@ -587,12 +588,15 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * schema name is not always its class's own -- {@code set} and {@code array} both reach {@code
          * ArrayBody}, §5's array family resolving to one body shape.
          */
-        private Class<?> boundClassOrNull(String schemaTypeName) {
-            try {
-                return context.getDescriptor(schemaTypeName).typeClass();
-            } catch (DataBindException | RuntimeException e) {
-                return null;
+        private Class<?> boundClassOrNull(String schemaTypeName, ValueReaderContext vctx) {
+            for (String candidate : vctx.bindingNamesFor(schemaTypeName)) {
+                try {
+                    return context.getDescriptor(candidate).typeClass();
+                } catch (DataBindException | RuntimeException e) {
+                    // Not a member under this name; the next candidate is the entry's own.
+                }
             }
+            return null;
         }
 
         /**
@@ -605,14 +609,23 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
          * never mapped the type that this library cannot do the job, and that reading travels: a downstream
          * service turns it into a 501.
          */
-        private DataClass descriptorFor(String name) {
-            try {
-                return context.getDescriptor(name);
-            } catch (DataBindException e) {
-                throw new MissingBindingException("no bound Java class for '" + name + "': nothing in this "
-                        + "bind context resolves that schema type name. Map it (ProcessorConfig.bindings) or give "
-                        + "the context a DataNameBinder that can find it -- " + e.getMessage());
+        private DataClass descriptorFor(String name, TypeDefinition definition, ValueReaderContext vctx) {
+            DataBindException first = null;
+            StringBuilder tried = new StringBuilder();
+            for (String candidate : vctx.bindingNamesFor(name, definition)) {
+                try {
+                    return context.getDescriptor(candidate);
+                } catch (DataBindException e) {
+                    // The first failure is the one reported: it is the name the author wrote, so a class
+                    // that was mapped and then failed analysis is not masked by "the minted name is unbound".
+                    first = first == null ? e : first;
+                    tried.append(tried.isEmpty() ? "" : "' or '").append(candidate);
+                }
             }
+            throw new MissingBindingException("no bound Java class for '" + tried + "': nothing in this "
+                    + "bind context resolves that schema type name. Map it (ProcessorConfig.bindings) or give "
+                    + "the context a DataNameBinder that can find it -- "
+                    + (first == null ? "" : first.getMessage()), first);
         }
 
         private static DataClassRecord requireRecord(String name, DataClass dataClass) {
