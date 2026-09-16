@@ -847,7 +847,16 @@ public final class TsonSchemaLinker {
                                                                  Set<String> localNames) {
         Map<String, Set<String>> newSubtypesByName = new LinkedHashMap<>();
         for (String localName : localNames) {
-            for (String supertype : merged.get(localName).supertypes()) {
+            TypeDefinition local = merged.get(localName);
+            if (!local.parameters().isEmpty()) {
+                // A template is not a type until it is applied (§5.10), so no value can ever be one and it
+                // has no business in an index of what a position typed by the supertype admits. Its own
+                // `supertypes` stays: `<V> base & { … }` records the composition there, and that is what
+                // materialisation reads to give each instantiation its contract -- so what is excluded is
+                // the reverse edge alone, and each application still indexes under the base as it closes.
+                continue;
+            }
+            for (String supertype : local.supertypes()) {
                 if (merged.containsKey(supertype)) {
                     newSubtypesByName.computeIfAbsent(supertype, ignored -> new LinkedHashSet<>()).add(localName);
                 }
