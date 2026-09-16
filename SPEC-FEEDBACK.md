@@ -1254,6 +1254,22 @@ flag and no rule about which kind of template is which: `pet<"dog", dog_type>` i
 gets no entry, `result<text>` is written at positions and gets one, and a schema that writes both gets both
 behaviours from one rule.
 
+**A declaration body mints too, and what that buys is measured.** `a => box<text>` resolves to a REFERENCE
+entry over a minted `box<text>` rather than to the closed entry itself, and the hop reads as ceremony until
+the identity it carries is asked for. Three properties, measured on this implementation: a direct definition
+and a field use of one application reach one entry; two declarations naming one application are two aliases
+over one entry, neither privileged; and a schema writing `box<text>` that has never seen the schema declaring
+`a` names that same entry, so an import merge unifies the two instead of splitting them. The third settles
+it — a content-addressed name is a function of the form alone where an author's name is a fact about one
+namespace, and a field use in another schema cannot name what it has not heard of (§3.3.4). Letting a
+declaration body *be* the entry costs the first two as well: two PRODUCT entries carrying one `source` breaks
+one-entry-per-form, and privileging one by declaration order makes a second declaration's resolved output
+depend on whether the first exists. Indexing `subtypes` by an alias *where one happens to exist* fails the
+same way, for the reason this entry gives elsewhere: an index assembled from whichever names a closure
+contains is not a function of the schema. So the hop stays and what moves is which name is **shown** — a
+binding map is keyed on the name the author wrote and a diagnostic prints it, the alias being collapsed when
+readers are compiled (§8.3) so a read pays nothing for it.
+
 **The correction to #11.** #11 refuses SEALED on a template because "a template has no set for such a claim to
 range over … the claim's subject would be assembled from whichever applications a closure happens to contain".
 That argument is sound where a *type* parameter multiplies the families — `ok<T>` composing onto `result<T>`

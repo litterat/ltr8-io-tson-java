@@ -58,6 +58,18 @@ own prose (which had gone stale on it):
   belongs with the other constructor-eligibility checks, where `requireApplicable` already asks what `!C`
   may be applied to.
 
+- [ ] **A template lands in its base's `subtypes` index, and a template is not a type.** A subtype template
+  composing onto a closed base puts *itself* there beside the instantiations it closes into: `pet => @sealed
+  { @discriminator pet_type: text }` with `pet_of => <T, V> pet & { pet_type: = T  pet: V }` and two
+  applications gives `pet.subtypes = [pet_of, pet_of_cat_text_48ad744f, pet_of_dog_int32_b3a7f8ab]`, where
+  `pet_of` is `kind=TEMPLATE`. §5.10 makes a template no type until applied and §8.2 makes `subtypes` a
+  name-level index of entries that are, so nothing typed by the base can ever be one — the edge the closing
+  needs is `pet_of.supertypes`, which is where the composition is already recorded and must stay. Fix it
+  where the index is populated (`TsonSchemaLinker`), not where it is read. Two filters downstream exist only
+  because it is not: `RecordExtension.checkFamily` skips an entry with parameters before comparing pins, and
+  the sealed dispatcher builds its member list without one — both can go, and until they do a new consumer
+  that enumerates the index inherits the trap rather than the workaround.
+
 ## Checked annotations
 
 [TSON-SCHEMA] §6 defines the category and §5.4's `@disjoint` is the precedent both follow: an annotation with
