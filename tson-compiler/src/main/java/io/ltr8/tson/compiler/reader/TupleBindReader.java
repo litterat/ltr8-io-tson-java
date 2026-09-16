@@ -88,7 +88,7 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
             if (!(typeDefinition.body() instanceof TupleBody body)) {
                 throw new IllegalArgumentException("'" + name + "' is not tuple-shaped: " + typeDefinition.body());
             }
-            DataClass dataClass = descriptorFor(name);
+            DataClass dataClass = descriptorFor(name, typeDefinition, context);
             if (!(dataClass instanceof DataClassTuple descriptor)) {
                 throw new IllegalArgumentException("'" + name + "' resolves to " + dataClass.typeClass()
                         + ", which isn't tuple-shaped -- can't bind '" + name + "' as one");
@@ -98,15 +98,22 @@ final class TupleBindReader extends TupleAbstractReader<Object> {
                     AnnotationTypes.of(context));
         }
 
-        private DataClass descriptorFor(String name) {
-            try {
-                return context.getDescriptor(name);
-            } catch (DataBindException e) {
-                // A misconfiguration, not a gap -- see RecordBindReader.Factory.descriptorFor.
-                throw new MissingBindingException("no bound Java class for '" + name + "': nothing in this "
-                        + "bind context resolves that schema type name. Map it (ProcessorConfig.bindings) or give "
-                        + "the context a DataNameBinder that can find it -- " + e.getMessage());
+        private DataClass descriptorFor(String name, TypeDefinition definition, ValueReaderContext vctx) {
+            DataBindException first = null;
+            StringBuilder tried = new StringBuilder();
+            for (String candidate : vctx.bindingNamesFor(name, definition)) {
+                try {
+                    return context.getDescriptor(candidate);
+                } catch (DataBindException e) {
+                    first = first == null ? e : first;
+                    tried.append(tried.isEmpty() ? "" : "' or '").append(candidate);
+                }
             }
+            // A misconfiguration, not a gap -- see RecordBindReader.Factory.descriptorFor.
+            throw new MissingBindingException("no bound Java class for '" + tried + "': nothing in this "
+                    + "bind context resolves that schema type name. Map it (ProcessorConfig.bindings) or give "
+                    + "the context a DataNameBinder that can find it -- "
+                    + (first == null ? "" : first.getMessage()), first);
         }
     }
 }

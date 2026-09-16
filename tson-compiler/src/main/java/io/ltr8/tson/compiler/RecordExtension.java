@@ -7,6 +7,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
+import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.Reference;
@@ -206,7 +207,8 @@ final class RecordExtension {
                 String blamed = localNames.contains(subtype) ? subtype
                         : localNames.contains(collision) ? collision : null;
                 if (blamed != null) {
-                    violations.add(new Violation(blamed, "'" + subtype + "' and '" + collision
+                    violations.add(new Violation(blamed, "'" + shown(subtype, merged) + "' and '"
+                            + shown(collision, merged)
                             + "' pin the discriminator" + (selectors.size() > 1 ? "s" : "") + " of '" + base
                             + "' to the same "
                             + describe(selectors, pins) + " -- two subtypes a value cannot tell apart, so the "
@@ -216,6 +218,17 @@ final class RecordExtension {
                 }
             }
         }
+    }
+
+    /**
+     * A member named the way the author wrote it: a minted entry as the application that produced it, which
+     * is the same rule a reader's own messages follow. A family whose members are template applications
+     * collides under names the resolver chose ({@code pet_of_cat_int32_1c52dc45}, §8.2), and those name
+     * nothing an author can open.
+     */
+    private static String shown(String name, Map<String, TypeDefinition> merged) {
+        TypeDefinition definition = merged.get(name);
+        return definition == null ? name : EntryDisplayName.of(name, definition, merged);
     }
 
     /**

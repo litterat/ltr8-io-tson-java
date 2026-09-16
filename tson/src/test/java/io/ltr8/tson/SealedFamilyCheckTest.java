@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -201,6 +202,29 @@ class SealedFamilyCheckTest {
                   dog => pet & { pet_type: = "dog"  breed: text }
                   hound => pet & { pet_type: = "dog"  scent: text }
                 }""").contains("to the same value"));
+    }
+
+    /**
+     * <b>A colliding member is named the way the author wrote it.</b> Both members here are template
+     * applications, so the entries that collide are minted and named by content (§8.2) -- and a message
+     * naming {@code pet_of_cat_int32_1c52dc45} points at nothing an author can open. {@code
+     * EntryDisplayName} renders a minted entry as the application that produced it, which is the same rule
+     * every reader's own messages follow.
+     */
+    @Test
+    void collidingMembersAreNamedAsTheApplicationsThatProducedThem() {
+        String refusal = problems(Tson.standard(), "displayed", """
+                {
+                  pet => @sealed { @discriminator pet_type: text }
+                  pet_of => <T, V> pet & { pet_type: = T  pet: V }
+                  a => pet_of<"cat", text>
+                  b => pet_of<"cat", int32>
+                }""");
+
+        assertTrue(refusal.contains("pet_of<cat, int32>"), refusal);
+        assertTrue(refusal.contains("pet_of<cat, text>"), refusal);
+        assertFalse(refusal.matches("(?s).*pet_of_cat_[a-z0-9]+_[0-9a-f]{8}.*"),
+                "no content-derived entry name reaches the author: " + refusal);
     }
 
     /**

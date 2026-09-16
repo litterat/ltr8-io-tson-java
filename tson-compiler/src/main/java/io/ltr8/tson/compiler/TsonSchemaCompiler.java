@@ -15,6 +15,7 @@ import io.ltr8.tson.schema.meta.TypeKind;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -178,6 +179,14 @@ public final class TsonSchemaCompiler {
         private final Map<String, Set<String>> namesMeaning;
 
         /**
+         * The inverse of §8.3's alias hop, built once: which written names reach each entry. A binding map is
+         * keyed on the names an author wrote and a materialised entry has none of its own (§8.2), so a bind
+         * lookup asks under these before the entry's own name -- and, like {@code namesMeaning}, this is a
+         * property of the schema rather than of the entry, so deriving it per entry would be quadratic.
+         */
+        private final Map<String, List<String>> referrers;
+
+        /**
          * What every built reader is handed for its own name lookups. Resolves through this compilation
          * while the walk runs, then is rebound to the finished schema so nothing here outlives the call --
          * a reader that resolves at read time (dispatch, annotations) holds this, not {@code this}.
@@ -191,6 +200,7 @@ public final class TsonSchemaCompiler {
             this.factoryFor = factoryFor;
             this.foreign = foreign;
             this.namesMeaning = Subsumption.namesMeaning(schema.entries());
+            this.referrers = ValueReaderContext.referrers(schema.entries());
         }
 
         TsonTypeReader<?> resolve(String name) {
@@ -238,7 +248,8 @@ public final class TsonSchemaCompiler {
                 // every other entry is dispatched on. See OpenTemplateReader for why the refusal is the
                 // entry's own reader rather than a check at the root.
                 return new OpenTemplateReader(name, definition.parameters(),
-                        new ValueReaderContext(linked, readers, foreign, namesMeaning).locationOf(name, definition));
+                        new ValueReaderContext(linked, readers, foreign, namesMeaning, referrers)
+                                .locationOf(name, definition));
             }
             Top body = definition.body();
             if (body instanceof Reference r) {
@@ -251,7 +262,7 @@ public final class TsonSchemaCompiler {
             }
             ValueReaderFactory factory = factoryFor.apply(TsonCompiledMetaSchema.typenameOf(body));
             TsonTypeReader<?> built = factory.create(name, definition,
-                    new ValueReaderContext(linked, readers, foreign, namesMeaning));
+                    new ValueReaderContext(linked, readers, foreign, namesMeaning, referrers));
             // §7.2's subsumption rule, applied at every position it governs rather than only where a record
             // happened to have subtypes -- see Subsumption for which kinds it deliberately leaves alone.
             return Subsumption.guard(name, definition, built, namesMeaning, readers);
