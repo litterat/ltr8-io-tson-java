@@ -917,7 +917,10 @@ over. `subtypes` is an index over entries (§8.2), and an instantiation entry ex
 that application, so the claim's subject would be assembled from whichever applications a closure happens to
 contain: `ok<T>` composing onto `result<T>` puts nothing in `result<text>`'s index unless someone also writes
 `ok<text>`, and writing it in a fourth schema would change the family without touching its declaration. **Both
-marks are therefore a resolver error on a template**, and `@abstract` is not.
+marks are therefore a resolver error on a template**, and `@abstract` is not. **#13 reopens half of this**:
+the argument above holds where a type parameter multiplies the families, and does not reach a family whose
+members are the applications themselves, so SEALED is admissible there under one condition and FINAL is
+refused for a different reason than this paragraph gives.
 
 The disanalogy with the host language is worth stating, because the host language is where the intuition comes
 from: Java's `sealed abstract class Result<T> permits Ok, Err` has one class carrying one permits list, and its
@@ -1148,3 +1151,157 @@ second check and no comparison of bodies — the name-level index answers on its
 other position already relies on. State the §5.9 interaction: a removal drops an open application from the
 lineage it keeps for names, because the two behave differently once the entry closes. Drop the "two-part
 check" sentence; there is no second part left for it to name.
+
+---
+
+## 13. An ABSTRACT or SEALED template has no entry to name, and that position is the one a template can safely fill
+
+**Documents:** [TSON-SCHEMA] §5.10 (a template is not a type, and the closed-entry rule), §1.3 (what a
+resolved-output consumer must support), §5.2 (`record.extension`), §5.4, §5.7 (the identity diagonal), §5.8
+(composition), §7.2 (subsumption), §8.1 (resolved output), §8.2 (identity and internal names), §3.3.1
+(namespaces), §3.3.4 (`subtypes` open across schemas); [TSON-JSON] §6.1.5, §8.2, §8.4. Reads with #10 and #11,
+and **corrects an argument #11 makes**.
+**Kind:** design proposal — one rule with one condition, one conformance-class repair, and a correction to a
+refusal this implementation ships.
+
+**The asymmetry that shows the line is in the wrong place.** Two declarations differing in one mark get
+opposite verdicts, and neither verdict is the useful one:
+
+```
+pet => @sealed   <N, T> { @discriminator type: text = N  pet: T }    ; refused at load
+pet => @abstract <N, T> {               type: text = N  pet: T }    ; loads clean
+dog => pet<"dog", dog_type> & { … }
+```
+
+The first is refused because "`@sealed` states a closed set of subtypes, which a template has none of". The
+second loads — and is inert. `dog` is a subtype of `pet<"dog", dog_type>`, `cat` of `pet<"cat", cat_type>`, so
+the closure holds one family per argument list, each with one member, and no position can be typed `pet` at
+all: `holder => { a: pet }` is refused by the same rule that refuses `holder => { a: box }`. One mark is
+refused loudly and the other is accepted and cannot be used. The author wanted the same thing in both cases,
+and neither spelling delivers it.
+
+**Why "a template is not a type" is right for `box<T>` and wrong for an abstract base.** The rule's force is
+about *elimination*: a position typed `box` would have to read a value against an element type nothing has
+fixed, and the reader would be left inferring arguments from the payload — which is not underspecified but
+ill-defined, since `[]` determines nothing and two instantiations can accept one document. **None of that
+reaches an ABSTRACT or SEALED base, because no value is ever read against it.** A value at such a position is
+a value of some member, selected by a tag (ABSTRACT) or by reading the discriminator fields (SEALED), and
+every member is a closed entry with every argument already fixed. The existential is eliminated by dispatch,
+never by inference. This is precisely the host-language shape the marks were taken from: `Pet<?>` is a
+declarable variable type and `new Pet<T>()` is not, and §5.2 already forbids the second for an abstract record.
+
+**The condition: the pre-dispatch contract must be parameter-free.** A decoder at a SEALED position parses the
+discriminator fields *before* it knows the member, so their declared types cannot be parameters — while their
+pins are exactly what the parameters supply. In the example above `type: text = N` satisfies this: the
+declared type is `text` and only the pinned value is parametric. `pet: T` is unconstrained, because nothing
+reads it until the member is selected and the member's own entry types it concretely. ABSTRACT needs no
+condition at all: the tag comes from the document and the base contributes nothing to the read. So the rule is
+**an ABSTRACT or SEALED template is nameable at a type position; a plain template is not** — with SEALED
+carrying the one check above.
+
+**Faithful erasure is not required, and that is the point.** The natural objection is that `<N, T> { type:
+text = N  pet: T }` has no erasure: drop the parameters and `pet:` has no type. It needs none. What a base
+must carry is the part read before dispatch plus the fact that it has no instances, and both survive. A base
+whose field list is smaller than its members' is the ordinary case for an abstract record today; a base whose
+field list omits what it cannot type is the same thing one step further.
+
+**The mechanism, and the conformance-class repair it exists for.** §1.3 promises that a consumer ingesting
+only resolved schema values "is fully conforming with no support for templates or parameters … since every
+entry a data document's type can reach is closed by the closed-entry rule". Naming a template at a field type
+would break exactly that. The repair is to keep the promise literally: **the resolver mints a closed entry for
+the base**, carrying the pre-dispatch fields with their parameter-free types, the `extension` member, and
+nothing that could not be stated; a type position written `pet` resolves to that entry, and resolved output
+therefore never names a template at a position. This is §5.3's lift applied one level up — a source spelling
+becomes an injected entry plus a bare reference — and it needs no kernel change and no new namespace rule.
+Two alternatives were considered and are worse: making the name denote one entry that is both template and
+base needs a kernel field to hold the held body; and letting `pet` mean the template as an application head
+and the base at a type position splits one name by syntactic role, which §3.3.1's namespaces do not do.
+
+**Subtyping, and why the checks are #10's unchanged.** The edge runs from the member to the base, read off the
+head of the application the member's body records, so `subtypes` of the base is its members directly — the
+same flat index a hand-written family produces, and the same one §7.2 and every dispatcher already consult.
+The sealed checks then read exactly as they do for hand-written members: every member pins each discriminator
+`REQUIRED_FIXED` — automatic here, the pin being the argument — and the pins are pairwise distinct as tuples,
+compared as values. An importing schema writing a further
+application is judged where it writes it, which is #10's propagating obligation working unchanged. An empty
+family stays a read-time diagnostic and never a load error, on #11's own reasoning about library schemas.
+
+**Where the arguments go, and why nothing is minted for them.** In `dog => pet<"dog", dog_type> & { … }` the
+arguments are the *member's* own contribution and not a shared type's: `N = "dog"` fills `type: text = N` and
+becomes a `REQUIRED_FIXED` pin in `dog`'s flattened field list, and `T = dog_type` fills `pet: T` and becomes
+`dog`'s own field. Substituted where it stands, the declaration is exactly the hand-written member `dog => pet
+& { type: = "dog"  pet: dog_type }`, and the one fact that outlives the substitution is that `dog` IS-A `pet`.
+So an application standing at a **composition operand** is subsumed there — §5.8 already absorbs an open
+operand's fields — and **mints no entry at all**. What a resolver mints instead today is an artifact: measured,
+`pet_dog_dog_type_9e7bfc62` carries `subtypes=[dog]` and `extension=ABSTRACT`, nothing in the closure names
+it, and a bind-mode compile never asks for it. An entry with one subtype, no referent and no reader is a
+derivation step wearing an entry's clothes.
+
+**The precision #12 secured is kept, in the channel #12 put it in.** #12 needed a supertype edge to carry
+arguments so that `ok<text>` is IS-A `result<text>` and not `result<int32>`, and typed `record.supertypes`
+`[type_ref]` for it. That channel is sufficient on its own: the body records the application **as written**
+(`dog.supertypes = [pet<"dog", dog_type>]`) while the derived `type_definition.supertypes` records the base
+(`[pet]`) and `pet.subtypes` lists `dog` and `cat` directly. Today the body holds a closed name with the
+arguments already discarded into it, so one channel states nothing the other does not; under this rule each
+states something a consumer needs — the body what was applied, the index what the family is.
+
+**Minting is keyed on naming, not on the mark.** An instantiation entry is minted where an application is
+*named at a type position*, and nowhere else. Keying it on the mark instead — ABSTRACT and SEALED templates
+subsume, plain ones instantiate — reads simpler and costs a shape people want: `result => @abstract <T> { … }`
+with `ok => <T> result<T> & { … }` would leave `ok<text>` and `ok<int32>` both IS-A a flat `result`, and
+`result<text>` would stop being writable at a position at all. Keyed on naming, the two coexist with no regime
+flag and no rule about which kind of template is which: `pet<"dog", dog_type>` is only ever an operand and
+gets no entry, `result<text>` is written at positions and gets one, and a schema that writes both gets both
+behaviours from one rule.
+
+**The correction to #11.** #11 refuses SEALED on a template because "a template has no set for such a claim to
+range over … the claim's subject would be assembled from whichever applications a closure happens to contain".
+That argument is sound where a *type* parameter multiplies the families — `ok<T>` composing onto `result<T>`
+puts nothing in `result<text>`'s index unless someone writes `ok<text>` — and it does not reach a family whose
+members *are* the applications, which is one family with one index. Nor does openness separate the two cases:
+a plain `@sealed` base is already open across schemas (§3.3.4), and #10 answers that with the pinning
+obligation rather than by refusing the mark. **FINAL stays refused, and now for a better reason**: its only
+coherent reading on a template would forbid composition onto the base, and every application is a subtype of
+that base, so the mark would forbid the applications it exists alongside.
+
+**What a host binding gets, which is what the shape is for.** The base binds to an interface and each member
+to its own class — `sealed interface Pet permits Dog, Cat` over records — and that is already how a
+hand-written family binds in this implementation. Two facts measured here are worth stating because they
+constrain the design: a member cannot bind to the base's class (it is not record-shaped, and the strict
+field-to-component check would refuse it in any case), and the base's own binding is never asked for, an
+abstract base having nothing to construct. So this proposal changes what a *schema* can say and leaves the
+binding contract where it is.
+
+**What is running:** the two verdicts above, and nothing else in this entry. `@abstract` on a template is
+implemented and tested, including the family a base template and its subtype templates close into; `@sealed`
+and `@final` on a template are refused with the message quoted; a type position naming a bare template is
+refused at link. The value-argument family (`pet => @abstract <N> { … }` with `dog => pet<"dog"> & { … }`)
+resolves, links, compiles and reads, with `dog` binding to its own class — which is the evidence that
+everything below the base already works, and that what is missing is the entry the base would be. The edges
+are measured rather than argued: `dog.supertypes = [pet_dog_dog_type_9e7bfc62]`, that entry's `subtypes =
+[dog]` with `extension = ABSTRACT`, and `pet` a TEMPLATE entry with an empty index. That per-argument entry is
+the artifact this entry proposes to stop minting, and its inertness is the evidence: one subtype, no referent,
+never asked for at bind. **The
+proposal itself is not built**: no minted base entry, no nameable template, no check over a template's
+discriminator types.
+
+**The one open question.** Whether the base may state a payload field it cannot type — `pet: top`, saying
+every member carries one while promising nothing about it. Nothing reads the field at the base, so it costs a
+reader nothing, and it is the only thing the parameterised base says that a hand-written family cannot say at
+all. It is left open here because it turns on whether §7.2 should admit a field typed `top` as a contract that
+every member narrows, which is a question about subsumption rather than about templates.
+
+**Suggested resolution.** State in §5.10 that a template marked ABSTRACT or SEALED may be named at a type
+position, with the reason — the position is never read against the template, only against the member dispatch
+selects — and that a plain template may not, with the inference argument that makes the refusal principled
+rather than conservative. State the SEALED condition: a discriminator's declared type MUST contain no type
+parameter, its pin being what a parameter supplies. State that the resolver mints the closed base entry and
+that a type position naming the template resolves to it, so §1.3's resolved-output guarantee is untouched.
+State that an application at a composition operand is subsumed where it stands and mints nothing, that an
+instantiation entry is minted only where an application is named at a type position, and that the two rules
+are keyed on the position rather than on the mark — so a discriminated family mints only its base while
+`result<text>` stays writable. State that the member's body records the application as written (§5.8's
+`[type_ref]` channel, #12) while the derived index records the base, and that #10's closure checks apply to
+the members unchanged. Correct #11's blanket refusal: SEALED is admissible on a template whose members are
+its applications, FINAL is not, and the reason FINAL is not should be the one above rather than the set-membership
+argument, which does not apply.
