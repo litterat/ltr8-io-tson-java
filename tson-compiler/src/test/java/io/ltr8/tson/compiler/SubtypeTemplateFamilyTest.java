@@ -82,6 +82,35 @@ class SubtypeTemplateFamilyTest {
     }
 
     /**
+     * <b>The template itself is not one of its base's subtypes.</b> A subtype template records its
+     * composition in its own {@code supertypes} -- which is what materialisation reads to give each
+     * instantiation its contract -- and the reverse index used to credit it back, so a base listed the
+     * template beside the instantiations that close from it. §5.10 makes a template no type until applied,
+     * so no value at a {@code base} position can ever be one, and §8.2's index is over entries that are
+     * types.
+     *
+     * <p>Nothing downstream read it, which is why it went unnoticed: the family checks skip an entry with
+     * parameters and the dispatchers build their member lists without one. Those filters are what an index
+     * holding a non-type costs -- each consumer of the index has to know to apply them.
+     */
+    @Test
+    void aTemplateIsNotIndexedAsASubtypeOfItsBase() {
+        TsonCompiledSchema compiled = compile("""
+                  base     => { x: int32 }
+                  box      => <V> base & { item: V }
+                  box_text => box<text>
+                """);
+        TypeDefinition baseEntry = compiled.schema().entries().get("base");
+
+        assertTrue(baseEntry.subtypes().contains(target(compiled, "box_text")),
+                () -> "the instantiation is indexed: " + baseEntry.subtypes());
+        assertFalse(baseEntry.subtypes().contains("box"),
+                () -> "a template is not a type and cannot be a subtype: " + baseEntry.subtypes());
+        assertEquals(List.of("base"), compiled.schema().entries().get("box").supertypes(),
+                "the template keeps its own composition edge -- materialisation reads it");
+    }
+
+    /**
      * Two arguments, two families. Nothing in {@code result<int32>}'s family came from {@code text}'s, which
      * is the fact a name-level edge to {@code result} could not have carried.
      */
