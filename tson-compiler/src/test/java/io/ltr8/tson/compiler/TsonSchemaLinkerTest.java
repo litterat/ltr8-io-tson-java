@@ -138,7 +138,8 @@ class TsonSchemaLinkerTest {
      * test states one directly rather than assembling the tree it denotes.
      */
     private static TypeDefinition template(String parameter, String body) {
-        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(), new TemplateBody(List.of(parameter), body));
+        return new TypeDefinition(Optional.empty(), TypeKind.PRODUCT, List.of(), List.of(),
+                new TemplateBody(List.of(parameter), body, Optional.empty()));
     }
 
     /**

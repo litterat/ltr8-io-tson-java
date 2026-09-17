@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=0162a483fe6f35714eb192907d81a22cc282f79bfd904b8932b3c859bf063ead"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=b117906921ff83f9adeb029fe48ea039509048bb2e1ccacdc4611e54fb678b2b"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -85,10 +85,30 @@
 
     Composes with `top` directly, like `reference` and `data`: it
     describes no value's shape, and nothing is ever typed by it.
+
+    `extension` is the **parent's**, and only a record-bodied
+    template has one: absent means this template is no type, so
+    naming it at a type position is an error. Present, it is
+    ABSTRACT or SEALED and never OPEN or FINAL — a parent has no
+    direct instances, nothing being able to write a value whose
+    type is the template rather than one of its applications, and
+    its applications are subtypes by construction. It is derived
+    rather than stated, in the manner of `choice.disjoint`; the
+    author's own `@abstract` mark is the *instantiation's* fact and
+    travels inside the held text above.
+
+    Optional with no default, because absence is a fact no member
+    spells. A default would be omitted from output at its own value
+    ([TSON-SCHEMA] §8.1), leaving a consumer unable to tell
+    "omitted because default" from "omitted because this template
+    is not a type" — and deriving the answer from the body shape
+    instead would mean parsing the held text, which is the one
+    thing §1.3 promises a resolved-output consumer never has to do.
     """
   template => top & {
     parameters:  [param_name]
     template:    text
+    extension:   record_extension_type?
   }
 
   @doc:"""
