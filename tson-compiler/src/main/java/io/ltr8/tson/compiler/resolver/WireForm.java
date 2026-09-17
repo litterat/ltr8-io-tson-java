@@ -86,6 +86,18 @@ final class WireForm {
     static final String SUPERTYPES = "supertypes";
 
     /**
+     * {@code record_field.discriminator} -- the field a sealed family dispatches on (§5.2). Written only
+     * where it is set, the constructor's own default being {@code false}, on {@link #EXTENSION}'s terms: a
+     * held body states a mark exactly when one was made.
+     *
+     * <p><b>Both producers of a held record write it, and that is the point of the constant.</b> A
+     * composition or refinement template reaches the wire form through {@link #heldRecord} and a plain
+     * {@code <T> { … }} through {@code SchemaDesugarer}, so a member only one of them spelled would be a
+     * mark that survives one spelling of a template and not the other.
+     */
+    static final String DISCRIMINATOR = "discriminator";
+
+    /**
      * {@code record.extension} -- how the record may be realised (§5.2). Written only where it is not
      * {@code OPEN}, the constructor's own default, so a held body states a mark exactly when one was made.
      */
@@ -178,6 +190,11 @@ final class WireForm {
             members.add(new RecordValue.Field(TYPE, scoped(refValue(field.type()))));
             if (field.state() != FieldState.REQUIRED) {
                 members.add(nameField(STATE, field.state().name()));
+            }
+            if (field.discriminator()) {
+                // The mark the author wrote, stated as the member it lowers to. Without it a held body keeps
+                // the pin and loses what gives the pin meaning, so a template family could never be sealed.
+                members.add(nameField(DISCRIMINATOR, "true"));
             }
             // The two channels collapse into one: a literal keeps its own token form, and a routed parameter
             // is a bare name standing where the literal would.

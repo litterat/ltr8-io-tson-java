@@ -86,14 +86,12 @@ final class RecordExtension {
                                           Map<String, TypeDefinition> merged, List<Violation> violations) {
         checkNothingComposesOntoFinal(name, def, merged, violations);
 
-        // §5.8 flattens an inherited field whole, the mark included, so a subtype's copy of its base's
-        // selector is indistinguishable here from one the subtype declared. The rule is about the mark a
-        // declaration *makes*: a field it inherits from a sealed supertype is that supertype's statement and
-        // needs no mark of its own, where a genuinely new one starts a family and needs `@sealed` like any
-        // other. Without the distinction every subtype of a sealed base would be refused for pinning it.
+        // Every mark here is one this declaration makes: the mark is the base's statement about which field a
+        // family dispatches on, and a member that pins the selector carries the value without it (§5.2). So
+        // this needs no inherited-selector exemption -- it used to, when §5.8's flattening copied the mark
+        // onto every member and made a subtype indistinguishable from a fresh base.
         List<RecordField> marked = record.fields().stream()
                 .filter(RecordField::discriminator)
-                .filter(field -> !inheritedSelector(def, field.name(), merged))
                 .toList();
         if (record.extension() == RecordExtensionType.SEALED && marked.isEmpty()) {
             violations.add(new Violation(name, "'" + name + "' is @sealed but no field of it carries "
@@ -116,21 +114,6 @@ final class RecordExtension {
         for (RecordField field : marked) {
             checkDiscriminatorField(name, field, record.groups(), merged, violations);
         }
-    }
-
-    /**
-     * Whether a marked field came from a sealed supertype rather than from this declaration. Read off {@code
-     * TypeDefinition.supertypes}, so a subtraction -- which empties the contract index (§5.9) -- leaves the
-     * field this record's own to justify, which is right: the type is no longer in the family.
-     */
-    private static boolean inheritedSelector(TypeDefinition def, String field,
-                                              Map<String, TypeDefinition> merged) {
-        return def.supertypes().stream()
-                .map(supertype -> merged.get(ReferenceChain.terminal(supertype, merged)))
-                .anyMatch(parent -> parent != null && parent.body() instanceof RecordBody record
-                        && record.extension() == RecordExtensionType.SEALED
-                        && record.fields().stream()
-                                .anyMatch(f -> f.name().equals(field) && f.discriminator()));
     }
 
     /**

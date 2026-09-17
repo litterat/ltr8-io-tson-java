@@ -841,8 +841,18 @@ final class SchemaDesugarer {
         if (resolved.state() != FieldState.REQUIRED) {
             members.add(WireForm.nameField(WireForm.STATE, resolved.state().name()));
         }
+        // The mark lowers to the member it denotes, here as at a closed declaration -- through the same
+        // `DefinitionMarks` predicate, so the two paths cannot disagree about what a discriminator is. This
+        // stays purely syntactic: the helper reads written annotation names against a fixed table and
+        // consults no governing meta.
+        if (DefinitionMarks.discriminates(field.name(), field.annotations())) {
+            members.add(WireForm.nameField(WireForm.DISCRIMINATOR, "true"));
+        }
         resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.scoped(token))));
-        return WireForm.scoped(new RecordValue(members), field.annotations());
+        // Consumed, not carried: a mark that lowers into the body must not also survive in the annotation
+        // channel, or a closed member would state one fact twice and §8.1's output would preserve a mark
+        // §6 says is never an annotation.
+        return WireForm.scoped(new RecordValue(members), DefinitionMarks.consumed(field.annotations()));
     }
 
     /**

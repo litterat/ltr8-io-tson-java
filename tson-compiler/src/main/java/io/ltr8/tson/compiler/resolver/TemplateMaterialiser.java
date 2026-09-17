@@ -680,10 +680,11 @@ final class TemplateMaterialiser {
      * value concrete the field takes the state its literal spelling would have had. A {@code ~ P} default
      * arrives as {@code REQUIRED_DEFAULT} and stays one: data may still override it.
      *
-     * <p><b>Shared with the operand path.</b> {@code DefinitionResolver} absorbs a composition operand's
-     * fields by value and mints nothing for the application, so a closed operand's body never reaches this
-     * pass -- and it needs the same fixation, for the same reason, one phase earlier. An operand still open
-     * does not: its value is a parameter, and its own closing is what makes it concrete.
+     * <p><b>Fixation is also where a discriminator's mark stops.</b> The mark says which field a family
+     * dispatches <em>on</em>, which is the base's statement: the base declares the selector unpinned and
+     * carries the mark, and whoever pins it is a member and carries the value instead. A template's own
+     * field is the base's -- REQUIRED with the parameter standing in {@code value} -- so the mark belongs in
+     * the held body; the instantiation that closes it has pinned the selector, so it does not.
      */
     static Top fixRoutedValues(Top body) {
         if (!(body instanceof RecordBody record)) {
@@ -691,7 +692,7 @@ final class TemplateMaterialiser {
         }
         return new RecordBody(record.supertypes(), record.fields().stream()
                 .map(field -> field.state() == FieldState.REQUIRED && field.value().isPresent()
-                        ? field.withState(FieldState.REQUIRED_FIXED)
+                        ? field.withState(FieldState.REQUIRED_FIXED).withDiscriminator(false)
                         : field)
                 .toList(), record.groups(), record.extension());
     }
