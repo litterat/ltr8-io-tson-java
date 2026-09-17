@@ -1,6 +1,7 @@
 package io.ltr8.tson.compiler.resolver;
 
 import io.ltr8.annotation.Annotations;
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.compiler.ast.Annotation;
 import io.ltr8.tson.compiler.ast.ArrayValue;
 import io.ltr8.tson.compiler.ast.CoreValue;
@@ -248,6 +249,68 @@ final class WireForm {
         List<RecordValue.Field> members = new ArrayList<>(binding.fields());
         members.add(nameField(EXTENSION, extension.name()));
         return new DataValue(held.annotations(), held.typeRef(), new RecordValue(members));
+    }
+
+    /**
+     * The <b>parent's</b> extension for a held body, read off the payload ({@code SPEC-FEEDBACK.md} #13).
+     *
+     * <p><b>Absent unless the body is a record</b>, which is the one shape with a parent at all: a container,
+     * a constructor application and a reference template are no types, so there is nothing for an extension
+     * to describe and a type position naming one stays the error it is today. Present, it is ABSTRACT, or
+     * SEALED where a discriminator survives erasure -- never OPEN or FINAL, a parent having no direct
+     * instances (nothing can write a value whose type is the template rather than one of its applications)
+     * and its applications being subtypes by construction.
+     *
+     * <p><b>Derived rather than stated</b>, in the manner of {@code choice.disjoint}, which is what keeps it
+     * clear of the author's {@code @abstract} mark: that mark is the <em>instantiation's</em> fact and rides
+     * inside this same payload as {@code extension}, so the two levels never collide.
+     *
+     * <p><b>Read from the structure the resolver just built, never from the text.</b> The payload is in hand
+     * before it is written out, so this parses nothing -- which is the property §1.3 rests on, a
+     * resolved-output consumer never having to read a held body to learn what a template is.
+     *
+     * <p>A discriminator's declared type may not be a parameter: a position typed by the template reads the
+     * selector before it knows which member it has, so a type that varies per application is one it cannot
+     * read. The <em>pin</em> varying is the whole point, and does.
+     */
+    static Optional<RecordExtensionType> parentExtension(DataValue application, List<String> parameters) {
+        if (!RECORD.equals(application.typeRef().orElse(null))
+                || !(application.coreValue() instanceof RecordValue binding)) {
+            return Optional.empty();
+        }
+        boolean sealed = false;
+        for (RecordValue.Field member : binding.fields()) {
+            if (!FIELDS.equals(member.name())
+                    || !(member.value().value().coreValue() instanceof ArrayValue fields)) {
+                continue;
+            }
+            for (ScopedValue element : fields.elements()) {
+                if (!(element.value().coreValue() instanceof RecordValue field)
+                        || !"true".equals(memberToken(field, DISCRIMINATOR))) {
+                    continue;
+                }
+                String type = memberToken(field, TYPE);
+                if (type != null && parameters.contains(type)) {
+                    throw new SchemaValidationException("discriminator field '" + memberToken(field, NAME)
+                            + "' is typed by the type parameter '" + type + "', and a position typed by this "
+                            + "template reads a discriminator before it knows which member it has -- so its "
+                            + "type cannot vary per application (§5.10). The value it is pinned to is what an "
+                            + "argument supplies; its type is the base's own");
+                }
+                sealed = true;
+            }
+        }
+        return Optional.of(sealed ? RecordExtensionType.SEALED : RecordExtensionType.ABSTRACT);
+    }
+
+    /** One member's token text, or {@code null} where it is absent or is not a bare token. */
+    private static String memberToken(RecordValue record, String member) {
+        for (RecordValue.Field field : record.fields()) {
+            if (field.name().equals(member) && field.value().value().coreValue() instanceof TokenValue token) {
+                return token.text();
+            }
+        }
+        return null;
     }
 
     /** A resolved annotation carrier back in wire form, its bound value unbound by the caller's writer. */

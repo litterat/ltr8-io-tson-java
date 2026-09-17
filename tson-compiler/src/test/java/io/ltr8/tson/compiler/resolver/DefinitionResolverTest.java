@@ -541,6 +541,10 @@ class DefinitionResolverTest {
      * {@code !record { fields: [ ... ] }} §5.2 says it denotes, normalised at desugar and left unread until
      * materialisation substitutes the parameters away. The entry is a {@code record} construction, so
      * {@code source} names that constructor -- the same shape {@code <T> [T]} has with {@code array}.
+     *
+     * <p>{@code extension} is the <b>parent's</b> and is derived, not stated: a record-bodied template has a
+     * parent, and a parent has no direct instances whatever anyone writes, so ABSTRACT falls out with no
+     * discriminator in sight ({@code SPEC-FEEDBACK.md} #13).
      */
     @Test
     void resolvesAFreshRecordTemplateAsAHeldRecordConstruction() throws DataBindException {
@@ -551,7 +555,8 @@ class DefinitionResolverTest {
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"A\" \"B\" ] "
                         + "template: \"!record { fields: [ "
-                        + "{ name: first type: A } { name: second type: B } ] }\" } }",
+                        + "{ name: first type: A } { name: second type: B } ] }\" "
+                        + "extension: \"ABSTRACT\" } }",
                 write(pair));
     }
 
@@ -593,7 +598,8 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"base\" ] "
                         + "subtypes: [] body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { supertypes: [ base ] "
-                        + "fields: [ { name: value type: T } ] }\" } }",
+                        + "fields: [ { name: value type: T } ] }\" "
+                        + "extension: \"ABSTRACT\" } }",
                 write(box));
     }
 
@@ -614,7 +620,8 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"base\" ] "
                         + "subtypes: [] body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { supertypes: [ base ] "
-                        + "fields: [ { name: id type: text } { name: value type: T } ] }\" } }",
+                        + "fields: [ { name: id type: text } { name: value type: T } ] }\" "
+                        + "extension: \"ABSTRACT\" } }",
                 write(entries.get("box")));
     }
 
@@ -694,7 +701,8 @@ class DefinitionResolverTest {
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { fields: [ "
-                        + "{ name: value type: type_ref value: T } ] }\" } }",
+                        + "{ name: value type: type_ref value: T } ] }\" "
+                        + "extension: \"ABSTRACT\" } }",
                 write(sized));
     }
 
@@ -710,7 +718,8 @@ class DefinitionResolverTest {
                         + "supertypes: [] subtypes: [] "
                         + "body: !template { parameters: [ \"N\" ] "
                         + "template: \"!record { fields: [ "
-                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] }\" } }",
+                        + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] }\" "
+                        + "extension: \"ABSTRACT\" } }",
                 write(retry));
     }
 
