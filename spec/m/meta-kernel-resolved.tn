@@ -125,9 +125,10 @@
   template => !type_definition {
     supertypes: [top]
     body: !record { supertypes: [top]  fields: [
-      !record_field { name: parameters  type: array_param_name_xxhash }
-      !record_field { name: template    type: text }
-      !record_field { name: extension   type: record_extension_type  state: OPTIONAL }
+      !record_field { name: parameters      type: array_param_name_xxhash }
+      !record_field { name: template        type: text }
+      !record_field { name: extension       type: record_extension_type  state: OPTIONAL }
+      !record_field { name: discriminators  type: array_field_name_xxhash  state: OPTIONAL }
     ] }
   }
 
@@ -378,6 +379,7 @@
       !record_field { name: groups          type: array_field_group_xxhash  state: OPTIONAL }
       !record_field { name: extension       type: record_extension_type  state: REQUIRED_DEFAULT  value: OPEN }
       !record_field { name: supertypes      type: array_type_ref_xxhash   state: OPTIONAL }
+      !record_field { name: discriminators  type: array_field_name_xxhash  state: OPTIONAL }
     ] }
   }
 

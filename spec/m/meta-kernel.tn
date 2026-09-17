@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=b117906921ff83f9adeb029fe48ea039509048bb2e1ccacdc4611e54fb678b2b"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=a3274235a9a130a8de2e0791180dc4052ce12ba9528d5a11ce479b7e88b12109"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -104,11 +104,25 @@
     is not a type" — and deriving the answer from the body shape
     instead would mean parsing the held text, which is the one
     thing §1.3 promises a resolved-output consumer never has to do.
+
+    `discriminators` is the same statement one step further, and
+    for the same reason. `extension` says a SEALED base dispatches
+    on its members' pins; this says which fields carry them, in the
+    order the pins are compared as a tuple. Without it a consumer
+    holding only resolved output knows a template family is sealed
+    and cannot place a value in it — the selector names live in the
+    held text, and reading them there is the parse §1.3 rules out.
+    It is `record.discriminators` for a base that is a template, so
+    a dispatcher reads one field whichever kind of base it has.
+
+    Present exactly when `extension` is SEALED, and then non-empty:
+    a sealed family with nothing to dispatch on is not a family.
     """
   template => top & {
-    parameters:  [param_name]
-    template:    text
-    extension:   record_extension_type?
+    parameters:      [param_name]
+    template:        text
+    extension:       record_extension_type?
+    discriminators:  [field_name]?
   }
 
   @doc:"""
@@ -517,6 +531,17 @@
     name had. The derived index `type_definition.supertypes` stays
     type_name: it is computed once every parent is a type, and a
     template never is ([TSON-SCHEMA] §5.10).
+
+    `record.discriminators` names the fields a SEALED family
+    dispatches on, in the order their pins are compared as a tuple.
+    It is the base's own statement rather than a mark on each field:
+    which fields select is a property of the family, and §5.8
+    flattens a base's fields into every member, so a per-field mark
+    has to be cleared again at each member and in each phase that
+    builds one. Naming them here instead makes that structural — a
+    member's record simply states none. Every name must name a field
+    the enclosing record declares; the list is present exactly when
+    `extension` is SEALED, and is then non-empty.
     """
   record => product & {
     access_pattern:  product_access_type = NAMED
@@ -525,6 +550,7 @@
     groups:          [field_group]?
     extension:       record_extension_type ~ OPEN
     supertypes:      [type_ref]?
+    discriminators:  [field_name]?
   }
 
   array => product & {

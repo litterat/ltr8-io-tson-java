@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.List;
@@ -36,25 +37,37 @@ import java.util.List;
  */
 @Typename(name = "record")
 public record RecordBody(List<TypeRef> supertypes, List<RecordField> fields, List<FieldGroup> groups,
-                          RecordExtensionType extension) implements Product {
+                          RecordExtensionType extension, List<String> discriminators) implements Product {
 
     /**
-     * <b>Absent and empty are the same list</b> for the two the kernel makes optional ({@code supertypes:
-     * [type_ref]?}, {@code groups: [field_group]?}): a body resolved from source arrives with an empty
+     * <b>Absent and empty are the same list</b> for the three the kernel makes optional ({@code supertypes:
+     * [type_ref]?}, {@code groups: [field_group]?}, {@code discriminators: [field_name]?}): a body resolved
+     * from source arrives with an empty
      * list where one bound from a resolved-form document that omits the field arrives with {@code null},
      * and no rule distinguishes "no supertypes stated" from "an empty supertypes list". {@code fields} is
      * required and is deliberately not guarded -- an absent required field is a violation the reader
      * reports and abandons the construction over, so it never reaches here, and swallowing a {@code null}
      * would only turn some other defect into an empty record.
      */
+    @Record
     public RecordBody {
         supertypes = supertypes == null ? List.of() : List.copyOf(supertypes);
         fields = List.copyOf(fields);
         groups = groups == null ? List.of() : List.copyOf(groups);
+        discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
+    }
+
+    /**
+     * The same body with {@code discriminators} unstated -- every construction that has no family to
+     * dispatch, which while the per-field mark is still the live carrier is all of them.
+     */
+    public RecordBody(List<TypeRef> supertypes, List<RecordField> fields, List<FieldGroup> groups,
+                       RecordExtensionType extension) {
+        this(supertypes, fields, groups, extension, List.of());
     }
 
     /** A fresh record body: no supertypes, no field groups, just plain fields, extensible. */
     public static RecordBody of(List<RecordField> fields) {
-        return new RecordBody(List.of(), fields, List.of(), RecordExtensionType.OPEN);
+        return new RecordBody(List.of(), fields, List.of(), RecordExtensionType.OPEN, List.of());
     }
 }
