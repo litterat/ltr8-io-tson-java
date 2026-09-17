@@ -87,6 +87,10 @@ class CrossEncodingParityTest {
               outcome_of => outcome<text>
               won_of     => won<text>
               ledger     => { o: outcome<text> }
+              box        => <T> { v: T }
+              int_box    => box<int32>
+              text_box   => box<text>
+              crate      => { b: box }
             }
             """;
 
@@ -316,6 +320,40 @@ class CrossEncodingParityTest {
     void anAbstractTemplatePositionRequiresItsTagInBoth() {
         sameRule("ledger", "{ o: { code: \"c\"  prize: \"p\" } }", """
                 {"o": {"code": "c", "prize": "p"}}""");
+    }
+
+    // ── A bare template at a type position ──────────────────────────────
+    //    `crate => { b: box }` names the template itself, which is the family base its instantiations close
+    //    from ({@code SPEC-FEEDBACK.md} #13). The base is ABSTRACT by derivation -- a record body with no
+    //    discriminator -- so the tag is the selector in both encodings, and every member is minted, so an
+    //    alias is the only name either document has for one.
+
+    /** A member named by its alias reads at the template's own position, in both encodings. */
+    @Test
+    void aMemberOfABareTemplateBaseReadsInBoth() {
+        bothAccept("crate", "{ b: !int_box { v: 1 } }", """
+                {"b": {"$type": "int_box", "v": 1}}""");
+    }
+
+    /** And the other member, which is what makes the dispatch a dispatch rather than a single admission. */
+    @Test
+    void theOtherMemberOfABareTemplateBaseReadsInBoth() {
+        bothAccept("crate", "{ b: !text_box { v: \"x\" } }", """
+                {"b": {"$type": "text_box", "v": "x"}}""");
+    }
+
+    /** Untagged selects nothing: the base has no direct instances, so both encodings require the tag. */
+    @Test
+    void aBareTemplateBaseRequiresItsTagInBoth() {
+        sameRule("crate", "{ b: { v: 1 } }", """
+                {"b": {"v": 1}}""");
+    }
+
+    /** A tag naming the base itself selects nothing either, which is the other end of the same set. */
+    @Test
+    void aTagNamingTheBareTemplateBaseSelectsNothingInBoth() {
+        sameRule("crate", "{ b: !box { v: 1 } }", """
+                {"b": {"$type": "box", "v": 1}}""");
     }
 
     private static void bothAccept(String rootType, String tsonBody, String jsonBody) {

@@ -13,6 +13,7 @@ import io.ltr8.tson.schema.meta.TypeKind;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -103,8 +104,19 @@ public final class JsonSchemaCompiler {
         private JsonTypeReader<?> build(String name, TypeDefinition definition) {
             ValueReaderContext context = new ValueReaderContext(linked, readers);
             if (definition.kind() == TypeKind.TEMPLATE) {
-                // Before the body is looked at at all: a template's body is held unsubstituted text, so no
-                // factory could read it, and a template is not a type until it is applied ([TSON-SCHEMA] §5.10).
+                // A *family base* -- a template carrying `extension` ({@code SPEC-FEEDBACK.md} #13) -- is a
+                // type by the only test that matters: a value can stand at it, being a value of one of its
+                // instantiations. So it dispatches on `$type` exactly as a closed abstract record does.
+                // A SEALED one cannot yet: its selectors live in the held body's text, which this module has
+                // no route to. See JsonAbstractTemplateReader.
+                Optional<JsonTypeReader<?>> family =
+                        JsonAbstractTemplateReader.of(name, definition, context);
+                if (family.isPresent()) {
+                    return family.get();
+                }
+                // Otherwise the body is not looked at at all: a template's body is held unsubstituted text,
+                // so no factory could read it, and a template with no dispatch is not a type until it is
+                // applied ([TSON-SCHEMA] §5.10).
                 return new OpenTemplateReader(name, definition.parameters(),
                         context.locationOf(name, definition));
             }
