@@ -2,6 +2,9 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.schema.TsonBundledSchemas;
+import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -55,18 +58,32 @@ class SealedFamilyCheckTest {
     }
 
     /**
-     * A subtype pins the selector, which restates a field the base marks -- so the mark travels with the
-     * field under §5.8's flattening and the subtype's copy carries it too. The rule that a discriminator
-     * requires {@code @sealed} is about the mark a declaration <em>makes</em>, and reading it otherwise
-     * refuses every subtype of every sealed family.
+     * <b>A member does not carry the mark at all.</b> The mark says which field a family dispatches
+     * <em>on</em>, which is the base's statement; a member restates the selector to pin it, and what it
+     * carries is the value. So the subtype resolves clean without needing an exemption from "a discriminator
+     * requires {@code @sealed}" -- that rule now reads exactly as written, because every mark it sees is one
+     * the declaration made.
      */
     @Test
-    void aSubtypeIsNotRequiredToBeSealedForInheritingTheSelector() {
-        isClean(Tson.standard(), "inherit", """
+    void aSubtypePinningTheSelectorDoesNotCarryTheMark() {
+        Tson tson = Tson.standard();
+        String schema = schema("inherit", """
                 {
                   pet => @sealed { @discriminator pet_type: text  name: text }
                   dog => pet & { pet_type: = "dog" }
                 }""");
+        // validateSchema registers a schema that reports nothing, so asking for it again would be a second
+        // registration under one identity -- the entries are already there to read.
+        assertEquals(List.of(), tson.validateSchema(schema), "inherit");
+
+        RecordBody member = (RecordBody) tson.schemaRegistry()
+                .get("https://example.test/inherit.tn").orElseThrow()
+                .schema().entries().get("dog").body();
+        RecordField pinned = member.fields().stream()
+                .filter(f -> f.name().equals("pet_type")).findFirst().orElseThrow();
+
+        assertEquals(FieldState.REQUIRED_FIXED, pinned.state(), "the member pins the selector");
+        assertFalse(pinned.discriminator(), () -> "and carries the value, not the mark: " + pinned);
     }
 
     /** §5.10's 2x2: the pins are distinct as tuples, in the base's declaration order. */

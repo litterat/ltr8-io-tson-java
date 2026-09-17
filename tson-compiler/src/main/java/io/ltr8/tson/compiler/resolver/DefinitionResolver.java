@@ -1758,6 +1758,13 @@ final class DefinitionResolver {
     private RecordField resolveTighteningField(String declarationName, FieldDef fieldDef, RecordField inherited,
                                                 List<String> parameters) {
         RecordField tightened = resolveField(fieldDef, parameters, Optional.of(inherited));
+        if (tightened.state() == FieldState.REQUIRED_FIXED) {
+            // A member pins the selector and carries the value; the mark stays with the base, which is whose
+            // statement it is -- "this is the field a family dispatches on". Dropping it here is what keeps a
+            // member's copy from claiming to start a family of its own, and is why nothing downstream has to
+            // subtract an inherited mark before reading one.
+            tightened = tightened.withDiscriminator(false);
+        }
         if (!isValidTighteningTransition(inherited.state(), tightened.state())) {
             // §5.7's table is a rule about schemas, not a coverage boundary: "refinement can only restrict,
             // never expand -- FIXED states are terminal, and loosening a required field to optional is a

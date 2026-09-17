@@ -2264,20 +2264,26 @@ class DefinitionResolverTest {
     }
 
     /**
-     * A restatement inherits the mark it does not repeat, on the annotation-merge rule's own logic (§5.7):
-     * a tightening entry states what it tightens, and the modifier-only spelling has no annotation position
-     * at all, so an entry that mentions nothing must not erase what it does not mention.
+     * <b>A restatement pins the selector and carries no mark.</b> The annotation-merge rule (§5.7) is about
+     * what an entry inherits when it mentions nothing -- and there is no annotation here to inherit: the mark
+     * was <em>consumed</em> at the base, becoming {@code record_field.discriminator} on the base's own field.
+     * What the mark says is which field a family dispatches on, which is the base's statement to make; a
+     * member restates the field to pin it, and what it restates is the value.
+     *
+     * <p>So the modifier-only spelling having no annotation position is no longer a reason to copy the flag
+     * down -- it is a reason the flag was never the member's to state. Nothing reads a member's copy:
+     * {@code RecordExtension} takes a family's selectors from the base and finds each member's pin by name.
      */
     @Test
-    void aRestatedFieldKeepsTheDiscriminatorItDoesNotRepeat() {
+    void aRestatedFieldPinsTheSelectorAndCarriesNoMark() {
         RecordBody dog = assertInstanceOf(RecordBody.class, resolveSnippetsAgainstMetaKernel("""
                 pet => @sealed { @discriminator pet_type: text  name: text }
                 dog => pet & { pet_type: = "dog"  breed: text }""").body());
 
         RecordField pinned = dog.fields().stream().filter(f -> f.name().equals("pet_type")).findFirst()
                 .orElseThrow();
-        assertTrue(pinned.discriminator(), "the pin restates the field and must not drop what marks it");
-        assertEquals(FieldState.REQUIRED_FIXED, pinned.state());
+        assertEquals(FieldState.REQUIRED_FIXED, pinned.state(), "the member pins the selector");
+        assertFalse(pinned.discriminator(), "and the mark stays with the base that declared it");
     }
 
     /** Three alternatives, never companions: a record states how it may be realised once. */
