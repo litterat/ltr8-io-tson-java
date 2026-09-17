@@ -79,10 +79,14 @@ final class MetaRefs {
 
     private static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map, boolean mapRecordSupertypes) {
         return switch (body) {
+            // `discriminators` is carried, not mapped: it holds field *names* of this record, which no
+            // reference rewrite touches. Dropping it here would lose a family's selector list on every
+            // synthetic rename and every materialisation rewrite -- a body that arrived sealed would come
+            // back with nothing to dispatch on.
             case RecordBody record -> new RecordBody(mapRecordSupertypes
                     ? record.supertypes().stream().map(map).toList() : record.supertypes(),
                     record.fields().stream().map(field -> field.withType(map.apply(field.type()))).toList(),
-                    record.groups(), record.extension());
+                    record.groups(), record.extension(), record.discriminators());
             case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.state(),
                     array.unordered(), array.uniqueItems(), array.minItems(), array.maxItems());
             case MapBody mapBody -> new MapBody(map.apply(mapBody.keyType()), map.apply(mapBody.valueType()),

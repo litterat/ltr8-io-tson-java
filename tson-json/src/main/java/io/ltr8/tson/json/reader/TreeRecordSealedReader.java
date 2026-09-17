@@ -80,7 +80,14 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
     private final RecordDiagnostics rules;
     private final String pinned;
 
-    TreeRecordSealedReader(Set<String> selfNames, String displayName, RecordBody body, Set<String> subtypes,
+    /**
+     * <b>The selectors arrive already chosen, from either kind of base</b> ({@code FamilySelectors}) -- a
+     * closed record declares them, and a family-base template's are recovered from its members at the base's
+     * own declared type. Taking the fields rather than a {@code RecordBody} is what lets one dispatcher serve
+     * both, and is the same signature its {@code tson-compiler} peer takes.
+     */
+    TreeRecordSealedReader(Set<String> selfNames, String displayName, List<RecordField> selectorFields,
+                           Set<String> subtypes,
                            ValueReaderContext context, JsonSchemaLocation schemaLocation,
                            RecordDiagnostics rules) {
         this.selfNames = Set.copyOf(selfNames);
@@ -90,8 +97,7 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
         this.rules = rules;
         TsonSchema schema = context.schema();
         Map<String, TypeDefinition> entries = schema.entries();
-        this.selectors = body.fields().stream().filter(RecordField::discriminator)
-                .map(field -> selectorOf(field, schema)).toList();
+        this.selectors = selectorFields.stream().map(field -> selectorOf(field, schema)).toList();
         this.selectorNames = selectors.stream().map(Selector::name).collect(LinkedHashSet::new,
                 Set::add, Set::addAll);
         this.members = new LinkedHashMap<>();

@@ -6,9 +6,9 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
-import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
+import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.Reference;
@@ -68,17 +68,17 @@ final class RecordExtension {
         List<Violation> violations = new ArrayList<>();
         for (String name : localNames) {
             TypeDefinition def = merged.get(name);
-            RecordBody record = def == null ? null : familyBodyOf(def);
+            RecordBody record = def == null ? null : familyBodyOf(def, merged);
             if (record != null) {
                 checkDeclaration(name, def, record, merged, violations);
             }
         }
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             TypeDefinition def = entry.getValue();
-            RecordBody base = familyBodyOf(def);
+            RecordBody base = familyBodyOf(def, merged);
             if (base != null && base.extension() == RecordExtensionType.SEALED
                     && touchesLocally(entry.getKey(), def, localNames)) {
-                checkFamily(entry.getKey(), def, base, merged, localNames, violations);
+                checkFamily(entry.getKey(), def, merged, localNames, violations);
             }
         }
         return violations;
@@ -90,21 +90,24 @@ final class RecordExtension {
                                           Map<String, TypeDefinition> merged, List<Violation> violations) {
         checkNothingComposesOntoFinal(name, def, merged, violations);
 
-        // Every mark here is one this declaration makes: the mark is the base's statement about which field a
-        // family dispatches on, and a member that pins the selector carries the value without it (§5.2). So
-        // this needs no inherited-selector exemption -- it used to, when §5.8's flattening copied the mark
-        // onto every member and made a subtype indistinguishable from a fresh base.
-        List<RecordField> marked = record.fields().stream()
-                .filter(RecordField::discriminator)
+        // The *names* this declaration states, never fields resolved from its members: which fields a family
+        // dispatches on is the base's own statement (§5.2), and a template nobody has applied yet has no
+        // members to resolve against -- asking for fields here refused a correct `@sealed <T>` for having no
+        // instantiations. It needs no inherited-selector exemption either: a member states no discriminators
+        // of its own, where the per-field mark had to be cleared at each one to say the same thing.
+        List<String> declared = FamilySelectors.namesOf(def);
+        List<RecordField> marked = declared.stream()
+                .map(selector -> record.fields().stream().filter(f -> f.name().equals(selector)).findFirst())
+                .flatMap(Optional::stream)
                 .toList();
-        if (record.extension() == RecordExtensionType.SEALED && marked.isEmpty()) {
+        if (record.extension() == RecordExtensionType.SEALED && declared.isEmpty()) {
             violations.add(new Violation(name, "'" + name + "' is @sealed but no field of it carries "
                     + "@discriminator -- a sealed family is dispatched on its own members, so there is nothing "
                     + "here to dispatch on. Mark the field subtypes pin, or write @abstract, whose subtypes are "
                     + "selected by the tag instead (§5.2)"));
         }
-        if (!marked.isEmpty() && record.extension() != RecordExtensionType.SEALED) {
-            violations.add(new Violation(name, "'" + name + "': field '" + marked.get(0).name() + "' carries "
+        if (!declared.isEmpty() && record.extension() != RecordExtensionType.SEALED) {
+            violations.add(new Violation(name, "'" + name + "': field '" + declared.get(0) + "' carries "
                     + "@discriminator, so '" + name + "' must be @sealed"
                     + (record.extension() == RecordExtensionType.ABSTRACT
                             ? " -- @abstract is the tag-dispatched case and admits no discriminator, and the two"
@@ -173,9 +176,11 @@ final class RecordExtension {
 
     // ── The family's obligations, over the closure ───────────────────────
 
-    private static void checkFamily(String base, TypeDefinition def, RecordBody body,
+    private static void checkFamily(String base, TypeDefinition def,
             Map<String, TypeDefinition> merged, Set<String> localNames, List<Violation> violations) {
-        List<RecordField> selectors = body.fields().stream().filter(RecordField::discriminator).toList();
+        // The same derivation the dispatchers read, never a second filter over the fields: a check that
+        // decided "which fields select" differently from the read could pass a family no reader can place.
+        List<RecordField> selectors = FamilySelectors.of(def, merged);
         if (selectors.isEmpty() || selectors.stream().anyMatch(f -> parserFor(f, merged).isEmpty())) {
             return; // already reported against the base, and a pin has nothing to be read at
         }
@@ -282,28 +287,30 @@ final class RecordExtension {
      * The record body whose family rules this entry is subject to, or {@code null} where it has none.
      *
      * <p><b>A marked template is a family base and is judged as one</b> ({@code SPEC-FEEDBACK.md} #13). Its
-     * body is held text, so the body checked here is assembled from the two facts the entry states
-     * structurally: the derived {@code extension}, and the discriminator fields {@code HeldBody.selectors()}
-     * reads off the held payload. Skipping it instead -- which every guard here used to do, on
-     * {@code parameters().isEmpty()} -- would accept {@code @sealed <T>} with no family check at all: no
-     * rule that every member pins every selector, and no rule that the pins are pairwise distinct. An
-     * unchecked family is worse than a refused one.
+     * body is held text, so the body checked here is assembled from the two facts the entry now states
+     * structurally: the derived {@code extension}, and the {@code discriminators} it names. Skipping it
+     * instead -- which every guard here used to do, on {@code parameters().isEmpty()} -- would accept
+     * {@code @sealed <T>} with no family check at all: no rule that every member pins every selector, and no
+     * rule that the pins are pairwise distinct. An unchecked family is worse than a refused one.
      *
-     * <p><b>The selector derivation is the reader's own</b>, so the check and the dispatch cannot disagree
-     * about which fields a family is selected by -- a check that passed a family the read could not place
-     * is the defect one derivation per consumer produces.
+     * <p><b>The selector derivation is the reader's own</b> ({@code FamilySelectors}), so the check and the
+     * dispatch cannot disagree about which fields a family is selected by -- a check that passed a family
+     * the read could not place is the defect one derivation per consumer produces.
      *
      * <p>An <em>unmarked</em> template still has none: it is no type until applied (§5.10), nothing can
      * stand at it, and its instantiations are judged as the closed records they are.
      */
-    private static RecordBody familyBodyOf(TypeDefinition def) {
+    private static RecordBody familyBodyOf(TypeDefinition def, Map<String, TypeDefinition> merged) {
         if (def.body() instanceof RecordBody record) {
             return def.parameters().isEmpty() ? record : null;
         }
         if (!(def.body() instanceof TemplateBody held) || held.extension().isEmpty()) {
             return null;
         }
-        return new RecordBody(List.of(), HeldBody.of(held).selectors(), List.of(), held.extension().get());
+        // The selectors come from `FamilySelectors`, the one derivation both encodings read -- no longer
+        // from parsing the held text, which `tson-json` cannot do and §1.3 says no consumer should have to.
+        return new RecordBody(List.of(), FamilySelectors.of(def, merged), List.of(),
+                held.extension().get(), held.discriminators());
     }
 
     /** Whether this schema may be blamed for the family at all -- the base or any subtype declared here. */

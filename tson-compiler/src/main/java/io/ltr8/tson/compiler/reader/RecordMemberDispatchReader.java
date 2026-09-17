@@ -78,11 +78,12 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private final String pinned;
 
     /**
-     * <b>The selectors arrive already chosen, from either kind of base.</b> A closed record declares its
-     * discriminator fields; a family-base template holds them in its body text, where {@code
-     * HeldBody.selectors()} reads them. Taking the fields rather than a {@code RecordBody} is what lets one
-     * dispatcher serve both -- the alternative was fabricating a record body for a template that has none,
-     * which put the choice of "which fields select" in two places that could disagree.
+     * <b>The selectors arrive already chosen, from either kind of base</b> ({@code FamilySelectors}). A
+     * closed record declares its discriminator fields; a family-base template names them on the entry and
+     * their types are recovered from its members, which carry the selector at the base's own declared type.
+     * Taking the fields rather than a {@code RecordBody} is what lets one dispatcher serve both -- the
+     * alternative was fabricating a record body for a template that has none, which put the choice of "which
+     * fields select" in two places that could disagree.
      */
     RecordMemberDispatchReader(Set<String> selfNames, String displayName, List<RecordField> selectorFields,
                                 Set<String> subtypes, ValueReaderContext context,

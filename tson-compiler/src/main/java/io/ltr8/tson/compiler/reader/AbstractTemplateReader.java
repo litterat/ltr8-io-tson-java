@@ -3,7 +3,7 @@ package io.ltr8.tson.compiler.reader;
 import io.ltr8.tson.compiler.TsonReadContext;
 import io.ltr8.tson.compiler.TsonTypeReader;
 import io.ltr8.tson.compiler.TsonTypeReaderResolver;
-import io.ltr8.tson.compiler.resolver.HeldBody;
+import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -30,11 +30,11 @@ import java.util.Set;
  * wrote -- which is what lets {@code pet} bind to a host sealed type directly.
  *
  * <p><b>Both dispatchers are the ones a closed base uses</b> ({@link RecordDispatch}), so a family whose base
- * is a template and one whose base is a hand-written record read identically and report identically. What
- * differs is only where the selectors come from: a closed base declares them, and a template's are read off
- * its held payload by {@link HeldBody#selectors()} -- the same derivation {@code RecordExtension} checks the
- * family against, since a check and a dispatch that disagreed about the selectors would admit a family no
- * reader could place.
+ * is a template and one whose base is a hand-written record read identically and report identically. The
+ * selectors come from {@code FamilySelectors} either way -- a closed base declares them, and a template's are
+ * recovered from its members at the base's own declared type -- which is the same derivation {@code
+ * RecordExtension} checks the family against, since a check and a dispatch that disagreed about the selectors
+ * would admit a family no reader could place.
  *
  * <p>{@link Subsumption.Applied} because the dispatcher it holds decides §7.2 at this position itself. The
  * marker changes nothing today -- {@code Subsumption.guard} runs past the template branch and never sees one
@@ -59,10 +59,11 @@ public final class AbstractTemplateReader implements TsonTypeReader<Object>, Sub
 
         this.dispatcher = (TsonTypeReader<Object>) (extension == RecordExtensionType.SEALED
                 // The selectors are the base's, at the types the base declares -- the one set known before a
-                // member is selected, which is what the pins are compared in. Read off the held body, since
-                // §5.7 fixation clears the mark on every member, and handed to the same dispatcher a closed
-                // base uses: one dispatch, two sources for its inputs.
-                ? new RecordMemberDispatchReader(selfNames, name, HeldBody.of(held).selectors(),
+                // member is selected, which is what the pins are compared in. Named on the entry and typed
+                // from any member, and handed to the same dispatcher a closed base uses: one dispatch, two
+                // sources for its inputs.
+                ? new RecordMemberDispatchReader(selfNames, name,
+                        FamilySelectors.of(definition, context.schema().entries()),
                         Set.copyOf(definition.subtypes()), context, readers)
                 : new RecordTagDispatchReader(selfNames, name,
                         Subsumption.admitting(definition.subtypes(), context.namesMeaning()), readers));

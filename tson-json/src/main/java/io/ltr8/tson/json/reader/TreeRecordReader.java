@@ -16,6 +16,7 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 
@@ -65,7 +66,8 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
                     context.admitting(definition.subtypes()), context.readers(), location, rules);
             // The sealed reader takes its subtypes raw: it maps each member's pins to that member, so an
             // alias is not a second member. Where it compares a written tag it admits aliases (`deeper`).
-            case SEALED -> new TreeRecordSealedReader(context.admitting(List.of(name)), displayName, body,
+            case SEALED -> new TreeRecordSealedReader(context.admitting(List.of(name)), displayName,
+                    FamilySelectors.of(definition, context.schema().entries()),
                     Set.copyOf(definition.subtypes()), context, location, rules);
             case OPEN, FINAL -> new TreeRecordReader(name, context.admitting(List.of(name)), displayName, body,
                     context.admitting(definition.subtypes()), context, location);
