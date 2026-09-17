@@ -40,8 +40,8 @@ are kept in step deliberately.
   `SchemaResolver` catches the second set's failures itself, since that loop runs outside the memoized getter
   that catches the first set's.
 - **Four marks are consumed before any of that runs** (`DefinitionMarks`). `@abstract`, `@sealed` and `@final`
-  at a declaration lower into `record.extension`; `@discriminator` on a field lowers into
-  `record_field.discriminator`. None reaches the annotation channel, so one carrier holds each fact and §6's
+  at a declaration lower into `record.extension`; `@discriminator` on a field lowers into the enclosing
+  `record.discriminators`. None reaches the annotation channel, so one carrier holds each fact and §6's
   no-hoisting question does not arise. **They are matched by name and never resolved**, which is what reserves
   them: an ordinary annotation means whatever the governing meta says, and these are taken before the meta is
   consulted, so a meta-schema cannot give them another meaning — meta.tn declares all four anyway, which is

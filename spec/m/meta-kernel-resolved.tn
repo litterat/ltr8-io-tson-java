@@ -349,7 +349,6 @@
       !record_field { name: name           type: field_name }
       !record_field { name: type           type: type_ref }
       !record_field { name: state          type: field_state  state: REQUIRED_DEFAULT  value: REQUIRED }
-      !record_field { name: discriminator  type: boolean  state: REQUIRED_DEFAULT  value: false }
       !record_field { name: value          type: value  state: OPTIONAL }
     ] }
   }

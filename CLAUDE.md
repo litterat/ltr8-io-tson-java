@@ -83,7 +83,7 @@ proposing it rather than being re-identified at the end.
 
 **The open proposal is `r2026-36-proposal`, and this is it.** What takes the work off `main` is that the
 discriminated-family design (`SPEC-FEEDBACK.md` #10, #11) needs two kernel fields — `record.extension` and
-`record_field.discriminator` — so it is a meta-kernel change and no longer a Revision 35 feature. Work lands
+`record.discriminators` — so it is a meta-kernel change and no longer a Revision 35 feature. Work lands
 here through ordinary PR branches off this one. `main` stays the Revision 35 reference until the spec catches
 up, at which point this merges.
 

@@ -96,7 +96,7 @@ public final class FamilySelectors {
                 Optional<RecordField> found = field(record, name);
                 if (found.isPresent()) {
                     selectors.add(new RecordField(found.get().name(), found.get().type(), FieldState.REQUIRED,
-                            true, Optional.empty(), found.get().annotations(), Optional.empty()));
+                            Optional.empty(), found.get().annotations(), Optional.empty()));
                     break;
                 }
             }

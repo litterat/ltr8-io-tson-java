@@ -761,18 +761,30 @@ final class SchemaDesugarer {
     private Binding recordBinding(RecordDef record) {
         List<ScopedValue> fields = new ArrayList<>();
         List<ScopedValue> groups = new ArrayList<>();
+        List<ScopedValue> discriminators = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (RecordEntry entry : record.entries()) {
             switch (entry) {
                 case FieldDef field -> {
                     requireFieldNameUnseen(field.name(), seen, "this body declares it twice");
                     fields.add(recordField(field));
+                    if (DefinitionMarks.discriminates(field.name(), field.annotations())) {
+                        discriminators.add(WireForm.scoped(
+                                new TokenValue(field.name(), TokenForm.UNQUOTED)));
+                    }
                 }
                 case GroupDef group -> {
                     List<ScopedValue> members = new ArrayList<>();
                     for (GroupDef.Member member : group.members()) {
                         requireFieldNameUnseen(member.name(), seen, "a group member repeats it -- member "
                                 + "labels share the enclosing record's field namespace");
+                        // A mark on a group member is collected rather than dropped, so the linker can refuse
+                        // it (§5.11 makes a member uniformly OPTIONAL, and a selector that may be absent
+                        // selects nothing). Dropping it here would make the mistake vanish instead.
+                        if (DefinitionMarks.discriminates(member.name(), member.annotations())) {
+                            discriminators.add(WireForm.scoped(
+                                    new TokenValue(member.name(), TokenForm.UNQUOTED)));
+                        }
                         // A group's members are ordinary OPTIONAL fields of the record, and the group records
                         // only their names and its own state (§5.11) -- the same shape the resolver builds.
                         fields.add(WireForm.scoped(new RecordValue(List.of(
@@ -794,6 +806,13 @@ final class SchemaDesugarer {
         binding.add(new RecordValue.Field(WireForm.FIELDS, WireForm.scoped(new ArrayValue(fields))));
         if (!groups.isEmpty()) {
             binding.add(new RecordValue.Field(WireForm.GROUPS, WireForm.scoped(new ArrayValue(groups))));
+        }
+        // The record's own statement about which of its fields select a member (§5.2). Written here rather
+        // than per field, so a held body carries the list a base states and a member simply states none --
+        // §5.8 flattens a base's fields into every member, which a per-field mark had to be cleared from.
+        if (!discriminators.isEmpty()) {
+            binding.add(new RecordValue.Field(WireForm.DISCRIMINATORS,
+                    WireForm.scoped(new ArrayValue(discriminators))));
         }
         return new Binding(WireForm.RECORD, binding);
     }
@@ -840,13 +859,6 @@ final class SchemaDesugarer {
         members.add(new RecordValue.Field(WireForm.TYPE, WireForm.scoped(refValue(type.typeRef()))));
         if (resolved.state() != FieldState.REQUIRED) {
             members.add(WireForm.nameField(WireForm.STATE, resolved.state().name()));
-        }
-        // The mark lowers to the member it denotes, here as at a closed declaration -- through the same
-        // `DefinitionMarks` predicate, so the two paths cannot disagree about what a discriminator is. This
-        // stays purely syntactic: the helper reads written annotation names against a fixed table and
-        // consults no governing meta.
-        if (DefinitionMarks.discriminates(field.name(), field.annotations())) {
-            members.add(WireForm.nameField(WireForm.DISCRIMINATOR, "true"));
         }
         resolved.value().ifPresent(token -> members.add(new RecordValue.Field(WireForm.VALUE, WireForm.scoped(token))));
         // Consumed, not carried: a mark that lowers into the body must not also survive in the annotation

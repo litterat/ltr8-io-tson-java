@@ -10,9 +10,13 @@ import java.util.Optional;
 /**
  * The four marks a resolver reads and consumes: {@code @abstract}, {@code @sealed} and {@code @final} at a
  * declaration, {@code @discriminator} on a field. Each lowers into the body -- the first three into {@code
- * record.extension}, the last into {@code record_field.discriminator} ([TSON-SCHEMA] §5.2, §8.1) -- and none
- * survives into §8.1's author-annotation channel, so one carrier holds each fact and §6's no-hoisting question
- * does not arise.
+ * record.extension}, the last into the enclosing {@code record.discriminators} ([TSON-SCHEMA] §5.2, §8.1) --
+ * and none survives into §8.1's author-annotation channel, so one carrier holds each fact and §6's no-hoisting
+ * question does not arise.
+ *
+ * <p><b>The mark is written on a field and lands on the record</b>, because §5.8 flattens a base's fields into
+ * every member: a per-field carrier would arrive on each subtype's copy of the selector and have to be cleared
+ * there, where a member's own declaration simply names none.
  *
  * <p><b>They are recognised by name, unconditionally, and that is what "reserved" means.</b> An ordinary
  * annotation resolves one hop against the governing meta (§3.3.3) and means whatever that meta says; these are

@@ -400,7 +400,7 @@
 
   @doc:"""
     Marks the field a sealed family dispatches on. A consumed mark:
-    lowered into record_field.discriminator, with load-time checks.
+    lowered into record.discriminators, with load-time checks.
     """
   discriminator => @annotation !type_definition {
     source: void

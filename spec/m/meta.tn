@@ -1,6 +1,6 @@
-!!id:"https://tson.io/2026/36/m/meta.tn?sha256=a42ee045b0aa36309cd121af7525d38f2db39ef7850993f26a845f0234bff812"
-!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=a3274235a9a130a8de2e0791180dc4052ce12ba9528d5a11ce479b7e88b12109"
-!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=a3274235a9a130a8de2e0791180dc4052ce12ba9528d5a11ce479b7e88b12109"
+!!id:"https://tson.io/2026/36/m/meta.tn?sha256=711876037cfd3ebc8136d13218c28b40580ab8528423f9b4f2abe82380f737bb"
+!!meta:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=0c32377b35b0380025b6f836ff2faf16a4c2df11925a8b8a4f44a533dd51b530"
+!!import:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=0c32377b35b0380025b6f836ff2faf16a4c2df11925a8b8a4f44a533dd51b530"
 @doc:"""
   TSON meta-schema (2026 Revision 36 draft).
 
@@ -72,7 +72,7 @@
   `discriminator` each state a fact about the type — which values a
   position typed by the record admits — so erasing one would change
   what conforms. They are therefore lowered into the kernel's own
-  `record.extension` and `record_field.discriminator` at resolution
+  `record.extension` and `record.discriminators` at resolution
   and do not survive into resolved output: there is no annotation
   left to erase, and one carrier holds each fact. The annotation
   spelling is an interim, and Part 2 §12.1 should eventually spell
@@ -710,9 +710,17 @@
     Not a representation directive, and this is what tells the two
     apart — a directive's force is confined to the encodings that
     claim it, where this decides which values the position admits in
-    every encoding and in the model. So it is consumed into
-    `record_field.discriminator` rather than carried, and erasing it
-    would change what conforms.
+    every encoding and in the model. So it is consumed into the
+    enclosing `record.discriminators` rather than carried, and
+    erasing it would change what conforms.
+
+    **The mark is written on a field and lowered onto the record**,
+    because §5.8 flattens a base's fields into every member: a
+    per-field carrier would arrive on each subtype's copy of the
+    selector and have to be cleared there, where a member's own
+    declaration simply names none. A template states it the same
+    way, `template.discriminators`, which is what lets a held body
+    carry the fact at all.
 
     Checked at schema load, over the linked closure: the field is
     REQUIRED, is no member of a field group, is typed by an atom or

@@ -690,11 +690,12 @@ final class TemplateMaterialiser {
      * value concrete the field takes the state its literal spelling would have had. A {@code ~ P} default
      * arrives as {@code REQUIRED_DEFAULT} and stays one: data may still override it.
      *
-     * <p><b>Fixation is also where a discriminator's mark stops.</b> The mark says which field a family
-     * dispatches <em>on</em>, which is the base's statement: the base declares the selector unpinned and
-     * carries the mark, and whoever pins it is a member and carries the value instead. A template's own
-     * field is the base's -- REQUIRED with the parameter standing in {@code value} -- so the mark belongs in
-     * the held body; the instantiation that closes it has pinned the selector, so it does not.
+     * <p><b>Fixation is also where a family's selectors stop.</b> Which fields a family dispatches <em>on</em>
+     * is the base's statement ({@code record.discriminators}): the base declares the selectors unpinned and
+     * names them, and whoever pins them is a member and carries the values instead. A template's own field is
+     * the base's -- REQUIRED with the parameter standing in {@code value} -- so the names belong in the held
+     * body; the instantiation that closes it has pinned them, so it names none, which is what the body built
+     * here leaves unstated.
      */
     static Top fixRoutedValues(Top body) {
         if (!(body instanceof RecordBody record)) {
@@ -702,7 +703,7 @@ final class TemplateMaterialiser {
         }
         return new RecordBody(record.supertypes(), record.fields().stream()
                 .map(field -> field.state() == FieldState.REQUIRED && field.value().isPresent()
-                        ? field.withState(FieldState.REQUIRED_FIXED).withDiscriminator(false)
+                        ? field.withState(FieldState.REQUIRED_FIXED)
                         : field)
                 .toList(), record.groups(), closedExtension(record));
     }
@@ -713,11 +714,11 @@ final class TemplateMaterialiser {
      * <p>ABSTRACT is a claim about the marked type alone and holds of every instantiation identically, which
      * is how {@code @abstract} on a template reaches them all (#504, and {@code AbstractTemplateFamilyTest}
      * pins it). SEALED is the different claim that this record <em>has discriminator fields to dispatch
-     * on</em> -- and the lines above have just pinned those fields and cleared their marks, because the mark
-     * belongs to the field that is still unpinned ({@code SPEC-FEEDBACK.md} #10). So a member of a sealed
-     * family is an ordinary concrete record, exactly as it is in a hand-written family, and inheriting the
-     * word would make every member fail the "is @sealed but no field carries @discriminator" rule its own
-     * closing created.
+     * on</em> -- and the lines above have just pinned those fields and left the member naming none, because
+     * the selectors belong to the base that declares them unpinned ({@code SPEC-FEEDBACK.md} #10). So a member
+     * of a sealed family is an ordinary concrete record, exactly as it is in a hand-written family, and
+     * inheriting the word would make every member fail the "is @sealed but names no discriminator" rule its
+     * own closing created.
      */
     private static RecordExtensionType closedExtension(RecordBody record) {
         return record.extension() == RecordExtensionType.SEALED
