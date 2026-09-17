@@ -410,10 +410,24 @@ pays for a branch it will never take.
   names a tag may carry, which is the subtype set, and a FINAL record's is empty *by construction* rather
   than by a check — nothing asks whether the record is final, and the "admissible" list a diagnostic prints
   is right without asking.
-- **ABSTRACT** gets `TreeAbstractReader`, which decodes no member at all: `$type` is REQUIRED, the failure
+- **ABSTRACT** gets `TreeRecordAbstractReader`, which decodes no member at all: `$type` is REQUIRED, the failure
   lands before the object's shape is consulted, and the base itself is not admissible — a tag naming it is an
   error where a concrete position would take one as a redundant restatement.
-- **SEALED** gets `TreeSealedReader`, which reads the discriminator members and looks the value up.
+- **SEALED** gets `TreeRecordSealedReader`, which reads the discriminator members and looks the value up.
+- **A family-base template** gets `TreeTemplateAbstractReader`, which is the ABSTRACT reading over the
+  template itself. A template carrying `extension` is a type by the only test that matters — a value can
+  stand at it, being a value of one of its instantiations (`SPEC-FEEDBACK.md` #13) — so `{ b: box }` admits
+  `{"$type": "int_box", "v": 1}` and refuses an untagged object, exactly as TSON text does. Every member of
+  such a family is minted, so the alias is the only name a document has for one, which is what makes the
+  flattening above load-bearing here rather than merely consistent.
+  - **ABSTRACT only, and the reason is the module boundary rather than a design choice.** A SEALED family is
+    selected by reading its discriminator fields, and a template's live in its held body's *text*, which
+    `tson-compiler`'s `HeldBody` parses. This module depends on the schema pipeline's output and never on its
+    engine, so it cannot reach that derivation — and duplicating the walk would put two opinions about which
+    fields select a family on either side of a module wall, which §9.4 makes a specification failure rather
+    than untidiness. A SEALED template base therefore still reaches `OpenTemplateReader` here while TSON text
+    dispatches it: the one place the two encodings knowingly differ. It closes when the discriminator names
+    are stated structurally on the `template` constructor, where both stacks read them without parsing.
 
 **The mapping is derived once and never at read time.** Each member's pins are decoded at construction, at
 the fields' declared types *in the base* — the one set known before a member is selected — and keyed by what
