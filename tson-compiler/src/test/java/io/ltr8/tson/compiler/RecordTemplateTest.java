@@ -558,8 +558,11 @@ class RecordTemplateTest {
     }
 
     // ── A template named as a data value's own type ──────────────────────
-    //    A template is not a type until it is applied, and a data type-ref carries no arguments -- so
-    //    naming one in data is the author's error, not a gap in this library. See OpenTemplateReader.
+    //    A *record-bodied* template is a family base ({@code SPEC-FEEDBACK.md} #13), so naming it in data is
+    //    refused the way naming any abstract base is: the value has to say which member it is. Naming a
+    //    template with no family -- a container, a reference, a constructor application -- is still refused
+    //    by OpenTemplateReader, which says a template is not a type until it is applied. Either way it is
+    //    the author's error and an ordinary data diagnostic, never a gap in this library.
 
     /**
      * A <b>parameterised alias</b> (§5.10 partial application): a declaration whose whole body is an
@@ -701,12 +704,12 @@ class RecordTemplateTest {
         assertNull(value);
         assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
         Diagnostic problem = problems.diagnostics().get(0);
-        // The name resolves -- to a template, which is not a type, so it is not admissible here.
+        // The name resolves -- to a family base, which has no direct instances, so the value has to name the
+        // member it is. Refused for the same reason an untagged value at any abstract record is.
         assertEquals(Diagnostic.Code.TYPE_MISMATCH, problem.code());
-        assertTrue(problem.message().contains("'paged' is a template taking 1 type argument [T]"),
-                problem.message());
-        assertTrue(problem.message().contains("my_type => paged<...>"), "the route out of it: " + problem.message());
-        assertEquals("!paged", problem.actual());
+        assertTrue(problem.message().contains("'paged' selects nothing"), problem.message());
+        assertTrue(problem.message().contains("orders_page"),
+                "the route out of it names the member a document can write: " + problem.message());
         // The applied form is a type and still reads, which is what the message points at.
         assertNotNull(compiled.get("orders_page")
                 .read(TestDocuments.document("{ items: [ { id: \"a\" } ] }")));
@@ -716,9 +719,12 @@ class RecordTemplateTest {
      * The same for a template whose body needs no lifting at all: {@code box}'s field type is the parameter
      * itself, which used to compile to an {@link io.ltr8.tson.compiler.reader.ErrorReader} whose message
      * blamed the linker for not rejecting {@code T}. The entry is refused before any of that.
+     *
+     * <p><b>And the member is accepted</b>, which is the other half of the rule: {@code !box} names the base
+     * and selects nothing, {@code !int_box} names a member and reads.
      */
     @Test
-    void aTemplateWhoseFieldIsTheParameterIsRefusedTheSameWay() {
+    void aTemplateWhoseFieldIsTheParameterIsRefusedButItsMemberReads() {
         TsonCompiledSchema compiled = compile("""
                   box => <T> { v: T }
                   int_box => box<int32>""");
@@ -727,8 +733,11 @@ class RecordTemplateTest {
         compiled.get("box").read(TestDocuments.document("!box { v: 1 }", problems));
 
         assertEquals(1, problems.diagnostics().size(), () -> problems.diagnostics().toString());
-        assertTrue(problems.diagnostics().get(0).message().startsWith("'box' is a template taking"),
+        assertTrue(problems.diagnostics().get(0).message().contains("'box' selects nothing"),
                 problems.diagnostics().get(0).message());
+
+        assertEquals(List.of(), collect(compiled, "box", "!int_box { v: 1 }"),
+                "the member a document can name reads at the base's own position");
     }
 
     /** A fail-fast read throws the read exception every other data problem throws -- never a library fault. */
@@ -741,6 +750,13 @@ class RecordTemplateTest {
         ReadException thrown = assertThrows(ReadException.class,
                 () -> compiled.get("box").read(TestDocuments.document("!box { v: 1 }")));
 
-        assertTrue(thrown.getMessage().contains("is a template taking"), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("selects nothing"), thrown.getMessage());
+    }
+
+    /** Every diagnostic one document collects at {@code rootType}. */
+    private static List<Diagnostic> collect(TsonCompiledSchema compiled, String rootType, String document) {
+        DiagnosticsCollector problems = DiagnosticsReceiver.collecting();
+        compiled.get(rootType).read(TestDocuments.document(document, problems));
+        return List.copyOf(problems.diagnostics());
     }
 }

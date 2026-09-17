@@ -77,14 +77,20 @@ final class RecordMemberDispatchReader implements TsonTypeReader<Object>, Subsum
     private final RecordExtensionDiagnostics extension;
     private final String pinned;
 
-    RecordMemberDispatchReader(Set<String> selfNames, String displayName, RecordBody body,
+    /**
+     * <b>The selectors arrive already chosen, from either kind of base.</b> A closed record declares its
+     * discriminator fields; a family-base template holds them in its body text, where {@code
+     * HeldBody.selectors()} reads them. Taking the fields rather than a {@code RecordBody} is what lets one
+     * dispatcher serve both -- the alternative was fabricating a record body for a template that has none,
+     * which put the choice of "which fields select" in two places that could disagree.
+     */
+    RecordMemberDispatchReader(Set<String> selfNames, String displayName, List<RecordField> selectorFields,
                                 Set<String> subtypes, ValueReaderContext context,
                                 TsonTypeReaderResolver readerFor) {
         Map<String, TypeDefinition> entries = context.schema().entries();
         this.selfNames = Set.copyOf(selfNames);
         this.readerFor = readerFor;
-        this.selectors = body.fields().stream().filter(RecordField::discriminator)
-                .map(field -> selectorOf(field, entries)).toList();
+        this.selectors = selectorFields.stream().map(field -> selectorOf(field, entries)).toList();
         this.selectorNames = new LinkedHashSet<>(selectors.stream().map(Selector::name).toList());
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();

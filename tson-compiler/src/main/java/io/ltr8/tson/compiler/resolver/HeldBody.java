@@ -1,5 +1,6 @@
 package io.ltr8.tson.compiler.resolver;
 
+import io.ltr8.annotation.Annotations;
 import io.ltr8.tson.compiler.TsonDataParser;
 import io.ltr8.tson.compiler.writer.DataClassObjectWriter;
 import io.ltr8.tson.compiler.ast.ArrayValue;
@@ -7,8 +8,11 @@ import io.ltr8.tson.compiler.ast.CoreValue;
 import io.ltr8.tson.compiler.ast.DataValue;
 import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
+import io.ltr8.tson.compiler.ast.ScopedValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.meta.FieldState;
+import io.ltr8.tson.schema.meta.RecordField;
 import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.TypeRef;
 
@@ -93,6 +97,60 @@ public final class HeldBody {
                     + body.template() + " -- a held body is written by WireForm and read here, so the "
                     + "two have disagreed about the one spelling §5.10 requires", e);
         }
+    }
+
+    /**
+     * The <b>discriminator fields</b> a marked template's family dispatches on ({@code SPEC-FEEDBACK.md}
+     * #13): each as the {@link RecordField} a closed base would declare -- its own name, its declared type,
+     * {@code REQUIRED}, and no pin, the pin being what an argument supplies per member.
+     *
+     * <p><b>One derivation, two callers, and that is the point.</b> {@code RecordExtension} checks the family
+     * (every member pins every selector, pins pairwise distinct) and the reader dispatches on it, and a second
+     * opinion about which fields those are would let the check pass a family the read cannot place. Both go
+     * through here.
+     *
+     * <p><b>Read off the held payload, which is where the mark survives.</b> §5.7 fixation clears the mark on
+     * each member ({@code TemplateMaterialiser.fixRoutedValues}) -- the mark belongs to the field that is
+     * still unpinned -- so the members cannot answer this and the template's own body is the only carrier.
+     * A declared type that is a parameter is skipped: a position typed by the template reads the selector
+     * before it knows the member, so a type varying per application is one it cannot read (the <em>pin</em>
+     * varying is the whole design, and does).
+     *
+     * <p>Empty for every body but a {@code record} application, which is the only shape with fields at all.
+     */
+    public List<RecordField> selectors() {
+        if (!WireForm.RECORD.equals(application.typeRef().orElse(null))
+                || !(application.coreValue() instanceof RecordValue binding)) {
+            return List.of();
+        }
+        List<RecordField> selectors = new ArrayList<>();
+        for (RecordValue.Field member : binding.fields()) {
+            if (!WireForm.FIELDS.equals(member.name())
+                    || !(member.value().value().coreValue() instanceof ArrayValue fields)) {
+                continue;
+            }
+            for (ScopedValue element : fields.elements()) {
+                if (element.value().coreValue() instanceof RecordValue field) {
+                    selectorOf(field).ifPresent(selectors::add);
+                }
+            }
+        }
+        return List.copyOf(selectors);
+    }
+
+    /** One held field as a selector, or empty where it carries no mark or its type is a parameter. */
+    private Optional<RecordField> selectorOf(RecordValue field) {
+        if (!"true".equals(WireForm.memberTokenOf(field, WireForm.DISCRIMINATOR))) {
+            return Optional.empty();
+        }
+        CoreValue declared = WireForm.field(field, WireForm.TYPE).orElse(null);
+        if (!(declared instanceof TokenValue type) || parameters().contains(type.text())) {
+            return Optional.empty();
+        }
+        String name = WireForm.memberTokenOf(field, WireForm.NAME);
+        return name == null ? Optional.empty()
+                : Optional.of(new RecordField(name, TypeRef.of(type.text()), FieldState.REQUIRED,
+                        true, Optional.empty(), Annotations.empty(), Optional.empty()));
     }
 
     /** The entry's own parameter names, in declaration order. */

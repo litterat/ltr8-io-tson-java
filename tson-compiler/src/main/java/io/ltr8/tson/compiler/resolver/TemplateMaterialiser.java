@@ -11,6 +11,7 @@ import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.Top;
@@ -703,7 +704,24 @@ final class TemplateMaterialiser {
                 .map(field -> field.state() == FieldState.REQUIRED && field.value().isPresent()
                         ? field.withState(FieldState.REQUIRED_FIXED).withDiscriminator(false)
                         : field)
-                .toList(), record.groups(), record.extension());
+                .toList(), record.groups(), closedExtension(record));
+    }
+
+    /**
+     * A closed member's own {@code extension}: the template's, except that <b>SEALED does not travel</b>.
+     *
+     * <p>ABSTRACT is a claim about the marked type alone and holds of every instantiation identically, which
+     * is how {@code @abstract} on a template reaches them all (#504, and {@code AbstractTemplateFamilyTest}
+     * pins it). SEALED is the different claim that this record <em>has discriminator fields to dispatch
+     * on</em> -- and the lines above have just pinned those fields and cleared their marks, because the mark
+     * belongs to the field that is still unpinned ({@code SPEC-FEEDBACK.md} #10). So a member of a sealed
+     * family is an ordinary concrete record, exactly as it is in a hand-written family, and inheriting the
+     * word would make every member fail the "is @sealed but no field carries @discriminator" rule its own
+     * closing created.
+     */
+    private static RecordExtensionType closedExtension(RecordBody record) {
+        return record.extension() == RecordExtensionType.SEALED
+                ? RecordExtensionType.OPEN : record.extension();
     }
 
     /**

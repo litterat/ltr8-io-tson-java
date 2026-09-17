@@ -2312,20 +2312,34 @@ class DefinitionResolverTest {
     }
 
     /**
-     * <b>A template may not be sealed or final</b>, and it is the spec that refuses it rather than this
-     * resolver falling short: both are claims about <em>other</em> declarations, and §8.2's {@code subtypes}
-     * indexes entries, so an instantiation entry exists only where some schema writes that application. The
-     * claim's subject would be whichever applications a closure happens to contain.
+     * <b>{@code @sealed} is a claim with a subject on a template</b> ({@code SPEC-FEEDBACK.md} #13): a
+     * template carrying {@code extension} takes part in IS-A, and {@code subtypes} holds its own
+     * instantiations -- which is exactly the set the claim ranges over. So the mark lowers into the held body
+     * like {@code @abstract}, and {@code RecordExtension} judges it against the fields the way it does for a
+     * closed record.
      */
     @Test
-    void aTemplateCannotBeSealedOrFinal() {
-        for (String mark : List.of("sealed", "final")) {
-            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                    () -> resolveSnippetsAgainstMetaKernel(
-                            "box => @" + mark + " <T> { @discriminator kind: identifier  v: T }"),
-                    mark);
-            assertTrue(thrown.getMessage().contains("states a closed set of subtypes"), thrown.getMessage());
-        }
+    void aTemplateMayBeSealed() {
+        TypeDefinition box = resolveSnippetsAgainstMetaKernel(
+                "box => @sealed <T> { @discriminator kind: text  v: T }");
+
+        assertInstanceOf(TemplateBody.class, box.body());
+        assertTrue(((TemplateBody) box.body()).template().contains("extension: SEALED"),
+                ((TemplateBody) box.body()).template());
+    }
+
+    /**
+     * <b>{@code @final} still cannot hold of a template.</b> It forbids anything composing onto the marked
+     * type, and every application of a template is a subtype of it by construction -- so the claim is false
+     * of the declaration before an author writes a second one.
+     */
+    @Test
+    void aTemplateCannotBeFinal() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> resolveSnippetsAgainstMetaKernel(
+                        "box => @final <T> { @discriminator kind: text  v: T }"));
+
+        assertTrue(thrown.getMessage().contains("subtype of it by construction"), thrown.getMessage());
     }
 
     /**

@@ -101,10 +101,14 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   - **Two §5.10 rules on templates, both decidable here and neither depending on anyone applying one.**
     *Arity*, over every reference: a reference supplies exactly as many arguments as the entry it names
     declares parameters, which folds three author errors into one rule — too many, too few, and **none at
-    all**. That last is the one that mattered: naming a template without applying it (`use => { u: box }`)
-    linked and compiled clean, then failed at *read* time with "no usable compiled reader" and a
-    library-fault exit code, because the eager-rejection discipline guarded applications and never bare
-    names. *Parameter usage*: an open entry references every parameter it declares, so
+    all**. That last used to be unguarded: naming a template without applying it linked and compiled clean,
+    then failed at *read* time with "no usable compiled reader" and a library-fault exit code, because the
+    eager-rejection discipline guarded applications and never bare names. It is now conditional, and the
+    condition is `template.extension`: a **family base** may be named bare (`use => { u: box }` resolves to
+    `box`, and a value there is a value of one of its instantiations), while a container, a reference and a
+    constructor-application template carry no `extension`, have no dispatch to eliminate their parameters,
+    and are refused here as before (`SPEC-FEEDBACK.md` #13). *Parameter usage*: an open entry references
+    every parameter it declares, so
     `box => <T> { v: text }` is rejected — every application of it would denote the same type, and a
     parameter list is author-written, so an unused one is a `TsonSchemaValidationException`.
     - Its old converse — §5.10's closed-entry rule, checked over `record_field.value_param` — has no sound

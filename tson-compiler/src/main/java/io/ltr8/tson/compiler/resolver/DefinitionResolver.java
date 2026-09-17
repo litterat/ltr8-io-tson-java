@@ -368,15 +368,17 @@ final class DefinitionResolver {
             return resolved;
         }
         if (resolved.body() instanceof TemplateBody open) {
-            if (extension.get() != RecordExtensionType.ABSTRACT) {
-                throw new SchemaValidationException("'" + declaration.name() + "': '@"
-                        + extension.get().name().toLowerCase(java.util.Locale.ROOT)
-                        + "' states a closed set of subtypes, which a template has none of -- each application"
-                        + " mints its own entry with its own subtypes index, so the claim would range over"
-                        + " whichever applications a closure happens to write. Mark a closed declaration"
-                        + " instead ([TSON-SCHEMA] §5.2, §5.10)");
+            if (extension.get() == RecordExtensionType.FINAL) {
+                // FINAL forbids anything composing onto the marked type, and every application of a template
+                // is a subtype of it by construction -- so the claim is false of a template before an author
+                // writes a second declaration. ABSTRACT and SEALED both have a subject: `subtypes` holds the
+                // template's own instantiations ({@code SPEC-FEEDBACK.md} #13).
+                throw new SchemaValidationException("'" + declaration.name() + "': '@final' forbids anything "
+                        + "composing onto this type, and every application of a template is a subtype of it by "
+                        + "construction -- so the claim is false of '" + declaration.name() + "' whatever else "
+                        + "the schema says. Mark a closed declaration instead ([TSON-SCHEMA] §5.2, §5.10)");
             }
-            return abstractTemplate(declaration.name(), resolved, open);
+            return markedTemplate(declaration.name(), resolved, open, extension.get());
         }
         if (!(resolved.body() instanceof RecordBody record)) {
             throw new SchemaValidationException("'" + declaration.name()
@@ -389,12 +391,19 @@ final class DefinitionResolver {
     }
 
     /**
-     * {@code resolved} with {@code @abstract} stated in its held body. Refused where the body applies
+     * {@code resolved} with the author's mark stated in its held body. Refused where the body applies
      * anything but {@code record}: an array or a choice has no {@code extension} member to state it in, and
      * an alias states nothing of its own -- {@code @abstract <B> pair<uuid, B>} would be a claim about
      * {@code pair}, made by a declaration that merely names it.
+     *
+     * <p><b>The mark is stated, not merely permitted.</b> {@code extension} is otherwise derived from the
+     * body -- SEALED where a discriminator survives, ABSTRACT otherwise -- so an author writing {@code
+     * @sealed} is asserting the fact the derivation reaches anyway, and {@code RecordExtension} judges the
+     * two against each other the way it does for a closed record: {@code @sealed} with nothing marked is
+     * refused there, naming the field that is missing.
      */
-    private static TypeDefinition abstractTemplate(String name, TypeDefinition resolved, TemplateBody open) {
+    private static TypeDefinition markedTemplate(String name, TypeDefinition resolved, TemplateBody open,
+                                                  RecordExtensionType extension) {
         HeldBody held = HeldBody.of(open);
         if (!WireForm.RECORD.equals(held.application().typeRef().orElse(null))) {
             throw new SchemaValidationException("'" + name + "': only a record states how it may be realised"
@@ -402,7 +411,7 @@ final class DefinitionResolver {
                     + "' ([TSON-SCHEMA] §5.2)");
         }
         return resolved.withBody(HeldBody.held(open.parameters(),
-                WireForm.heldWithExtension(held.application(), RecordExtensionType.ABSTRACT)));
+                WireForm.heldWithExtension(held.application(), extension)));
     }
 
     /**

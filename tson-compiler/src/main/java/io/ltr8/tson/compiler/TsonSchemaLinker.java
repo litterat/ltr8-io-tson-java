@@ -848,12 +848,16 @@ public final class TsonSchemaLinker {
         Map<String, Set<String>> newSubtypesByName = new LinkedHashMap<>();
         for (String localName : localNames) {
             TypeDefinition local = merged.get(localName);
-            if (!local.parameters().isEmpty()) {
-                // A template is not a type until it is applied (§5.10), so no value can ever be one and it
-                // has no business in an index of what a position typed by the supertype admits. Its own
-                // `supertypes` stays: `<V> base & { … }` records the composition there, and that is what
-                // materialisation reads to give each instantiation its contract -- so what is excluded is
-                // the reverse edge alone, and each application still indexes under the base as it closes.
+            if (!local.parameters().isEmpty() && !isFamilyBase(local)) {
+                // An *unmarked* template is not a type until it is applied (§5.10), so no value can ever be
+                // one and it has no business in an index of what a position typed by the supertype admits.
+                // Its own `supertypes` stays: `<V> base & { … }` records the composition there, and that is
+                // what materialisation reads to give each instantiation its contract -- so what is excluded
+                // is the reverse edge alone, and each application still indexes under the base as it closes.
+                //
+                // A template carrying `extension` is a family base and does take part
+                // ({@code SPEC-FEEDBACK.md} #13): a value at a position typed by it is a value of some
+                // member, so it is a type by the only test that matters -- something can stand at it.
                 continue;
             }
             indexUnderItsTemplate(localName, local, merged, newSubtypesByName);
@@ -897,6 +901,16 @@ public final class TsonSchemaLinker {
         if (template != null && template.body() instanceof TemplateBody held && held.extension().isPresent()) {
             newSubtypesByName.computeIfAbsent(head, ignored -> new LinkedHashSet<>()).add(name);
         }
+    }
+
+    /**
+     * Whether this entry is a <b>family base</b> -- a template whose held body carries {@code extension}
+     * ({@code SPEC-FEEDBACK.md} #13), which is what makes it a participant in IS-A rather than a form waiting
+     * for arguments. A container, a constructor application and a reference template carry none, so they stay
+     * out of every index: nothing can stand at one, there being no dispatch to eliminate the parameters.
+     */
+    private static boolean isFamilyBase(TypeDefinition def) {
+        return def.body() instanceof TemplateBody held && held.extension().isPresent();
     }
 
     /**

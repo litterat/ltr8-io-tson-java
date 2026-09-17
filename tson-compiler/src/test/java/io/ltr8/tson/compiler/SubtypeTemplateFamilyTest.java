@@ -82,19 +82,18 @@ class SubtypeTemplateFamilyTest {
     }
 
     /**
-     * <b>The template itself is not one of its base's subtypes.</b> A subtype template records its
-     * composition in its own {@code supertypes} -- which is what materialisation reads to give each
-     * instantiation its contract -- and the reverse index used to credit it back, so a base listed the
-     * template beside the instantiations that close from it. §5.10 makes a template no type until applied,
-     * so no value at a {@code base} position can ever be one, and §8.2's index is over entries that are
-     * types.
+     * <b>A family-base template <em>is</em> one of its base's subtypes</b> ({@code SPEC-FEEDBACK.md} #13).
+     * A template carrying {@code extension} is a type by the only test that matters -- something can stand
+     * at it, namely a value of one of its instantiations -- so the reverse index credits it beside the
+     * instantiations that close from it, and a position typed {@code base} admits a value tagged as the
+     * template's family.
      *
-     * <p>Nothing downstream read it, which is why it went unnoticed: the family checks skip an entry with
-     * parameters and the dispatchers build their member lists without one. Those filters are what an index
-     * holding a non-type costs -- each consumer of the index has to know to apply them.
+     * <p>The instantiations are indexed too, through their own {@code supertypes}: both edges exist and they
+     * say different things. The template's says "this family composes onto base"; each instantiation's says
+     * "this closed type does".
      */
     @Test
-    void aTemplateIsNotIndexedAsASubtypeOfItsBase() {
+    void aFamilyBaseTemplateIsIndexedAsASubtypeOfItsBase() {
         TsonCompiledSchema compiled = compile("""
                   base     => { x: int32 }
                   box      => <V> base & { item: V }
@@ -104,8 +103,8 @@ class SubtypeTemplateFamilyTest {
 
         assertTrue(baseEntry.subtypes().contains(target(compiled, "box_text")),
                 () -> "the instantiation is indexed: " + baseEntry.subtypes());
-        assertFalse(baseEntry.subtypes().contains("box"),
-                () -> "a template is not a type and cannot be a subtype: " + baseEntry.subtypes());
+        assertTrue(baseEntry.subtypes().contains("box"),
+                () -> "and so is the family base it closes from: " + baseEntry.subtypes());
         assertEquals(List.of("base"), compiled.schema().entries().get("box").supertypes(),
                 "the template keeps its own composition edge -- materialisation reads it");
     }

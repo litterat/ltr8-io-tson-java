@@ -14,6 +14,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -194,14 +195,20 @@ class AbstractTemplateFamilyTest {
 
     // ── What is still refused ───────────────────────────────────────────────
 
-    /** {@code @sealed} and {@code @final} range over a set of subtypes a template does not have. */
+    /**
+     * {@code @sealed} <b>is</b> a claim with a subject on a template ({@code SPEC-FEEDBACK.md} #13): a
+     * template carrying {@code extension} takes part in IS-A and {@code subtypes} holds its own
+     * instantiations, which is the set the claim ranges over. Only {@code @final} still cannot hold --
+     * every application is a subtype of the template by construction, so the claim is false before an
+     * author writes anything else.
+     */
     @Test
-    void aTemplateIsStillNeitherSealedNorFinal() {
-        for (String mark : List.of("sealed", "final")) {
-            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                    () -> compile("      box => @" + mark + " <T> { @discriminator kind: identifier  v: T }\n"),
-                    mark);
-            assertTrue(thrown.getMessage().contains("states a closed set of subtypes"), thrown.getMessage());
-        }
+    void aTemplateMayBeSealedButNeverFinal() {
+        assertNotNull(compile("      box => @sealed <T> { @discriminator kind: text  v: T }\n"),
+                "@sealed states the fact the derivation reaches anyway");
+
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
+                () -> compile("      box => @final <T> { @discriminator kind: text  v: T }\n"));
+        assertTrue(thrown.getMessage().contains("subtype of it by construction"), thrown.getMessage());
     }
 }

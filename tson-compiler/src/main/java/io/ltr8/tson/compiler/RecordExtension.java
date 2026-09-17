@@ -6,6 +6,7 @@ import io.ltr8.tson.atom.AtomTypeException;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
 import io.ltr8.tson.compiler.reader.ValueIdentity;
+import io.ltr8.tson.compiler.resolver.HeldBody;
 import io.ltr8.tson.compiler.resolver.ReferenceChain;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.FieldGroup;
@@ -14,6 +15,7 @@ import io.ltr8.tson.schema.meta.Reference;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordExtensionType;
 import io.ltr8.tson.schema.meta.RecordField;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Token;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 
@@ -66,14 +68,16 @@ final class RecordExtension {
         List<Violation> violations = new ArrayList<>();
         for (String name : localNames) {
             TypeDefinition def = merged.get(name);
-            if (def != null && def.body() instanceof RecordBody record && def.parameters().isEmpty()) {
+            RecordBody record = def == null ? null : familyBodyOf(def);
+            if (record != null) {
                 checkDeclaration(name, def, record, merged, violations);
             }
         }
         for (Map.Entry<String, TypeDefinition> entry : merged.entrySet()) {
             TypeDefinition def = entry.getValue();
-            if (def.body() instanceof RecordBody base && base.extension() == RecordExtensionType.SEALED
-                    && def.parameters().isEmpty() && touchesLocally(entry.getKey(), def, localNames)) {
+            RecordBody base = familyBodyOf(def);
+            if (base != null && base.extension() == RecordExtensionType.SEALED
+                    && touchesLocally(entry.getKey(), def, localNames)) {
                 checkFamily(entry.getKey(), def, base, merged, localNames, violations);
             }
         }
@@ -272,6 +276,34 @@ final class RecordExtension {
             return Optional.empty();
         }
         return AtomParsers.forType(terminal, target.body());
+    }
+
+    /**
+     * The record body whose family rules this entry is subject to, or {@code null} where it has none.
+     *
+     * <p><b>A marked template is a family base and is judged as one</b> ({@code SPEC-FEEDBACK.md} #13). Its
+     * body is held text, so the body checked here is assembled from the two facts the entry states
+     * structurally: the derived {@code extension}, and the discriminator fields {@code HeldBody.selectors()}
+     * reads off the held payload. Skipping it instead -- which every guard here used to do, on
+     * {@code parameters().isEmpty()} -- would accept {@code @sealed <T>} with no family check at all: no
+     * rule that every member pins every selector, and no rule that the pins are pairwise distinct. An
+     * unchecked family is worse than a refused one.
+     *
+     * <p><b>The selector derivation is the reader's own</b>, so the check and the dispatch cannot disagree
+     * about which fields a family is selected by -- a check that passed a family the read could not place
+     * is the defect one derivation per consumer produces.
+     *
+     * <p>An <em>unmarked</em> template still has none: it is no type until applied (§5.10), nothing can
+     * stand at it, and its instantiations are judged as the closed records they are.
+     */
+    private static RecordBody familyBodyOf(TypeDefinition def) {
+        if (def.body() instanceof RecordBody record) {
+            return def.parameters().isEmpty() ? record : null;
+        }
+        if (!(def.body() instanceof TemplateBody held) || held.extension().isEmpty()) {
+            return null;
+        }
+        return new RecordBody(List.of(), HeldBody.of(held).selectors(), List.of(), held.extension().get());
     }
 
     /** Whether this schema may be blamed for the family at all -- the base or any subtype declared here. */
