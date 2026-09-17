@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -68,7 +69,9 @@ public final class HeldBody {
      * rather than a difference between two entries that should be equal.
      */
     public static TemplateBody held(List<String> parameters, DataValue application) {
-        return new TemplateBody(parameters, WRITER.toTson(application));
+        // No `extension` yet: it is the parent's fact and the resolver derives it once a template's body
+        // shape is known, which is not here -- this mints the held text and nothing else.
+        return new TemplateBody(parameters, WRITER.toTson(application), Optional.empty());
     }
 
     /**

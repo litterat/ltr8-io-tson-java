@@ -127,6 +127,7 @@
     body: !record { supertypes: [top]  fields: [
       !record_field { name: parameters  type: array_param_name_xxhash }
       !record_field { name: template    type: text }
+      !record_field { name: extension   type: record_extension_type  state: OPTIONAL }
     ] }
   }
 
