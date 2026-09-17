@@ -96,15 +96,20 @@ class TemplateRegularityTest {
     //    unchecked: three are one arity rule, and the fourth is the converse of the closed-entry rule.
 
     /**
-     * <b>A template is not a type until it is applied.</b> Naming one without arguments used to compile and
-     * link clean, then fail at <em>read</em> time with "no usable compiled reader" and a library-fault exit
-     * code -- the author's error reported as this library's, at the latest possible moment. It survived
-     * because the eager-rejection discipline guarded *applications* and never bare names.
+     * <b>A template with no parent is not a type until it is applied.</b> Naming one without arguments used
+     * to compile and link clean, then fail at <em>read</em> time with "no usable compiled reader" and a
+     * library-fault exit code -- the author's error reported as this library's, at the latest possible
+     * moment. It survived because the eager-rejection discipline guarded *applications* and never bare names.
+     *
+     * <p><b>A record-bodied template is admitted instead</b>, naming the parent every such template has
+     * ({@code SPEC-FEEDBACK.md} #13): nothing is ever read against the template itself, a value there being a
+     * value of some member. So the subject here is a container, which has no parent to name -- and
+     * {@code TemplateAtATypePositionTest} carries both sides of the line.
      */
     @Test
-    void namingATemplateWithoutApplyingItIsRejected() {
+    void namingATemplateWithNoParentIsRejected() {
         String message = rejected("""
-                  tmpl => <T> { v: T }
+                  tmpl => <T> [T]
                   use  => { u: tmpl }""");
 
         assertTrue(message.contains("is a template taking 1 type argument [T]"), message);
@@ -112,15 +117,16 @@ class TemplateRegularityTest {
     }
 
     /**
-     * A recursive reference that forgets its arguments is caught <b>when the template is applied</b>, not at
-     * its declaration -- and an unapplied one gets no verdict at all.
+     * A recursive <b>bare</b> reference inside a record template names the parent rather than forgetting an
+     * argument list ({@code SPEC-FEEDBACK.md} #13): {@code tail: chain} is "any chain", which is what an
+     * abstract parent is for, and the recursion is regular because a reference is not an application that
+     * grows its argument at every level.
      *
-     * <p><b>The bare-name half of the rule cannot run against a held body.</b> Arity over an *application* is
-     * decidable there ({@code chain<T, T>} below), because an application is a distinguishable shape in the
-     * wire tree. A bare name is not: a held body's tokens are field names, states, literals and type
-     * references alike, so "this token names a template" would reject a schema whose field happens to be
-     * called {@code box} beside a template of that name. A false verdict on a correct schema is worse than a
-     * late one on an incorrect schema, so the check runs where the shape is unambiguous.
+     * <p><b>The arity half is unchanged and still runs here.</b> Arity over an *application* is decidable
+     * against a held body, because an application is a distinguishable shape in the wire tree. A bare name is
+     * not: a held body's tokens are field names, states, literals and type references alike, so "this token
+     * names a template" would reject a schema whose field happens to be called {@code box} beside a template
+     * of that name.
      *
      * <p>An unapplied template getting no verdict is the design's own position, not a shortfall it tolerates
      * -- §5.10: "an unapplied template is checked no further and receives no verdict".
@@ -128,13 +134,14 @@ class TemplateRegularityTest {
      * list, and the unused-parameter rule -- which *is* answerable from a held body -- fires first.
      */
     @Test
-    void aRecursiveReferenceWithoutArgumentsIsRejectedWhereItIsApplied() {
+    void aRecursiveBareReferenceNamesTheParent() {
         assertNotNull(compile("  chain => <T> { head: T  tail: chain? }"),
                 "unapplied, it gets no verdict");
 
-        assertTrue(rejected("""
+        assertNotNull(compile("""
                   chain => <T> { head: T  tail: chain? }
-                  use   => { c: chain<text> }""").contains("not a type until it is applied"));
+                  use   => { c: chain<text> }"""),
+                "applied, the bare `chain` names the parent every record template has");
     }
 
     /**

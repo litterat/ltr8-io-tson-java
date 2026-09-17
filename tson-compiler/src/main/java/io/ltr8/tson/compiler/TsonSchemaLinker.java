@@ -1570,6 +1570,14 @@ public final class TsonSchemaLinker {
                     + "none (§5.10); drop the argument list");
         }
         if (supplied == 0) {
+            if (referenced.body() instanceof TemplateBody held && held.extension().isPresent()) {
+                // A record-bodied template has a parent, and naming it here names that parent
+                // ({@code SPEC-FEEDBACK.md} #13). Nothing is ever read *against* it: a value at the position
+                // is a value of some member, selected by a tag or by the discriminators, and every member is
+                // a closed entry -- so the existential is eliminated by dispatch rather than by inferring
+                // arguments from the payload, which is what makes naming `box` here still an error.
+                return;
+            }
             throw new SchemaValidationException(context + ": '" + ref.name() + "' is a template taking "
                     + declared + " type argument" + (declared == 1 ? "" : "s") + " " + referenced.parameters()
                     + ", and a template is not a type until it is applied -- write '" + ref.name()
