@@ -106,9 +106,10 @@ public final class JsonSchemaCompiler {
             if (definition.kind() == TypeKind.TEMPLATE) {
                 // A *family base* -- a template carrying `extension` ({@code SPEC-FEEDBACK.md} #13) -- is a
                 // type by the only test that matters: a value can stand at it, being a value of one of its
-                // instantiations. So it dispatches on `$type` exactly as a closed abstract record does.
-                // A SEALED one cannot yet: its selectors live in the held body's text, which this module has
-                // no route to. See TreeTemplateAbstractReader.
+                // instantiations. So it dispatches exactly as a closed base does -- ABSTRACT on `$type`,
+                // SEALED on the discriminator fields, which `template.discriminators` states on the entry
+                // itself, so this module reads them without ever parsing the held body's text. See
+                // TreeTemplateAbstractReader.
                 Optional<JsonTypeReader<?>> family =
                         TreeTemplateAbstractReader.of(name, definition, context);
                 if (family.isPresent()) {
