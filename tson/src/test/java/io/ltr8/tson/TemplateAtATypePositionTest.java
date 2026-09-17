@@ -24,9 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>So the test is the parent's existence, which {@code template.extension} states: present for a record
  * body, absent for a container, a constructor application and a reference template alike.
  *
- * <p><b>Reading such a position is a later step.</b> Until the family dispatcher lands, a value at a
- * template-typed position still meets {@code OpenTemplateReader}'s refusal -- what this step changes is
- * whether the schema loads at all.
+ * <p><b>What this test covers is whether the schema loads</b>, which is the half the parent's existence
+ * decides. Reading such a position is {@code TemplateIsAFamilyBaseTest}'s: a value there dispatches to a
+ * member, by tag or by the discriminators, and only a template with no parent still meets {@code
+ * OpenTemplateReader}'s refusal.
  */
 class TemplateAtATypePositionTest {
 
