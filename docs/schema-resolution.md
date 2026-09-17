@@ -62,11 +62,19 @@ are kept in step deliberately.
   reader, so nothing in the closing path knows the member exists. An open body applying anything but `record`
   has no such member and is refused, named by the constructor it applies. A restated field keeps a
   discriminator it does not repeat, on the annotation-merge rule's own logic below.
-- **The family an abstract template is abstract over is the one §5.8's reference-valued `supertypes` builds.**
-  `result => @abstract <T> { payload: T }` with `ok => <T> result<T> & { note: text }` closes at `result<text>`
-  to an ABSTRACT entry whose `subtypes` holds `ok<text>` and not `ok<int32>` — the edge being to the
-  instantiation the arguments name. Marking a template whose family could never be populated would be marking a
-  type nothing can ever stand at, which is why the two landed together (`AbstractTemplateFamilyTest`).
+- **Two different edges populate a family's `subtypes`, and they are minted by two different mechanisms.**
+  The first is §5.8's reference-valued `supertypes`: `result => @abstract <T> { payload: T }` with `ok => <T>
+  result<T> & { note: text }` closes at `result<text>` to an ABSTRACT entry whose `subtypes` holds `ok<text>`
+  and not `ok<int32>` — the edge being to the instantiation the arguments name, minted by `contractOf` and
+  inverted by the linker's ordinary supertype walk. The second is **membership in the parent a record-bodied
+  template has**: every instantiation indexes under the head it closes, `pet<"dog", dog_type>` under `pet`,
+  read off `source` by `TsonSchemaLinker.indexUnderItsTemplate` and credited only where the template's held
+  body carries an `extension` (a container, a constructor application and a reference template have no parent,
+  so their applications index nowhere). A closed entry's own `subtypes` is empty when it is minted:
+  `subtypes` is linking's throughout, one phase after resolution, which is what keeps two schemas closing one
+  application agreeing on the entry §2.2.3 unifies them by (`MintedEntryUnificationTest`). Marking a template
+  whose family could never be populated would be marking a type nothing can ever stand at, which is why the
+  two landed together (`AbstractTemplateFamilyTest`).
   **Every entry in such a family is minted**, so §8.2 makes every name in it non-normative and an alias is the
   only spelling a document has for a member *or* for the base — which is what makes §7.2's flattening
   load-bearing at both record dispatchers rather than only at the concrete record readers (`RecordDispatch`).

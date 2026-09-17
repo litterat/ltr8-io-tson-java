@@ -549,6 +549,15 @@ final class TemplateMaterialiser {
      * point is common: one held body, one substitution, one set of closed inner applications. What differs is
      * only what the result <em>is</em> -- a form that needs a name of its own, or the type the author named
      * by writing the application.
+     *
+     * <p><b>It is minted with no subtypes, like every resolved entry.</b> {@code subtypes} is linking's,
+     * derived one phase later over the closed namespace ({@code TsonSchemaLinker}), which is the invariant
+     * {@code SchemaResolver}'s own merge rests on. Taking the template's list instead would hand each
+     * instantiation the whole family -- {@code box<text>} claiming {@code box<int32>} -- and, where the
+     * template arrived already linked through an {@code !!import}, itself. That last is what makes it
+     * load-bearing rather than untidy: §8.2 names an instantiation by a function of its resolved form alone,
+     * so two schemas closing one application mint one entry and §2.2.3 unifies them. An entry shaped by
+     * *which* schema closed it is not a function of the form, and the unification fails as a name collision.
      */
     private TypeDefinition closeHeldRecord(String head, TypeDefinition template, HeldBody open,
             List<TypeArgument> arguments, Map<String, TypeArgument> bindings) {
@@ -556,7 +565,7 @@ final class TemplateMaterialiser {
         Top body = fixRoutedValues(closed.body());
         return new TypeDefinition(Optional.of(new TypeRef(head, arguments)),
                 kindOfClosed(closed.body()),
-                contractOf(template, open, body), template.subtypes(),
+                contractOf(template, open, body), List.of(),
                 body);
     }
 
