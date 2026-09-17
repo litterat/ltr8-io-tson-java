@@ -105,7 +105,7 @@ class DefinitionResolverTest {
                     + "discriminator: false } "
                     + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } state: \"REQUIRED\" "
                     + "discriminator: false } "
-                    + "] groups: [] extension: \"OPEN\" } }";
+                    + "] groups: [] extension: \"OPEN\" discriminators: [] } }";
 
     /**
      * The same shape as the real fixture resolves it. meta-kernel types {@code bits} as a count rather than
@@ -311,7 +311,8 @@ class DefinitionResolverTest {
         assertEquals(TypeKind.PRODUCT, top.kind());
         assertEquals(List.of(), top.supertypes());
         assertEquals("{ supertypes: [] subtypes: [] "
-                + "body: !record { supertypes: [] fields: [] groups: [] extension: \"OPEN\" } }", write(top));
+                + "body: !record { supertypes: [] fields: [] groups: [] extension: \"OPEN\" "
+                + "discriminators: [] } }", write(top));
     }
 
     @Test
@@ -343,10 +344,10 @@ class DefinitionResolverTest {
         // atom, sum: empty trailing body, no fields inherited from top (which has none) -- just the composition itself.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [] groups: [] "
-                + "extension: \"OPEN\" } }", write(atom));
+                + "extension: \"OPEN\" discriminators: [] } }", write(atom));
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [] groups: [] "
-                + "extension: \"OPEN\" } }", write(sum));
+                + "extension: \"OPEN\" discriminators: [] } }", write(sum));
 
         // product: two brand-new fields added by the trailing body (top contributes none).
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
@@ -355,13 +356,13 @@ class DefinitionResolverTest {
                 + "discriminator: false } "
                 + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } state: \"REQUIRED\" "
                 + "discriminator: false } "
-                + "] groups: [] extension: \"OPEN\" } }", write(product));
+                + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(product));
 
         // reference: one brand-new field.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
                 + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" discriminator: false } "
-                + "] groups: [] extension: \"OPEN\" } }", write(reference));
+                + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(reference));
     }
 
     // ── Field groups (§5.11) + constructor flag + OPTIONAL fields: integer_type ──
@@ -399,7 +400,7 @@ class DefinitionResolverTest {
                         + "groups: [ "
                         + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "
                         + "{ members: [ \"max\" \"exclusive_max\" ] state: \"OPTIONAL\" } "
-                        + "] extension: \"OPEN\" } }",
+                        + "] extension: \"OPEN\" discriminators: [] } }",
                 write(integerType));
     }
 
@@ -556,7 +557,7 @@ class DefinitionResolverTest {
                         + "body: !template { parameters: [ \"A\" \"B\" ] "
                         + "template: \"!record { fields: [ "
                         + "{ name: first type: A } { name: second type: B } ] }\" "
-                        + "extension: \"ABSTRACT\" } }",
+                        + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(pair));
     }
 
@@ -571,7 +572,7 @@ class DefinitionResolverTest {
                         + "discriminator: false } "
                         + "{ name: \"second\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" "
                         + "discriminator: false } "
-                        + "] groups: [] extension: \"OPEN\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pair));
     }
 
@@ -599,7 +600,7 @@ class DefinitionResolverTest {
                         + "subtypes: [] body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { supertypes: [ base ] "
                         + "fields: [ { name: value type: T } ] }\" "
-                        + "extension: \"ABSTRACT\" } }",
+                        + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(box));
     }
 
@@ -621,7 +622,7 @@ class DefinitionResolverTest {
                         + "subtypes: [] body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { supertypes: [ base ] "
                         + "fields: [ { name: id type: text } { name: value type: T } ] }\" "
-                        + "extension: \"ABSTRACT\" } }",
+                        + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(entries.get("box")));
     }
 
@@ -642,7 +643,7 @@ class DefinitionResolverTest {
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
                         + "discriminator: false "
                         + "value: REQUIRED } "
-                        + "] groups: [] extension: \"OPEN\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(tupleElement));
     }
 
@@ -664,7 +665,7 @@ class DefinitionResolverTest {
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
                         + "discriminator: false "
                         + "value: REQUIRED } "
-                        + "] groups: [] extension: \"OPEN\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(fieldGroup));
     }
 
@@ -678,7 +679,7 @@ class DefinitionResolverTest {
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
                         + "state: \"REQUIRED_FIXED\" discriminator: false value: INDEX } "
-                        + "] groups: [] extension: \"OPEN\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pinned));
     }
 
@@ -702,7 +703,7 @@ class DefinitionResolverTest {
                         + "body: !template { parameters: [ \"T\" ] "
                         + "template: \"!record { fields: [ "
                         + "{ name: value type: type_ref value: T } ] }\" "
-                        + "extension: \"ABSTRACT\" } }",
+                        + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(sized));
     }
 
@@ -719,7 +720,7 @@ class DefinitionResolverTest {
                         + "body: !template { parameters: [ \"N\" ] "
                         + "template: \"!record { fields: [ "
                         + "{ name: attempts type: integer state: REQUIRED_DEFAULT value: N } ] }\" "
-                        + "extension: \"ABSTRACT\" } }",
+                        + "extension: \"ABSTRACT\" discriminators: [] } }",
                 write(retry));
     }
 
@@ -760,7 +761,7 @@ class DefinitionResolverTest {
                         + "discriminator: false } "
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
                         + "discriminator: false } "
-                        + "] groups: [] extension: \"OPEN\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(array));
     }
 
@@ -794,7 +795,7 @@ class DefinitionResolverTest {
                         + "discriminator: false } "
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
                         + "discriminator: false } "
-                        + "] groups: [] extension: \"OPEN\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(map));
     }
 
@@ -836,7 +837,7 @@ class DefinitionResolverTest {
                         + "value: \"prod.example.com\" } "
                         + "{ name: \"port\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" "
                         + "discriminator: false } "
-                        + "] groups: [] extension: \"OPEN\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(production));
     }
 
@@ -904,7 +905,7 @@ class DefinitionResolverTest {
                         + "discriminator: false value: 1 } "
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
                         + "discriminator: false } "
-                        + "] groups: [] extension: \"OPEN\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(set));
     }
 
@@ -952,7 +953,7 @@ class DefinitionResolverTest {
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } state: \"REQUIRED\" "
                         + "discriminator: false } "
-                        + "] groups: [] extension: \"OPEN\" } }",
+                        + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(enumDef));
     }
 

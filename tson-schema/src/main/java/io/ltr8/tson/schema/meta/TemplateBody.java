@@ -1,5 +1,6 @@
 package io.ltr8.tson.schema.meta;
 
+import io.ltr8.annotation.Record;
 import io.ltr8.annotation.Typename;
 
 import java.util.List;
@@ -53,8 +54,19 @@ import java.util.Optional;
  */
 @Typename(name = "template")
 public record TemplateBody(List<String> parameters, String template,
-                            Optional<RecordExtensionType> extension) implements Top {
+                            Optional<RecordExtensionType> extension,
+                            List<String> discriminators) implements Top {
 
+    /**
+     * <b>{@link #discriminators} names the fields a SEALED family base dispatches on</b>, in the order their
+     * pins are compared as a tuple -- the same statement {@code record.discriminators} makes for a closed
+     * base, so a dispatcher reads one field whichever kind of base it has.
+     *
+     * <p><b>Absent and empty say the same thing here</b>, unlike {@link #extension}, whose absence is the
+     * distinct fact that this template is no type at all and which no member of the enum spells. A template
+     * with no discriminators is ABSTRACT or not a family base, and either way the list is nothing.
+     */
+    @Record
     public TemplateBody {
         Objects.requireNonNull(parameters, "parameters");
         Objects.requireNonNull(template, "template");
@@ -64,5 +76,12 @@ public record TemplateBody(List<String> parameters, String template,
                     + "parameters, and a template with none is a closed entry (§5.10)");
         }
         parameters = List.copyOf(parameters);
+        discriminators = discriminators == null ? List.of() : List.copyOf(discriminators);
+    }
+
+    /** The same body with {@code discriminators} unstated -- every producer, until they are wired. */
+    public TemplateBody(List<String> parameters, String template,
+                         Optional<RecordExtensionType> extension) {
+        this(parameters, template, extension, List.of());
     }
 }
