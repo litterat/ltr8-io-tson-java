@@ -69,9 +69,11 @@ public final class HeldBody {
      * rather than a difference between two entries that should be equal.
      */
     public static TemplateBody held(List<String> parameters, DataValue application) {
-        // No `extension` yet: it is the parent's fact and the resolver derives it once a template's body
-        // shape is known, which is not here -- this mints the held text and nothing else.
-        return new TemplateBody(parameters, WRITER.toTson(application), Optional.empty());
+        // The parent's extension is derived here because this is the one door every open entry passes
+        // through, whatever spelling produced it -- and from the payload's own structure rather than from
+        // the text below it, which is not parsed back on this path at all.
+        return new TemplateBody(parameters, WRITER.toTson(application),
+                WireForm.parentExtension(application, parameters));
     }
 
     /**
