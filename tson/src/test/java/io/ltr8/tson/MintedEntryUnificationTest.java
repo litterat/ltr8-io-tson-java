@@ -104,11 +104,17 @@ class MintedEntryUnificationTest {
                 "a closed record has no subtypes of its own here");
     }
 
-    /** The index step 4 adds still lands, on the template, in both schemas. */
+    /**
+     * The instantiation indexes under {@code box} in both schemas -- the edge itself unifying, like the entry.
+     *
+     * <p><b>No parent entry is involved, and that is deliberate.</b> A parent is minted where some position
+     * names a template <em>bare</em>; here both schemas write {@code box<text>}, an application, so {@code
+     * box} keeps the index and nothing is minted for a base nothing names. {@code TemplateParentEntryTest}
+     * owns the case where a position does name one.
+     */
     @Test
-    void theTemplateStillIndexesTheInstantiation() {
-        Map<String, TsonLinkedSchema> schemas = both();
-        schemas.forEach((which, schema) -> assertTrue(
+    void bothSchemasIndexTheInstantiationUnderTheTemplate() {
+        both().forEach((which, schema) -> assertTrue(
                 schema.schema().entries().get("box").subtypes().contains(mintedName(schema)),
                 () -> which + ": " + schema.schema().entries().get("box").subtypes()));
     }

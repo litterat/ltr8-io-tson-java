@@ -885,6 +885,13 @@ public final class TsonSchemaLinker {
      * template are no types, so crediting {@code arr<text>} to {@code arr} would put members under something
      * no position can name -- the same defect, in the other direction, that keeping a template out of its
      * base's index removed.
+     *
+     * <p><b>The index goes on the parent entry, not on the template.</b> A type position written {@code pet}
+     * resolves to the parent the resolver minted, so that entry is the one every dispatcher consults; leaving
+     * the members on the template would put them on an entry no position names. The parent's name is derived
+     * here by the same function that minted it ({@link HeldBody#parentNameOf}), which is also what makes an
+     * <em>imported</em> template work: the name is a function of the form, so this reaches the entry the
+     * declaring schema already published.
      */
     private static void indexUnderItsTemplate(String name, TypeDefinition def,
             Map<String, TypeDefinition> merged, Map<String, Set<String>> newSubtypesByName) {
@@ -894,9 +901,11 @@ public final class TsonSchemaLinker {
             return;
         }
         TypeDefinition template = merged.get(head);
-        if (template != null && template.body() instanceof TemplateBody held && held.extension().isPresent()) {
-            newSubtypesByName.computeIfAbsent(head, ignored -> new LinkedHashSet<>()).add(name);
+        if (template == null || !(template.body() instanceof TemplateBody held) || held.extension().isEmpty()) {
+            return;
         }
+        String under = HeldBody.parentNameOf(head, template).filter(merged::containsKey).orElse(head);
+        newSubtypesByName.computeIfAbsent(under, ignored -> new LinkedHashSet<>()).add(name);
     }
 
     /**

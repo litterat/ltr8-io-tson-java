@@ -104,6 +104,15 @@ final class TemplateMaterialiser {
     private final MintedNames minted = new MintedNames();
 
     /**
+     * Everything minted so far, for a caller that mints after {@link #materialise} has returned -- a parent
+     * entry, whose existence depends on some position naming its template and so is not knowable during the
+     * closing pass.
+     */
+    Map<String, TypeDefinition> materialisedEntries() {
+        return Map.copyOf(materialised);
+    }
+
+    /**
      * Which of {@link #materialised} are <b>synthetic</b> entries rather than instantiation entries -- the
      * closed forms {@link #closeHeldTemplate} mints, which are indistinguishable from the entry a
      * directly-written {@code [pixel; 1920]} lifts to and are the same entry when both appear (§8.2).
@@ -251,6 +260,42 @@ final class TemplateMaterialiser {
     Set<String> syntheticNames() {
         return Set.copyOf(synthetics);
     }
+
+    /**
+     * The closed <b>parent</b> entry a record-bodied template gets ({@code SPEC-FEEDBACK.md} #13), minted
+     * here so that a type position naming the template resolves to an ordinary closed record.
+     *
+     * <p><b>Why it exists at all.</b> §1.3 promises that a consumer ingesting only resolved schema values is
+     * fully conforming with no support for templates, "since every entry a data document's type can reach is
+     * closed by the closed-entry rule". A field typed by a template would break exactly that promise. Minting
+     * the base keeps it literally, and needs no kernel change: it is §5.3's lift one level up, a source
+     * spelling becoming an injected entry plus a bare reference.
+     *
+     * <p><b>Named from the erased binding, not from the template's name.</b> {@link DerivedName#ofBinding} is
+     * the closed-form family, so two schemas whose templates erase alike reach one entry and §2.2.3 unifies
+     * them -- the property a content-addressed name exists for. Naming it after the template would make the
+     * entry a fact about one namespace instead.
+     *
+     * <p><b>It carries no {@code @synthetic} marker</b>, on §8.2's own division: the marker is for a form
+     * lifted from a sugar spelling, which a consumer folds back into what the author wrote. A parent is
+     * neither that nor an instantiation, and inventing a third meaning for the marker would state vocabulary
+     * the spec does not have. What distinguishes it is structural, as an instantiation's {@code source} is.
+     *
+     * <p>Only a record-bodied template has one, which {@link TemplateBody#extension} already answers -- it is
+     * present exactly where a parent exists, and carries the parent's own derived ABSTRACT/SEALED.
+     */
+    String mintParent(String templateName, TypeDefinition template) {
+        Optional<RecordBody> body = HeldBody.parentBodyOf(template);
+        if (body.isEmpty()) {
+            return null;
+        }
+        String name = HeldBody.parentNameOf(templateName, template).orElseThrow();
+        minted.claim(name, HeldBody.canonicalParent(templateName, body.get()));
+        materialised.putIfAbsent(name, new TypeDefinition(Optional.empty(), TypeKind.PRODUCT,
+                List.of(), List.of(), body.get()));
+        return name;
+    }
+
 
     /** Where an application this pass cannot close is reported, entry by entry. */
     @FunctionalInterface

@@ -303,6 +303,91 @@ final class WireForm {
         return Optional.of(sealed ? RecordExtensionType.SEALED : RecordExtensionType.ABSTRACT);
     }
 
+    /**
+     * The <b>parent's</b> own body: whatever survives erasure ({@code SPEC-FEEDBACK.md} #13), as the closed
+     * record a type position written {@code pet} resolves to.
+     *
+     * <p><b>Erasure keeps what is read before dispatch and drops what only a member can type.</b> A field
+     * whose type is parameter-free stays, losing any pin an argument would have supplied ({@code type: text =
+     * T} becomes {@code type: text}); a field whose type mentions a type parameter is omitted, nothing above
+     * the dispatch reading it and the member's own entry typing it. So a parent may legally be <b>empty</b>,
+     * and dispatches by tag when it is -- erasure governs what a parent holds rather than whether it exists.
+     *
+     * <p><b>Faithful erasure is not the goal and could not be had.</b> {@code <N, T> { type: text = N  pet: T
+     * }} has no faithful erasure: drop the parameters and {@code pet:} has no type. It needs none. What a base
+     * must carry is the part read before dispatch plus the fact that it has no direct instances, and both
+     * survive. A base whose field list is smaller than its members' is the ordinary abstract record.
+     *
+     * <p><b>The discriminator predicate is {@link #parentExtension}'s, and deliberately the same walk.</b> The
+     * extension says SEALED exactly when a discriminator survives here, so the two answers are one answer
+     * read twice; a field this omitted while that still counted would state a family no reader could place.
+     *
+     * <p>Empty unless the body is a record, on {@link #parentExtension}'s own terms -- a container, a
+     * constructor application and a reference template are no types and have no parent to carry anything.
+     */
+    static Optional<RecordBody> parentBody(DataValue application, List<String> parameters,
+                                           RecordExtensionType extension) {
+        if (!RECORD.equals(application.typeRef().orElse(null))
+                || !(application.coreValue() instanceof RecordValue binding)) {
+            return Optional.empty();
+        }
+        List<RecordField> surviving = new ArrayList<>();
+        for (RecordValue.Field member : binding.fields()) {
+            if (!FIELDS.equals(member.name())
+                    || !(member.value().value().coreValue() instanceof ArrayValue fields)) {
+                continue;
+            }
+            for (ScopedValue element : fields.elements()) {
+                if (element.value().coreValue() instanceof RecordValue field) {
+                    erasedField(field, parameters).ifPresent(surviving::add);
+                }
+            }
+        }
+        return Optional.of(new RecordBody(List.of(), surviving, List.of(), extension));
+    }
+
+    /**
+     * One held field erased, or empty where it does not survive.
+     *
+     * <p>A field is dropped exactly when its declared type mentions a type parameter -- which includes a type
+     * written as an application carrying one, since {@code box<T>} is no more typeable here than {@code T} is.
+     * What survives keeps its name, its type and its discriminator mark, and loses its pin: the pin is what an
+     * argument supplies, so at the parent the field is simply of its declared type.
+     *
+     * <p><b>A surviving field's state drops to REQUIRED where a pin made it fixed.</b> {@code REQUIRED_FIXED}
+     * without a value is not a state a reader can act on -- §5.2 makes the value the point of it -- and the
+     * member's own entry restores both when its argument arrives.
+     */
+    private static Optional<RecordField> erasedField(RecordValue field, List<String> parameters) {
+        CoreValue type = field(field, TYPE).orElse(null);
+        if (type == null || mentionsParameter(type, parameters)) {
+            return Optional.empty();
+        }
+        String state = memberToken(field, STATE);
+        FieldState declared = state == null ? FieldState.REQUIRED : FieldState.valueOf(state);
+        return Optional.of(new RecordField(memberToken(field, NAME), typeRefOfValue(type),
+                declared == FieldState.REQUIRED_FIXED ? FieldState.REQUIRED : declared,
+                "true".equals(memberToken(field, DISCRIMINATOR)), Optional.empty(), Annotations.empty(),
+                Optional.empty()));
+    }
+
+    /** Whether a held type slot names, or applies, any of {@code parameters} -- at any depth. */
+    private static boolean mentionsParameter(CoreValue type, List<String> parameters) {
+        return switch (type) {
+            case TokenValue token -> parameters.contains(token.text());
+            case RecordValue record -> record.fields().stream()
+                    .anyMatch(f -> mentionsParameter(f.value().value().coreValue(), parameters));
+            case ArrayValue array -> array.elements().stream()
+                    .anyMatch(e -> mentionsParameter(e.value().coreValue(), parameters));
+            default -> false;
+        };
+    }
+
+    /** A held type slot as a {@link TypeRef} -- a bare token, or {@code type_ref}'s own record form. */
+    private static TypeRef typeRefOfValue(CoreValue type) {
+        return type instanceof TokenValue token ? TypeRef.of(token.text()) : typeRefOf((RecordValue) type);
+    }
+
     /** One member's token text, or {@code null} where it is absent or is not a bare token. */
     private static String memberToken(RecordValue record, String member) {
         for (RecordValue.Field field : record.fields()) {

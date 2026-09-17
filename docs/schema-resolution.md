@@ -67,10 +67,17 @@ are kept in step deliberately.
   result<T> & { note: text }` closes at `result<text>` to an ABSTRACT entry whose `subtypes` holds `ok<text>`
   and not `ok<int32>` — the edge being to the instantiation the arguments name, minted by `contractOf` and
   inverted by the linker's ordinary supertype walk. The second is **membership in the parent a record-bodied
-  template has**: every instantiation indexes under the head it closes, `pet<"dog", dog_type>` under `pet`,
-  read off `source` by `TsonSchemaLinker.indexUnderItsTemplate` and credited only where the template's held
-  body carries an `extension` (a container, a constructor application and a reference template have no parent,
-  so their applications index nowhere). A closed entry's own `subtypes` is empty when it is minted:
+  template has**: every instantiation indexes under the **parent entry** of the head it closes where that
+  parent exists, and under the template itself where it does not — read off `source` by
+  `TsonSchemaLinker.indexUnderItsTemplate`, and only where the template's held body carries an `extension`
+  (a container, a constructor application and a reference template have no parent, so their applications
+  index nowhere). **The parent is minted where a position names the template bare**, never for every
+  record-bodied template: §5.10 leaves an unapplied template unverdicted and §8.2 mints on *naming*, so a
+  parent for a template nothing names would be an entry with no referent and no reader. Its name is derived
+  from the **erased** body by `HeldBody.parentNameOf`, the same function `TemplateMaterialiser` mints it
+  under — erased, so two templates identical up to a consistent renaming of their parameters reach one
+  parent (§8.2's own rule for open forms) and an **imported** template's parent is reached by deriving the
+  name the declaring schema already published. A closed entry's own `subtypes` is empty when it is minted:
   `subtypes` is linking's throughout, one phase after resolution, which is what keeps two schemas closing one
   application agreeing on the entry §2.2.3 unifies them by (`MintedEntryUnificationTest`). Marking a template
   whose family could never be populated would be marking a type nothing can ever stand at, which is why the

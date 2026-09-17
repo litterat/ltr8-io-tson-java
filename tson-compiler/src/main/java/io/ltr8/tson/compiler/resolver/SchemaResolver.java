@@ -25,6 +25,7 @@ import io.ltr8.tson.base.SourcePosition;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeKind;
+import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 /**
  * Resolves a whole {@link SchemaDocument} into a {@link TsonSchema}: header-directive validation
@@ -323,6 +325,8 @@ public final class SchemaResolver {
         Map<String, TypeDefinition> instantiations = materialiser.materialise(resolvedLocals,
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
         republish(namespace, resolvedLocals, instantiations);
+        repointBareTemplateNames(resolvedLocals, instantiations, namespace, materialiser);
+        republish(namespace, resolvedLocals, instantiations);
 
         // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
         // have resolved". A form the desugar phase lifted with an application in a slot was named before that
@@ -481,6 +485,76 @@ public final class SchemaResolver {
                                   Map<String, TypeDefinition> instantiations) {
         namespace.putAll(resolvedLocals);
         namespace.putAll(instantiations);
+    }
+
+    /**
+     * Every <b>bare</b> reference to a record-bodied template repointed at the parent entry materialisation
+     * minted for it ({@code SPEC-FEEDBACK.md} #13), so a type position written {@code pet} names an ordinary
+     * closed record.
+     *
+     * <p><b>This is what keeps §1.3's promise literal.</b> That section says a consumer ingesting only
+     * resolved schema values is fully conforming with no support for templates, "since every entry a data
+     * document's type can reach is closed by the closed-entry rule". A field left naming the template would
+     * break exactly that, so the rewrite happens here -- before resolved output exists -- rather than at link.
+     *
+     * <p><b>A reference carrying arguments is left alone, and the distinction is load-bearing.</b> {@code
+     * pet<"dog", dog_type>} is an instantiation's head, not a position typed by the parent: repointing it
+     * would aim every member at the base and the family would have no members at all. So the rename fires on
+     * arity zero only -- which is also exactly the spelling the linker admits as naming a parent.
+     *
+     * <p><b>Every template the namespace holds, not only this schema's own.</b> The parent's name is a
+     * function of the template's erased form ({@link HeldBody#parentNameOf}), so an <em>imported</em>
+     * template's parent is derived to the same name the declaring schema minted -- and a position naming it
+     * has to repoint exactly as a local one does, or §1.3's promise holds for a schema's own templates and
+     * quietly fails for its imports.
+     *
+     * <p><b>A parent is minted only where some position names its template</b>, which is why the minting runs
+     * from here rather than over every template the schema declares. §5.10 leaves an unapplied template
+     * unverdicted and §8.2 mints on <em>naming</em>; a parent for a template nothing names would be an entry
+     * with no referent and no reader, and every entry count in the suite would move to make room for it.
+     */
+    private static void repointBareTemplateNames(Map<String, TypeDefinition> resolvedLocals,
+                                                  Map<String, TypeDefinition> instantiations,
+                                                  Map<String, TypeDefinition> namespace,
+                                                  TemplateMaterialiser materialiser) {
+        Set<String> named = new LinkedHashSet<>();
+        for (Map<String, TypeDefinition> entries : List.of(resolvedLocals, instantiations)) {
+            entries.forEach((ignored, definition) -> {
+                if (definition.parameters().isEmpty()) {
+                    MetaRefs.mapRefs(definition, ref -> {
+                        if (ref.arguments().isEmpty()) {
+                            named.add(ref.name());
+                        }
+                        return ref;
+                    });
+                }
+            });
+        }
+        Map<String, String> parents = new LinkedHashMap<>();
+        for (String templateName : named) {
+            TypeDefinition template = namespace.get(templateName);
+            if (template != null && !template.parameters().isEmpty()) {
+                String parent = materialiser.mintParent(templateName, template);
+                if (parent != null) {
+                    parents.put(templateName, parent);
+                }
+            }
+        }
+        instantiations.putAll(materialiser.materialisedEntries());
+        if (parents.isEmpty()) {
+            return;
+        }
+        UnaryOperator<TypeRef> repoint = ref -> {
+            String parent = ref.arguments().isEmpty() ? parents.get(ref.name()) : null;
+            return parent == null ? ref : new TypeRef(parent, ref.arguments(), ref.annotations());
+        };
+        for (Map<String, TypeDefinition> entries : List.of(resolvedLocals, instantiations)) {
+            for (Map.Entry<String, TypeDefinition> entry : entries.entrySet()) {
+                if (entry.getValue().parameters().isEmpty()) {
+                    entry.setValue(MetaRefs.mapRefs(entry.getValue(), repoint));
+                }
+            }
+        }
     }
 
     /**

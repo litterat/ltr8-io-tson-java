@@ -9,7 +9,9 @@ import io.ltr8.tson.compiler.ast.MapValue;
 import io.ltr8.tson.compiler.ast.RecordValue;
 import io.ltr8.tson.compiler.ast.TokenForm;
 import io.ltr8.tson.compiler.ast.TokenValue;
+import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.TemplateBody;
+import io.ltr8.tson.schema.meta.TypeDefinition;
 import io.ltr8.tson.schema.meta.TypeRef;
 
 import java.util.ArrayList;
@@ -93,6 +95,57 @@ public final class HeldBody {
                     + body.template() + " -- a held body is written by WireForm and read here, so the "
                     + "two have disagreed about the one spelling §5.10 requires", e);
         }
+    }
+
+    /**
+     * The name of the <b>parent entry</b> a record-bodied template gets ({@code SPEC-FEEDBACK.md} #13), or
+     * empty where the template has no parent.
+     *
+     * <p><b>One function, two callers, which is the point.</b> {@code TemplateMaterialiser} mints the entry
+     * under this name and {@code TsonSchemaLinker} indexes members under it, and the two must agree exactly
+     * or the members land on an entry nothing resolves to. Deriving it twice from one function is the same
+     * arrangement {@link DerivedName#ofBinding} already has with its two lift channels; two functions of one
+     * template would be the defect {@code WireForm}'s own note warns about.
+     *
+     * <p><b>It is a function of the template's name and its held fields alone</b>, so the linker derives the
+     * same name for an <em>imported</em> template as the declaring schema minted -- which is what lets a
+     * schema name another schema's template at a type position at all.
+     */
+    public static Optional<String> parentNameOf(String templateName, TypeDefinition template) {
+        return parentBodyOf(template).map(body -> DerivedName.ofBinding(templateName, wireFields(body)));
+    }
+
+    /**
+     * The <b>erased</b> record a template's parent carries, or empty where the template has no parent
+     * ({@code SPEC-FEEDBACK.md} #13) -- the one input both {@link #parentNameOf} and the entry itself are
+     * built from, so the name and the body cannot describe different records.
+     */
+    public static Optional<RecordBody> parentBodyOf(TypeDefinition template) {
+        if (!(template.body() instanceof TemplateBody held) || held.extension().isEmpty()) {
+            return Optional.empty();
+        }
+        return WireForm.parentBody(of(held).application(), template.parameters(), held.extension().get());
+    }
+
+    /** The parent's canonical rendering, for §8.2's freshness check ({@code MintedNames}). */
+    static String canonicalParent(String templateName, RecordBody body) {
+        return DerivedName.canonicalBinding(templateName, wireFields(body));
+    }
+
+    /**
+     * The erased body back in wire form, which is what both naming functions render.
+     *
+     * <p><b>The erased body and not the held one, which is the whole point.</b> A held body still carries the
+     * parameter tokens, so naming from it would splice {@code T} and {@code N} into the entry name -- two
+     * templates identical up to a consistent renaming of their parameters would reach two parents, where
+     * §8.2 makes them one form, and an importer deriving the name would agree with the declaring schema only
+     * by having chosen the same parameter letters. Erasure has already dropped every parameter-typed field,
+     * so what is rendered here mentions none.
+     */
+    private static List<RecordValue.Field> wireFields(RecordBody body) {
+        return WireForm.heldRecord(body, value -> {
+            throw new IllegalStateException("a parent's erased fields carry no annotation values");
+        }).coreValue() instanceof RecordValue record ? record.fields() : List.of();
     }
 
     /** The entry's own parameter names, in declaration order. */
