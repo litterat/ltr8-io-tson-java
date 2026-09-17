@@ -256,7 +256,21 @@ public final class SchemaResolver {
                 // An annotation names an ordinary entry, not a constructor (§6), so this goes through the
                 // compiled schema's own reader for that name rather than the constructor vocabulary.
                 (type, value) -> read(metaParser.get(type), value),
-                metaParser.schema().entries()::get, namespaceGetter, materialiser::closeApplication, positions);
+                metaParser.schema().entries()::get, namespaceGetter, new ApplicationCloser() {
+
+                    @Override
+                    public String closeApplication(io.ltr8.tson.schema.meta.TypeRef application) {
+                        return materialiser.closeApplication(application);
+                    }
+
+                    /** An operand absorbed by value gets the same argument-kind inference a closed one does. */
+                    @Override
+                    public List<io.ltr8.tson.schema.meta.TypeArgument> byParameterKind(String head,
+                            TypeDefinition template, List<String> parameters,
+                            List<io.ltr8.tson.schema.meta.TypeArgument> arguments) {
+                        return materialiser.byParameterKind(head, template, parameters, arguments);
+                    }
+                }, positions);
         namespaceGetter.resolveWith(resolver);
 
         for (String name : declarations.keySet()) {

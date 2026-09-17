@@ -47,6 +47,37 @@ class OpenOperandCompositionTest {
 
     private static final String ID = "https://example.test/open-operand.tn";
 
+    /**
+     * <b>A closed application at an operand takes the same route, and mints nothing either.</b> The template
+     * is a macro at both ends: it contributes its fields and its own ancestors, and the type the composition
+     * produces is the composing declaration. What minting gave instead was an entry nothing else named --
+     * one subtype, no referent, no reader -- standing in this declaration's contract index in place of the
+     * ancestors that are really there. An application some other position names is still minted by that
+     * position, §8.2 keying identity on the application, so both land on one entry.
+     */
+    @Test
+    void aClosedApplicationAtAnOperandMintsNothing() {
+        TsonCompiledSchema compiled = compile("""
+                  base => { tag: text }
+                  box  => <V> base & { item: V }
+                  c    => box<text> & { extra: text }
+                """);
+
+        assertTrue(compiled.schema().entries().keySet().stream().noneMatch(n -> n.startsWith("box_")),
+                () -> "nothing names box<text>, so no entry is minted for it: "
+                        + compiled.schema().entries().keySet());
+
+        TypeDefinition c = compiled.schema().entries().get("c");
+        assertEquals(List.of("base"), c.supertypes(),
+                "the ancestors arrive by value; the application itself is no type to be IS-A");
+        assertEquals(List.of("tag", "item", "extra"),
+                ((RecordBody) c.body()).fields().stream().map(f -> f.name()).toList(),
+                "the operand's fields flatten in, left to right, with the body's own appended");
+        assertEquals(List.of("box"), ((RecordBody) c.body()).supertypes().stream()
+                        .map(io.ltr8.tson.schema.meta.TypeRef::name).toList(),
+                "record.supertypes keeps the application as written -- the reference channel, arguments and all");
+    }
+
     private static TsonCompiledSchema compile(String declarations) {
         String schema = """
                 !!id:"https://example.test/open-operand.tn"
