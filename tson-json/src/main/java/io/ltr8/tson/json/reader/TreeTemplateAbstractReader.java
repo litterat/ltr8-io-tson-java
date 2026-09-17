@@ -32,7 +32,7 @@ import java.util.Optional;
  * stated here rather than hidden: it closes when the discriminator names are stated structurally on the
  * {@code template} constructor, where both stacks read them without parsing anything.
  */
-public final class JsonAbstractTemplateReader implements JsonTypeReader<JsonValue> {
+public final class TreeTemplateAbstractReader implements JsonTypeReader<JsonValue> {
 
     private final JsonTypeReader<JsonValue> dispatcher;
 
@@ -47,10 +47,10 @@ public final class JsonAbstractTemplateReader implements JsonTypeReader<JsonValu
                 || held.extension().orElse(null) != RecordExtensionType.ABSTRACT) {
             return Optional.empty();
         }
-        return Optional.of(new JsonAbstractTemplateReader(name, definition, context));
+        return Optional.of(new TreeTemplateAbstractReader(name, definition, context));
     }
 
-    private JsonAbstractTemplateReader(String name, TypeDefinition definition, ValueReaderContext context) {
+    private TreeTemplateAbstractReader(String name, TypeDefinition definition, ValueReaderContext context) {
         // Reported under the template's own name -- the one the author wrote, which is the whole point of the
         // template being the base rather than an entry derived from it. A family base has no field list of
         // its own, so the closure rules carry none: nothing here decodes a member.

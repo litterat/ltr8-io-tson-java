@@ -414,7 +414,7 @@ pays for a branch it will never take.
   lands before the object's shape is consulted, and the base itself is not admissible — a tag naming it is an
   error where a concrete position would take one as a redundant restatement.
 - **SEALED** gets `TreeRecordSealedReader`, which reads the discriminator members and looks the value up.
-- **A family-base template** gets `JsonAbstractTemplateReader`, which is the ABSTRACT reading over the
+- **A family-base template** gets `TreeTemplateAbstractReader`, which is the ABSTRACT reading over the
   template itself. A template carrying `extension` is a type by the only test that matters — a value can
   stand at it, being a value of one of its instantiations (`SPEC-FEEDBACK.md` #13) — so `{ b: box }` admits
   `{"$type": "int_box", "v": 1}` and refuses an untagged object, exactly as TSON text does. Every member of

@@ -108,9 +108,9 @@ public final class JsonSchemaCompiler {
                 // type by the only test that matters: a value can stand at it, being a value of one of its
                 // instantiations. So it dispatches on `$type` exactly as a closed abstract record does.
                 // A SEALED one cannot yet: its selectors live in the held body's text, which this module has
-                // no route to. See JsonAbstractTemplateReader.
+                // no route to. See TreeTemplateAbstractReader.
                 Optional<JsonTypeReader<?>> family =
-                        JsonAbstractTemplateReader.of(name, definition, context);
+                        TreeTemplateAbstractReader.of(name, definition, context);
                 if (family.isPresent()) {
                     return family.get();
                 }
