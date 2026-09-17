@@ -1181,10 +1181,16 @@ final class DefinitionResolver {
         Map<String, Integer> inheritedFieldIndex = new LinkedHashMap<>();
 
         for (TypeRef supertypeRef : construction.supertypes()) {
-            if (supertypeRef instanceof GenericRef generic && namesOwnParameter(generic, parameters)) {
-                // §5.8's "Parameterized references" at their open end: the operand is applied to this
-                // declaration's own parameter, so it denotes no entry and contributes no name. Its fields
-                // come through all the same, and its own supertypes with them -- see openOperand.
+            if (supertypeRef instanceof GenericRef generic) {
+                // §5.8's "Parameterized references", open end and closed alike: an application at an operand
+                // denotes no entry of its own, whether its arguments are this declaration's parameters or
+                // concrete. A template is a macro here -- it contributes its fields and its own ancestors,
+                // and the type the composition produces is *this* declaration. Minting an entry for the
+                // application instead gave a form nothing else named an entry with one subtype, no referent
+                // and no reader, and put it in this declaration's contract index in place of the ancestors
+                // that are really there. An application some *other* position names is minted by that
+                // position (§8.2 keys identity on the application, so both land on one entry); what changed
+                // is only that an operand no longer mints on its own account.
                 OpenOperand operand = openOperand(name, generic, parameters, "supertype");
                 for (String ancestor : operand.ancestors()) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
@@ -1196,16 +1202,26 @@ final class DefinitionResolver {
                 // A removal revokes IS-A for every parent (§5.9) and there is nothing here to keep as
                 // lineage: a name kept in the body is inert, where an application closes into a live edge.
                 if (construction.removal().isEmpty()) {
+                    // Closed: the arguments go in as §5.10 classifies them, since this channel is validated
+                    // and a value argument left as a reference is looked up as a type. Open: they stay as
+                    // written, the argument being this declaration's own parameter and materialisation being
+                    // what classifies it when the held body closes.
                     directSupertypes.add(new io.ltr8.tson.schema.meta.TypeRef(generic.name(),
-                            typeArguments(name, generic)));
+                            namesOwnParameter(generic, parameters)
+                                    ? typeArguments(name, generic)
+                                    : operand.arguments()));
                 }
-                absorb(name, operand.body(), fields, groups, seenFieldNames, inheritedFieldIndex);
+                // §5.7's fixation, at the only place a closed operand gets one. A field routed `= P` is held
+                // REQUIRED with the parameter in `value`, and becomes REQUIRED_FIXED when substitution makes
+                // the value concrete -- which for an operand applied to concrete arguments is here, there
+                // being no later materialisation of this body to do it. An operand applied to this
+                // declaration's own parameter keeps REQUIRED: its value is still a parameter, and its own
+                // closing is what fixes it.
+                RecordBody absorbed = namesOwnParameter(generic, parameters)
+                        ? operand.body()
+                        : (RecordBody) TemplateMaterialiser.fixRoutedValues(operand.body());
+                absorb(name, absorbed, fields, groups, seenFieldNames, inheritedFieldIndex);
                 continue;
-            }
-            if (supertypeRef instanceof GenericRef generic) {
-                // A fully-bound application: closed to the entry it denotes, which is a real name this can
-                // index against. Closing is also what gives it a field set to absorb.
-                supertypeRef = new SimpleRef(closedApplication(name, generic, parameters, "supertype"));
             }
             if (!(supertypeRef instanceof SimpleRef simple)) {
                 // A choice or an inline array/tuple at a supertype position. §12.1 lets these through only
@@ -1600,12 +1616,22 @@ final class DefinitionResolver {
                     + template.parameters().size() + " type parameter(s) and is applied to "
                     + application.args().size() + " (§5.10)");
         }
-        Map<String, TypeArgument> bindings = new LinkedHashMap<>();
-        for (int i = 0; i < template.parameters().size(); i++) {
+        List<TypeArgument> arguments = new ArrayList<>();
+        for (TypeArg arg : application.args()) {
             // An argument that is itself an application needs no special case: substitution writes a bound
             // reference in `type_ref`'s record form when it carries arguments, so `box<inner<T>>` keeps
             // `inner<T>` whole and the absorbing declaration's own materialisation closes it.
-            bindings.put(template.parameters().get(i), typeArgument(application.args().get(i)));
+            arguments.add(typeArgument(arg));
+        }
+        // §5.10's argument kinds, which an operand absorbed by value would otherwise never get: §12.1 reads
+        // an argument's channel off the token that spells it, so an unquoted `red` is a reference until the
+        // parameter's kind says otherwise. A resolver built without a materialiser keeps §12.1's reading --
+        // the open case never needed the inference, its arguments being parameters.
+        List<TypeArgument> classified = applicationCloser == null ? arguments
+                : applicationCloser.byParameterKind(head, template, template.parameters(), arguments);
+        Map<String, TypeArgument> bindings = new LinkedHashMap<>();
+        for (int i = 0; i < template.parameters().size(); i++) {
+            bindings.put(template.parameters().get(i), classified.get(i));
         }
         DataValue body = HeldBody.of(open).application();
         CoreValue substituted = WireForm.substitute(body.coreValue(), head,
@@ -1618,11 +1644,18 @@ final class DefinitionResolver {
                     + "<...>' has no fields to contribute -- it is a binding record, not a vocabulary, so "
                     + "there is nothing to compose with (§5.8, and §5.7's vocabulary-body rule read across)");
         }
-        return new OpenOperand(template.supertypes(), record);
+        return new OpenOperand(template.supertypes(), record, classified);
     }
 
-    /** What an open operand hands its absorber: the ancestors it can still be indexed under, and its fields. */
-    private record OpenOperand(List<String> ancestors, RecordBody body) {
+    /**
+     * What an operand hands its absorber: the ancestors it can still be indexed under, its fields, and its
+     * arguments as §5.10 classifies them.
+     *
+     * <p>The arguments matter to the caller because a closed operand is <b>kept</b> in {@code
+     * record.supertypes} as the record of what was applied, and the linker validates that channel: an
+     * argument left on §12.1's token-shape reading sends it looking for a type called {@code red}.
+     */
+    private record OpenOperand(List<String> ancestors, RecordBody body, List<TypeArgument> arguments) {
     }
 
     /**

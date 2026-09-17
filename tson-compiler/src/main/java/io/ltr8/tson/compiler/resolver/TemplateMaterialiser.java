@@ -268,9 +268,28 @@ final class TemplateMaterialiser {
         return close(application).name();
     }
 
-    /** One definition with every application inside it closed. */
+    /**
+     * One definition with every application inside it closed -- <b>except the ones in {@code
+     * record.supertypes}</b>, which are left exactly as written.
+     *
+     * <p>A composition operand denotes no entry ({@code DefinitionResolver}'s own supertype branch): its
+     * fields are absorbed by value and the application is kept in the body as the record of what was
+     * applied. Closing it here would mint the entry that branch exists to avoid -- one nothing else names,
+     * with no referent and no reader -- so the channel that records the operand is the one channel this pass
+     * does not touch.
+     *
+     * <p>Nothing else needs it closed. A template's own body is held text, not a {@code RecordBody}, and the
+     * application inside it closes through {@link #closeApplications} when the held body is substituted; an
+     * instantiation's body arrives from that path already closed. So this omission costs no edge: what
+     * {@link #contractOf} folds into a closed entry's contract it reads from the substituted body, never
+     * from here.
+     *
+     * <p>The channel is skipped rather than restored afterwards, because {@link #close} publishes the entry
+     * it closes -- so a walk that maps it has already minted, whatever is done with the reference it hands
+     * back.
+     */
     private TypeDefinition rewrite(TypeDefinition definition) {
-        return MetaRefs.mapRefs(definition, this::close);
+        return MetaRefs.mapRefsKeepingRecordSupertypes(definition, this::close);
     }
 
     /**
@@ -660,8 +679,13 @@ final class TemplateMaterialiser {
      * REQUIRED field has none, which is what {@code REQUIRED_FIXED} means. Once substitution has made the
      * value concrete the field takes the state its literal spelling would have had. A {@code ~ P} default
      * arrives as {@code REQUIRED_DEFAULT} and stays one: data may still override it.
+     *
+     * <p><b>Shared with the operand path.</b> {@code DefinitionResolver} absorbs a composition operand's
+     * fields by value and mints nothing for the application, so a closed operand's body never reaches this
+     * pass -- and it needs the same fixation, for the same reason, one phase earlier. An operand still open
+     * does not: its value is a parameter, and its own closing is what makes it concrete.
      */
-    private static Top fixRoutedValues(Top body) {
+    static Top fixRoutedValues(Top body) {
         if (!(body instanceof RecordBody record)) {
             return body;
         }
@@ -748,8 +772,12 @@ final class TemplateMaterialiser {
      *
      * <p>Only a bare reference converts. One carrying arguments is an application, which no value parameter
      * could bind (§5.10 confines value parameters to scalars), and is left for the position to refuse.
+     *
+     * <p><b>Shared with the operand path</b>, through {@link ApplicationCloser#byParameterKind}: a
+     * composition operand absorbs by value and mints nothing, so it never reaches this pass and would
+     * otherwise keep §12.1's token-shape reading of every argument.
      */
-    private List<TypeArgument> byParameterKind(String head, TypeDefinition template,
+    List<TypeArgument> byParameterKind(String head, TypeDefinition template,
                                                 List<String> parameters, List<TypeArgument> arguments) {
         Map<String, ParameterKinds.Kind> kinds = parameterKinds.get(head);
         if (kinds == null) {

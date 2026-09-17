@@ -41,9 +41,31 @@ final class MetaRefs {
      * {@code record.supertypes} <em>is</em> a reference channel and is mapped with the rest.
      */
     static TypeDefinition mapRefs(TypeDefinition definition, UnaryOperator<TypeRef> map) {
+        return mapRefs(definition, map, true);
+    }
+
+    /**
+     * The same, leaving a {@link RecordBody}'s {@code supertypes} exactly as written.
+     *
+     * <p>{@code TemplateMaterialiser} is the caller, and a composition operand is why: an application there
+     * denotes no entry -- its fields are absorbed by value -- so the channel keeps it as the record of what
+     * was applied, and closing it would mint the entry that path exists to avoid.
+     *
+     * <p><b>Skipping the call is the point, not discarding its result.</b> Closing an application publishes
+     * the entry as a side effect, so a walk that maps this channel has already minted whatever the caller
+     * then does with the rewritten reference.
+     */
+    static TypeDefinition mapRefsKeepingRecordSupertypes(TypeDefinition definition,
+            UnaryOperator<TypeRef> map) {
+        return mapRefs(definition, map, false);
+    }
+
+    private static TypeDefinition mapRefs(TypeDefinition definition, UnaryOperator<TypeRef> map,
+            boolean mapRecordSupertypes) {
         Optional<TypeRef> source = definition.source().map(map);
         return new TypeDefinition(source, definition.kind(),
-                definition.supertypes(), definition.subtypes(), mapBodyRefs(definition.body(), map), definition.position(),
+                definition.supertypes(), definition.subtypes(),
+                mapBodyRefs(definition.body(), map, mapRecordSupertypes), definition.position(),
                 definition.annotations());
     }
 
@@ -52,8 +74,13 @@ final class MetaRefs {
      * carries</b>, so a shape added to {@code schema.meta} needs remembering here and nowhere else.
      */
     static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map) {
+        return mapBodyRefs(body, map, true);
+    }
+
+    private static Top mapBodyRefs(Top body, UnaryOperator<TypeRef> map, boolean mapRecordSupertypes) {
         return switch (body) {
-            case RecordBody record -> new RecordBody(record.supertypes().stream().map(map).toList(),
+            case RecordBody record -> new RecordBody(mapRecordSupertypes
+                    ? record.supertypes().stream().map(map).toList() : record.supertypes(),
                     record.fields().stream().map(field -> field.withType(map.apply(field.type()))).toList(),
                     record.groups(), record.extension());
             case ArrayBody array -> new ArrayBody(map.apply(array.elementType()), array.state(),
