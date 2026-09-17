@@ -87,16 +87,16 @@ final class WireForm {
     static final String SUPERTYPES = "supertypes";
 
     /**
-     * {@code record_field.discriminator} -- the field a sealed family dispatches on (§5.2). Written only
-     * where it is set, the constructor's own default being {@code false}, on {@link #EXTENSION}'s terms: a
-     * held body states a mark exactly when one was made.
+     * {@code record.discriminators} -- the fields a sealed family dispatches on (§5.2), in the order their
+     * pins are compared as a tuple. Written only where the record states one, the constructor's own default
+     * being absent, on {@link #EXTENSION}'s terms.
      *
      * <p><b>Both producers of a held record write it, and that is the point of the constant.</b> A
      * composition or refinement template reaches the wire form through {@link #heldRecord} and a plain
-     * {@code <T> { … }} through {@code SchemaDesugarer}, so a member only one of them spelled would be a
-     * mark that survives one spelling of a template and not the other.
+     * {@code <T> { … }} through {@code SchemaDesugarer}, so a list only one of them spelled would be a family
+     * that survives one spelling of a template and not the other.
      */
-    static final String DISCRIMINATOR = "discriminator";
+    static final String DISCRIMINATORS = "discriminators";
 
     /**
      * {@code record.extension} -- how the record may be realised (§5.2). Written only where it is not
@@ -192,11 +192,6 @@ final class WireForm {
             if (field.state() != FieldState.REQUIRED) {
                 members.add(nameField(STATE, field.state().name()));
             }
-            if (field.discriminator()) {
-                // The mark the author wrote, stated as the member it lowers to. Without it a held body keeps
-                // the pin and loses what gives the pin meaning, so a template family could never be sealed.
-                members.add(nameField(DISCRIMINATOR, "true"));
-            }
             // The two channels collapse into one: a literal keeps its own token form, and a routed parameter
             // is a bare name standing where the literal would.
             field.value().ifPresent(token -> members.add(new RecordValue.Field(VALUE,
@@ -223,6 +218,13 @@ final class WireForm {
         binding.add(new RecordValue.Field(FIELDS, scoped(new ArrayValue(fields))));
         if (!groups.isEmpty()) {
             binding.add(new RecordValue.Field(GROUPS, scoped(new ArrayValue(groups))));
+        }
+        // The base's own statement about which fields select a member (§5.2). Without it a held body keeps
+        // each pin and loses what gives the pins meaning, so a template family could never be sealed.
+        if (!body.discriminators().isEmpty()) {
+            binding.add(new RecordValue.Field(DISCRIMINATORS, scoped(new ArrayValue(
+                    body.discriminators().stream()
+                            .map(name -> scoped(new TokenValue(name, TokenForm.UNQUOTED))).toList()))));
         }
         return new DataValue(List.of(), Optional.of(RECORD), new RecordValue(binding));
     }
@@ -307,30 +309,47 @@ final class WireForm {
     static List<String> parentDiscriminators(RecordValue binding, List<String> parameters) {
         List<String> names = new ArrayList<>();
         for (RecordValue.Field member : binding.fields()) {
+            if (!DISCRIMINATORS.equals(member.name())
+                    || !(member.value().value().coreValue() instanceof ArrayValue stated)) {
+                continue;
+            }
+            for (ScopedValue element : stated.elements()) {
+                if (element.value().coreValue() instanceof TokenValue name) {
+                    names.add(name.text());
+                }
+            }
+        }
+        // The types are still read off the fields, which is where they are: a selector's *declared* type may
+        // not be a parameter, since a position typed by this template reads it before it knows which member
+        // it has. The pin varying per application is the whole design; the type cannot.
+        for (String name : names) {
+            String type = declaredType(binding, name);
+            if (type != null && parameters.contains(type)) {
+                throw new SchemaValidationException("discriminator field '" + name + "' is typed by the type "
+                        + "parameter '" + type + "', and a position typed by this template reads a "
+                        + "discriminator before it knows which member it has -- so its type cannot vary per "
+                        + "application (§5.10). The value it is pinned to is what an argument supplies; its "
+                        + "type is the base's own");
+            }
+        }
+        return List.copyOf(names);
+    }
+
+    /** The declared type of the held body's field {@code name}, or {@code null} where it declares none. */
+    private static String declaredType(RecordValue binding, String name) {
+        for (RecordValue.Field member : binding.fields()) {
             if (!FIELDS.equals(member.name())
                     || !(member.value().value().coreValue() instanceof ArrayValue fields)) {
                 continue;
             }
             for (ScopedValue element : fields.elements()) {
-                if (!(element.value().coreValue() instanceof RecordValue field)
-                        || !"true".equals(memberToken(field, DISCRIMINATOR))) {
-                    continue;
-                }
-                String type = memberToken(field, TYPE);
-                if (type != null && parameters.contains(type)) {
-                    throw new SchemaValidationException("discriminator field '" + memberToken(field, NAME)
-                            + "' is typed by the type parameter '" + type + "', and a position typed by this "
-                            + "template reads a discriminator before it knows which member it has -- so its "
-                            + "type cannot vary per application (§5.10). The value it is pinned to is what an "
-                            + "argument supplies; its type is the base's own");
-                }
-                String name = memberToken(field, NAME);
-                if (name != null) {
-                    names.add(name);
+                if (element.value().coreValue() instanceof RecordValue field
+                        && name.equals(memberToken(field, NAME))) {
+                    return memberToken(field, TYPE);
                 }
             }
         }
-        return List.copyOf(names);
+        return null;
     }
 
     /** The held body's discriminator names, or none where it is not a record application at all. */

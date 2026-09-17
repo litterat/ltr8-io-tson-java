@@ -83,7 +83,8 @@ class SealedFamilyCheckTest {
                 .filter(f -> f.name().equals("pet_type")).findFirst().orElseThrow();
 
         assertEquals(FieldState.REQUIRED_FIXED, pinned.state(), "the member pins the selector");
-        assertFalse(pinned.discriminator(), () -> "and carries the value, not the mark: " + pinned);
+        assertTrue(member.discriminators().isEmpty(),
+                () -> "and the member names no selector of its own, the base having stated it: " + member);
     }
 
     /** §5.10's 2x2: the pins are distinct as tuples, in the base's declaration order. */

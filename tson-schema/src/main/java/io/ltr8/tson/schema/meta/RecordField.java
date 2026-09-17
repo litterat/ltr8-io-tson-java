@@ -20,12 +20,11 @@ import java.util.Optional;
  * {@code = P} sits in {@code REQUIRED} until its value is concrete, then becomes {@code REQUIRED_FIXED}) is
  * what the single channel costs and where it is paid.
  *
- * <p><b>{@code discriminator} marks the field a sealed family dispatches on</b>, and is a kernel field
- * rather than a preserved annotation: a position typed by the enclosing record recovers the subtype from
- * this field's value in every encoding, so erasing the mark would change which values are admitted. It is
- * part of {@link #equals} for the same reason. What the linker checks of a marked field -- REQUIRED, no
- * group member, an atom or enum type, no value of its own, and every subtype pinning it distinctly -- is
- * §5.2's and §5.7's, applied over the linked closure.
+ * <p><b>A field never says it is a discriminator.</b> Which fields a sealed family dispatches on is the
+ * enclosing record's own statement ({@code record.discriminators}), because §5.8 flattens a base's fields
+ * into every member -- a per-field mark would have to be cleared again at each one, where a member's record
+ * simply states none. What the linker checks of a named field -- REQUIRED, no group member, an atom or enum
+ * type, no value of its own, and every subtype pinning it distinctly -- is §5.2's and §5.7's, unchanged.
  *
  * <p><b>{@code position} is {@code @Unbound}</b>, for the reason {@code TypeDefinition}'s own is: §8.1's
  * {@code record_field} declares no such field, so nothing fills it and the strict binding check would call
@@ -41,7 +40,7 @@ import java.util.Optional;
  * against really-resolved ones, and a position in equality would stop two representations of one logical
  * field comparing equal.
  */
-public record RecordField(String name, TypeRef type, FieldState state, boolean discriminator,
+public record RecordField(String name, TypeRef type, FieldState state,
                            Optional<Token> value, Annotations annotations,
                            @Unbound Optional<SourcePosition> position) {
 
@@ -54,12 +53,12 @@ public record RecordField(String name, TypeRef type, FieldState state, boolean d
     /** Same as the canonical constructor with no position -- every caller that does not know its own source. */
     public RecordField(String name, TypeRef type, FieldState state, Optional<Token> value,
                         Annotations annotations) {
-        this(name, type, state, false, value, annotations, Optional.empty());
+        this(name, type, state, value, annotations, Optional.empty());
     }
 
     /** Same as the canonical constructor with no annotations -- every caller that has none to carry. */
     public RecordField(String name, TypeRef type, FieldState state, Optional<Token> value) {
-        this(name, type, state, false, value, Annotations.empty(), Optional.empty());
+        this(name, type, state, value, Annotations.empty(), Optional.empty());
     }
 
     /** A plain {@code REQUIRED} field with no default or fixed value. */
@@ -69,7 +68,7 @@ public record RecordField(String name, TypeRef type, FieldState state, boolean d
 
     /** A copy of this field with {@code annotations} replaced -- every other component unchanged. */
     public RecordField withAnnotations(Annotations annotations) {
-        return new RecordField(name, type, state, discriminator, value, annotations, position);
+        return new RecordField(name, type, state, value, annotations, position);
     }
 
     /**
@@ -81,23 +80,17 @@ public record RecordField(String name, TypeRef type, FieldState state, boolean d
      * comparing resolved values can catch, since it is excluded from equality.
      */
     public RecordField withType(TypeRef type) {
-        return new RecordField(name, type, state, discriminator, value, annotations, position);
-    }
-
-    /** A copy of this field with {@code discriminator} replaced -- every other component unchanged, as {@link #withType}. */
-    public RecordField withDiscriminator(boolean discriminator) {
-        return discriminator == this.discriminator ? this
-                : new RecordField(name, type, state, discriminator, value, annotations, position);
+        return new RecordField(name, type, state, value, annotations, position);
     }
 
     /** A copy of this field with {@code state} replaced -- every other component unchanged, as {@link #withType}. */
     public RecordField withState(FieldState state) {
-        return new RecordField(name, type, state, discriminator, value, annotations, position);
+        return new RecordField(name, type, state, value, annotations, position);
     }
 
     /** A copy of this field with {@code position} replaced -- every other component unchanged. */
     public RecordField withPosition(Optional<SourcePosition> position) {
-        return new RecordField(name, type, state, discriminator, value, annotations, position);
+        return new RecordField(name, type, state, value, annotations, position);
     }
 
     /** Excludes {@code annotations}/{@code position} -- neither changes a field's identity, as on {@code TypeDefinition}. */
@@ -107,13 +100,12 @@ public record RecordField(String name, TypeRef type, FieldState state, boolean d
                 && Objects.equals(name, other.name)
                 && Objects.equals(type, other.type)
                 && state == other.state
-                && discriminator == other.discriminator
                 && Objects.equals(value, other.value);
     }
 
     /** Excludes {@code annotations}/{@code position} -- see {@link #equals}. */
     @Override
     public int hashCode() {
-        return Objects.hash(name, type, state, discriminator, value);
+        return Objects.hash(name, type, state, value);
     }
 }

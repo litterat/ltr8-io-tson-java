@@ -636,7 +636,7 @@ resolver error of consequence 3.
 
 1. **The mark becomes a bare marker on a field**, `@rest`'s shape rather than `@rest`'s standing — the
    `field_name` parameter disappears, and with it the only place in the series where an annotation names a field
-   by string. Where the fact then *lives* is #11's question, and its answer is `record_field.discriminator`: the
+   by string. Where the fact then *lives* is #11's question, and its answer is `record.discriminators`: the
    spelling is annotation-shaped and the resolver consumes it into the body, so the two marks §6 introduces
    together end up in different places, `@rest` genuinely an annotation and this one not.
 2. **It is the shape converted contracts arrive in.** OpenAPI's `discriminator` sits on the *base* schema with
@@ -860,12 +860,11 @@ record_field => {
   name:           field_name
   type:           type_ref
   state:          field_state ~ REQUIRED
-  discriminator:  boolean ~ false
   value:          value?
 }
 ```
 
-**`record_field.discriminator` and not an annotation, on three arguments that converge.** The erasure test above
+**`record.discriminators` and not an annotation, on three arguments that converge.** The erasure test above
 is the first. The second is compilation: a discriminator field is read as a dispatch key rather than as an
 ordinary field, and is non-elidable on the wire, in *both* encodings — a property of the field in the type
 system, not of one encoding's projection of it. The third is the one the design forces on itself: `extension` is
@@ -1021,7 +1020,7 @@ refused outright because §4.1 has already given "kind" to the four base kinds.
 **The spelling is provisional, and deliberately so.** The four marks are annotation-shaped for now — `@abstract`,
 `@sealed` and `@final` at the definition, `@discriminator` on a field — and all four are **consumed by the resolver
 into the body** rather than preserved in §8.1's author-annotation channel: the first three into `record.extension`,
-the last into `record_field.discriminator`. Consumption is the whole of what makes the interim legitimate — a mark
+the last into `record.discriminators`. Consumption is the whole of what makes the interim legitimate — a mark
 that lowers into the type is syntax wearing annotation clothing, and none of the four is an annotation in §6's sense
 once it lands. One of these *preserved* would be the erasure violation twice over. It is also what makes the
 arrangement temporary, since a construct that the resolver reads, that is absent from output, and that no schema may
@@ -1041,7 +1040,7 @@ where it stands. Moving the declarations into the kernel meanwhile would put aut
 
 **What is running:** the two kernel fields, the four marks, and the lowering.
 `record_extension_type => !enum [ABSTRACT SEALED FINAL OPEN]`, `record.extension: record_extension_type ~ OPEN`
-and `record_field.discriminator: boolean ~ false` are in this implementation's meta-kernel and bound by its value
+and `record.discriminators: [field_name]?` are in this implementation's meta-kernel and bound by its value
 model. meta.tn declares `abstract`, `sealed`, `final` and `discriminator`, all four `@annotation void`;
 `@discriminator` has moved off `field_name`, so its old choice-level spelling is refused at the annotation's own
 type. **The resolver consumes all four into the body** — the definition mark once, after the body is built, so a

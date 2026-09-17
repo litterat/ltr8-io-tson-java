@@ -102,9 +102,9 @@ class DefinitionResolverTest {
             "{ supertypes: [] subtypes: [] "
                     + "body: !record { supertypes: [] fields: [ "
                     + "{ name: \"bits\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" "
-                    + "discriminator: false } "
+                    + "} "
                     + "{ name: \"signed\" type: { name: \"boolean\" arguments: [] } state: \"REQUIRED\" "
-                    + "discriminator: false } "
+                    + "} "
                     + "] groups: [] extension: \"OPEN\" discriminators: [] } }";
 
     /**
@@ -353,15 +353,15 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
                 + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } state: \"REQUIRED\" "
-                + "discriminator: false } "
+                + "} "
                 + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } state: \"REQUIRED\" "
-                + "discriminator: false } "
+                + "} "
                 + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(product));
 
         // reference: one brand-new field.
         assertEquals("{ supertypes: [ \"top\" ] subtypes: [] "
                 + "body: !record { supertypes: [ { name: \"top\" arguments: [] } ] fields: [ "
-                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" discriminator: false } "
+                + "{ name: \"target\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" } "
                 + "] groups: [] extension: \"OPEN\" discriminators: [] } }", write(reference));
     }
 
@@ -384,19 +384,19 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
                         + "{ name: \"size\" type: { name: \"integer_size\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"exclusive_min\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"exclusive_max\" type: { name: \"integer\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"multiple_of\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"members\" type: { name: \"integer_member_set\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } ] "
+                        + "} ] "
                         + "groups: [ "
                         + "{ members: [ \"min\" \"exclusive_min\" ] state: \"OPTIONAL\" } "
                         + "{ members: [ \"max\" \"exclusive_max\" ] state: \"OPTIONAL\" } "
@@ -569,9 +569,9 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"first\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"second\" type: { name: \"text\" arguments: [] } state: \"REQUIRED\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pair));
     }
@@ -639,9 +639,9 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } state: \"REQUIRED\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
-                        + "discriminator: false "
+                        + ""
                         + "value: REQUIRED } "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(tupleElement));
@@ -661,9 +661,9 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"members\" type: { name: \"array_field_name_f1a73e72\" arguments: [] } state: \"REQUIRED\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
-                        + "discriminator: false "
+                        + ""
                         + "value: REQUIRED } "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(fieldGroup));
@@ -678,7 +678,7 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" discriminator: false value: INDEX } "
+                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(pinned));
     }
@@ -746,21 +746,21 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" discriminator: false value: INDEX } "
+                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" discriminator: false value: VARIABLE } "
+                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" discriminator: false } "
+                        + "state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" discriminator: false value: REQUIRED } "
+                        + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" discriminator: false value: false } "
+                        + "state: \"REQUIRED_DEFAULT\" value: false } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" discriminator: false value: false } "
+                        + "state: \"REQUIRED_DEFAULT\" value: false } "
                         + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(array));
     }
@@ -782,19 +782,19 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"product\" arguments: [] } ] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" discriminator: false value: NAMED } "
+                        + "state: \"REQUIRED_FIXED\" value: NAMED } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" discriminator: false value: VARIABLE } "
+                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
                         + "{ name: \"key_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" discriminator: false } "
+                        + "state: \"REQUIRED\" } "
                         + "{ name: \"value_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" discriminator: false } "
+                        + "state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_DEFAULT\" discriminator: false value: REQUIRED } "
+                        + "state: \"REQUIRED_DEFAULT\" value: REQUIRED } "
                         + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(map));
     }
@@ -833,10 +833,10 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"config\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"config\" arguments: [] } ] fields: [ "
                         + "{ name: \"host\" type: { name: \"text\" arguments: [] } state: \"REQUIRED_FIXED\" "
-                        + "discriminator: false "
+                        + ""
                         + "value: \"prod.example.com\" } "
                         + "{ name: \"port\" type: { name: \"integer\" arguments: [] } state: \"REQUIRED\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(production));
     }
@@ -890,21 +890,21 @@ class DefinitionResolverTest {
                         + "supertypes: [ \"array\" \"product\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [] fields: [ "
                         + "{ name: \"access_pattern\" type: { name: \"product_access_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" discriminator: false value: INDEX } "
+                        + "state: \"REQUIRED_FIXED\" value: INDEX } "
                         + "{ name: \"size_type\" type: { name: \"product_size_type\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" discriminator: false value: VARIABLE } "
+                        + "state: \"REQUIRED_FIXED\" value: VARIABLE } "
                         + "{ name: \"element_type\" type: { name: \"type_ref\" arguments: [] } "
-                        + "state: \"REQUIRED\" discriminator: false } "
+                        + "state: \"REQUIRED\" } "
                         + "{ name: \"state\" type: { name: \"element_state\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" discriminator: false value: REQUIRED } "
+                        + "state: \"REQUIRED_FIXED\" value: REQUIRED } "
                         + "{ name: \"unordered\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" discriminator: false value: true } "
+                        + "state: \"REQUIRED_FIXED\" value: true } "
                         + "{ name: \"unique_items\" type: { name: \"boolean\" arguments: [] } "
-                        + "state: \"REQUIRED_FIXED\" discriminator: false value: true } "
+                        + "state: \"REQUIRED_FIXED\" value: true } "
                         + "{ name: \"min_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"REQUIRED_DEFAULT\" "
-                        + "discriminator: false value: 1 } "
+                        + "value: 1 } "
                         + "{ name: \"max_items\" type: { name: \"non_negative_integer\" arguments: [] } state: \"OPTIONAL\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(set));
     }
@@ -952,7 +952,7 @@ class DefinitionResolverTest {
         assertEquals("{ supertypes: [ \"atom\" \"top\" ] subtypes: [] "
                         + "body: !record { supertypes: [ { name: \"atom\" arguments: [] } ] fields: [ "
                         + "{ name: \"members\" type: { name: \"enum_set\" arguments: [] } state: \"REQUIRED\" "
-                        + "discriminator: false } "
+                        + "} "
                         + "] groups: [] extension: \"OPEN\" discriminators: [] } }",
                 write(enumDef));
     }
@@ -2208,7 +2208,7 @@ class DefinitionResolverTest {
 
     /**
      * Both marks reach the body: {@code @sealed} into {@code record.extension}, {@code @discriminator} into
-     * the field it stands on.
+     * {@code record.discriminators} -- the enclosing record's statement, not the field's.
      *
      * <p>That they lower <em>without</em> the governing meta declaring them is a different property and is
      * not shown here -- this harness builds a resolver with no {@code AnnotationValueReader}, so it never
@@ -2222,8 +2222,8 @@ class DefinitionResolverTest {
                 "pet => @sealed { @discriminator pet_type: text  name: text }").body());
 
         assertEquals(RecordExtensionType.SEALED, body.extension());
-        assertTrue(body.fields().get(0).discriminator(), "the marked field discriminates");
-        assertFalse(body.fields().get(1).discriminator(), "an unmarked field does not");
+        assertEquals(List.of("pet_type"), body.discriminators(),
+                "the record names the field the mark stood on, and names no other");
     }
 
     /** Consumed, not preserved: §8.1's author-annotation channel carries neither, so one carrier holds each fact. */
@@ -2256,7 +2256,7 @@ class DefinitionResolverTest {
                 resolveSnippetsAgainstMetaKernel("plain => { a: text  b: text }").body());
 
         assertEquals(RecordExtensionType.OPEN, body.extension());
-        assertFalse(body.fields().stream().anyMatch(RecordField::discriminator));
+        assertTrue(body.discriminators().isEmpty());
     }
 
     /**
@@ -2276,7 +2276,7 @@ class DefinitionResolverTest {
     /**
      * <b>A restatement pins the selector and carries no mark.</b> The annotation-merge rule (§5.7) is about
      * what an entry inherits when it mentions nothing -- and there is no annotation here to inherit: the mark
-     * was <em>consumed</em> at the base, becoming {@code record_field.discriminator} on the base's own field.
+     * was <em>consumed</em> at the base, becoming {@code record.discriminators} on the base's own declaration.
      * What the mark says is which field a family dispatches on, which is the base's statement to make; a
      * member restates the field to pin it, and what it restates is the value.
      *
@@ -2293,7 +2293,7 @@ class DefinitionResolverTest {
         RecordField pinned = dog.fields().stream().filter(f -> f.name().equals("pet_type")).findFirst()
                 .orElseThrow();
         assertEquals(FieldState.REQUIRED_FIXED, pinned.state(), "the member pins the selector");
-        assertFalse(pinned.discriminator(), "and the mark stays with the base that declared it");
+        assertTrue(dog.discriminators().isEmpty(), "and the mark stays with the base that declared it");
     }
 
     /** Three alternatives, never companions: a record states how it may be realised once. */

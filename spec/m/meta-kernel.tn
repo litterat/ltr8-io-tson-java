@@ -1,4 +1,4 @@
-!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=a3274235a9a130a8de2e0791180dc4052ce12ba9528d5a11ce479b7e88b12109"
+!!id:"https://tson.io/2026/36/m/meta-kernel.tn?sha256=0c32377b35b0380025b6f836ff2faf16a4c2df11925a8b8a4f44a533dd51b530"
 !!meta:"https://tson.io/2026/36/m/meta-kernel.tn"
 @doc:"""
   TSON meta-kernel — self-referencing bootstrap layer
@@ -459,23 +459,22 @@
     parameter in `value`, and becomes REQUIRED_FIXED when
     substitution makes the value concrete.
 
-    `discriminator` marks the field a sealed family dispatches on.
-    It is a fact about the type and not a directive: a position
-    typed by the enclosing record recovers the subtype from this
-    field's value in every encoding, so erasing it would change
-    which values are admitted. The field is REQUIRED, is no member
-    of a field group, is typed by an atom or an enum, and carries
-    no value of its own — the base cannot pin what its subtypes
-    each pin differently (§5.7). Each subtype restates it
-    REQUIRED_FIXED, and the pins are pairwise distinct under the
-    field type's own equality.
+    Which fields a sealed family dispatches on is the enclosing
+    record's own statement, `record.discriminators`, and no field
+    says it of itself: §5.8 flattens a base's fields into every
+    member, so a per-field mark would have to be cleared again at
+    each one, while a member's record simply states none. The rules
+    on a named field are unchanged — REQUIRED, no member of a field
+    group, typed by an atom or an enum, carrying no value of its own
+    (the base cannot pin what its subtypes each pin differently,
+    §5.7) — and each subtype restates it REQUIRED_FIXED, the pins
+    pairwise distinct under the field type's own equality.
     """
   record_field => {
-    name:           field_name
-    type:           type_ref
-    state:          field_state ~ REQUIRED
-    discriminator:  boolean ~ false
-    value:          value?
+    name:   field_name
+    type:   type_ref
+    state:  field_state ~ REQUIRED
+    value:  value?
   }
 
   tuple_element => {

@@ -7,7 +7,7 @@ package io.ltr8.tson.schema.meta;
  *
  * <p>{@link #OPEN} is the ordinary case: the record has instances of its own and may be composed onto or
  * refined. {@link #ABSTRACT} has none of its own, so a value at a position typed by it is a value of some
- * subtype. {@link #SEALED} is {@link #ABSTRACT} with at least one {@code RecordField#discriminator()} field,
+ * subtype. {@link #SEALED} is {@link #ABSTRACT} with at least one field named by {@code record.discriminators},
  * which makes the subtype recoverable from the value's own members; it is <b>derived from the body</b> rather
  * than stated, as {@code choice.disjoint} is (§5.4). {@link #FINAL} has instances and admits no subtype: no
  * composition or refinement may name it as a source. Subtraction stays admissible against a {@link #FINAL}

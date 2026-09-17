@@ -1282,7 +1282,7 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(directSupertypes, fields, groups, RecordExtensionType.OPEN,
-                markedNames(fields));
+                construction.body().map(declared -> markedNames(declared.entries())).orElse(List.of()));
         // §5.9: subtraction breaks IS-A. The contract index (type_definition.supertypes) is emptied while the
         // body keeps `directSupertypes` as authorial lineage (record.supertypes) -- the distinction §7.2's
         // subsumption rule reads, so a subtracted type does not stand where its source is expected. `kind` is
@@ -1522,7 +1522,7 @@ final class DefinitionResolver {
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
         RecordBody body = new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN,
-                markedNames(fields));
+                markedNames(refined.body().entries()));
         return new TypeDefinition(source, kind, transitiveSupertypes,
                 List.of(), body);
     }
@@ -1702,19 +1702,6 @@ final class DefinitionResolver {
 
     // ── Record bodies, fields, and field groups (§5.2, §5.11) ─────────────
 
-    /**
-     * The names of the fields this body dispatches on -- {@code record.discriminators}
-     * ({@code SPEC-FEEDBACK.md} #13), in declaration order, which is the order their pins compare as a tuple.
-     *
-     * <p><b>Derived from the fields this construction just built</b>, where the per-field mark is still the
-     * carrier the author's {@code @discriminator} lowers into. Naming them on the record is what makes the
-     * fact the <em>base's</em>: §5.8 flattens a base's fields into every member, so a per-field mark has to
-     * be cleared again at each member, while a member's own record simply states no discriminators.
-     */
-    private static List<String> markedNames(List<RecordField> fields) {
-        return fields.stream().filter(RecordField::discriminator).map(RecordField::name).toList();
-    }
-
     private RecordBody resolveRecordBody(List<RecordEntry> entries, List<String> parameters) {
         List<RecordField> fields = new ArrayList<>();
         List<FieldGroup> groups = new ArrayList<>();
@@ -1722,7 +1709,43 @@ final class DefinitionResolver {
         for (RecordEntry entry : entries) {
             resolveEntry(null, entry, fields, groups, seenFieldNames, Map.of(), parameters);
         }
-        return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN, markedNames(fields));
+        return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN, markedNames(entries));
+    }
+
+    /**
+     * The fields this declaration's own entries mark {@code @discriminator} -- {@code record.discriminators},
+     * in the order they are written, which is the order §5.2 compares their pins as a tuple.
+     *
+     * <p><b>Read from the entries and never from the resolved fields.</b> Which fields a family dispatches on
+     * is the declaring record's statement, so a base that writes the mark states it once and a member that
+     * merely inherits the selector states none. Reading the resolved list instead would restate every
+     * inherited selector at each member -- §5.8 flattens a base's fields into all of them -- which is exactly
+     * the clearing the per-field carrier used to owe. Composition's absorbed fields are excluded for free:
+     * they are no part of this declaration's entry list. {@link SchemaDesugarer} collects the same names for a
+     * declaration-position body, which reaches this resolver as a {@code record} payload rather than here.
+     *
+     * <p>A mark on a group member is collected rather than dropped, so the linker can refuse it: §5.11 makes a
+     * member uniformly OPTIONAL, and a selector that may be absent selects nothing.
+     */
+    private static List<String> markedNames(List<RecordEntry> entries) {
+        List<String> marked = new ArrayList<>();
+        for (RecordEntry entry : entries) {
+            switch (entry) {
+                case FieldDef field -> {
+                    if (DefinitionMarks.discriminates(field.name(), field.annotations())) {
+                        marked.add(field.name());
+                    }
+                }
+                case GroupDef group -> {
+                    for (GroupDef.Member member : group.members()) {
+                        if (DefinitionMarks.discriminates(member.name(), member.annotations())) {
+                            marked.add(member.name());
+                        }
+                    }
+                }
+            }
+        }
+        return marked;
     }
 
     /**
@@ -1782,13 +1805,6 @@ final class DefinitionResolver {
     private RecordField resolveTighteningField(String declarationName, FieldDef fieldDef, RecordField inherited,
                                                 List<String> parameters) {
         RecordField tightened = resolveField(fieldDef, parameters, Optional.of(inherited));
-        if (tightened.state() == FieldState.REQUIRED_FIXED) {
-            // A member pins the selector and carries the value; the mark stays with the base, which is whose
-            // statement it is -- "this is the field a family dispatches on". Dropping it here is what keeps a
-            // member's copy from claiming to start a family of its own, and is why nothing downstream has to
-            // subtract an inherited mark before reading one.
-            tightened = tightened.withDiscriminator(false);
-        }
         if (!isValidTighteningTransition(inherited.state(), tightened.state())) {
             // §5.7's table is a rule about schemas, not a coverage boundary: "refinement can only restrict,
             // never expand -- FIXED states are terminal, and loosening a required field to optional is a
@@ -1892,14 +1908,10 @@ final class DefinitionResolver {
      */
     private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
         Annotations own = annotationsOf(field.name(), DefinitionMarks.consumed(field.annotations()));
-        // A restatement inherits the mark it does not repeat, on the annotation-merge rule's own logic: a
-        // tightening entry states what it tightens, and §5.7's modifier-only spelling has no annotation
-        // position at all, so an entry that mentions nothing must not be able to erase what it does not
-        // mention. Which field a family dispatches on is exactly such a fact.
-        boolean discriminator = DefinitionMarks.discriminates(field.name(), field.annotations())
-                || inherited.map(RecordField::discriminator).orElse(false);
+        // No mark to inherit: which fields a family dispatches on is the *record's* statement now
+        // (`record.discriminators`), and a member states none of its own. The inheritance rule this replaced
+        // existed only because §5.8 flattening copied a per-field mark onto every member.
         return resolveFieldEntry(field, parameters, inherited)
-                .withDiscriminator(discriminator)
                 .withAnnotations(inherited.map(source -> merged(own, source.annotations())).orElse(own));
     }
 
@@ -1974,7 +1986,7 @@ final class DefinitionResolver {
         // fixed until the value is concrete -- and that is what FieldModifiers decides.
         FieldModifiers.Resolved resolved =
                 FieldModifiers.of(field.name(), optional, field.modifier(), parameters);
-        return new RecordField(field.name(), type, resolved.state(), false,
+        return new RecordField(field.name(), type, resolved.state(),
                 resolved.value().map(DefinitionResolver::toMetaToken), Annotations.empty(),
                 positions.of(field));
     }
@@ -2129,14 +2141,15 @@ final class DefinitionResolver {
     /**
      * §12.1 gives a group member its own annotation position ({@code group-member = *annotation field-name ws
      * ":" ws type-ref}), and it is read here on {@link #resolveField}'s terms: the marks are consumed and
-     * everything else reaches the annotation channel. Dropping them would make {@code @discriminator} on a
-     * member vanish rather than be refused, which is the silence the lowering exists to remove -- and would
-     * lose the member's `@doc` with it. The state is §5.11's own: members are uniformly OPTIONAL, presence
-     * governed by the group.
+     * everything else reaches the annotation channel -- which is what keeps the member's {@code @doc}. A
+     * {@code @discriminator} here is collected by {@link SchemaDesugarer} into the enclosing record's own
+     * {@code discriminators}, where the linker refuses it: §5.11 makes a member uniformly OPTIONAL, and a
+     * selector that may be absent selects nothing. Dropping the mark at this point would make that mistake
+     * vanish instead of being reported. The state is §5.11's own, presence governed by the group.
      */
     private RecordField resolveGroupMember(GroupDef.Member member) {
         return new RecordField(member.name(), resolveTypeRef(member.typeRef()), FieldState.OPTIONAL,
-                DefinitionMarks.discriminates(member.name(), member.annotations()), Optional.empty(),
+                Optional.empty(),
                 annotationsOf(member.name(), DefinitionMarks.consumed(member.annotations())),
                 Optional.empty());
     }
