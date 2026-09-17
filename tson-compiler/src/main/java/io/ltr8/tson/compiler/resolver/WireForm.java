@@ -285,7 +285,27 @@ final class WireForm {
         // lets `RecordExtension` refuse it against the fields. Deriving over the top would silently correct
         // the author instead, which is how `@sealed <T>` came to load clean with no family check at all.
         String stated = memberToken(binding, EXTENSION);
-        boolean sealed = false;
+        boolean sealed = !parentDiscriminators(binding, parameters).isEmpty();
+        return Optional.of(stated != null ? RecordExtensionType.valueOf(stated)
+                : sealed ? RecordExtensionType.SEALED : RecordExtensionType.ABSTRACT);
+    }
+
+    /**
+     * The <b>names</b> of the marked fields a held record body carries -- {@code template.discriminators}
+     * ({@code SPEC-FEEDBACK.md} #13), in the order the body declares them.
+     *
+     * <p>Read off the payload rather than the text below it, on {@link #parentExtension}'s own terms: this is
+     * the one door every open entry passes through, and the structure is in hand there. Stating the names on
+     * the entry is what lets a consumer holding only resolved output dispatch a sealed template family
+     * without parsing the held body -- the parse §1.3 rules out, and the one {@code tson-json} cannot make
+     * at all.
+     *
+     * <p>A discriminator's declared type may not be a parameter: a position typed by the template reads the
+     * selector before it knows which member it has, so a type that varies per application is one it cannot
+     * read. The <em>pin</em> varying is the whole point, and does.
+     */
+    static List<String> parentDiscriminators(RecordValue binding, List<String> parameters) {
+        List<String> names = new ArrayList<>();
         for (RecordValue.Field member : binding.fields()) {
             if (!FIELDS.equals(member.name())
                     || !(member.value().value().coreValue() instanceof ArrayValue fields)) {
@@ -304,11 +324,20 @@ final class WireForm {
                             + "type cannot vary per application (§5.10). The value it is pinned to is what an "
                             + "argument supplies; its type is the base's own");
                 }
-                sealed = true;
+                String name = memberToken(field, NAME);
+                if (name != null) {
+                    names.add(name);
+                }
             }
         }
-        return Optional.of(stated != null ? RecordExtensionType.valueOf(stated)
-                : sealed ? RecordExtensionType.SEALED : RecordExtensionType.ABSTRACT);
+        return List.copyOf(names);
+    }
+
+    /** The held body's discriminator names, or none where it is not a record application at all. */
+    static List<String> parentDiscriminators(DataValue application, List<String> parameters) {
+        return RECORD.equals(application.typeRef().orElse(null))
+                && application.coreValue() instanceof RecordValue binding
+                        ? parentDiscriminators(binding, parameters) : List.of();
     }
 
     /** {@link #memberToken} for a caller in this package that reads a held field's own members. */

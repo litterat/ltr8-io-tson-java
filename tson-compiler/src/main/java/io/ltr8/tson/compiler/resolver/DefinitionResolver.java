@@ -387,7 +387,7 @@ final class DefinitionResolver {
         }
         return new TypeDefinition(resolved.source(), resolved.kind(), resolved.supertypes(),
                 resolved.subtypes(), new RecordBody(record.supertypes(), record.fields(), record.groups(),
-                        extension.get()), resolved.position(), resolved.annotations());
+                        extension.get(), record.discriminators()), resolved.position(), resolved.annotations());
     }
 
     /**
@@ -1281,7 +1281,8 @@ final class DefinitionResolver {
         checkGroupPresence(name, fields, groups);
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
-        RecordBody body = new RecordBody(directSupertypes, fields, groups, RecordExtensionType.OPEN);
+        RecordBody body = new RecordBody(directSupertypes, fields, groups, RecordExtensionType.OPEN,
+                markedNames(fields));
         // §5.9: subtraction breaks IS-A. The contract index (type_definition.supertypes) is emptied while the
         // body keeps `directSupertypes` as authorial lineage (record.supertypes) -- the distinction §7.2's
         // subsumption rule reads, so a subtracted type does not stand where its source is expected. `kind` is
@@ -1520,7 +1521,8 @@ final class DefinitionResolver {
         checkGroupPresence(name, fields, groups);
 
         TypeKind kind = determineKind(name, transitiveSupertypes);
-        RecordBody body = new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN);
+        RecordBody body = new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN,
+                markedNames(fields));
         return new TypeDefinition(source, kind, transitiveSupertypes,
                 List.of(), body);
     }
@@ -1700,6 +1702,19 @@ final class DefinitionResolver {
 
     // ── Record bodies, fields, and field groups (§5.2, §5.11) ─────────────
 
+    /**
+     * The names of the fields this body dispatches on -- {@code record.discriminators}
+     * ({@code SPEC-FEEDBACK.md} #13), in declaration order, which is the order their pins compare as a tuple.
+     *
+     * <p><b>Derived from the fields this construction just built</b>, where the per-field mark is still the
+     * carrier the author's {@code @discriminator} lowers into. Naming them on the record is what makes the
+     * fact the <em>base's</em>: §5.8 flattens a base's fields into every member, so a per-field mark has to
+     * be cleared again at each member, while a member's own record simply states no discriminators.
+     */
+    private static List<String> markedNames(List<RecordField> fields) {
+        return fields.stream().filter(RecordField::discriminator).map(RecordField::name).toList();
+    }
+
     private RecordBody resolveRecordBody(List<RecordEntry> entries, List<String> parameters) {
         List<RecordField> fields = new ArrayList<>();
         List<FieldGroup> groups = new ArrayList<>();
@@ -1707,7 +1722,7 @@ final class DefinitionResolver {
         for (RecordEntry entry : entries) {
             resolveEntry(null, entry, fields, groups, seenFieldNames, Map.of(), parameters);
         }
-        return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN);
+        return new RecordBody(List.of(), fields, groups, RecordExtensionType.OPEN, markedNames(fields));
     }
 
     /**
