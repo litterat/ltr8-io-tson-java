@@ -8,6 +8,7 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.TemplateBody;
 import io.ltr8.tson.schema.meta.Top;
 import io.ltr8.tson.compiler.reader.Subsumption;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -244,12 +245,19 @@ public final class TsonSchemaCompiler {
 
         private TsonTypeReader<?> build(String name, TypeDefinition definition) {
             if (definition.kind() == TypeKind.TEMPLATE) {
-                // A template is not a type ([TSON-SCHEMA] §5.10), and its kind says so -- the same field
-                // every other entry is dispatched on. See OpenTemplateReader for why the refusal is the
+                ValueReaderContext context =
+                        new ValueReaderContext(linked, readers, foreign, namesMeaning, referrers);
+                if (definition.body() instanceof TemplateBody held && held.extension().isPresent()) {
+                    // A *family base* -- a template carrying `extension` ({@code SPEC-FEEDBACK.md} #13). No
+                    // value is read against it: one of its instantiations is, selected by a tag or by the
+                    // discriminators, so it dispatches exactly as a closed abstract or sealed record does.
+                    return new AbstractTemplateReader(name, definition, context, readers);
+                }
+                // Every other template is not a type ([TSON-SCHEMA] §5.10), and its kind says so -- the same
+                // field every other entry is dispatched on. See OpenTemplateReader for why the refusal is the
                 // entry's own reader rather than a check at the root.
                 return new OpenTemplateReader(name, definition.parameters(),
-                        new ValueReaderContext(linked, readers, foreign, namesMeaning, referrers)
-                                .locationOf(name, definition));
+                        context.locationOf(name, definition));
             }
             Top body = definition.body();
             if (body instanceof Reference r) {

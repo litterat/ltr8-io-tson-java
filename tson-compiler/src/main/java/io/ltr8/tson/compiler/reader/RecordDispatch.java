@@ -2,6 +2,7 @@ package io.ltr8.tson.compiler.reader;
 
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.RecordBody;
+import io.ltr8.tson.schema.meta.RecordField;
 
 import java.util.List;
 import java.util.Set;
@@ -43,7 +44,8 @@ final class RecordDispatch {
                         Subsumption.admitting(definition.subtypes(), context.namesMeaning()), context.readers());
                 // The sealed reader takes its subtypes raw: it maps each member's pins to that member, so an
                 // alias is not a second member. Where it compares a written tag it admits aliases (`deeper`).
-                case SEALED -> new RecordMemberDispatchReader(selfNames, displayName, body,
+                case SEALED -> new RecordMemberDispatchReader(selfNames, displayName,
+                        body.fields().stream().filter(RecordField::discriminator).toList(),
                         Set.copyOf(definition.subtypes()), context, context.readers());
                 case OPEN, FINAL -> concrete.create(name, definition, context);
             };

@@ -62,12 +62,29 @@ are kept in step deliberately.
   reader, so nothing in the closing path knows the member exists. An open body applying anything but `record`
   has no such member and is refused, named by the constructor it applies. A restated field keeps a
   discriminator it does not repeat, on the annotation-merge rule's own logic below.
+- **A template carrying `extension` is a family base, and takes part in IS-A as one** (`SPEC-FEEDBACK.md`
+  #13). `template.extension` is derived — SEALED where a discriminator survives, ABSTRACT otherwise — and its
+  presence is the test: `TsonSchemaLinker.isFamilyBase`. Such a template is credited under its own supertypes
+  (so `base.subtypes` holds `box` beside `box<text>`), its `subtypes` holds its instantiations, and a type
+  position naming it compiles to `AbstractTemplateReader` rather than to `OpenTemplateReader`'s refusal. What
+  makes that safe is *elimination*: no value is read against the template — a value there is a value of some
+  member, selected by a tag or by the discriminators, each member closed with its arguments fixed. A
+  container, a reference and a constructor-application template have no such dispatch, carry no `extension`,
+  and stay "not a type until applied". **`@sealed` on a template is accepted** on the same reasoning — the
+  claim's subject is the instantiation set — and lowers into the held body beside `@abstract`; only `@final`
+  is refused, its applications being subtypes by construction. **SEALED does not travel to a member**
+  (`TemplateMaterialiser.closedExtension`): §5.7 fixation pins the selectors and clears their marks, so a
+  member is an ordinary concrete record, where ABSTRACT does travel and is how `@abstract` reaches every
+  instantiation. One dispatcher serves both kinds of base — `RecordMemberDispatchReader` takes the selector
+  *fields* rather than a body, so a closed base supplies them from its own fields and a template from
+  `HeldBody.selectors()`, and `RecordExtension` checks the family against that same derivation.
 - **Two different edges populate a family's `subtypes`, and they are minted by two different mechanisms.**
   The first is §5.8's reference-valued `supertypes`: `result => @abstract <T> { payload: T }` with `ok => <T>
   result<T> & { note: text }` closes at `result<text>` to an ABSTRACT entry whose `subtypes` holds `ok<text>`
   and not `ok<int32>` — the edge being to the instantiation the arguments name, minted by `contractOf` and
-  inverted by the linker's ordinary supertype walk. The second is **membership in the parent a record-bodied
-  template has**: every instantiation indexes under the head it closes, `pet<"dog", dog_type>` under `pet`,
+  inverted by the linker's ordinary supertype walk. The second is **membership in the family base itself**,
+  which for a marked template is the template: every instantiation indexes under the head it closes,
+  `pet<"dog", dog_type>` under `pet`,
   read off `source` by `TsonSchemaLinker.indexUnderItsTemplate` and credited only where the template's held
   body carries an `extension` (a container, a constructor application and a reference template have no parent,
   so their applications index nowhere). A closed entry's own `subtypes` is empty when it is minted:

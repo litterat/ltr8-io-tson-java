@@ -830,7 +830,9 @@ not the channel, being what keeps it apart from an author error), with two delib
 rethrown so a schema and a class that disagree fail the compile rather than the first read, and its
 `MissingBindingException` subclass rides an `ErrorReader` but is thrown from it **unwrapped**, being a
 misconfiguration rather than a gap. An entry declaring type parameters becomes an
-`OpenTemplateReader` before its body is looked at at all: a template is not a type, so naming one in *data*
+`AbstractTemplateReader` where its held body carries `extension` — a **family base**, which dispatches to one
+of its instantiations by tag or by the discriminators exactly as a closed abstract or sealed record does — and
+an `OpenTemplateReader` otherwise: a template with no such dispatch is not a type, so naming one in *data*
 is an ordinary data diagnostic (a schema naming one unapplied was already refused at link time).
 `TsonCompiledSchema` is `sealed permits TsonCompiledMetaSchema` (a
 meta-layer schema can govern others). Two compile modes (governed / standalone) share one walk; two output
@@ -1439,8 +1441,12 @@ compatibility).
   substitution writes a bound reference through `WireForm.refValue`, which spells one carrying
   arguments in `type_ref`'s record form). **A template may be `@abstract`**, the mark being stated in the held
   body's own text (`extension: ABSTRACT`) and read back by the `record` constructor's reader when the body
-  closes, so every instantiation is abstract over the family the edge above builds; `@sealed` and `@final`
-  stay a resolver error there, having no set of subtypes to range over (`SPEC-FEEDBACK.md` #11).
+  closes, so every instantiation is abstract over the family the edge above builds. **`@sealed` is accepted
+  too** — a template carrying `extension` takes part in IS-A and its `subtypes` holds its own instantiations,
+  which is the set the claim ranges over — and SEALED does not travel to a member, §5.7 fixation having pinned
+  the selectors and cleared their marks. Only `@final` stays a resolver error there: every application is a
+  subtype of the template by construction, so the claim is false before an author writes anything else
+  (`SPEC-FEEDBACK.md` #13, correcting #11).
   `OpenOperandCompositionTest` pins the substitutability table,
   `SubtypeTemplateFamilyTest` the family a base template and its subtype templates close into, and
   `AbstractTemplateFamilyTest` the mark over that family. `DefinitionResolver`'s Javadoc is the exact current boundary.

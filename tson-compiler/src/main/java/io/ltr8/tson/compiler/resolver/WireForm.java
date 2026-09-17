@@ -278,6 +278,13 @@ final class WireForm {
                 || !(application.coreValue() instanceof RecordValue binding)) {
             return Optional.empty();
         }
+        // An `extension` member already in the payload is the author's own mark, spliced by
+        // `heldWithExtension` -- so it wins over the derivation below. The two agree for every coherent
+        // declaration; where they differ the author has claimed something the body does not support
+        // (`@sealed` with nothing marked, `@abstract` with a discriminator), and recording the claim is what
+        // lets `RecordExtension` refuse it against the fields. Deriving over the top would silently correct
+        // the author instead, which is how `@sealed <T>` came to load clean with no family check at all.
+        String stated = memberToken(binding, EXTENSION);
         boolean sealed = false;
         for (RecordValue.Field member : binding.fields()) {
             if (!FIELDS.equals(member.name())
@@ -300,7 +307,13 @@ final class WireForm {
                 sealed = true;
             }
         }
-        return Optional.of(sealed ? RecordExtensionType.SEALED : RecordExtensionType.ABSTRACT);
+        return Optional.of(stated != null ? RecordExtensionType.valueOf(stated)
+                : sealed ? RecordExtensionType.SEALED : RecordExtensionType.ABSTRACT);
+    }
+
+    /** {@link #memberToken} for a caller in this package that reads a held field's own members. */
+    static String memberTokenOf(RecordValue record, String member) {
+        return memberToken(record, member);
     }
 
     /** One member's token text, or {@code null} where it is absent or is not a bare token. */
