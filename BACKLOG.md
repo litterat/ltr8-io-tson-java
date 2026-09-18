@@ -149,16 +149,44 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
     contradiction on the pin, and `CrossEncodingParityTest` pins that as a divergence until the TSON side catches
     up (entry below). With it goes the early stop: a sealed dispatcher whose family has no member with subtypes
     of its own can stop scanning at its selectors, since no later `$type` could select deeper.
-  - **A concrete record reader reached directly still scans before reading.** Judging `$type`, `$value`, `$schema`
-    and unknown `$`-names inside the member loop removes that scan for every record without subtypes. The
-    constraint is the diagnostics: a member read before an inadmissible `$type` has already reported, where the
-    scan-first order — and TSON text, whose tag precedes the value — refuses on the tag alone. Either those
-    reports are held until the object closes, or the difference is accepted and pinned.
+  - **A concrete record reader reached directly still scans before reading.** It judges `$type`, `$value`,
+    `$schema` and unknown `$`-names inside its member loop instead, with no lookahead and no held diagnostics:
+    a member read before an inadmissible `$type` reports as it is read, so a document with a bad tag gets
+    diagnostics that follow its member order, where TSON text (whose tag precedes the value) refuses on the tag
+    alone. That difference is accepted and pinned in `CrossEncodingParityTest`; the `$type`-first rule below
+    removes it.
   - **A sealed family reached through an outer dispatcher scans twice**, the handed-on scan carrying no selectors.
     The outer dispatcher knows at compile which routes lead to a sealed reader and can scan for their selectors
     too.
   - What is left unmeasured is the dispatcher's own scan: `JsonAllocationHarnessTest` reads schemalessly, so a
     bound-record case is owed with the above.
+
+- [ ] **Part 3 fixes where a selector sits, so no position scans an object for one.** Today §3.3 makes
+  reserved-members-first a SHOULD for encoders and says a decoder rejecting a late `$type` "would have invented a
+  rule", §6.1.6 forbids a decoder any order rule, and §4's lookahead paragraph and §8.2's decode order are written
+  for a selector that may arrive anywhere. The edit, decided:
+  - **`$type`, when present, is an object's first member**, and anywhere else is an error; §6.1.6 carries the
+    exception. It is the only reserved member with a position rule: `$value` needs none, the selected reader
+    knowing whether it takes a wrapper once `$type` has been read.
+  - **A sealed family's discriminators come first**, after a `$type` when one is present, in any order among
+    themselves. The lookahead at a sealed position is then the first k members, never the whole object.
+  - **A map is class-unstable at a choice** (§8.3's unstable set becomes the `.nan` leak and every map), so a map
+    variant is always tagged and rides in `$value`. The one combination that made an untagged object ambiguous —
+    a disjoint, class-stable choice whose brace-class variant is an object-form map with a key that can spell a
+    reserved name — cannot arise, and §8.3.1's escape rule goes, with its carve-outs in §3.2, §6.5 and §9.2.
+  - **Scoped positions (§8.5) state their own rule** for `$schema` and `$type` rather than sharing §8.3.1's.
+
+  The reader follows: every `$type` dispatcher decides from the first member (a bounded peek, no scan), the
+  choice's reserved-member scan goes, and the concrete record reader's diagnostics stop depending on member order.
+  `DiscriminationClass.stable` refuses a map, and the parity cases for an untagged map variant become tagged ones.
+
+- [ ] **`SPEC-FEEDBACK.md` gets an entry proposing that a choice's untagged route be locked down in Part 2, for
+  every encoding.** [TSON-SCHEMA] §5.4 derives `disjoint` and leaves each encoding to state its own predicate
+  over it, which is how JSON came to need class stability and §8.3.1's escape while TSON text needs neither. The
+  proposal: a choice may omit its tag only when its variants are disjoint **and** class-stable, stated once in
+  Part 2 over the encoding-neutral classes, with a map never class-stable — so one schema's untagged values are
+  the same set in every encoding and no encoding carries an escape rule for a reserved key. The entry states what
+  is running (JSON's §8.2/§8.3 after the Part 3 edit above) and that the Part 2 change is a proposal.
 
 - [ ] **The container readers split into a shared base and a tree subclass before bind mode is written.**
   `tson-compiler`'s `RecordAbstractReader`/`RecordTreeReader`/`RecordBindReader` split, applied to record, array,
