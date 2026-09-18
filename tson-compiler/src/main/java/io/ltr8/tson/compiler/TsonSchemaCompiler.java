@@ -26,8 +26,8 @@ import java.util.function.Function;
  * this project's own parse -&gt; resolve -&gt; link -&gt; register -&gt; compile -&gt; read
  * pipeline vocabulary: this class is the verb, {@link TsonCompiledSchema} is the noun it produces.
  * Requires a {@link TsonLinkedSchema}, not a bare {@code TsonSchema} -- every {@code type_ref}
- * reachable from a body must already be argument-free (materialization already flattened any {@code
- * <...>} application into a reference to a synthesized entry), and every name a body refers to must
+ * reachable from a body must already be argument-free (materialisation closes every {@code <...>}
+ * application into a reference to the entry it mints), and every name a body refers to must
  * actually be present in {@code linkedSchema.schema().entries()}; a referenced-but-missing name is
  * treated as a bug, not a normal failure (see {@link Compilation#resolve}'s own {@code
  * IllegalStateException}).
@@ -41,13 +41,19 @@ import java.util.function.Function;
  * <p>A build failure for one specific entry doesn't abort the whole walk -- {@link
  * Compilation#resolve} catches it and substitutes an {@link ErrorReader}, so the schema as a whole
  * still compiles; only actually reading a value against that one entry fails, at that point. This
- * covers both a constructor with no registered {@link ValueReaderFactory} at all, and a factory
- * that's registered but rejects this particular entry.
+ * covers both a constructor with no {@link ValueReaderFactory} to dispatch to, and a factory that exists
+ * but rejects this particular entry. Every constructor meta-kernel.tn and meta.tn declare has a factory,
+ * so the first case is a constructor declared by a meta-layer schema this library has never seen
+ * ([TSON-SCHEMA] §2.2.2's extension point), or one out of the governing meta's scope ({@link
+ * #governedFactory}).
  *
- * <p><b>An entry declaring type parameters never reaches a factory at all</b>: it is a template, not a type
- * (§5.10), so it compiles to an {@link OpenTemplateReader} that reports against the data and skips the
- * value. Only a <em>data</em> type-ref can reach one -- a schema naming a template without applying it is
- * refused when it links -- and that is the author's error, not a gap. See {@link OpenTemplateReader}.
+ * <p><b>An entry declaring type parameters never reaches a factory at all</b>, and compiles to one of two
+ * readers. A template whose held body carries {@code extension} is a <em>family base</em> and compiles to
+ * an {@link AbstractTemplateReader}, which dispatches to one of its instantiations by tag or by the
+ * discriminators exactly as a closed abstract or sealed record does. Every other template is not a type
+ * (§5.10) and compiles to an {@link OpenTemplateReader}, which reports against the data and skips the
+ * value: only a <em>data</em> type-ref can reach one -- a schema naming a template without applying it is
+ * refused when it links -- and that is the author's error, not a gap.
  *
  * <p>Two compile modes share this eager walk, differing only in how a body's constructor name maps to
  * a factory. A <b>governed</b> compile ({@link #compile(TsonLinkedSchema, TsonCompiledMetaSchema)})
@@ -174,8 +180,8 @@ public final class TsonSchemaCompiler {
 
         /**
          * §7.2's alias index, built once: which written names mean each entry. A property of the schema
-         * rather than of the entry being guarded, so computing it per entry made the walk quadratic in the
-         * schema's size for an answer that never changed.
+         * rather than of the entry being guarded, so deriving it per entry would make the walk quadratic in
+         * the schema's size for an answer that never changes.
          */
         private final Map<String, Set<String>> namesMeaning;
 

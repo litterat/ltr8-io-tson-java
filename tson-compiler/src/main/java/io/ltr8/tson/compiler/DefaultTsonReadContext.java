@@ -166,12 +166,14 @@ final class DefaultTsonReadContext implements TsonReadContext {
      * be judged at Highly Restrictive over the whole name. They are one report shape because they are one outcome -- the
      * document is refused, and which table said so is the message's business.
      *
-     * <p><b>Here rather than in {@code TsonDataStream}, because a refusal needs a receiver.</b> §8.2 makes a
-     * restricted-character failure a policy refusal: the document is not invalid, it is refused by this processor
-     * under a policy reading data the UCD does not freeze, and it MUST NOT be reported in any of §8.1's four
-     * categories. The stream throws {@link ParseException} and holds no receiver, so a check there can
-     * only say "invalid", which is the one thing this is not. The grammar stays there, where a failure
-     * really is a parse error ({@code IdentifierProfile.validate}), and the policy is applied here.
+     * <p><b>Here rather than beside the grammar in {@code TsonDataStream}, because a refusal is reported and
+     * not thrown.</b> §8.2 makes a restricted-character failure a policy refusal: the document is not invalid,
+     * it is refused by this processor under a policy reading data the UCD does not freeze, and it MUST NOT be
+     * reported in any of §8.1's four categories. Where the stream reads a name it throws
+     * {@link ParseException}, which can only say "invalid" -- the one thing this is not -- and the one
+     * receiver it holds is its token surface's, present only when it was built with a policy. Every context
+     * has a receiver. So the grammar stays there, where a failure really is a parse error
+     * ({@code IdentifierProfile.validate}), and the policy is applied here.
      *
      * <p><b>Only on a freshly pulled event.</b> {@link TsonReadContext#lookingAhead} rewinds what it
      * consumed and a reader replays it, so checking every event would report a refused name once per

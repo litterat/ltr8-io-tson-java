@@ -330,7 +330,7 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
      * schema-driven build produced (element/key/value readers, size constraints -- everything
      * *structural* stays schema-derived; only the target Java container type changes). Untouched for
      * every field whose target type isn't itself a collection {@link DataClass}, which is every
-     * ordinary case today.
+     * ordinary case.
      */
     private static TsonTypeReader<?> rebindContainerIfNeeded(CompiledField field, DataClassField target,
                                                              TsonTypeReaderResolver resolver, AnnotationTypes annotationTypes) {
@@ -383,9 +383,9 @@ final class RecordBindReader extends RecordAbstractReader<Object> {
                 arguments[target.index()] = decoded;
                 return;
             }
-            // Unreachable under a strict reader: a field with no component fails when the reader is built,
-            // so nothing gets here to drop. A lenient one asked for exactly this, and asked in the one place
-            // where the intention is written down rather than inferred from silence.
+            // Only a FIXED field gets here: any other field with no component fails when the reader is built.
+            // A stated FIXED value has already been checked against the schema's own, which settles it, so
+            // there is nothing to keep.
         };
         boolean[] seen = switch (shapeResult.shape()) {
             case FIELDS -> readFields(ctx, sink);

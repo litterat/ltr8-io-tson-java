@@ -13,10 +13,10 @@ import java.util.Optional;
  *
  * <p><b>A refusal is not a verdict, and that is the whole reason this exists.</b> §8.2 says a name-hygiene
  * refusal "MUST NOT be reported in any of the four categories" of §8.1, because these rules read data the UCD
- * does not freeze and so may not decide validity. Without this check a document sending {@code pаssword} with
- * U+0430 against a record declaring {@code password} matched no field and drew {@code UNRECOGNIZED_FIELD} -- a
- * validation error, in exactly the case the look-alike rule exists for, and advice that told the sender to add
- * a field already there when the fix was one character.
+ * does not freeze and so may not decide validity. So hygiene is judged <em>before</em> the verdict an
+ * unmatched name would otherwise draw: {@code p\u0430ssword}, spelled with U+0430, against a record declaring
+ * {@code password} matches no field, and {@code UNRECOGNIZED_FIELD} there would be a validation error in
+ * exactly the case the rule exists for -- advice to add a field already declared, when the fix is one character.
  *
  * <p><b>Only an unmatched name reaches here</b>, which is §9.4's reach and is narrower than it looks: a member
  * name matching a declared field, or a {@code $type} naming a declared type, carries that declaration's own

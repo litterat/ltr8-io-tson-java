@@ -23,7 +23,7 @@ import io.ltr8.tson.base.SchemaValidationException;
  * code carry the distinction the channel cannot.
  *
  * <p><b>Every branch is a positive verdict, and the default rethrows.</b> {@link
- * Diagnostic#ofBaseSyntaxError} classifies the same way and ends {@code default -> throw e}, on the rule
+ * TsonDiagnostics#ofBaseSyntaxError} classifies the same way and ends {@code default -> throw e}, on the rule
  * that a fault in this library propagates as itself; this holds to it. What makes that possible is {@link
  * SchemaSource#fetch} naming the exception a source must throw for "cannot supply this" ({@link
  * SchemaFetchException}) -- without it, an unfetchable schema and a broken invariant are

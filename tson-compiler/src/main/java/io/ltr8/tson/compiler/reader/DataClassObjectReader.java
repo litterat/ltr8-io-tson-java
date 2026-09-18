@@ -163,10 +163,10 @@ public final class DataClassObjectReader {
      *
      * <p><b>{@code BIND_MISMATCH}, which is not a verdict.</b> A class this context cannot analyse is a
      * misconfiguration in the reading application and says nothing whatever about the document -- the
-     * distinction {@code Code.verdict()} exists to carry, and the same line {@code TsonBindMismatchException}
-     * draws at compile time between a schema and a class that disagree. It reported {@code SCHEMA_ERROR}
-     * before, which is a verdict, so a caller routing on the answer was told the document was wrong when
-     * nothing had looked at it.
+     * distinction {@code Code.verdict()} exists to carry, and the same line
+     * {@link io.ltr8.tson.base.BindMismatchException} draws at compile time between a schema and a class
+     * that disagree. {@code SCHEMA_ERROR} is a verdict, and would tell a caller routing on the answer that
+     * the document was wrong when nothing had looked at it.
      */
     private DataClass descriptorFor(TsonReadContext ctx, Class<?> targetClass) {
         try {

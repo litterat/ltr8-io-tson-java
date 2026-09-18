@@ -22,10 +22,9 @@ import java.util.Set;
  * <p>{@link VariantSchemaReader} already decides exactly that -- no type-ref or the entry's own name reads
  * through the entry's reader, a subtype dispatches to the subtype's, and anything else is {@code
  * UNKNOWN_TYPE_REF} -- and it is generic over the reader it wraps. What this adds is reaching every position
- * the rule covers rather than the one that happened to be wired: it was applied only where a record had a
- * non-empty {@code subtypes()}, so a stray or wrong annotation was silently discarded at every atom, array,
- * map, tuple, and at every record whose type had no subtype. The rule is unconditional; the enforcement was
- * not.
+ * the rule covers: every atom, array, map and tuple, and every record whether or not its type has a subtype.
+ * The rule is unconditional, so the enforcement is -- applied only where a record has a non-empty
+ * {@code subtypes()}, a stray or wrong annotation is silently discarded everywhere else.
  *
  * <p><b>The guard follows the body, not the declared kind</b>, and only {@code Atom} and {@code Product}
  * bodies take it. §7.2 excludes the others by name: a choice discriminates "by variant membership (§5.4)"
@@ -111,10 +110,11 @@ public final class Subsumption {
 
     /**
      * Each of {@code names} with every {@code REFERENCE} entry whose chain ends at it. §7.2 compares "after
-     * reference flattening of <b>both</b>", and an alias and its target are one type -- so {@code !created}
-     * at a {@code created}-typed position names the position's own type even though the reader running there
-     * belongs to the instantiation {@code created} aliases, and {@code !ok_of_text} at a {@code result<text>}
-     * position names a subtype even though the entry it aliases is one the resolver minted.
+     * following both reference chains to their terminal entries", and an alias and its target are one type
+     * -- so {@code !created} at a {@code created}-typed position names the position's own type even though
+     * the reader running there belongs to the instantiation {@code created} aliases, and
+     * {@code !ok_of_text} at a {@code result<text>} position names a subtype even though the entry it
+     * aliases is one the resolver minted.
      *
      * <p><b>Both ends of the comparison need it, which is why this is one function and not two.</b> The
      * position's own type and each of its subtypes are matched against a written name by the same rule, and

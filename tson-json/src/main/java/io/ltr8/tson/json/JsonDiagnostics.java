@@ -17,11 +17,12 @@ import java.util.Optional;
  * cannot name.
  *
  * <p><b>One case where the text encoding has three.</b> [TSON-DATA] §8.1 makes a lexer error and a parse
- * error separate categories and TSON text keeps them separate in the type; the JSON stack raises {@link
- * ParseException} for both, so the split is made here, when a failure becomes a diagnostic, rather than
- * carried on the exception where a second opinion could only disagree with it. There is no counterpart to
- * {@code TsonUnsupportedDocumentException} either: a JSON document declares no conformance class to be
- * refused for, {@code !!meta} being TSON text syntax.
+ * error separate categories and TSON text keeps them separate in the exception type; the JSON stack raises
+ * {@link ParseException} for both. Neither encoding's classifier carries the split further: a base-syntax
+ * failure of either kind is one {@link Diagnostic.Code#VALIDATION_ERROR}, the code saying that the document
+ * will not read and the message saying why. There is no counterpart to {@code
+ * TsonUnsupportedDocumentException} either: a JSON document declares no conformance class to be refused for,
+ * {@code !!meta} being TSON text syntax.
  */
 public final class JsonDiagnostics {
 

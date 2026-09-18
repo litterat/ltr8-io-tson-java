@@ -274,13 +274,13 @@ enum OutputFormat {
     /**
      * One JSON object, written field by field so an absent one is left out rather than written {@code null}.
      *
-     * <p><b>Both formats now spell one report one way</b> -- {@code snake_case}, absences omitted -- which is
-     * what {@code --output tson} always did, what {@code diagnostics.tn} declares, and what the TypeScript
+     * <p><b>Both formats spell one report one way</b> -- {@code snake_case}, absences omitted -- which is
+     * what {@code --output tson} writes, what {@code diagnostics.tn} declares, and what the TypeScript
      * CLI emits in both of its formats. Two implementations of one series disagreeing about the keys of one
      * report is a worse cost than either spelling, and nothing in [TSON-DATA] §8.1 fixes a CLI's wire shape
      * to appeal to instead.
      *
-     * <p>The distinction the two RFC 6901 pointers carry survives the move: a present {@code ""} is the root,
+     * <p>The distinction the two RFC 6901 pointers carry is kept: a present {@code ""} is the root,
      * which a document-level problem genuinely has, and a key that is not there means this diagnostic has no
      * such end at all. Omission says that in the spelling the rest of this project already uses.
      */

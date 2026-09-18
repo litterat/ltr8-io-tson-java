@@ -27,13 +27,15 @@ import java.util.Deque;
  * before a non-empty scope's closing delimiter -- {@code { x: 1 y: 2 }}, not {@code {x: 1, y: 2}}
  * -- valid either way, but matching this repo's own established literal style.
  *
- * <p><b>Writes into an {@link Appendable} sink, which is what keeps a document off the heap.</b> The
- * no-argument constructor supplies its own {@link StringBuilder} -- the whole document in memory, which is
- * all a {@code toTson} caller wants -- while a {@code Writer} over an {@code OutputStream} lets the bytes
- * leave as they are produced. Nothing here buffers on its own: every method appends straight to the sink, so
- * memory is the sink's business plus this class's own scope stack. An {@link IOException} from the sink
- * becomes an {@link UncheckedIOException}, the same treatment {@code Lexer} gives a failing {@code
- * InputStream} on the read side.
+ * <p><b>Writes into one of two sinks, which is what keeps a document off the heap.</b> An {@link
+ * Appendable} is the caller's: the no-argument constructor supplies a {@link StringBuilder} -- the whole
+ * document in memory, which is all a {@code toTson} caller wants -- and every method appends straight to
+ * it, so nothing is buffered here and {@link #flush()} has nothing to push. A {@link ByteSink} is written
+ * through a {@link Utf8Sink} this emitter owns, which encodes UTF-8 itself and holds bytes in a block of
+ * the sink's own size until pushed -- so on that path {@link #flush()} is required, a document never
+ * flushed being a document never written. Either way memory is one block at most plus this class's own
+ * scope stack. An {@link IOException} from the sink becomes an {@link UncheckedIOException}, the same
+ * treatment {@code Lexer} gives a failing source on the read side.
  *
  * <p>Not thread-safe; single-use, like {@link io.ltr8.tson.compiler.lexer.Lexer}.
  */

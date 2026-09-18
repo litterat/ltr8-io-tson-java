@@ -131,10 +131,9 @@ class ResolvedFixtureTest {
      * {@code kind}, {@code source}, {@code parameters}, {@code constructor}, {@code supertypes}, {@code
      * subtypes}, {@code disjoint}, {@code body} and the annotations each carries.
      *
-     * <p>It was not always so, and what closed the gap is worth knowing before changing any of it: the
-     * container forms were carried as applications of a parameterized {@code array}/{@code map}, which the
-     * structure-templates CR removed (D3, "array, set, and map lose their parameter lists"), and every sugar
-     * form now lifts to a synthetic entry instead (D5). The fixtures were written against the older shape.
+     * <p>What the agreement rests on is worth knowing before changing any of it: {@code array}, {@code set}
+     * and {@code map} carry no parameter lists ([TSON-SCHEMA] §4.2), so a container form is never an
+     * application of one, and every sugar form lifts to a synthetic entry instead (§5.3).
      */
     @Test
     void everyEntryResolvesIdentically() throws Exception {
@@ -148,8 +147,8 @@ class ResolvedFixtureTest {
     /**
      * <b>And the same entries are synthetic on both sides.</b> [TSON-SCHEMA] §8.2 puts the derived
      * {@code @synthetic} marker on the schema-map key of every entry the resolver materialised from a sugar
-     * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark nine keys
-     * in meta-kernel and one in meta.tn; core.tn writes no inline form and has none, which is as much a
+     * form, and on no other -- an instantiation entry deliberately carries none. The fixtures mark eight keys
+     * in meta-kernel and five in meta.tn; core.tn writes no inline form and has none, which is as much a
      * statement as the other two.
      *
      * <p>This is the one assertion here that does not go through the bound document -- see {@link

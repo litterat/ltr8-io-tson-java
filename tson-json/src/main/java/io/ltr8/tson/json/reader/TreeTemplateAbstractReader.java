@@ -25,12 +25,11 @@ import java.util.Set;
  * against {@code !name} -- which {@code RecordExtensionDiagnostics} spends only in {@code actual}.
  *
  * <p><b>Both readings, on the same terms a closed base gets them.</b> ABSTRACT dispatches on {@code $type};
- * SEALED reads the discriminator fields, which {@code template.discriminators} now states structurally on
- * the entry ({@code FamilySelectors}). That is what closed the one place these two encodings knowingly
- * differed: the selector names used to live only in the held body's <em>text</em>, which {@code
- * tson-compiler}'s {@code HeldBody} parses and this module -- depending on the schema pipeline's output and
- * never on its engine -- could not reach. Stating them on the entry means neither stack parses anything, and
- * §1.3's promise that a resolved-output consumer needs no template support holds literally.
+ * SEALED reads the discriminator fields, which {@code template.discriminators} states structurally on the
+ * entry ({@code FamilySelectors}). Structurally is what lets this module read them at all: the held body's
+ * <em>text</em> is {@code tson-compiler}'s {@code HeldBody} to parse, and this module depends on the schema
+ * pipeline's output and never on its engine. With the selector names on the entry neither stack parses
+ * anything, and §1.3's promise that a resolved-output consumer needs no template support holds literally.
  */
 public final class TreeTemplateAbstractReader implements JsonTypeReader<JsonValue> {
 

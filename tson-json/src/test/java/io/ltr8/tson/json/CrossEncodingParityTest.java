@@ -154,7 +154,7 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * The strongest comparison, for a rule both encodings now state from one place
+     * The strongest comparison, for a rule both encodings state from one place
      * ({@code base.diagnostics}): the code, the data pointer, the machine-readable {@code expected}, <b>and
      * the prose</b>.
      *
@@ -182,10 +182,10 @@ class CrossEncodingParityTest {
     // ── §7.2 subsumption ─────────────────────────────────────────────────
 
     /**
-     * A tag naming a type the position does not admit. One rule, and the two encodings had been giving it two
-     * codes -- {@code UNKNOWN_TYPE_REF} in TSON text against {@code TYPE_MISMATCH} here -- which also put it
-     * in two of §8.1's categories, {@code resolver} against {@code validation}, for one verdict. There was no
-     * parity case for it, and that absence is how they drifted.
+     * A tag naming a type the position does not admit is one rule with one code, {@code TYPE_MISMATCH}: the
+     * name resolves and is merely inadmissible where it stands, where {@code UNKNOWN_TYPE_REF} means a name
+     * denoting nothing. The code decides §8.1's category too -- {@code validation} against {@code resolver}
+     * -- so two stacks picking differently would misfile one verdict, which is what this case guards.
      */
     @Test
     void aTagNamingAnInadmissibleTypeIsOneRuleInBoth() {
@@ -610,10 +610,10 @@ class CrossEncodingParityTest {
      * §6.5: identity is over the key type's value space, so {@code 1} and {@code 1.0} under a {@code number}
      * key are one key in both encodings.
      *
-     * <p>This case was held out of the suite while the TSON reader disagreed — its {@code ValueIdentity} had
-     * no {@code BigDecimal} case, so the exact tier compared by scale there (issue #470). Pinning that as
-     * expected divergence is how a defect becomes permanent, so it waited instead, and it is here now that
-     * both encodings answer alike.
+     * <p>What this pins is that the exact tier compares by value and not by scale in both stacks: {@code
+     * BigDecimal.equals} tells {@code 1} from {@code 1.0}, so a reader comparing decoded keys with it admits
+     * the pair as two keys. It is a parity case rather than a divergence because §6.5 leaves neither encoding
+     * room to answer differently.
      */
     @Test
     void twoSpellingsOfOneKey() {

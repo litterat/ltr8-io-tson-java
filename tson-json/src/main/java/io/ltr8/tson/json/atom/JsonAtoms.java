@@ -17,11 +17,13 @@ import java.util.Optional;
 /**
  * One JSON leaf into one host value, at a {@link DataClassAtom} position.
  *
- * <p>The seed of this module's atom vocabulary, and where [TSON-JSON] §5's per-family readers land when
- * the schema-directed decode arrives: §5.1 hands a string's content to the atom's own parser exactly as a
- * TSON quoted token's text would be, so each family needs a reader here and none of them belongs in a
- * reader that walks structure. Unexported, on the same terms as {@code tson-compiler}'s own {@code atom}
- * package -- a consumer names a value or a reader, never a parser.
+ * <p>The leaf half of the <em>bind</em> read, where the target class stands in for the schema: {@code
+ * DataClassObjectReader} walks structure and hands each leaf here, so no reader that walks structure holds an
+ * atom rule. A schema-directed position is {@code reader.AtomReader}'s instead, the schema naming the family
+ * there where the host class names it here; both hand content to the same {@code tson-atom} parsers
+ * ([TSON-JSON] §5.1), so neither holds an atom grammar of its own. {@link #describe} is the one thing the
+ * two share: how a JSON event is named in a diagnostic's {@code actual}. Unexported, on the same terms as
+ * {@code tson-compiler}'s own {@code atom} package -- a consumer names a value or a reader, never a parser.
  *
  * <p><b>The target picks the parser; the JSON kind decides only whether the content is admitted.</b> That
  * is [TSON-JSON] §4.1's schema-directed reading with the class standing in for the schema: there is no
@@ -34,8 +36,8 @@ import java.util.Optional;
  *
  * <p><b>Exact or an error, never a silent round</b> (§3.1). The exact tier's own contracts do it: {@code
  * 1.5} at an {@code int} is a float form where §5.3 admits only an integer one, and {@code 2147483648} is
- * outside {@code int32}'s range -- two different refusals for two different reasons, where narrowing one
- * {@code BigDecimal} made them one. {@code float} and {@code double} are the exception and are meant to be:
+ * outside {@code int32}'s range -- two different refusals for two different reasons, which narrowing one
+ * {@code BigDecimal} could not tell apart. {@code float} and {@code double} are the exception and are meant to be:
  * rounding onto the binary grid is the approximate families' own contract (§5.4).
  *
  * <p><b>A bridged atom binds its serial type, then crosses.</b> {@code DataClassAtom.dataClass()} is the
@@ -56,10 +58,9 @@ import java.util.Optional;
  * the inverse of {@code IntegerParser.hostType}, so {@code int} reaches {@code int32} and {@code double}
  * reaches {@code float64}. What that buys over narrowing a host value the encoding chose: §5.3's contract
  * rejection is a rejection ({@code 1.0} at an {@code int} is not an integer, as the token {@code 1.0} is
- * not in text), §5.4's string-spelled special values reach the family that parses them, the atom's own
- * {@code expected} reaches the diagnostic ({@code >= -128 and <= 127} rather than the target's Java name),
- * and a refinement's {@code allow_nan} or {@code multiple_of} has somewhere to be honoured when the
- * schema-directed decode lands.
+ * not in text), §5.4's string-spelled special values reach the family that parses them,
+ * and the atom's own {@code expected} reaches the diagnostic ({@code >= -128 and <= 127} rather than the
+ * target's Java name).
  *
  * <p><b>There is no enum rule here, and that is not an omission.</b> {@code tson-bind} binds every plain
  * Java enum through {@code EnumStringBridge}, so an enum component arrives as a {@code String} atom whose

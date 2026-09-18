@@ -198,17 +198,16 @@ class AllocationHarnessTest {
      *
      * <p>The conforming path therefore scans and returns {@code Optional.empty()}: no split array, no script
      * set, no stream, and no capturing lambda at the call. Only a genuinely mixed-script token builds
-     * anything, and that one is a diagnostic. What is left is the decorator itself, once per read.
+     * anything, and that one is a diagnostic.
      *
      * <p>The ceiling is loose enough to survive a JDK upgrade and tight enough to catch the shape this
-     * guards: the first cut of this code allocated ~2.3 KB per read of this document at {@code asciiOnly},
-     * two orders of magnitude over what it now costs.
+     * guards: materialising per token costs ~2.3 KB per read of this document at {@code asciiOnly}, two
+     * orders of magnitude over the conforming path.
      *
-     * <p><b>The last of that cost was the lambda this note already claimed was not there.</b> The scan was
-     * allocation-free and the call site was not -- {@code ifPresent} with a lambda capturing the token and
-     * the receiver allocates whether or not the {@code Optional} holds anything -- which is ~670 of the
-     * ~770 bytes this measured before. A ceiling of 1,000 could not see it, so it is 300 now: the figure is
-     * under 100, and a return to per-token allocation fails here rather than passing quietly.
+     * <p><b>The call site counts as much as the scan.</b> {@code ifPresent} with a lambda capturing the
+     * token and the receiver allocates whether or not the {@code Optional} holds anything -- ~670 bytes per
+     * read of this document. A ceiling of 1,000 cannot see that, so it is 300: the figure is under 100, and
+     * a return to per-token allocation fails here rather than passing quietly.
      */
     @Test
     void aRaisedTokenPolicyCostsAlmostNothingPerRead() {
@@ -227,9 +226,10 @@ class AllocationHarnessTest {
     /**
      * Where a read's bytes go, reported and asserted on only as a shape: each stage of the stack over the
      * same document, so a number that moves says <em>which</em> stage moved it. Lexing and parsing dominate
-     * -- a read builds a fresh {@code Lexer} over a fresh {@code InputStreamReader}, whose decoder buffers
-     * are a fixed cost per document regardless of how short the document is -- and the schema-driven stages
-     * add their validation on top of that floor.
+     * -- a read of a {@code String} encodes it to UTF-8 once and builds a fresh {@code Lexer} and
+     * {@code TsonDataStream} over the resulting resident {@code ByteSource}, which the lexer indexes in
+     * place with no block of its own, so what is left is per token and per event -- and the schema-driven
+     * stages add their validation on top of that floor.
      */
     @Test
     void whereAReadsBytesGo() {
@@ -383,10 +383,9 @@ class AllocationHarnessTest {
     }
 
     /**
-     * The write path's own per-character question, and the regression guard for the fix that prompted this
-     * harness: {@code quotedString} asked "is this a control character?" with a {@code Pattern}, costing a
-     * {@code String}, a {@code Matcher} and the matcher's internals for every character of every string
-     * written -- 56 bytes per character against 0 for the comparison that replaced it. A quoted string must
+     * The write path's own per-character question: asking "is this a control character?" with a
+     * {@code Pattern} costs a {@code String}, a {@code Matcher} and the matcher's internals for every
+     * character of every string written -- 56 bytes per character against 0 for a comparison. A quoted string must
      * cost the characters it writes and nothing per character beyond them.
      */
     @Test

@@ -74,11 +74,9 @@ import java.util.function.UnaryOperator;
  * {K =&gt; V; N..M}   the same, with min_items/max_items
  * </pre>
  *
- * This phase therefore consults no governing meta at all. It used to: constructors carried parameter lists
- * and their vocabulary fields named the parameter each drew from ({@code element_type: type_ref = T}), so
- * routing was read off the meta and the meta-kernel's own bootstrap had to hand-write a stand-in table for
- * the three constructors it applies to itself. With the constructors parameterless the table above is the
- * whole rule, and the bootstrap needs no special case.
+ * This phase therefore consults no governing meta at all. The kernel's container constructors are
+ * parameterless (§4.2), so nothing about routing is stated in a meta to be read off it: the table above is
+ * the whole rule, and the meta-kernel's own bootstrap needs no special case.
  *
  * <p><b>A nested bracket or brace form expands innermost first.</b> §5.3's declaration-level container
  * syntax nests inside itself -- {@code [[T; N]; N]}, {@code {text =&gt; [order; 1..]}} -- so a position
@@ -159,11 +157,10 @@ final class SchemaDesugarer {
      * <p>It is deliberately never in {@code TsonSchemaParser.declarationPositions()} -- the position belongs
      * to the diagnostic already reported against the real declaration, not to this stand-in.
      *
-     * <p><b>Keeping those parameters used to make it the last parameterised {@code RecordBody} in the
-     * system</b>, and so kept a whole second substitution path alive in {@code TemplateMaterialiser} to
-     * serve a body with no fields to substitute into. It is held like every other open body now
-     * ({@link #heldEmptyRecord}, applied by {@code DefinitionResolver.holdIfOpen} where this resolves), which
-     * is what lets that path delete.
+     * <p><b>A stand-in keeping parameters is held like every other open body</b>
+     * ({@code WireForm.heldEmptyRecord}, applied by {@code DefinitionResolver} where this resolves), so
+     * {@code TemplateMaterialiser} has one substitution path and none of its own for a body with no fields to
+     * substitute into.
      */
     private static TypeDef absorbed(SchemaMap.Declaration declaration) {
         return new StructuralTypeDef(typeParams(declaration.typeDef()), new RecordDef(List.of()));
@@ -191,7 +188,7 @@ final class SchemaDesugarer {
      * The type parameters of the declaration currently being walked, or empty outside a template. A sugar
      * form naming one of these lifts to an <em>open</em> entry rather than a closed one -- a closed entry
      * would carry a reference to a parameter nothing has bound. Every other form in the same declaration
-     * lifts exactly as it would outside a template (D5's one rule).
+     * lifts exactly as it would outside a template (§5.3's one lift rule).
      */
     private List<String> currentParameters = List.of();
 
@@ -301,15 +298,13 @@ final class SchemaDesugarer {
      * DefinitionResolver} the very {@code ContainerTypeDef} this phase exists to remove, and it answers that
      * with an {@code UnsupportedOperationException} -- which {@code SchemaResolver} deliberately does not
      * catch, since a library gap is not a verdict on the author's schema. So passing through would convert a
-     * reported author error into an unreported abort: worse than the fail-fast behaviour it replaces.
+     * reported author error into an unreported abort: worse than failing fast.
      *
      * <p><b>A gap is reported too, and absorbed the same way</b> -- as {@code Diagnostic.Code.NOT_IMPLEMENTED},
-     * not as an author error. Thrown instead, it took every other declaration's verdict with it: one
-     * unimplemented construct and a document with three ordinary mistakes in it reported none of them. The
-     * classification the exception policy draws is unchanged and is what picks the code; what changes is
-     * that it no longer decides whether the pass survives. Fail-fast (a {@code null} reporter) still
-     * rethrows the original exception untouched, so every caller that never took a receiver sees exactly
-     * what it always did.
+     * not as an author error. Thrown instead, it would take every other declaration's verdict with it: one
+     * unimplemented construct and a document with three ordinary mistakes in it would report none of them.
+     * The classification the exception policy draws is what picks the code, and does not decide whether the
+     * pass survives. Fail-fast (a {@code null} reporter) rethrows the original exception untouched.
      *
      * <p><b>Anything already injected on behalf of a failed declaration stays injected</b>, and is not rolled
      * back. Injected names are derived from the binding record itself, so a later declaration containing the
@@ -362,12 +357,10 @@ final class SchemaDesugarer {
                 // `!record { fields: [ ... ] }`, so a record template becomes the construction it always
                 // was and is held like every other open form. See recordBinding.
                 //
-                // Every parameterised record body takes this path, `~`-marked or not. Marked ones used to
-                // skip it and be held one phase later by `DefinitionResolver.holdIfOpen` instead, which
-                // wraps an open RecordBody into the same `!record { ... }` -- so the two routes produced
-                // identical bodies and the marker decided only which phase did the work. The "flatten
-                // first" reason the second route exists belongs to composition and refinement, which
-                // absorb fields from a source; a bare record has none.
+                // Every parameterised record body takes this path, `~`-marked or not. The other route --
+                // `DefinitionResolver.holdIfOpen`, one phase later -- wraps an open RecordBody into the same
+                // `!record { ... }`, and exists for composition and refinement: both absorb fields from a
+                // source, so the form to hold is the flattened one. A bare record has no source.
                 if (!structural.typeParams().isEmpty() && body instanceof RecordDef record) {
                     yield instance(recordBinding(record), structural.typeParams());
                 }
@@ -377,11 +370,11 @@ final class SchemaDesugarer {
             // A declaration's own body reference names what this declaration *is*; only its arguments are
             // expandable, so the head stays put and its own handling is unchanged.
             case ReferenceTypeDef reference -> {
-                // **A declaration's own body never lifts** (D5): the form *is* the construction, so it
+                // **A declaration's own body never lifts** (§5.3): the form *is* the construction, so it
                 // becomes the instance directly rather than a reference to an injected one. That is what
                 // keeps `score_list => [integer; 1..]` a PRODUCT entry with a real body, and
                 // `contact => (email | phone)` a SUM entry with a real ChoiceBody, instead of REFERENCEs to
-                // ones. Every sugar form takes this path now -- the bracket forms reach it through
+                // ones. Every sugar form takes this path -- the bracket forms reach it through
                 // `type-ref` like the rest, since there is no separate declaration-level tier.
                 Optional<Binding> binding = binding(reference.ref());
                 if (binding.isPresent()) {
@@ -510,9 +503,8 @@ final class SchemaDesugarer {
      * form, not over the AST, so this phase leaves the application for {@code SchemaResolver} to materialise
      * and the head keeps its arguments into resolution.
      *
-     * <p><b>A template containing a sugar form passes through as well</b>, now that {@code box => <T> { v:
-     * [T] } } lifts that form to an open synthetic instead of leaving it where it was. What used to be
-     * refused here is the mechanism itself.
+     * <p><b>A template containing a sugar form passes through as well</b>: {@code box => <T> { v: [T] }}
+     * lifts that form to an open synthetic, which closes with the application like any other open body.
      *
      * <p>A head this document neither declares nor imports is left alone -- the reference is simply
      * unresolved, which is {@code TsonSchemaLinker}'s verdict to deliver. A local head that declares no
@@ -752,11 +744,11 @@ final class SchemaDesugarer {
      * recognise.
      *
      * <p><b>A parameter rides the ordinary {@code value} slot</b>, with §8.1's shadowing rule to tell it from
-     * a literal. That is what a held body buys and what retires {@code record_field.value_param}: the
-     * separate channel existed because a body read as constructor vocabulary at its declaration cannot
-     * otherwise say which of the two a token is, and a held body is read as vocabulary only once its
-     * parameters are gone. §5.7's fixation then happens at materialisation, where {@code TemplateMaterialiser}
-     * turns a {@code REQUIRED} field that has acquired a value into {@code REQUIRED_FIXED}.
+     * a literal. That is what a held body buys, and why the kernel's {@code record_field} needs no separate
+     * parameter channel: a body read as constructor vocabulary at its declaration could not say which of the
+     * two a token is, and a held body is read as vocabulary only once its parameters are gone. §5.7's fixation
+     * then happens at materialisation, where {@code TemplateMaterialiser} turns a {@code REQUIRED} field that
+     * has acquired a value into {@code REQUIRED_FIXED}.
      */
     private Binding recordBinding(RecordDef record) {
         List<ScopedValue> fields = new ArrayList<>();
@@ -940,7 +932,7 @@ final class SchemaDesugarer {
     /**
      * Records an injected declaration under its derived name and yields the reference that replaces the sugar.
      *
-     * <p><b>Which entry it lifts to is D5's one rule.</b> A form naming none of the enclosing declaration's
+     * <p><b>Which entry it lifts to is §5.3's one lift rule.</b> A form naming none of the enclosing declaration's
      * parameters lifts <em>closed</em> -- an ordinary construction referenced by a bare name -- whether or not
      * the declaration around it is a template. A form naming one lifts <em>open</em>: a template over just the
      * parameters it uses, referenced by an application binding them straight back through. {@code <T> { a: [T]
