@@ -54,6 +54,14 @@ class OpenOperandCompositionTest {
      * one subtype, no referent, no reader -- standing in this declaration's contract index in place of the
      * ancestors that are really there. An application some other position names is still minted by that
      * position, §8.2 keying identity on the application, so both land on one entry.
+     *
+     * <p><b>{@code box<text>} is still no type to be IS-A; {@code box} is.</b> A record-bodied template is a
+     * family base ({@code SPEC-FEEDBACK.md} #13), deriving ABSTRACT where no discriminator survives, so a
+     * value can stand at it and be a value of one of its members. The edge therefore runs from the member to
+     * the base itself -- which is what indexes {@code c} under {@code box.subtypes} and lets a position typed
+     * {@code box} dispatch to it. The application in between still never becomes an entry, and a declaration
+     * taking parameters of its own states no such edge here: it is held, and each instantiation mints its own
+     * as it closes.
      */
     @Test
     void aClosedApplicationAtAnOperandMintsNothing() {
@@ -68,8 +76,8 @@ class OpenOperandCompositionTest {
                         + compiled.schema().entries().keySet());
 
         TypeDefinition c = compiled.schema().entries().get("c");
-        assertEquals(List.of("base"), c.supertypes(),
-                "the ancestors arrive by value; the application itself is no type to be IS-A");
+        assertEquals(List.of("base", "box"), c.supertypes(),
+                "the ancestors arrive by value, and the edge runs to the family base the operand applies");
         assertEquals(List.of("tag", "item", "extra"),
                 ((RecordBody) c.body()).fields().stream().map(f -> f.name()).toList(),
                 "the operand's fields flatten in, left to right, with the body's own appended");

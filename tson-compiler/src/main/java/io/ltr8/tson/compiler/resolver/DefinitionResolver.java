@@ -1204,6 +1204,20 @@ final class DefinitionResolver {
                 for (String ancestor : operand.ancestors()) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
                 }
+                // A *family base* is the one head that is itself a type ({@code SPEC-FEEDBACK.md} #13): its
+                // held body carries `extension`, so a value can stand at it and be a value of one of its
+                // members. Where this declaration takes no parameters of its own it is never held, so there
+                // is no later materialisation to close the application kept in `record.supertypes` and mint
+                // the edge the way an open operand's gets one -- the same "no later materialisation of this
+                // body" the fixation below is doing its work for. So the edge is stated here, and to the base
+                // itself rather than to an instantiation nothing mints: `dog => pet<"dog"> & { … }` IS-A
+                // `pet`, which is what puts `dog` in `pet.subtypes` and lets a `pet` position dispatch.
+                TypeDefinition headDefinition = namespaceDefinitions.getTypeDefinition(generic.name());
+                if (parameters.isEmpty() && headDefinition != null
+                        && headDefinition.body() instanceof TemplateBody heldBase
+                        && heldBase.extension().isPresent()) {
+                    addIfAbsent(transitiveSupertypes, seenTransitive, generic.name());
+                }
                 // The application itself goes into the body, arguments and all. It contributes no name to the
                 // contract index -- `result` is a template and nothing is IS-A one -- but `record.supertypes`
                 // is a reference channel, so materialisation substitutes and closes it with the rest of the
