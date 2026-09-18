@@ -80,9 +80,14 @@ class AbstractTemplateFamilyTest {
         return registry;
     }
 
-    /** The entry a `name => head<args>` alias resolves to -- what every use site flattens to. */
+    /**
+     * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
+     * its instantiation ({@code SPEC-FEEDBACK.md} #15), or the entry it aliases where an earlier declaration
+     * already named the same application.
+     */
     private static String target(TsonCompiledSchemaRegistry registry, String alias) {
-        return registry.get(ID).schema().entries().get(alias).source().orElseThrow().name();
+        return registry.get(ID).schema().entries().get(alias).body()
+                instanceof io.ltr8.tson.schema.meta.Reference ref ? ref.target().name() : alias;
     }
 
     private static RecordBody bodyOf(TsonCompiledSchemaRegistry registry, String alias) {

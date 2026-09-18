@@ -117,9 +117,11 @@ class OpenOperandCompositionTest {
             """;
 
     private static String aliasTarget(TsonCompiledSchema compiled, String alias) {
-        // A `name => head<args>` declaration is a REFERENCE entry whose source is the application; the entry
-        // materialisation minted for it is what every use site flattens to, and what the index keys on.
-        return compiled.schema().entries().get(alias).source().orElseThrow().name();
+        // A `name => head<args>` declaration *is* the instantiation entry ({@code SPEC-FEEDBACK.md} #15), so
+        // the entry every use site reaches is the declaration itself -- or, where an earlier declaration
+        // already named the same application, the one it aliases.
+        return compiled.schema().entries().get(alias).body() instanceof io.ltr8.tson.schema.meta.Reference ref
+                ? ref.target().name() : alias;
     }
 
     @Test

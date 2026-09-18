@@ -2,6 +2,7 @@ package io.ltr8.tson;
 
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.Reference;
+import io.ltr8.tson.schema.meta.TypeDefinition;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -55,8 +56,15 @@ class AliasedArgumentIdentityTest {
                 """.formatted(ID));
     }
 
+    /**
+     * The entry an application denotes: the declaration itself where that declaration <em>is</em> the
+     * instantiation, and the entry it aliases where a earlier declaration already named the same application
+     * ({@code SPEC-FEEDBACK.md} #15). Either way this is the one name two equal applications must agree on,
+     * which is what every assertion below compares.
+     */
     private static String entryOf(TsonLinkedSchema linked, String alias) {
-        return ((Reference) linked.schema().entries().get(alias).body()).target().name();
+        TypeDefinition definition = linked.schema().entries().get(alias);
+        return definition.body() instanceof Reference reference ? reference.target().name() : alias;
     }
 
     /** The rule: an application of a rename is an application of the name it renames. */

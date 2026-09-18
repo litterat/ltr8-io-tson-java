@@ -710,9 +710,13 @@ The exception-classification policy under Conventions governs every rejection he
 **Materialisation (`TemplateMaterialiser`)** closes a §5.10 template application, running over the
 *resolved* form after every declaration has resolved — an application arrives as a `TypeRef` carrying
 arguments, so substitution is a walk over `schema.meta` values and the entry it mints can record its own
-`source`, which §8.2 keys identity on. Two `box<text>` anywhere share one entry and a declaration naming the
-application aliases it; arguments close innermost-first; the memo is registered before the body is
-substituted, so regular recursion ties the knot on the entry under construction. Non-regular recursion —
+`source`, which §8.2 keys identity on. Two `box<text>` anywhere share one entry, and a declaration naming the
+application **is** that entry rather than a reference to it (`SPEC-FEEDBACK.md` #15): `bx => box<text>`
+resolves to `bx => !record { … }`, a use site writing the same application resolves to the declaration, and a
+second declaration of one application is an ordinary bare-name alias of the first. A *synthetic* is never
+adopted this way, one form's synthetic being shared schema-wide. Arguments close innermost-first; the memo is
+registered before the body is substituted, so regular recursion ties the knot on the entry under
+construction. Non-regular recursion —
 where the argument grows every level and the memo never fires — is caught by a depth guard rather than run
 into a `StackOverflowError`. Three template shapes close, by three paths: a **record** template is
 substituted and kept; an **open instance** (a container sugar form over a parameter) stops being a template

@@ -473,9 +473,23 @@ recorded open form, and replacing the application with a reference to the entry 
   substitution and is not an application to close — so entries with a non-empty `parameters` list are
   skipped. Closing them would mint an entry per level, keyed on the literal parameter name.
 - **Identity is the flattened application** recorded in `source` (§8.2), and the derived name is built from
-  it, so two `box<text>` anywhere in the schema land on one entry for free. A declaration naming the
-  application (`text_box => box<text>`) resolves as a `Reference` to that entry rather than a second copy —
-  the compiler collapses a `Reference` body at compile time, so nothing downstream sees the hop.
+  it, so two `box<text>` anywhere in the schema land on one entry for free.
+- **A declaration naming the application *is* that entry** (`SPEC-FEEDBACK.md` #15). `text_box => box<text>`
+  resolves to the closed record itself, carrying the canonical application in its own `source` — not a
+  `Reference` to a content-named entry sitting beside it. `SchemaResolver` adopts it after materialisation:
+  the entry minted under the derived name moves onto the declared key, every reference to the derived name is
+  rewritten onto that key, and the derived key is dropped. A use site writing the same application therefore
+  resolves to the declaration, and one entry per application survives, which is what §8.2 requires.
+  - **The rename covers both channels, not just the refs.** `MetaRefs.mapRefs` maps `source` and every
+    reference a body carries; §8.1 makes `supertypes`/`subtypes` lists of *names*, which a walk over refs
+    cannot see. A composition that absorbed the instantiation keeps the derived name in its contract index,
+    so missing that channel left an unresolved supertype the linker refuses — seventeen conformance vectors
+    caught it.
+  - **A second declaration of one application stays an alias of the first**, in document order. §8.2 says
+    neither is privileged, so this is a deliberate divergence, recorded as one: two entries would be two
+    family members pinning one value, which §5.2's pin rule refuses.
+  - **A synthetic is never adopted.** §8.2 shares one synthetic per distinct form schema-wide, so binding one
+    to a declared name would make a shared entry answer to a single namer.
 - **Arguments close innermost-first**, so `box<box<text>>` builds the inner entry before the outer one names
   it, and no special case is needed for depth.
 - **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head

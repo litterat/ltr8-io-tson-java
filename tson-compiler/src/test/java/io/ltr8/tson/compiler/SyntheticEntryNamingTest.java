@@ -119,10 +119,19 @@ class SyntheticEntryNamingTest {
                 .startsWith("'(text | int32)' has no variant"));
     }
 
-    /** The entry a template application materialises renders as the application, from its own §8.2 source. */
+    /**
+     * A declared application needs no rendering at all: {@code order_response => paged<order>} <b>is</b> the
+     * instantiation entry ({@code SPEC-FEEDBACK.md} #15), so the reader already holds the name the author
+     * wrote. Rendering the application instead -- {@code 'paged<order>'} -- was the best available answer
+     * while the entry was content-named and the declaration a hop to it; the declared name is better, being
+     * a name the author can open.
+     *
+     * <p>{@code EntryDisplayName} still earns its keep for the entries that remain minted: a synthetic
+     * lifted from a sugar form, and an instantiation a <em>use site</em> closes.
+     */
     @Test
-    void anInstantiationEntryIsNamedByTheApplication() {
-        assertEquals("unknown field 'extra' on 'paged<order>' -- a record is closed under its type (§7.2), "
+    void aDeclaredApplicationIsNamedByItsDeclaration() {
+        assertEquals("unknown field 'extra' on 'order_response' -- a record is closed under its type (§7.2), "
                         + "whose fields are (items)",
                 only("order_response", "{ items: [ { id: \"a\" } ]  extra: 1 }"));
     }
@@ -130,9 +139,10 @@ class SyntheticEntryNamingTest {
     // ── Where a diagnostic points, not just what it calls things ─────────
 
     /**
-     * The pointer roots at the name the read entered through. {@code order_response} is an alias for the
-     * entry the application materialised, and that entry's reader is shared by every name reaching it -- so
-     * the root cannot come from the reader, and comes from the facade that looked the name up.
+     * The pointer roots at the name the read entered through. {@code order_response} is the entry the
+     * application denotes rather than a hop to one (#15), and its reader is shared by every use site that
+     * writes {@code paged<order>} -- so the root still cannot come from the reader, and comes from the
+     * facade that looked the name up.
      */
     @Test
     void thePointerRootsAtTheNameTheReadEnteredThrough() {
