@@ -141,44 +141,23 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
   name — so this is a decision to take deliberately, not a gap to close by reflex.
 
-- [ ] **The JSON dispatchers still leave three things to the selected reader's side undone.** Selection is its own
-  readers now (`DispatchFactories`, `DispatchTagReader`, `DispatchMemberReader`, `DispatchChoiceReader`),
-  wired at compile and handing their one scan on (`ScannedReader`). What is left:
-  - **A sealed dispatcher still judges the tag against the dispatched member.** A `$type` contradicting a
-    discriminator is `tagContradictsDiscriminator` there; moved to the selected reader it becomes a FIXED
-    contradiction on the pin, and `CrossEncodingParityTest` pins that as a divergence until the TSON side catches
-    up (entry below). With it goes the early stop: a sealed dispatcher whose family has no member with subtypes
-    of its own can stop scanning at its selectors, since no later `$type` could select deeper.
-  - **A concrete record reader reached directly still scans before reading.** It judges `$type`, `$value`,
-    `$schema` and unknown `$`-names inside its member loop instead, with no lookahead and no held diagnostics:
-    a member read before an inadmissible `$type` reports as it is read, so a document with a bad tag gets
-    diagnostics that follow its member order, where TSON text (whose tag precedes the value) refuses on the tag
-    alone. That difference is accepted and pinned in `CrossEncodingParityTest`; the `$type`-first rule below
-    removes it.
-  - **A sealed family reached through an outer dispatcher scans twice**, the handed-on scan carrying no selectors.
-    The outer dispatcher knows at compile which routes lead to a sealed reader and can scan for their selectors
-    too.
-  - What is left unmeasured is the dispatcher's own scan: `JsonAllocationHarnessTest` reads schemalessly, so a
-    bound-record case is owed with the above.
-
-- [ ] **Part 3 fixes where a selector sits, so no position scans an object for one.** Today §3.3 makes
-  reserved-members-first a SHOULD for encoders and says a decoder rejecting a late `$type` "would have invented a
-  rule", §6.1.6 forbids a decoder any order rule, and §4's lookahead paragraph and §8.2's decode order are written
-  for a selector that may arrive anywhere. The edit, decided:
-  - **`$type`, when present, is an object's first member**, and anywhere else is an error; §6.1.6 carries the
-    exception. It is the only reserved member with a position rule: `$value` needs none, the selected reader
-    knowing whether it takes a wrapper once `$type` has been read.
-  - **A sealed family's discriminators come first**, after a `$type` when one is present, in any order among
-    themselves. The lookahead at a sealed position is then the first k members, never the whole object.
-  - **A map is class-unstable at a choice** (§8.3's unstable set becomes the `.nan` leak and every map), so a map
-    variant is always tagged and rides in `$value`. The one combination that made an untagged object ambiguous —
-    a disjoint, class-stable choice whose brace-class variant is an object-form map with a key that can spell a
-    reserved name — cannot arise, and §8.3.1's escape rule goes, with its carve-outs in §3.2, §6.5 and §9.2.
-  - **Scoped positions (§8.5) state their own rule** for `$schema` and `$type` rather than sharing §8.3.1's.
-
-  The reader follows: every `$type` dispatcher decides from the first member (a bounded peek, no scan), the
-  choice's reserved-member scan goes, and the concrete record reader's diagnostics stop depending on member order.
-  `DiscriminationClass.stable` refuses a map, and the parity cases for an untagged map variant become tagged ones.
+- [ ] **The JSON readers follow Part 3's leading-member rules, and no position scans an object.** Part 3 now puts
+  every selector at the front (§3.3, §6.1.5, §10.1): `$schema` first where present, then `$type`, then a sealed
+  position's discriminators in any order among themselves; a misplaced `$schema`/`$type`, or a `$value` in an
+  object not led by `$type`, is a resolver error, and a discriminator after a non-discriminator member is
+  *discriminator missing*. The readers still scan whole objects (`ReservedMembers.scan`/`scanFor`). What is owed:
+  - **Every `$type` decision is a peek at the leading members**: `DispatchTagReader`, `DispatchChoiceReader`
+    (§8.2's first step and §8.3.1's decoder test read the first member only; a reserved name among a map
+    variant's later keys is a key), and the concrete record reader, which then judges `$value`, a misplaced
+    `$type`/`$schema` and unknown `$`-names inside its member loop with no lookahead. `ScannedReader` hands on
+    what the leading members said rather than a whole-object scan.
+  - **The sealed dispatcher reads its first *k* members** after any reserved ones and dispatches on them, with
+    no scan. The refusal for a discriminator that is not leading names the fix ("`pet_type` must lead the
+    object"). A `$type` contradicting a discriminator moves to the selected reader, as a FIXED contradiction on
+    the pin, and `CrossEncodingParityTest` pins that as a divergence until the TSON side catches up (entry below).
+  - **Scoped positions (§8.5)** read their cell off the leading members when their reader is built.
+  - Parity cases for the new refusals, and the allocation harness's first bound-record case, which should show
+    no lookahead buffer at all.
 
 - [ ] **`SPEC-FEEDBACK.md` gets an entry proposing that a choice's untagged route be locked down in Part 2, for
   every encoding.** [TSON-SCHEMA] §5.4 derives `disjoint` and leaves each encoding to state its own predicate
