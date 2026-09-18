@@ -297,7 +297,7 @@ final class TemplateMaterialiser {
      * <p>Every shape but two closes here. A <b>record</b> template's closure is the instantiation itself, so
      * {@link #closeHeldRecord} answers directly. Every other held form -- an open instance such as {@code arr
      * => <T> !array { element_type: T }} -- substitutes to a construction the declaration simply <em>is</em>,
-     * which is where the synthetic that used to stand between them disappears. §5.10's partial application
+     * with no synthetic standing between them. §5.10's partial application
      * and an unresolvable or mis-applied head return {@code null} for the caller to handle.
      */
     TypeDefinition closeApplicationInto(String declaredName, TypeRef application) {
@@ -492,9 +492,8 @@ final class TemplateMaterialiser {
         heads.add(head);
         try {
             // Every shape reaches here, so every shape gets the memo, the depth backstop and one publish
-            // path. An open *instance* used to short-circuit ahead of all three, which left a template
-            // applying itself (`weird => <T> [weird<T>]`) recursing to a StackOverflowError instead of
-            // tying the knot.
+            // path. A shape that short-circuited ahead of all three would leave a template applying itself
+            // (`weird => <T> [weird<T>]`) recursing to a StackOverflowError instead of tying the knot.
             // §5.10's partial application mints nothing at all: the alias *is* the application it names
             // with some arguments still open, so closing it composes the two argument lists and hands back
             // whatever that denotes -- `uuid_pair<int32>` is the entry `pair<text, int32>` already produced.
@@ -559,7 +558,7 @@ final class TemplateMaterialiser {
         return bindings;
     }
 
-    // ── Closing an open instance (§5.10, D7) ─────────────────────────────────────────────────────
+    // ── Closing an open instance (§5.10) ─────────────────────────────────────────────────────────
 
     /**
      * The entry an application of an <b>open instance</b> denotes -- a template whose held body is a
@@ -723,8 +722,8 @@ final class TemplateMaterialiser {
     private Closed closeHeld(String head, TypeDefinition template, HeldBody open,
             Map<String, TypeArgument> bindings) {
         String target = open.application().typeRef().orElseThrow();
-        // One walk does what three steps used to: a parameter in a slot, a parameter inside an application a
-        // slot holds (`tree<p0>` becoming `tree<text>`), and a parameter inside a collection are all the same
+        // One walk covers all three cases: a parameter in a slot, a parameter inside an application a slot
+        // holds (`tree<p0>` becoming `tree<text>`), and a parameter inside a collection are all the same
         // thing here -- a token in a tree -- because the body was never read against the constructor's
         // vocabulary in the first place.
         CoreValue substituted = WireForm.substitute(open.application().coreValue(), head, template.parameters(), bindings);
@@ -746,15 +745,14 @@ final class TemplateMaterialiser {
      *
      * <p>A composition operand denotes no entry ({@code SPEC-FEEDBACK.md} #15, and {@code
      * DefinitionResolver}'s own supertype branch): composition needs the operand's <em>fields</em>, which
-     * substitution has already produced, and nothing else. Closing it here minted the entry that branch
-     * exists to avoid -- {@code vip => <T> customer & box<T>} closed at {@code vip<text>} produced a
+     * substitution has already produced, and nothing else. Closing it here would mint the entry that branch
+     * exists to avoid -- {@code vip => <T> customer & box<T>} closed at {@code vip<text>} would produce a
      * {@code box<text>} nothing named, beside the {@code text_box} a declaration may well have named.
      *
-     * <p><b>The resolved-form walk has always exempted this channel</b> ({@code
-     * MetaRefs.mapRefsKeepingRecordSupertypes}); the wire walk did not, and that asymmetry was the whole of
-     * the defect. Both now agree: the operand is kept as the record of what was applied, and resolving it to
-     * the entry it denotes belongs to the linker, which runs after every declaration and so cannot make the
-     * answer depend on declaration order.
+     * <p><b>The resolved-form walk exempts this channel too</b> ({@code
+     * MetaRefs.mapRefsKeepingRecordSupertypes}), and the two walks must agree: the operand is kept as the
+     * record of what was applied, and resolving it to the entry it denotes belongs to the linker, which runs
+     * after every declaration and so cannot make the answer depend on declaration order.
      */
     private CoreValue closeApplicationsOutsideSupertypes(CoreValue value) {
         if (!(value instanceof RecordValue record)) {

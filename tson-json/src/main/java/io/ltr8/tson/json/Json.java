@@ -23,8 +23,9 @@ import java.util.Objects;
  * <p>The shape {@code Tson} takes over {@code TsonTreeReader}/{@code TsonObjectReader} -- one place a
  * deployment states its {@link ProcessorPolicy}, its binding and where problems go, and two readers that
  * carry it. {@link #treeReader()} produces a {@link JsonValue}; {@link #objectReader()} produces a bound
- * Java object. It holds no schema registry because there is nothing yet to register: the schema-directed
- * decode of [TSON-JSON] §5-§8 is where one arrives, and this is where it will live.
+ * Java object. Given a loader ({@link #withSchemas}) it also holds the compiled readers for [TSON-JSON]
+ * §5-§8's schema-directed decode; it resolves no schema itself, a schema document being TSON text whichever
+ * encoding the data arrives in.
  *
  * <p><b>JEP 540's own entry points are the statics below</b>, over a default configuration. They are the
  * zero-ceremony path this API is named for -- {@code Json.parse(text)} and nothing else to know -- and they
@@ -37,10 +38,9 @@ import java.util.Objects;
  * tree} package's value model; reading, writing and exceptions follow the TSON side of this library, so a
  * consumer reading both encodings routes on one rule.
  *
- * <p><b>What this class no longer is.</b> It used to reduce events into a tree itself, which put an engine
- * in a front door's name and left the JSON stack with no tree <em>facade</em> at all -- so a tree read
- * could not be given a receiver, a policy or a path, where a bound read could. The reduction is
- * {@code SchemalessTreeReader}'s now, under {@link JsonTreeReader}, and the two readers are peers.
+ * <p><b>It is a front door, not an engine.</b> Reducing events into a tree is {@code SchemalessTreeReader}'s,
+ * under {@link JsonTreeReader}, so a tree read takes a receiver, a policy and a path exactly as a bound read
+ * does, and the two readers are peers.
  */
 public final class Json {
 
