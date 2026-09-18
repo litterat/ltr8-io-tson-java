@@ -74,7 +74,7 @@ final class TreeMapPairsReader extends TreeMapReader {
             return null;
         }
         int before = at.reported();
-        JsonValue key = (JsonValue) keyReader.read(at.index(0));
+        JsonValue key = Nodes.node(keyReader.read(at.index(0)));
         if (at.peek() instanceof JsonEvent.ArrayEnd) {
             at.next();
             at.report(Diagnostic.Code.WRONG_ARITY, "'%s' is in pairs form and this entry has no value"

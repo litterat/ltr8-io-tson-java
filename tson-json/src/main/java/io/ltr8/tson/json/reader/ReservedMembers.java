@@ -4,8 +4,6 @@ import io.ltr8.tson.base.Diagnostic;
 import io.ltr8.tson.json.JsonReadContext;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.json.tree.JsonNull;
-import io.ltr8.tson.json.tree.JsonValue;
 
 import io.ltr8.tson.base.unicode.Nfc;
 
@@ -165,19 +163,20 @@ final class ReservedMembers {
      *
      * <p>Shared by every position that can be tagged -- a record under subsumption (§6.1.5) and a choice
      * variant (§8.1) -- because the wrapper is one form and a second reading of it is a second chance to
-     * disagree about what it admits.
+     * disagree about what it admits. Returns what {@code target} produced, or null where there was no
+     * {@code $value} to read: the wrapper builds nothing of its own, so it serves every mode.
      */
-    static JsonValue readWrapped(JsonReadContext ctx, JsonTypeReader<?> target) {
+    static Object readWrapped(JsonReadContext ctx, JsonTypeReader<?> target) {
         ctx.next();   // ObjectStart
-        JsonValue value = null;
+        Object value = null;
+        boolean found = false;
         while (true) {
             JsonEvent event = ctx.next();
             if (event instanceof JsonEvent.ObjectEnd) {
-                if (value == null) {
+                if (!found) {
                     ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                             "this is an annotation object in wrapper form and carries no '$value' to annotate",
                             "a '$value' member", "no $value");
-                    return JsonNull.INSTANCE;
                 }
                 return value;
             }
@@ -185,7 +184,8 @@ final class ReservedMembers {
                 throw new IllegalStateException("a member name or '}' was due and the stream produced " + event);
             }
             if (VALUE.equals(member.name())) {
-                value = (JsonValue) target.read(ctx.field(VALUE));
+                value = target.read(ctx.field(VALUE));
+                found = true;
                 continue;
             }
             if (!isReserved(member.name())) {

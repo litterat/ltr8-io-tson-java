@@ -11,8 +11,10 @@ import io.ltr8.tson.json.JsonTypeReader;
  * reference to the half-built map, and every later lookup would go through it. The peer of {@code
  * tson-compiler}'s {@code CompiledReaders}, which carries the same hazard and the same fix.
  *
- * <p>Only the edges that need a name at read time consult this: a subtype named by {@code $type} (§6.1.5),
- * and whatever §8's dispatch reaches. Every other child reader is a real object reference wired at compile.
+ * <p><b>No reader consults it at read time.</b> Every edge -- a child position, and every reader a dispatcher
+ * can select -- is an object reference wired at compile, and an edge that closes a cycle reaches its target
+ * through {@link DeferredTypeReader}. What the rebind guarantees is that a reader keeping the resolver anyway
+ * never reaches the compile it came from.
  */
 public final class CompiledReaders implements TypeReaderResolver {
 

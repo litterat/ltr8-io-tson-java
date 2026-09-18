@@ -14,11 +14,15 @@ import java.util.function.UnaryOperator;
  * carried instead ({@link TreeAtomReader}) and changes nothing about what was parsed or refused. The modes
  * genuinely diverge at the containers, which is why the split arrives with [TSON-JSON] §6.
  *
+ * <p><b>What places a value is shared too.</b> A record family's dispatchers ({@link DispatchFactories}), a
+ * family-base template's, and the choice's ({@link DispatchChoiceReader}) select a reader and build nothing,
+ * so every mode registers the same ones; only the concrete record reader under {@link DispatchFactories} is the
+ * mode's own.
+ *
  * <p><b>An unregistered constructor is a gap, not a fault.</b> {@link #resolve} raises, {@code
  * JsonSchemaCompiler} catches, and the entry becomes a {@link ErrorReader} -- so a schema whose types this
  * encoding cannot yet read still compiles, and each unreadable value costs a verdict on itself alone. That is
- * how §6-§8's absence is currently spelled, and it is the same shape [TSON-SCHEMA] §2.2.2's extension point
- * will keep using afterwards.
+ * how §8.5's absence is spelled, and the shape [TSON-SCHEMA] §2.2.2's extension point keeps for good.
  */
 public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResolver {
 
@@ -47,7 +51,9 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      * question a mode hides: <em>what did the parser produce</em>, which tree mode discards by design.
      */
     public static ValueReaderFactoryRegistry atoms() {
-        return new ValueReaderFactoryRegistry(Map.copyOf(vocabulary(UnaryOperator.identity())));
+        Map<String, ValueReaderFactory> factories = vocabulary(UnaryOperator.identity());
+        factories.put("template", DispatchFactories.TEMPLATE);
+        return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 
     /**
@@ -60,14 +66,15 @@ public final class ValueReaderFactoryRegistry implements ValueReaderFactoryResol
      */
     public static ValueReaderFactoryRegistry tree() {
         Map<String, ValueReaderFactory> factories = vocabulary(TreeAtomReader::over);
-        factories.put("record", TreeRecordReader.FACTORY);
+        factories.put("record", DispatchFactories.over(TreeRecordReader.FACTORY));
         factories.put("array", TreeArrayReader.FACTORY);
         // A `set` resolves to an ArrayBody like `array` itself -- refinement never adds or removes a field --
         // so the same factory serves it and the body's own `unique_items` is what separates them.
         factories.put("set_type", TreeArrayReader.FACTORY);
         factories.put("tuple", TreeTupleReader.FACTORY);
         factories.put("map", TreeMapReader.FACTORY);
-        factories.put("choice", TreeChoiceReader.FACTORY);
+        factories.put("choice", DispatchChoiceReader.FACTORY);
+        factories.put("template", DispatchFactories.TEMPLATE);
         return new ValueReaderFactoryRegistry(Map.copyOf(factories));
     }
 

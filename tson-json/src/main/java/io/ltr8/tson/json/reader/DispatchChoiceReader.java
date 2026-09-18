@@ -6,8 +6,6 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.json.tree.JsonNull;
-import io.ltr8.tson.json.tree.JsonValue;
 import io.ltr8.tson.schema.TsonSchema;
 import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ChoiceBody;
@@ -16,7 +14,6 @@ import io.ltr8.tson.schema.meta.TypeRef;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Optional;
 
 /**
@@ -38,51 +35,67 @@ import java.util.Optional;
  * implementation SHOULD compute the predicate's verdict per choice at schema load, in the manner of
  * [TSON-SCHEMA] §5.11's compiled group lookup -- the wire decision is then a table hit, not a per-value
  * derivation".
+ *
+ * <p><b>Every reader it can select was wired then too</b> ({@link Route}): a variant by its kind, and a
+ * variant, an alias of one or a subtype of one by its tag. It builds nothing itself, so one class serves
+ * every mode.
  */
-final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
+final class DispatchChoiceReader implements JsonTypeReader<Object> {
 
     static final ValueReaderFactory FACTORY = (name, definition, context) -> {
         ChoiceBody body = (ChoiceBody) definition.body();
-        return new TreeChoiceReader(EntryDisplayName.of(name, definition, context.schema().entries()), body,
+        return new DispatchChoiceReader(EntryDisplayName.of(name, definition, context.schema().entries()), body,
                 context, context.locationOf(name, definition));
     };
 
     private final String name;
     private final List<String> variants;
     private final JsonSchemaLocation schemaLocation;
-    private final TypeReaderResolver readerFor;
-
     /** §8.2's condition, decided once: {@code disjoint} and class-stable, so the kind alone selects. */
     private final Map<DiscriminationClass, String> byClass;
 
-    /**
-     * Every subtype of every variant, to the variant it reaches -- §8.4's "subtypes of variants" note, which
-     * holds for a tagged value at any choice: "a record whose {@code $type} names a proper subtype S of a
-     * variant validates as S". Resolved here so the read is a lookup.
-     */
-    private final Map<String, String> bySubtype;
+    /** {@link #byClass}'s variants, as their readers. */
+    private final Map<DiscriminationClass, JsonTypeReader<?>> readerByClass;
 
     /**
-     * The variant names a written {@code $type} may spell: each variant, and every alias whose chain ends at
-     * it. {@link #variants} stays the declared list, which is what a diagnostic names.
+     * Every name a written {@code $type} may spell here, to where the value goes: each variant, every alias
+     * whose chain ends at one, and every subtype of one -- §8.4's "subtypes of variants" note, which holds for
+     * a tagged value at any choice: "a record whose {@code $type} names a proper subtype S of a variant
+     * validates as S". {@link #variants} stays the declared list, which is what a diagnostic names.
      */
-    private final Set<String> admittedVariants;
+    private final Map<String, Route> routes;
 
-    private TreeChoiceReader(String name, ChoiceBody body, ValueReaderContext context,
-                             JsonSchemaLocation schemaLocation) {
+    private DispatchChoiceReader(String name, ChoiceBody body, ValueReaderContext context,
+                                 JsonSchemaLocation schemaLocation) {
         this.name = name;
         this.variants = body.variants().stream().map(TypeRef::name).toList();
-        this.admittedVariants = context.admitting(this.variants);
         this.schemaLocation = schemaLocation;
-        this.readerFor = context.readers();
         this.byClass = variantsByClass(context.schema(), body);
-        Map<String, String> subtypes = new LinkedHashMap<>();
+        Map<DiscriminationClass, JsonTypeReader<?>> kinds = new LinkedHashMap<>();
+        byClass.forEach((kind, variant) -> kinds.put(kind, context.readers().resolve(variant)));
+        this.readerByClass = Map.copyOf(kinds);
+        Map<String, Route> table = new LinkedHashMap<>();
+        for (String written : context.admitting(variants)) {
+            table.put(written, Route.to(context.readers().resolve(written)));
+        }
         for (TypeRef variant : body.variants()) {
+            JsonTypeReader<?> reader = context.readers().resolve(variant.name());
             ReferenceChain.terminal(context.schema(), variant.name())
                     .ifPresent(resolved -> context.admitting(resolved.definition().subtypes())
-                            .forEach(subtype -> subtypes.putIfAbsent(subtype, variant.name())));
+                            .forEach(subtype -> table.putIfAbsent(subtype, routeBelow(reader, subtype))));
         }
-        this.bySubtype = Map.copyOf(subtypes);
+        this.routes = Map.copyOf(table);
+    }
+
+    /**
+     * The route to {@code subtype} through the variant whose compiled reader is {@code variant}. A variant
+     * placed by {@code $type} already holds that route, flattened; any other -- a sealed family, whose
+     * selectors this position cannot bypass, or a reader still closing a cycle -- receives the value and
+     * places it itself.
+     */
+    private static Route routeBelow(JsonTypeReader<?> variant, String subtype) {
+        Route route = variant instanceof DispatchTagReader dispatch ? dispatch.route(subtype) : null;
+        return route != null ? route : new Route(variant, variant);
     }
 
     /**
@@ -115,7 +128,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
     }
 
     @Override
-    public JsonValue read(JsonReadContext ctx) {
+    public Object read(JsonReadContext ctx) {
         ctx = ctx.underDeclaration(schemaLocation);
         JsonEvent first = ctx.peek();
 
@@ -132,9 +145,9 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
 
         // Step 2: the untagged route -- where §8.2's condition holds, dispatch on the value kind.
         Optional<DiscriminationClass> arriving = DiscriminationClass.ofKind(first);
-        String variant = arriving.map(byClass::get).orElse(null);
+        JsonTypeReader<?> variant = arriving.map(readerByClass::get).orElse(null);
         if (variant != null) {
-            return (JsonValue) readerFor.resolve(variant).read(ctx);
+            return variant.read(ctx);
         }
         return untagged(ctx, first, arriving);
     }
@@ -144,49 +157,29 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
      * value at any choice position, including positions where the tag could have been omitted". So this runs
      * whether or not §8.2's condition holds, and a redundant tag is never wrong.
      */
-    private JsonValue tagged(JsonReadContext ctx, ReservedMembers.Tag tag) {
-        if (tag.unknown() != null) {
-            ReservedMembers.refuseUnknown(ctx, tag.unknown());
-            EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
-        }
-        if (tag.schema()) {
-            // §8.5 admits `$schema` at a scoped position -- the open sum -- and a choice is the closed one.
-            ctx.field(ReservedMembers.SCHEMA).report(Diagnostic.Code.UNRECOGNIZED_FIELD,
-                    "'$schema' opens a schema scope, which [TSON-SCHEMA] §7.8 admits only at a scoped position "
-                            + "-- '" + name + "' is a choice, whose variants its own schema declares",
-                    "no $schema at this position", ReservedMembers.SCHEMA);
-            EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
+    private Object tagged(JsonReadContext ctx, ReservedMembers.Tag tag) {
+        // §8.5 admits `$schema` at a scoped position -- the open sum -- and a choice is the closed one.
+        if (Tags.refusesMisuse(ctx, tag, name, Tags.CHOICE)) {
+            return null;
         }
         if (tag.type() == null) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
                     "this object carries this encoding's reserved members but no '$type' naming a variant of '"
                             + name + "' (§3.3)", "a '$type' member holding a variant name", "no $type");
             EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
+            return null;
         }
-        String selected = admittedVariants.contains(tag.type()) ? tag.type() : variantAdmitting(tag.type());
-        if (selected == null) {
+        Route route = routes.get(tag.type());
+        if (route == null) {
             if (!NameHygiene.refuses(ctx, tag.type())) {
                 ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
                         "'$type' names '%s', which is not a variant of '%s'".formatted(tag.type(), name),
                         String.join(" | ", variants), tag.type());
             }
             EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
+            return null;
         }
-        // A subtype of a variant is admissible (§8.4's own note) and reaches the variant's own reader, which
-        // applies [TSON-SCHEMA] §7.2 to whatever the tag named. Naming the variant is all this position decides.
-        JsonTypeReader<?> reader = readerFor.resolve(selected);
-        return tag.wrapper()
-                ? ReservedMembers.readWrapped(ctx, reader)
-                : (JsonValue) reader.read(ctx);
-    }
-
-    /** The variant {@code type} is a subtype of, or null -- §7.2's admission, resolved once at construction. */
-    private String variantAdmitting(String type) {
-        return bySubtype.get(type);
+        return route.read(ctx, tag);
     }
 
     /**
@@ -203,7 +196,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
      * spends it as the absent sentinel before any class question arises, so it is not an unrecognised kind but
      * an absence at a position admitting none.
      */
-    private JsonValue untagged(JsonReadContext ctx, JsonEvent first, Optional<DiscriminationClass> arriving) {
+    private Object untagged(JsonReadContext ctx, JsonEvent first, Optional<DiscriminationClass> arriving) {
         String found = JsonAtoms.describe(first);
         if (first instanceof JsonEvent.NullValue) {
             ctx.report(Diagnostic.Code.FIELD_REQUIRED,
@@ -223,6 +216,6 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
                     String.join(" | ", variants), found);
         }
         EventSkip.nextValue(ctx);
-        return JsonNull.INSTANCE;
+        return null;
     }
 }

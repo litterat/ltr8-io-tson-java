@@ -116,7 +116,7 @@ abstract sealed class TreeMapReader implements JsonTypeReader<JsonValue>
             }
             return JsonNull.INSTANCE;
         }
-        return (JsonValue) value.read(at);
+        return Nodes.node(value.read(at));
     }
 
     /** §6.5: size facets count entries -- an entry with an absent value is an entry. */

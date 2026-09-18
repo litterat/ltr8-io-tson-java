@@ -178,6 +178,17 @@ class JsonChoiceReadTest {
                 {"$type": "unit_circle", "radius": 1.0, "fixed": true}""").accepted().toString());
     }
 
+    /**
+     * The wrapper form carries the same note: the tag names {@code $value}'s type, so a subtype's own field is
+     * admitted there -- read as the variant instead, {@code fixed} would be refused as unrecognised.
+     */
+    @Test
+    void aWrapperTagNamingASubtypeOfAVariantReadsItsValueAsThatSubtype() {
+        assertEquals("""
+                {"radius":1.0,"fixed":true}""", read("shape", """
+                {"$type": "unit_circle", "$value": {"radius": 1.0, "fixed": true}}""").accepted().toString());
+    }
+
     @Test
     void aTagNamingSomethingThatIsNoVariantIsRefused() {
         Diagnostic refusal = read("shape", """

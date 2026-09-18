@@ -6,7 +6,7 @@ A stack of its own — lexer, stream, tree, readers, writers, schema-directed re
 | Working in | Read (`design/…`) |
 |---|---|
 | `lexer/`, `stream/`, `tree/` | `json-lexer-stream-tree.md` |
-| `reader/` schema-directed (`Tree*Reader`, `JsonSchemaCompiler`, `JsonTypeReader`) | `json-schema-directed-reading.md` |
+| `reader/` schema-directed (`Tree*Reader`, dispatchers, `JsonSchemaCompiler`, `JsonTypeReader`) | `json-schema-directed-reading.md` |
 | `Json`, the two facades, `reader/DataClassObjectReader`, `writer/` | `json-facades-binding-writing.md` |
 | Identifier or token policy, `NameHygiene` | `json-unicode-policies.md` |
 
@@ -21,5 +21,6 @@ Rules that bite here:
 - A schema-directed read returns a `JsonValue`, never a `TsonValue`.
 - The field-state rules exist twice; `CrossEncodingParityTest` is the guard. A rule changed here or in
   `tson-compiler`'s readers gets a parity case. Shared refusals are stated once in `tson-base`'s `base.diagnostics`.
-- `Json` prefixes exported types only; `reader` types are bare and named mode first (`TreeRecordReader`).
+- `Json` prefixes exported types only; `reader` types are bare and named mode first (`TreeRecordReader`). A dispatcher
+  selects and builds nothing, so it has no mode and one set serves every mode (`DispatchTagReader`).
 - The look-alike (confusable) rule reaches no JSON position — settled, not owed.

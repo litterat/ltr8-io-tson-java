@@ -12,8 +12,6 @@ import io.ltr8.tson.json.JsonSchemaLocation;
 import io.ltr8.tson.json.JsonTypeReader;
 import io.ltr8.tson.json.atom.JsonAtoms;
 import io.ltr8.tson.json.stream.JsonEvent;
-import io.ltr8.tson.json.tree.JsonNull;
-import io.ltr8.tson.json.tree.JsonValue;
 import io.ltr8.tson.schema.meta.FieldState;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
@@ -46,12 +44,16 @@ import java.util.Set;
  * the opening brace settles nothing -- and §8.1 admits a tag beside them. {@link ReservedMembers#scanFor}
  * answers both in the pass this position was going to make anyway.
  *
+ * <p><b>Every reader it can select was wired when the schema compiled</b> ({@link Route}), and so was every
+ * name a tag may carry to reach one -- the members and, for each, the deeper names it admits. It builds
+ * nothing itself, so one class serves every mode, and it hands its scan to the reader it selects.
+ *
  * <p><b>The tag can only assert.</b> {@code $type} MAY be present and MUST name the dispatched member or a
  * subtype of it; there is one selector per position, and the pin's own FIXED check is what makes the dispatch
  * read and the validation read agree by construction -- the selected member re-reads the whole object,
  * including the member that selected it.
  */
-final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
+final class DispatchMemberReader implements JsonTypeReader<Object>, ScannedReader {
 
     /** One discriminator field of the base: the member name, and the parser its declared type gives. */
     private record Selector(String name, AtomType<?> parser, AtomForm form) {
@@ -74,7 +76,8 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
     /** What each dispatched member admits a deeper tag to name: itself and its own subtypes (§6.1.5). */
     private final Map<String, Set<String>> deeper;
 
-    private final TypeReaderResolver readerFor;
+    /** Where a value goes once selected, by every name a member or a deeper tag may reach it under. */
+    private final Map<String, Route> routes;
     private final JsonSchemaLocation schemaLocation;
     private final RecordExtensionDiagnostics extension;
     private final RecordDiagnostics rules;
@@ -86,13 +89,12 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
      * own declared type. Taking the fields rather than a {@code RecordBody} is what lets one dispatcher serve
      * both, and is the same signature its {@code tson-compiler} peer takes.
      */
-    TreeRecordSealedReader(Set<String> selfNames, String displayName, List<RecordField> selectorFields,
+    DispatchMemberReader(Set<String> selfNames, String displayName, List<RecordField> selectorFields,
                            Set<String> subtypes,
                            ValueReaderContext context, JsonSchemaLocation schemaLocation,
                            RecordDiagnostics rules) {
         this.selfNames = Set.copyOf(selfNames);
         this.displayName = displayName;
-        this.readerFor = context.readers();
         this.schemaLocation = schemaLocation;
         this.rules = rules;
         TsonSchema schema = context.schema();
@@ -102,6 +104,7 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
                 Set::add, Set::addAll);
         this.members = new LinkedHashMap<>();
         this.deeper = new LinkedHashMap<>();
+        Map<String, Route> table = new LinkedHashMap<>();
         for (String subtype : subtypes) {
             TypeDefinition definition = entries.get(subtype);
             if (definition == null || !(definition.body() instanceof RecordBody record)) {
@@ -115,8 +118,12 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
             under.add(subtype);
             under.addAll(definition.subtypes());
             deeper.put(subtype, context.admitting(under));
+            for (String written : deeper.get(subtype)) {
+                table.computeIfAbsent(written, ignored -> Route.to(context.readers().resolve(written)));
+            }
         }
-        this.pinned = members.keySet().stream().map(TreeRecordSealedReader::render).reduce((a, b) -> a + " | " + b)
+        this.routes = Map.copyOf(table);
+        this.pinned = members.keySet().stream().map(DispatchMemberReader::render).reduce((a, b) -> a + " | " + b)
                 .orElse("(none)");
         this.extension = new RecordExtensionDiagnostics(displayName, String.join(" | ", subtypes));
     }
@@ -152,19 +159,30 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
     }
 
     @Override
-    public JsonValue read(JsonReadContext ctx) {
+    public Object read(JsonReadContext ctx) {
         ctx = ctx.inRecord(schemaLocation);
         if (!(ctx.peek() instanceof JsonEvent.ObjectStart)) {
             JsonEvent found = ctx.next();
             ctx.report(rules.notARecord(JsonAtoms.describe(found)));
             EventSkip.value(ctx, found);
-            return JsonNull.INSTANCE;
+            return null;
         }
-        ReservedMembers.Scan scan = ReservedMembers.scanFor(ctx, selectorNames);
+        return dispatch(ctx, ReservedMembers.scanFor(ctx, selectorNames));
+    }
+
+    /**
+     * Scans again, for the selectors: the scan an outer dispatcher hands on answers only for the reserved
+     * members, and a sealed position selects on members of its own.
+     */
+    @Override
+    public Object readScanned(JsonReadContext ctx, ReservedMembers.Tag tag) {
+        return read(ctx);
+    }
+
+    private Object dispatch(JsonReadContext ctx, ReservedMembers.Scan scan) {
         ReservedMembers.Tag tag = scan.tag();
-        JsonValue refused = Tags.refuseMisuse(ctx, tag, displayName);
-        if (refused != null) {
-            return refused;
+        if (Tags.refusesMisuse(ctx, tag, displayName, Tags.RECORD)) {
+            return null;
         }
         // §3.3's wrapper puts the record inside `$value`, so the selectors are not at this level to read and
         // the tag is the only thing that can place it -- the ordinary wrapper rule, not a second dispatch.
@@ -180,14 +198,14 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
                 // family dispatch two ways.
                 ctx.field(selector.name()).report(extension.discriminatorMissing(selector.name()));
                 EventSkip.nextValue(ctx);
-                return JsonNull.INSTANCE;
+                return null;
             }
             Object decoded = decode(selector, value);
             if (decoded == null) {
                 ctx.field(selector.name()).report(extension.unmatchedDiscriminator(
                         selector.name(), JsonAtoms.describe(value), pinned));
                 EventSkip.nextValue(ctx);
-                return JsonNull.INSTANCE;
+                return null;
             }
             key.add(decoded);
         }
@@ -195,14 +213,14 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
         if (selected == null) {
             ctx.report(extension.unmatchedDiscriminator(named(), render(key), pinned));
             EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
+            return null;
         }
         if (tag.type() != null && selfNames.contains(tag.type())) {
             // §8.1 admits a redundant tag restating a position's own type, but that rule assumes a type with
             // direct instances, and a sealed base has none: naming it selects nothing.
             ctx.report(extension.tagNamesTheBase(ReservedMembers.TYPE));
             EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
+            return null;
         }
         if (tag.type() != null && !deeper.getOrDefault(selected, Set.of()).contains(tag.type())) {
             // Located at the value and not at `/$type`, though the member is right there. §9.4 holds both
@@ -211,24 +229,24 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
             // reserved members are apparatus rather than data in any case, which is the same conclusion.
             ctx.report(extension.tagContradictsDiscriminator(ReservedMembers.TYPE, tag.type(), selected));
             EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
+            return null;
         }
         // A deeper tag wins over the dispatched member, which is §6.1.5's "deeper than one level": the pins
         // are inherited and §5.7 forbids changing them, so a family dispatches one level by member and every
         // level below it by tag. The selected reader re-reads the whole object and re-verifies each pin as an
         // ordinary FIXED check, which is what makes the two reads agree by construction.
-        String effective = tag.type() != null ? tag.type() : selected;
-        return (JsonValue) readerFor.resolve(effective).read(ctx);
+        return routes.get(tag.type() != null ? tag.type() : selected).read(ctx, tag);
     }
 
     /** §3.3's wrapper form at a sealed position: `$type` places the value and `$value` holds it. */
-    private JsonValue wrapped(JsonReadContext ctx, ReservedMembers.Tag tag) {
+    private Object wrapped(JsonReadContext ctx, ReservedMembers.Tag tag) {
         if (tag.type() == null) {
             ctx.report(extension.tagRequired(ReservedMembers.TYPE));
             EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
+            return null;
         }
-        if (!members.containsValue(tag.type()) && deeper.values().stream().noneMatch(s -> s.contains(tag.type()))) {
+        Route route = routes.get(tag.type());
+        if (route == null) {
             if (!NameHygiene.refuses(ctx, tag.type())) {
                 ctx.field(ReservedMembers.TYPE).report(Diagnostic.Code.TYPE_MISMATCH,
                         "'$type' names '%s', which is not a member of the sealed '%s'"
@@ -236,9 +254,9 @@ final class TreeRecordSealedReader implements JsonTypeReader<JsonValue> {
                         extension.members(), tag.type());
             }
             EventSkip.nextValue(ctx);
-            return JsonNull.INSTANCE;
+            return null;
         }
-        return ReservedMembers.readWrapped(ctx, readerFor.resolve(tag.type()));
+        return route.read(ctx, tag);
     }
 
     private Object decode(Selector selector, JsonEvent value) {

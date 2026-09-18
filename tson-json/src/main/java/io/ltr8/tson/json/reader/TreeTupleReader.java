@@ -98,6 +98,6 @@ final class TreeTupleReader implements JsonTypeReader<JsonValue> {
             }
             return JsonNull.INSTANCE;
         }
-        return (JsonValue) slots.get(slot).read(at);
+        return Nodes.node(slots.get(slot).read(at));
     }
 }
