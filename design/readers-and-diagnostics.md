@@ -29,7 +29,7 @@ is small and parsed once.)
       answers "what is here *after the part that can repeat*". `*annotation [type-ref] core-value` puts the
       type-ref behind a run of any length, so everything keyed on that type-ref needs it: the facades
       selecting a root reader, and every dispatcher choosing a variant (`EventSkip.typeRefAhead` /
-      `aheadOfValue`, `docs/facades-and-tree.md`). Consumed events are replayed from a buffer, never
+      `aheadOfValue`, `design/facades-and-tree.md`). Consumed events are replayed from a buffer, never
       re-lexed, so the cost is what was looked past rather than the document; `position()` is left where the
       lookahead reached, since a caller looks ahead in order to say something about what it found.
       Ordinary readers have no use for it — a reader knows its own shape from the schema.

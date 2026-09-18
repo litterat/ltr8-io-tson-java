@@ -66,5 +66,5 @@ See [BACKLOG.md](BACKLOG.md) for the actively-tracked engineering backlog, and
 [STRUCTURED-OUTPUT.md](STRUCTURED-OUTPUT.md) for the target-use-case plan (LLM structured-output
 validation, JSON compatibility).
 
-See [CLAUDE.md](CLAUDE.md) for orientation, [docs/](docs/) for the per-area design notes, and
+See [CLAUDE.md](CLAUDE.md) for orientation, [design/](design/) for the per-area design notes, and
 [CONFORMANCE.md](CONFORMANCE.md) for edge-case behavior worth knowing about.

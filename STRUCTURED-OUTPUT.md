@@ -39,7 +39,7 @@ backend.
   document, and `tson.treeReader()/objectReader().withDiagnostics(collector).read(...)` returns the
   (possibly partial) **value alongside** them — the shape a repair loop actually needs, which for a while
   no route offered. `tson-cli`'s `ValidateCommand` is now just a caller of the former. See
-  `docs/readers-and-diagnostics.md` for the full design. Field by field, against the
+  `design/readers-and-diagnostics.md` for the full design. Field by field, against the
   shape sketched below:
   - `path` — landed exactly as described, an RFC 6901 JSON Pointer accumulated by
     `TsonReadContext.field`/`index` as a read descends (that context is still the engine's cursor; it
@@ -111,7 +111,7 @@ backend.
     Synthesis would degrade both. It is also not mechanically available: `code` does not determine the
     sentence (`TYPE_MISMATCH` alone spans six unrelated situations). The real failure mode was a site
     leaving `expected`/`actual` blank, which was three facade-level diagnostics and is now fixed and
-    structurally prevented — see `docs/readers-and-diagnostics.md`.
+    structurally prevented — see `design/readers-and-diagnostics.md`.
   - **Ranked above all five for a model that authors *schemas* as well as data**: a wrong schema must not
     report `OK`. An unknown member in a refinement body is silently ignored today, so JSON-Schema
     vocabulary (`minimum`/`maximum`) compiles clean and enforces nothing — see `BACKLOG.md`'s "Validation
@@ -229,7 +229,7 @@ Concrete items and decisions:
 
 ### JSON compatibility
 
-**This is Part 3's now, and `docs/json-encoding.md` holds the design.** [TSON-JSON]
+**This is Part 3's now, and `design/json-encoding.md` holds the design.** [TSON-JSON]
 (`spec/tson-part3-json.md`) is the normative JSON interoperability surface of the series, `tson-json` its
 implementation, and `BACKLOG.md`'s "JSON encoding" section the engineering list. What stays here is the part
 those do not cover: why this matters to *this* document's target use case, and the one design question still
@@ -241,7 +241,7 @@ format. Tier 2 native-TSON constrained decoding is a real future direction, but 
 applies to *today's* model output the moment a JSON document can be read against a TSON schema, with no
 decoder integration at all. It is the same reader the broader on-ramp needs — a JSON Schema or OpenAPI
 contract converted to a TSON schema, validating documents already in flight unchanged — so the two use cases
-fund one piece of work. `docs/json-encoding.md` states that goal and what it rules out of a converted schema.
+fund one piece of work. `design/json-encoding.md` states that goal and what it rules out of a converted schema.
 
 **Two of this section's former items were wrong by Revision 35**, and both were load-bearing assumptions
 rather than details:
@@ -250,9 +250,9 @@ rather than details:
   schema".** That rested on §2.5 leaving `field-name` lexical, which Revision 35 withdrew: a field name is an
   identifier at every layer. `{"first name": 1}` is now refused where the name is read, not reported as
   `UNRECOGNIZED_FIELD` later — a much harder wall, and the largest single obstacle to the on-ramp.
-  `docs/json-encoding.md` has the consequences; `SPEC-FEEDBACK.md` #5 states the proposal.
+  `design/json-encoding.md` has the consequences; `SPEC-FEEDBACK.md` #5 states the proposal.
 - **A JSON front end producing the same `DataValue`/`CoreValue` AST is not the shape.** `tson-json` is a
-  stack of its own; `docs/json-encoding.md` and `CLAUDE.md`'s "Not yet implemented" carry the two
+  stack of its own; `design/json-encoding.md` and `CLAUDE.md`'s "Not yet implemented" carry the two
   disagreements that decide it. Duplicate member names and JSON `null`-as-absence, which that plan got right,
   are §3.1 and §7 now — the implementation's obligations rather than this document's open questions.
 
@@ -299,7 +299,7 @@ rather than details:
   Schema keyword → the nearest TSON construct, and which JSON Schema features have no honest TSON
   equivalent at all) to guide a human doing the conversion by hand. What such a reference has to be honest
   about is the six places where the conversion costs the *producer* a change, not merely the author one:
-  `docs/json-encoding.md` lists them, and a converter that lands outside that profile produces a schema whose
+  `design/json-encoding.md` lists them, and a converter that lands outside that profile produces a schema whose
   documents have to be rewritten — the one outcome the exercise exists to avoid.
 - [ ] A JSON *writer* (TSON data → valid JSON text) is the natural write-direction companion to
   this whole section — tracked alongside the general schema-aware writer in `BACKLOG.md`'s "Write

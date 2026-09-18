@@ -474,7 +474,7 @@ java --module-path tson/build/modules --add-modules io.ltr8.tson examples/Object
 
 `CLAUDE.md` at the repository root is the orientation for changing this code — the hard constraints
 (Java 25, no external runtime dependencies), the module dependency direction, the pipeline phase by
-phase, the exception-classification policy, and the traps that look like cleanup targets. The `docs/`
+phase, the exception-classification policy, and the traps that look like cleanup targets. The `design/`
 notes carry the per-area design detail, `BACKLOG.md` the outstanding work, `SPEC-FEEDBACK.md` the spec
 issues still open against the current revision, and `STATUS.md` the implemented/not-yet checklist.
 `references/` here documents the API as it stands, not how to extend it.

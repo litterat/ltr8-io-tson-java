@@ -316,7 +316,7 @@ admit UTS #39's own `Toys-Я-Us`.
   branch is genuinely rare, and the loop around it is what mattered.
 - **Each writer is a facade over an engine in the unexported `writer` package** — `TsonTreeWriter` over
   `TreeValueWriter`, `TsonObjectWriter` over `DataClassObjectWriter` — the split the readers already have,
-  and for the reason `docs/json-encoding.md` states: a front door owns the *document* (its header, its root
+  and for the reason `design/json-encoding.md` states: a front door owns the *document* (its header, its root
   type-ref, the sinks it writes to) where an engine owns one value and contributes no framing. `AstWriter`
   and `AtomWriter` are engines too and live there beside them.
 - **The resolver reaches for the engine, never the facade.** `DefinitionResolver`'s atom-refinement merge
@@ -327,7 +327,7 @@ admit UTS #39's own `Toys-Я-Us`.
 
 ## Tree model: `TsonValue` (`tson-tree` module)
 
-What every tree read hands back — the compiled tree readers (`docs/linking-and-compilation.md`) and the
+What every tree read hands back — the compiled tree readers (`design/linking-and-compilation.md`) and the
 schemaless `TsonTreeReader` alike. A sealed `TsonValue` over eight pure immutable node types (`TsonRecord`/
 `TsonMap`/`TsonArray`/`TsonTuple`/`TsonAtom`/`TsonAbsent`/`TsonMissing`/`TsonScopedValue`),
 **structure-preserving** — TSON's
@@ -620,7 +620,7 @@ TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_ty
   needs to re-derive the binding without the application in between.
 - **Two binding seams, never merged.** `ProcessorConfig.withDataBindContext` binds the *data* a schema
   describes (`order` → `Order`); `ProcessorConfig.withMetaNameBinder` binds a governing meta's own *vocabulary*
-  (`operation` → `Operation`, the `data` base kind's case — `docs/linking-and-compilation.md`). One
+  (`operation` → `Operation`, the `data` base kind's case — `design/linking-and-compilation.md`). One
   namespace holding both would collide the first time a schema type and a meta-layer constructor shared a
   name. The meta binder is composed over `SchemaMetaNameBinder.INSTANCE` rather than replacing it, so what a
   consumer supplies adds names and gives up nothing: the standard library still compiles in object-binding

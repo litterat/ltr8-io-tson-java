@@ -20,7 +20,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
   admits begins with a digit, a sign or a dot — all in token-Start only so a *number* can be an unquoted
   token — so the profile subsumes it and also catches the names that merely *begin* like a number (`42x`,
   `-foo`) which the number rule let through. Field names are the one naming position the parser leaves
-  alone: `field-name` stays lexical for the Class 1 reason (`docs/lexer-and-data-parsing.md`), and
+  alone: `field-name` stays lexical for the Class 1 reason (`design/lexer-and-data-parsing.md`), and
   `DefinitionResolver.requireIdentifier` applies the contract to the ones a declaration actually binds.
   §12.1's `type-name = identifier` states it, and its note carries the field-name half.
 - **`SchemaMap.declarations` is a `Map<String, Declaration>`** (a `LinkedHashMap`, insertion order
@@ -61,7 +61,7 @@ materialization, no validation (those are the resolver's/linker's jobs).
 - **Two entry points, one grammar.** `parseSchemaDocument()` is fail-fast; `parseSchemaDocument(receiver)`
   reports each *declaration's* syntax error and resynchronises to the next, handing back no document at all
   if it reported anything. The mechanics, the resync rule and the two failures that stay fail-fast are in
-  `docs/readers-and-diagnostics.md` under "Schema-side diagnostics", with the rest of the diagnostics model.
+  `design/readers-and-diagnostics.md` under "Schema-side diagnostics", with the rest of the diagnostics model.
 - **A mismatch names the construct the position admits, not the token class** — `expect` takes that
   construct in the author's voice, and every call site here is phrased that way (`"a record field's ':'"`,
   `"a choice type's closing ')'"`), never as the enclosing construct. One position goes further and names
@@ -184,7 +184,7 @@ rebuilt and called a cache.
   its head through the type-name namespace only (§3.3.1) — parameters, then locals, then imports — so
   `map<text, text>` finds nothing and is an ordinary unresolved reference for the linker to report, and
   anything that *does* resolve is a §5.10 template. Substitution happens over the **resolved** form
-  (`TemplateMaterialiser`, `docs/schema-resolution.md`), not over the AST, so an application passes through
+  (`TemplateMaterialiser`, `design/schema-resolution.md`), not over the AST, so an application passes through
   here with its head and arguments intact. `checkTemplateApplication` refuses exactly one thing: a local
   head declaring *no* parameters, the author's error — nothing there takes type arguments. A template whose
   body writes a container sugar form over one of its own parameters used to be refused here too; that form
@@ -208,7 +208,7 @@ rebuilt and called a cache.
   governing meta's compiled reader, where an undeclared member is `UNRECOGNIZED_FIELD` under §7.2's closure.
   §5.4's "each variant resolves to a distinct type" is deliberately not checked here — it is a question about
   what names *resolve to*, after §8.3 flattening, which runs at the end of resolution and so cannot have
-  happened yet when this phase runs (`ReferenceFlattener`, `docs/schema-resolution.md`).
+  happened yet when this phase runs (`ReferenceFlattener`, `design/schema-resolution.md`).
 - **Both declaration-level tiers desugar in place.** At declaration position the form *is* the construction
   (`pair => [integer, text]` becomes `!tuple { … }`, like `ids => [text]`, `entries => {text => integer}` and
   `contact => (A | B)`); inline, each is hoisted into its own declaration and referenced.
@@ -249,7 +249,7 @@ rebuilt and called a cache.
   position is a parse error): a vacuous `[T; 0..]`, an incoherent size range, and an application of something
   that takes no type arguments. **A template-application `UnsupportedOperationException` is reported too**,
   as `NOT_IMPLEMENTED` rather than as an author error — thrown, it took every other declaration's verdict
-  with it. See `docs/readers-and-diagnostics.md` for the code split, the placeholder and the no-rollback
+  with it. See `design/readers-and-diagnostics.md` for the code split, the placeholder and the no-rollback
   rule.
 - **Structural sharing is load-bearing, not an optimization.** Every node not being rewritten is returned
   by identity, because `TsonSchemaParser.declarationPositions()` is an `IdentityHashMap` — an
@@ -301,7 +301,7 @@ rebuilt and called a cache.
       entry names something that is not an entry yet — for exactly the window an ordinary forward reference
       lives in, since `close()` walks every closed entry's references after the driving loop. What made this
       possible was teaching the bind readers to read an untagged labelled choice, which is what
-      `type_argument` is (`docs/linking-and-compilation.md`).
+      `type_argument` is (`design/linking-and-compilation.md`).
     - **A *value* argument makes the trip intact.** `type_argument`'s value channel binds a raw `Token` —
       §5.10 calls a type argument's literal a bare token rather than the value it denotes — so the slot reads
       the token rather than decoding it (`RawTokenParser`). The spelling is therefore what reaches identity,
@@ -381,7 +381,7 @@ rebuilt and called a cache.
 - **Every entry it lifts is a *synthetic* entry, and is marked as one.** `SchemaDesugarer.lifted(original,
   desugared)` is the set difference between the two documents, and that set is exactly what §8.2's derived
   `@synthetic` marker goes on — attached at the schema-map key by the caller, not here, since this phase
-  deals in AST and the marker belongs to resolved output (`docs/schema-resolution.md`). A set difference
+  deals in AST and the marker belongs to resolved output (`design/schema-resolution.md`). A set difference
   rather than a field on the pass, because `hoist` deliberately does *not* inject a form an `!!import`
   already declares: that entry is the same form resolved by the schema that owns it, and marking it here
   would put this document's derived marker on someone else's key.

@@ -91,7 +91,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   `x => tmpl<text>` against a `tmpl` its governing meta declares found the template through the fallback and
   then faulted it on *arity* — telling the author to supply arguments they had written, or that they had
   written the wrong number of them, when the real answer is the one every other reference form gives: the
-  name is not in scope. Its other half is in `TemplateMaterialiser` (`docs/schema-resolution.md`): an
+  name is not in scope. Its other half is in `TemplateMaterialiser` (`design/schema-resolution.md`): an
   application that cannot be closed keeps its argument list rather than collapsing to its bare head, so what
   the linker judges is what the author wrote. **The linker does not materialize anything** —
   `SchemaDesugarer` already turned every sugar form into a real declaration, one phase earlier and in the
@@ -253,7 +253,7 @@ for a defect in the schema, at a line the data's author does not control.
 
 A checker rather than a derivation, and `ChoiceDisjointness`'s peer in shape: it takes the merged namespace
 and the local names and hands back violations, leaving reporting to the linker. The fact itself is written
-by the author's mark and lowered by the resolver (`docs/schema-resolution.md`); what is left is whether the
+by the author's mark and lowered by the resolver (`design/schema-resolution.md`); what is left is whether the
 rest of the closure agrees with it.
 
 - **Why the linker and not the resolver.** Every rule needs a namespace the declaration does not have. FINAL

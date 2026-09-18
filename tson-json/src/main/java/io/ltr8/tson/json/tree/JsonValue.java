@@ -10,7 +10,7 @@ import java.util.Optional;
  * <p><b>Shaped and named after JEP 540</b>, the JDK's forthcoming {@code jdk.incubator.json} — the same
  * six subtypes, the same {@code get}/{@code tryGet} navigation and {@code as*} conversion vocabulary,
  * the same {@code of} factories — so a consumer learns one value model across the two and a bridge is later
- * a mapping rather than a rewrite. Where this differs, {@code docs/json-encoding.md} says why.
+ * a mapping rather than a rewrite. Where this differs, {@code design/json-encoding.md} says why.
  *
  * <p><b>The alignment stops at this package.</b> It is a statement about a tree's shape and names, never
  * about how a document is read or written or what a failure is raised as — those follow the TSON side of

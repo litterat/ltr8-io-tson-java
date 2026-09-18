@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  *
  * <p><b>This is a drift guard, and it exists because the schema-directed readers are two implementations.</b>
  * {@code tson-json} has its own compiled reader stack rather than sharing {@code tson-compiler}'s -- see
- * {@code docs/json-encoding.md} for why that is the right trade -- and the cost of the trade is that the
+ * {@code design/json-encoding.md} for why that is the right trade -- and the cost of the trade is that the
  * field-state rules ([TSON-SCHEMA] §5.2's six states, REQUIRED_FIXED injection, the FIXED check, closure,
  * duplicate members) are written twice and can drift apart silently.
  *

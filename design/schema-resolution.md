@@ -11,7 +11,7 @@ only; history lives in git. `CLAUDE.md` holds the one-paragraph orientation; thi
 wrapper over `SchemaResolver`) resolves a whole `SchemaDocument`: header-directive validation, deriving
 the structure namespace from the governing `!!meta`, merging `!!import` entries into the type-name
 namespace *before* any local declaration resolves. That merge is transitive and its collisions are decided
-by entry identity, exactly as at link time (§2.2.3, and `docs/linking-and-compilation.md`
+by entry identity, exactly as at link time (§2.2.3, and `design/linking-and-compilation.md`
 for the rule in full) — this is the same concept discovered one phase earlier, so the two implementations
 are kept in step deliberately.
 
@@ -525,7 +525,7 @@ recorded open form, and replacing the application with a reference to the entry 
   slot where the difference showed is `source`, whose lookup falls back to the governing meta's structure
   namespace: a stripped head found a template the schema cannot name and was faulted for supplying no
   arguments, when the author had written them. Keeping the list means the linker judges what was written.
-  The fallback's own half of the fix is in `docs/linking-and-compilation.md` — it does not apply to an
+  The fallback's own half of the fix is in `design/linking-and-compilation.md` — it does not apply to an
   argument-bearing `source` at all, a §5.10 head being resolved in the type-name namespace only (§3.3.1).
 - **Kind checking falls out of substitution, for the shapes that still resolve at their declaration.** A value
   argument reaching a type position is the author's error
@@ -789,7 +789,7 @@ recorded open form, and replacing the application with a reference to the entry 
     here closes it, the same walk that closes every other ref. Nested arguments need no separate handling,
     since `close()` already builds `pair<int32>` before `box<pair<int32>>` names it. What made the wire hop
     possible was `type_argument` becoming readable, value channel included
-    (`docs/linking-and-compilation.md`).
+    (`design/linking-and-compilation.md`).
 
 ## References are hops, not rewrites (`tson-compiler/.../TsonSchemaCompiler.java`)
 
@@ -845,7 +845,7 @@ meta the way an author-written annotation is: there is no author to resolve agai
   `TypeDefinition` value. §6 forbids hoisting between the two positions and nothing here does.
 - **Marked: exactly the synthetic entries, from both channels.** The desugar lift produces them and
   `SchemaDesugarer.lifted` names them as the document's own set difference
-  (`docs/schema-grammar-and-desugaring.md`); materialisation produces more of the same kind when it closes an
+  (`design/schema-grammar-and-desugaring.md`); materialisation produces more of the same kind when it closes an
   open synthetic, and `TemplateMaterialiser.syntheticNames()` reports which of its minted entries those are.
   A declaration's own sugar body is **not** one: `tag_list => [text; 1..2]` *is* the construction, not a lift
   of one (§5.3).

@@ -5,21 +5,21 @@ form, present tense. How it got here lives in git history and `BACKLOG.md`, not 
 choice has a non-obvious *why*, the current rationale is stated directly rather than the sequence of
 edits that produced it.
 
-**This file is deliberately an overview.** The full per-phase design detail lives in `docs/` (map below)
-and in class Javadoc. **Before working in an area, read its `docs/` note** — each note carries the
+**This file is deliberately an overview.** The full per-phase design detail lives in `design/` (map below)
+and in class Javadoc. **Before working in an area, read its `design/` note** — each note carries the
 invariants, spec-feedback citations, and deliberate divergences for that area at the depth this file used
 to. Trust but verify: the code is the source of truth if a note has drifted.
 
 | Area | Design note |
 |---|---|
-| Lexer, Tier 2/3 data parsing, base type resolution, atom vocabulary | `docs/lexer-and-data-parsing.md` |
-| Schema grammar, desugaring | `docs/schema-grammar-and-desugaring.md` |
-| Schema resolution, template materialisation, meta-kernel bootstrap | `docs/schema-resolution.md` |
-| Identity, linking, registry, Class 2 compilation, compiled registries | `docs/linking-and-compilation.md` |
-| Streaming readers, read context, diagnostics (data- and schema-side) | `docs/readers-and-diagnostics.md` |
-| Read facades, writers, tree model, `Tson` front door | `docs/facades-and-tree.md` |
-| CLI, config package, bundled schemas, content hashing | `docs/cli-config-hashing.md` |
-| The JSON encoding: its own lexer, structural layer, tree and readers | `docs/json-encoding.md` |
+| Lexer, Tier 2/3 data parsing, base type resolution, atom vocabulary | `design/lexer-and-data-parsing.md` |
+| Schema grammar, desugaring | `design/schema-grammar-and-desugaring.md` |
+| Schema resolution, template materialisation, meta-kernel bootstrap | `design/schema-resolution.md` |
+| Identity, linking, registry, Class 2 compilation, compiled registries | `design/linking-and-compilation.md` |
+| Streaming readers, read context, diagnostics (data- and schema-side) | `design/readers-and-diagnostics.md` |
+| Read facades, writers, tree model, `Tson` front door | `design/facades-and-tree.md` |
+| CLI, config package, bundled schemas, content hashing | `design/cli-config-hashing.md` |
+| The JSON encoding: its own lexer, structural layer, tree and readers | `design/json-encoding.md` |
 
 ## Project
 
@@ -171,7 +171,7 @@ absorbs what survives of the argument and the document goes, git history keeping
 *current* behavior — never dates, "renamed from X", "used to do Y, now does Z", "on the user's direction",
 or similar changelog framing. If a design needs a WHY, state the current invariant and its rationale
 directly. When you edit a class, clean up its Javadoc in the same edit — remove stale narrative (even if
-you didn't write it), fix anything that no longer matches the code, tighten what's left. The `docs/` notes
+you didn't write it), fix anything that no longer matches the code, tighten what's left. The `design/` notes
 and this file follow the same no-history rule; the dated log lives in git.
 
 **`BACKLOG.md` is a clean list of outstanding work and nothing else.** Every entry names something someone
@@ -181,11 +181,11 @@ decided against** (a won't-do is not work), and **what might become work later**
 something if conditions change is not actionable today, and sits in the list forever looking like a task).
 Prose inside a live entry follows the same rule — say what is left and what constrains it; recounting which
 halves already work turns an item into a status report that goes stale silently. Where one of those facts has
-to survive its entry, it belongs in the `docs/` note, the Javadoc, or the test that owns the area, where the
+to survive its entry, it belongs in the `design/` note, the Javadoc, or the test that owns the area, where the
 person who trips over it will be looking. Git history is the log. Same rule for the "Not yet implemented"
 section of this file.
 
-**Keep the `docs/` note current in the same session as the change.** When work alters behavior an area's
+**Keep the `design/` note current in the same session as the change.** When work alters behavior an area's
 design note describes, update that note the way you'd update the class's Javadoc — same edit, not a
 follow-up. A note that silently drifts is worse than no note.
 
@@ -220,7 +220,7 @@ saying *which* is the defect §7.2 refuses on the wire, and a class that means t
 schema while another is current declares a `@Profile` constructor for it. Reaching a read as a diagnostic
 instead (a schema compiled on demand), it keeps its own code, `Diagnostic.Code.BIND_MISMATCH` — a
 misconfiguration in the reading application is no more a verdict on the document than a gap is.
-`docs/readers-and-diagnostics.md` has the why.
+`design/readers-and-diagnostics.md` has the why.
 
 **Exception classification is a policy, not a style choice.** Across the schema pipeline:
 `TsonSchemaValidationException` means *the author's schema is wrong and the spec says so*;
@@ -527,10 +527,10 @@ directives — binding only ever touches public constructors/methods.
 The schema pipeline is **parse → desugar → resolve → link → register → compile → read**; the class
 vocabulary follows it (`TsonSchemaParser`, `SchemaDesugarer`, `TsonSchemaResolver`, `TsonSchemaLinker`,
 `TsonSchemaRegistry`, `TsonSchemaCompiler`, `TsonTypeReader`). Data documents (Class 1, no schema) run the
-shorter lex → parse → base-type-resolve path. One paragraph per phase below; the depth is in the `docs/`
+shorter lex → parse → base-type-resolve path. One paragraph per phase below; the depth is in the `design/`
 note named at the head of each.
 
-### Lexer (`tson-compiler/.../lexer/`) — `docs/lexer-and-data-parsing.md`
+### Lexer (`tson-compiler/.../lexer/`) — `design/lexer-and-data-parsing.md`
 
 `Lexer` is a single hand-written scanner producing `Token`s off `nextToken()` (never a batch). §1.3 says
 higher parts add no tokens, modes or character-classification changes, which is a statement about the
@@ -560,7 +560,7 @@ subtracts that set and two literal `ID_ \ XID_` tables — verified zero-over/ze
 `IdentifierProfile` through `JoiningControls` (UTS #39 §3.1.1.1's contexts A1/A2/B).
 Errors are fail-fast (`LexException`); multi-error recovery is deferred.
 
-### Structural parsing: Tier 2 stream + Tier 3 AST — `docs/lexer-and-data-parsing.md`
+### Structural parsing: Tier 2 stream + Tier 3 AST — `design/lexer-and-data-parsing.md`
 
 One implementation of the data grammar, split by role: **`TsonDataStream`** (Tier 2) is the only thing that
 walks source text — a lazy pull-based `TsonEventSource` over a sealed `TsonEvent` hierarchy, frame-stacked,
@@ -596,7 +596,7 @@ the header**, so reading only the header leaves an empty frame stack — which i
 take the event and then drive `drain` over a stack the header never touched, and what stops the stream
 needing to know what kind of document it holds.
 
-### Base type resolution (`.../base/`) — `docs/lexer-and-data-parsing.md`
+### Base type resolution (`.../base/`) — `design/lexer-and-data-parsing.md`
 
 `BaseTypeResolver.resolve(TokenValue)` implements §4's fixed order (boolean → number → string) for
 untyped tokens — **there is no `null`**: absence has one spelling, `_`, and it is lexical (its own token type,
@@ -611,7 +611,7 @@ host type and enforces the
 `255`/`0xFF` equivalences. Quoted tokens always resolve to `StringValue` (§4.4); form is consulted once,
 here.
 
-### Built-in atom vocabulary (`tson-atom`) — `docs/lexer-and-data-parsing.md`
+### Built-in atom vocabulary (`tson-atom`) — `design/lexer-and-data-parsing.md`
 
 `AtomType<T>` is a built-in atom's parsing contract, **over a `String`**: every family but two is a function of the text
 alone, which is what lets one vocabulary serve both encodings (§5.1). `BuiltinTypeVocabulary` is the fixed name→`AtomType`
@@ -625,7 +625,7 @@ declaration's own name — §4.2 makes that dispatch normative, the resolved sha
 uninformative — and two of the three are the *encoding's* rather than this vocabulary's: `AtomParsers` answers for
 `identifier` and declines `value` and `void`, whose readings depend on the lexical form and on a sentinel no token is.
 
-### Schema grammar (`TsonSchemaParser`, `.../ast/schema/`) — `docs/schema-grammar-and-desugaring.md`
+### Schema grammar (`TsonSchemaParser`, `.../ast/schema/`) — `design/schema-grammar-and-desugaring.md`
 
 Parses a schema document body (Part 2 §12.1) into a `SchemaDocument`, grammar-only — no resolution, no
 validation. `extends TsonDataParser` (same package) because §12.1 imports Part 1's grammar directly.
@@ -644,7 +644,7 @@ referenced name and `!` constructor head matches the profile, which *replaces* �
 not declarable names" rather than joining it: identifier-Start is `XID_Start`, so the one rule answers both
 and also catches the names that merely begin like a number (`42x`, `-foo`).
 
-### Desugaring (`.../resolver/SchemaDesugarer.java`) — `docs/schema-grammar-and-desugaring.md`
+### Desugaring (`.../resolver/SchemaDesugarer.java`) — `design/schema-grammar-and-desugaring.md`
 
 An AST→AST rewrite between parsing and resolution: every sugar form — `[T]` and the sized forms, `[T, U]`,
 `{K => V}`, `(A | B)` — becomes the `!C value` construction it denotes, at declaration position simply *being*
@@ -667,7 +667,7 @@ generic application can only be a §5.10 user-template application (§3.3.1 reso
 namespace only), and applying one is rejected at the site that writes it, an imported head included. Invalid
 sugar forms report per declaration via `DesugarFailureReporter` rather than throwing.
 
-### Shared resolver vocabulary: `WireForm`, `MetaRefs`, `DerivedName` — `docs/schema-resolution.md`
+### Shared resolver vocabulary: `WireForm`, `MetaRefs`, `DerivedName` — `design/schema-resolution.md`
 
 Three leaf classes the phases share, each owning a fact none of them owns individually. **`WireForm`** is how
 schema vocabulary is spelled as data, in both directions — the vocabulary member names, `refValue` and its
@@ -682,7 +682,7 @@ same tag letters in different roles. What is shared is each family's own renderi
 *both* lift channels, which is what makes a form written directly and the same form closed from a template land
 on one entry.
 
-### Schema resolution (`.../resolver/`) — `docs/schema-resolution.md`
+### Schema resolution (`.../resolver/`) — `design/schema-resolution.md`
 
 `DefinitionResolver` (package-private) turns one declaration into a resolved `schema.meta.TypeDefinition`;
 `TsonSchemaResolver` (public) resolves a whole `SchemaDocument`, merging `!!import` entries into the
@@ -763,7 +763,7 @@ so rewriting the output as well was a second representation to keep in step, who
 the source-site name and dropped the hops that mattered. A directive on an alias is applied where the alias
 compiles (`UseSite.named`, applied by the reference entry's own compile). §8.3 states both halves — a
 processor MAY collapse after linking, when it compiles for reading, and MUST NOT collapse in resolved output;
-`docs/schema-resolution.md` has the measurements.
+`design/schema-resolution.md` has the measurements.
 
 **The `@synthetic` marker** is the one derived marker (§8.1): §8.2 puts the bare marker on the schema-map
 **key** of every entry the resolver materialised from a sugar form, and on no other — an instantiation entry
@@ -776,7 +776,7 @@ it and the linker re-attaches it, imports included. The bootstrap route attaches
 and meta-kernel's own nine are marked anyway, by the ordinary resolution everything but the transient
 governing-meta stand-in comes from.
 
-### Meta-kernel bootstrap (`MetaKernelBootstrapResolver`) — `docs/schema-resolution.md`
+### Meta-kernel bootstrap (`MetaKernelBootstrapResolver`) — `design/schema-resolution.md`
 
 Meta-kernel's `!!meta` names itself (§1.5's one deliberate circularity), so ordinary resolution can't
 bootstrap it. `getMetaKernelSchema()` resolves it in **two passes** (non-`Instance` declarations first,
@@ -785,7 +785,7 @@ Desugaring needs no special case: the table is fixed by the sugar forms, so the 
 meta — which here would have been the very entries this class is producing. The payoff: meta-kernel's linked
 form needs no materialization.
 
-### Registry and linking (`TsonSchemaLinker`, `tson-schema/.../registry/`) — `docs/linking-and-compilation.md`
+### Registry and linking (`TsonSchemaLinker`, `tson-schema/.../registry/`) — `design/linking-and-compilation.md`
 
 `TsonCanonicalIdentity.canonicalize` is §2.2.1's algorithm (exactly two reductions — strip scheme, strip
 query — everything else must already be canonical), public API because `TsonSchemaLoader` keys on it.
@@ -813,7 +813,7 @@ unmodifiable `entries()` *is* the "locked" guarantee). The linker lives in `tson
 stage, next to `Diagnostic` and `tson-regex`); the registry stays in `tson-schema` (storage over the value
 model).
 
-### Meta-layer vocabulary: `Data` and the `data` base kind — `docs/linking-and-compilation.md`
+### Meta-layer vocabulary: `Data` and the `data` base kind — `design/linking-and-compilation.md`
 
 §2.2.2 makes the meta layer the format's extension point, and §4.1's fourth base kind — **`data => top & {}`**,
 with `DATA` in `type_kind` — is where an instance of a meta-schema's own constructor lives when the thing it
@@ -828,7 +828,7 @@ in full, and an unresolvable class is an error where the constructor is applied.
 §9's guidance for extension meta-schemas is the other half: a slot holding a type reference MUST be typed
 `type_ref`, which is what makes it participate in reference walking and identity.
 
-### Class 2 compilation (`TsonSchemaCompiler`, `.../reader/`) — `docs/linking-and-compilation.md`
+### Class 2 compilation (`TsonSchemaCompiler`, `.../reader/`) — `design/linking-and-compilation.md`
 
 `compile` turns a `TsonLinkedSchema` into a `TsonCompiledSchema` — one `TsonTypeReader` per entry, wired as
 real Java references, **eager** so a broken entry surfaces at compile time. `TsonTypeReader<T>` is strictly
@@ -847,7 +847,7 @@ is an ordinary data diagnostic (a schema naming one unapplied was already refuse
 meta-layer schema can govern others). Two compile modes (governed / standalone) share one walk; two output
 modes (tree / bind) share each `*AbstractReader` family, selected by which factory registry you hold.
 
-### The compiled registries — `docs/linking-and-compilation.md`
+### The compiled registries — `design/linking-and-compilation.md`
 
 `TsonCompiledMetaRegistry` is the shared meta/resolution core: compiles and caches **only** meta-layer
 schemas, resolves/links/registers everything else (`resolveLinked`) without compiling it, owns content-hash
@@ -863,7 +863,7 @@ shares this cache, this loader and this read mode with the schema that admitted 
 registry behind it passes `ForeignSchemas.none()`, whose every lookup is `SCHEMA_NOT_PERMITTED` — a fact
 about the deployment, never a verdict.
 
-### Streaming readers and read context — `docs/readers-and-diagnostics.md`
+### Streaming readers and read context — `design/readers-and-diagnostics.md`
 
 Every compiled reader pulls `TsonEvent`s through `TsonReadContext` — no reader requires a materialized
 tree. The context holds **no error policy**: `report(...)` hands a `Diagnostic` to the read's
@@ -913,7 +913,7 @@ acceptance is authored intent, not accident"). A **schemaless** document opens n
 §7.8's own rule: a nested `!!schema` in a document with no `!!schema` of its own is a validation error naming
 the directive.
 
-### Diagnostics — `docs/readers-and-diagnostics.md`
+### Diagnostics — `design/readers-and-diagnostics.md`
 
 `Diagnostic` (`tson-base`) is one record for both data- and schema-side problems — the variation is
 locational, not categorical: a closed `Code` enum, `message`, `expected`/`actual`, four location
@@ -1012,7 +1012,7 @@ of `ofBaseSyntaxError` in both facades) — a base-syntax failure is a verdict e
 a statement about the reader. It replaced a `StackOverflowError` that escaped every `catch (RuntimeException)`
 and got exit 1 with nothing on stdout.
 
-### Read facades and writers — `docs/facades-and-tree.md`
+### Read facades and writers — `design/facades-and-tree.md`
 
 `TsonObjectReader` (bound Java object) and `TsonTreeReader` (`TsonValue` tree) are the whole
 document-reading surface, dual-mode fixed at construction: standalone = schemaless (Class 1,
@@ -1057,7 +1057,7 @@ lexer, which is the stream's job.
 These live in `tson-compiler`'s root package because `DefinitionResolver` depends on
 `TsonObjectWriter`.
 
-### Tree model: `TsonValue` (`tson-tree`) — `docs/facades-and-tree.md`
+### Tree model: `TsonValue` (`tson-tree`) — `design/facades-and-tree.md`
 
 A sealed `TsonValue` over eight pure immutable node types (`TsonRecord`/`TsonMap`/`TsonArray`/`TsonTuple`/
 `TsonAtom`/`TsonAbsent`/`TsonMissing`/`TsonScopedValue`), structure-preserving and annotation-aware. No `Node`
@@ -1079,7 +1079,7 @@ Two accessor families with different questions: `as(Class)`/`asString`/…
 **cast** ("what host type did the read produce?"), `asInt`/`asLong`/`asDouble` **convert** ("what number is
 this?") — a test asserting which host type a reader produced must use `as(Class)`. Read-side only; no
 builders or transforms, deferred until a concrete produce/edit use case exists rather than pending
-(`docs/facades-and-tree.md`).
+(`design/facades-and-tree.md`).
 **`TsonDocument(id, schema, root)` is the model's document** — the counterpart of `ast.Document`, since §2.2
 makes a header a property of the document and not of its root value. No `meta` component: that would be a
 *schema* document, whose model is `schema.meta`, and `TsonDocumentHeader` (which carries all three) answers
@@ -1092,7 +1092,7 @@ the facades) is the object side's, and a distinct type rather than the same one:
 `rootType` is a name a `DataNameBinder` cannot invert, which is also why `TsonObjectWriter.describing` takes
 two arguments where the tree writer's takes one.
 
-### Front door: `Tson` (`tson` module) / `ProcessorConfig` (`tson-base`) — `docs/facades-and-tree.md`
+### Front door: `Tson` (`tson` module) / `ProcessorConfig` (`tson-base`) — `design/facades-and-tree.md`
 
 `Tson.standard()` bootstraps meta-kernel/meta.tn/core.tn and returns an immutable `Tson`.
 `ProcessorConfig.withDataBindContext` says which Java classes the schema's types bind to. **The vocabulary
@@ -1110,7 +1110,7 @@ tson.resolve(schemaText);                      // registers the schema by its ow
 TsonValue value = tson.treeReader().withSchema(schemaId).readAs(dataText, "my_type");
 ```
 
-### CLI, config, bundled schemas, hashing — `docs/cli-config-hashing.md`
+### CLI, config, bundled schemas, hashing — `design/cli-config-hashing.md`
 
 `tson validate [--output text|json|tson] <file|->...` auto-classifies a flat file list into schemas (by
 embedded `!!id`, never filename) and data, and validates each data document via `Tson.validate` — fully
@@ -1162,7 +1162,7 @@ differing by exactly the name binder.
 ## Traps — read before touching the class involved
 
 Hard-won invariants that look like cleanup targets or are easy to break silently. Each is documented at
-the class and (where noted) pinned by a test; the `docs/` notes carry the full why.
+the class and (where noted) pinned by a test; the `design/` notes carry the full why.
 
 - **`TypeArgument` is a sealed interface (`Ref`/`Value`), never a plain record.** It is the labelled choice
   the kernel declares, and a plain record with two `Optional`s would be a worse model: nothing in the type
@@ -1299,7 +1299,7 @@ position, and that is settled rather than owed**: it is a property of a *set*, a
 encoding applies it to data is TSON's schemaless tree read, where the grammar has already said the members
 are fields. In JSON the attack and a legitimate map of look-alike keys are spelled identically, so it must
 be accepted — a deployment that will not accept it raises the **token** policy, which reaches every token
-including a key. `docs/json-encoding.md` has the worked comparison.
+including a key. `design/json-encoding.md` has the worked comparison.
 
 **A minted name is judged by the same walk, and is built so it can be.** A derived name splices
 author-written content into its readable half, so `InternalName` restricts that half to **ASCII**: what §7.7
@@ -1309,7 +1309,7 @@ anything else is the hash alone. That satisfies §8.2's freshness MUST — an in
 all three hygiene rules at every level. Admitting `XID_Continue` instead would keep the name legal while
 letting a document's own text shape a namespace name, and would refuse any schema written outside Latin
 script; exempting minted names from the walk would answer that by leaving the hole open.
-`docs/linking-and-compilation.md` has the detail.
+`design/linking-and-compilation.md` has the detail.
 
 **One place is the point, not a tidiness.** The restricted-character rule used to run at the reading
 positions instead — spread over the schema parser, the definition resolver and the atom vocabulary — and had
@@ -1473,7 +1473,7 @@ compatibility).
   values) and an **open instance** — `<T> { v: [T] }`, or the explicit `<T, N> !array { element_type: T
   min_items: N }`. An open instance's body is **held** as text — the application as written, unread
   until materialisation substitutes its parameters away (`schema.meta.TemplateBody` carries it, `HeldBody`
-  parses it, `docs/schema-resolution.md`)
+  parses it, `design/schema-resolution.md`)
   — which is what makes §5.10's "collection-valued slots are parameterizable" work: `result => <T>
   ( T | error )` (the spec's own example), `<T> [T, text]` and `<T> { v: (T | text) }` all resolve. A
   container position holding an
@@ -1516,7 +1516,7 @@ compatibility).
   comments.
 - **Schema-side diagnostics** — **none outstanding**; what follows is the boundary. Parsing, desugaring,
   resolution and linking all report through a `DiagnosticsReceiver` (see
-  `docs/readers-and-diagnostics.md`), and read- and schema-side diagnostics now populate the same four
+  `design/readers-and-diagnostics.md`), and read- and schema-side diagnostics now populate the same four
   location components. Throw-site classification is done across the whole schema pipeline. The lexer stays
   fail-fast on purpose and is the floor under schema-parse recovery — not a tracked gap;
   `STRUCTURED-OUTPUT.md` holds the open question. **`schemaPosition` descends with the pointer** —
@@ -1546,9 +1546,9 @@ compatibility).
   open**: concurrent reads through one `Tson` are safe (the
   readers are immutable, the lexer/stream are per-read, both on-demand caches settle a race by keeping
   one entry, and a cache *hit* — which is every read, in a process that resolved its schemas at startup —
-  takes no lock at all; `docs/linking-and-compilation.md`), and **both halves are now stated on `Tson` and
+  takes no lock at all; `design/linking-and-compilation.md`), and **both halves are now stated on `Tson` and
   `ProcessorConfig` themselves** rather than only in the design notes — a consumer reads the front door, not
-  `docs/`, and that guarantee is what decides between one instance and one per request
+  `design/`, and that guarantee is what decides between one instance and one per request
   (`SharedInstanceConcurrencyTest` pins it at that surface). What is still open is everything *outside* a
   read: registering schemas concurrently. **Mutating a `DataBindContext` after use is no longer one** —
   registration is `DataBindContext.Builder`'s and closes when the context is built, so the API cannot

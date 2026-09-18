@@ -18,7 +18,7 @@ could pick up and do. Three things are therefore not entries, however true they 
   outstanding item; nobody can act on it today, and it sits in the list forever looking like a task.
 
 Where any of those has to survive its entry — a won't-do someone would otherwise re-propose, the why behind
-a shipped design, a condition that should trigger future work — it belongs in the `docs/` note, the Javadoc,
+a shipped design, a condition that should trigger future work — it belongs in the `design/` note, the Javadoc,
 or the test that owns the area, where the person who trips over it will actually be looking. Not here.
 
 Prose inside a live entry follows the same rule: say what is left to do and what constrains it. Recounting
@@ -117,7 +117,7 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   dispatch that used to be its second route is §6.1.5's and belongs to a record family, not to this
   entry. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`,
   `JsonCompiledSchema`,
-  `JsonSchemaCompiler`, its own factory registries — and `docs/json-encoding.md` carries why that is a deferral
+  `JsonSchemaCompiler`, its own factory registries — and `design/json-encoding.md` carries why that is a deferral
   rather than a conclusion: the two disagreements that keep the *event* layers apart both dissolve above the
   schema, where the reader is the position, so one compiled schema over an encoding-neutral context stays a real
   option and is simply not an abstraction worth designing from one implementation. **It gains no dependency on

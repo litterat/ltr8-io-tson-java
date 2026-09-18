@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git add *)",
+      "Bash(git mv *)",
+      "Bash(git rm *)",
+      "Bash(git stash *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh pr list *)",
+      "Bash(gh run *)",
+      "Bash(gh issue *)",
+      "Bash(gh api *)",
+      "Bash(tson-cli/build/install/tson/bin/tson *)",
+      "Bash(scripts/restamp-bundled-schemas.sh --check)",
+      "Bash(scripts/check-line-length.sh *)",
+      "Read(//Users/david/github/**)",
+      "WebFetch(domain:tson.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebSearch"
+    ]
+  }
+}
