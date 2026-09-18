@@ -1578,3 +1578,63 @@ needed. And **how cross-schema unification survives**: most simply by keeping th
 content-addressed name as a merge key alongside the declared entry, so §8.2's determinism SHOULD still has a
 subject. The sugar channel should then be brought to the same rule, or §5.3 should say why a use-site sugar
 form mints where a use-site application does not.
+
+---
+
+## 16. §4.3's operand rule contradicts itself for a record template's instantiation
+
+**Documents:** [TSON-SCHEMA] §4.3 (both operator families), §5.7 (refinement, which restates the same list),
+§5.8 (composition), §5.6 (top-level constructor applications), §8.2 (identity, and the instantiation entry's
+shape). Reads with #15, which is what made the collision reachable.
+**Kind:** internal inconsistency — one sentence states a MUST and an exception, and the exception is either
+redundant with the MUST or contradicts it, with no case where it does independent work. **The narrowing is
+running.**
+
+**The sentence, in §4.3:**
+
+> **Both families consume vocabulary bodies.** The source of a refinement and every operand of a composition
+> or subtraction MUST, after following its reference chain (§8.3), be a definition whose body is a `!record`
+> — a shape with fields to tighten or merge. A definition whose body is a binding record — a top-level
+> constructor application (§5.6), **a template instantiation (§8.2)**, or an alias resolving to either — is
+> *finished* and admits neither operator.
+
+**A record template's instantiation satisfies the MUST and is caught by the exception.** §8.2's own entry
+shape is why: an instantiation's body is "the substituted binding record, headed by the applied constructor",
+and for a record template that constructor is `record` — so the body literally *is* a `!record` with fields.
+For every other template the two halves agree and the exception is redundant: `vector<text, 3>` closes to
+`!array`, a map template to `!map`, a choice template to `!choice`, and the MUST already refuses each on its
+own body. So the clause does no work except where it contradicts the clause beside it. §5.7 restates the same
+list for its own source and inherits the same defect.
+
+**Measured, over `box => <V> { item: V }`:**
+
+| Written | Before |
+|---|---|
+| `sub => box<text> & { extra: text }` (application inline) | resolved — `item` + `extra` |
+| `bx => box<text>` then `sub => bx & { extra: text }` | **refused** |
+| `bx => { item: text }` then `sub => bx & { extra: text }` | resolved — `item` + `extra` |
+| `bx => box<text>` then `sub => bx ^ { item: text = "x" }` | **refused** |
+
+Rows 1 and 2 denote the same type and got opposite answers; rows 1 and 3 produce identical field sets. The
+refusal protected nothing — the composition was already expressible, just not through a name.
+
+**Why the MUST is the half to keep.** §8.2 says "what is canonicalised is identity, not provenance", and
+after #15 a declared application *is* an ordinary `!record` entry — so the only thing left to discriminate on
+is `source`, which is provenance. Gating `&` on it makes composition depend on how the author spelled a type.
+§5.8 already admits the application written inline, and §5.7's own prose recommends it ("a composition
+wanting one writes a trailing body, `method<order, order> & { … }`"), so refusing the *name* for that same
+instantiation draws a line with no semantic content. And "whose bindings are already set" is covered where it
+belongs: §5.7's per-field rule refuses re-fixing a `REQUIRED_FIXED` field to a different value, whoever wrote
+it, so the blanket refusal is redundant with a rule that is sharper.
+
+**What is running.** Both `source`-based discriminators are deleted, and §4.3's body test is the whole rule.
+It gives the right verdict in every case on the operand's own body: a record instantiation composes and
+refines, while `vector<text, 3>` (`!array`), a declared `{text => int32}` (`!map`) and a choice (`!choice`)
+are each refused for having no fields — which is what keeps the "finished" idea intact where it was always
+doing the work.
+
+**Suggested resolution.** Drop "a template instantiation (§8.2)" from the finished list in **both** §4.3 and
+§5.7, leaving "a top-level constructor application (§5.6), or an alias resolving to it". The MUST beside it
+already refuses every instantiation that genuinely has nothing to merge, and does so by asking about the body
+rather than about provenance. If instead the exception is meant to stand, §4.3 needs to say which half wins
+for a record template and why an author may compose with `box<text>` written out but not with a name for it.
