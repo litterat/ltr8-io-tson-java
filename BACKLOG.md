@@ -67,7 +67,7 @@ guess at: a checked annotation is an assertion in *either* declaration position 
 both spellings, which is what `@disjoint` already does. `@rest` is declared in meta.tn and is not checked, so
 it is advisory today where §6 says it carries force; it is also re-checked on ingest (§8.1), which is a second
 call site for whatever the load-time check becomes. `@discriminator` is **not** in this category — the erasure
-test puts its fact in the kernel, and its work is under "Discriminated record families" below.
+test puts its fact in the kernel rather than in an annotation a processor checks.
 
 - [ ] **`@rest` is not checked.** Two checks: the annotated field's type resolves to a text-keyed map, and at
   most one field per composed chain carries the mark — the chain being countable since §5.8's restated-field
@@ -114,8 +114,8 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   will finally admit a `$schema` member: the cell read off the members present, EXTERN needing both `$schema`
   and `$type`, LOCAL taking `$type` alone, and a bare value a validation error in every mode. `scoped` compiles
   to a `NOT_IMPLEMENTED` reader meanwhile. §8.2's predicate is one condition and is built whole; the member
-  dispatch that used to be its second route is §6.1.5's and belongs to a record family, tracked under
-  "Discriminated record families". **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`,
+  dispatch that used to be its second route is §6.1.5's and belongs to a record family, not to this
+  entry. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`,
   `JsonCompiledSchema`,
   `JsonSchemaCompiler`, its own factory registries — and `docs/json-encoding.md` carries why that is a deferral
   rather than a conclusion: the two disagreements that keep the *event* layers apart both dissolve above the
