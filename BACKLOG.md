@@ -112,8 +112,9 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
 - [ ] **No schema-directed decode of the open sum — §8.5.** §8.5's scoped positions are the open sum and what
   will finally admit a `$schema` member: the cell read off the members present, EXTERN needing both `$schema`
   and `$type`, LOCAL taking `$type` alone, and a bare value a validation error in every mode. `scoped` compiles
-  to a `NOT_IMPLEMENTED` reader meanwhile. §8.2's predicate is one condition and is built whole; the member
-  dispatch that used to be its second route is §6.1.5's and belongs to a record family, not to this
+  to a `NOT_IMPLEMENTED` reader meanwhile. The cell is read off the leading members (§8.5: `$schema` first, then
+  `$type`), which `ReservedMembers.lead` already answers. §8.2's predicate is one condition and is built whole;
+  the member dispatch that used to be its second route is §6.1.5's and belongs to a record family, not to this
   entry. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`,
   `JsonCompiledSchema`,
   `JsonSchemaCompiler`, its own factory registries — and `design/json-encoding.md` carries why that is a deferral
@@ -140,32 +141,6 @@ it. `design/json-encoding.md` has the argument; the entries below follow it. The
   could run over them as `SchemalessTreeReader` runs it for TSON. What it would add over the two per-name rules
   is narrow — two unmatched members that read alike as a pair, where neither is confusable with a declared
   name — so this is a decision to take deliberately, not a gap to close by reflex.
-
-- [ ] **The JSON readers follow Part 3's leading-member rules, and no position scans an object.** Part 3 now puts
-  every selector at the front (§3.3, §6.1.5, §10.1): `$schema` first where present, then `$type`, then a sealed
-  position's discriminators in any order among themselves; a misplaced `$schema`/`$type`, or a `$value` in an
-  object not led by `$type`, is a resolver error, and a discriminator after a non-discriminator member is
-  *discriminator missing*. The readers still scan whole objects (`ReservedMembers.scan`/`scanFor`). What is owed:
-  - **Every `$type` decision is a peek at the leading members**: `DispatchTagReader`, `DispatchChoiceReader`
-    (§8.2's first step and §8.3.1's decoder test read the first member only; a reserved name among a map
-    variant's later keys is a key), and the concrete record reader, which then judges `$value`, a misplaced
-    `$type`/`$schema` and unknown `$`-names inside its member loop with no lookahead. `ScannedReader` hands on
-    what the leading members said rather than a whole-object scan.
-  - **The sealed dispatcher reads its first *k* members** after any reserved ones and dispatches on them, with
-    no scan. The refusal for a discriminator that is not leading names the fix ("`pet_type` must lead the
-    object"). A `$type` contradicting a discriminator moves to the selected reader, as a FIXED contradiction on
-    the pin, and `CrossEncodingParityTest` pins that as a divergence until the TSON side catches up (entry below).
-  - **Scoped positions (§8.5)** read their cell off the leading members when their reader is built.
-  - Parity cases for the new refusals, and the allocation harness's first bound-record case, which should show
-    no lookahead buffer at all.
-
-- [ ] **`SPEC-FEEDBACK.md` gets an entry proposing that a choice's untagged route be locked down in Part 2, for
-  every encoding.** [TSON-SCHEMA] §5.4 derives `disjoint` and leaves each encoding to state its own predicate
-  over it, which is how JSON came to need class stability and §8.3.1's escape while TSON text needs neither. The
-  proposal: a choice may omit its tag only when its variants are disjoint **and** class-stable, stated once in
-  Part 2 over the encoding-neutral classes, with a map never class-stable — so one schema's untagged values are
-  the same set in every encoding and no encoding carries an escape rule for a reserved key. The entry states what
-  is running (JSON's §8.2/§8.3 after the Part 3 edit above) and that the Part 2 change is a proposal.
 
 - [ ] **The container readers split into a shared base and a tree subclass before bind mode is written.**
   `tson-compiler`'s `RecordAbstractReader`/`RecordTreeReader`/`RecordBindReader` split, applied to record, array,

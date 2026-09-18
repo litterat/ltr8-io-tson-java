@@ -37,6 +37,9 @@ class JsonSealedFamilyReadTest {
               frame => @sealed { @discriminator opcode: int32  payload: text }
               ping => frame & { opcode: = 0xFF  seq: int32 }
 
+              event => @sealed { @discriminator source: text  @discriminator kind: text  at: int32 }
+              login => event & { source: = "auth"  kind: = "login"  user: text }
+
               holder => { p: pet  s: shape? }
             }
             """;
@@ -76,14 +79,39 @@ class JsonSealedFamilyReadTest {
     }
 
     /**
-     * §6.1.6 gives member order no meaning, so the selector may arrive last -- after members that only the
-     * type it selects declares. A reader that decided on the opening brace, or on the first member, cannot
-     * read this, which is why the scan is a lookahead over the whole object.
+     * §6.1.5 puts the discriminators first, so the reader never holds more than they are before it knows the
+     * member (§10.1). One written after another member is missing to it, and the refusal says where it goes.
      */
     @Test
-    void theSelectorMayArriveAfterTheMembersItSelects() {
+    void aDiscriminatorAfterAnotherMemberIsMissing() {
+        String refusal = message("""
+                {"breed": "corgi", "name": "Rex", "pet_type": "dog"}""", "pet");
+        assertTrue(refusal.contains("missing discriminator 'pet_type'"), refusal);
+        assertTrue(refusal.contains("lead the object"), refusal);
+    }
+
+    /** Two discriminators lead in either order, and the pair selects the member. */
+    @Test
+    void severalDiscriminatorsLeadInAnyOrder() {
         assertEquals(List.of(), problems("""
-                {"breed": "corgi", "name": "Rex", "pet_type": "dog"}""", "pet"));
+                {"source": "auth", "kind": "login", "at": 1, "user": "ada"}""", "event"));
+        assertEquals(List.of(), problems("""
+                {"kind": "login", "source": "auth", "at": 1, "user": "ada"}""", "event"));
+    }
+
+    /** A second discriminator after an ordinary member is missing, even though the first led. */
+    @Test
+    void aSecondDiscriminatorAfterAnotherMemberIsMissing() {
+        String refusal = message("""
+                {"source": "auth", "at": 1, "kind": "login", "user": "ada"}""", "event");
+        assertTrue(refusal.contains("missing discriminator 'kind'"), refusal);
+    }
+
+    /** The discriminators lead after the tag, where the object carries one. */
+    @Test
+    void theDiscriminatorsLeadAfterAnyTag() {
+        assertEquals(List.of(), problems("""
+                {"$type": "dog", "pet_type": "dog", "name": "Rex", "breed": "corgi"}""", "pet"));
     }
 
     /** The selected member validates the whole value, so its own fields are checked as they always were. */
@@ -146,11 +174,15 @@ class JsonSealedFamilyReadTest {
                 {"$type": "dog", "pet_type": "dog", "name": "Rex", "breed": "corgi"}""", "pet"));
     }
 
+    /**
+     * The tag places the value and the selected member's reader holds it to the discriminator: `cat` pins
+     * `pet_type` to `cat`, so a document saying `dog` there contradicts a FIXED field.
+     */
     @Test
     void aTagContradictingTheDiscriminatorIsRefused() {
         String refusal = message("""
                 {"$type": "cat", "pet_type": "dog", "name": "Rex", "breed": "corgi"}""", "pet");
-        assertTrue(refusal.contains("a tag may only agree"), refusal);
+        assertTrue(refusal.contains("'pet_type' is fixed on 'cat'"), refusal);
     }
 
     // ── ABSTRACT: the tag is the only selector ───────────────────────────

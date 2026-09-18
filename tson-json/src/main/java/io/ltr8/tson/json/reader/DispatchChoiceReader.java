@@ -132,14 +132,14 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
         ctx = ctx.underDeclaration(schemaLocation);
         JsonEvent first = ctx.peek();
 
-        // §8.2's decode order, step 1, and §8.3.1's escape rule: at a choice position an object carrying any
-        // reserved member is the tagged form -- always, before any other reading. That is what lets a bare
-        // map stand as a variant while its keys remain data: the one ambiguity is settled by the tag, and a
-        // map whose keys would collide rides in a wrapper.
+        // §8.2's decode order, step 1, and §8.3.1's escape rule: at a choice position an object whose first
+        // member is reserved is the tagged form -- always, before any other reading, and from that member
+        // alone. That is what lets a bare map stand as a variant while its keys remain data: a reserved name
+        // among its later keys is a key, and a map holding one rides in a wrapper when it is written.
         if (first instanceof JsonEvent.ObjectStart) {
-            ReservedMembers.Tag tag = ReservedMembers.scan(ctx);
-            if (tag.present() || tag.unknown() != null) {
-                return tagged(ctx, tag);
+            ReservedMembers.Lead lead = ReservedMembers.lead(ctx);
+            if (lead.present()) {
+                return tagged(ctx, lead);
             }
         }
 
@@ -157,14 +157,14 @@ final class DispatchChoiceReader implements JsonTypeReader<Object> {
      * value at any choice position, including positions where the tag could have been omitted". So this runs
      * whether or not §8.2's condition holds, and a redundant tag is never wrong.
      */
-    private Object tagged(JsonReadContext ctx, ReservedMembers.Tag tag) {
+    private Object tagged(JsonReadContext ctx, ReservedMembers.Lead tag) {
         // §8.5 admits `$schema` at a scoped position -- the open sum -- and a choice is the closed one.
-        if (Tags.refusesMisuse(ctx, tag, name, Tags.CHOICE)) {
+        if (Tags.refusesScope(ctx, tag, name, Tags.CHOICE)) {
             return null;
         }
         if (tag.type() == null) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
-                    "this object carries this encoding's reserved members but no '$type' naming a variant of '"
+                    "this object leads with this encoding's reserved members but no '$type' naming a variant of '"
                             + name + "' (§3.3)", "a '$type' member holding a variant name", "no $type");
             EventSkip.nextValue(ctx);
             return null;

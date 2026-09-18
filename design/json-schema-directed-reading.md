@@ -10,10 +10,10 @@ surface. Current form only; history lives in git.
   diagnostic and never a verdict.
 - A `$type` is matched after reference flattening at every position that compares a written name against a set, through
   the one index `ReferenceChain.namesMeaning`.
-- The annotation-object scan runs before every record read; peeking the first member cannot conclude, because member order
-  is free.
-- The record reader passes over a reserved member silently (the scan already judged it), and `$schema` is refused everywhere
-  this can reach.
+- Selectors lead their object ([TSON-JSON] §3.3, §6.1.5): every decision is a peek at the leading members
+  (`ReservedMembers.lead`), bounded by the schema, and no reader scans an object.
+- The concrete record reader looks ahead at nothing: its member loop judges every reserved member as it arrives, and
+  `$schema` is refused everywhere this can reach.
 - `CompiledReaders` is rebound exactly once, from the in-progress compilation to the finished schema.
 - The map form is chosen by the factory from `K` and the record reader from `record.extension`, once at compile, never by
   inspecting a value.
@@ -21,8 +21,6 @@ surface. Current form only; history lives in git.
   trying variants in order. A missing required tag is `TYPE_MISMATCH`.
 - A dispatcher only selects: every reader it can select is wired when the schema compiles, it builds nothing, and one
   set serves every mode. The reader it selects validates in full.
-- An object is scanned for reserved members once: a dispatcher hands its scan to the reader it selects
-  (`ScannedReader`).
 - Readers are named mode, then family, then form, and carry no `Json` prefix inside the unexported `reader` package; a
   dispatcher has no mode and carries none.
 
@@ -83,7 +81,7 @@ diagnostic and never a verdict**: `SCHEMA_NOT_FOUND` for an identity the loader 
 for a root type the schema does not declare, and `Code.verdict()` separates the first from anything the
 document did.
 
-### The annotation object, and the lookahead it requires
+### The annotation object, and the peek at its leading members
 
 TSON text attaches a type annotation beside a value; JSON has no beside, so §3.3's **annotation object** is
 the carrier — wrapper (`{"$type": "age", "$value": 42}`) or inline (`{"$type": "employee", "name": "Ada"}`,
@@ -107,34 +105,37 @@ codebase `Annotation` means an `@name` annotation and nothing else — two dozen
 `tson-annotation` module through `Annotations`, `TsonAnnotation` and the `AnnotationStart`/`AnnotationEnd`
 events — and those have **no JSON carrier at all**: §4.3 declines one for v1 and makes encoding a value that
 carries them an encode error. A type named for §3.3 would be the single place the word meant something else,
-so it is named for the §3.2 namespace it scans and cites §3.3 throughout. The spec's noun is right for the
+so it is named for the §3.2 namespace it reads and cites §3.3 throughout. The spec's noun is right for the
 spec, where `@name` annotations are §3.1's and no reader is looking at a Java identifier to tell them apart.
 
-**Recognising one needs a rewindable lookahead, and this is the position the parallel-stack decision
-predicted would need it.** §6.1.6 gives member order no meaning, so `$type` may sit anywhere in the object
-and the opening brace settles nothing — a schema-directed reader must read into a value before it knows
-which reader owns it. `JsonReadContext.lookingAhead` is the peer of the TSON context's: a probe runs against
-the cursor and every event it consumed is replayed from a buffer rather than re-lexed. The scan reads member
-*names* only, skipping values without materialising them.
+**Recognising one is a bounded peek, because the selectors lead.** A reader cannot read an object's members
+until it knows which reader owns them, and §3.3 puts what decides that first: `$schema` where present, then
+`$type`, and §6.1.5 puts a sealed position's discriminators next, in any order among themselves.
+`ReservedMembers.lead` reads those members and stops at the first that is none of them, and
+`JsonReadContext.lookingAhead` replays what it consumed. It holds a scalar value per selector and nothing
+else — a selector whose value is not a scalar stops the peek — so what a reader holds before dispatch is a
+count the schema fixes, never one the document chooses (§10.1 gives the attack this closes). A valid wrapper's
+members are the reserved ones only, so its `$value` directly follows them and the peek sees it there; a
+`$value` anywhere else is an extra member of an invalid object, refused by whoever reads it.
 
-**It costs a second pass over each record's events**, replayed from memory rather than the lexer, and the
-scan runs before every record read because a redundant tag is admissible at any typed position (§8.1: "a tag
-is never wrong"). There is no sound shortcut: peeking the first member cannot conclude, because order is
-free. `BACKLOG.md` carries it as something to measure rather than something to assume.
+**The concrete record reader does no lookahead at all.** It is reached only for its own type, so its member
+loop judges reserved members as they arrive: a `$type` in first place must restate the record; `$value`
+straight after it makes the object a wrapper, read at the reader the dispatcher chose for it (`ExactReader`,
+`Route`), since the value inside may carry a tag of its own; a misplaced `$type` or `$value`, any `$schema`,
+and a name outside the closed set refuse the object, and the rest of it is skipped. Members read before a
+refusal have already reported, so an invalid document's diagnostics follow its member order — accepted
+deliberately: holding them back would cost every valid document a buffer to tidy the answer for invalid ones.
+The allocation harness measures what the peek saved (`aSchemaDirectedRecordReadsWithoutLookingAhead`).
 
-Two rules fall out of the scan and are worth naming because they look like omissions:
-
-- **The record reader passes over a reserved member silently.** By the time members are being read, the scan
-  has already judged them — an unknown `$name` refused, a `$schema` refused, a `$type` resolved against the
-  position. Passing over one is the decision already taken, not a decision skipped.
 - **`$schema` is refused everywhere this can reach.** §8.5 admits it only where the effective type is a
   `scoped` instance holding EXTERN, and §3.3 makes it a resolver error anywhere else. That is the correct
   verdict at every position built so far, and the scoped reader is what will admit it.
 
-`CompiledReaders` is what resolves a name at read time, and carries `tson-compiler`'s own hazard: it is **rebound exactly
-once**, from the in-progress compilation to the finished schema, because handing readers the compilation's
-resolve would leak its mutable state past the compile. Only the edges that need a name at read time consult
-it — a subtype named by `$type`, and whatever §8's dispatch reaches.
+`CompiledReaders` is how a factory reaches another entry's reader, and carries `tson-compiler`'s own hazard: it is
+**rebound exactly once**, from the in-progress compilation to the finished schema, because handing readers the
+compilation's resolve would leak its mutable state past the compile. No reader consults it at read time: every
+edge, a dispatcher's included, is an object reference wired at compile, and a cycle closes through
+`DeferredTypeReader`.
 
 ### The map form is chosen by the factory, not re-asked per value
 
@@ -193,23 +194,21 @@ they compare as (`ValueIdentity`). So a read is one map lookup, and both sides o
 the same parser: a schema pinning `= 0xFF` selects on a document writing `255`, which §4.3 makes the same
 integer. A table keyed on tokens would read that as unmatched.
 
-**One scan per object.** `ReservedMembers.scanFor` captures the reserved members *and* the named selectors in
-the single lookahead the position was going to make anyway — §6.1.6 gives member order no meaning, so the
-selector may arrive after the members it selects, and a reader that decided on the opening brace or the first
-member could not read that at all. Every dispatcher hands its scan to the reader it selects (`ScannedReader`),
-so the concrete reader does not scan again. The one exception is a sealed family reached through an outer
-dispatcher, which scans again for its selectors.
+**The leading members, and no more.** `ReservedMembers.lead` captures the reserved members *and* the
+discriminators from the front of the object, as many members as the family declares discriminators. One that
+follows another member is missing to the dispatcher, and the refusal says where it has to be — JSON's own
+wording of the shared rule, which `CrossEncodingParityTest` pins as the one difference from TSON text's.
 
 **The selected member re-reads the whole object**, which is what makes the dispatch read and the validation
 read agree by construction: the pin is re-verified as an ordinary FIXED check rather than trusted from the
-scan. A deeper `$type` wins over the dispatched member (§6.1.5's "deeper than one level"), and a tag that
-contradicts it is a refusal rather than a precedence question.
+peek. The discriminators are still required beside a tag, and a tagged value goes where its tag names — a
+deeper `$type` is §6.1.5's "deeper than one level" — so a tag disagreeing with the discriminator meets a pinned
+field the document contradicts, refused by the selected reader. TSON text still compares the tag against the
+dispatched member in the dispatcher; the parity test pins that divergence until `BACKLOG.md`'s port closes it.
 
 **What is specialised beyond the dispatch** is what the compiler already knows and the reader was re-deriving:
 a record with no field group skips the group pass entirely (§5.11's groups are the exception, and the pass
-indexes every member of every group). The larger one is still owed — a concrete reader reached directly still
-scans before reading, because §8.1 admits a redundant tag anywhere, and judging reserved members inside its
-member loop instead is `BACKLOG.md`'s.
+indexes every member of every group).
 
 ### Discrimination: one condition, and the table is built at schema load
 

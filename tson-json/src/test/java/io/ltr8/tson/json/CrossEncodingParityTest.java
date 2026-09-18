@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * One schema, one document in two encodings, one verdict.
@@ -171,6 +172,16 @@ class CrossEncodingParityTest {
                 "the two encodings state this rule differently");
     }
 
+    /** Both encodings refuse on the same codes at the same pointers; the JSON diagnostics, for what is left. */
+    private static List<Diagnostic> sameCodeAndPath(String rootType, String tsonBody, String jsonBody) {
+        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!%s %s".formatted(ID, rootType, tsonBody));
+        assertFalse(fromTson.isEmpty(), "the TSON side reported nothing, so this compares nothing");
+        List<Diagnostic> fromJson = jsonDiagnostics(rootType, jsonBody);
+        assertEquals(fromTson.stream().map(d -> d.code() + " " + d.path()).toList(),
+                fromJson.stream().map(d -> d.code() + " " + d.path()).toList(), "the two encodings differ");
+        return fromJson;
+    }
+
     /** A rule as both encodings must state it: which rule, where in the data, the constraint, and the prose. */
     private record Rule(Diagnostic.Code code, String path, String expected, String message) {
 
@@ -229,11 +240,17 @@ class CrossEncodingParityTest {
                         {"p": {"pet_type": "cat", "name": "Tom", "indoor": true}}""");
     }
 
+    /**
+     * One rule, one code, one pointer -- and JSON's prose says one thing more. [TSON-JSON] §6.1.5 puts a sealed
+     * position's discriminators first, so the JSON refusal says where the member has to be; TSON text has no
+     * member order and nothing to add.
+     */
     @Test
-    void aMissingDiscriminatorIsOneRuleInBoth() {
-        sameRule("kennel", "{ p: { name: Rex  breed: corgi } }",
+    void aMissingDiscriminatorIsOneRuleInBothAndJsonSaysWhereItGoes() {
+        List<Diagnostic> json = sameCodeAndPath("kennel", "{ p: { name: Rex  breed: corgi } }",
                 """
                         {"p": {"name": "Rex", "breed": "corgi"}}""");
+        assertTrue(json.getFirst().message().contains("lead the object"), json.getFirst().message());
     }
 
     @Test
@@ -244,15 +261,21 @@ class CrossEncodingParityTest {
     }
 
     /**
-     * The tag's <em>spelling</em> is the one thing that legitimately differs here -- {@code !cat} against
-     * {@code "$type": "cat"} -- which is why {@code RecordExtensionDiagnostics} keeps it out of the message and spends
-     * it in {@code actual}, the component this comparison excludes.
+     * <b>A divergence, pinned until the TSON reader catches up.</b> The JSON sealed dispatcher sends a tagged
+     * value where its tag names, and the selected member's reader refuses the pin the document contradicts --
+     * a FIXED contradiction at the discriminator. The TSON reader still compares the tag against the
+     * dispatched member itself and refuses at the value. Both refuse the document; they say so differently.
      */
     @Test
-    void aTagContradictingTheDiscriminatorIsOneRuleInBoth() {
-        sameRule("kennel", "{ p: !cat { pet_type: dog  name: Rex  breed: corgi } }",
-                """
-                        {"p": {"$type": "cat", "pet_type": "dog", "name": "Rex", "breed": "corgi"}}""");
+    void aTagContradictingTheDiscriminatorIsRefusedInBothAndStatedDifferently() {
+        List<Diagnostic> fromTson = TSON.validate("!!schema:\"%s\"\n!kennel %s".formatted(ID,
+                "{ p: !cat { pet_type: dog  name: Rex  breed: corgi } }"));
+        assertEquals(List.of(new Rule(Diagnostic.Code.TYPE_MISMATCH, "/p", "dog", fromTson.getFirst().message())),
+                fromTson.stream().map(Rule::of).toList());
+        List<Diagnostic> fromJson = jsonDiagnostics("kennel", """
+                {"p": {"$type": "cat", "pet_type": "dog", "name": "Rex", "breed": "corgi"}}""");
+        assertTrue(fromJson.stream().anyMatch(d -> d.code() == Diagnostic.Code.FIELD_FIXED
+                && d.path().orElse("").equals("/p/pet_type")), fromJson.toString());
     }
 
     @Test

@@ -40,6 +40,7 @@ class JsonChoiceReadTest {
             !!import:"https://tson.io/2026/36/m/core.tn"
             {
               scalar_or_list => ( text | int32 | boolean | [text] )
+              any_json       => ( text | number | boolean | [any_json?] | {text => any_json?} )
 
               circle      => { radius: float64 }
               square      => { side: float64 }
@@ -168,6 +169,26 @@ class JsonChoiceReadTest {
                 {"$type": "circle", "radius": 1.0}""").accepted().toString());
         assertEquals("42", read("scalar_or_list", """
                 {"$type": "int32", "$value": 42}""").accepted().toString());
+    }
+
+    /**
+     * §8.3.1: the tagged form is recognised from the first member alone, so a reserved name among a map
+     * variant's later keys is a key -- §5.7's arbitrary-JSON declaration reads it untagged.
+     */
+    @Test
+    void aReservedNameAfterTheFirstMemberIsAMapKey() {
+        assertEquals("""
+                {"a":1,"$type":"x"}""", read("any_json", """
+                {"a": 1, "$type": "x"}""").accepted().toString());
+    }
+
+    /** The same name leading the object is the tag, and names no variant here. */
+    @Test
+    void aLeadingReservedNameIsTheTagEvenWhereAMapCouldTakeIt() {
+        Diagnostic refusal = read("any_json", """
+                {"$type": "x", "a": 1}""").refusal();
+        assertEquals(Diagnostic.Code.TYPE_MISMATCH, refusal.code());
+        assertTrue(refusal.message().contains("not a variant"), refusal.message());
     }
 
     /** §8.4's note: a `$type` naming a proper subtype of a variant validates as that subtype. */

@@ -14,7 +14,7 @@ import java.util.Map;
  * object reference at compile time, so a read never consults a name-keyed map except at the edge that closes
  * a loop.
  */
-public final class DeferredTypeReader implements JsonTypeReader<Object> {
+public final class DeferredTypeReader implements JsonTypeReader<Object>, ExactReader {
 
     private final String name;
     private final Map<String, JsonTypeReader<?>> finished;
@@ -26,11 +26,23 @@ public final class DeferredTypeReader implements JsonTypeReader<Object> {
 
     @Override
     public Object read(JsonReadContext ctx) {
+        return target().read(ctx);
+    }
+
+    /** As {@link Route#read} treats a target it reached directly: exact where it can be, a wrapper otherwise. */
+    @Override
+    public Object readExact(JsonReadContext ctx, JsonTypeReader<?> wrapped) {
+        return target() instanceof ExactReader exact
+                ? exact.readExact(ctx, wrapped)
+                : ReservedMembers.readWrapped(ctx, wrapped);
+    }
+
+    private JsonTypeReader<?> target() {
         JsonTypeReader<?> target = finished.get(name);
         if (target == null) {
             throw new IllegalStateException("'" + name + "' closes a cycle but never finished compiling -- "
                     + "the compile should have completed every entry before any read began");
         }
-        return target.read(ctx);
+        return target;
     }
 }

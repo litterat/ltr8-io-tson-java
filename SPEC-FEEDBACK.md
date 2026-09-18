@@ -1638,3 +1638,48 @@ doing the work.
 already refuses every instantiation that genuinely has nothing to merge, and does so by asking about the body
 rather than about provenance. If instead the exception is meant to stand, §4.3 needs to say which half wins
 for a record template and why an author may compose with `box<text>` written out but not with a name for it.
+
+## 17. §5.4 makes `disjoint` sufficient to omit a tag, and in JSON it is not
+
+**Documents:** [TSON-SCHEMA] §5.4 (the discrimination classes, the no-class list, and **Tagging**);
+[TSON-JSON] §4.2, §8.2, §8.3 (the class-stability condition this entry would move into Part 2).
+**Kind:** inconsistency between Parts 2 and 3 — Part 2 states a rule for every encoding that one encoding has to
+break. **Part 3's stricter rule is running; the Part 2 change is a proposal.**
+
+**The sentence, in §5.4:**
+
+> The tag is REQUIRED when the choice is not disjoint, and MAY be omitted when it is: `disjoint` means precisely
+> that the encoding's own form resolution […] recovers the variant
+
+**For JSON that is false in two cases, and they are the only two.** A `float_type` instance still admitting
+`.nan` or the infinities has values JSON spells as strings ([TSON-JSON] §5.4), so an untagged `"…"` at
+`( float64 | text )` could belong to either variant; and a map whose key type is compound is spelled as a JSON
+array of pairs ([TSON-JSON] §6.5), so an untagged `[…]` at `( {point => text} | [text] )` could belong to
+either. Both choices are `disjoint: true` by §5.4, and in both the encoding's form resolution does not recover
+the variant. Part 3 therefore adds a second condition — every variant *class-stable* (§8.3) — and a decoder
+omitting the tag on §5.4's word alone would be non-conforming to Part 3. One schema then has two different
+sets of untagged values depending on the encoding, which is the thing a derived, encoding-neutral fact exists
+to prevent.
+
+**Part 2 already has the mechanism, and uses it for the same reason.** §5.4 gives `rational` and `complex` no
+discrimination class because their "typed forms straddle classes". The two JSON leaks are the same property in
+another encoding: an approximate atom admitting non-finite values has forms in two classes, and so does a map
+whose key type no single scalar token denotes. Neither is special to JSON in kind — any encoding without a
+number spelling for the specials, or without a delimiter pair for compound-keyed maps, meets the same two.
+
+**What is running.** [TSON-JSON] §8.2 omits the tag only where the choice is disjoint **and** every variant is
+class-stable, computed once per choice when the schema compiles; §8.3 names the two leaks and closes the set.
+Object-form maps are class-stable, which is what keeps §5.7's arbitrary-JSON declaration
+(`( text | number | boolean | [json?] | {text => json?} )`) readable untagged, and §8.3.1's escape rule —
+reduced to a test of the object's first member now that Part 3 puts `$type` first — settles the one reading it
+leaves. TSON text omits the tag on `disjoint` alone, so `( float64 | text )` is untagged in text and tagged in
+JSON.
+
+**Suggested resolution.** Extend §5.4's no-class list with the two straddling kinds: *an approximate atom whose
+`allow_nan` or `allow_infinity` is true, and a map whose key type, after following its reference chain, is not
+a type a single scalar token denotes by its content — an atom family or an enum, the `unit` instances `value`
+and `void` excepted*. `disjoint` then carries class stability itself, every encoding reads the one derived fact,
+and a choice's untagged values are the same set in every encoding. Part 3's §8.3 reduces to a note explaining
+why those two have no class, and §8.2's predicate to `disjoint` alone. The cost is on the text side:
+`( float64 | text )` and a choice over a compound-keyed map need a tag there too, where today they do not — the
+price of one answer across encodings, payable by narrowing `allow_nan`/`allow_infinity` or by tagging.

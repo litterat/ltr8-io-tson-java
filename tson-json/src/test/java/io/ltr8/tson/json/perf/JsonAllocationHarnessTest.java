@@ -1,8 +1,10 @@
 package io.ltr8.tson.json.perf;
 
+import io.ltr8.tson.Tson;
 import io.ltr8.tson.base.io.ByteSource;
 import io.ltr8.tson.base.DiagnosticsReceiver;
 import io.ltr8.tson.base.policy.ProcessorPolicy;
+import io.ltr8.tson.json.Json;
 import io.ltr8.tson.json.JsonObjectReader;
 import io.ltr8.tson.json.JsonTreeReader;
 import io.ltr8.tson.json.stream.JsonStream;
@@ -57,6 +59,21 @@ class JsonAllocationHarnessTest {
 
     private static JsonObjectReader reader;
 
+    private static final String SCHEMA_ID = "https://example.test/orders.tn";
+
+    /** The order's shape as a schema, for the schema-directed read: every record here is concrete. */
+    private static final String SCHEMA = """
+            !!id:"https://example.test/orders.tn"
+            !!meta:"https://tson.io/2026/36/m/meta.tn"
+            !!import:"https://tson.io/2026/36/m/core.tn"
+            {
+              line  => { sku: text  quantity: int32  price: float64 }
+              order => { id: uuid  customer: text  placed: datetime  lines: [line]  note: text }
+            }
+            """;
+
+    private static JsonTreeReader schemaReader;
+
     @BeforeAll
     static void startUp() {
         assumeTrue(AllocationProbe.supported(), "needs HotSpot's per-thread allocation counter");
@@ -66,6 +83,12 @@ class JsonAllocationHarnessTest {
         // design, so it is built here rather than measured as a read's cost.
         for (int i = 0; i < 2_000; i++) {
             AllocationProbe.sink = reader.read(DOCUMENT, Order.class);
+        }
+        Tson tson = Tson.standard();
+        tson.resolve(SCHEMA);
+        schemaReader = Json.standard().withSchemas(tson.schemaRegistry()).treeReader().withSchema(SCHEMA_ID);
+        for (int i = 0; i < 2_000; i++) {
+            AllocationProbe.sink = schemaReader.readAs(DOCUMENT, "order");
         }
         AllocationProbe.sink = null;
     }
@@ -129,6 +152,25 @@ class JsonAllocationHarnessTest {
         report("allocated per record bound (JSON)", perLine, "bytes");
         assertTrue(perLine < 4_000, "binding one three-field record allocated " + perLine + " bytes, which is "
                 + "not the shape of three values and the slots to hold them");
+    }
+
+    /**
+     * What one record costs a schema-directed tree read: the member values, the slots the record reader keeps,
+     * the node it hands back, and the contexts that carry each field's data and schema pointers.
+     *
+     * <p>[TSON-JSON] §3.3 and §6.1.5 put every selector at the front of its object, so a record with no
+     * subtypes decides nothing ahead of its members and this figure holds no lookahead buffer. Scanning each
+     * object for reserved members, which is what the rule removed, cost about a tenth of it for this
+     * three-field record -- too little for a ceiling to catch without becoming a budget, so the assertion is
+     * the harness's usual ratchet against work that returns per field rather than per record.
+     */
+    @Test
+    void aSchemaDirectedRecordReadsWithoutLookingAhead() {
+        double perLine = perLine(order(4), order(64), d -> schemaReader.readAs(d, "order"));
+
+        report("allocated per record, schema-directed tree", perLine, "bytes");
+        assertTrue(perLine < 8_000, "reading one three-field record against its schema allocated " + perLine
+                + " bytes, which is not the shape of three values and the node that holds them");
     }
 
     /** Bytes per line of the order, the flat per-read cost cancelling out. */
