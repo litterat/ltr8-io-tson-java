@@ -130,6 +130,25 @@ final class TemplateMaterialiser {
     private final List<String> heads = new ArrayList<>();
 
     /**
+     * Which <b>declared</b> name owns the entry for an application, keyed on §8.2's canonical application
+     * ({@code SPEC-FEEDBACK.md} #15). Populated by {@link #closeApplicationInto} and read by {@link
+     * #instantiate} before it derives a name of its own, so it answers two questions with one map.
+     *
+     * <p><b>Knot-tying</b>: a recursive application inside a declaration-owned closure -- {@code use =>
+     * tree<text>} over {@code tree => <T> { children: [tree<T>; 1..] }} -- re-derives the same canonical
+     * form, and without this would mint a content-named entry beside {@code use} for the very recursion
+     * {@code use} names. <b>Reuse</b>: a use site writing the same application resolves to the declaration
+     * rather than minting, which is the half of "do not create the derived entry" that reaches field
+     * positions.
+     *
+     * <p>It is not a dedup table across declarations. Two declarations naming one application each own an
+     * entry, the second finding the first here only if it resolves later -- and either way the resolver is
+     * free to produce two structurally equal entries, which is what two hand-written records with the same
+     * fields already are.
+     */
+    private final Map<String, String> ownedBy = new LinkedHashMap<>();
+
+    /**
      * How deep the closing chain may go before materialisation is abandoned -- a <b>backstop</b>, not the
      * rule.
      *
@@ -270,6 +289,61 @@ final class TemplateMaterialiser {
     }
 
     /**
+     * The entry a declaration naming a fully-bound application <b>is</b> -- see {@link
+     * ApplicationCloser#closeApplicationInto}. Closes the application into {@code declaredName} and hands the
+     * definition back for the caller to own: nothing is published under a derived name, and nothing is
+     * claimed in {@link #minted}, whose ledger is §8.2's freshness MUST over <em>internal</em> names.
+     *
+     * <p>Every shape but two closes here. A <b>record</b> template's closure is the instantiation itself, so
+     * {@link #closeHeldRecord} answers directly. Every other held form -- an open instance such as {@code arr
+     * => <T> !array { element_type: T }} -- substitutes to a construction the declaration simply <em>is</em>,
+     * which is where the synthetic that used to stand between them disappears. §5.10's partial application
+     * and an unresolvable or mis-applied head return {@code null} for the caller to handle.
+     */
+    TypeDefinition closeApplicationInto(String declaredName, TypeRef application) {
+        String head = application.name();
+        TypeDefinition template = namespace.getTypeDefinition(head);
+        if (template == null || !(template.body() instanceof TemplateBody body)) {
+            return null; // unresolved, or a head taking no parameters -- reported through the ordinary path
+        }
+        List<String> parameters = template.parameters();
+        if (parameters.isEmpty() || parameters.size() != application.arguments().size()) {
+            return null; // arity is `instantiate`'s to report, in its own words
+        }
+        HeldBody open = HeldBody.of(body);
+        String constructor = open.application().typeRef().orElseThrow();
+        if (REFERENCE.equals(constructor)) {
+            return null; // §5.10: an alias hop mints no entry, so there is none for a declaration to own
+        }
+        // §8.2 keys an instantiation on the *canonical* application -- "arguments compared after following
+        // reference chains" -- so an argument naming a pure rename is replaced by the entry at the end of it
+        // before anything is derived from the list. `close` does this for a minted entry; without it here,
+        // `by_alias => box<user_id>` and `by_target => box<uuid>` would record two applications for one type,
+        // and the name, the ownership key and `source` would each disagree with the minted path.
+        List<TypeArgument> classified =
+                byParameterKind(head, template, parameters, application.arguments());
+        List<TypeArgument> arguments = new ArrayList<>();
+        for (TypeArgument argument : classified) {
+            arguments.add(argument instanceof TypeArgument.Ref nested
+                    ? new TypeArgument.Ref(dereferenced(close(nested.ref())))
+                    : argument);
+        }
+        ownedBy.put(DerivedName.canonicalApplication(head, arguments), declaredName);
+        heads.add(head);
+        try {
+            Map<String, TypeArgument> bindings = bind(parameters, arguments);
+            if (RECORD.equals(constructor)) {
+                return closeHeldRecord(head, template, open, arguments, bindings);
+            }
+            Closed closed = closeHeld(head, template, open, bindings);
+            return new TypeDefinition(Optional.of(new TypeRef(head, arguments)),
+                    kindOfClosed(closed.body()), List.of(), List.of(), closed.body());
+        } finally {
+            heads.remove(heads.size() - 1);
+        }
+    }
+
+    /**
      * One definition with every application inside it closed -- <b>except the ones in {@code
      * record.supertypes}</b>, which are left exactly as written.
      *
@@ -290,7 +364,18 @@ final class TemplateMaterialiser {
      * back.
      */
     private TypeDefinition rewrite(TypeDefinition definition) {
-        return MetaRefs.mapRefsKeepingRecordSupertypes(definition, this::close);
+        TypeDefinition mapped = MetaRefs.mapRefsKeepingRecordSupertypes(definition, this::close);
+        if (!(definition.body() instanceof Reference) || definition.source().isEmpty()) {
+            return mapped;
+        }
+        // An <b>alias</b>'s source is the application it names, and §8.3 makes the entry at the end of the
+        // chain what it denotes -- closing it is what turns `applied => open<int32>` into a reference sourced
+        // at `int32`. A declaration that *owns* an instantiation records the application as provenance
+        // instead (§8.2's "what is canonicalised is identity, not provenance"), and closing that would
+        // rewrite it to the declaration itself; those are told apart by the body, which is a Reference only
+        // for the alias.
+        return new TypeDefinition(definition.source().map(this::close), mapped.kind(), mapped.supertypes(),
+                mapped.subtypes(), mapped.body(), mapped.position(), mapped.annotations());
     }
 
     /**
@@ -373,6 +458,13 @@ final class TemplateMaterialiser {
                     + arguments.size() + " " + (arguments.size() == 1 ? "was" : "were") + " applied (§5.10)");
         }
         arguments = byParameterKind(head, template, parameters, arguments);
+        String owner = ownedBy.get(DerivedName.canonicalApplication(head, arguments));
+        if (owner != null) {
+            // A declaration owns this application's entry ({@code SPEC-FEEDBACK.md} #15), so there is nothing
+            // to mint: a recursive reference inside its own closure ties the knot on the declared name, and a
+            // use site writing the same application names the declaration instead of a derived entry.
+            return owner;
+        }
         String name = DerivedName.ofApplication(head, arguments);
         if (aliasClosing.contains(name)) {
             throw new SchemaValidationException("'" + head + "<...>' is a reference template whose own "
@@ -566,69 +658,39 @@ final class TemplateMaterialiser {
         Top body = fixRoutedValues(closed.body());
         return new TypeDefinition(Optional.of(new TypeRef(head, arguments)),
                 kindOfClosed(closed.body()),
-                contractOf(template, open, body), List.of(),
+                contractOf(template), List.of(),
                 body);
     }
 
     /**
      * The closed entry's IS-A contract (§8.1's {@code type_definition.supertypes}): the template's own chain,
-     * plus every parent that was still an <em>application</em> when the template was written.
+     * and nothing more.
      *
-     * <p>A template's chain is settled at its declaration, where a parent applied to its own parameter denotes
-     * no entry -- {@code result<T>} is not a type and nothing can be IS-A one, so it contributes no name
-     * there. Once the arguments arrive it does denote one, and this is where that edge is minted: {@code
-     * ok<text>} IS-A {@code result<text>} and not {@code result<int32>}, which is the whole reason the body
-     * carries the parent as a reference rather than as a name.
+     * <p>A template's chain is settled at its declaration, where a parent applied to its own parameter
+     * denotes no entry -- {@code result<T>} is not a type and nothing can be IS-A one -- so it contributes no
+     * name there, while {@code openOperand} has already folded in the operand's own ancestors. What is left
+     * is the edge to the entry the <em>closed</em> application denotes, and this is the wrong place to mint
+     * it: composition needs the operand's fields and never an entry for it, so {@link #closeHeld} leaves the
+     * application in {@code record.supertypes} as written, and whether some declaration names that same
+     * application depends at this moment on declaration order.
      *
-     * <p><b>Which parents those were is read off the held body, not off the closed one.</b> Closing reduces
-     * an application to a bare name, so afterwards a parent that was written {@code result<T>} and one
-     * written {@code account} are the same shape -- and the difference decides whether an edge is minted or
-     * an already-revoked one is resurrected: §5.9 subtraction empties the contract while the body keeps its
-     * named lineage. The two lists are index-aligned, substitution and closing both mapping elementwise, so
-     * the held body's own supertype elements answer it exactly.
+     * <p><b>So the edge is derived once, afterwards</b>, by {@code SchemaResolver} over a namespace in which
+     * every declaration has resolved -- §8.1's own account of the field, "the derived transitive index,
+     * computed once every parent is a type". That keeps {@code ok<text>} IS-A {@code result<text>} and not
+     * {@code result<int32>}, which is why the body carries the parent as a reference rather than as a name,
+     * and it makes the answer independent of the order the declarations were written in.
+     *
+     * <p>§5.9 needs nothing here either: a declaration carrying a removal never puts the operand in
+     * {@code record.supertypes} at all, so there is no revoked edge for a later pass to resurrect.
      */
-    private List<String> contractOf(TypeDefinition template, HeldBody open, Top body) {
-        if (!(body instanceof RecordBody record) || record.supertypes().isEmpty()) {
-            return template.supertypes();
-        }
-        List<Boolean> applied = appliedParents(open);
-        List<String> contract = new ArrayList<>(template.supertypes());
-        Set<String> seen = new LinkedHashSet<>(contract);
-        for (int i = 0; i < record.supertypes().size(); i++) {
-            if (i >= applied.size() || !applied.get(i)) {
-                continue;
-            }
-            String parent = record.supertypes().get(i).name();
-            if (!seen.add(parent)) {
-                continue;
-            }
-            contract.add(parent);
-            TypeDefinition closedParent = materialised.get(parent);
-            if (closedParent == null) {
-                closedParent = namespace.getTypeDefinition(parent);
-            }
-            if (closedParent != null) {
-                for (String ancestor : closedParent.supertypes()) {
-                    if (seen.add(ancestor)) {
-                        contract.add(ancestor);
-                    }
-                }
-            }
-        }
-        return List.copyOf(contract);
-    }
-
-    /** Which of a held body's supertype elements were written as applications -- a record rather than a token. */
-    private static List<Boolean> appliedParents(HeldBody open) {
-        if (!(open.application().coreValue() instanceof RecordValue held)) {
-            return List.of();
-        }
-        return WireForm.field(held, WireForm.SUPERTYPES)
-                .filter(ArrayValue.class::isInstance)
-                .map(ArrayValue.class::cast)
-                .map(array -> array.elements().stream()
-                        .map(element -> element.value().coreValue() instanceof RecordValue).toList())
-                .orElse(List.of());
+    private List<String> contractOf(TypeDefinition template) {
+        // An operand written as an application contributes no name here, and cannot: the entry it denotes is
+        // whichever declaration names the same application, and at this moment whether one does depends on
+        // declaration order. `SchemaResolver` derives that edge once every declaration has resolved, which
+        // is §8.1's own account of the field -- "the derived transitive index, computed once every parent is
+        // a type". What the template's own chain carries is already here, openOperand having contributed the
+        // operand's ancestors at the declaration.
+        return template.supertypes();
     }
 
     /**
@@ -666,7 +728,7 @@ final class TemplateMaterialiser {
         // thing here -- a token in a tree -- because the body was never read against the constructor's
         // vocabulary in the first place.
         CoreValue substituted = WireForm.substitute(open.application().coreValue(), head, template.parameters(), bindings);
-        CoreValue wire = closeApplications(substituted);
+        CoreValue wire = closeApplicationsOutsideSupertypes(substituted);
         try {
             return new Closed(wire, metaReader.read(target, new DataValue(List.of(), Optional.of(target), wire)));
         } catch (ReadException e) {
@@ -676,6 +738,33 @@ final class TemplateMaterialiser {
                     + "valid data for '" + target + "', the constructor's own constraint vocabulary -- "
                     + e.getMessage(), e);
         }
+    }
+
+    /**
+     * The held body's applications closed -- <b>except the ones standing in {@code record.supertypes}</b>,
+     * which are left exactly as written.
+     *
+     * <p>A composition operand denotes no entry ({@code SPEC-FEEDBACK.md} #15, and {@code
+     * DefinitionResolver}'s own supertype branch): composition needs the operand's <em>fields</em>, which
+     * substitution has already produced, and nothing else. Closing it here minted the entry that branch
+     * exists to avoid -- {@code vip => <T> customer & box<T>} closed at {@code vip<text>} produced a
+     * {@code box<text>} nothing named, beside the {@code text_box} a declaration may well have named.
+     *
+     * <p><b>The resolved-form walk has always exempted this channel</b> ({@code
+     * MetaRefs.mapRefsKeepingRecordSupertypes}); the wire walk did not, and that asymmetry was the whole of
+     * the defect. Both now agree: the operand is kept as the record of what was applied, and resolving it to
+     * the entry it denotes belongs to the linker, which runs after every declaration and so cannot make the
+     * answer depend on declaration order.
+     */
+    private CoreValue closeApplicationsOutsideSupertypes(CoreValue value) {
+        if (!(value instanceof RecordValue record)) {
+            return closeApplications(value);
+        }
+        return new RecordValue(record.fields().stream()
+                .map(field -> WireForm.SUPERTYPES.equals(field.name()) ? field
+                        : new RecordValue.Field(field.name(), WireForm.rescope(field.value(),
+                                closeApplications(field.value().value().coreValue()))))
+                .toList());
     }
 
     /** A closed held body, and the wire form it was read from -- the one an entry name derives from. */

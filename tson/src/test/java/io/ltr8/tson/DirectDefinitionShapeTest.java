@@ -1,5 +1,6 @@
 package io.ltr8.tson;
 
+import io.ltr8.tson.base.SchemaValidationException;
 import io.ltr8.tson.schema.TsonBundledSchemas;
 import io.ltr8.tson.schema.TsonLinkedSchema;
 import io.ltr8.tson.schema.meta.TypeDefinition;
@@ -9,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * <b>What a declaration whose body directly denotes a type resolves to</b> -- and how the two lift channels
@@ -72,25 +75,21 @@ class DirectDefinitionShapeTest {
     // ── An application at declaration position is a reference ────────────
 
     /**
-     * <b>The family consequence, which is where #15's "duplicates are inert" was load-bearing.</b> Two names
-     * for one application still reach one entry -- the first declaration is it and the second aliases it --
-     * so the base indexes one member and §5.2's pin-distinctness rule has nothing to refuse. Had they become
-     * two entries, both would pin {@code "dog"} and the rule would refuse a schema that loads today, which
-     * is the relaxation #15 would otherwise have had to pair its proposal with.
+     * <b>Two names for one family member are two members, and §5.2 refuses them.</b> Each declaration is its
+     * own entry (#15), so both pin {@code "dog"} and the family's mapping stops being a function -- the same
+     * verdict two hand-written members with one pin already get. The duplication is not a naming or dedup
+     * question at all: it is authored twice, and the pin rule is what catches it.
      */
     @Test
-    void twoNamesForOneFamilyMemberStillReachOneMember() {
-        TsonLinkedSchema linked = resolve("dd5", """
+    void twoNamesForOneFamilyMemberCollideOnTheirPin() {
+        SchemaValidationException thrown = assertThrows(SchemaValidationException.class, () -> resolve("dd5", """
                   dog_type => { breed: text }
                   pet      => <T, V> { @discriminator type: text = T  value: V }
                   dogs     => pet<"dog", dog_type>
                   hounds   => pet<"dog", dog_type>
                   holder   => { p: pet }
-                """);
+                """));
 
-        assertEquals(List.of("dogs"), linked.schema().entries().get("pet").subtypes(),
-                "one member, under the name that declared it first");
-        assertEquals("dogs", linked.schema().entries().get("hounds").source().orElseThrow().name(),
-                "and the second name is an ordinary alias of it");
+        assertTrue(thrown.getMessage().contains("to the same value"), thrown.getMessage());
     }
 }

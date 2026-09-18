@@ -1102,14 +1102,18 @@ final class DefinitionResolver {
     /**
      * A declaration whose body is an application that {@code SchemaDesugarer} did not rewrite -- in practice
      * a <em>template</em> application, since every constructor application is turned into an {@code !C value}
-     * instance before resolution. It resolves to a {@link TypeKind#REFERENCE} entry targeting the application
-     * as written. The arguments are carried, not applied: closing the application is
-     * {@code TemplateMaterialiser}'s pass, which runs over the resolved form.
+     * instance before resolution.
      *
-     * <p>{@code parameters} is the declaration's own {@code <...>} list, empty for an ordinary alias and
+     * <p><b>A closed one is the entry it denotes</b> ({@code SPEC-FEEDBACK.md} #15): {@code bx => box<text>}
+     * resolves to the closed record itself, with the canonical application in its own {@code source}, rather
+     * than to a {@code REFERENCE} at a content-derived entry. §8.2 makes a declared entry's identity its
+     * name, and a declaration that <em>constructs</em> a type already keeps it (§5.3's lift leaves {@code
+     * text_list => [text]} as the entry), so one that <em>denotes</em> a type obeys the same rule.
+     *
+     * <p>{@code parameters} is the declaration's own {@code <...>} list, empty for a closed application and
      * non-empty for §5.10's <b>partial application</b> ({@code uuid_pair => <B> pair<uuid, B>}), where some
-     * of the arguments name parameters this declaration re-declares. It threads through untouched -- what
-     * makes the entry a template is exactly that list, and the open form is the application itself.
+     * of the arguments name parameters this declaration re-declares. That case threads through untouched --
+     * what makes the entry a template is exactly that list, and the open form is the application itself.
      */
     private TypeDefinition resolveTemplateApplication(String name, GenericRef generic, List<String> parameters) {
         List<TypeArgument> arguments = new ArrayList<>();
@@ -1120,7 +1124,17 @@ final class DefinitionResolver {
                 throw new UnsupportedOperationException("'" + name + "': " + e.getMessage());
             }
         }
-        return openAliasOr(new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments), parameters);
+        io.ltr8.tson.schema.meta.TypeRef target =
+                new io.ltr8.tson.schema.meta.TypeRef(generic.name(), arguments);
+        if (parameters.isEmpty() && applicationCloser != null) {
+            // Closed: this declaration owns the entry. A null answer means it cannot -- an unresolved head,
+            // an arity mismatch, or a partial application -- and the reference form below is the fallback.
+            TypeDefinition owned = applicationCloser.closeApplicationInto(name, target);
+            if (owned != null) {
+                return owned;
+            }
+        }
+        return openAliasOr(target, parameters);
     }
 
     /**
@@ -1130,6 +1144,10 @@ final class DefinitionResolver {
      * <p>An open entry's body is held whatever shape it takes, with no exception for the alias form: that is
      * what lets materialisation dispatch on the constructor head, and what makes "declares parameters" and
      * "holds its body" one question. {@code source} records the same reference either way, as provenance.
+     *
+     * <p><b>A closed template application no longer reaches the first branch</b> -- it is the entry it
+     * denotes (see {@link #resolveTemplateApplication}) -- so what remains for it is a bare-name alias
+     * ({@code day => date}), and the partial-application case for the second.
      */
     private static TypeDefinition openAliasOr(io.ltr8.tson.schema.meta.TypeRef target, List<String> parameters) {
         return parameters.isEmpty() ? TypeDefinition.reference(target)
@@ -1276,13 +1294,25 @@ final class DefinitionResolver {
             boolean supertypeHops = !supertypeTerminal.equals(supertypeName);
             TypeDefinition terminalSupertype = supertypeHops
                     ? namespaceDefinitions.getTypeDefinition(supertypeTerminal) : supertypeDef;
-            if (terminalSupertype == null || !(terminalSupertype.body() instanceof RecordBody supertypeBody)) {
+            // §4.3 names a *template instantiation* as finished alongside a binding record, and since #15 a
+            // declaration that names an application is one -- with a `!record` body indistinguishable from a
+            // hand-written record. So the discriminator is `source`: an argument-bearing one is an
+            // instantiation, whatever its body looks like. The remedy §5.7 gives is unchanged -- write the
+            // application again with a trailing body, `method<order, order> & { … }`.
+            boolean terminalIsInstantiation = terminalSupertype != null
+                    && terminalSupertype.source().filter(from -> !from.arguments().isEmpty()).isPresent();
+            if (terminalSupertype == null || terminalIsInstantiation
+                    || !(terminalSupertype.body() instanceof RecordBody supertypeBody)) {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName + "'"
                         + (supertypeHops ? " resolves through its reference chain to '" + supertypeTerminal
                                 + "', which" : "")
-                        + " has no fields to contribute -- its body is a binding record, not a vocabulary, so "
-                        + "there is nothing for '&' to compose with (§4.3, §5.8). Compose with the head it "
-                        + "derives from");
+                        + (terminalIsInstantiation
+                                ? " is a template instantiation, whose bindings are already set, so it is "
+                                        + "finished and '&' on it is a resolver error (§4.3, §5.8). Compose "
+                                        + "with the application itself and a trailing body"
+                                : " has no fields to contribute -- its body is a binding record, not a "
+                                        + "vocabulary, so there is nothing for '&' to compose with (§4.3, "
+                                        + "§5.8). Compose with the head it derives from"));
             }
 
             directSupertypes.add(new io.ltr8.tson.schema.meta.TypeRef(supertypeName, List.of()));
@@ -1500,13 +1530,30 @@ final class DefinitionResolver {
         boolean sourceHops = !sourceTerminal.equals(sourceName);
         TypeDefinition terminalSource = sourceHops
                 ? namespaceDefinitions.getTypeDefinition(sourceTerminal) : sourceDef;
-        if (terminalSource == null || !(terminalSource.body() instanceof RecordBody sourceBody)) {
+        // §4.3's "finished" test, with the same discriminator the composition operand uses: since #15 a
+        // declaration naming an application *is* the instantiation and carries a `!record` body, so what
+        // tells one apart from a hand-written record is an argument-bearing `source`, not the body shape.
+        //
+        // <b>Only where the author wrote a bare name.</b> §5.7 admits refining an application directly --
+        // `pinned => box<text> ^ { … }`, whose `refined-def` head is what the optional `<type-args>` slot is
+        // for -- and `resolveRefinementSource` has already flattened both spellings to a name by here, so
+        // testing the terminal alone would refuse the spelling the section permits. What §4.3 forbids is an
+        // *alias* resolving to an instantiation, which is the bare-name case and only that.
+        boolean sourceIsInstantiation = refined.target() instanceof SimpleRef && terminalSource != null
+                && terminalSource.source().filter(from -> !from.arguments().isEmpty()).isPresent();
+        if (terminalSource == null || sourceIsInstantiation
+                || !(terminalSource.body() instanceof RecordBody sourceBody)) {
             throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName + "'"
                     + (sourceHops ? " resolves through its reference chain to '" + sourceTerminal
                             + "', which" : "")
-                    + " has no vocabulary to tighten -- its body is a binding record, so it is finished and "
-                    + "'^' on it is a resolver error (§4.3, §5.7). Refine the head it derives from, or, for an "
-                    + "atom instance, use atom refinement ('!" + sourceName + " ^ { ... }', §5.5)");
+                    + (sourceIsInstantiation
+                            ? " is a template instantiation, whose bindings are already set, so it is "
+                                    + "finished and '^' on it is a resolver error (§4.3, §5.7). Refine the "
+                                    + "application itself, or the head it derives from"
+                            : " has no vocabulary to tighten -- its body is a binding record, so it is "
+                                    + "finished and '^' on it is a resolver error (§4.3, §5.7). Refine the "
+                                    + "head it derives from, or, for an atom instance, use atom refinement "
+                                    + "('!" + sourceName + " ^ { ... }', §5.5)"));
         }
 
         List<String> transitiveSupertypes = new ArrayList<>();

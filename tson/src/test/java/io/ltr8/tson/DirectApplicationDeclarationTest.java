@@ -107,9 +107,14 @@ class DirectApplicationDeclarationTest {
                 "the field names the declaration, which is what the application denotes");
     }
 
-    /** Two declarations of one application: the first is the entry, the second an ordinary alias of it. */
+    /**
+     * <b>Two declarations of one application are two entries</b>, exactly as {@code a => { v: text }} and
+     * {@code b => { v: text }} are two entries with one structure. Nothing dedupes them and nothing is
+     * privileged: §8.2 gives each its name as its identity, and a rule that cares about the duplication --
+     * §5.2's pin distinctness over a family's members -- catches it downstream on its own terms.
+     */
     @Test
-    void asecondDeclarationOfTheSameApplicationIsAnAliasOfTheFirst() {
+    void twoDeclarationsOfOneApplicationAreTwoEntries() {
         TsonLinkedSchema linked = resolve("dad5", """
                   box => <V> { item: V }
                   bx  => box<text>
@@ -117,8 +122,11 @@ class DirectApplicationDeclarationTest {
                 """);
 
         assertEquals(TypeKind.PRODUCT, linked.schema().entries().get("bx").kind());
-        assertEquals(TypeKind.REFERENCE, linked.schema().entries().get("by").kind());
-        assertEquals("bx", linked.schema().entries().get("by").source().orElseThrow().name());
+        assertEquals(TypeKind.PRODUCT, linked.schema().entries().get("by").kind());
+        assertEquals("box", linked.schema().entries().get("bx").source().orElseThrow().name());
+        assertEquals("box", linked.schema().entries().get("by").source().orElseThrow().name());
+        assertEquals(java.util.List.of("bx", "by"), linked.schema().entries().get("box").subtypes(),
+                "both are members of the template they close");
     }
 
     // ── What it buys a family: the member is named, not hashed ───────────

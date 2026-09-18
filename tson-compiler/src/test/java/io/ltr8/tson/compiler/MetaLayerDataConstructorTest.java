@@ -20,9 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import io.ltr8.tson.base.unicode.IdentifierProfile;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -294,48 +291,51 @@ class MetaLayerDataConstructorTest {
     }
 
     /**
-     * <b>A templated constructor whose content carries punctuation mints a name that is still an
-     * identifier</b> ([TSON-SCHEMA] §8.2's freshness MUST), and <b>§8.2's name-hygiene policy does not judge
-     * it</b> — the two halves of one defect. Before, {@code path: "/x"} produced
-     * {@code operation_/x_GET_..._bb34a349} and the linker refused it under {@code RESTRICTED_CHARACTER},
-     * against a schema with nothing wrong in it.
+     * <b>A declared application mints no name, so §8.2's hygiene walk has nothing to judge.</b> This was one
+     * defect with two halves. {@code path: "/x"} produced {@code operation_/x_GET_..._bb34a349}, which the
+     * linker refused under {@code RESTRICTED_CHARACTER} against a schema with nothing wrong in it; and
+     * {@code operation_путь_..._bef13f0c}, a perfectly valid identifier, was still refused under {@code
+     * RESTRICTED_SCRIPT} for mixing the Latin constructor head with the author's own word.
      *
-     * <p>The Cyrillic case is why sanitising to {@code XID_Continue} was not enough: {@code
-     * operation_путь_..._bef13f0c} is a perfectly valid identifier, and was still refused under {@code
-     * RESTRICTED_SCRIPT} for mixing the Latin constructor head with the author's own word. Hashing what is
-     * not ASCII is what settles it — the name carries no author text that could mix scripts, spoof another
-     * name, or otherwise shape the namespace, so §8.2's walk stays on and passes it.
+     * <p><b>Both are now unreachable for this shape rather than handled.</b> {@code getOrder =>
+     * fetch<search_request>} <em>is</em> the entry the application denotes ({@code SPEC-FEEDBACK.md} #15),
+     * carrying the application in its own {@code source} -- so the author's punctuation and the author's
+     * Cyrillic never reach a derived name, because no name is derived. The schema loads.
      *
-     * <p>What is left after the fix is an unrelated gap this repository already knows about — a DATA-kinded
-     * entry cannot be named as a type — so the assertion is that the failure is <em>not</em> a §8.2 refusal,
-     * and that the name it names is a clean ASCII identifier.
+     * <p><b>What still mints, and is still judged, is a name nobody wrote</b>: a sugar lift, or an
+     * application some <em>use site</em> closes. {@code InternalName} keeps its rule for those -- admitted
+     * ASCII spliced, other ASCII truncated beside a hash, anything else the hash alone -- and this schema
+     * has one, {@code search_response}'s own {@code [text]}. So the claim below is the stronger one the
+     * indirect assertion was reaching for: every name in the schema is ASCII, and none carries the author's
+     * text.
      */
     @Test
-    void aTemplatedConstructorMintsAnIdentifierAndIsNotJudgedByNameHygiene() {
+    void aDeclaredApplicationMintsNoNameForNameHygieneToJudge() {
         for (String path : new String[] {"/x", "путь"}) {
-            SchemaValidationException thrown = assertThrows(SchemaValidationException.class,
-                    () -> linked("minted" + path.hashCode(), """
-                            fetch    => <T> !operation {
-                                path: "%s"  method: "GET"  request: T  response: T
-                              }
-                            getOrder => fetch<search_request>""".formatted(path)));
+            String label = "minted" + Math.abs(path.hashCode());
+            TsonLinkedSchema resolved = assertDoesNotThrow(() -> linked(label, """
+                    fetch    => <T> !operation {
+                        path: "%s"  method: "GET"  request: T  response: T
+                      }
+                    getOrder => fetch<search_request>""".formatted(path)),
+                    () -> "a declared application mints nothing, so no name of its own can be refused");
 
-            assertFalse(thrown.getMessage().contains("Identifier_Status"),
-                    () -> "no restricted-character refusal on a name nobody wrote: " + thrown.getMessage());
-            assertFalse(thrown.getMessage().contains("mixes the scripts"),
-                    () -> "no restricted-script refusal either: " + thrown.getMessage());
-            assertTrue(thrown.getMessage().contains("describes something other than a data value"),
-                    () -> "what is left is the DATA-reference gap, not a name problem: " + thrown.getMessage());
+            TypeDefinition order = resolved.schema().entries().get("getOrder");
+            assertEquals(TypeKind.DATA, order.kind(), "the declaration is the operation it denotes");
+            assertEquals("fetch", order.source().orElseThrow().name(),
+                    "and records the application, which is what §8.2 keys its identity on");
 
-            // That gap's message names the minted entry, which is where §8.2's freshness MUST can be read
-            // off directly -- and it has to be asserted separately, because the scoping change alone makes
-            // the *refusal* disappear whether or not the name is well formed.
-            Matcher minted = Pattern.compile("names '([^']+)'").matcher(thrown.getMessage());
-            assertTrue(minted.find(), thrown::getMessage);
-            assertTrue(IdentifierProfile.validate(minted.group(1)).isEmpty(),
-                    () -> "§8.2: an internal name is a valid identifier -- got '" + minted.group(1) + "'");
-            assertTrue(minted.group(1).chars().allMatch(c -> c < 0x80),
-                    () -> "and ASCII, which is what lets §8.2's walk judge it: '" + minted.group(1) + "'");
+            String own = CanonicalIdentity.canonicalize("https://example.test/api-" + label + ".tn");
+            resolved.schema().entries().forEach((name, definition) -> {
+                if (!resolved.originOf(name).equals(own)) {
+                    return;
+                }
+                assertFalse(name.contains(path),
+                        () -> "no entry name carries the author's own text: '" + name + "'");
+                assertTrue(name.chars().allMatch(character -> character < 0x80),
+                        () -> "§8.2: every name here is ASCII, which is what lets the walk judge it: '"
+                                + name + "'");
+            });
         }
     }
 

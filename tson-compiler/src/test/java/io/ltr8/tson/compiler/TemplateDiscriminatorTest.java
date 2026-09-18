@@ -50,7 +50,6 @@ class TemplateDiscriminatorTest {
         return TsonCompiledSchemaRegistry.tree(core).get(ID);
     }
 
-    /** The entry a `name => head<args>` alias resolves to -- the instantiation materialisation minted. */
     /**
      * The entry a {@code name => head<args>} declaration denotes: itself, since such a declaration <em>is</em>
      * its instantiation ({@code SPEC-FEEDBACK.md} #15), or the entry it aliases where an earlier declaration

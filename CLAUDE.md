@@ -711,10 +711,15 @@ The exception-classification policy under Conventions governs every rejection he
 *resolved* form after every declaration has resolved — an application arrives as a `TypeRef` carrying
 arguments, so substitution is a walk over `schema.meta` values and the entry it mints can record its own
 `source`, which §8.2 keys identity on. Two `box<text>` anywhere share one entry, and a declaration naming the
-application **is** that entry rather than a reference to it (`SPEC-FEEDBACK.md` #15): `bx => box<text>`
-resolves to `bx => !record { … }`, a use site writing the same application resolves to the declaration, and a
-second declaration of one application is an ordinary bare-name alias of the first. A *synthetic* is never
-adopted this way, one form's synthetic being shared schema-wide. Arguments close innermost-first; the memo is
+application **is** that entry rather than a reference to it (`SPEC-FEEDBACK.md` #15): `bx => box<text>` closes
+**into** the declared name (`closeApplicationInto`) — the body is built under `bx`, no internal name is
+derived or claimed, and nothing is published beside it, so a synthetic for a declared application is never
+created rather than created and collapsed. A use site writing the same application reuses the declaration that
+owns it, so one entry per application still serves the schema; **two declarations of one application are two
+entries** with one structure, as two hand-written records with identical fields are, and §5.2's
+pin-distinctness rule is what catches the pair where they are family members. A *synthetic* is untouched: a
+use-site sugar form has no author-written name to key identity on and keeps its content-derived one.
+Arguments close innermost-first; the memo is
 registered before the body is substituted, so regular recursion ties the knot on the entry under
 construction. Non-regular recursion —
 where the argument grows every level and the memo never fires — is caught by a depth guard rather than run

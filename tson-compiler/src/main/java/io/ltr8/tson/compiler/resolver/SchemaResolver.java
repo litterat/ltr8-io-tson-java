@@ -270,6 +270,17 @@ public final class SchemaResolver {
                             List<io.ltr8.tson.schema.meta.TypeArgument> arguments) {
                         return materialiser.byParameterKind(head, template, parameters, arguments);
                     }
+
+                    /**
+                     * A declaration naming a fully-bound application is the entry it denotes ({@code
+                     * SPEC-FEEDBACK.md} #15), so the closure happens here rather than minting a
+                     * content-named entry for the declaration to reference.
+                     */
+                    @Override
+                    public TypeDefinition closeApplicationInto(String declaredName,
+                            io.ltr8.tson.schema.meta.TypeRef application) {
+                        return materialiser.closeApplicationInto(declaredName, application);
+                    }
                 }, positions);
         namespaceGetter.resolveWith(resolver);
 
@@ -323,6 +334,7 @@ public final class SchemaResolver {
         Map<String, TypeDefinition> instantiations = materialiser.materialise(resolvedLocals,
                 problems.collecting() ? (name, error) -> problems.report(declarations.get(name), error) : null);
         republish(namespace, resolvedLocals, instantiations);
+        appliedParentEdges(namespace, resolvedLocals, instantiations);
 
         // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
         // have resolved". A form the desugar phase lifted with an application in a slot was named before that
@@ -343,68 +355,6 @@ public final class SchemaResolver {
                     resolvedLocals.put(to, eager);
                 }
             });
-            republish(namespace, resolvedLocals, instantiations);
-        }
-
-        // A declaration whose body is a fully-bound application IS the instantiation entry, not a reference
-        // to a content-named one ({@code SPEC-FEEDBACK.md} #15). §8.2 makes a declared entry's identity its
-        // name, and a declaration that *constructs* a type already keeps it -- §5.3's lift leaves
-        // `text_list => [text]` as the entry -- so this makes one that *denotes* a type obey the same rule.
-        // Materialisation has already closed the application, so the work is to adopt the entry it minted
-        // and rewrite every reference onto the declared name. One entry per application survives, which is
-        // what §8.2's "two fully-bound applications denote the same entry" requires within a schema, and the
-        // hop that used to stand between an author's name and its own type is gone from resolved output.
-        //
-        // A *synthetic* is deliberately never adopted: §8.2 shares one synthetic per distinct form
-        // schema-wide, so binding one to a declared name would make a shared entry answer to a single namer.
-        Map<String, String> adopted = new LinkedHashMap<>();
-        Set<String> syntheticNames = materialiser.syntheticNames();
-        for (String name : declarations.keySet()) {
-            TypeDefinition local = resolvedLocals.get(name);
-            if (local == null || !(local.body() instanceof io.ltr8.tson.schema.meta.Reference reference)) {
-                continue;
-            }
-            String target = reference.target().name();
-            // A second declaration of one application stays an ordinary bare-name alias of the first: §8.2
-            // privileges neither, and an alias composes and refines through §4.3's chain walk like any other.
-            if (!instantiations.containsKey(target) || syntheticNames.contains(target)
-                    || adopted.containsKey(target)) {
-                continue;
-            }
-            adopted.put(target, name);
-        }
-        if (!adopted.isEmpty()) {
-            adopted.forEach((minted, declared) -> {
-                TypeDefinition instantiation = instantiations.remove(minted);
-                TypeDefinition declaration = resolvedLocals.get(declared);
-                // The instantiation's own facts under the author's name, keeping the declaration's position
-                // and annotations. `source` stays the canonical application, which identity is keyed on.
-                resolvedLocals.put(declared, new TypeDefinition(instantiation.source(), instantiation.kind(),
-                        instantiation.supertypes(), instantiation.subtypes(), instantiation.body(),
-                        declaration.position(), declaration.annotations()));
-                namespace.remove(minted);
-            });
-            java.util.function.UnaryOperator<io.ltr8.tson.schema.meta.TypeRef> onto = ref -> {
-                String to = adopted.get(ref.name());
-                return to == null ? ref
-                        : new io.ltr8.tson.schema.meta.TypeRef(to, ref.arguments(), ref.annotations());
-            };
-            // `MetaRefs.mapRefs` covers `source` and every reference a body carries, and deliberately not
-            // the two name-level indexes -- §8.1 makes `supertypes`/`subtypes` lists of *names* rather than
-            // type-refs, so they are invisible to a walk over refs. A composition that absorbed the
-            // instantiation put the minted name in its contract index, and leaving that behind is an
-            // unresolved supertype the linker refuses. So the rename covers both channels, not just one.
-            java.util.function.UnaryOperator<TypeDefinition> reindexed = definition -> {
-                TypeDefinition mapped = MetaRefs.mapRefs(definition, onto);
-                List<String> supertypes = mapped.supertypes().stream()
-                        .map(entry -> adopted.getOrDefault(entry, entry)).toList();
-                List<String> subtypes = mapped.subtypes().stream()
-                        .map(entry -> adopted.getOrDefault(entry, entry)).toList();
-                return new TypeDefinition(mapped.source(), mapped.kind(), supertypes, subtypes,
-                        mapped.body(), mapped.position(), mapped.annotations());
-            };
-            resolvedLocals.replaceAll((entryName, definition) -> reindexed.apply(definition));
-            instantiations.replaceAll((entryName, definition) -> reindexed.apply(definition));
             republish(namespace, resolvedLocals, instantiations);
         }
 
@@ -531,6 +481,122 @@ public final class SchemaResolver {
             resolvedLocals.put(name, placeholder);
             namespace.put(name, placeholder);
         }
+    }
+
+    /**
+     * §5.8's IS-A edge for a <b>composition operand written as an application</b>, derived once every
+     * declaration has resolved.
+     *
+     * <p>Composition needs the operand's <em>fields</em> and nothing else, so {@code TemplateMaterialiser}
+     * leaves the application in {@code record.supertypes} exactly as written and mints no entry for it
+     * ({@code SPEC-FEEDBACK.md} #15). The edge is the half that has to wait: the entry an application denotes
+     * is whichever declaration names the same application, and asking that <em>during</em> materialisation
+     * made the answer depend on declaration order -- {@code text_box} declared before the composition was
+     * found, declared after it was not. §8.1 calls this field "the derived transitive index, computed once
+     * every parent is a type", and this is that moment.
+     *
+     * <p><b>Nothing is created here.</b> The pass derives an index over entries that already exist, keyed on
+     * §8.2's canonical application so two spellings of one application agree. Where no declaration names the
+     * application there is no name to record, and that is the right answer rather than a gap: nobody declared
+     * that type, so nothing can be declared as it.
+     *
+     * <p><b>§5.9 needs no guard here, and a guard was wrong.</b> {@code DefinitionResolver} already omits an
+     * operand from {@code record.supertypes} when the declaration carries a removal -- "a name kept in the
+     * body is inert, where an application closes into a live edge" -- so a subtracted entry has no applied
+     * parent left for this pass to find. Skipping entries whose contract is empty looked like the same rule
+     * and is not: a template composing a base that itself composes nothing has an empty chain too, so
+     * {@code ok => <T> result<T> & { … }} closed at {@code ok<text>} was silently denied its edge to
+     * {@code result_of}.
+     */
+    private static void appliedParentEdges(Map<String, TypeDefinition> namespace,
+                                            Map<String, TypeDefinition> resolvedLocals,
+                                            Map<String, TypeDefinition> instantiations) {
+        Map<String, String> byApplication = new LinkedHashMap<>();
+        namespace.forEach((entryName, definition) -> definition.source()
+                .filter(source -> !source.arguments().isEmpty())
+                .ifPresent(source -> byApplication.putIfAbsent(
+                        DerivedName.canonicalApplication(source.name(), source.arguments()), entryName)));
+        if (byApplication.isEmpty()) {
+            return;
+        }
+        // <b>To a fixed point</b>, because the edge is transitive and each pass can only see the contracts
+        // the previous one left. `great => <T> ok<T> & { … }` over `ok => <T> result<T> & { … }` needs
+        // `ok_of`'s own edge to `result_of` to exist before `great_of` can inherit it, and the two are
+        // derived here rather than at their declarations. Bounded by the entry count: each round adds at
+        // least one name to some contract or stops.
+        for (int round = 0; round <= namespace.size(); round++) {
+            // Republished between the two folds as well as after them: an owner's contract grows in this
+            // same round, and `withAppliedParents` reads its ancestors out of the namespace -- so
+            // `great_of` inheriting from `ok_of` needs `ok_of`'s new edge visible before it is asked for,
+            // not one round later.
+            boolean changed = fold(resolvedLocals, byApplication, namespace);
+            republish(namespace, resolvedLocals, instantiations);
+            changed |= fold(instantiations, byApplication, namespace);
+            republish(namespace, resolvedLocals, instantiations);
+            if (!changed) {
+                return;
+            }
+        }
+    }
+
+    /** One round of {@link #appliedParentEdges} over one map -- {@code true} when any contract grew. */
+    private static boolean fold(Map<String, TypeDefinition> entries, Map<String, String> byApplication,
+                                 Map<String, TypeDefinition> namespace) {
+        boolean changedAny = false;
+        // <b>To a fixed point within the map, not merely across rounds.</b> A pass visits entries in map
+        // order while mutating them, so `great_of` can be reached before `ok_of` has grown the edge it
+        // inherits -- and both live in this same map, which an outer round cannot fix. Each inner pass
+        // republishes, because `withAppliedParents` reads an owner's ancestors out of the namespace.
+        for (int pass = 0; pass <= entries.size(); pass++) {
+            boolean changed = false;
+            for (Map.Entry<String, TypeDefinition> entry : entries.entrySet()) {
+                TypeDefinition folded = withAppliedParents(entry.getValue(), byApplication, namespace);
+                if (folded != entry.getValue()) {
+                    entry.setValue(folded);
+                    namespace.put(entry.getKey(), folded);
+                    changed = true;
+                }
+            }
+            if (!changed) {
+                return changedAny;
+            }
+            changedAny = true;
+        }
+        return changedAny;
+    }
+
+    /** One entry with every applied parent's owning declaration folded into its contract index. */
+    private static TypeDefinition withAppliedParents(TypeDefinition definition,
+                                                      Map<String, String> byApplication,
+                                                      Map<String, TypeDefinition> namespace) {
+        if (!(definition.body() instanceof RecordBody record)) {
+            return definition;
+        }
+        List<String> contract = new java.util.ArrayList<>(definition.supertypes());
+        Set<String> seen = new LinkedHashSet<>(contract);
+        for (io.ltr8.tson.schema.meta.TypeRef parent : record.supertypes()) {
+            if (parent.arguments().isEmpty()) {
+                continue;
+            }
+            String owner = byApplication.get(
+                    DerivedName.canonicalApplication(parent.name(), parent.arguments()));
+            if (owner == null || !seen.add(owner)) {
+                continue;
+            }
+            contract.add(owner);
+            TypeDefinition ownerDefinition = namespace.get(owner);
+            if (ownerDefinition != null) {
+                for (String ancestor : ownerDefinition.supertypes()) {
+                    if (seen.add(ancestor)) {
+                        contract.add(ancestor);
+                    }
+                }
+            }
+        }
+        return contract.size() == definition.supertypes().size() ? definition
+                : new TypeDefinition(definition.source(), definition.kind(), List.copyOf(contract),
+                        definition.subtypes(), definition.body(), definition.position(),
+                        definition.annotations());
     }
 
     /**

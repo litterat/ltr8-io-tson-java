@@ -474,22 +474,27 @@ recorded open form, and replacing the application with a reference to the entry 
   skipped. Closing them would mint an entry per level, keyed on the literal parameter name.
 - **Identity is the flattened application** recorded in `source` (§8.2), and the derived name is built from
   it, so two `box<text>` anywhere in the schema land on one entry for free.
-- **A declaration naming the application *is* that entry** (`SPEC-FEEDBACK.md` #15). `text_box => box<text>`
-  resolves to the closed record itself, carrying the canonical application in its own `source` — not a
-  `Reference` to a content-named entry sitting beside it. `SchemaResolver` adopts it after materialisation:
-  the entry minted under the derived name moves onto the declared key, every reference to the derived name is
-  rewritten onto that key, and the derived key is dropped. A use site writing the same application therefore
-  resolves to the declaration, and one entry per application survives, which is what §8.2 requires.
-  - **The rename covers both channels, not just the refs.** `MetaRefs.mapRefs` maps `source` and every
-    reference a body carries; §8.1 makes `supertypes`/`subtypes` lists of *names*, which a walk over refs
-    cannot see. A composition that absorbed the instantiation keeps the derived name in its contract index,
-    so missing that channel left an unresolved supertype the linker refuses — seventeen conformance vectors
-    caught it.
-  - **A second declaration of one application stays an alias of the first**, in document order. §8.2 says
-    neither is privileged, so this is a deliberate divergence, recorded as one: two entries would be two
-    family members pinning one value, which §5.2's pin rule refuses.
-  - **A synthetic is never adopted.** §8.2 shares one synthetic per distinct form schema-wide, so binding one
-    to a declared name would make a shared entry answer to a single namer.
+- **A declaration naming the application *is* that entry, and nothing is minted beside it**
+  (`SPEC-FEEDBACK.md` #15). `text_box => box<text>` resolves to the closed record itself, carrying the
+  canonical application in its own `source` — not a `Reference` to a content-named entry sitting beside it.
+  `DefinitionResolver` reaches `closeApplicationInto`, which builds the body **under the declared name**: it
+  derives no internal name and claims none (`MintedNames.claim` is never called) and publishes nothing, so
+  the synthetic is never created rather than created and then collapsed. What it records instead is
+  `ownedBy`, keyed on the canonical application — which serves twice over, as the knot-tie for recursion and
+  as what a **use site** writing that same application reuses, so one entry per application still serves the
+  schema and §8.2's "two fully-bound applications denote the same entry" holds within it.
+  - **Two declarations of one application are two entries**, each closing into its own name. §8.2 gives a
+    declared entry its name as its identity, so there is nothing to collapse and no privileged first: the
+    pair is two entries with one structure, exactly as two hand-written records with identical fields are.
+    Where they are family members §5.2's **pin-distinctness** rule refuses them — the same verdict the
+    hand-written pair gets. The duplication is authored rather than derived, and is that rule's to catch.
+  - **The parent edge is derived after the fact, order-independently** (`SchemaResolver.appliedParentEdges`).
+    A composition absorbing an application takes its fields while the entry is still open, so the IS-A edge
+    to the owning declaration cannot be written at close time — that declaration may not have resolved yet.
+    The pass indexes entries by their own canonical application and folds each owner and its ancestors into
+    `supertypes` to a fixed point, so `dogs` reaches `pet` whether it is declared before or after it.
+  - **A synthetic still mints, and must.** Only a *declared* application closes into a name; a use-site sugar
+    form has no author-written name for identity to key on, so it keeps its content-derived one (§8.2).
 - **Arguments close innermost-first**, so `box<box<text>>` builds the inner entry before the outer one names
   it, and no special case is needed for depth.
 - **Substitution descends into arguments.** A parameter is always a whole ref (§5.10 admits no head
