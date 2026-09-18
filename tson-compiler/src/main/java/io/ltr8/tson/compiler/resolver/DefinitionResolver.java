@@ -1265,18 +1265,34 @@ final class DefinitionResolver {
                 throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName
                         + "' names no type this schema declares or imports");
             }
-            if (!(supertypeDef.body() instanceof RecordBody supertypeBody)) {
-                // §4.3 generalises §5.7's vocabulary-body requirement to composition, which has the same
-                // need: it copies the parent's fields, and a binding record has none to copy.
-                throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName
-                        + "' has no fields to contribute -- its body is a binding record, not a vocabulary, so "
-                        + "there is nothing for '&' to compose with (§5.8, and §5.7's vocabulary-body rule "
-                        + "read across). Compose with the head it derives from");
+            // §4.3 judges an operand at the end of its reference chain (§8.3), never at the name written: a
+            // reference is the same type under another name (§5.7's table), so an alias of a record has that
+            // record's fields to contribute. The walk stops at an argument-bearing target, so an alias of an
+            // instantiation still arrives as a binding record and is refused below -- §4.3's "an alias
+            // resolving to either is finished", reached for the terminal's reason rather than by testing
+            // whichever body the written name happened to have.
+            String supertypeTerminal = ReferenceChain.terminal(supertypeName,
+                    namespaceDefinitions::getTypeDefinition);
+            boolean supertypeHops = !supertypeTerminal.equals(supertypeName);
+            TypeDefinition terminalSupertype = supertypeHops
+                    ? namespaceDefinitions.getTypeDefinition(supertypeTerminal) : supertypeDef;
+            if (terminalSupertype == null || !(terminalSupertype.body() instanceof RecordBody supertypeBody)) {
+                throw new SchemaValidationException("'" + name + "': supertype '" + supertypeName + "'"
+                        + (supertypeHops ? " resolves through its reference chain to '" + supertypeTerminal
+                                + "', which" : "")
+                        + " has no fields to contribute -- its body is a binding record, not a vocabulary, so "
+                        + "there is nothing for '&' to compose with (§4.3, §5.8). Compose with the head it "
+                        + "derives from");
             }
 
             directSupertypes.add(new io.ltr8.tson.schema.meta.TypeRef(supertypeName, List.of()));
             addIfAbsent(transitiveSupertypes, seenTransitive, supertypeName);
-            for (String ancestor : supertypeDef.supertypes()) {
+            // The terminal is the same type under another name, so IS-A reaches it: without this edge a field
+            // typed by the terminal would refuse a value of this declaration, though it IS-A a renaming of it.
+            if (supertypeHops) {
+                addIfAbsent(transitiveSupertypes, seenTransitive, supertypeTerminal);
+            }
+            for (String ancestor : terminalSupertype.supertypes()) {
                 addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
             }
 
@@ -1475,21 +1491,31 @@ final class DefinitionResolver {
             throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName
                     + "' names no type this schema declares or imports");
         }
-        if (!(sourceDef.body() instanceof RecordBody sourceBody)) {
-            // §5.7's "Refinement requires a vocabulary body": the source of ^ MUST be a definition whose body
-            // is a !record, and one whose body is a binding record -- a top-level constructor application, a
-            // template instantiation, or an alias for either -- is *finished*, its bindings set. The author's
-            // error, not a gap: there is no vocabulary here to tighten.
-            throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName
-                    + "' has no vocabulary to tighten -- its body is a binding record, so it is finished and "
-                    + "'^' on it is a resolver error (§5.7). Refine the head it derives from, or, for an atom "
-                    + "instance, use atom refinement ('!" + sourceName + " ^ { ... }', §5.5)");
+        // §5.7 states the walk explicitly -- "the source of `^`, after following its reference chain (§8.3)"
+        // -- and §4.3 states it for both operator families. A binding record is *finished*, its bindings set:
+        // a top-level constructor application, a template instantiation, a choice, or an alias resolving to
+        // any of them. What the walk adds is the case that is not finished: an alias of a record, which has
+        // that record's vocabulary to tighten.
+        String sourceTerminal = ReferenceChain.terminal(sourceName, namespaceDefinitions::getTypeDefinition);
+        boolean sourceHops = !sourceTerminal.equals(sourceName);
+        TypeDefinition terminalSource = sourceHops
+                ? namespaceDefinitions.getTypeDefinition(sourceTerminal) : sourceDef;
+        if (terminalSource == null || !(terminalSource.body() instanceof RecordBody sourceBody)) {
+            throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName + "'"
+                    + (sourceHops ? " resolves through its reference chain to '" + sourceTerminal
+                            + "', which" : "")
+                    + " has no vocabulary to tighten -- its body is a binding record, so it is finished and "
+                    + "'^' on it is a resolver error (§4.3, §5.7). Refine the head it derives from, or, for an "
+                    + "atom instance, use atom refinement ('!" + sourceName + " ^ { ... }', §5.5)");
         }
 
         List<String> transitiveSupertypes = new ArrayList<>();
         Set<String> seenTransitive = new HashSet<>();
         addIfAbsent(transitiveSupertypes, seenTransitive, sourceName);
-        for (String ancestor : sourceDef.supertypes()) {
+        if (sourceHops) {
+            addIfAbsent(transitiveSupertypes, seenTransitive, sourceTerminal);
+        }
+        for (String ancestor : terminalSource.supertypes()) {
             addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
         }
         return refineOnto(name, refined, parameters, Optional.of(sourceRef), transitiveSupertypes,
