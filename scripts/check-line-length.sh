@@ -7,7 +7,9 @@
 #   scripts/check-line-length.sh <base-ref>   lines added since <base-ref>, e.g. r2026-36-proposal
 #   scripts/check-line-length.sh --files F... every line of the named files
 #
-# Markdown table rows and lines holding a URL are skipped: neither can be wrapped. Exits 1 if anything is reported.
+# Markdown table rows and lines holding a URL are skipped: neither can be wrapped. spec/ is skipped in the diff modes:
+# the spec documents keep a paragraph per line, which is their format and not this repo's to rewrap. Exits 1 if anything
+# is reported.
 set -euo pipefail
 LIMIT=125
 
@@ -23,11 +25,11 @@ fi
 
 BASE="${1:-HEAD}"
 status=0
-untracked=$(git ls-files --others --exclude-standard -- '*.java' '*.md' '*.kts' '*.tn' '*.sh')
+untracked=$(git ls-files --others --exclude-standard -- '*.java' '*.md' '*.kts' '*.tn' '*.sh' ':!spec/')
 if [[ -n "$untracked" ]]; then
   echo "$untracked" | tr '\n' '\0' | xargs -0 "$0" --files || status=1
 fi
-git diff "$BASE" -U0 --no-color -- '*.java' '*.md' '*.kts' '*.tn' '*.sh' | perl -CSD -ne '
+git diff "$BASE" -U0 --no-color -- '*.java' '*.md' '*.kts' '*.tn' '*.sh' ':!spec/' | perl -CSD -ne '
   chomp;
   if (m{^\+\+\+ b/(.*)}) { $file = $1; next }
   if (/^@@ -\S+ \+(\d+)/) { $line = $1; next }

@@ -65,11 +65,11 @@ Three places this must differ, each because §3.1 requires it:
 
 ## Lexer (`tson-json/.../lexer/`)
 
-`JsonLexer` is a single hand-written scanner over UTF-8 bytes read incrementally from an `InputStream` --
-**bytes only, with no `String` entry point**, since §3.1 makes the document UTF-8 and a decoder handed
+`JsonLexer` is a single hand-written scanner over UTF-8 bytes read from a `ByteSource` (`tson-base`'s `base.io`) --
+**bytes only, with no character entry point**, since §3.1 makes the document UTF-8 and a decoder handed
 characters has already lost the malformed-sequence rule and the byte offset §8.1 requires. A caller holding
-a string is one `getBytes(UTF_8)` away, and `Json.parse(String)`/`JsonObjectReader.read(String, …)` do it
-there so one place re-encodes rather than every layer offering to. It is
+a string forms `ByteSource.of(String)`, which re-encodes it as a value, and `Json.parse(String)`/
+`JsonObjectReader.read(String, …)` do it there so one place re-encodes rather than every layer offering to. It is
 code-point addressed, with one code point of lookahead — no JSON token needs more. `nextToken()` returns only
 a `JsonTokenType`, the text and the six position coordinates read off separate accessors, so a token costs no
 `JsonPosition` allocation unless a caller retains one; `tokenize()` materializes `JsonToken` snapshots and is
@@ -114,8 +114,8 @@ Errors are `tson-base`'s shared `ParseException`, thrown immediately — fail-fa
 what went wrong and never where**; `position()` is the location, so a diagnostic built from one carries it
 structurally rather than by parsing prose. §9.4 splits what the exception covers across two of [TSON-DATA]
 §8.1's categories — a lexer error for malformed UTF-8 and ill-formed strings, a parse error for grammar
-violations — and that split is the schema-directed layer's to make when it classifies one into a `Diagnostic`.
-Carrying it on the exception as well would be a second opinion about one fact.
+violations. The exception does not carry that split, and neither does the classifier: `JsonDiagnostics`, like
+`TsonDiagnostics`, reports a base-syntax failure of either kind as one `VALIDATION_ERROR`.
 
 ## Structural layer (`tson-json/.../stream/`)
 
@@ -145,7 +145,7 @@ repeat an error whose *category* follows the position's type, which no grammar l
 the rule where JEP 540 does, the schema-directed decode applies it with a category); no value is interpreted;
 and no member name is reserved, §3.2's `$`-namespace being a question about the position's type.
 
-**One constructor**, `JsonStream(InputStream, ProcessorPolicy, DiagnosticsReceiver)`. A stream reads under a
+**One constructor**, `JsonStream(ByteSource, ProcessorPolicy, DiagnosticsReceiver)`. A stream reads under a
 policy and reports through a receiver, and both are always true, so neither is defaulted: a caller with
 nothing particular to say forms `ProcessorPolicy.defaults()` and `DiagnosticsReceiver.throwing()` where they
 can be seen, rather than picking them up from an overload that hides which defaults it chose. The bound comes
@@ -155,14 +155,15 @@ have refused — that record refuses a bound below one, once, for every encoding
 **`withProcessorPolicy` is `JsonObjectReader`'s only policy derivation.** `ProcessorPolicy` already carries
 `withIdentifierPolicy`/`withTokenPolicy`/`withLimits`, so a caller changing one component writes
 `r.withProcessorPolicy(r.processorPolicy().withTokenPolicy(p))` — one method on the reader, and the component
-derivations where the components live. The TSON facades carry all four for history; a new surface need not.
+derivations where the components live. `JsonTreeReader` has the same one derivation. The TSON facades carry the
+three component derivations beside it; this surface states each fact once.
 
 **Nesting depth is bounded here** (§10.1) — the one place every container opens, so a refusal lands before
 any consumer descends, which matters because every consumer of this stream recurses where the stream itself
-iterates. The bound arrives as an `int` because a stream needs a number rather than a policy, but **the
+iterates. The stream reads the bound off the policy's `LimitsPolicy` once, at construction, and **the
 number and the refusal are the processor's, not this encoding's**: §10.1 makes it [TSON-DATA] §9.1's policy
 "in JSON clothing, and the same policy applies with the same defaults", so the stream counts against
-`LimitsPolicy.DEFAULT_MAX_DEPTH` and refuses with `LimitExceededException` — the same type the text
+`LimitsPolicy.maxDepth()` and refuses with `LimitExceededException` — the same type the text
 encoding refuses with, from `tson-base`. A deployment that raises the bound raises it for both encodings at
 once, which is what one policy means.
 
@@ -212,8 +213,8 @@ opposite semantics on the two sides a consumer moves between, and that is the wh
 **§3.1's duplicate-member rule lands here**, not in the event stream: the stream is grammar and a repeat is
 not a grammar error. §3.1 gives the *category* to the position's type, which a schemaless parse has none
 of — so this refuses unconditionally, where JEP 540 does and for the reason §10.2 gives (two `$type`
-members, one seen by a security filter and the other by the decoder). The schema-directed decode will
-report the same fact with the category its position gives it. Names are compared **decoded**, so
+members, one seen by a security filter and the other by the decoder). The schema-directed decode
+reports the same fact with the category its position gives it. Names are compared **decoded**, so
 `"ab"` and `"\u0061b"` are one name.
 
 **`toString()` is compact RFC 8259 and `Json.toDisplayString` is the indented form.** Both parse back to

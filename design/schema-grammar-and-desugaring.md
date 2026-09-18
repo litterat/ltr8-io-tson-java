@@ -29,19 +29,17 @@ An AST→AST rewrite between parsing and resolution. Every sugar form — `[T]` 
 it simply *is* that construction, and anywhere else (a field, an element, a variant, a map value) it becomes
 an **injected declaration plus a bare reference to it**. So `DefinitionResolver` only ever sees two shapes: a
 bare reference or `!C value`. §5.3/§5.6 already *describe* these forms as desugarings and §3.3.1 calls their
-targets "the implicit desugar targets of the sugar forms" — this implements that literally instead of
-splitting it across the resolver (declaration position) and the linker (field position), which is what it
-replaces.
+targets "the implicit desugar targets of the sugar forms" — this implements that literally, in one phase,
+rather than splitting it across the resolver (declaration position) and the linker (field position).
 
 **The injected-entry half is the spec's own rule.** §8.2: "**Every application materialises** ... Nothing is
 carried structurally in place: a use site holds a bare reference to its entry", and the materialised entries
-merge under `!!import` by the same structural identities they have within a schema. The structure-templates
-CR, now the baseline, is where that came from: **D3** de-parameterises
-`array`/`set`/`map`, so a container at a use site cannot be an application at all — nothing in meta-kernel
-takes type parameters, `map` holding `key_type`/`value_type` as ordinary fields — and **D5** states one lift
-rule, "every sugar form lifts at desugar: a concrete form to a closed synthetic entry". The resolved
-fixtures were written against the older shape and were brought onto this one; `ResolvedFixtureTest` now
-asserts the two agree entry for entry.
+merge under `!!import` by the same structural identities they have within a schema. Two rules make it so:
+§4.2's `array`/`set`/`map` constructors are parameterless, so a container at a use site cannot be an
+application at all — nothing in meta-kernel takes type parameters, `map` holding `key_type`/`value_type` as
+ordinary fields — and §5.3 states one lift rule, every sugar form lifting at desugar, a concrete form to a
+closed synthetic entry. `ResolvedFixtureTest` asserts the resolved fixtures and this output agree entry for
+entry.
 
 **The rule this settles on:** `TypeRef.arguments` non-empty means an **open** form — a template application,
 whose arguments are what materialisation substitutes. Everything closed is an entry, referenced by a bare
@@ -50,9 +48,9 @@ rule checkable structurally, with no vocabulary needed to read a `type_ref`. One
 application (`<B> pair<uuid, B>`) is a template that holds nothing, keeping the `type_ref` with arguments it
 already resolves to.
 
-The structure-templates change report proposed the opposite — inline sugar riding as a structural
-`type_ref` rather than as an injected entry, with the compiler building readers from those refs — and is
-**deliberately not implemented**. Four arguments were weighed for it and none holds:
+The alternative — inline sugar riding as a structural `type_ref` rather than as an injected entry, with the
+compiler building readers from those refs — is **deliberately not implemented**. Four arguments stand for it
+and none holds:
 
 - *An entry set wider than the declaration set is untidy.* It is already normal — `subtypes` and `disjoint`
   are resolver-derived too, so §8 output has never been the author's declarations and nothing else.
@@ -64,9 +62,9 @@ The structure-templates change report proposed the opposite — inline sugar rid
   disclaims the names, and a comparison tool canonicalises. Nor do they reach an author: a read diagnostic
   reports the path taken (`/holder/xs`), never the leaf it resolves to.
 
-Two arguments run the other way. The change report's own D7 rejects a second representation of a nested form
-because it "forces every consumer to walk two representations" — precisely what D8 would impose on every
-container. And the deduplication would not disappear, only relocate: `[text]` in five records must not
+Two arguments run the other way. A second representation of a nested form forces every consumer to walk two
+representations, which is precisely what a structural `type_ref` would impose on every container. And the
+deduplication would not disappear, only relocate: `[text]` in five records must not
 compile five readers, so the compiler would need a memo keyed on ref structure, which is the naming below
 rebuilt and called a cache.
 
@@ -85,22 +83,20 @@ rebuilt and called a cache.
   | `{K => V?}`, `{K => V?; …}` | the corresponding form with `state: OPTIONAL` bound directly |
   | `{K => V; N..M}` | the same, plus `min_items`/`max_items` |
 
-  The phase used to read that routing off the governing meta — constructors carried parameter lists and each
-  vocabulary field named the parameter it drew from (`element_type: type_ref = T`), so `map<K, V>` zipped
-  arguments against `map`'s own `parameters()`. With the constructors parameterless (the change report's D3)
-  the table above is the whole rule, `SchemaResolver` no longer threads the meta's entries in, and
-  **meta-kernel's bootstrap needs no special case**: the routing table it used to hand-write for the three
-  constructors it applies to itself would have had to come from the very entries it is in the middle of
-  producing.
+  The constructors being parameterless (§4.2), the table above is the whole rule: `SchemaResolver` threads no
+  governing-meta entries into the phase, and **meta-kernel's bootstrap needs no special case** — routing read
+  off the governing meta would, for the three constructors meta-kernel applies to itself, have to come from
+  the very entries it is in the middle of producing.
 - **A generic application is a user template, and this phase mostly leaves it alone.** `name<args>` resolves
   its head through the type-name namespace only (§3.3.1) — parameters, then locals, then imports — so
   `map<text, text>` finds nothing and is an ordinary unresolved reference for the linker to report, and
   anything that *does* resolve is a §5.10 template. Substitution happens over the **resolved** form
   (`TemplateMaterialiser`, `design/template-materialisation.md`), not over the AST, so an application passes through
   here with its head and arguments intact. `checkTemplateApplication` refuses exactly one thing: a local
-  head declaring *no* parameters, the author's error — nothing there takes type arguments. A template whose
-  body writes a container sugar form over one of its own parameters used to be refused here too; that form
-  now lifts open, so what was the refusal is the mechanism.
+  head declaring *no* parameters, the author's error — nothing there takes type arguments. A head this
+  document neither declares nor imports is the linker's unresolved reference, and a template whose body writes
+  a container sugar form over one of its own parameters lifts open
+  (`design/desugaring-open-forms-and-templates.md`).
 - **Identity is the resolved binding record, not the spelling.** The injected name is
   `head_value_value_hash`, derived from the record the form desugars to, so `[T; 3]` and `[T; 3..3]` land on
   the same entry and any two structurally identical forms anywhere in the document collapse to one
@@ -119,8 +115,9 @@ rebuilt and called a cache.
   as every other defaulted vocabulary field is. Nothing rides on trust: the emitted body binds through the
   governing meta's compiled reader, where an undeclared member is `UNRECOGNIZED_FIELD` under §7.2's closure.
   §5.4's "each variant resolves to a distinct type" is deliberately not checked here — it is a question about
-  what names *resolve to*, after §8.3 flattening, which runs at the end of resolution and so cannot have
-  happened yet when this phase runs (`ReferenceFlattener`, `design/schema-resolution.md`).
+  what names *resolve to*, at the end of each variant's reference chain, which has no answer until the whole
+  namespace exists, imports merged. `TsonSchemaLinker.checkVariantsAreDistinct` asks it
+  (`design/schema-resolution.md`).
 - **Both declaration-level tiers desugar in place.** At declaration position the form *is* the construction
   (`pair => [integer, text]` becomes `!tuple { … }`, like `ids => [text]`, `entries => {text => integer}` and
   `contact => (A | B)`); inline, each is hoisted into its own declaration and referenced.
@@ -128,40 +125,37 @@ rebuilt and called a cache.
   `TypeRef`, so `typeRef` recurses into it and the inner form is already a plain name by the time the
   enclosing one is built. That reaches every nesting position alike — an array's element (`[[T]; 3]`), a
   tuple's positions (`[[T; 2], U]`) and a map's value (`{text => [order; 1..]}`) — to any depth, with no
-  per-depth case and no second walk; the `hoistNested`/`exprRef` pair this replaces existed only because
-  the declaration-level tier was a separate node family.
+  per-depth case and no second walk, there being one node family for a container wherever it stands.
   Because identity is structural, the injected entry is shared: one `array_integer_<hash>` serves the nested
   position, the flat declaration `[integer]` and an inline field's `[integer]` alike. An injected **tuple**'s
   name derives from its positions' *states* as well as their types, or `[T, U?]` and `[T, U]` would land on
   one entry.
 - **The element `?` binds `state` directly.** `[T?]` becomes `!array { element_type: T  state: OPTIONAL }` —
   §5.3's "elements at any position MAY be the absent sentinel `_`; absent elements occupy positional slots".
-  It has no parameter to route through and never did, which is why §5.3 gives the `?` forms no template
-  route. An unmarked element states nothing and lets §5.2's REQUIRED_DEFAULT injection supply `REQUIRED`,
-  exactly as a REQUIRED tuple position omits its own `state`. The state reaches the derived name too, or
-  `[T?]` and `[T]` collide on one injected entry. `[T?; 3]` — the form §5.3 states the rule through — puts
-  the state and both bounds on one binding record, which is the shape the whole table is now written in. The
-  read side needed nothing: `ArrayAbstractReader` already admitted `_` under `ElementState.OPTIONAL` and
-  already counted it toward the bounds. **A map's value takes the same `?`** and binds the same field —
-  `map` carries an `element_state` for it (§5.3's `{K => V?}` row) — so `{K => V}` means what `[T]` means
-  and an author who wants absence writes it. The *key* takes
-  none and never will: §2.9 forbids an absent key outright, so there is no state for a marker to bind.
+  It has no parameter to route through, which is why §5.3 gives the `?` forms no template route. An unmarked
+  element states nothing and lets §5.2's REQUIRED_DEFAULT injection supply `REQUIRED`, exactly as a REQUIRED
+  tuple position omits its own `state`. The state reaches the derived name too, or `[T?]` and `[T]` collide on
+  one injected entry. `[T?; 3]` — the form §5.3 states the rule through — puts the state and both bounds on
+  one binding record, which is the shape the whole table is written in. On the read side `ArrayAbstractReader`
+  admits `_` under `ElementState.OPTIONAL` and counts it toward the bounds. **A map's value takes the same
+  `?`** and binds the same field — `map` carries an `element_state` for it (§5.3's `{K => V?}` row) — so
+  `{K => V}` means what `[T]` means and an author who wants absence writes it. The *key* takes none: §2.9
+  forbids an absent key outright, so there is no state for a marker to bind.
 - **The size specifier is one rule over the `min_items`/`max_items` pair, for arrays and maps alike.** There
-  is no template in between: the kernel's `array_min`/`array_max`/`array_ranged` are deleted, and each of the
+  is no template in between — the kernel declares no size template — and each of the
   four spellings binds the pair directly, an exact `N` pinning both. §5.3's bound coherence (`min <= max`) is
   checked here, where the bounds are literal at schema load; a bound naming a value parameter is
-  materialisation's question. So is the rejection of a **vacuous `[T; 0..]`**: §5.3 calls the form vacuous
-  and rejects it: §5.3 makes `0..` a resolver error, because structural identity (§8.2) makes it an entry
+  materialisation's question. The rejection of a **vacuous `[T; 0..]`** is here too: §5.3 makes `0..` a
+  resolver error, because structural identity (§8.2) makes it an entry
   *distinct from* `[T]` that means the same thing, and the diagnostic SHOULD say so. Only a literal `0` is
   caught.
 - **An invalid sugar form is reported per declaration, not thrown**, when a `DesugarFailureReporter` is
   supplied — `SchemaResolver` always supplies one on its reporting overload, so the phase joins resolution
   and linking in reporting every independent problem in one pass. The reportable forms are
-  `TsonSchemaValidationException`s and declaration-position-only (a size specifier at an inline type-ref
-  position is a parse error): a vacuous `[T; 0..]`, an incoherent size range, and an application of something
+  `SchemaValidationException`s: a vacuous `[T; 0..]`, an incoherent size range, and an application of something
   that takes no type arguments. **A template-application `UnsupportedOperationException` is reported too**,
-  as `NOT_IMPLEMENTED` rather than as an author error — thrown, it took every other declaration's verdict
-  with it. See `design/schema-side-diagnostics.md` for the code split, the placeholder and the no-rollback
+  as `NOT_IMPLEMENTED` rather than as an author error — thrown, it would take every other declaration's
+  verdict with it. See `design/schema-side-diagnostics.md` for the code split, the placeholder and the no-rollback
   rule.
 - **Structural sharing is load-bearing, not an optimization.** Every node not being rewritten is returned
   by identity, because `TsonSchemaParser.declarationPositions()` is an `IdentityHashMap` — an

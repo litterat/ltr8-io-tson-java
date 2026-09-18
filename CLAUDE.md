@@ -32,9 +32,6 @@ Forty-odd notes, each under ~25 KB and opening with its invariants. Pick by the 
 | **CLI, bundled schemas, hashing** | `cli-config-hashing.md` |
 | **Conformance, build, process** | `conformance-suite.md` (runner contract, §8.2 scope walks) · `build.md` (commands, allocation harness, publishing) · `process.md` (branches, spec-feedback register, backlog and identity rules at full length) |
 
-`design/KNOWN-DRIFT.md` lists statements in the notes known to be stale. If a note contradicts the code, check there,
-trust the code, and fix the note.
-
 Other root documents: `BACKLOG.md` (outstanding work), `SPEC-FEEDBACK.md` (open spec issues against Parts 1 and 2),
 `STRUCTURED-OUTPUT.md` (the target use case: LLM structured-output validation, JSON compatibility), `README.md`
 (consumer-facing).
@@ -132,7 +129,7 @@ fact that must survive its entry goes in the note, the Javadoc or the test that 
 names in their own code; internal machinery is bare (`Lexer`, `SchemaResolver`). `tson-base` drops it; `tson-json`
 uses `Json` on the same terms.
 
-**Exception classification is a policy.** `TsonSchemaValidationException`: the author's schema is wrong and the spec
+**Exception classification is a policy.** `SchemaValidationException`: the author's schema is wrong and the spec
 says so. `UnsupportedOperationException`: this library has not implemented that yet. `IllegalStateException`: an
 internal invariant broke. The test: *a schema error's verdict doesn't change when this library improves; a gap's does.*
 A gap travels as `Diagnostic.Code.NOT_IMPLEMENTED`, and the CLI's exit 1 vs 70 rides on that code.

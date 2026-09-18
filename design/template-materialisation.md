@@ -41,10 +41,10 @@ recorded open form, and replacing the application with a reference to the entry 
   (`!uuid ^ {}`, IS-A `uuid`) and a fresh instance (`!uuid_type {}`, related to neither) are ordinary entries
   and keep their own applications, which is what makes those two spellings mean something. **Identity is
   normalised, not provenance**: the minted `source` becomes the canonical application, and the name the author
-  wrote survives at the use site, which states it as written — a division that only became available once
-  flattening stopped rewriting use sites. `AliasedArgumentIdentityTest` pins it. The one case this used to get
-  wrong — a reference carrying an alphabet directive, which was not a pure rename — cannot arise now: the
-  alphabet is `bytes_type`'s own `encoding` selector (§5.5), so it is part of the type and travels with it.
+  wrote survives at the use site, which states it as written — a division available because no pass rewrites
+  use sites (§8.3). `AliasedArgumentIdentityTest` pins it. **Every reference is a pure rename**, which is what
+  the rule rests on: nothing that changes how a value reads rides on a reference — a `bytes` alphabet is
+  `bytes_type`'s own `encoding` selector (§5.5), so it is part of the type and travels with it.
 - **It runs over the resolved form, not the AST**, as a pass in `SchemaResolver` after the driving loop.
   Two reasons. An application arrives here as a `schema.meta.TypeRef` carrying `arguments` — the one thing
   that shape means, since a closed form is always an entry named by a bare reference — so substitution is a
@@ -110,31 +110,22 @@ recorded open form, and replacing the application with a reference to the entry 
   arguments, when the author had written them. Keeping the list means the linker judges what was written.
   The fallback's own half of the fix is in `design/class2-compilation.md` — it does not apply to an
   argument-bearing `source` at all, a §5.10 head being resolved in the type-name namespace only (§3.3.1).
-- **Kind checking falls out of substitution, for the shapes that still resolve at their declaration.** A value
+- **Kind checking falls out of substitution.** A value
   argument reaching a type position is the author's error
   — §5.10 infers a parameter's kind from its use, so the body's use and the applied argument are the two
   things being compared. Arity is checked before any of it, against the template's own `parameters`.
-  - **A *held* body has no slot types, so the kind rule enforces neither half — two other rules do**, which
-    is §5.10's own account: an argument is "read by the position it lands in". A literal applied where the
-    body uses the parameter as
-    a type is still refused, because the substituted token stands in a type position and nothing declares a
-    type called `3` — the verdict arrives as an unresolved reference rather than as a kind error. Its converse,
-    a type name applied where the body routes the parameter into a field's *value*, is accepted: `value` is
-    §4's escape-hatch atom and takes any token. **What closes that is not the kind rule** but §5.2's own
-    dependency — `record_field.value` must be the field's declared type — which catches `int32 ~ text`
-    whether a parameter put it there or the author wrote it literally. It is `BACKLOG.md`'s deferred
-    FIXED/DEFAULT value validation, and it subsumes this case.
   - **§5.10's argument-kind rule is answered by two other rules, not by the kind rule.** A held body has no
     slot types — that is what it is for — so it can never say *this slot expected a value*. Neither half needs
     it to: a literal applied where the body uses the parameter as a **type** is refused because `3` is not an
     identifier at all — `type_ref.name` is typed `identifier`, so it fails where the substituted body is read
-    against the kernel's own vocabulary, which is sharper than an unresolved-reference verdict
-    (that one implied an author could go and declare a type called `3`) — and a type name routed into a
-    field's **value** is
-    refused because §5.2 makes `record_field.value` a value of the field's declared type — which catches
+    against the kernel's own vocabulary (`'3': U+0033 at index 0 cannot start an identifier`), which is sharper
+    than an unresolved-reference verdict — that one would imply an author could go and declare a type called
+    `3` — and a type name routed into a field's **value** is refused because §5.2 makes `record_field.value` a value of the
+    field's declared type — which catches
     `int32 ~ text` whether a parameter put it there or the author wrote it literally (`TsonSchemaLinker`'s
     `checkFieldValue`, `FieldValueConformanceTest`). §5.10 states the same division — an argument is "read by
     the position it lands in" — and §5.2's value conformance is the half named there.
+    `RecordTemplateTest` pins both refusals.
 - **Failures report per entry**, through the same receiver resolution uses, so two bad applications in one
   schema are both reported against their own declarations rather than the first aborting the document.
 - **Two positions close on demand, during resolution, rather than waiting for the pass.** A composition
@@ -196,16 +187,16 @@ recorded open form, and replacing the application with a reference to the entry 
 - **`kind` is the resolver's own, not resolver output.** It is derived from an entry's `supertypes` and body,
   so writing it restates what the record already carries; `type_definition` declares no such field and the
   kernel declares no `type_kind`. `TypeDefinition.kind` is an `@Unbound` component — computed at resolution,
-  carried for the resolver's use, and never written. The reader stack had already worked this way:
+  carried for the resolver's use, and never written. The reader stack works the same way:
   nothing in `reader/` consults it, and `Subsumption` says why — "using the body rather than `kind()` is
   deliberate: a hand-built entry can carry a `ChoiceBody` under [another kind]".
-  - **Which is what the atom-refinement test rests on now** (`DefinitionResolver`): an atom *instance's* body
+  - **Which is what the atom-refinement test rests on** (`DefinitionResolver`): an atom *instance's* body
     IS an atom (`integer` carries `!integer_type {}`), where its constructor's body is the vocabulary record
     describing one (`integer_type` carries a `!record { ... }`). So `body instanceof Atom` separates the pair
     and establishes atom-ness at once, where neither the kind nor the supertype chain does alone — a plain
     record has no supertypes either, and `integer_type` is ATOM-kinded exactly like its instances.
 - **Internally an open entry's `kind` is `TEMPLATE`, and says nothing about what applying it produces.** §5.10 makes a
-  template not a type, so the entry that cannot validate anything no longer claims the kind an application of
+  template not a type, so the entry that cannot validate anything does not claim the kind an application of
   it would take: `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than
   REFERENCE — it is a template whose closure is a reference, not a reference that happens to have parameters.
   Like `REFERENCE` it is a `type_kind` and not a base kind (§4.1).
@@ -216,8 +207,9 @@ recorded open form, and replacing the application with a reference to the entry 
     entry materialisation mints is never a constructor, so it does not compose with `top`, and for
     everything that does not, kind is its body's branch.
   - **And it makes the derivation total.** Every other entry's kind follows from what it already states —
-    the base-kind name in its own `supertypes` for a constructor, its body's branch otherwise — and the open
-    entry was the one case needing a lookup outside itself. `OpenEntryResolvedFormTest` asserts the whole
+    the base-kind name in its own `supertypes` for a constructor, its body's branch otherwise — and an open
+    entry claiming its application's kind would be the one case needing a lookup outside itself. `OpenEntryResolvedFormTest`
+    asserts the whole
     rule over every entry of every schema.
 
 ## Template regularity (`tson-compiler/.../resolver/TemplateRegularity.java`)
@@ -231,9 +223,9 @@ template body, a recursive application — direct or mutual — must pass each p
   build. Caught only while materialising it costs a depth counter — a non-portable limit, and the same
   retrofit C++ reached for after shipping templates without a regularity restriction. Caught here it is an
   ordinary schema error at the line that wrote it.
-- **A template nobody applies is still rejected.** That is the difference the move buys: `weird` used to
-  compile clean and fail at the first user's application, which is the pre-concepts C++ error-quality
-  failure in miniature.
+- **A template nobody applies is still rejected.** That is what checking at the declaration buys: caught
+  only at closing, `weird` would compile clean and fail at the first user's application, which is the
+  pre-concepts C++ error-quality failure in miniature.
 - **Mutual recursion needs reachability, not a self-edge** — neither template in an `a → b → a` cycle
   applies itself, so an application is checked whenever its head can reach the declaration it sits in.
 - **Applications nested inside arguments are checked too** (`box<deep<box<T>>>`), so the walk recurses
@@ -251,7 +243,7 @@ template body, a recursive application — direct or mutual — must pass each p
 - **A condemned template does not reach materialisation.** `check` returns the names it rejected and
   `SchemaResolver` replaces each with the same placeholder a failed declaration leaves, in both the entry map
   and the namespace — `materialise` walks the first, an application's head resolves through the second.
-  Without that, an application of a condemned template ran to `MAX_CLOSING_DEPTH` and reported the defect a
-  second time, against the entry that applied it and with a 64-link chain of synthetic names attached. The
+  Without that, an application of a condemned template would run to `MAX_CLOSING_DEPTH` and report the
+  defect a second time, against the entry that applied it and with a 64-link chain of synthetic names attached. The
   depth guard stays: it exists for a hole in this check, not for a template this check has already caught,
   and the alternative failure it prevents is a `StackOverflowError`.

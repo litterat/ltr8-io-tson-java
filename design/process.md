@@ -176,7 +176,7 @@ developer-facing type, ask "would a consumer plausibly have their own class with
 and it's consumer-facing, prefix it; if it's internal machinery, leave it bare.
 
 **Exception classification is a policy, not a style choice.** Across the schema pipeline:
-`TsonSchemaValidationException` means *the author's schema is wrong and the spec says so*;
+`SchemaValidationException` means *the author's schema is wrong and the spec says so*;
 `UnsupportedOperationException` means *this library hasn't implemented that yet*; `IllegalStateException`
 means an internal invariant broke. The classification test: **a schema error's verdict doesn't change when
 this library improves; a gap's does.** A gap is not a verdict on the author's schema, and the CLI's exit 1

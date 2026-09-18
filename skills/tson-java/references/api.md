@@ -441,7 +441,7 @@ public final class TsonSchemaRegistry implements TsonSchemaLoader {
     public Optional<TsonLinkedSchema> load(String canonicalIdentity);
 }
 
-public final class TsonCanonicalIdentity {
+public final class CanonicalIdentity {
     public static String  canonicalize(String uri);         // §2.2.1: strip scheme, strip query. Nothing else.
     public static void    validate(String uri);
     public static boolean sameIdentity(String a, String b);

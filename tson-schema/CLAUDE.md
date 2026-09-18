@@ -1,7 +1,7 @@
 # tson-schema — the resolved-schema value model and the registry
 
 `schema.meta` (pure records, sealed interfaces, enums — §8's model), `TsonSchemaRegistry`/`TsonLinkedSchema`/
-`TsonSchemaLoader`/`TsonCanonicalIdentity`, and `TsonBundledSchemas`. Read `design/linking-and-compilation.md` for the
+`TsonSchemaLoader`, and `TsonBundledSchemas`. Read `design/linking-and-compilation.md` for the
 registry and identity, `design/meta-layer-data-kind.md` for `Data`, `design/held-template-bodies.md` for `TemplateBody`.
 
 - Names no `tson-compiler` type — the engine depends on this module, not the reverse. Where a compiler type is needed

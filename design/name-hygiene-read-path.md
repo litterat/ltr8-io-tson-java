@@ -15,7 +15,6 @@ refusal interacts with the verdicts around it. Current form only; history lives 
 - `withTokenPolicy` defaults to `unrestricted()`, `withIdentifierPolicy` to Highly Restrictive over the whole name; a
   relaxation is a method, never ambient.
 - The restricted-character rule is gated on the level (`appliesIdentifierProfile()`), at both walks.
-- An unbindable target class is `BIND_MISMATCH`, not `SCHEMA_ERROR`.
 
 Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-location.md`, `design/scope-push.md`,
 `design/record-dispatch.md`, `design/diagnostic-model.md`, `design/diagnostic-rules-and-messages.md`,
@@ -24,18 +23,13 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 
 ## Name hygiene on the read path ([TSON-DATA] §8.2)
 
-**An unbindable target class is `BIND_MISMATCH`, not `SCHEMA_ERROR`.** A class `tson-bind` cannot analyse
-is a misconfiguration in the reading application and says nothing about the document — the distinction
-`Code.verdict()` exists to carry, and the same line `TsonBindMismatchException` draws at compile time.
-Reporting it as `SCHEMA_ERROR` told a caller routing on the answer that the document was wrong when nothing
-had looked at it. Both encodings' class-driven readers report it the same way.
-
 **The token policy is the stream's, not the context's.** Both `TsonDataStream` and `JsonStream` apply it as
-an event leaves them; neither read context takes one, and `TsonReadContext.of` no longer has a parameter for
-it. The reason is unchanged from when this was a decorator: a context **rewinds** — an event consumed during
+an event leaves them; neither read context takes one, and `TsonReadContext.of` has no parameter for
+it. The reason is that a context **rewinds** — an event consumed during
 lookahead is delivered again, and a probe context can be built over events already seen — so a check there
-reports one token once per lookahead that crossed it, where a stream produces each token exactly once. It
-stopped being a decorator when the JSON stream needed the same rule: a wrapper is a second place to forget to
+reports one token once per lookahead that crossed it, where a stream produces each token exactly once. It is
+the stream's own step rather than a decorator over it because both encodings' streams need the same rule: a
+wrapper is a second place to forget to
 apply it, and two encodings with one rule should not have two mechanisms. At `unrestricted()` — the default,
 and every ordinary read — the check is a field read and a branch.
 
@@ -46,7 +40,7 @@ across that one pull and skip their `UNRECOGNIZED_FIELD` when the delta is non-z
 consumed between the two reads and nothing but the hygiene check reports during it, so the delta is exactly
 "this name was refused".
 
-The reason is not tidiness. A homoglyph of a declared name previously drew both the refusal *and* "unknown
+The reason is not tidiness. A homoglyph of a declared name would otherwise draw both the refusal *and* "unknown
 field 'pаssword' — the type declares (password)", which instructs the sender to add a field that is already
 there when the fix is one character. **A refused name was never read, so nothing downstream can hold a
 verdict about it** — reporting it unrecognised claims to have looked it up, which the processor declined to
@@ -65,7 +59,8 @@ A Class 1 document carries two names — a type-ref name and an annotation name,
 `identifier` — and §8.2's restricted-character and restricted-script rules apply to both, **on by default**. They
 run in
 `DefaultTsonReadContext` as the name's event is first pulled, that being the first point on the read path
-holding a diagnostics receiver: `TsonDataStream` throws and holds none, so a check there could only say
+holding the read's diagnostics receiver for names: what `TsonDataStream` raises of its own is a thrown
+`ParseException`, so a name check there could only say
 "invalid", which is the one thing a refusal is not. What stays in the stream is §7.7's grammar, where a
 failure really is a parse error.
 
@@ -75,25 +70,25 @@ one name once per lookahead that crossed it. `NameHygieneTest` counts every shap
 because that is the failure that would survive every other test.
 
 **Not in `TsonDataStream`**, which is where the *token* surface's policy runs and gets exactly-once
-for free by sitting upstream of the rewind. That decorator skips itself entirely at its default —
-`unrestricted()`, which is every ordinary read — so a rule §8.2 defaults *on* cannot live behind it
-without making the wrapper unconditional and putting a switch per token back into the cost of a read that
-has no policy at all.
+for free by sitting upstream of the rewind. The two surfaces sit on opposite sides of the rewind because they
+default differently: the token policy defaults *off* — `unrestricted()`, which is every ordinary read — so the
+stream's check is a field read and a branch, where the name rules §8.2 defaults *on* have to run wherever a
+name is actually delivered.
 
 **Both surfaces are allocation-free when nothing is refused**, which is what makes the on-by-default one
 affordable. `UnicodePolicy.violation` and `IdentifierProfile.hygiene` each scan and return
 `Optional.empty()` — no split array, no script set, no stream — and the two call sites test that `Optional`
 rather than passing a lambda to `ifPresent`. That last part is not a style preference: a lambda capturing
 the name and the receiver allocates whether or not the `Optional` holds anything, and at one per rule per
-name it was the whole measured cost of a check that is otherwise free — ~110 bytes per bound record, ~640
-per read, and ~670 of the ~770 a raised *token* policy used to add. `AllocationHarnessTest` carries the
-figures and the ceiling that now catches a return to them.
+name it is the whole measured cost of a check that is otherwise free — ~110 bytes per bound record and ~640
+per read on the name surface, and most of what a raised *token* policy would add. `AllocationHarnessTest`
+carries the figures and the ceiling that catches a return to them.
 
 **The look-alike rule is the expensive one, and `Confusables.skeleton` is where that was spent.** It runs
-per name per record on the schemaless tree path, and it normalised, built and re-normalised for every name
-whether or not the name carried a confusable character. It now scans first and returns the decomposition
-untouched when nothing maps — no builder, no second normalisation, and none of the stream and capturing
-lambda a `forEach` over `codePoints()` costs — which is ~2.4 KB of a ~27 KB tree read. **What it must never
+per name per record on the schemaless tree path, so normalising, building and re-normalising for every name
+whether or not it carries a confusable character is what it must not do. It scans first and returns the
+decomposition untouched when nothing maps — no builder, no second normalisation, and none of the stream and
+capturing lambda a `forEach` over `codePoints()` costs — which is worth ~2.4 KB of a ~27 KB tree read. **What it must never
 do is skip the table for ASCII**: eight ASCII code points carry a mapping, `m → rn` and `1 → l` among them,
 so `payment` and `payrnent` read alike without a single non-ASCII character. `ConfusablesTest`
 pins that pair for exactly this reason.

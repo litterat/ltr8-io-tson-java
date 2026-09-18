@@ -17,7 +17,8 @@ refinement narrows (`Atom.constraintsCheck`) and that a body's own facets admit 
   again for the entries materialisation mints.
 - A network family's `within`/`excluding` entries are judged by the family's own `coherenceCheck`
   (`AtomCoherence.checkNetworks`), never by the linker or the resolver; its prefix bounds fold in.
-- Unchecked by design: `pattern` against `pattern`, selector facets, `duration_type`'s text bounds.
+- Unchecked by design: `pattern` against `pattern` (and `pattern` emptiness), selector facets. A `value`-typed bound
+  binds to its family's host type (`ValueParser.at`), so temporal and duration bounds are compared as values.
 
 Related: `design/schema-resolution.md` (the resolution phase and its exception boundary),
 `design/constructor-application.md` (what makes an entry an atom instance), `design/template-materialisation.md`
@@ -32,7 +33,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   constructor field that is `REQUIRED` with no schema default (`float_type.format`, `binary.encoding`) is one
   a refinement body has no reason to restate, so binding the body alone would fail `FIELD_REQUIRED`
   (`DefinitionResolverTest.atomRefinementInheritsARequiredFieldItsSourceAlreadyFixed` pins that case). This is
-  why `DefinitionResolver` still holds a writer at all. **It holds the engine, not the facade**: what it
+  why `DefinitionResolver` holds a writer at all. **It holds the engine, not the facade**: what it
   needs is one value's text with no document around it, which is exactly `DataClassObjectWriter`'s contract,
   and reaching for `TsonObjectWriter` instead would point this module at a front door built over it.
   **The text round-trip has no cheaper substitute**: the engine
@@ -43,7 +44,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
 - **A refinement must narrow, and this is enforced** (§5.7). After binding, `checkNarrows` asks the
   constraint family itself — `Atom.constraintsCheck(refined)`, one rule per `schema.meta` family over the
   shared `AtomNarrowing` mechanics — whether the merged result is a valid tightening of the source's own body,
-  and throws `TsonSchemaValidationException` if not (`!uint8 ^ { min: -10 max: 300 }` is rejected). Comparing
+  and throws `SchemaValidationException` if not (`!uint8 ^ { min: -10 max: 300 }` is rejected). Comparing
   the *merged* result rather than the refinement body is what lets an unmentioned facet tighten vacuously; a
   stated bound is judged against the source's **effective** range, folding in a derived one like an integer's
   `size` (intersecting the refinement's own bounds first would make every widening vacuous). Unchecked by
@@ -54,7 +55,7 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   settable where the source leaves it at the constructor's default, identity-only once bound.
 - **A body must also be coherent with itself**, which is the other question about the same facets and
   needs no source to compare against. `checkCoherent` asks `Atom.coherenceCheck()` — one rule per family over
-  the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `TsonSchemaValidationException`
+  the shared `AtomCoherence` mechanics, the `AtomNarrowing` twin — and throws `SchemaValidationException`
   when a body's own facets admit nothing (`{ min_length: 10 max_length: 3 }`, `{ min: 10 max: 3 }`,
   `{ min_prefix: 40 max_prefix: 8 }`). §7.2 puts the rule and its home in one sentence — "family coherence
   between bindings (e.g. `min ≤ max`) is a **compilation** and ingest concern (§8), **not data validation**"
@@ -64,8 +65,8 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
   structural twin: `min_items` above `max_items` admits no value of any length, and an array and a map share
   the one rule since they carry the identical pair. Stating it on the family rather than with any one
   spelling is what makes `[text; 5..3]` and the `!array { … min_items: 5 max_items: 3 }` body it denotes get
-  the same verdict — they are one type, and the rule used to live in the desugar phase, which only ever saw
-  the first. `TsonSchemaLinker` asks it a second time for the entries **materialisation** mints, which
+  the same verdict — they are one type, and a rule kept in the desugar phase would only ever see the
+  first. `TsonSchemaLinker` asks it a second time for the entries **materialisation** mints, which
   resolution never produced: §8.2's "family coherence rules whose operands were parameters" is exactly a
   template whose bounds were `MIN`/`MAX` until an application supplied both. meta.tn's own header `@doc`
   states the same obligation from the other side: bounds are field
@@ -85,15 +86,13 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
     first, so it is the one family where a single stated bound can be incoherent on its own — the opposite of
     `constraintsCheck`, which deliberately does *not* fold the refinement side (there, intersecting first
     would make every widening compare vacuously equal).
-  - **`multiple_of: 0` is the one case that was unsound rather than merely undiagnosed.** `IntegerParser` and
-    `DecimalParser` validate with `value.remainder(m)`, which throws on a zero divisor — so before this check
-    a valid *data* document read against such a type failed on the library's own fault code, an author error
-    reported against the wrong document. `RationalParser` already guarded its
-    own divisor.
+  - **`multiple_of: 0` is the one case where the check buys soundness rather than a diagnosis.** `IntegerParser`
+    and `DecimalParser` validate with `value.remainder(m)`, which throws on a zero divisor — so without the
+    check a valid *data* document read against such a type would fail on the library's own fault code, an
+    author error reported against the wrong document. `RationalParser` guards its own divisor.
   - Unchecked by design, each documented on its class and matching that family's existing narrowing gap:
-    `duration_type`'s text bounds (ordering them means parsing them — `"P1M"` vs `"P30D"` does not order
-    lexically, and judging them as strings would call a coherent body empty), `pattern` emptiness, and
-    selector facets.
+    `pattern` emptiness and selector facets. `duration_type` and `period_type` bounds are compared as the values
+    they denote (a `Duration`; a period's months), never as text — `"P1M"` vs `"P30D"` does not order lexically.
   - **The four network families check their own `within`/`excluding` entries here**, through
     `AtomCoherence.checkNetworks`: the facets are typed `[value]` in meta.tn and must stay so (they list
     networks, and meta declares no network instance to type them by — core.tn does, and core imports meta),
@@ -109,10 +108,12 @@ Related: `design/schema-resolution.md` (the resolution phase and its exception b
     excluding: ["10.0.0.5/32"] max_prefix: 24` admits no network while admitting almost every address. That is
     the same fold `integer` performs with its `size`-derived range, and §5.5 states both halves: the pair MUST
     admit a value, and for a network family the prefix bounds participate.
-  - **The three temporal families' rules are correct but not yet reachable from schema text**, for a reason
-    that predates them and is nothing to do with coherence: `date_type.min`/`max` are declared `value?` in
-    meta.tn (the untyped escape hatch), so a bound arrives as a `String` and the bind into `DateType`'s
-    `Optional<LocalDate>` throws `ClassCastException` — surfaced as an `UnsupportedOperationException`, exit
-    70, "not implemented yet". `!date ^ { min: 2020-01-01 }` and the `!date`-tagged spelling fail
-    identically, so **no temporal bound can be written at all today**. `AtomCoherenceTest` reaches these
-    families by direct construction; they go live at the resolver the moment the binding is fixed.
+  - **A non-numeric bound binds, so the temporal and duration families' rules are live at the resolver.**
+    `date_type.min`/`max` and their siblings are declared `value` in meta.tn (§7.4 — meta cannot write
+    `min: date`, `date` living a layer up in core.tn), so a bound is decoded by [TSON-DATA] §4 and arrives as a
+    `String`. `ValueParser.at` closes the distance: where the natural resolution cannot be what the bound
+    component holds, the token is re-read under the built-in atom that produces that host type (`HostAtoms`), so
+    `!date ^ { min: 2020-01-01 }` binds a `LocalDate` and `!duration ^ { min: PT30M }` a `Duration`. A bound the
+    atom refuses (`!date ^ { min: "not-a-date" }`, `!duration ^ { min: P1Y }`) is the author's error and reports
+    `SCHEMA_ERROR`, named by the facet written. `ValueTypedFacetTest` pins the binding, the refusals, and that a
+    loaded bound decides a read; `AtomCoherenceTest` reaches the same rules by direct construction.

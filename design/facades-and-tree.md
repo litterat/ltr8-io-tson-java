@@ -90,8 +90,8 @@ conforming path through `UnicodePolicy.violation` scans and returns `Optional.em
 per call), no script set (a single-script unit is decided without materialising one — only a genuinely mixed
 token builds the set `covered` and the message need), no stream, and `isPresent`/`get` at the call rather than
 a lambda that would capture three fields per token. What is left is the decorator, once per read:
-`AllocationHarnessTest.aRaisedTokenPolicyCostsAlmostNothingPerRead` pins it at ~100 bytes per read, against
-~2.3 KB before the scan paths were written this way.
+`AllocationHarnessTest.aRaisedTokenPolicyCostsAlmostNothingPerRead` pins it at ~100 bytes per read, where
+a scan that splits, builds a script set and captures costs ~2.3 KB.
 
 The check sees the four events carrying text — a value, a field name, a type-ref, an annotation name — because
 at that layer nothing yet knows which is which. **So a name is a token**, and a token policy stricter than the
@@ -115,8 +115,8 @@ admit UTS #39's own `Toys-Я-Us`.
   cursor, for a caller managing their own context) and always schemaless.
 - **A failure reaching the schema is a diagnostic, not an exception.** An unresolvable `!!schema`, a missing
   root type-ref, a root type the target class can't hold: each reports through the receiver and skips the
-  root value (so the stream still lands on `DocumentEnd`). Under `throwing()` that is indistinguishable from
-  the old behaviour; under a collector they arrive as `Diagnostic`s, which is what lets `Tson.validate`
+  root value (so the stream still lands on `DocumentEnd`). Under `throwing()` that is a `ReadException` at
+  the first one; under a collector they arrive as `Diagnostic`s, which is what lets `Tson.validate`
   delegate to `treeReader()` wholesale instead of re-deriving anything.
 - **The root type-ref is found past the root value's annotations (`EventSkip.typeRefAhead`), not at the
   first event.**
@@ -125,8 +125,8 @@ admit UTS #39's own `Toys-Я-Us`.
   `@doc:"…" !api { … }` annotates and types one value and its root type-ref is `!api`. This is not a
   nicety: TSON has no comment syntax (§2.4, deliberately), so an annotation is the only way to put prose in
   a document, and a root that cannot carry one leaves configuration, fixtures and API descriptions unable
-  to say what they are for. Reading against an explicitly named type (`readAs`) never had the problem — it
-  needs no lookup — which is what shows the whole reader stack below has always handled this.
+  to say what they are for. Reading against an explicitly named type (`readAs`) needs no lookup at all, the
+  reader stack below handling an annotated value as it stands.
     - **Looked past by rewinding, not consuming** (`TsonReadContext.lookingAhead`, which records what a
       lookahead reads and replays it afterwards — the same primitive every dispatcher uses, below). The
       annotations belong to the root value, and the reader underneath builds them into what it returns — a
@@ -189,18 +189,17 @@ admit UTS #39's own `Toys-Я-Us`.
   type-ref and core-value — exactly as it would be if nothing had dispatched to it. `NamedDispatchReader`,
   `VariantSchemaReader` and `VariantBindReader` all work this way, and `ChoiceReader` is one factory for both
   modes rather than two, there being nothing left for a mode to differ about.
-    - **Consuming the framing was the whole problem.** `data-value = *annotation [type-ref] core-value`, so
-      reaching the `!typeName` meant eating the annotations, and the reader that then built the value never
-      saw them. Tree mode papered over it by re-attaching to the finished node (`TsonValue.withAnnotations`);
-      bind mode had no equivalent, so a variant class declaring an `Annotations` carrier got an empty one
-      while the *same class* read where nothing dispatched got the annotation — a document's prose surviving
-      or not according to how deep the value sat. Looking and rewinding makes both modes agree by
-      construction instead of by two implementations staying in step, and deleted the re-attachment rather
-      than growing it a bind-mode half.
-    - The error paths moved with it: a dispatch that reports (an unknown variant, no tag where one is
-      required) now discards with `EventSkip.dataValue`, framing included, since nothing else consumed it.
-      Untagged recovery reads the value's discrimination class off `EventSkip.aheadOfValue` for the same
-      reason — the value no longer starts at the cursor.
+    - **Consuming the framing is what this avoids.** `data-value = *annotation [type-ref] core-value`, so
+      reaching the `!typeName` by consuming means eating the annotations, and the reader that then builds the
+      value never sees them. Tree mode could re-attach them to the finished node; bind mode has no
+      equivalent, so a variant class declaring an `Annotations` carrier would get an empty one while the
+      *same class* read where nothing dispatched got the annotation — a document's prose surviving or not
+      according to how deep the value sat. Looking and rewinding makes both modes agree by construction
+      instead of by two implementations staying in step.
+    - The error paths follow: a dispatch that reports (an unknown variant, no tag where one is required)
+      discards with `EventSkip.dataValue`, framing included, since nothing else consumed it. Untagged
+      recovery reads the value's discrimination class off `EventSkip.aheadOfValue` for the same reason — the
+      cursor sits at the framing, not at the core-value.
 - **A schema-driven read also type-checks annotations** (§6: an annotation *names a type*). `AnnotationTypes`
   resolves the name against the governing schema (§3.3.3's one hop — for a data document that's the
   `!!schema` target, i.e. the very schema the readers were compiled from) and the value is read by *that
@@ -216,16 +215,16 @@ admit UTS #39's own `Toys-Я-Us`.
   nothing can interpret, and rejecting its innards would take that back. §1.3's Class 2 list requires the
   resolution and validation; the preserving reader is how the two rules meet.
     - **Checked wherever it is written, kept only where there is room** — the two are different questions and
-      `AnnotationTypes` now separates them (`capture()` vs `validating()`; `discarding()` is the vocabulary
+      `AnnotationTypes` separates them (`capture()` vs `validating()`; `discarding()` is the vocabulary
       that drops its result and checks it anyway). Whether an annotation has somewhere to land is a fact
       about the bound Java class — a record declaring an `Annotations` component, or a bound scalar with no
       slot at all — and a document does not conform any better for being read by a class that throws its
-      annotations away. Conflating them made the *carrier decide the verdict*: one document, one schema, one
+      annotations away. Conflating them would make the *carrier decide the verdict*: one document, one schema, one
       mode, reported for `Carrier` and silently accepted for `Plain`. `DISCARDED` survives for the one case
       where dropping and not checking really are the same decision — no governing schema at all.
-    - A consequence worth stating: bind mode is all-or-nothing, so an annotation a reader was going to
-      discard can now fail the whole read. That is the point — the document is invalid, and it was being
-      accepted for a property of the reading application rather than of itself.
+    - A consequence worth stating: bind mode is all-or-nothing, so an annotation a reader is going to
+      discard can fail the whole read. That is the point — the document is invalid, and accepting it would
+      rest on a property of the reading application rather than of the document.
 - **`DataClassObjectReader` streams events** (like the compiled readers), walking the descriptor in
   parallel — never materializing a tree first. Problems report through a `TsonReadContext` (fail-fast throws
   `ReadException`; collecting accumulates), and a `tson-bind` `DataBindException` while narrowing /

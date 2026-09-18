@@ -22,7 +22,7 @@ Related: `design/linking-and-compilation.md`, `design/class2-compilation.md`, `d
 ## `Data`: an entry that is not a type (`schema.meta.Data`, §4.1's `data` base kind)
 
 §2.2.2 calls the meta layer the format's sanctioned extension point, and a meta-schema may declare
-constructors of its own. What the kernel had no answer for is where an *instance* of such a constructor
+constructors of its own. The question that needs an answer is where an *instance* of such a constructor
 lands when the thing it describes is not a data type — `schema => {type_name => type_definition}` makes
 every schema-map entry a type definition. `data => top & {}` is the fourth base kind that lets one say
 otherwise, and `TypeKind.DATA` is what it resolves to. The motivating case is an HTTP operation, which must
@@ -58,17 +58,17 @@ sit at the schema layer because that is the only layer able to name request and 
   a nicety.
 - **Resolved output is ordinary.** §8.1's `body` carries an instance of whichever constructor built the
   entry, and a meta-schema's own constructor is not a special case: a DATA entry writes as
-  `body: !operation { ... }`, formally indistinguishable from `!record { ... }`. What made that work is a
-  general `tson-bind` fix (#121) — a non-sealed union branch now stands for its own implementations, where
-  exact-class membership never matched them.
+  `body: !operation { ... }`, formally indistinguishable from `!record { ... }`. What makes that work is a
+  general `tson-bind` rule (`DataClassUnion`) — a non-sealed union branch stands for its own implementations,
+  which exact-class membership would never match.
 - **A meta-schema keeps a constructor this library cannot build a reader for**, its factory standing in as
-  an `ErrorReader` carrying the real cause. Dropping it — which `TsonCompiledMetaSchema` used to do — lost
-  the constructor from the scoped vocabulary silently, so a governing meta compiled and registered looking
-  healthy and the complaint landed against a *different* document: the first governed schema to apply it was
-  told the meta-schema does not declare it, which is both false and unactionable. **This is now the only
-  route to an `ErrorReader` at all**: every constructor the kernel and meta.tn declare builds a
-  real reader, `scoped` having been the last, and `CoreSchemaImportTest` asserts that no entry of core.tn
-  compiles to one.
+  an `ErrorReader` carrying the real cause (`TsonCompiledMetaSchema`'s `unbuildable`). Dropping it would lose
+  the constructor from the scoped vocabulary silently, so a governing meta would compile and register looking
+  healthy and the complaint would land against a *different* document: the first governed schema to apply it
+  is told the meta-schema does not declare it, which is both false and unactionable. **This is the only
+  constructor that reaches an `ErrorReader` for want of a reader**: every constructor the kernel and meta.tn
+  declare builds a real one, and `CoreSchemaImportTest` asserts that no entry of core.tn compiles to an
+  `ErrorReader`.
 
 - **A meta layer is not a vocabulary channel, and this is the first thing an author tries.** The instinct on
   declaring `operation` in a meta layer is to put the shared types beside it — a `status_code` atom, an
@@ -80,9 +80,5 @@ sit at the schema layer because that is the only layer able to name request and 
   layer chaining to meta-kernel imports meta.tn, which imports meta-kernel, and imports are transitive here
   (§2.2.3), so meta-kernel's `void` arrives alongside core.tn's and collides — correctly, and
   with a diagnostic naming both origins. The constraint is real and worth stating; what is not acceptable is
-  discovering it through a message about the wrong thing, which is what the `source` fallback's
-  argument-bearing case (`design/class2-compilation.md`) used to give.
-
-**`spec/m/` is a cache of the spec, with one difference: the hash pins.** The published drafts spell them
-`xxhash` and compute real digests at publication, so these copies carry digests over their own bytes and
-`TsonBundledSchemas` holds those rather than tson.io's.
+  discovering it through a message about the wrong thing, which is why the `source` fallback excludes a
+  `source` carrying arguments (`design/linking-and-compilation.md`).

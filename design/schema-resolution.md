@@ -17,8 +17,9 @@ field states, groups, subtraction, and the exception boundary. Current form only
   lineage.
 - `subtypes` is linking's throughout: a closed entry's own `subtypes` is empty when it is minted.
 - A schema error's verdict doesn't change when this library improves; a gap's does — and only
-  `TsonSchemaValidationException` is collected into a `Diagnostic`.
-- `TypeArgument` stays a sealed interface (`Ref`/`Value`); a `schema.meta` bind target with more than one public
+  `SchemaValidationException` is collected into a `Diagnostic`.
+- `TypeArgument` stays a sealed interface (`Ref`/`Value`), on the modelling argument (exactly one is present); a
+  `schema.meta` bind target with more than one public
   constructor needs `@Record` on the canonical one.
 
 Related: `design/constructor-application.md` (what `!C { … }` may apply and how its head resolves),
@@ -48,17 +49,17 @@ are kept in step deliberately.
 - **An annotation on a declaration resolves one hop and only one hop** (§3.3.3): against the governing
   meta's namespace (`metaDefinitions`), never the schema's own declarations or its `!!import`s. The name is
   checked whether or not a value was written — §6 makes bare `@T` shorthand for `@T:_`, so both forms name a
-  type — and a name that misses is a `TsonSchemaValidationException` against the declaration that wrote it,
+  type — and a name that misses is a `SchemaValidationException` against the declaration that wrote it,
   with the near miss worded separately: a type *this* schema declares (or imports) is usable by the schema's
   **data documents** and not within the schema document itself, so the message names the remedy (move the
-  declaration into a meta-schema and point `!!meta` at it). Silence here was the harmful outcome and is what
-  the check replaces — the annotation used to keep its name and lose its value, so the schema loaded clean
-  and the metadata was not there; §6 makes an unresolved annotation name a resolver error, the valueless
+  declaration into a meta-schema and point `!!meta` at it). Silence is the harmful outcome the check exists
+  to prevent — an annotation keeping its name and losing its value lets the schema load clean with the
+  metadata not there; §6 makes an unresolved annotation name a resolver error, the valueless
   form included (`SchemaAnnotationScopeTest`). A value that *does*
   resolve is read by that type's own compiled reader, so `@doc:"..."` arrives as a `String`. **The one
   resolver that skips the check is the meta-kernel bootstrap**, which passes no `AnnotationValueReader` at
   all: it is producing the very entries such a reader would read through, so every name would fail, and there
-  the name is kept and the value dropped as before. Both annotation sets go through this — the ones after
+  the name is kept and the value dropped. Both annotation sets go through this — the ones after
   `=>` that land on the `TypeDefinition`, and the ones before the name that land on the entry's key — and
   `SchemaResolver` catches the second set's failures itself, since that loop runs outside the memoized getter
   that catches the first set's.
@@ -73,15 +74,15 @@ are kept in step deliberately.
   it: a fresh record, a composition and a refinement each mint their own `RecordBody`, and a mark read three
   times is a mark two of them can disagree about — applying it once is also what makes "extensibility is never
   inherited" fall out rather than need stating, a composition's body arriving OPEN from its operands. A mark on
-  a non-record is the author's error. A **template** takes exactly one of them: `@sealed` and `@final` are
-  claims about other declarations, and §8.2's `subtypes` indexes entries, so an instantiation entry exists only
-  where some schema writes that application and the claim would range over whichever ones a closure happens to
-  contain — a schema error; `@abstract` constrains the marked type alone and holds of every instantiation
-  identically, so it travels. **It is spliced into the held body rather than set on a `RecordBody`**
-  (`WireForm.heldWithExtension`), because by the time a declaration's annotations are read the body is text:
+  a non-record is the author's error. A **template** takes two of the three: `@abstract` and `@sealed` both
+  have a subject — the template's own instantiations, which its `subtypes` holds (next bullet) — while
+  `@final` is a schema error, every application being a subtype of the template by construction, so the claim
+  is false before the author writes anything else. **The mark is spliced into the held body rather than set
+  on a `RecordBody`** (`WireForm.heldWithExtension`), because by the time a declaration's annotations are read the body is
+  text:
   §5.2's `{ x: T }` is rewritten to `!record { … }` at desugar and a composition or refinement template is held
-  by `holdIfOpen` one phase later, so neither producer has the mark in hand. Stating `extension: ABSTRACT` in
-  that text is enough — materialisation reads the closed body back through the `record` constructor's own
+  by `holdIfOpen` one phase later, so neither producer has the mark in hand. Stating `extension: ABSTRACT` (or
+  `SEALED`) in that text is enough — materialisation reads the closed body back through the `record` constructor's own
   reader, so nothing in the closing path knows the member exists. An open body applying anything but `record`
   has no such member and is refused, named by the constructor it applies. A restated field keeps a
   discriminator it does not repeat, on the annotation-merge rule's own logic below.
@@ -114,16 +115,16 @@ are kept in step deliberately.
   `subtypes` is linking's throughout, one phase after resolution, which is what keeps two schemas closing one
   application agreeing on the entry §2.2.3 unifies them by (`MintedEntryUnificationTest`). Marking a template
   whose family could never be populated would be marking a type nothing can ever stand at, which is why the
-  two landed together (`AbstractTemplateFamilyTest`).
+  mark and the family edges are one feature (`AbstractTemplateFamilyTest`).
   **Every entry in such a family is minted**, so §8.2 makes every name in it non-normative and an alias is the
   only spelling a document has for a member *or* for the base — which is what makes §7.2's flattening
   load-bearing at both record dispatchers rather than only at the concrete record readers (`RecordDispatch`).
 - **A restated field's annotations merge over the inherited ones, restatement first** (`resolveField`/`merged`).
-  §5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one, and neither says what
-  becomes of the field's annotations; a resolver's two paths gave two answers, an inherited field being absorbed
-  whole while a restated one was rebuilt with only what the restatement wrote. The rule closes that: the
-  restatement's own annotations in source order, then the inherited field's, one path serving refinement and
-  composition alike. **Concatenation rather than replacement by name**, because [TSON-DATA] §3.1 makes a name
+  §5.8 flattens a composition's inherited fields and §5.7 lets a body entry restate one; absorbing an
+  inherited field whole while rebuilding a restated one from only what the restatement wrote would give one
+  field two answers. The rule is the restatement's own annotations in source order, then the inherited
+  field's, one path serving refinement and composition alike. **Concatenation rather than replacement by name**, because
+  [TSON-DATA] §3.1 makes a name
   repeatable on one value with every occurrence preserved — annotations are a list, not a map, so "the
   inherited `@doc`" names nothing when the source wrote two. **Restatement first**, because order *is* the
   precedence mechanism: `Annotations.get`/`value` take the first occurrence, so leading with the nearer
@@ -132,7 +133,7 @@ are kept in step deliberately.
   to the type, the alphabet a `bytes` value is written in included (`bytes_type.encoding`, §5.5). So the
   ordering is demonstrated over resolved output, and §5.8 gives it read-side force wherever an annotation
   directs reading. `RestatedFieldAnnotationsTest` covers each
-  case, and §5.8 now states the rule: the restatement's own annotations in source order, then the inherited
+  case, and §5.8 states the rule: the restatement's own annotations in source order, then the inherited
   field's, adding and never removing.
 - **What resolves:** record construction; composition (`A & B & { ... }`, §5.8, with kind from the literal
   base-kind names in the transitive supertype chain, and tightening in the trailing body per §5.7); the
@@ -185,9 +186,13 @@ are kept in step deliberately.
   members left is dropped — §5.11 runs the arity ladder to zero and states the two-member minimum as an
   invariant of resolved output.
 - **Two exception types, and which one is deliberate.** `UnsupportedOperationException` means *this library
-  hasn't implemented that yet* — the identity-diagonal FIXED-value invariant, a generic type-ref with a
-  nested or value (non-simple) argument, a parameterized supertype.
-  `TsonSchemaValidationException` means *the schema is wrong*, and the spec says so: a tightening outside
+  hasn't implemented that yet*. No schema construct reaches one: what is left in `DefinitionResolver` is the
+  catch-all around the compiled meta reader (a failure binding a body or an annotation value that is not a
+  `ReadException`), a grammar-layer `TypeDef` shape the dispatch does not know, and a container sugar form
+  arriving unlifted — each the library's fault rather than a verdict. The identity-diagonal FIXED-value
+  invariant (a restated FIXED field MUST NOT change its pinned value) is not a throw site at all: it is
+  unchecked, and is the one deferred design question below.
+  `SchemaValidationException` means *the schema is wrong*, and the spec says so: a tightening outside
   §5.7's transition table, a refinement body field (or group) that adds rather than tightens, an atom body
   whose own facets admit nothing, a
   modifier-only entry with nothing to elide toward (§5.7), a field name two supertypes both contribute or a
@@ -205,18 +210,20 @@ are kept in step deliberately.
   against a `DataValueEvents` replay whose positions are all the `(0,0,0)` placeholder and whose `path`
   points into a synthetic body; the declaration's real position comes from `SchemaResolver`'s catch.
   Telling an author their correctly-rejected schema is
-  unsupported sends them looking for the wrong fix, and now costs more than clarity: only the validation
+  unsupported sends them looking for the wrong fix, and costs more than clarity: only the validation
   exception is collected into a `Diagnostic`, so a misfiled author error also aborts the run instead of
   joining the other problems. The useful test is that **a schema error's verdict doesn't change when this
   library improves; a gap's does.** The split is worth keeping honest —
-  `IllegalStateException` is the third, for an invariant only a malformed `TypeDefinition` could break (a
-  `constructor: true` entry with a non-record body, which §12.1's grammar makes unreachable).
+  `IllegalStateException` is the third, for an invariant only a malformed `TypeDefinition` could break (an
+  applicable head — an entry that IS-A `top` — with a non-record body, a constructor being record-shaped,
+  §7.2).
   `DefinitionResolver`'s Javadoc lists the exact boundary.
 - **`TypeArgument` is a sealed interface (`Ref`/`Value`), NOT a plain record — do not "simplify" it
-  back.** `TypeRef`/`TypeArgument` are mutually recursive, and `tson-bind`'s record binder eagerly resolves
-  every field descriptor with no cycle protection, so a plain-record `TypeArgument` deadlocks with
-  `StackOverflowError` the moment a non-empty `arguments` list is bound. The sealed interface is the one
-  shape that binds at all (union binding breaks the loop by member class). Re-read its Javadoc before
+  back.** It is the labelled choice the kernel declares (`type_argument`, a reference or a value), and a plain
+  record with two `Optional`s would be a worse model: nothing in the type would say exactly one is present.
+  The shape rests on that modelling argument alone — `TypeRef`/`TypeArgument` are mutually recursive, but
+  `DataBindContext` resolves a cyclic type graph (a re-entrant `getDescriptor` gets a deferred supplier held
+  in a `Memoized`; `RecursiveModelTest`), so binding does not constrain it. Re-read its Javadoc before
   touching it. The cost is a spurious `!ref`/`!value` tag on `toTson` output, documented.
 - **`schema.meta` value model:** one Java type per kernel vocabulary record/enum. `Top`/`Atom`/`Product`/
   `Sum` replicate the kernel's composition chain (§4.1) as real Java subtyping — a consumer tests kind
@@ -250,8 +257,9 @@ subtype of the template by construction, so the claim is false before an author 
 `OpenOperandCompositionTest` pins the substitutability table,
 `SubtypeTemplateFamilyTest` the family a base template and its subtype templates close into, and
 `AbstractTemplateFamilyTest` the mark over that family. `DefinitionResolver`'s Javadoc is the exact current boundary.
-Only about half the `UnsupportedOperationException` sites in the pipeline are gaps at all; the rest are
-schema-author errors or internal faults wearing the wrong exception type, and the classification is done.
+The `UnsupportedOperationException` sites left in the resolver are not constructs a schema can write: the
+catch-alls around the compiled meta reader, shape guards an ordinary pipeline never trips, and the bootstrap's closed
+switch over meta-kernel's own declarations.
 
 **No gap reaches a read either**: every constructor
 meta-kernel.tn and meta.tn declare builds a real reader, and `CoreSchemaImportTest` asserts that no entry

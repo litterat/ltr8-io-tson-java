@@ -13,7 +13,8 @@ Current form only; history lives in git.
 - A failed declaration leaves an empty-record placeholder that keeps the declaration's own type parameters; a
   desugar-reported declaration is replaced with an `absorbed` stand-in, never passed through.
 - `Tson.validateSchema` owns the phase boundary, and a schema that reported anything is never registered.
-- A gap is a diagnostic under its own code (`NOT_IMPLEMENTED`), a bind mismatch `BIND_MISMATCH`; every
+- A gap is a diagnostic under its own code (`NOT_IMPLEMENTED`), a bind mismatch — an unbindable target class
+  included — `BIND_MISMATCH`; every
   `SchemaFailure` branch is a positive verdict and the default rethrows.
 - A schema and its bound class must agree about a type's fields, at bind-mode compile; FIXED fields are exempt,
   optional ones are not.
@@ -72,11 +73,11 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
   takes that construct in the author's voice (`"a record field's ':'"`), and `describe` prints the written
   token without its `TokenType` — `expected UNQUOTED (a type reference), found '!' (BANG)` spent both halves
   on parser vocabulary. The construct and the written token also become the diagnostic's `expected`/`actual`
-  (via `TsonParseException`), which were the useless constant pair `well-formed TSON`/`a base-syntax error`
-  before; a throw site stating a *rule* rather than a substitution — an adjacency violation, a trailing
-  separator — leaves both `""` and nothing invents a pair. **One position names the fix outright:** `!` at a
-  type-ref position (`quantity: !integer ^ { min: 1 }`, the natural first attempt) is rejected by name with
-  the hoist-and-reference correction, the same shape as the size-spec and element-`?` rejections beside it.
+  (via `ParseException`) in place of a constant pair that says nothing; a throw site stating a *rule* rather than a
+  substitution — an adjacency violation, a trailing separator — leaves both `""` and nothing invents a pair. **One position
+  names the fix outright:** `!` at a type-ref position (`quantity: !integer ^ { min: 1 }`, the natural first attempt) is
+  rejected by name with the hoist-and-reference correction, the same shape as the size-spec and element-`?` rejections beside
+  it.
 - **Both callers parse this way**, so `tson validate` and `tson compile` give the same account of the same
   broken schema: `Tson.validateSchema` and `TsonCompiledMetaRegistry.resolveLinked(uri, receiver)` — the
   latter being how a *data* read reports on the schema its `!!schema` names.
@@ -99,21 +100,21 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
   of its own.
     - **It keeps the declaration's own type parameters**, which is the one declaration-specific thing it
       carries. Answering every question is not answering them all with nothing: with the arity dropped, an
-      application `bl<int32>` of a broken template `bl => <T> …` was told that `bl` "declares no type
+      application `bl<int32>` of a broken template `bl => <T> …` is told that `bl` "declares no type
       parameters … drop the argument list" — a fix that would break the schema further, the real one being
       upstream. With the arity intact the application closes against the empty body and says nothing.
 - **A template condemned by `TemplateRegularity` is replaced before materialisation**, on the same terms.
   `check` hands its caller the names it rejected and `SchemaResolver` substitutes a placeholder in both the
   entry map and the namespace (the two are read by different halves — `materialise` walks the first, an
-  application's head resolves through the second). Left in place, an application of one ran to
-  `MAX_CLOSING_DEPTH` and reported the same defect a second time, against whichever entry applied it and
+  application's head resolves through the second). Left in place, an application of one runs to
+  `MAX_CLOSING_DEPTH` and reports the same defect a second time, against whichever entry applied it and
   carrying a 64-link chain of synthetic names the author never wrote. **The depth guard itself does not
   stand down**: what it guards is a hole in the static check, not a template the check already condemned.
 - **A defect a held body deferred is reported against the declaration whose text wrote it**
   (`TsonSchemaLinker.heldDeclarationNaming`). A template's references cannot be settled until an application
   supplies arguments, so nothing checks them at the declaration; the verdict arrives on the entry
   materialisation minted, and the walk to a positioned entry finds the *applier*. So
-  `box => <T> { v: T  w: no_such_type }` was reported against `holder => { b: box<text> }` — a line that is
+  `box => <T> { v: T  w: no_such_type }` would be reported against `holder => { b: box<text> }` — a line that is
   not wrong and does not contain the name — once per applier, each naming a different application. Deferred
   checking is what holding buys, and it is survivable only if the author is sent to the line they can edit.
     - **The offending name is the evidence, not the entry.** Walking a derived entry's own lineage cannot
@@ -125,8 +126,8 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
     - **The subject moves with the location**, which is why `UnresolvedReference` carries the sentence in
       parts (subject, trail, name) rather than finished: `'box<text>' field 'w'` states the mistake against
       an application that is itself correct. It is linker-internal and never escapes — re-stated as a
-      `TsonSchemaValidationException`, whose classification it shares — because that type is deliberately
-      `final` and lives in `tson-schema`, which holds no pipeline machinery.
+      `SchemaValidationException`, whose classification it shares — because that type is deliberately
+      `final` and lives in `tson-base`, which holds no pipeline machinery.
     - **Both filters are load-bearing.** Only a *derived* entry is retargeted, or a closed declaration's own
       typo would be blamed on any template that happens to name it; and only a `TemplateBody` declaration is
       a candidate, since a defect no held body deferred is already located correctly. `HeldBody.names()`
@@ -171,25 +172,28 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
       declares a `@Profile` constructor for it. Reaching a read as a diagnostic instead (a schema compiled on demand),
       it keeps its own code, `Diagnostic.Code.BIND_MISMATCH` — a misconfiguration in the reading application is no more
       a verdict on the document than a gap is.
-    - **Strict is the default because the two ways of being wrong are not symmetric.** A strict reader that
+    - **Strict is the only mode because the two ways of being wrong are not symmetric.** A strict reader that
       is wrong says so at startup, once, naming both sides; a lenient one that is wrong drops a value from
-      every document and surfaces later as a field mysteriously holding its default.
-      `DataBinding.lenient()` is the opt-out, the one path on which a field is dropped at all, and it is
-      **silent**: reporting abandons the construction
-      (`ConstructionGuard`), so a lenient reader that reported would return `null` for exactly the documents
-      it exists to accept — and a diagnostic the guard is told to ignore is a severity axis under another
-      name, and [TSON-DATA] §8.1 states there is no such axis: a conforming processor has one severity.
-- **A gap becomes a diagnostic too, under its own code.** Both `TsonSchemaValidationException` and
+      every document and surfaces later as a field mysteriously holding its default. A lenient mode could not
+      report what it dropped either: reporting abandons the construction (`ConstructionGuard`), so a lenient
+      reader that reported would return `null` for exactly the documents it exists to accept — and a
+      diagnostic the guard is told to ignore is a severity axis under another name, and [TSON-DATA] §8.1
+      states there is no such axis: a conforming processor has one severity.
+    - **An unbindable target class is `BIND_MISMATCH`, not `SCHEMA_ERROR`.** A class `tson-bind` cannot analyse
+      is a misconfiguration in the reading application and says nothing about the document — the distinction
+      `Code.verdict()` exists to carry, and the same line `BindMismatchException` draws at compile time.
+      Reporting it as `SCHEMA_ERROR` would tell a caller routing on the answer that the document is wrong when
+      nothing has looked at it. Both encodings' class-driven readers report it the same way.
+- **A gap becomes a diagnostic too, under its own code.** Both `SchemaValidationException` and
   `UnsupportedOperationException` are reported per declaration; the code is what tells them apart —
   `SCHEMA_ERROR` for the author's mistake, `NOT_IMPLEMENTED` for a construct beyond this library. The test
-  for which is which is unchanged, and is from Swift's treatment of `expression_too_complex`: *a schema
-  error's verdict doesn't change when this library improves; a gap's does.* What changed is only its
-  consequence for the pass.
-    - **Why the channel stopped being the distinction.** Throwing a gap out of a phase that reports per
+  for which is which is Swift's treatment of `expression_too_complex`: *a schema
+  error's verdict doesn't change when this library improves; a gap's does.*
+    - **Why the code and not the channel is the distinction.** Throwing a gap out of a phase that reports per
       declaration takes every other declaration's verdict with it: one unimplemented construct, and a
-      document with three ordinary mistakes reported none of them, so the author fixed one thing per run.
+      document with three ordinary mistakes reports none of them, so the author fixes one thing per run.
       The policy's substance is that a gap is not a verdict on the author's schema, and a code carries that
-      as well as a channel did — while letting the pass stay single, which is the property the whole
+      as well as a channel would — while letting the pass stay single, which is the property the whole
       schema-diagnostics design exists for. `SchemaResolver.Problems` is where the schema pipeline
       classifies, and `TsonCli.exitCodeFor` is what the CLI's exit code rides on.
     - **It classifies three ways, not two.** A `BindMismatchException` is neither an author error nor a
@@ -216,35 +220,36 @@ floor under schema-parse recovery — not a tracked gap; `STRUCTURED-OUTPUT.md` 
   `ContentHashMismatchException` *is* `SCHEMA_ERROR`, and the pair marks the line: something arrived,
   and it is not what the reference named. Each branch carries the `expected` that matches its code ("a
   schema that can be obtained", "a schema matching its `?sha256=` pin", "a resolvable schema"), and the
-  fetch branch carries the exception's own `Reason` besides — the classification is the last place that
-  still holds the exception, so what it drops is dropped for every collecting read.
+  fetch branch's code is the exception's own `Reason`, mapped by `Code.of` — the classification is the last
+  place that still holds the exception, so what it drops is dropped for every collecting read.
     - **This is `NOT_IMPLEMENTED`'s argument one step further out**: a bind mismatch is no more a verdict on
       the document than a gap is, and once the failure arrives as a `Diagnostic` there is no exception type
       left for a consumer to classify on — only the code. A consumer choosing an HTTP status wants the three
       apart (the sender's problem, its own wiring, this library); one code gives it none of that, and
       matching on message text is the alternative it should not be pushed to.
     - **Every branch is a positive verdict and the default rethrows**, the same rule `ofBaseSyntaxError`
-      ends on: a library fault propagates as itself. What makes that possible is `TsonSchemaSource.fetch`
+      ends on: a library fault propagates as itself. What makes that possible is `SchemaSource.fetch`
       naming `SchemaFetchException` as the one way a source says "cannot supply this" — with no mandated
       type, an `IllegalStateException` arriving here is equally a source's miss or a broken invariant, and
       either every fault reads as a bad schema or every source that spells a miss that way crashes the read.
       A source failing any other way is that source malfunctioning, and surfaces as the exception it threw:
       `Tson.validate` promises a bad *document* never throws, and a bad *source* is not a document.
-    - **Seven codes are not a verdict on the document** (`Code.verdict()`), and they differ in *who* could
-      not give one: `NOT_IMPLEMENTED` (this library), `BIND_MISMATCH` (the reading application), and the five
-      `SCHEMA_*` codes (whoever was to serve the schema). The CLI's exit codes follow — 70, 78, and 69 or 75
-      by whether a rerun could help — and a mixed run ranks by who must act first, permanence breaking the
-      tie between ranks where nobody present can act: 70 > 78 > 69 > 75 > 1.
+    - **Eight codes are not a verdict on the document** (`Code.verdict()`), and they differ in *who* could
+      not give one: `NOT_IMPLEMENTED` (this library), `BIND_MISMATCH` (the reading application), the five
+      `SCHEMA_*` codes (whoever was to serve the schema), and `LIMIT_EXCEEDED` (this reader's own §9.1 bound,
+      `design/processor-policy.md`). The CLI's exit codes follow — 70, 78, and 69 or 75
+      by whether a rerun could help, a limit refusal exiting 1 because the runner can act — and a mixed run ranks by who must
+      act first, permanence breaking the tie between ranks where nobody present can act: 70 > 78 > 69 > 75 > 1.
 - **What still throws even with a receiver:** an `!!import` that won't load, a `!!meta` that may not
   govern, or a reference whose target owns a different `!!id` than it was fetched under (§2.2.1's
   cross-check, `TsonCompiledMetaRegistry.crossCheckId`). Those make the namespace itself unusable rather
   than one entry wrong, and continuing would report a page of unresolved references that are all
-  consequences of the one real problem. Each is a `TsonSchemaValidationException` — an authoring or
+  consequences of the one real problem. Each is a `SchemaValidationException` — an authoring or
   publishing error, not a library fault, which is what lets `Tson.validateSchema` catch them and report
   against RFC 6901's root pointer (`""`), since they concern the document rather than any declaration, and
   what keeps the CLI's exit 1 apart from exit 70.
 - **Desugaring reports too, and needs no gate of its own.** `SchemaDesugarer.desugar` takes a
-  `DesugarFailureReporter` — a `(Declaration, TsonSchemaValidationException)` callback rather than a receiver,
+  `DesugarFailureReporter` — a `(Declaration, SchemaValidationException)` callback rather than a receiver,
   keeping the diagnostics vocabulary out of a phase whose whole shape is AST-in/AST-out, and keeping
   `Diagnostic.ofSchemaError` construction in `SchemaResolver`, which alone holds the canonical id and the
   identity-keyed position table. It needs no phase boundary because it runs *inside* `resolveSchema`, so

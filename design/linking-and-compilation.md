@@ -7,8 +7,8 @@ history lives in git.
 **Invariants**
 
 - The linker lives in `tson-compiler` and the registry in `tson-schema`, on purpose; the linker materializes nothing.
-- `TsonCanonicalIdentity.canonicalize` is exactly two reductions (strip scheme, strip query); anything else not already
-  canonical is rejected.
+- `CanonicalIdentity.canonicalize` (`tson-base`) is exactly two reductions (strip scheme, strip query); anything else not
+  already canonical is rejected.
 - Import collisions are decided by an entry's origin schema, not by name occurrence; a local declaration may not reuse a
   name the closure already binds.
 - A reference to a DATA-kinded entry is refused at every position a type-ref occupies.
@@ -20,7 +20,7 @@ history lives in git.
 Related: `design/meta-layer-data-kind.md`, `design/choice-disjointness.md`, `design/name-hygiene-and-minted-names.md`,
 `design/class2-compilation.md`, `design/compiled-registries.md`, `design/schema-resolution.md`.
 
-## Schema registry and linking (`tson-compiler/TsonSchemaLinker.java`, `tson-schema/.../`, `.../registry/`)
+## Schema registry and linking (`tson-compiler/TsonSchemaLinker.java`, `tson-schema/.../`, `tson-base`)
 
 Resolution handles one declaration at a time (references carried as unverified strings, `!!import` not
 consulted). `TsonSchemaLinker`/`TsonSchemaRegistry` add the second stage. **They sit in different modules on
@@ -29,7 +29,7 @@ so every phase that will grow schema-side diagnostics is in one module with `Dia
 `tson-regex` directly (what §5.4 pattern disjointness needs, with no injected-oracle seam); the registry is
 storage over the `schema.meta` value model and stays in `tson-schema`, the leaf everything else depends on.
 
-- **`TsonCanonicalIdentity.canonicalize(String)`** implements §2.2.1's canonical-identity algorithm — **not**
+- **`CanonicalIdentity.canonicalize(String)`** (`tson-base`) implements §2.2.1's canonical-identity algorithm — **not**
   general URI normalization. Exactly two reductions (strip scheme + `://`, strip query); everything else must
   already be canonical (lowercase host, no port, no dot-segments, no fragment, no percent-encoding of
   unreserved chars) or it's rejected. `http://` and `https://` resolve to the same identity; a `?sha256=`
@@ -37,9 +37,10 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   (so a caller checking a candidate `!!id` up front reads as such), and `sameIdentity(a, b)` canonicalizes
   both and compares — the recurring question, since a pin or a scheme never distinguishes two references.
   **Public API, not internal machinery**: `TsonSchemaLoader.load` takes a canonical identity as its
-  argument, so anything implementing that seam or a `TsonSchemaSource` has to derive them the same way. It
-  is the identity half of §2.2.1; `TsonContentHash` is the `?sha256=` half this one strips. Prefixed for
-  the reason `TsonContentHash` is — a consumer plausibly has their own `CanonicalIdentity`.
+  argument, so anything implementing that seam or a `SchemaSource` has to derive them the same way. It
+  is the identity half of §2.2.1; `TsonContentHash` is the `?sha256=` half this one strips. It sits in
+  `tson-base`'s root package, unprefixed like the rest of that module, because how a schema is named is one
+  algorithm across every encoding.
 - **`TsonSchemaLinker.link(schema, loader)`** is the pass-2 engine returning a `TsonLinkedSchema` (a thin
   wrapper that is a compile-time proof linking ran): (1) **merge `!!import`s** — each import's *whole
   namespace* copied in as-is (transitive, its own imports included — §2.2.3: "an `!!import` contributes the
@@ -70,17 +71,18 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   expected a resolver error). A DATA
   entry's own references are validated too, and it is the body that says which they are — see the `Data`
   note in `design/meta-layer-data-kind.md`;
-  **a choice's variants are checked distinct** (§5.4) *after* §8.3 flattening, since an alias and its target
-  are one type — so `(text | my_text)` with `my_text => text` is caught, which comparing the written names
-  would miss and which is the only spelling an author can't see for themselves; the walk stops on a
-  reference cycle rather than hanging, and an alias cycle is then caught by the inhabitance check below; **an author's
+  **a choice's variants are checked distinct** (§5.4) at the *end of each variant's §8.3 reference chain*
+  (`ReferenceChain.terminal`), since an alias and its target are one type — so `(text | my_text)` with
+  `my_text => text` is caught, which comparing the written names would miss and which is the only spelling
+  an author can't see for themselves; the walk stops on a reference cycle rather than hanging, and an alias
+  cycle is then caught by the inhabitance check below; **an author's
   `@disjoint` marker is checked against the derived fact** (§5.4) — `true` verifies it silently, `false` is
   an error, and there is no third outcome because §5.4's derivation is total. There is no unprovable state
   to warn about, and no severity axis to warn on: §8.1 states that a conforming processor has one.
   The marker is read from both places §6 puts it,
   the definition and the map key, which is why the check runs last, after `withNameAnnotations`;
   and a **constructor-eligibility** check with two halves, the same §2.2.2 question asked from both ends
-  (§2.2.2, §4.2): a locally-declared `constructor: true` entry is valid only if the schema's
+  (§2.2.2, §4.2): a locally-declared constructor — an entry that IS-A `top` — is valid only if the schema's
   `!!meta` is exactly meta-kernel's identity, and a schema named as this one's **`!!meta` target** is valid
   only if *its* `!!meta` is — so an ordinary type library can't govern (naming core.tn as `!!meta` is the
   `!!import` confusion, and core.tn declares no constructors to supply). The target half is judged only when
@@ -96,7 +98,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   document later tries to name the schema as its `!!meta`. In the shipped wiring
   `TsonCompiledMetaRegistry.loadMeta` reaches that verdict a phase earlier (it must *compile* the meta to
   resolve against it) and raises the linker's own `TsonSchemaLinker.notAMetaSchema` — one wording, one module,
-  and a **`TsonSchemaValidationException` rather than an `IllegalStateException`**
+  and a **`SchemaValidationException` rather than an `IllegalStateException`**
   because a wrong `!!meta` is an authoring error, not a library fault (which is what lets the CLI keep exit 1
   and exit 70 apart). `source`
   validation additionally falls back to the governing meta's namespace (a `source` naming a constructor is
@@ -104,8 +106,8 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   which is the one shape the fallback would reach past its own justification. Desugar rewrites every
   constructor application long before resolution, so arguments surviving into a `source` mean a §5.10
   user-template head, which §3.3.1 resolves in the type-name namespace only. Without the exclusion
-  `x => tmpl<text>` against a `tmpl` its governing meta declares found the template through the fallback and
-  then faulted it on *arity* — telling the author to supply arguments they had written, or that they had
+  `x => tmpl<text>` against a `tmpl` its governing meta declares would find the template through the fallback
+  and then fault it on *arity* — telling the author to supply arguments they had written, or that they had
   written the wrong number of them, when the real answer is the one every other reference form gives: the
   name is not in scope. Its other half is in `TemplateMaterialiser` (`design/template-materialisation.md`): an
   application that cannot be closed keeps its argument list rather than collapsing to its bare head, so what
@@ -117,20 +119,19 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   - **Two §5.10 rules on templates, both decidable here and neither depending on anyone applying one.**
     *Arity*, over every reference: a reference supplies exactly as many arguments as the entry it names
     declares parameters, which folds three author errors into one rule — too many, too few, and **none at
-    all**. That last used to be unguarded: naming a template without applying it linked and compiled clean,
-    then failed at *read* time with "no usable compiled reader" and a library-fault exit code, because the
-    eager-rejection discipline guarded applications and never bare names. It is now conditional, and the
-    condition is `template.extension`: a **family base** may be named bare (`use => { u: box }` resolves to
-    `box`, and a value there is a value of one of its instantiations), while a container, a reference and a
-    constructor-application template carry no `extension`, have no dispatch to eliminate their parameters,
-    and are refused here as before (`SPEC-FEEDBACK.md` #13). *Parameter usage*: an open entry references
+    all**. That last is the one worth guarding here: a template named without being applied otherwise links
+    and compiles clean and fails only at *read* time, against a document with nothing wrong with it. It is
+    conditional, and the condition is `template.extension`: a **family base** may be named bare
+    (`use => { u: box }` resolves to `box`, and a value there is a value of one of its instantiations), while
+    a container, a reference and a constructor-application template carry no `extension`, have no dispatch to
+    eliminate their parameters, and are refused (`SPEC-FEEDBACK.md` #13). *Parameter usage*: an open entry references
     every parameter it declares, so
     `box => <T> { v: text }` is rejected — every application of it would denote the same type, and a
-    parameter list is author-written, so an unused one is a `TsonSchemaValidationException`.
-    - Its old converse — §5.10's closed-entry rule, checked over `record_field.value_param` — has no sound
-      form now the kernel declares one `value` slot: at a closed entry there are no parameters for a token to
-      resolve into, so a token there *is* a literal and there is nothing to detect. The rule's reference half
-      needs no code either — a parameter reference at a closed entry is already an unresolved one.
+    parameter list is author-written, so an unused one is a `SchemaValidationException`.
+    - The converse — a parameter used at a *closed* entry — needs no check of its own. The kernel declares one
+      `value` slot, and at a closed entry there are no parameters for a token to resolve into, so a token
+      there *is* a literal and there is nothing to detect; a parameter *reference* at a closed entry is
+      already an unresolved one.
   - **A held body answers the arity rule for the *applications* it writes** (`checkHeldArity`). A held body
     withholds one thing — what a reference *resolves to*, which no argument settles until substitution — so
     type-kind validation and inhabitance wait for materialisation. Arity does not depend on that: it counts
@@ -148,7 +149,7 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
     fact *linking* establishes rather than part of the resolved schema value §9 defines — and because
     `schema.meta` is a bind target with a hand-written `equals` and the `@Record` constructor-selection trap,
     which a new component would walk straight into. It keeps a declaration's identity and its line answerable
-    from the same document however many schemas flattened it in — the pair a non-record reader offers as its
+    from the same document however many schemas merged it in — the pair a non-record reader offers as its
     own location (`ValueReaderContext.locationOf`), which is what locates a root-level `!int32` in core.tn
     rather than in whatever schema imported it. The registry stores `TsonLinkedSchema` directly, so the map
     survives registration and every later `load`.
@@ -196,7 +197,9 @@ for a defect in the schema, at a line the data's author does not control.
   entry; calling it uninhabited too would report one defect twice, the second time in words naming a
   different problem. The check runs after that validation for exactly this reason.
 - **Scope is structural.** An atom whose own facets admit nothing (`int8 ^ { min: 300 }`) is uninhabited too,
-  but that is its constraint family's question, next to `AtomNarrowing` (`BACKLOG.md`).
+  but that is its constraint family's question, answered at schema load by `Atom.coherenceCheck` (over
+  `AtomCoherence`) next to `AtomNarrowing` — asked by the resolver of each written body and again by the linker
+  of every entry materialisation mints.
 
 ## What `record.extension` obliges (`RecordExtension`, §5.2, §5.7, §5.9)
 
@@ -218,7 +221,7 @@ rest of the closure agrees with it.
 - **A marked field is the declaration's own only if no sealed supertype declares it.** §5.8 flattens an
   inherited field whole, the mark included, so a subtype's copy of its base's selector is indistinguishable
   here from one the subtype wrote. Without the distinction the rule "a discriminator requires `@sealed`"
-  refuses every subtype of every sealed family — which it did, until the first end-to-end test.
+  refuses every subtype of every sealed family.
 - **A family is re-judged whenever any part of it is local**, base or subtype, which is not the same as
   judging local entries. §3.3.4 makes `subtypes` open across schemas, so an importer really can add a
   member: the new sibling can collide with an imported one, and only a closure holding both can see it.

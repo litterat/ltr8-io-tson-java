@@ -47,23 +47,22 @@ than prose.
 That split tells the parity test exactly what to compare: **code, path, `expected` and `message`** for a
 shared rule, and never `actual`, where `_` on one side and `null` on the other is correct.
 
-**What the sharing found, on the first run.** For absence written at a REQUIRED field the two readers were
-choosing *different rules* for one document: JSON said "'name' on 'person' admits no absence", TSON said
-"missing required field 'name'". Same code, same pointer, same `expected` — and TSON's prose told an author
-they had forgotten a field they could see themselves writing. §5.2's rule is that `_` asserts absence at a
-position the schema always fills, so the document stated something and is not missing it. TSON's fall-through
-to the missing-field message was the defect; it now reports the rule the document actually broke.
+**Absence written at a REQUIRED field is its own rule, not the missing-field one.** Both readers say
+"'name' on 'person' admits no absence" and neither says "missing required field 'name'": the two share a code,
+a pointer and an `expected`, and the second's prose tells an author they have forgotten a field they can see
+themselves writing. §5.2's rule is that `_` asserts absence at a position the schema always fills, so the
+document stated something and is not missing it, and the message reports the rule the document actually
+broke. Sharing the prose is what keeps the two readers from choosing different rules for one document.
 
 **Five families state their rules here**: records, arrays and sets (one class, a set being an array that
 refuses a repeat), tuples, and maps. Choices wait for [TSON-JSON] §8.5 — `tson-compiler` states its dispatch
 diagnostics parameterised over a "candidate noun" so one class serves a choice *and* a scoped position, and
 aligning before the JSON side has the second position would be aligning against a shape about to change.
 
-**What the wider pass taught, beyond the record family's finding.** Two boundary calls turned out to be
-finer than "the schema's nouns":
+**Two boundary calls are finer than "the schema's nouns":**
 
 - **"The absent sentinel" is the schema's noun and stays in the prose**; only the *spelling* is the format's.
-  The first draft removed both and had to be walked back — [TSON-DATA] §2.9 names the concept, and a message
+  [TSON-DATA] §2.9 names the concept, and a message
   that will not say it loses the word the spec uses for the thing it is refusing.
 - **A message about a value renders the value, not the wire form.** A set duplicate reads `'a'` and not
   `'"a"'`. That is harder on the JSON side than it sounds, because tree mode discards the host value by
@@ -100,13 +99,13 @@ fired.
 untouched — it is shared with two schemaless binders that have no read context, and with the JSON stack,
 none of which can be handed a `Diagnostic`. What `AtomRefusal` carries is the four non-locational components
 (code, message, `expected`, `actual`); the reader adds the location, since only it has one. It lives in
-`tson-atom` rather than on `Diagnostic` for the reason the rest of the classifying half stayed with each
-encoding: `Diagnostic`'s ten `of*` factories each switch on an exception an *encoding* declares, and
+`tson-atom` rather than on `Diagnostic` for the reason the rest of the classifying half sits with each
+encoding: the `of*` factories each switch on an exception an *encoding* declares, and
 `AtomTypeException` is the vocabulary's own and neither encoding's — so a factory for it on `Diagnostic`
 would make the base depend on the vocabulary, while a copy per reader is how two encodings come to disagree
-about one token. They already had: before the merge, a target that cannot represent a family's value was a
-bind problem on one path and a type mismatch on the other, and nothing said which was right. Four readers go
-through it now — `AtomTypeReader`, `TypeRefCheck`, `DataClassObjectReader` and the JSON stack's
+about one token — a target that cannot represent a family's value being a bind problem on one path and a
+type mismatch on the other, with nothing saying which is right. Four readers go
+through it — `AtomTypeReader`, `TypeRefCheck`, `DataClassObjectReader` and the JSON stack's
 `JsonAtoms` — and `AtomTypeException` is sealed to exactly two subtypes, so the switch is exhaustive rather
 than a guess. Per-field schema positions are a separate matter
 (`design/reader-naming-and-schema-location.md`). (Message synthesis from code + params
@@ -125,9 +124,9 @@ every differing document get rejected.
 **`expected` carries the constraint that failed, never the type's name.** `AtomTypeException` holds an
 `expected` alongside its message, filled at each throw site from the facet that rejected the value, and all
 three atom report sites (`AtomTypeReader`, `TypeRefCheck.violation`, `DataClassObjectReader.bindBuiltin`)
-pass it straight through. Naming the type there — the old `a value satisfying quantity_t` against a message
-reading `'99999' is greater than the maximum 100` — made the structured half carry strictly *less* than the
-prose, so a consumer wanting the bound had to regex the sentence. That exception's own Javadoc fixes the
+pass it straight through. Naming the type there — `a value satisfying quantity_t` against a message
+reading `'99999' is greater than the maximum 100` — would make the structured half carry strictly *less* than
+the prose, so a consumer wanting the bound would have to regex the sentence. That exception's own Javadoc fixes the
 vocabulary at six shapes and no site invents a seventh:
 
 | shape | example |
@@ -147,8 +146,8 @@ field's value is that it is one vocabulary across atoms, not a per-parser phrasi
 **`message` and the structured fields do different jobs, and neither is derived from the other.** The
 structured half — `code`, `path`, `expected`, `actual`, the positions — carries the *facts*, and is what a
 machine consumer acts on; it must be complete at every report site, including the facade-level ones
-(`TsonObjectReader`/`TsonTreeReader`'s `abandon`, which no longer offers an overload that omits them, because
-that overload is how three diagnostics ended up with a blank structured half). `message` is for a person, and
+(`TsonObjectReader`/`TsonTreeReader`'s `abandon`, which offers no overload that omits them, because
+such an overload is how a diagnostic ends up with a blank structured half). `message` is for a person, and
 is free to do what a template could not: cite the spec, or name the fix.
 
 ```
@@ -162,16 +161,16 @@ would make them worse. **So there is deliberately no message-synthesis layer her
 added: `code` does not determine the sentence (`TYPE_MISMATCH` alone covers a wrong shape, a wrong token, a
 wrong cardinality, a bare annotation, an unmatched variant and a host-binding failure), and the sentences
 differ because the situations do. The failure mode worth guarding is a site that forgets `expected` — which
-the missing overload now makes hard — not a site that writes a sentence a template wouldn't have.
+the missing overload makes hard — not a site that writes a sentence a template wouldn't have.
 
 ## Base-syntax failures
 
-**A base-syntax diagnostic states its position once, structurally.** `TsonParseException`, `LexException`
+**A base-syntax diagnostic states its position once, structurally.** `ParseException`, `LexException`
 and `TsonUnsupportedDocumentException` keep the location in `position()` and out of `getMessage()`;
 `toString()` appends it, so a stack trace still says where while the `Diagnostic` built from one carries
-`dataPosition` as the single copy. Repeating it in the message made every renderer print the location twice,
-in two formats, the second without a byte offset. `ReadException.toString()` does the same from its own
-diagnostic, which is what keeps a stack trace informative now that a base-syntax failure reaches a fail-fast
+`dataPosition` as the single copy. Repeating it in the message would make every renderer print the location
+twice, in two formats, the second without a byte offset. `ReadException.toString()` does the same from its own
+diagnostic, which is what keeps a stack trace informative, a base-syntax failure reaching a fail-fast
 caller through *it* rather than as the parse exception itself.
 
 **A base-syntax failure goes to the receiver, like every other problem with the document.** Both facades'
@@ -180,18 +179,17 @@ never throws for a bad *document* — it hands back nothing (no tree, `null` bin
 Three reasons this is the receiver's business rather than the caller's:
 
 - **The stream is lazy**, so a base-syntax failure surfaces *mid-read*, after any earlier value-level
-  problem has already been reported. Throwing past the receiver left a caller holding a populated collector
-  *and* an exception, with nothing saying the two belonged to one document — and `Tson.validate` resolved
-  that by discarding the collector and returning the syntax error alone, losing what it had already found.
-- **It is the same shape the facade already used** for an unreachable `!!schema` (`readAgainstSchema`):
+  problem has already been reported. Throwing past the receiver would leave a caller holding a populated
+  collector *and* an exception, with nothing saying the two belong to one document, and `Tson.validate`
+  either discarding the collector or losing the syntax error.
+- **It is the same shape the facade uses** for an unreachable `!!schema` (`readAgainstSchema`):
   report once, abandon the value. "Nothing can continue past a document that will not parse" is an argument
   for not continuing, not for not reporting.
 - **A caller could not classify it themselves**: `LexException` is in the unexported `lexer` package, so
-  `ofBaseSyntaxError` had to be public for anyone to write the `catch` — the library conceding the
-  classification is required while making every caller ask for it.
+  a caller left to write the `catch` cannot name what it catches.
 
-**Fail-fast is unchanged in kind, changed in type.** `throwing()` still throws at the first problem, but a
-base-syntax failure now arrives as `ReadException` (carrying the diagnostic, position included) rather
-than `TsonParseException`. The exception type is the whole cost of the change, and it buys `Tson.validate`
-being a plain call with no catch at all. Only a fault in *this library* still propagates as itself:
+**Fail-fast throws one type.** `throwing()` throws at the first problem, and a
+base-syntax failure arrives as `ReadException` (carrying the diagnostic, position included) rather
+than as `ParseException`, which is what lets `Tson.validate`
+be a plain call with no catch at all. Only a fault in *this library* still propagates as itself:
 `ofBaseSyntaxError` rethrows anything that is not one of §8.1's three.

@@ -36,23 +36,20 @@ materialization, no validation (those are the resolver's/linker's jobs).
   "numbers are not declarable names"; identifier-Start is `XID_Start`, and every spelling the number grammar
   admits begins with a digit, a sign or a dot — all in token-Start only so a *number* can be an unquoted
   token — so the profile subsumes it and also catches the names that merely *begin* like a number (`42x`,
-  `-foo`) which the number rule let through. Field names are the one naming position the parser leaves
+  `-foo`), which a number rule alone lets through. Field names are the one naming position the parser leaves
   alone: `field-name` stays lexical for the Class 1 reason (`design/lexer-and-data-parsing.md`), and
   `DefinitionResolver.requireIdentifier` applies the contract to the ones a declaration actually binds.
   §12.1's `type-name = identifier` states it, and its note carries the field-name half.
 - **`SchemaMap.declarations` is a `Map<String, Declaration>`** (a `LinkedHashMap`, insertion order
   preserved) — §3.4.1's Pass 1 shape and the schema's own `{type_name => type_definition}`. A duplicate
   name overwrites, same "grammar layer doesn't dedupe" treatment the data grammar gives duplicate fields.
-- **Three ABNF defects were implemented per intent before the spec caught up, and it since has.**
-  `instance`'s payload is a `core-value`, not the full `data-value` (`Instance` wraps a `DataValue` with
-  `typeRef` pre-set, no separate `target`); `construction-def` admits the implicit `&` before its trailing
-  `record-def`; `field-modifier`'s value is a bare token or the absent sentinel. §12.1 now spells all three
-  that way, and states that no production of the schema grammar takes the full `data-value`.
-  - **`atom-refinement` followed late.** Its production is `"!" type-name ws "^" ws record-def`, and the
-    `^` branch took a full `data-value` for a revision longer than the `instance` branch did — so
-    `!integer ^ 5`, `!integer ^ !foo { … }` and `!integer ^ @doc:"d" { … }` all parsed. The branch now
-    requires a brace and reports at the offending token, per declaration like every other schema syntax
-    error.
+- **No production of the schema grammar takes the full `data-value`**, which §12.1 states.
+  `instance`'s payload is a `core-value` (`Instance` wraps a `DataValue` with `typeRef` pre-set, no separate
+  `target`); `construction-def` admits the implicit `&` before its trailing `record-def`; `field-modifier`'s
+  value is a bare token or the absent sentinel.
+  - **`atom-refinement` is `"!" type-name ws "^" ws record-def`**, so the `^` branch requires a brace:
+    `!integer ^ 5`, `!integer ^ !foo { … }` and `!integer ^ @doc:"d" { … }` are syntax errors, reported at the
+    offending token, per declaration like every other schema syntax error.
   - An unquoted non-numeric type-argument always parses as a type reference, never a value literal — a
     deliberate grammar-layer deferral, classified at a later semantic layer.
 - **A `!` head behind a parameter list is the same production as one without** (§12.1's `instance =
@@ -70,11 +67,9 @@ materialization, no validation (those are the resolver's/linker's jobs).
     box<text> }` is not a `core-value`, in either form. That line falls where the grammars already divide --
     a *type* position is schema grammar and takes `box<text>` directly, while `!C value` takes data, so an
     application inside one is written in `type_ref`'s record form, which is what the sugar expands to anyway.
-  - A parameterized **atom refinement** is still no form at all: §12.1 gives `atom-refinement` no parameter
+  - A parameterized **atom refinement** is no form at all: §12.1 gives `atom-refinement` no parameter
     list, a refinement of an atom instance having no parameter to take, and the parser says so where the
     `^` is read.
-  - The **resolved** form does not exist yet, so `DefinitionResolver` refuses one by name rather than
-    dropping its parameters into an ordinary construction.
 - **Two entry points, one grammar.** `parseSchemaDocument()` is fail-fast; `parseSchemaDocument(receiver)`
   reports each *declaration's* syntax error and resynchronises to the next, handing back no document at all
   if it reported anything. The mechanics, the resync rule and the two failures that stay fail-fast are in
@@ -84,30 +79,20 @@ materialization, no validation (those are the resolver's/linker's jobs).
   `"a choice type's closing ')'"`), never as the enclosing construct. One position goes further and names
   the *fix*: an inline atom refinement or constructor application (`quantity: !integer ^ { min: 1 }`),
   rejected at a type-ref position with the "declare a named type and reference it by name" correction
-  (§5.3). It used to have two companions, for an element `?` and a size specifier at a type-ref position;
-  both are legal there now and the diagnostics went with the restriction.
+  (§5.3). An element `?` and a size specifier are legal at a type-ref position, so neither has a diagnostic
+  of that kind.
 - **One production per container, reachable from `type-ref`** — `ArrayRef`, `TupleRef`, `MapRef`, each
-  admitting a size specifier after `;` and an element `?` at *every* position. The grammar used to spell
-  each twice, a declaration-level form admitting both and an inline form admitting neither, with a prose
-  tie-break in §12.1 because `type-def` was otherwise ambiguous between them. The split existed because a
-  sized form had no inline representation to carry it; every form lifts to an entry, so it protected
-  nothing; §12.1 now has one bracket production, and size specifiers and element/position `?` are legal at
-  every type-ref position. `type-def` reaches both through `type-ref`
-  like anything else, so the tie-break disappeared rather than being reworded.
+  admitting a size specifier after `;` and an element `?` at *every* position. §12.1 has one bracket
+  production and one map production: every form lifts to an entry (§5.3), so a sized form needs no
+  declaration-level tier to carry it, and `type-def` reaches each container through `type-ref` like anything
+  else, with no tie-break between a declaration-level and an inline spelling to state.
   - **Nesting is the recursion in `ElementType`**, which holds a plain `TypeRef` — `[[T; 2]; 3]` and
-    `{text => [order; 1..]}` need no second node family, which is what `ElementType.Expr.Nested` used to be.
+    `{text => [order; 1..]}` and `{text => {text => integer}}` need no second node family.
   - **An element's `?` and a field's own `?` cannot collide**: a field is `field-name ":" type-ref ["?"]`,
     so in `xs: [T?]?` the inner belongs to `element-type` and the outer to the field.
   - A map key stays `type-name ["<" type-args ">"]` and nothing else — not a paren type, not a bracket form
     — which is what holds the brace dispatch below to its lookahead budget; a composite key earns a named
     declaration and the explicit `!map { key_type: … }` form.
-- **The map sugar is parsed twice for the same reason** — `MapContainerDef` at declaration position (which
-  admits a `; size-spec`), `InlineMapRef` at type-ref position (which does not). `map-value = container-def
-  / type-ref`, the same pair an array element position takes, so it reuses `ElementType.Expr` and the
-  declaration-level tier nests inside a map value to any depth (`{text => [order; 1..]}`,
-  `{text => {text => integer}}`). The key is `type-name ["<" type-args ">"]` and nothing else — not a paren
-  type, not a bracket form — which is what holds the dispatch below to its lookahead budget; a composite key
-  earns a named declaration and the explicit `!map { key_type: … }` form.
 - **`{` at a type position dispatches by consuming one token and inspecting** (`braceTypeDef`/
   `braceOpensMap`) — [TSON-DATA] §2.8's record/map idiom, imported wholesale into the schema grammar as
   §12.2 asks. `}`, `(` (a leading field group) and `@` (annotations, which the map sugar admits nowhere

@@ -23,7 +23,7 @@ before editing — each opens with its invariants.
 Rules that bite here:
 
 - No reader requires a materialised tree, and `TsonReadContext` holds no error policy — report through the receiver.
-- A schema-author error is `TsonSchemaValidationException`; a library gap is `UnsupportedOperationException` and travels
+- A schema-author error is `SchemaValidationException`; a library gap is `UnsupportedOperationException` and travels
   as `NOT_IMPLEMENTED`; a broken invariant is `IllegalStateException`. `DefinitionResolver`'s Javadoc is the boundary.
 - Every open entry's body is held text; there is one opinion about its wire form, and it is `WireForm`'s.
 - The grammar is checked where a name is read; §8.2 hygiene runs once per layer over scopes, never at a reading position.

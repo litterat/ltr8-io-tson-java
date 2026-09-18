@@ -12,8 +12,8 @@ lives in git.
   else to a synthetic — and a third body shape is an `IllegalStateException`.
 - A held body is text; the parsed form is a working value that is never retained, and nothing outside `resolver` sees a
   `DataValue`.
-- Substitution is one rule at every depth: a token in a tree, rewritten when its text resolves into the entry's
-  `parameters` (§8.1's shadowing rule).
+- Substitution is one rule at every depth: an **unquoted** token in a tree, rewritten when its text resolves into the
+  entry's `parameters` (§8.1's shadowing rule); a quoted token is a literal.
 - §5.7's fixation happens at closing (`fixRoutedValues`): a routed `= P` arrives `REQUIRED` and becomes
   `REQUIRED_FIXED`; a `~ P` arrives `REQUIRED_DEFAULT` and stays one.
 - Applications inside a held body close before the entry is named, and in the synthetic merge the closed-record name
@@ -65,11 +65,10 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     to a **synthetic** named for the form, which the instantiation then references — a form has no
     author-written name for identity to key on. That is the whole of the divergence; everything before it is
     shared.
-  - **There is no third case, and that is what deletes the old machinery.** Every open entry's body is a
-    `HeldBody` or a `Reference` — an *error placeholder* included, which holds an empty record rather than
-    staying the one parameterised `RecordBody` left in the system (`WireForm.heldEmptyRecord`). While
-    that one shape survived, `TemplateMaterialiser` had to keep a general substitution over *resolved* bodies
-    beside the held one — `substitute`/`mapFields`/`bindValue`, ~75 lines — to serve a placeholder with no
+  - **There is no third case.** Every open entry's body is a `HeldBody` or a `Reference` — an *error
+    placeholder* included, which holds an empty record (`WireForm.heldEmptyRecord`) rather than being the one
+    parameterised `RecordBody` in the system. A placeholder of that shape would oblige `TemplateMaterialiser`
+    to keep a general substitution over *resolved* bodies beside the held one, to serve an entry with no
     fields to substitute into. Holding it makes `close` total on two branches and the third an
     `IllegalStateException` naming the invariant.
   - **§5.7's fixation happens here** (`fixRoutedValues`), which is what a held record body's retirement of
@@ -80,10 +79,12 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
     `REQUIRED_DEFAULT` and stays one: data may still override it.
   - **Substitution is one rule, at every depth.** The body was never read against constructor vocabulary, so
     a parameter in a slot, one inside an application a slot holds (`tree<p0>` becoming `tree<text>`), and one
-    inside a collection are the same thing here: a token in a tree, rewritten when its text resolves into the
-    entry's `parameters` (§8.1's shadowing rule). Quoting does not enter into it — a token's form is a
-    schemaless-data concern ([TSON-DATA] §4.4) — which is why a held body needs no `param`/`value` label
-    where a typed open vocabulary did, and why §5.10 can state "substitution is one rule at any depth" with
+    inside a collection are the same thing here: an unquoted token in a tree, rewritten when its text resolves
+    into the entry's `parameters` (§8.1's shadowing rule). **A quoted token is a literal and is never
+    rewritten** (`WireForm.substitute`, and `HeldBody.names()` returns exactly the tokens it would rewrite) —
+    which is what lets a body state the string `"T"` beside the parameter `T`, and why the held-record
+    writers emit unquoted tokens. The slot's *kind* is what does not enter into it: a held body needs no
+    `param`/`value` label, which is how §5.10 can state "substitution is one rule at any depth" with
     collection-valued slots included.
   - **Applications inside it close before the entry is named**, which is what keeps one type on one entry:
     the desugar phase lifts innermost-first, so a form it writes already names the entry its inner form
@@ -115,7 +116,7 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       reference"), so a parameter passed to another template says nothing locally: it takes the callee's kind
       at that position, and two templates may wait on each other. §5.10 anticipates the cycle and makes a
       parameter grounded only by it an error, which `BACKLOG.md` still carries.
-    - **Two declaration-time verdicts fall out**, both of which used to be per-application or absent: a
+    - **Two declaration-time verdicts fall out**, neither of which has to wait for an application: a
       parameter standing for a whole collection or record (`<T> !enum { members: T }`) is neither a reference
       nor a scalar, and a parameter standing in both kinds of position (`<T> { v: T  w: int32 ~ T }`) has no
       argument that could satisfy both.
@@ -150,8 +151,8 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
       name into identity. `SchemaResolver` tells the two apart by the plainest fact available — the
       difference between the declarations the author wrote and the ones desugaring added.
   - **Both closure paths share one memo**, so a template that applies itself (`weird => <T> [weird<T>]`) ties
-    the knot on the entry under construction. An open instance used to short-circuit ahead of the memo and
-    the depth backstop alike, which made that spelling a `StackOverflowError`.
+    the knot on the entry under construction. An open instance goes through the memo and the depth backstop
+    like a record template; short-circuiting ahead of them would make that spelling a `StackOverflowError`.
 - **An alias holds its body too, and closes by composing rather than minting an entry.** §5.10's *partial
   application* — `uuid_pair => <B> pair<uuid, B>` — is a declaration whose whole body is an application some
   of whose arguments name parameters it re-declares, which makes the alias itself a template. §8.1 says that
@@ -162,7 +163,7 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
   - **`reference` is the one head materialisation dispatches to a name rather than an entry**
     (`closeHeldAlias`). The first two steps are shared — substitute, then close the application in the slot —
     and what differs is that there is nothing left to build. That is also why `close` tells the three cases
-    apart by the constructor head: the body shape no longer distinguishes them, every open entry's being held.
+    apart by the constructor head: the body shape does not distinguish them, every open entry's being held.
   - **`reference`'s kind is not a base kind**, so `DefinitionResolver`
     dispatches the head instead of judging it by the generic `!C value` rule: §4.1 gives an alias
     `kind: REFERENCE`, which is a `type_kind` with nothing in the supertype chain to supply it, and the
@@ -200,8 +201,8 @@ Related: `design/template-materialisation.md` (the pass itself, kind checking, r
   - **A closed container position takes one too** (`[box<text>]`). Its slot is written in `type_ref`'s record
     form, so the entry the desugar phase injects names something that is not an entry yet — and the batch pass
     here closes it, the same walk that closes every other ref. Nested arguments need no separate handling,
-    since `close()` already builds `pair<int32>` before `box<pair<int32>>` names it. What made the wire hop
-    possible was `type_argument` becoming readable, value channel included
+    since `close()` already builds `pair<int32>` before `box<pair<int32>>` names it. The wire hop rests on
+    `type_argument` — an untagged labelled choice — being readable, value channel included
     (`design/class2-compilation.md`).
 
 
@@ -218,8 +219,8 @@ container position holding an
 application works too: the binding keeps the `type_ref` whole, so `tree => <T> { value: T  children:
 [tree<T>; 1..] }` ties its knot through the lifted synthetic. A *closed* container position takes one as
 well (`[box<text>]`, nested arguments included): the slot is written in `type_ref`'s record form and
-materialisation rewrites it to the instantiation entry one pass later, which needed `type_argument` — an
-untagged labelled choice — to become readable (`GroupUnionBindReader`). **A collection-valued position is
+materialisation rewrites it to the instantiation entry one pass later, which rests on `type_argument` — an
+untagged labelled choice — being readable (`GroupUnionBindReader`). **A collection-valued position is
 no different** — `( box<text> | int32 )` and `[text, box<text>]` write the same record form into
 `variants`/`elements`, closed or open, because a `[type_ref]` holds what a `type_ref` holds. What remains is narrower:
 a *value*

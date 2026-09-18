@@ -25,8 +25,8 @@ facades these mirror).
 `Json` is the configuration a read is judged under — the `ProcessorPolicy`, the binding, and where problems
 go — and hands out the two readers that apply it: `treeReader()` producing a `JsonValue`, `objectReader()`
 producing a bound Java object. That is the shape `Tson` takes over `TsonTreeReader`/`TsonObjectReader`. It
-holds no schema registry because there is nothing yet to register; §5–§8's decode is where one arrives, and
-this is where it will live.
+holds a schema registry only once one is named: `withSchemas(TsonSchemaLoader)` returns an instance holding a
+`JsonCompiledSchemaRegistry`, which its tree readers share (`design/json-schema-directed-reading.md`).
 
 **JEP 540's entry points stay static on it** — `Json.parse(text)`, `Json.toDisplayString(value)` — over a
 default configuration. They are the zero-ceremony path the API is named for, and what a consumer moving from
@@ -50,9 +50,8 @@ one `try` there covers every entry point, and the failure goes to `readFailure`:
 So a collecting read never throws for a bad *document* — it returns nothing and the collector says why, with
 whatever value-level problems it found first still in it — and a fail-fast read still throws, as
 `ReadException`, because its receiver is what throws. That is the TSON readers' rule exactly (`TsonTreeReader.
-readFailure`), which is the point: the two encodings answered this differently for as long as the JSON readers
-caught nothing, and a `ParseException` escaping a collecting read was the one failure a caller who asked for
-every problem could not see coming.
+readFailure`), which is the point: a `ParseException` escaping a collecting read would be the one failure a
+caller who asked for every problem could not see coming.
 
 **`JsonDiagnostics` is a peer of `TsonDiagnostics`, not a case inside it.** A `Diagnostic` is the shape of an
 answer and is shared (§9.4 adds no category of its own); *classifying* a failure is reading a document, and
@@ -62,9 +61,9 @@ parse error separate categories and TSON text keeps them separate in the type, w
 `ParseException` for both and splits them here; and there is no counterpart to
 `TsonUnsupportedDocumentException`, a JSON document declaring no conformance class to be refused for.
 
-`Json` used to reduce events into a tree itself, which put an **engine in a front door's name** and left the
-stack with no tree *facade* at all — a tree read could not be given a receiver, a policy or a path where a
-bound read could. The reduction is `SchemalessTreeReader`'s now, under `JsonTreeReader`, and the two readers
+**`Json` reduces no events itself.** A reduction there would put an **engine in a front door's name** and leave
+the stack with no tree *facade* — a tree read that could not be given a receiver, a policy or a path where a
+bound read could. The reduction is `SchemalessTreeReader`'s, under `JsonTreeReader`, and the two readers
 are peers.
 
 **The tree engine is the one place `Schemaless` is the right word.** `DataClassObjectReader` is driven by the
@@ -72,9 +71,9 @@ target class, which is in effect its schema; the tree reader is driven by nothin
 accurate here where it would have been wrong there. Both are named for what drives them and what they
 produce.
 
-**§3.1's duplicate-member rule became a diagnostic** in the move: `DUPLICATE_FIELD` with an RFC 6901 pointer,
+**§3.1's duplicate-member rule is a diagnostic**: `DUPLICATE_FIELD` with an RFC 6901 pointer,
 reported rather than thrown, so a collecting read finds every repeat in one pass and a fail-fast one still
-stops at the first. That is more faithful to §3.1 than the `ParseException` it replaced — the grammar accepts
+stops at the first. That is more faithful to §3.1 than a `ParseException` would be — the grammar accepts
 the document, and §3.1 puts a repeat in the categories that follow the position's type rather than in the
 parse category. JEP 540 calls it a parse error for want of anywhere else to put it; this has somewhere.
 
@@ -159,13 +158,14 @@ which is the same rendering reached from a value instead of from a writer.
 **It is a facade over `DataClassObjectReader`**, which is what actually binds a value — the same split
 `TsonObjectReader` makes over the reader of that name in `tson-compiler`, and for the same reason: **a front
 door owns the document** (entry points, framing, and the configuration a read is judged under) where **an
-engine owns one value at one descriptor and stops**. That is also where the schema-directed decode of §5–§8
-arrives: a second engine under the same door rather than a second door.
+engine owns one value at one descriptor and stops**. The schema-directed decode of §5–§8 takes the same shape
+on the tree side — the compiled readers are a second engine under `JsonTreeReader` rather than a second door —
+and a schema-directed bind reader, which is not built (`BACKLOG.md`), lands under this one on those terms.
 
 **The engine is named for both axes every reader in this family is named for** — what drives the read, and
 what it produces. A `DataClass` descriptor drives this one and an object comes out. That has to stay in the
 name or the family stops scaling: `JsonTreeReader` sits over a tree engine, and §5–§8's
-schema-directed decode is a third engine under the same facade, so a name encoding only "what drives it"
+schema-directed decode is a further engine under a facade, so a name encoding only "what drives it"
 would leave two readers sharing one.
 
 `tson-compiler`'s engine carries the same name, because it is the same engine against the other encoding's
@@ -249,13 +249,13 @@ question rather than the vocabulary's, so it is answered by the two Java types �
 an `AtomType` about JSON kinds it should know nothing about.
 
 What the routing buys over narrowing a host value the encoding chose is visible in the refusals. `1.5` and
-`2147483648` at an `int` used to be one message — "not exactly representable" — because one `BigDecimal` was
-asked both questions. They are now two: the first is not an integer *form* at all (§5.3's contract
-rejection, exactly as the token `1.5` is in text, which the TSON side already got right through
+`2147483648` at an `int` are two refusals where one `BigDecimal` asked both questions would give one — "not
+exactly representable": the first is not an integer *form* at all (§5.3's contract
+rejection, exactly as the token `1.5` is in text, which the TSON side reaches through
 `NumberNarrowing`), the second is an integer outside `int32`'s range. `200` at a `byte` reports
-`>= -128 and <= 127` — `int8`'s own bound, from `AtomTypeException`'s vocabulary — where it reported "a value
+`>= -128 and <= 127` — `int8`'s own bound, from `AtomTypeException`'s vocabulary — rather than "a value
 that fits byte", which is the JVM's account of the same fact and not the schema's. And a refinement's
-`allow_nan` or `multiple_of` now has somewhere to be honoured when the schema-directed decode lands.
+`allow_nan` or `multiple_of` is honoured by the same family parser under the schema-directed decode.
 
 **The mapping from a Java type to a family is an interpretation**, stated once in `HostAtoms` as the inverse
 of `IntegerParser.hostType`: `byte`→`int8` … `long`→`int64`, `BigInteger`→`integer`, `float`/`double`→
@@ -280,10 +280,13 @@ sender fixing a document one round trip per mistake is the failure mode diagnost
 `JsonReadContext` is what carries it — the peer of `TsonReadContext`, holding no error policy of its own.
 It tracks the position and builds the RFC 6901 pointer by *stepping* (`field(name)`/`index(i)` return a
 context one link deeper) rather than concatenating, since concatenating per step is quadratic in depth and
-thrown away by every read that reports nothing. It is simpler than its TSON peer in three ways, each
-because this read has less to say: no schema end (the class is the schema, and a class has no document to
-point into), no lookahead or rewind (the engine pulls a value's opening event and passes it down), and no
-name policy yet.
+thrown away by every read that reports nothing. One context serves both engines, and the schemaless bind read
+uses the smaller half of it: no schema end (the class is the schema, and a class has no document to
+point into; a schema-directed read carries a `JsonSchemaLocation`), and no lookahead (the engine pulls a value's
+opening event and passes it down, where a schema-directed record read rewinds through `lookingAhead` to recognise
+an annotation object). The context also carries the read's identifier policy (`identifierPolicy()`), which
+`DataClassObjectReader.checkNameHygiene` and `reader.NameHygiene` judge names under
+(`design/json-unicode-policies.md`).
 
 Codes come from the same closed vocabulary the TSON readers use — §9.4 adds no category of its own — so
 `TYPE_MISMATCH`, `FIELD_REQUIRED`, `UNRECOGNIZED_FIELD`, `DUPLICATE_FIELD`, `DUPLICATE_MAP_KEY`,

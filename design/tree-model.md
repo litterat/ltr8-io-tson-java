@@ -59,12 +59,11 @@ annotation-aware, every node carrying its own `typeRef()` and `annotations()`.
     model is `schema.meta`. `TsonDocumentHeader` is the type that holds all three, and it answers a different
     question — classifying a document from its opening bytes (`isSchemaDocument()`) before deciding how to
     read it. Same reason `ast.Document` carries only the two.
-  - **`readDocument` sits beside `read`, and `read` is untouched.** The wrapper's one real cost was said to
-    be changing what a read hands back and every caller with it; that is a cost of *replacing* `read`, not of
-    the wrapper. `TsonTreeWriter.toTson(TsonDocument)` closes the loop from the other end, the document's own
-    directives winning over the writer's component by component and only where it has one — so reproducing a
-    document reproduces it, while a writer configured for something the document does not state still
-    contributes it.
+  - **`readDocument` sits beside `read`, which still hands back the root value.** Changing what a read
+    hands back, and every caller with it, would be a cost of *replacing* `read`, not of the wrapper.
+    `TsonTreeWriter.toTson(TsonDocument)` closes the loop from the other end, the document's own directives
+    winning over the writer's component by component and only where it has one — so reproducing a document
+    reproduces it, while a writer configured for something the document does not state still contributes it.
   - **`TsonObjectDocument<T>`** (in `tson-compiler`, beside the facades) **is the object side's own**, and
     deliberately not the same type: it needs a
     fourth component, `rootType`, because a `TsonValue` carries its own `typeRef()` and a bound object

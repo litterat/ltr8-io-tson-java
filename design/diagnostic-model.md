@@ -25,8 +25,8 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 
 **`Diagnostic` lives in `tson-base`, and its classifiers do not.** The record, its `Code` enum, the three
 receivers and `ReadException` are a module of their own, because [TSON-JSON] §9.4 makes a second
-encoding report in the same four categories — one vocabulary by specification, not by convenience. The ten
-`of*` factories that turn a thrown failure into a diagnostic stayed in `tson-compiler` as `TsonDiagnostics`,
+encoding report in the same four categories — one vocabulary by specification, not by convenience. The
+`of*` factories that turn a thrown failure into a diagnostic live in `tson-compiler` as `TsonDiagnostics`,
 because every one of them switches on an exception type this engine declares. What is shared is the shape of
 an answer; classifying a failure is reading a document, and that is each encoding's own. (`Diagnostic`, root package)
 
@@ -34,10 +34,11 @@ an answer; classifying a failure is reading a document, and that is each encodin
 one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`FIELD_FIXED`/`TYPE_MISMATCH`/`WRONG_ARITY`/
 `UNKNOWN_TYPE_REF`/`ATOM_FORM_INVALID`/`ATOM_CONSTRAINT_VIOLATION`/`UNRECOGNIZED_FIELD`/
 `DUPLICATE_MAP_KEY`/`DUPLICATE_FIELD`
-from readers;
+from readers; `CONFUSABLE_NAMES`/`RESTRICTED_CHARACTER`/`RESTRICTED_SCRIPT` for §8.2's three name-hygiene
+rules;
 `SCHEMA_ERROR`/`UNKNOWN_TYPE`/`VALIDATION_ERROR` for infrastructure-level failures, plus
-`NOT_IMPLEMENTED`/`BIND_MISMATCH` and the five `SCHEMA_*` fetch codes — the members that are not a verdict
-on the document at all, which `Code.verdict()` answers),
+`NOT_IMPLEMENTED`/`BIND_MISMATCH`/`LIMIT_EXCEEDED` and the five `SCHEMA_*` fetch codes — the members that are
+not a verdict on the document at all, which `Code.verdict()` answers),
 `message` (hand-composed per call site), `expected`/`actual` (machine-parseable) and **four location
 components covering two ends** — the value in the data, and the rule in the schema. Every component is a
 location; the one fact that is not, why a schema could not be obtained, is carried by the code itself.
@@ -55,8 +56,8 @@ model it the same way (rustc's `MultiSpan` being the mature form of the same ide
 deployment will not fetch and `SCHEMA_NOT_FOUND` one nothing serves, both the document's to fix, where
 `SCHEMA_UNREACHABLE`/`SCHEMA_TIMEOUT`/`SCHEMA_TOO_LARGE` say the reference was fine and the world was not.
 That is the difference between telling a sender to correct its document and telling it to retry, and it is a
-question consumers *route* on — so it lives where routing values live. A field beside the code was a second
-carrier for one fact, and it cost a `Diagnostic` component, a second `TsonReadContext.report` overload
+question consumers *route* on — so it lives where routing values live. A field beside the code would be a
+second carrier for one fact, and would cost a `Diagnostic` component, a `TsonReadContext.report` overload
 existing only to carry it, a `SchemaFailure` component, a `CliDiagnostic` component and a hand-copied enum
 in `diagnostics.tn`.
 
@@ -67,12 +68,12 @@ throwing channel's own vocabulary and the single input to `Diagnostic.Code.of`, 
 failure travels on cannot disagree.
 A consumer that resolves its schemas at startup sees `SchemaFetchException` thrown and reads
 `reason()`; one that reads through a collecting receiver — the common path for a server validating request
-bodies — sees a `Diagnostic` and never sees the exception at all. With the reason on the classification
-only, the same refused reference was the sender's mistake read one way and an operator's read the other.
-`SchemaFailure` carries it from the `catch` to the report (`TsonReadContext.report`'s five-argument form,
-which the facades alone reach — no reader in the compiled stack can have one to state, a schema that could
-not be fetched having no compiled readers to run), and `Diagnostic.ofSchemaUnavailable` takes the exception
-rather than its message so the schema-document channel states it too.
+bodies — sees a `Diagnostic` and never sees the exception at all. With the reason on the thrown channel
+only, the same refused reference would be the sender's mistake read one way and an operator's read the other.
+`SchemaFailure` carries it from the `catch` to the report as its `code` — mapped by `Code.of`, so the ordinary
+four-argument `TsonReadContext.report` states it and there is no overload for it — and
+`TsonDiagnostics.ofSchemaUnavailable` takes the exception rather than its message so the schema-document
+channel states it too.
 
 **A §8.2 refusal carries no component of its own**, by the same rule that puts a fetch failure's cause in
 the code. §8.2 requires a refusal to name the Unicode data version it was computed against, which is
@@ -101,7 +102,7 @@ all, which the five fetch codes, `NOT_IMPLEMENTED`, `BIND_MISMATCH` and `LIMIT_E
 
 ## When a fact earns a component
 
-Every component is now a location, and the rule that keeps it that way is one line: **carry a fact as a
+Every component is a location, and the rule that keeps it that way is one line: **carry a fact as a
 component when it is not recoverable from the document plus the schema, when it is a fact about the problem
 rather than about the processor, and when it is not something the consumer routes on** — a routing question
 belongs in the `Code`, which is what a consumer already switches over.

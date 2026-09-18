@@ -60,8 +60,8 @@ is small and parsed once.)
   abstract method a consumer receives from `TsonCompiledSchema.get`, so hiding the parameter type would
   make that method uncallable and the interface unimplementable from outside — categorically worse than the
   accepted `ValueReaderFactoryResolver` `-Xlint:exports` warning, where the hidden type is only ever *returned*.
-  What was removed instead is the conflation: `failFast()` (no callers) and `diagnostics()` (the receiver's
-  job) are gone.
+  What keeps the exported surface narrow is that it carries no policy: whether a read fails fast and where its
+  diagnostics go are the receiver's, so the context offers no accessor for either.
 - **`of(...)` is not a whole-document read.** It assumes and performs no framing. Consuming the leading
   `DocumentStart`, and pulling *past* the root value so a lazy `TsonDataStream`'s root frame actually
   rejects trailing content, belong to `TsonTreeReader`/`TsonObjectReader`. That second half is easy to lose,
@@ -70,7 +70,7 @@ is small and parsed once.)
 - **A FIXED field's value comes from the schema, and a document that states it is checked, not obeyed**
   (§5.2). `RecordAbstractReader.verifyFixed` decodes the written token and compares it to the schema's
   value: a contradiction is `FIELD_FIXED`, and the field still resolves to the *schema's*
-  value. Skipping it unread — the old behaviour — let a document say one thing and decode to another in
+  value. Skipping it unread would let a document say one thing and decode to another in
   silence. The comparison uses a raw parsed value and the **pre-rebind** parser (`FixedCheck`), because bind
   mode narrows `precomputedValue` in place and comparing across that narrowing would flag every conforming
   document. **The two FIXED states differ in exactly one thing:** §5.2's injection rule names
@@ -79,7 +79,7 @@ is small and parsed once.)
   states indistinguishable and the `?` decide nothing; §5.2 says it outright ("**OPTIONAL and OPTIONAL_FIXED
   fields are never injected**"). `_` is a validation error at
   `REQUIRED_FIXED`, fine at `OPTIONAL_FIXED`; a `= _` field (`OPTIONAL_FIXED` with no value) admits only
-  omission or `_`. There is no pre-seeding pass any more: every field the document didn't state goes through
+  omission or `_`. Nothing is pre-seeded: every field the document didn't state goes through
   one `valueForAbsentField` switch over all five states.
 - **An array element's own state is the two-member `ElementState`, and an absent element occupies its slot.**
   Under `[T?]` (`state: OPTIONAL`) an element may be the absent sentinel `_`; under the default `REQUIRED` one
@@ -102,21 +102,21 @@ is small and parsed once.)
   against a processor that decodes.
 - **One equality contract answers all three rules that compare two decoded values** (`ValueIdentity`): §7.5's
   duplicate rule, §5.2's check of a stated FIXED value against its declared one, and §2.6's key identity.
-  Each of those delegates to "the element type's equality contract" and none of them defines it, so with the
-  comparison at each call site the three disagreed — a key normalised and a set element did not, and `bytes`
-  had no comparison at all, `byte[]` carrying Java's identity equality. That last one is the shape worth
-  remembering: an absent comparison is usually a missing verdict and here it was an **inverted** one, a FIXED
-  `bytes` field rejecting the only document it can accept. A `String` compares NFC, a `byte[]` as its octets,
+  Each of those delegates to "the element type's equality contract" and none of them defines it, so a
+  comparison stated at each call site is three opinions — a key that normalises beside a set element that does
+  not, and `bytes` with no comparison at all, `byte[]` carrying Java's identity equality. That last one is the
+  shape worth remembering: an absent comparison is usually a missing verdict and there it is an **inverted**
+  one, a FIXED `bytes` field rejecting the only document it can accept. A `String` compares NFC, a `byte[]` as its octets,
   and a tree atom by its normalised value **beside its type-ref and annotations** — stripping those is §2.6's
   rule for a key, where the schema fixes the key type, and would merge `!cm 5` with `!inch 5` if it reached a
   set. **A `datetime` and a `time` compare as instants**, §5.5 making the mandatory offset a spelling: an
   `OffsetDateTime` reduces to its instant and an `OffsetTime` to its time of day in UTC, so
   `2026-01-01T10:00:00+01:00` and `2026-01-01T09:00:00Z` are one value and `23:30:00-02:00` is `01:30:00Z`.
-  Java's own `equals` compares the offset on both, a narrower relation than the value space, so all three
-  rules were wrong here at once; ordering needed nothing, `compareTo` already comparing the instant. §5.5 has
+  Java's own `equals` compares the offset on both, a narrower relation than the value space, which is why none
+  of the three rules may use it; ordering needs nothing, `compareTo` already comparing the instant. §5.5 has
   TSON text preserve the offset as written, so this is an identity and never what a reader hands back.
-  `Rendered` is the other half: `byte[]` inherits `Object.toString`, so a diagnostic naming one said
-  `[B@6d06d69c` until these comparisons could reach a value at all.
+  `Rendered` is the other half: `byte[]` inherits `Object.toString`, so a diagnostic naming one renders it
+  through `Rendered` rather than as `[B@6d06d69c`.
 - **A map entry's value may be `_` where the schema said so, and the entry counts either way.** `MapBody`
   carries an `ElementState` governing the value — `{K => V?}`, §5.3's own row and the `state` field the
   kernel gives `map` — so `MapAbstractReader.decodedValue` gives the array element's
@@ -132,10 +132,8 @@ is small and parsed once.)
   it governs, and the map-entry production accepts any data-value in key position — no tier below the reader
   can refuse one. The tree read reports and keeps the entry (tree mode keeps what it built) and leaves the
   key out of the duplicate set, a second `_` being this same problem again rather than a repeat of a key the
-  document meaningfully stated.
-  Note that §7.6 still describes the permission as *not* schema-conditional, and §5.3 still says neither
-  side admits a `?`. Those two contradicted each other, which is what #12 is about; this is the reading that
-  makes them consistent, built ahead of the revision that would state it.
+  document meaningfully stated. §7.6's table states the same rule from the data side: a map entry value is
+  `_` only when the map type's value state is OPTIONAL, and the entry counts toward the size bounds.
 - **Continuation policy: always keep reading in collecting mode.** A failed field/element is recorded and
   a placeholder kept in place (so later indices stay accurate) — Java `null` in bind mode, `TsonAbsent` in
   tree mode, where the diagnostic, not the node, carries what went wrong; a shape mismatch reports
@@ -189,13 +187,13 @@ is small and parsed once.)
   name the type doesn't declare is `UNRECOGNIZED_FIELD`, reported and then skipped, so a collecting pass
   finds every stray name and the value still comes back whole. The diagnostic carries the type's real field
   names in schema order (message *and* `expected`) — the information that turns a retry into a one-shot
-  fix. **Not configurable**: §7.2 makes closure a MUST wherever a schema is in scope and exempts only
-  schemaless records, which are read by `DataClassObjectReader`/`SchemalessTreeReader` and never reach
-  this code. **The same rule polices schema authoring**, through the same line: a constructor body is bound
-  by replaying it through the governing meta's compiled reader, so `!integer ^ { minimum: 1 }` (JSON
-  Schema's spelling of `min`) is rejected instead of compiling clean and constraining nothing — §7.2's "a
-  constructor is a record-shaped type, so it validates a record against its constraint-field vocabulary". In bind
-  mode a reported record still binds to `null` — the all-or-nothing rule above, not something closure chose.
+  fix. **Not configurable under a schema**: §7.2 makes closure a MUST wherever a schema is in scope, so
+  `ignoringUnknownFields()` relaxes the schemaless bind path (next bullet) and nothing here. **The same rule polices schema
+  authoring**, through the same line: a constructor body is bound by replaying it through the governing meta's compiled
+  reader, so `!integer ^ { minimum: 1 }` (JSON Schema's spelling of `min`) is rejected instead of compiling clean and
+  constraining nothing — §7.2's "a constructor is a record-shaped type, so it validates a record against its constraint-field
+  vocabulary". In bind mode a reported record still binds to `null` — the all-or-nothing rule above, not something closure
+  chose.
 - **Records are closed on the schemaless bind path too** (`UNRECOGNIZED_FIELD`), where the target class is the schema
   and a field it does not declare is reported rather than dropped, a later version's extra field being able to change
   what the fields a class does read mean; `ignoringUnknownFields()` is the derived opt-out on both encodings' readers.
@@ -216,7 +214,7 @@ is small and parsed once.)
   divergence from §2.6**, which defines key identity *textually* at the parser layer (`Alice`/`"Alice"`
   are duplicates, `1`/`1.0` are not) and leaves typed equality to §7.7's MAY — the series names no
   equality for the Class 1 *reader* in between, which has run §4 base resolution but has no declared
-  types. §2.6 now names that layer itself — "a processor that decodes values compares decoded values" — so a
+  types. §2.6 names that layer itself — "a processor that decodes values compares decoded values" — so a
   key realised as a host value is one key, which is what the host `Map` will do with it anyway.
   `SchemalessTreeReader.keyIdentity`
   does the stripping explicitly; the other two readers compare bound host values, which strips both by
@@ -227,8 +225,7 @@ is small and parsed once.)
   (`statedAbsentValue`, per subclass) because bind mode has nowhere to put it — a Java component has no third
   state between "set to nothing" and "never set", so both readings arrive as `null` there. A limit of the
   target rather than a reading of §2.9, and the reason the tree's answer is not aligned down to it. An array
-  element and a tuple slot already kept the distinction; the record was the one container of the four that
-  dropped it.
+  element and a tuple slot keep the same distinction, so the containers agree.
 - **A written `_` at a `REQUIRED_DEFAULT` field is an error**, where plain omission still injects the
   default silently (`valueForStatedAbsentField` against `valueForAbsentField`). §5.2 makes an explicit `_` a
   validation error at every REQUIRED-family field — "`_` asserts absence at a position the schema always
@@ -239,10 +236,10 @@ is small and parsed once.)
   an empty brace to the resolver and resolves it to "the empty container of that type" once a schema
   supplies one, so at a map position it is a map with zero entries and `min_items: 1` rejects it. The count
   is validated in `MapAbstractReader.expectMapShape`, the one funnel every map reader passes through, and
-  deliberately **not** in `readInto` — an empty brace never enters the entry loop, which is exactly how the
-  rule went missing while `max_items` on the same declaration reported correctly. The record position was
-  never affected (an empty brace there reports each missing required field) and an array's `[]` is an
-  ordinary empty element list, so this closed the one position where the three disagreed.
+  deliberately **not** in `readInto` — an empty brace never enters the entry loop, so a check placed there
+  would miss `min_items` while `max_items` on the same declaration reported correctly. A record position
+  reports each missing required field for an empty brace and an array's `[]` is an ordinary empty element
+  list, so all three positions agree.
 - **A reader names itself by what the author wrote, never by a content-derived entry name**, and as the *position*
   wrote it — `EntryDisplayName` and `UseSite`, both running where a reader is built, so neither costs a read anything.
   `design/reader-naming-and-schema-location.md` has both.
@@ -277,6 +274,5 @@ belief, over the bind path:
   answer carries no noise: 500 bound objects, all cleared once the collector has demonstrably run.
 - **Transient bytes are reported per read**, with a ceiling that only a gross regression trips.
   `whereAReadsBytesGo` splits one read into event stream / schemaless tree / schema tree / bind, which is
-  what turns "allocation went up" into "which stage". Today the token stream is over half of a small
-  document's cost and most of *that* is one `InputStreamReader` per read — fixed cost, unrelated to
-  document size, tracked in `BACKLOG.md`.
+  what turns "allocation went up" into "which stage". The lexer decodes UTF-8 from the `ByteSource` itself, so no
+  JDK decoder sits on the read path, and a resident source is indexed with no block allocated at all.

@@ -26,8 +26,8 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 
 ## Which entry a form lifts to: open and closed lifts
 
-- **Which entry a form lifts to is D5's one rule, and the enclosing declaration's parameters do not enter
-  it.** A form naming none of them lifts *closed*, template or not; a form naming one lifts *open* — an
+- **Which entry a form lifts to is §5.3's one lift rule, and the enclosing declaration's parameters do not
+  enter it.** A form naming none of them lifts *closed*, template or not; a form naming one lifts *open* — an
   `Instance` carrying just the parameters it uses, with the position that held it applying them straight
   back (`<T> { a: [T] }` injects `array_p0_… => <p0> !array { element_type: p0 }` and the field becomes
   `array_p0_…<T>`). So `<T> { a: [T]  b: [order] }` injects one of each, and only the first waits for
@@ -52,19 +52,16 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     rendering — written through the same `WireForm.refValue` producer, since a `[type_ref]` holds what a `type_ref`
     holds, and rewritten a pass later by `MetaRefs.mapBodyRefs`, which maps a choice's variants
     and a tuple's elements like any other reference.
-    - **A slot that refuses an application does not fail where it decided.** `choiceBinding` required a bare
-      name per variant, so `( box<text> | int32 )` left the *whole* choice unlifted and reached
-      `DefinitionResolver` as a `ChoiceRef` it has no case for — the author of a closed, ordinary type being
-      told that only "fresh record constructions, composition, simple type references … are resolved so far".
-      Inside a template it was worse: with the choice unlifted, holding the body handed the `ChoiceRef` to
-      `refValue`, whose two documented inputs are `SimpleRef` and `GenericRef`, and the schema died on a
-      `ClassCastException`.
+    - **No slot refuses an application, because a slot that did would not fail where it decided.** A
+      `choiceBinding` requiring a bare name per variant would leave `( box<text> | int32 )` unlifted *whole*, to
+      reach `DefinitionResolver` as a `ChoiceRef` it has no case for — and, inside a template, to reach
+      `refValue`, whose two inputs are `SimpleRef` and `GenericRef`.
     - **A closed construction writes the record form and lets materialisation close it.** Its body goes
       through the constructor's own reader, so the application has to survive a wire hop, and the resulting
       entry names something that is not an entry yet — for exactly the window an ordinary forward reference
-      lives in, since `close()` walks every closed entry's references after the driving loop. What made this
-      possible was teaching the bind readers to read an untagged labelled choice, which is what
-      `type_argument` is (`design/linking-and-compilation.md`).
+      lives in, since `close()` walks every closed entry's references after the driving loop. It rests on the
+      bind readers reading an untagged labelled choice, which is what `type_argument` is
+      (`design/linking-and-compilation.md`).
     - **A *value* argument makes the trip intact.** `type_argument`'s value channel binds a raw `Token` —
       §5.10 calls a type argument's literal a bare token rather than the value it denotes — so the slot reads
       the token rather than decoding it (`RawTokenParser`). The spelling is therefore what reaches identity,
@@ -78,7 +75,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     read against the constructor's vocabulary at all until materialisation substitutes, so a parameter
     inside a collection is a token inside an array and lifts like any other, `result => <T> ( T | error )`
     being the spec's own example.
-  - **The open form is the closed form**, which is what removed the per-slot analysis: one binding record
+  - **The open form is the closed form**, so there is no per-slot analysis: one binding record
     serves both, since a parameter in a slot is simply the token standing there. `instance(binding,
     typeParams)` builds either, and the phase needs no rule for how to quote a parameter — only for whether
     the declaration around it has one.
@@ -88,7 +85,7 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
 - **A parameterised alias is normalised here as well** (§5.10's partial application). `uuid_pair => <B>
   pair<text, B>` leaves this phase as `<B> !reference { target: pair<text, B> }` — §8.1's own reading of what
   an alias body is, spellable because the kernel's `reference.target` is a `type_ref` rather than a bare name.
-  It was the last open form that was not a constructor application; with it, §12.1's
+  With it no open form is anything but a constructor application: §12.1's
   `[type-params] "!" type-name ws core-value` covers every template and one walk closes them all.
   - Only a *parameterised* one. A closed alias (`text_box => box<text>`) resolves to a `REFERENCE` entry
     directly, the way a closed record resolves to a `RecordBody`: nothing about it is deferred, so there is
@@ -102,17 +99,16 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
   closed by the same process. The rule is as fixed and as closed as the sugar table: §5.2's six field
   spellings decide `state` and `value` from the two marks the author wrote, and nothing else is consulted.
   - **Only a *template*.** A closed record still resolves at its declaration into a `RecordBody`, because
-    nothing about it is deferred. **Every** template takes it: there is no marker to route one elsewhere, and
-    the route that used to exist for marked ones (`DefinitionResolver.holdIfOpen`, wrapping an open
-    `RecordBody` into the same `!record { … }`) produced an identical body anyway. The two paths share the §5.2 state
+    nothing about it is deferred. **Every** template takes it: there is no marker to route one elsewhere. The
+    two paths share the §5.2 state
     table (`FieldModifiers`) so the six spellings and the errors around them cannot drift apart between a template and
     the closed record beside it.
   - **Only what the author wrote is written.** `access_pattern` and `size_type` are `REQUIRED_FIXED` on the
     `record` constructor, and an unmarked field's `REQUIRED` is that constructor's own default, so none of the
     three is stated — the same economy `arrayBinding` makes with an unmarked element's `state`, and what keeps
     the held form the one the author would recognise.
-  - **The rewrite has to be here rather than in the resolver**, and that is the finding the earlier attempt
-    turned on. Resolving the body and writing the resolved form back out puts a *second producer* in front of
+  - **The rewrite has to be here rather than in the resolver.** Resolving the body and writing the resolved
+  form back out puts a *second producer* in front of
     a wire form two later phases read, and they disagree: `DataClassObjectWriter` states a no-argument `type_ref`
     in the explicit record form (`{ name: N  arguments: [] }`) where this phase states it positionally (`N`).
     That makes a `type_argument` indistinguishable from a `type_ref` application to a walk that reads neither
@@ -132,14 +128,13 @@ Related: `design/schema-grammar-and-desugaring.md` (the sugar table, derived nam
     producer of its spelling — both going through `WireForm.refValue` and `WireForm.nameField` is what makes
     that true by construction rather than by two authors agreeing.
     - **`DataClassObjectWriter` cannot serve as that second producer**, which is why `WireForm.heldRecord` exists rather
-      than a round-trip. Measured against the desugar spelling it differs five ways: `{ name: "text"
-      arguments: [] }` for a bare `text`, `!ref { … }` for a `type_argument`, every token quoted, `state:
-      REQUIRED` written where the default covers it, and the retired `value_param` channel emitted. The
-      first two are the
-      two-spellings problem; the third is fatal on its own, since `HeldBody.names()` and substitution
-      both key on a token being *unquoted*, so a fully-quoted body references no parameters at all. Its
-      output is canonical-explicit — a different language from the one a held body is written in.
-    - **The writer is still used for exactly one leaf**: a resolved annotation carries its value as a *bound
+      than a round-trip. Measured against the desugar spelling it differs four ways: `{ name: "text"
+      arguments: [] }` for a bare `text`, `!ref { … }` for a `type_argument`, every token quoted, and `state:
+      REQUIRED` written where the default covers it. The first two are the two-spellings problem; the third is
+      fatal on its own, since `HeldBody.names()` and substitution both key on a token being *unquoted*, so a
+      fully-quoted body references no parameters at all. Its output is canonical-explicit — a different
+      language from the one a held body is written in.
+    - **The writer is used for exactly one leaf**: a resolved annotation carries its value as a *bound
       object* (`Annotation.value` is `Optional<Object>`), and unbinding one is what an object writer is for.
       That is a self-contained value rather than part of the spelling, so it goes through
       `DefinitionResolver.annotationWireValue` and nothing structural does.

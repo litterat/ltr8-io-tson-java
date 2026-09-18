@@ -52,8 +52,8 @@ fixed rather than kept (Revision 35's escape-table change is exactly that).
     UTF-8 RECOMMENDED and permits UTF-16/UTF-32; this implementation has only ever read UTF-8, and the byte
     layer being explicit is what would make a BOM-sniffing choice of decoder a local change.
   - **§8.1's byte offset is counted, not derived.** Each buffered code point carries the byte length it was
-    decoded from (`lookaheadByteLengths`), where the offset used to be recomputed from the decoded value —
-    right only while the input is well-formed, which is the one case where the offset matters least.
+    decoded from (`lookaheadByteLengths`). An offset recomputed from the decoded value is right only while
+    the input is well-formed, which is the one case where the offset matters least.
   - **A decoder that reports what it rejects can reject.** Malformed UTF-8 is a `LexException`, not a
     U+FFFD substitution: a replacing decoder makes the same broken byte an error outside a quoted token and
     silent content inside one, and for a format whose identity can be a hash of its bytes, substituting
@@ -67,43 +67,43 @@ fixed rather than kept (Revision 35's escape-table change is exactly that).
     invisible to it, including a multi-byte sequence or a surrogate pair split across one — `LexerTest`
     walks token boundaries and a split pair across the seam, and `AllocationHarnessTest` pins the
     per-character cost.
-- **A quoted token that holds no escape is its own text.** Decoding used to run over every quoted token,
-  building a second copy to discover the first was already right — and `lexSingleLineToken` has just read
-  every character, so whether there was a backslash is *known* rather than searched for. A multi-line
+- **A quoted token that holds no escape is its own text.** Decoding every quoted token would build a second
+  copy to discover the first was already right — and `lexSingleLineToken` has just read every character, so
+  whether there was a backslash is *known* rather than searched for. A multi-line
   token's lines are checked individually (`decodeAllEscapes` returns its argument when it finds none), since
-  one token may hold both kinds of line. Halves the per-character cost of lexing a long quoted token
-  (10.5 → 5.8 bytes per character of input, which `AllocationHarnessTest` pins).
+  one token may hold both kinds of line. Lexing a long quoted token costs 5.8 bytes per character of input,
+  which `AllocationHarnessTest` pins.
 - **The escape table is `\" \\ \b \f \n \r \t \s` plus two `\u` forms, and one rule covers both of those.**
   `\uXXXX` and `\u{1*6HEXDIG}` are two spellings of one number, checked by asking whether the value denoted is a
   **Unicode scalar value** — so a surrogate is refused in either form and there is nothing to pair. That single
-  rule replaces the three MUST clauses UTF-16 pairing needed, and the braced form is what makes it sufficient:
+  rule does the work of the three MUST clauses UTF-16 pairing would need, and the braced form is what makes it
+  sufficient:
   four hex digits cannot reach past the BMP, so without it the format would either keep the pairing rules or lose
   the ability to escape a supplementary character at all — which costs something real, plane 14 holding the
   variation selectors and tag characters a document has reason to write visibly rather than embed invisibly.
-  **There is no `\/`**: a solidus needs no escaping anywhere in the format, and the reason it was admitted (a JSON
-  document parsing unchanged) is a claim the format no longer makes. A **leading BOM** is still stripped, on
-  §7.1's own authority as an encoding courtesy rather than a debt to another format.
+  **There is no `\/`**: a solidus needs no escaping anywhere in the format, and the one reason to admit it (a JSON
+  document parsing unchanged) is a claim the format does not make. A **leading BOM** is stripped, on §7.1's own
+  authority as an encoding courtesy rather than a debt to another format.
 - **`Token` is a flat record of six raw `int` coordinates plus type/text**, not nested `Position` objects,
   to keep allocation off the high-throughput read path; `start()`/`end()` materialize a `Position` on
   demand.
 - **§7.1's identifier profile is exact, and the JDK predicate alone is not it.** `Character
   .isUnicodeIdentifierStart/Part` is `ID_Start`/`ID_Continue`, and the `Part` half is additionally unioned
   with everything `Character.isIdentifierIgnorable` covers — all of `Cf` plus the non-whitespace C0/C1
-  controls. Standing it in unmodified put a BOM, a soft hyphen, a raw control and every bidi override
-  (U+202A–U+202E, U+2066–U+2069, U+061C) inside identifiers, and every ASCII test still passed. `Lexer`
+  controls. Standing it in unmodified would put a BOM, a soft hyphen, a raw control and every bidi override
+  (U+202A–U+202E, U+2066–U+2069, U+061C) inside identifiers, with every ASCII test still passing. `Lexer`
   subtracts the ignorable set and two literal `ID_ \ XID_` tables (24 code points for start, 20 for
   continue — the characters XID drops for not being NFKC-closed), which is **exact** against Unicode 16.0:
   zero over-, zero under-acceptance on both predicates across all 1,112,064 non-surrogate code points.
   `Xid.UNICODE_VERSION` declares the version, as §7.1 asks.
 - **`Xid` is the shared property, and neither profile is it.** `Xid.isStart`/`isContinue` are exactly
-  `XID_Start`/`XID_Continue`; the lexer's token profile adds `Nd`/`-`/`+`/`.` and subtracts the joiners,
-  and the kernel's `identifier` contract (`IdentifierProfile`) adds only `-` and requires NFC. Keeping the
-  property in one place is what stops the two drifting — the identifier profile is written to
-  `XID_Continue`, joiners included, and the lexer no longer subtracts them.
+  `XID_Start`/`XID_Continue`, joiners included; the lexer's token profile adds `Nd`/`-`/`+`/`.` and subtracts
+  nothing, and the kernel's `identifier` contract (`IdentifierProfile`) adds only `-`, requires NFC and applies
+  the contextual joiner rule below. Keeping the property in one place is what stops the two drifting.
 - **ZWNJ/ZWJ continue a token; whether they may appear in a *name* is decided one layer up.** U+200C and
-  U+200D are in `XID_Continue` (Unicode 16.0 `DerivedCoreProperties.txt`), so §7.1's set algebra admits them
-  while its prose excludes them by name. The lexer follows the algebra, and `IdentifierProfile` applies UTS
-  #39 §3.1.1.1's contextual rule (`JoiningControls`): a joiner is admitted where it has a shaping effect —
+  U+200D are in `XID_Continue` (Unicode 16.0 `DerivedCoreProperties.txt`), and §7.1 admits them on that basis,
+  naming them as the two exceptions to its no-`Cf` rule. The lexer follows the property, and `IdentifierProfile`
+  applies UTS #39 §3.1.1.1's contextual rule (`JoiningControls`): a joiner is admitted where it has a shaping effect —
   Persian `کتاب<ZWNJ>ها`, a Malayalam conjunct — and refused where it is invisible, which is every Latin
   position. That is sharper than a blanket exclusion in both directions, and it is why quoting is no
   remedy: the token profile governs unquoted tokens only, so a quoted spelling is the route by which
@@ -133,7 +133,7 @@ fixed rather than kept (Revision 35's escape-table change is exactly that).
 - **Multi-line common-prefix stripping** (§7.2.3) compares leading-whitespace prefixes character by
   character (a tab never matches a space). **Closing-delimiter detection checks the line content *after*
   removing leading whitespace against `"""`** — getting this backwards makes every multi-line token
-  spuriously "unterminated"; this bug happened once and is guarded by `LexerTest`.
+  spuriously "unterminated"; `LexerTest` guards it.
 - When embedding BOM/NEL/LINE SEPARATOR/PARAGRAPH SEPARATOR in tests or source, use `\uXXXX` escapes (and
   `\u{...}` past the BMP) — the
   literal invisible character is an editing hazard and exactly the confusable-character risk §9.4 warns
@@ -171,7 +171,7 @@ Key points:
   `consumeSeparatorOrCloseCheck` therefore answers "is there another element?", and the three container
   frames close on `false` rather than each re-checking the delimiter themselves.
 - **Layering is deliberately incomplete, matching §1.2's division of labor.** Neither tier deduplicates
-  record fields or map keys ("last value wins" is a resolver rule, §2.5/§2.6), NFC-normalizes field names,
+  record fields or map keys ("last value wins" is a resolver rule, §2.5/§2.6),
   rejects `_` as a map key (§2.9), resolves `EmptyBrace` to a record/typed container (§2.8), or interprets
   `TokenValue` text as boolean/number/string (base type resolution,
   `design/base-types-and-atom-vocabulary.md`). These are intentional gaps, not omissions.
@@ -182,8 +182,8 @@ Key points:
   adjacency problem ("expected whitespace before `'<'`"), whose advice produces a second error one column
   later and never states the rule that stopped it: a data type-ref is a bare name, and an application is
   named in the schema (`my_type => paged<order>`) and referenced as `!my_type`. Argument lists are refused
-  whether or not a space precedes them, precisely because the old wording sent authors to the spaced
-  spelling; `?` only when adjacent, there being no message advising otherwise. The separation rule itself is
+  whether or not a space precedes them, since an adjacency message sends authors to the spaced spelling;
+  `?` only when adjacent, there being no message advising otherwise. The separation rule itself is
   unchanged and still catches everything else (`!int32"5"`).
 - **A name position takes an `identifier`, not merely a bare token, and the check sits in the grammar.**
   `type-ref = "!" identifier` and `annotation = "@" identifier` (§7.4): `TsonDataStream` matches each name's
@@ -208,7 +208,8 @@ Key points:
   **Quoting buys the lexical accidents of the unquoted form** — a name that would otherwise resolve as a number — and
   never a key that is not a name; a key that is not a name is what a map is for, and the diagnostic says so. A map key
   keeps all three token forms.
-- **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `TsonParseException`** — and the
+- **`!!meta` in the header throws `TsonUnsupportedDocumentException`, not `ParseException`** (`tson-base`'s,
+  which is what a malformed document raises) — and the
   throw is `parseDocument`'s, on the `DocumentStart` the stream hands it, never the stream's own. This is a
   Class 1 processor; a schema document isn't malformed input, it's a well-formed document of a kind this
   parser doesn't implement, and §8.1 requires that distinction be visible (a categorized diagnostic). The
@@ -224,16 +225,15 @@ Key points:
 - **A directive §2.2 does not admit in a header is left unconsumed**, not refused by the stream. `!!import`
   is a schema document's and `TsonSchemaParser` reads it; a data document carrying one is an error, but the
   wording that names the broken rule belongs to the parser that knows which kind of document was expected.
-  Refusing it in the stream produced *"expected `!!schema`, `!!meta` or the start of the document's value"*
-  for a schema document whose actual problem was a missing `!!meta`. What survives in the stream is the
+  A refusal in the stream could only say *"expected `!!schema`, `!!meta` or the start of the document's value"*,
+  to a schema document whose actual problem was a missing `!!meta`. What the stream keeps is the
   **value-position** rule (`notAValue`), which names the directive rather than saying "found `!!`" — true
   whoever is reading, because nothing spelled `!!` can start a value.
 - **The root value is framed on first demand, not with the header.** `fill()` pushes `RootFrame`/
   `DataValueFrame` the first time an event past `DocumentStart` is wanted, so reading only the header costs
   nothing and leaves an empty frame stack — which is what lets a schema parser take `!!id`/`!!meta` off the
-  event and then drive `drain` over a stack the header never touched. The stream thereby stops needing to
-  know what kind of document it holds at all: a schema document simply never asks for a value, where it used
-  to be recognised by its `!!meta` and framed differently on that basis. `TsonDataStreamTest` pins both
-  halves.
+  event and then drive `drain` over a stack the header never touched. The stream therefore never needs to
+  know what kind of document it holds: a schema document simply never asks for a value. `TsonDataStreamTest`
+  pins both halves.
 - **Nested annotation value-scope is right-recursive** and can legitimately leave an outer data-value
   without a core-value (`@a:@b:val`) — §3.1's own worked example says so; intentional, not a bug.

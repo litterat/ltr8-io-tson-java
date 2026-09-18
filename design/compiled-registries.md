@@ -30,7 +30,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
 
 - **`TsonCompiledMetaRegistry`** is the shared **meta/resolution core**, and *is* the on-demand
   `TsonCompiledSchemaLoader`. It owns the paired `TsonSchemaRegistry`, a bind-mode resolver, a
-  `TsonSchemaSource`, content-hash verification, and the meta-kernel bootstrap. It compiles and caches
+  `SchemaSource`, content-hash verification, and the meta-kernel bootstrap. It compiles and caches
   **only meta-layer schemas** (meta-kernel, meta.tn — the name is literally accurate). Its loader
   interface is two honest methods: `loadMeta(uri) → TsonCompiledMetaSchema` (a governing meta, which must
   be compiled — its `!enum`/`!integer` instances are read into `schema.meta` objects during a governed
@@ -60,7 +60,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   runs in the registry's mode (standalone: the schema's constructor usage was already validated at link
   time). The bind read registry takes the *caller's own* `DataBindContext` (their user-class name binder),
   deliberately distinct from the core's internal `SchemaMetaNameBinder`-based resolution context. A user
-  schema importing core.tn gets core.tn's entries flattened into its own linked form (by `link`) and
+  schema importing core.tn gets core.tn's entries merged into its own linked form (by `link`) and
   compiled inline, which is why the core never needs core.tn compiled.
 - **An import cycle is caught by what is *in flight*, not by a cache lookup** (§2.2.3). A schema is
   registered only once it has linked, so while `a.tn` is resolving it is in no registry at all and `b.tn`
@@ -97,38 +97,38 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   has `sha256IfAddressable` beside `sha256` and the registry records `UNADDRESSABLE` for the empty answer.
   What gets refused is the pin: a hashed reference whose target carries no id line is
   a `ContentHashMismatchException` naming that, which §2.2.1 requires ("the target of a hashed reference
-  MUST carry an id line"). Eagerly hashing instead made an unpinned single-line schema an
+  MUST carry an id line"). Eagerly hashing with `sha256` instead would make an unpinned single-line schema an
   `IllegalArgumentException` escaping the read as a fault.
 - **Concurrent first use of one identity is safe, and deliberately not serialized.** `loadMeta`/
   `resolveLinked` recurse into themselves and hold no lock across a fetch, so two threads reaching the same
   cold identity both do the work; the caches settle it, keeping the first entry and handing it to both
   (`TsonSchemaRegistry.registerIfAbsent`, `compileAndCache`). **What is duplicated on a race is work, never
-  state** — one linked form and one compiled meta per identity, always. This is the fix for a real defect,
-  not a hypothetical: the old check-then-`register` shape failed the *loser*, and on a read that surfaced
+  state** — one linked form and one compiled meta per identity, always. The stake is real rather than
+  hypothetical: a check-then-`register` shape fails the *loser*, and on a read that surfaces
   not as a crash but as a `SCHEMA_ERROR` against a document with nothing wrong with it, on the first
-  concurrent requests a process ever served (`ReadPathConcurrencyTest` pins both halves). Explicit
-  registration stays strict — `register` on an identity already present is still an error, since doing that
-  on purpose is a caller mistake however many threads are involved. The same shape and the same fix applied
-  to `DataBindContext.getDescriptor`, the other read-path cache.
+  concurrent requests a process ever serves (`ReadPathConcurrencyTest` pins both halves). Explicit
+  registration stays strict — `register` on an identity already present is an error, since doing that
+  on purpose is a caller mistake however many threads are involved. `DataBindContext.getDescriptor`, the
+  other read-path cache, has the same shape and settles a race the same way.
 - **A hit takes no lock either.** Every data read reaches two caches — `TsonSchemaRegistry`'s identity map
   (through `resolveLinked`) and `TsonCompiledSchemaRegistry`'s compiled map — and in a process that
   registered its schemas at startup, which is what this design asks for, both hit essentially every time.
   So neither hit is allowed to serialize: `TsonSchemaRegistry` holds a `ConcurrentHashMap` and its lookups
-  are plain reads where they were `synchronized` methods, and the compiled cache does a `get` before
+  are plain reads rather than `synchronized` methods, and the compiled cache does a `get` before
   `computeIfAbsent`, which takes a bin lock only for a key sitting behind the first node. The
-  no-overwrite rule is unaffected — it moves from "check and put under the monitor" to `putIfAbsent`, which
-  is the same guarantee stated atomically, and `register` still refuses a second registration of one
-  identity. **Measured, this is small on a 16-CPU machine** (~6% at 32 threads, nothing below that): the
-  critical section was a map lookup, and a JVM absorbs an uncontended monitor well. It is here because a
-  monitor on the read path is a ceiling that arrives with the core count rather than a cost that shows up
-  in a profile, and because the section can only grow.
-- **A read canonicalizes its schema URI once.** `TsonCanonicalIdentity.canonicalize` is a `new URI(...)`
-  parse, and it used to run three times for one document — the compiled-schema cache's key, the resolution
-  cache's key, and the schema registry's own lookup. The identity is now computed at the top and passed
+  no-overwrite rule is unaffected — it is `putIfAbsent` rather than "check and put under a monitor", which
+  is the same guarantee stated atomically, and `register` refuses a second registration of one
+  identity. **Measured against a monitor, the gain is small on a 16-CPU machine** (~6% at 32 threads, nothing
+  below that): the critical section is a map lookup, and a JVM absorbs an uncontended monitor well. It is
+  lock-free because a monitor on the read path is a ceiling that arrives with the core count rather than a
+  cost that shows up in a profile, and because the section can only grow.
+- **A read canonicalizes its schema URI once.** `CanonicalIdentity.canonicalize` is a `new URI(...)`
+  parse, and three places want its result for one document — the compiled-schema cache's key, the resolution
+  cache's key, and the schema registry's own lookup. The identity is computed at the top and passed
   down (`resolveLinked(uri, identity, receiver)`, `TsonSchemaRegistry.getByCanonicalIdentity`), with the
   single-argument forms kept as the door for anyone holding a URI as written. **Not a shortcut past the pin
-  check**: `verifyPin` runs on every reference as before, and `BundledSchemaPinTest` pins that a wrong pin
-  is still rejected once the schema is compiled and cached.
+  check**: `verifyPin` runs on every reference, and `BundledSchemaPinTest` pins that a wrong pin
+  is rejected once the schema is compiled and cached.
 - **The rest of the read path needs no locking at all.** A `Lexer`/`TsonDataStream` is built per read and
   shared with nothing, and every compiled reader is immutable — the whole `reader` package holds exactly one
   non-final instance field (`CompiledReaders.delegate`, `volatile`, rebound once at the end of a compile).

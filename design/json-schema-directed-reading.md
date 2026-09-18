@@ -32,13 +32,33 @@ atoms, the whole of §6's containers, §7's absence, §3.2's reserved namespace 
 `$type` selects a subtype — the JSON spelling of `!employee` at a `person` field), and §8.2's discrimination predicate over
 §8.3's class stability, all compiled in **tree mode**; §8.5's scoped positions reach a `NOT_IMPLEMENTED` reader.
 
+## Naming inside `reader`: mode first, and no prefix
+
+The schema-directed readers are named **mode, then family, then form** — `TreeRecordReader`,
+`TreeMapObjectReader`, `TreeMapPairsReader` — so that bind mode lands as `BindRecordReader` beside its peer
+and a reader's mode is the first thing about it. That is the axis someone scans when adding a mode, and it is
+the axis a file listing then sorts by.
+
+**The `Json` prefix is dropped in `reader` and kept in the root**, which is `CLAUDE.md`'s rule applied rather
+than an exception to it: a prefix earns its keep disambiguating a name a *consumer* writes, and `reader` is
+unexported. The root package keeps it for exactly that reason — `JsonReadContext` beside a domain
+`ReadContext`, `JsonTypeReader` beside `TsonTypeReader`.
+
+The consequence worth having is that **thirteen of these share a bare name with their `tson-compiler`
+counterpart**: `ErrorReader`, `OpenTemplateReader`, `EventSkip`, `CompiledReaders`, `DiscriminationClass`,
+`ValueReaderFactory`, `ValueReaderContext`, `ValueReaderFactoryResolver`, `ValueReaderFactoryRegistry`,
+`VoidReader`, `DeferredTypeReader`, `ReferenceChain`, `ValueIdentity`. The two stacks read as peers, and which TSON class
+a JSON class answers to is visible at a glance — which is what a parallel implementation wants and what a
+prefix would hide. Nothing imports both, neither package being exported, so the shared names cost nothing.
+
 ## Binding a document, which is the one thing JSON cannot do for itself
 
 A TSON document names its own schema in its header and its own root type with a type-ref. A JSON document
 can do neither — `!!schema` is TSON text syntax — so [TSON-JSON] §3.4 gives it two routes and this stack
 implements the first: **out of band**, the application supplies both, and the document is then a bare value
-read directly at that type. The spec calls it "the expected production route", and the in-band route needs
-§3.3's annotation object, which arrives with §8.
+read directly at that type. The spec calls it "the expected production route". The in-band route — a root
+annotation object carrying `$schema` and `$type` — is not built (`BACKLOG.md`): the annotation object it rides on
+is, below, but `$schema` is refused at every position this stack reads.
 
 `Json.withSchemas(loader)` is where a schema identity becomes resolvable, and it takes a `TsonSchemaLoader` —
 `tson-schema`'s interface, so it costs no dependency. **Obtaining a schema is the TSON engine's job**, and
@@ -54,7 +74,7 @@ diagnostic and never a verdict**: `SCHEMA_NOT_FOUND` for an identity the loader 
 for a root type the schema does not declare, and `Code.verdict()` separates the first from anything the
 document did.
 
-### The annotation object, and the lookahead it finally required
+### The annotation object, and the lookahead it requires
 
 TSON text attaches a type annotation beside a value; JSON has no beside, so §3.3's **annotation object** is
 the carrier — wrapper (`{"$type": "age", "$value": 42}`) or inline (`{"$type": "employee", "name": "Ada"}`,
@@ -81,25 +101,6 @@ carries them an encode error. A type named for §3.3 would be the single place t
 so it is named for the §3.2 namespace it scans and cites §3.3 throughout. The spec's noun is right for the
 spec, where `@name` annotations are §3.1's and no reader is looking at a Java identifier to tell them apart.
 
-## Naming inside `reader`: mode first, and no prefix
-
-The schema-directed readers are named **mode, then family, then form** — `TreeRecordReader`,
-`TreeMapObjectReader`, `TreeMapPairsReader` — so that bind mode lands as `BindRecordReader` beside its peer
-and a reader's mode is the first thing about it. That is the axis someone scans when adding a mode, and it is
-the axis a file listing then sorts by.
-
-**The `Json` prefix is dropped in `reader` and kept in the root**, which is `CLAUDE.md`'s rule applied rather
-than an exception to it: a prefix earns its keep disambiguating a name a *consumer* writes, and `reader` is
-unexported. The root package keeps it for exactly that reason — `JsonReadContext` beside a domain
-`ReadContext`, `JsonTypeReader` beside `TsonTypeReader`.
-
-The consequence worth having is that **thirteen of these now share a bare name with their `tson-compiler`
-counterpart**: `ErrorReader`, `OpenTemplateReader`, `EventSkip`, `CompiledReaders`, `DiscriminationClass`,
-`ValueReaderFactory`, `ValueReaderContext`, `ValueReaderFactoryResolver`, `ValueReaderFactoryRegistry`,
-`VoidReader`, `DeferredTypeReader`, `ReferenceChain`, `ValueIdentity`. The two stacks read as peers, and which TSON class
-a JSON class answers to is visible at a glance — which is what a parallel implementation wants and what the
-prefix was hiding. Nothing imports both, neither package being exported, so the shared names cost nothing.
-
 **Recognising one needs a rewindable lookahead, and this is the position the parallel-stack decision
 predicted would need it.** §6.1.6 gives member order no meaning, so `$type` may sit anywhere in the object
 and the opening brace settles nothing — a schema-directed reader must read into a value before it knows
@@ -121,7 +122,7 @@ Two rules fall out of the scan and are worth naming because they look like omiss
   `scoped` instance holding EXTERN, and §3.3 makes it a resolver error anywhere else. That is the correct
   verdict at every position built so far, and the scoped reader is what will admit it.
 
-`CompiledReaders` arrives with this, and carries `tson-compiler`'s own hazard: it is **rebound exactly
+`CompiledReaders` is what resolves a name at read time, and carries `tson-compiler`'s own hazard: it is **rebound exactly
 once**, from the in-progress compilation to the finished schema, because handing readers the compilation's
 resolve would leak its mutable state past the compile. Only the edges that need a name at read time consult
 it — a subtype named by `$type`, and whatever §8's dispatch reaches.
@@ -156,14 +157,13 @@ pays for a branch it will never take.
   `{"$type": "int_box", "v": 1}` and refuses an untagged object, exactly as TSON text does. Every member of
   such a family is minted, so the alias is the only name a document has for one, which is what makes the
   flattening above load-bearing here rather than merely consistent.
-  - **ABSTRACT only, and the reason is the module boundary rather than a design choice.** A SEALED family is
-    selected by reading its discriminator fields, and a template's live in its held body's *text*, which
-    `tson-compiler`'s `HeldBody` parses. This module depends on the schema pipeline's output and never on its
-    engine, so it cannot reach that derivation — and duplicating the walk would put two opinions about which
-    fields select a family on either side of a module wall, which §9.4 makes a specification failure rather
-    than untidiness. A SEALED template base therefore still reaches `OpenTemplateReader` here while TSON text
-    dispatches it: the one place the two encodings knowingly differ. It closes when the discriminator names
-    are stated structurally on the `template` constructor, where both stacks read them without parsing.
+  - **Both readings, on the terms a closed base gets them.** ABSTRACT dispatches on `$type`; a SEALED template
+    base hands its value to `TreeRecordSealedReader`. The discriminator names are stated structurally on the entry
+    (`template.discriminators`, read through `tson-schema`'s `FamilySelectors`) rather than only in the held body's
+    *text*, which `tson-compiler`'s `HeldBody` parses: this module depends on the schema pipeline's output and
+    never on its engine, and a second walk of that text would put two opinions about which fields select a family
+    on either side of a module wall, which §9.4 makes a specification failure rather than untidiness. A template
+    carrying no `extension` reaches `OpenTemplateReader`.
 
 **The mapping is derived once and never at read time.** Each member's pins are decoded at construction, at
 the fields' declared types *in the base* — the one set known before a member is selected — and keyed by what
@@ -187,28 +187,28 @@ indexes every member of every group). The larger one is still owed — the annot
 before *every* record read because §8.1 admits a redundant tag anywhere, and fusing it into the member loop
 with a rewind only where a `$`-initial name actually appears is the measurement `BACKLOG.md` carries.
 
-### Discrimination: two routes, and the table is built at schema load
+### Discrimination: one condition, and the table is built at schema load
 
 §8.2's predicate is the rule [TSON-SCHEMA] §5.4 requires each encoding to state over the resolver-derived
-`disjoint` fact, and it is closed: a value may omit its tag by exactly two routes and "MUST NOT be extended by
+`disjoint` fact, and it is closed: a value may omit its tag by exactly one condition and "MUST NOT be extended by
 implementation cleverness — no member-shape matching among record variants, no value-set separation, no trying
 variants in order." `TreeChoiceReader` implements the whole of it — disjoint plus class-stable, selecting on
 the arriving value's kind. §8.2 has one condition and no second route: **member dispatch is not a choice
 mechanism**, a choice position having no expected record type whose selector fields a decoder could know
-before reading. It belongs to a sealed record family (§6.1.5), where the position does, and that is unbuilt —
-so a record family declaring a discriminator currently reads as an ordinary record, and a choice of records
+before reading. It belongs to a sealed record family (§6.1.5), where the position does, and
+`TreeRecordSealedReader` above is where it is built — so a choice of records
 requires the tag, which is the correct verdict rather than a quiet approximation of a route.
 
 **The verdict is computed once per choice, at compile time**, which is what §8.3 asks for in so many words —
 "the wire decision is then a table hit, not a per-value derivation". The table is empty exactly when the tag is
 required, so a read has one question to ask and the answer is a map lookup.
 
-**Both halves of route 2 are needed and neither implies the other.** `disjoint` guarantees at most one variant
+**Both halves of the condition are needed and neither implies the other.** `disjoint` guarantees at most one variant
 per class; class stability guarantees the arriving kind actually lands in its variant's class. Without the
 second, a `float64` variant still admitting `.nan` receives a JSON *string* (§5.4) and would dispatch as though
 a string variant had been chosen. The unstable set is closed to two members — that leak, and a map forced into
 pairs form — so the test is two cases rather than a survey, and narrowing `allow_nan`/`allow_infinity` restores
-route 2, which is the checkable reason §8.3 gives an API author to narrow.
+the untagged route, which is the checkable reason §8.3 gives an API author to narrow.
 
 **`DiscriminationClass` duplicates the TSON reader's derivation**, which lives in an unexported package.
 That is the parallel stack's cost showing up where it matters most, because the fact is derived from the schema
@@ -218,7 +218,7 @@ the cases.
 **A missing tag is `TYPE_MISMATCH`**, the code the TSON reader gives the same document. The closed `Code`
 enum has no member for "a required tag is missing" and needs none: a tag that is required and absent
 establishes no type, which is what the code says, where `UNKNOWN_TYPE_REF` would claim a name denoted nothing
-and there is no name at all. That is also what the family readers already gave `tagRequired`, so one rule now
+and there is no name at all. That is also what the family readers give `tagRequired`, so one rule
 has one code across both encodings and both readings of a record position.
 
 **Two divergences the parity test pins as divergences**, both structural rather than drift. A **choice cannot
@@ -245,9 +245,9 @@ once per file at exit 1 saying the documents were wrong.
 Standard input has no name to classify by, so the binding is what marks it JSON. That is not a guess: the two
 flags exist for nothing else, a `.tn` document naming its own binding in its header.
 
-**One thing the CLI surfaced that the library owed.** `unknownTypeMessage` listed the namespace in order, and
-an `!!import` merges the imported entries *first* — so a schema declaring one type over core.tn reported
-"whose types are (void | boolean | integer | ... and 44 more)" and showed the author none of their own. It
-now leads with the entries this schema declares and the author wrote, filtering by the origin index and by
+**An unknown `--type` is answered with the schema's own declarations first.** An `!!import` merges the imported
+entries *first*, so a schema declaring one type over core.tn listed in namespace order would show
+"(void | boolean | integer | ... and 44 more)" and none of the author's own. `JsonCompiledSchema.unknownTypeMessage`
+leads with the entries this schema declares and the author wrote, filtering by the origin index and by
 having a source position (the same test that tells a minted entry from an authored one). Imported and minted
 names remain usable root types; the count that follows covers them.

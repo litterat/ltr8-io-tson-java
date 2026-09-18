@@ -386,7 +386,7 @@ The remaining families — `text` and its refinements, `uri`, `regex`, `email`, 
 json => ( text | number | boolean | [json?] | {text => json?} )
 ```
 
-The choice is `disjoint: true` by construction — string, number, boolean, bracket, and brace, one variant per class — so every JSON value of §3.1's profile decodes at a `json` position tag-free by §8.2's route 2, nulls inside arrays and objects landing as absences, and re-encodes to the JSON it was. That is `unknown`'s old decoded form, obtained from an ordinary declaration the schema controls rather than from a permissive type the encoding had to interpret.
+The choice is `disjoint: true` by construction — string, number, boolean, bracket, and brace, one variant per class — so every JSON value of §3.1's profile decodes at a `json` position tag-free by §8.2's condition, nulls inside arrays and objects landing as absences, and re-encodes to the JSON it was. That is `unknown`'s old decoded form, obtained from an ordinary declaration the schema controls rather than from a permissive type the encoding had to interpret.
 
 
 ## 6. Containers

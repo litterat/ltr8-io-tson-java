@@ -50,9 +50,9 @@ tracks a current scope, and nothing can leak one.
 
 **Who may open a scope is `ScopePush`, and it is one decision rather than four.** `TsonDataStream` emits a
 `SchemaRef` ahead of a record field value, a map entry value and an array element — the three positions
-[TSON-DATA] §2.3 admits a directive at — and each of those containers used to consume it and throw it away,
-which is how a document could push a scope its schema never opted into and be read as though it had not. They
-now leave the event where it stands and ask `ScopePush.notAdmitted` on behalf of the position's own reader:
+[TSON-DATA] §2.3 admits a directive at — and a container that consumed it and threw it away would
+let a document push a scope its schema never opted into and be read as though it had not. The containers
+leave the event where it stands and ask `ScopePush.notAdmitted` on behalf of the position's own reader:
 a scoped one keeps it, and everything else has it consumed and refused (§7.8's typed-position restriction —
 "cross-schema acceptance is authored intent, not accident"). The check costs a document nothing, everything
 in it being guarded by "is the next event a directive at all", which for every value in almost every document

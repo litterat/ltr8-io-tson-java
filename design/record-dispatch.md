@@ -51,29 +51,30 @@ value to `cat` before the members are consulted; the marker is what stops it. Th
 than §7.2 in any case: a sibling's tag is admissible under §7.2 and still wrong, the members having already
 said which member this is.
 
-**Both compare a written tag against flattened names** (`Subsumption.admitting`), §7.2 comparing "after
-reference flattening of both": the base's own set, which decides the `tagNamesTheBase` refusal, and each
+**Both compare a written tag against a name and every alias whose chain ends at it**
+(`Subsumption.admitting`), §7.2 comparing "after following both reference chains to their terminal entries":
+the base's own set, which decides the `tagNamesTheBase` refusal, and each
 member's, which decides selection. Skipping it is not a lost nicety but a family nothing can name — a family
 whose base is a **template** has a minted entry for the base and for every member, and §8.2 makes a minted
-name non-normative, so an alias is the only spelling either end has. It was skipped: the concrete record
-readers were flattened and the two dispatchers were not, so a subtype-template family read in JSON and was
-refused in TSON text — the same schema, the same document, two answers. `CrossEncodingParityTest` carries both
-ends of it now.
+name non-normative, so an alias is the only spelling either end has. The dispatchers apply it on the same
+terms as the concrete record readers, or a subtype-template family would read in one encoding and be
+refused in the other — the same schema, the same document, two answers. `CrossEncodingParityTest` carries both
+ends of it.
 
 **`NamedDispatchReader` is not reused**, close as the shape is. Its verdicts are a choice's, and
 [TSON-JSON] §9.4 binds a family's to the ones the JSON stack gives — which is what `base.diagnostics`'
 `RecordExtensionDiagnostics` holds, and what `CrossEncodingParityTest` compares.
 
-**§7.2's own refusal is shared on the same terms** (`base.diagnostics`' `SubsumptionDiagnostics`), and it had
-to be: the two encodings were giving one rule two codes — `UNKNOWN_TYPE_REF` here against `TYPE_MISMATCH` in
-JSON — which put it in two of §8.1's categories, `resolver` against `validation`, for one verdict. There was
-no parity case for it, and that absence is how they drifted. It sits beside `RecordDiagnostics` rather than
+**§7.2's own refusal is shared on the same terms** (`base.diagnostics`' `SubsumptionDiagnostics`), and it has
+to be: two encodings giving one rule two codes — `UNKNOWN_TYPE_REF` against `TYPE_MISMATCH` — put it in two
+of §8.1's categories, `resolver` against `validation`, for one verdict, and `CrossEncodingParityTest` carries
+the parity case that keeps them from drifting. It sits beside `RecordDiagnostics` rather than
 inside it because the rule governs every atom and product position — an array, a map and a tuple refuse a
 wrong annotation on these same terms. **The refusal is located at the value, not at the tag**: TSON's
 annotation has no pointer step of its own, and §9.4 wants one pointer for a rule they share, so JSON reports
 at the value too.
 
-**Which is one instance of a line that now runs through the whole vocabulary.** `UNKNOWN_TYPE_REF` means the
+**Which is one instance of a line that runs through the whole vocabulary.** `UNKNOWN_TYPE_REF` means the
 written name *denotes nothing* — the schemaless reader's own check (`TypeRefCheck`) and an annotation naming
 no type the governing schema declares (`AnnotationCapture`), which are the only three sites left. Everything
 where a name resolves and is merely not admissible is `TYPE_MISMATCH`: §7.2 subsumption, a choice's variant

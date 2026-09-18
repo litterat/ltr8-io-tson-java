@@ -44,7 +44,7 @@ than a package because [TSON-JSON] §9.4 makes the JSON encoding report in [TSON
 categories and add none of its own: the vocabulary is one vocabulary across both encodings *by
 specification*, so leaving it in `tson-compiler` would make every other encoding depend on the TSON text
 engine to say "this field is required", or mint a second vocabulary for one fact. **What deliberately
-stayed behind is the classifying half**: `Diagnostic`'s ten `of*` factories all switch on an exception
+stayed behind is the classifying half**: the `of*` factories that classify an exception all switch on an exception
 type an encoding declares, so each encoding owns its own (`TsonDiagnostics` here, `JsonDiagnostics` in
 the JSON stack) — which is also what closes the old "`ofBaseSyntaxError` cannot classify another
 encoding's syntax failure" gap, since there is no longer one switch responsible for exceptions it cannot
@@ -54,7 +54,7 @@ conversion — `JsonPosition` does. **`LimitsPolicy` and `LimitExceededException
 same argument**: [TSON-JSON] §10.1 makes the bound §9.1's policy "in JSON clothing, and the same policy
 applies with the same defaults", so one record and one refusal serve both encodings and a deployment that
 raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and is the one factory that
-stayed on the record — its nine siblings switch on an encoding's own exception type where it classifies
+stayed on the record — its classifying siblings switch on an encoding's own exception type where it classifies
 nothing at all.
 **`io.ltr8.tson.base.policy`** is what this processor will admit and spend — `ProcessorPolicy` and the two
 it composes, `UnicodePolicy` (§8.2's levels) and `LimitsPolicy` (§9.1's bounds), plus `FetchPolicy`, the

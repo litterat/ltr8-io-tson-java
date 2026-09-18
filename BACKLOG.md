@@ -255,10 +255,19 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 - [ ] User-facing documentation on how to use the library, in `docs/` — `README.md` and the `tson-java` skill are the
   only consumer-facing prose; `design/` is internal.
-- [ ] Reconcile the design notes with the code: `design/KNOWN-DRIFT.md` lists each statement known to be stale or
-  self-contradictory, by note. Fix in the note, delete the entry, delete the file when empty.
 
 ## Miscellaneous
+
+- [ ] **A base-syntax diagnostic does not say whether it is a lexer error or a parse error.** [TSON-DATA] §8.1 makes
+  them two categories, and [TSON-JSON] §9.4's table sorts JSON's failures into them (malformed text, invalid UTF-8 and
+  ill-formed strings are lexer errors; grammar violations are parse errors). Both classifiers collapse the pair:
+  `TsonDiagnostics.ofBaseSyntaxError`/`ofSchemaSyntaxError` and `JsonDiagnostics.ofBaseSyntaxError` report every case as
+  `VALIDATION_ERROR`. On the TSON side the fact survives only on the thrown channel, as `LexException` against
+  `ParseException` -- which is what `ConformanceSuiteTest` reads the category from -- so a collecting read, and every CLI
+  envelope, loses it. The JSON stack has lost it on both channels, its lexer and stream raising the one shared
+  `ParseException`. What a consumer routes on is the `Code`, so the fix is a code per category rather than a component
+  beside it; what constrains it is that the JSON lexer has to state which kind it raised, and that
+  `CrossEncodingParityTest` compares codes, so the two encodings must sort one malformed input the same way.
 
 - [ ] **The look-alike check recomputes every skeleton per record, and ignores the identifier policy.**
   `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of

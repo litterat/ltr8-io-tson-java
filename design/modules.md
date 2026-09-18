@@ -47,7 +47,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   and they depend on nothing. `schema.meta` reads them structurally — `RationalType`'s
   `min`/`max`/`multiple_of` are `Rational` values — which is what used to hold them here, and is a pull from
   above rather than a reason to live above. Plus the schema
-  registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`/`TsonCanonicalIdentity`) and
+  registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`) and
   `TsonBundledSchemas`. **The linker is not here** — it is an engine, not a value model, so
   `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the pipeline; what
   stays is storage and the identity algorithm lookups

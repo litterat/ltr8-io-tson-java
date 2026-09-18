@@ -27,8 +27,8 @@ Related: `design/schema-resolution.md` (definition resolution), `design/template
 ## Shared vocabulary: `WireForm`, `MetaRefs`, `DerivedName`
 
 Three dependency-free leaf classes the phases share. Each owns a fact that belongs to none of them
-individually, and each was previously stated inside whichever phase happened to need it first — which in two
-cases meant it was stated more than once.
+individually; stated inside whichever phase happens to need it first, such a fact ends up stated more than
+once.
 
 **`WireForm`** — how schema vocabulary is spelled as data, in both directions. The vocabulary member names;
 the `scoped`/`nameField` builders every producer goes through; `refValue` and its inverse
@@ -41,9 +41,9 @@ a held body.
   declaration-time questions, `SyntheticMerge` asking whether one holds an application, `ParameterKinds`
   walking one for parameter kinds). `isApplication`'s own contract is that a held body is written by one
   phase and read by several, so a second opinion about what an application looks like is what makes one of
-  them wrong. There were three: the writer, the reader, and `ParameterKinds` matching `name`/`arguments`
-  against its own string literals — the one that could have drifted silently, since nothing would have
-  failed, only a parameter kind quietly not inferred.
+  them wrong. The writer, the reader and `ParameterKinds` all go through it; a walker matching
+  `name`/`arguments` against its own string literals is the copy that drifts silently, since nothing fails,
+  only a parameter kind quietly not inferred.
 - **`TsonObjectWriter` cannot *build* a held body, though it is what emits one.** Writing a resolved `Top`
   gives canonical-explicit, fully quoted output — a different language from the one a held body is written in:
   `HeldBody.names()` and substitution both key on a token being *unquoted*, so a quoted body references no
@@ -52,23 +52,24 @@ a held body.
   (`AstWriter`) — which is how `HeldBody.held` turns it into `TemplateBody.template`.
 - **`refValue`'s `arguments().isEmpty()` branch is load-bearing**, not an optimisation — see the
   materialisation note (`design/template-materialisation.md`).
-- **Every walk over a held body descends into a map slot, and three of them did not.** meta.tn's
+- **Every walk over a held body descends into a map slot.** meta.tn's
   `scoped.schemas` is `{uri => [type_name; 1..]?; 1..}`, so core's `extern_of => <S> !scoped { scope:
-  [EXTERN]  schemas: { S => _ } }` and `extern_type => <S, T> ... { S => [T] }` are the first templates
-  putting a parameter inside a map — one in a key, one inside the array its value names. `substitute` left
-  the parameter name standing where the argument belonged; `ParameterKinds` never observed the parameter at
-  all, so its kind was never inferred and a `type_name` argument stayed on the reference channel and failed
-  as an unresolved reference; and `DerivedName`'s canonical rendering — the half §8.2 keys identity on —
-  rendered the whole map as the unknown-value mark, so two bindings differing only inside one hashed alike;
-  the readable half masked it, which is the `startsWith` hazard inverted and why `DerivedNameTest` asserts
-  `canonicalBinding` directly. A map key is a `data-value` and its
+  [EXTERN]  schemas: { S => _ } }` and `extern_type => <S, T> ... { S => [T] }` put a parameter inside a
+  map — one in a key, one inside the array its value names. Each of the three walks fails differently if it
+  skips one: `substitute` leaves the parameter name standing where the argument belongs; `ParameterKinds`
+  never observes the parameter, so its kind is never inferred and a `type_name` argument stays on the
+  reference channel and fails as an unresolved reference; and `DerivedName`'s canonical rendering — the half
+  §8.2 keys identity on — renders the whole map as the unknown-value mark, so two bindings differing only
+  inside one hash alike while the readable half masks it, which is the `startsWith` hazard inverted and why
+  `DerivedNameTest` asserts `canonicalBinding` directly. A map key is a `data-value` and its
   value a `scoped-value` ([TSON-DATA] §2.6), so the two halves rebuild through their own carriers
   (`WireForm.rescope` and `WireForm.retyped`); both halves descend, because a parameter reaches either.
 
 **`MetaRefs`** — the `schema.meta` reference walk, `mapRefs` over a definition and `mapBodyRefs` over a body.
-Four callers use it and only one is closing a template: §8.3 flattening rewrites a use site, §8.2's synthetic
-merge renames onto a merged entry, and §5.10's regularity check uses it as a *visitor* by returning each
-reference unchanged. Which body shape carries which references is a fact about the value model, so it is
+Three callers use it and only one is closing a template: materialisation rewrites an application onto the entry it
+closed, §8.2's synthetic merge renames onto a merged entry, and §5.10's regularity check uses it as a
+*visitor* by returning each reference unchanged. No pass rewrites a use site onto the end of a reference
+chain — see "References are hops" below. Which body shape carries which references is a fact about the value model, so it is
 stated where the model is walked. Visiting is rewriting with the identity function deliberately: a separate
 read-only walk would be a second list of body shapes to keep in step, and the one that fell behind would
 silently skip a reference rather than fail.
@@ -82,9 +83,9 @@ silently skip a reference rather than fail.
 - What must *not* fork is each family's own rendering. `ofBinding` is called by **both** lift channels, and
   that shared call is exactly what makes a form written directly and the same form arriving through a
   materialised template land on one entry.
-- The two families' `appendText` were character-identical and their `appendNumberAware` differed only in
-  taking a `Token` or a `TokenValue`; they are one method. `MintedNames`' contract depends on the renderings
-  agreeing, and a shared decision about identity kept in two places is how they stop agreeing.
+- The two families share one `appendText` and one `appendNumberAware` (a `Token` and a `TokenValue` render
+  alike). `MintedNames`' contract depends on the renderings agreeing, and a shared decision about identity
+  kept in two places is how they stop agreeing.
 - **A hash is not normative, so the conformance layer cannot see one move.** `ResolvedFixtureTest` and the
   `class2/schema/` runner both reduce a synthetic's content hash to a placeholder before comparing (see
   `ResolvedForm`) — right for a comparison against the spec's own fixtures, since §8.2 leaves the spelling to
@@ -92,14 +93,14 @@ silently skip a reference rather than fail.
   is value-level: `DerivedNameTest` pins both channels, and `SchemaDesugarerTest` pins the binding side end to
   end. The point is not that the values are required but that a change to them is deliberate — an entry name
   is part of the resolved form, and an importing schema derives the same name for the same form.
-- **Assert a derived name by value, never by `startsWith`.** The application channel had no value-level guard
-  until `DerivedNameTest`: every assertion on an instantiation name checked the readable half
-  (`startsWith("box_text_")`), which a change to the hashed rendering passes. Perturbing
-  `canonicalApplication` alone left the whole build green.
+- **Assert a derived name by value, never by `startsWith`.** An assertion on an instantiation name's
+  readable half (`startsWith("box_text_")`) passes a change to the hashed rendering — perturbing
+  `canonicalApplication` alone leaves such a build green. `DerivedNameTest` is the value-level guard for the
+  application channel.
 
 ## References are hops, not rewrites (`tson-compiler/.../TsonSchemaCompiler.java`)
 
-§8.3's use-site flattening **is gone, and `@alias` with it**. Resolved output states the chain the author
+**There is no use-site flattening pass and no `@alias` marker.** Resolved output states the chain the author
 wrote: a type position naming a `REFERENCE` entry keeps that name, nothing is attached to record where it
 "really" points, and the chain stays walkable through the entries themselves.
 
@@ -108,16 +109,16 @@ namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a 
 *is* its target's reader, resolved recursively, named for the entry doing the referring, so a use site naming
 `pct` over `pct => small` reads and reports as `pct`.
 
-- **The walk was never avoidable, which is why the rewrite was not worth its price.** §8.3 itself required
-  the chain stay walkable (`reference.target` was never flattened), and several passes walk one. Rewriting the
-  output as well left two representations to keep in step, and `@alias` was a *lossy* summary of the one it
-  duplicated — it kept only the source-site name, so in `digest_chain => digest_alias => bytes` it recorded the
-  hop that carried nothing.
+- **The walk is unavoidable, which is why a rewrite is not worth its price.** §8.3 requires the chain stay
+  walkable (`reference.target` is never flattened), and several passes walk one. Rewriting the output as well
+  would leave two representations to keep in step, and an `@alias` marker recording where a rewritten site
+  pointed is a *lossy* summary of the one it duplicates — it keeps only the source-site name, so in
+  `digest_chain => digest_alias => bytes` it records the hop that carries nothing.
 - **`ReferenceChain` is that walk, stated once** (`resolver/ReferenceChain.java`). The linker's choice-variant
   distinctness and its §5.2 field-value check, `Subsumption`'s subtype naming and `DiscriminationClass`'s
-  classification each had their own loop, and the one decision inside — *stop at a non-reference, at an
+  classification all use it, because the one decision inside — *stop at a non-reference, at an
   **argument-bearing** target (an application, with no entry until materialisation mints one), or on a cycle*
-  — was four decisions that could drift. `terminal` answers with a name, `terminalDefinition` with the entry;
+  — kept in four loops is four decisions that can drift. `terminal` answers with a name, `terminalDefinition` with the entry;
   they differ only on an undeclared name and a cycle, where the first has an answer its caller wants (a type
   parameter is its own terminal) and the second has none. **`ParameterKinds` keeps its own loop deliberately**:
   it follows a chain to a slot's declared body and must *not* stop at an argument-bearing target, the template
@@ -126,13 +127,12 @@ namespace is present. `TsonSchemaCompiler`'s reference branch is that moment: a 
   terminal before checking a `~`/`=` value, since a field typed by an alias states a value of whatever the
   alias names; `FieldValueConformanceTest` pins both directions.
 - **§8.3 states both halves, and the walkers are several.** A processor MAY collapse after linking, when it
-  compiles for reading, and MUST NOT collapse in resolved output. The walk was never avoidable — the compiler,
-  `DiscriminationClass`, `TypeInhabitance` and the linker each do one, and §8.3 required `reference.target` stay
-  unflattened anyway. A directive on an alias is applied where the alias compiles (`UseSite.named`, applied by the
+  compiles for reading, and MUST NOT collapse in resolved output. The compiler, `DiscriminationClass`,
+  `TypeInhabitance` and the linker each walk a chain. A directive on an alias is applied where the alias compiles
+  (`UseSite.named`, applied by the
   reference entry's own compile).
-- **The bootstrap route needs no special case any more.** It used to have to flatten identically or diverge
-  from ordinary resolution, while binding no name-position annotations of its own — a divergence waiting to
-  matter. Neither route rewrites anything now (`BootstrapReferencesTest`).
+- **The bootstrap route needs no special case.** Neither it nor ordinary resolution rewrites a reference, so
+  the two cannot diverge on one (`BootstrapReferencesTest`).
 - Pinned by `ReferenceChainTest` — the chain stated as written, a read still reaching the end of it, and a
   diagnostic naming the hop the author wrote — and end to end by `ResolvedFixtureTest` against the spec's own
   `spec/m/*-resolved.tn`.
@@ -173,11 +173,11 @@ meta the way an author-written annotation is: there is no author to resolve agai
   gave it.
 - **The bootstrap route attaches none, deliberately.** `MetaKernelBootstrapResolver` exists to be *just*
   enough to load the real meta-kernel from its own file, and nothing in the pipeline reads this marker — it is
-  informational. meta-kernel's own nine synthetics are marked anyway, because the entries anything else sees come from
+  informational. meta-kernel's own eight synthetics are marked anyway, because the entries anything else sees come from
   ordinary resolution: the bootstrap output stands in only as the transient governing meta for its own
   resolution.
 - Cross-checked against the spec's own output by
-  `ResolvedFixtureTest.theSameEntriesAreMarkedSyntheticOnBothSides` — nine keys in meta-kernel, one in
+  `ResolvedFixtureTest.theSameEntriesAreMarkedSyntheticOnBothSides` — eight keys in meta-kernel, five in
   meta.tn, none in core.tn, which writes no inline form. It reads the fixtures' marked keys from their
   *text*, because a key-position annotation is still dropped when a resolved-form document is read back
   (`BACKLOG.md`), and a bound comparison would have both sides render nothing and agree for the wrong reason.
@@ -207,10 +207,8 @@ order, so it can't handle `boolean` preceding `enum`; this two-pass ordering liv
   compiled against a complete schema. Given how narrow and fixed meta-kernel's instance shapes are,
   hand-picking them is simplest — "the bootstrap can do whatever tricks it needs, including not compiling,
   just calling `new Xxx(...)`."
-- **Desugaring needs no equivalent trick, and used to.** The phase once read a constructor's `parameters()`
-  and its fields' parameter routing off the governing meta; for meta-kernel those would have had to come
-  from the entries this class is in the middle of producing, so the routing for the three constructors it
-  applies to itself was written out by hand. With the container constructors parameterless the desugar table
-  is fixed by the sugar forms and nothing is looked up, so the bootstrap special case and the general case
-  are one mechanism. The payoff is unchanged: meta-kernel's linked form needs no materialization either —
-  its eight sugar forms are ordinary declarations by the time the linker sees them.
+- **Desugaring needs no equivalent trick.** The container constructors are parameterless (§4.2), so the
+  desugar table is fixed by the sugar forms and nothing is looked up in the governing meta — which for
+  meta-kernel would be the entries this class is in the middle of producing. The bootstrap and the general
+  case are one mechanism, and meta-kernel's linked form needs no materialization either: its eight sugar
+  forms are ordinary declarations by the time the linker sees them.

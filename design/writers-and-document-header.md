@@ -9,7 +9,7 @@ keeps the rest of the document. Current form only; history lives in git.
 - Annotations are written ahead of a value's type-ref (§7.4's `*annotation [type-ref] core-value`);
   `writeUnion` emits its member's annotations before its own type-ref and goes straight to `writeCore`.
 - A sink is flushed and not closed; an `IOException` from it becomes an `UncheckedIOException`, deliberately
-  not `WriteException`, and `TsonObjectWriter`'s two `catch (Throwable)` handlers must let it past.
+  not `WriteException`, and `DataClassObjectWriter`'s two `catch (Throwable)` handlers must let it past.
 - The byte path encodes UTF-8 itself (`Utf8Sink`) and refuses an unpaired surrogate where
   `OutputStreamWriter` silently writes `?`.
 - A document header is off by default; the object writer takes the schema *and* the root type, the tree
@@ -30,7 +30,7 @@ Related: `design/facades-and-tree.md` (the read facades, annotation capture), `d
 
 Wire annotations are captured by the reads `design/facades-and-tree.md` describes.
 
-- **`TsonTreeWriter` re-emits them** — `TsonDataEmitter` gained `annotation`/`beginAnnotation`/
+- **`TsonTreeWriter` re-emits them** — `TsonDataEmitter` has `annotation`/`beginAnnotation`/
   `endAnnotation` (the valueless form's trailing space is load-bearing, §3.1) and `writeNode` writes a
   node's annotations ahead of its type-ref, per §7.4's `*annotation [type-ref] core-value` order, so a tree
   round trips with its metadata, not just its values. **`TsonObjectWriter` re-emits a carrier's too** —
@@ -45,19 +45,19 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
   symmetric and a caller writes neither a
   `throws` clause nor a try/catch for the common path.
 - **Both writers take a sink, and `toTson` is that method over a `StringBuilder`.** `write(value,
-  OutputStream)` / `write(value, Appendable)` mirror every reader taking an `InputStream`: `TsonDataEmitter`
-  holds an `Appendable` rather than its own `StringBuilder`, so nothing between the object graph and the
-  sink accumulates the document — memory is the sink's business plus the emitter's scope stack. The stream
-  is UTF-8 ([TSON-DATA] §9.1), **flushed and not closed**: unflushed, the encoder's own buffer swallows a
-  short document whole, and closing would end the HTTP response body this exists for. An `IOException` from
+  ByteSink|OutputStream|Appendable)` mirrors every reader taking an `InputStream`: `TsonDataEmitter` appends
+  straight to the sink it was given — an `Appendable`, or a `ByteSink` through the `Utf8Sink` below — so
+  nothing between the object graph and the sink accumulates the document; memory is the sink's business plus
+  the emitter's scope stack. The byte form is UTF-8 ([TSON-DATA] §9.1), **flushed and not closed**:
+  unflushed, `Utf8Sink`'s block swallows a short document whole, and closing would end the HTTP response
+  body this exists for. An `IOException` from
   the sink becomes an `UncheckedIOException` — the same treatment `Lexer` gives a failing `InputStream`, and
   deliberately *not* `WriteException`, which means "this value cannot be written in this encoding". That
-  distinction needs `TsonObjectWriter`'s two `catch (Throwable)` handlers to let it past, or an IO fault
-  surfaces blaming the object. Both writers take `write(value, ByteSink|OutputStream|Appendable)`, so a
-  document never has to exist as a `String`.
-- **A writer can emit a document header, and it is off by default.** `TsonDataEmitter` gained `documentId`/
+  distinction needs `DataClassObjectWriter`'s two `catch (Throwable)` handlers to let it past, or an IO
+  fault surfaces blaming the object. A document never has to exist as a `String`.
+- **A writer can emit a document header, and it is off by default.** `TsonDataEmitter` has `documentId`/
   `schemaRef` (the two of §3.3's four directive names that belong to a *data* document; `meta`/`import` are a
-  schema document's and this emitter does not write one), and both writers a `describing(...)` derivation
+  schema document's and this emitter does not write one), and both writers have a `describing(...)` derivation
   over a shared `TsonDocumentHeader` carrier that knows §2.2's order — `!!id` first when both are present.
   **A bare value is the default**, because that is what a writer is usually asked for — not to protect
   output already in the world, of which there is none. A caller who wants a self-describing document says so
@@ -72,7 +72,7 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
   - **The root type-ref is not part of `TsonDocumentHeader`**, however adjacent the two look on the wire: §2.2
     is explicit that header directives are properties of the *document*, and the root value's type
     annotation is not one of them. `TsonObjectWriter` holds it separately.
-  - **`typeRef` now refuses a second type-ref on one value**, which is what makes the root type safe to
+  - **`typeRef` refuses a second type-ref on one value**, which is what makes the root type safe to
     declare: `data-value = *annotation [type-ref] core-value` admits exactly one, and a value that writes
     its own (a vocabulary host type, a union member) would otherwise produce a document that does not
     parse. The flag clears the moment a core-value starts, so nested values and annotation values are
@@ -91,12 +91,12 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
     stream it opened. The flush is separate and always explicit, because a sink cannot tell a caller who
     finished from one who abandoned the document part-written — so it never pushes on their behalf.
 - **`quotedString` escapes with a comparison, not a `Pattern`.** The escape loop runs once per character of
-  every string a writer emits, and asking `c <= 0x1f` through a compiled `Pattern` cost a `String`, a
+  every string a writer emits, and asking `c <= 0x1f` through a compiled `Pattern` costs a `String`, a
   `Matcher` and the matcher's own internals *per character* — 188 bytes against 3.7 for the whole write,
-  measured, and 13% of sampled allocation in a demo server's profile. `isControl(char)` is that comparison
-  and the pattern is gone; `AllocationHarnessTest.writingAQuotedStringDoesNotAllocatePerCharacter` fails at
-  anything approaching the old cost. `String.format("\\u%04x", …)` on the branch it guards stays — that
-  branch is genuinely rare, and the loop around it is what mattered.
+  measured. `isControl(char)` is that comparison;
+  `AllocationHarnessTest.writingAQuotedStringDoesNotAllocatePerCharacter` fails at anything approaching the
+  per-character cost. `String.format("\\u%04x", …)` on the branch it guards is fine — that branch is
+  genuinely rare, and the loop around it is what matters.
 - **Each writer is a facade over an engine in the unexported `writer` package** — `TsonTreeWriter` over
   `TreeValueWriter`, `TsonObjectWriter` over `DataClassObjectWriter` — the split the readers already have,
   and for the reason `design/json-facades-binding-writing.md` states: a front door owns the *document* (its header, its root
@@ -105,8 +105,8 @@ Wire annotations are captured by the reads `design/facades-and-tree.md` describe
 - **The resolver reaches for the engine, never the facade.** `DefinitionResolver`'s atom-refinement merge
   and `HeldBody`'s held template body both write a wire record and parse it straight back, where a header
   would be content the parse would then have to strip — so what they want *is* the engine's contract. It is
-  also what keeps the direction honest: a resolver naming `TsonObjectWriter` would make `tson-compiler`
-  depend on a front door built over itself, which is what used to pin the facades to this module.
+  also what keeps the direction honest: a resolver naming `TsonObjectWriter` would make the engine depend
+  on a front door built over it.
 
 ## Reading a header: `TsonDocumentPeek`
 

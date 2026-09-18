@@ -35,12 +35,14 @@ member name matching a declared field has already inherited that verdict and nee
 what §9.4's parenthetical means. The one name that reaches the policy fresh is a member matching **no**
 declared field in a record with **no** rest field, and it must be tested before it is reported: a homoglyph
 (`pаssword`, Cyrillic а) would otherwise get `UNRECOGNIZED_FIELD` — a *verdict* — where §8.2 requires a
-refusal reported in none of the four categories. That single case is the whole of the identifier policy's job
-at the JSON data layer, and it is why the check cannot simply be dropped as redundant.
+refusal reported in none of the four categories. That case — and its twin at a tag, a `$type` naming no
+declared type — is the whole of the identifier policy's job
+in a schema-directed JSON read, and it is why the check cannot simply be dropped as redundant.
 
 **A rest key is a map key, not a name.** §6.2 collects unmatched members into the rest map, parsed by its key
 type; §9.4 puts map keys under the *token* policy, which defaults to `unrestricted()`. So the order matters —
-declared fields, then rest collection, then hygiene — and a converted schema's `@rest` tail is what keeps
+declared fields, then rest collection, then hygiene; §6.2's flatten is not built (`BACKLOG.md`), so
+`TreeRecordReader` goes from declared fields straight to hygiene — and a converted schema's `@rest` tail is what keeps
 ordinary foreign JSON from meeting an identifier rule at all. That is the on-ramp working as intended, not a
 hole: the names in a rest map were never declared, so nothing about them is a name.
 
@@ -49,13 +51,15 @@ principle 1, §1.5) — a JSON document with no binding is just JSON, and its me
 them under an identifier policy would refuse ordinary JSON for a rule that exists only where names are
 declared.
 
-**When each arrives.** Neither belongs in the lexer or the event layer, for the reason
+**Where each runs.** Neither belongs in a layer that can only throw, for the reason
 `DefaultTsonReadContext`'s Javadoc gives on the other side: a refusal needs a receiver, and a layer that can
-only throw can only say "invalid", which is the one thing a policy refusal is not. Both arrive with the
-schema-directed decode: the identifier policy in the record reader's unmatched-member path, the token policy
-in the stream over keys and string values, the way `TsonDataStream` applies it on the TSON side.
-§10.1's limits policy is different and arrives sooner — nesting depth is counted in the event layer, the one
-place every token is consumed.
+only throw can only say "invalid", which is the one thing a policy refusal is not. The identifier policy runs in
+the readers that hold a position — `reader.NameHygiene` on the schema-directed record and choice readers'
+unmatched-name paths, `DataClassObjectReader.checkNameHygiene` on the schemaless bind read. The token policy runs
+in `JsonStream` over the tokens it hands out, reporting through the receiver the stream is constructed with, the
+way `TsonDataStream` applies it on the TSON side.
+§10.1's limits policy is different — nesting depth is counted in the event layer and refused by throwing
+`LimitExceededException`, the one place every container opens.
 
 ### The two JSON walks
 
@@ -126,10 +130,10 @@ alike to a declared one is undeclared and already reports `UNRECOGNIZED_FIELD`. 
 the line in the same place, and drawing it elsewhere would make this encoding stricter than that one for a
 rule §8.2 states once.
 
-**It costs nothing measurable**, which took one edit rather than a design: both rule implementations are
+**It costs nothing measurable**, and one detail is what keeps it so: both rule implementations are
 allocation-free when a name passes, but `Optional.ifPresent` with a capturing lambda is not — it captures
-and allocates whether or not the `Optional` holds anything. Two per member name was ~140 bytes per bound
-record in `JsonAllocationHarnessTest`; tested rather than `ifPresent`-ed, it is back inside the noise.
+and allocates whether or not the `Optional` holds anything. Two per member name is ~140 bytes per bound
+record in `JsonAllocationHarnessTest`; tested rather than `ifPresent`-ed, the check is inside the noise.
 
 ## The token policy ([TSON-DATA] §8.2, reached by §9.4)
 
@@ -139,15 +143,17 @@ values"; a member name read as a *field* name meets the identifier policy as wel
 decides it is known, so **a token policy stricter than the identifier policy subsumes it**, exactly as on the
 TSON side.
 
-`JsonObjectReader.withTokenPolicy` is the surface, defaulting to `unrestricted()`: a value is data and may
+`withProcessorPolicy(policy.withTokenPolicy(…))` is the surface, on either reader or through
+`ProcessorConfig` — there is no `withTokenPolicy` on a JSON reader, `withProcessorPolicy` being its one policy
+derivation. The token policy defaults to `unrestricted()`: a value is data and may
 legitimately be anything, so §8.2 scans none of it until a deployment says otherwise — and §8.2 requires that
-saying so be code rather than ambient, which is what the method is.
+saying so be code rather than ambient, which is what the derivation is.
 
-**Built into the stream rather than wrapped around it**, and `TsonDataStream` now does the same — the
-decorator that used to do this on the TSON side is gone. The property the check needs is that each token is
-produced exactly once, which a stream gives and a read context does not (it rewinds). A wrapper bought that
+**Built into the stream rather than wrapped around it**, as `TsonDataStream` does.
+The property the check needs is that each token is
+produced exactly once, which a stream gives and a read context does not (it rewinds). A wrapper would buy that
 property and cost a second place to forget to apply it; with two encodings needing one rule, the mechanism
-should be one too.
+is one too.
 
 A number's digits are ASCII so a number never trips the check, and it is checked anyway rather than exempted
 — a rule with an exception nobody can state is a rule someone gets wrong when the exception stops holding.

@@ -24,39 +24,39 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 
 ## `ProcessorPolicy` — the configuration, stated once
 
-**And threaded as one value.** Every constructor and derivation that used to take a `UnicodePolicy`, a
-second `UnicodePolicy` and a `LimitsPolicy` — or, on the JSON side, a bare `int maxDepth` — takes the policy
-instead: both streams, both TSON facades, and `JsonObjectReader`. Three parameters that always travelled
+**And threaded as one value.** Every constructor and derivation that needs a `UnicodePolicy`, a
+second `UnicodePolicy` and a `LimitsPolicy` takes the policy
+instead: both streams, both TSON facades, and `JsonObjectReader`. Three parameters that always travel
 together is how a caller comes to pass a bound from one policy beside a token surface from another, and a
 bare `int` beside a `UnicodePolicy` is the same hazard with less to grep for.
 
-`withIdentifierPolicy`/`withTokenPolicy`/`withLimits` stay, each changing exactly one component; `ProcessorPolicy`
-grew the matching three so a reader's derivation is one call rather than a rebuild. `withProcessorPolicy` is
-the whole-value form, and what `Tson.objectReader()`/`treeReader()` now use — they chained all three before,
-which was three chances to state two and forget the third.
+A reader's `withIdentifierPolicy`/`withTokenPolicy`/`withLimits` each change exactly one component, and
+`ProcessorPolicy` has the matching three so a reader's derivation is one call rather than a rebuild.
+`withProcessorPolicy` is the whole-value form, and what `Tson.objectReader()`/`treeReader()` use — chaining
+all three is three chances to state two and forget the third.
 
-**The front door states it the same way.** `ProcessorConfig.withProcessorPolicy` takes the whole value and is the
-setter to reach for; `withIdentifierPolicy`/`withTokenPolicy`/`withLimits` are its components, each deriving from
-whatever is already stated rather than replacing it, so a piecewise configuration and a composed one reach
-the same processor and neither clobbers the other. `Tson` holds the one value, so `Tson.processorPolicy()`
-is an accessor: the identifier half is handed to the schema registry at construction because the linker
-judges declared names, and that is a use of the policy rather than a second home for it. A policy
-reassembled on demand from components living in three places is one a caller can state and a report can
-contradict. It is also what lets one policy configure both encodings — `Json.withProcessorPolicy` takes this
-same value, and a deployment stating its constraints twice has two places to get them wrong.
+**The front door states it the same way.** `ProcessorConfig.withProcessorPolicy` takes the whole value and is
+the setter to reach for; `withIdentifierPolicy`/`withTokenPolicy`/`withLimits` are its components, each
+deriving from whatever is already stated rather than replacing it, so a piecewise configuration and a composed
+one reach the same processor and neither clobbers the other. `Tson` holds the one value, so
+`Tson.processorPolicy()` is an accessor: the identifier half is handed to the schema registry at construction
+because the linker judges declared names, and that is a use of the policy rather than a second home for it. A
+policy reassembled on demand from components living in three places is one a caller can state and a report can
+contradict. It is also what lets one policy configure both encodings — `Json.of(config)` reads this same value
+off the `ProcessorConfig` that `Tson.of(config)` takes, and a deployment stating its constraints twice has two
+places to get them wrong.
 
 **A token policy is never per-segment, and `ProcessorPolicy` is what refuses one.** `_` and `-` are word
-separators by convention in a name and ordinary characters in a value, so segmenting a value admits UTS
-#39's own `Toys-Я-Us` — the spoof a strict token policy exists to refuse. That is a property of what a token
-policy can *mean*, not of any one way of stating one, so the compact constructor holds it and every route
+separators by convention in a name and ordinary characters in a value, so segmenting a value admits
+UTS #39's own `Toys-Я-Us` — the spoof a strict token policy exists to refuse. That is a property of what a
+token policy can *mean*, not of any one way of stating one, so the compact constructor holds it and every route
 that assembles a policy passes through there: the named setters, the withers, and a value a caller composes
 itself. A check on each setter instead is a check every new route has to remember, and one route that
 forgets accepts what all the others refuse.
 
 **It carries three settings, not two.** The identifier policy, the token policy and the limits, plus the UCD
-version the first two were computed against. The limits sat beside it while it was named
-`ProcessorPolicy` — correctly, since a nesting bound has no business inside a *Unicode* policy —
-and the rename is what made the grouping coherent rather than a reversal of that reasoning. A deployment
+version the first two were computed against. A nesting bound has no business inside a *Unicode* policy,
+which is why the container is the processor's and `UnicodePolicy` is two of its components. A deployment
 states one policy; the three components stay independent, and changing one still says nothing about the
 others.
 
@@ -96,10 +96,10 @@ reason is in neither the document nor the schema.
 
 What this processor will *spend* reading a document, where the policy above is what it will *admit as a
 name*: `Tson.limitsPolicy()`, either facade's `limitsPolicy()`, `TsonTreeReader.withLimits`, `tson policy`,
-and a `limits` record inside every `tson-cli` envelope's `policy` field. **Beside the Unicode policy, not
-inside it** — the two answer different questions, and a deployment that changed one has said nothing about
-the other. The three arguments above transfer whole: a bound is constant for a run, a sender needs it before
-it writes, and a number a caller can act on beats a refusal after the fact.
+and a `limits` record inside every `tson-cli` envelope's `policy` field. **Beside the two Unicode policies
+inside `ProcessorPolicy`, not inside either of them** — they answer different questions, and a deployment
+that changed one has said nothing about the other. The three arguments above transfer whole: a bound is constant for a run, a
+sender needs it before it writes, and a number a caller can act on beats a refusal after the fact.
 
 **Only nesting depth is bounded**, at §9.1's own default of 64. §9.1 states the whole set as one table with a
 default each — eleven more on the document side — and [TSON-SCHEMA] §11.5 adds five on the schema side under
@@ -113,8 +113,8 @@ deployment states one policy, and the CLI envelope nests `limits` under `policy`
 independence, not the separation: the three components answer three questions, and changing one still says nothing about
 the others.
 
-**Counted in the token stream, not in the readers.** `TsonDataStream.advance` already tracked bracket depth
-for the schema parser's error recovery, and that is the one place every token is consumed — so the check is
+**Counted in the token stream, not in the readers.** `TsonDataStream.advance` tracks bracket depth — the
+schema parser's error recovery reads the same counter — and that is the one place every token is consumed — so the check is
 one comparison per opening bracket and the refusal happens *before* any reader descends. That ordering is the
 whole point: the stream is iterative and never overflows, while every reader over it recurses
 (`SchemalessTreeReader.readNode` → `readArray` → `readNode`), and `EventSkip` recurses through values no
@@ -122,11 +122,11 @@ reader keeps and no context path steps. A limit enforced at the readers would ha
 them; enforced at the counter it also reaches schema documents, which are untrusted input wherever one is
 fetched or `!!import`ed, through the same code.
 
-**What it replaced.** A document a few thousand containers deep — about 10 KB, an ordinary request body —
-exhausted the Java stack. A `StackOverflowError` is an `Error`, so it passed through every
+**What the bound prevents.** A document a few thousand containers deep — about 10 KB, an ordinary request
+body — would otherwise exhaust the Java stack. A `StackOverflowError` is an `Error`, so it passes through every
 `catch (RuntimeException)` in the reader stack and in `TsonCli.run` alike: no report on stdout, a JVM stack
-trace on stderr, and exit 1, the code meaning *your document is invalid*. `LimitsPolicyTest` pins that the
-same document now reports.
+trace on stderr, and exit 1, the code meaning *your document is invalid*. `LimitsPolicyTest` pins that such
+a document reports instead.
 
 **The refusal is not a verdict** (`Diagnostic.Code.LIMIT_EXCEEDED`, `verdict()` false): the document may be
 well-formed, valid, and read in full by the next processor along. It has its own classifier
