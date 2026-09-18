@@ -165,18 +165,20 @@ public final class SchemaResolver {
      * contains placeholder entries and must not be linked, registered or compiled -- the caller checks the
      * receiver and stops, which is the phase boundary javac and Swift both draw (javac attributes every entry
      * before {@code shouldStopPolicyIfError} blocks the next phase; Swift never reaches SILGen after a Sema
-     * error). {@link DiagnosticsReceiver#throwing()}, the default the other overloads pass, makes the
-     * first failure an exception again and so keeps that impossible by construction.
+     * error). The fail-fast overloads make the first failure an exception and so keep that impossible by
+     * construction.
      *
-     * <p>Only a {@link SchemaValidationException} -- the schema is wrong -- becomes a diagnostic. An
-     * {@code UnsupportedOperationException} means this library hasn't implemented the construct and keeps
-     * propagating: a gap is not a verdict on the author's schema, and reporting it as one sends them looking
-     * for a fix that doesn't exist.
+     * <p>Three exception types become a diagnostic, and the type picks the code: a
+     * {@link SchemaValidationException} -- the schema is wrong -- is a schema error, an
+     * {@code UnsupportedOperationException} is {@code NOT_IMPLEMENTED}, and a {@link BindMismatchException}
+     * is {@code BIND_MISMATCH}. A gap is collected beside the ordinary problems rather than propagating,
+     * since thrown out of a per-declaration phase it would take every other declaration's verdict with it;
+     * it is the code that keeps it from reading as a verdict on the author's schema.
      *
      * <p><b>The fail-fast overloads do not route through {@link DiagnosticsReceiver#throwing()}</b>, which
-     * would raise {@code ReadException} and so quietly change the exception type every existing caller
-     * sees -- a schema that fails to resolve is not a read failure, and the CLI's own exit codes turn on that
-     * distinction. They rethrow the original instead, unwrapped and with its stack intact.
+     * would raise {@code ReadException} -- a schema that fails to resolve is not a read failure, and the
+     * CLI's own exit codes turn on that distinction. They rethrow the original instead, unwrapped and with
+     * its stack intact.
      *
      * @param receiver where a failed declaration is reported; must not be {@code null}
      */
@@ -338,8 +340,8 @@ public final class SchemaResolver {
 
         // §8.2's merge, at the moment that section names -- "identity settles after Pass 2, when references
         // have resolved". A form the desugar phase lifted with an application in a slot was named before that
-        // application had an entry to be named for; every application is closed now, so it re-derives to the
-        // name the other channel already gave the same form. See SyntheticMerge.
+        // application had an entry to be named for; at this point every application is closed, so it
+        // re-derives to the name the other channel gives the same form. See SyntheticMerge.
         Map<String, String> merged = SyntheticMerge.renames(declarations, generated, materialiser);
         if (!merged.isEmpty()) {
             SyntheticMerge.rewrite(resolvedLocals, merged);
@@ -381,11 +383,11 @@ public final class SchemaResolver {
             }
         }
 
-        // §8.3 use-site flattening used to run here and no longer exists. A reference is a hop, not a
+        // No reference is flattened here, at a use site or anywhere else. A reference is a hop, not a
         // rewrite: resolved output states the chain the author wrote, every use site keeps the name it
         // names, and a processor collapses the chain when it compiles readers -- after linking, where the
         // whole namespace is present and the walk is done once per entry rather than once per output.
-        // See docs/schema-resolution.md and [TSON-SCHEMA] §8.3.
+        // See design/resolver-vocabulary-and-bootstrap.md and [TSON-SCHEMA] §8.3.
 
         // §6: an annotation written before the declared name binds to the *name*, not to the definition,
         // and "the resolver does not hoist annotations from key to value". A resolved schema is a
@@ -491,8 +493,8 @@ public final class SchemaResolver {
      * leaves the application in {@code record.supertypes} exactly as written and mints no entry for it
      * ({@code SPEC-FEEDBACK.md} #15). The edge is the half that has to wait: the entry an application denotes
      * is whichever declaration names the same application, and asking that <em>during</em> materialisation
-     * made the answer depend on declaration order -- {@code text_box} declared before the composition was
-     * found, declared after it was not. §8.1 calls this field "the derived transitive index, computed once
+     * would make the answer depend on declaration order -- {@code text_box} declared before the composition
+     * found, declared after it not. §8.1 calls this field "the derived transitive index, computed once
      * every parent is a type", and this is that moment.
      *
      * <p><b>Nothing is created here.</b> The pass derives an index over entries that already exist, keyed on

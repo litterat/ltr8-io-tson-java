@@ -36,14 +36,12 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
 
     /**
      * <b>One factory for every atom family</b>, because the mapping from a resolved body to the parser that
-     * reads it is {@link AtomParsers}' and there is no second opinion to have about it. Each family used to
-     * carry its own constant doing {@code new XParser((XType) definition.body())} -- a table restating
-     * {@code AtomParsers.forType} entry for entry, which is how {@code period} came to be missing from one
-     * of them and present in the other, so a period-typed field's {@code ~} default was reported as "not a
-     * scalar type".
+     * reads it is {@link AtomParsers}' and there is no second opinion to have about it. A constant per family doing
+     * {@code new XParser((XType) definition.body())} would be a table restating {@code AtomParsers.forType}
+     * entry for entry, and two tables are what lets a family be present in one and missing from the other.
      *
-     * <p>{@link ValueReaderFactoryRegistry} still registers it under each constructor name: what collapses
-     * is the mapping, not the registration, and a name that reaches here with a body no atom parses is a
+     * <p>{@link ValueReaderFactoryRegistry} registers it under each constructor name: what is shared is the
+     * mapping, not the registration, and a name that reaches here with a body no atom parses is a
      * fault rather than an author error -- the registry only routes here for names that are atoms.
      */
     static final ValueReaderFactory ATOM = (name, definition, context) -> AtomParsers
@@ -56,7 +54,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
     /**
      * The enum reader for both tree and object-binding modes: {@code boolean} reads a real {@code Boolean},
      * every other enum instance its member text. Dispatch is keyed on the declaration's own name, the same
-     * mechanism {@link #UNIT} uses for {@code value}/{@code token}/{@code void}, and the one case
+     * mechanism {@link #UNIT} uses for {@code value}/{@code identifier}/{@code void}, and the one case
      * {@link #ATOM} cannot serve -- an enum body maps to {@link io.ltr8.tson.atom.parser.EnumParser}, which
      * hands back the member's own text, and this one name wants the host value its two members stand for.
      * (Tree mode then wraps the result in a {@code TsonAtom} -- see {@link ValueReaderFactoryRegistry}.)
@@ -65,7 +63,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * BuiltinTypeVocabulary} -- {@code atom.parser} is unexported, and an index is how a caller reaches one.
      * So {@code boolean} reads to the same host value with a schema and without one, and a token that is
      * neither member is refused as the enum miss it is: {@code ATOM_CONSTRAINT_VIOLATION}, the code every
-     * other enum reports, where the hand-rolled reader this replaced said {@code TYPE_MISMATCH}.
+     * other enum reports.
      */
     static final ValueReaderFactory ENUM_OBJECT_MODE = (name, definition, context) -> "boolean".equals(name)
             ? AtomTypeReader.of(name, BuiltinTypeVocabulary.lookup("boolean").orElseThrow(
@@ -73,7 +71,7 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
                     context.locationOf(name, definition))
             : ATOM.create(name, definition, context);
     /**
-     * {@code unit}'s three real instances -- {@code value}/{@code token}/{@code void} -- all resolve to the
+     * {@code unit}'s three real instances -- {@code value}/{@code identifier}/{@code void} -- all resolve to the
      * identical empty body, so, per the kernel's own doc ("distinguished by name and prose-level parsing
      * contract, not by schema shape"), dispatch is keyed on the declaration's own name rather than its
      * resolved shape. §4.2 makes that dispatch normative.
@@ -83,8 +81,8 @@ final class AtomTypeReader<T> implements TsonTypeReader<T>, UseSite.Renamed {
      * absent sentinel {@code _}, never a token -- so it bypasses {@link AtomType} via {@link VoidReader}.
      * {@code value} is decoded by [TSON-DATA] §4 base type resolution, whose §4.4 rule is that a quoted
      * token is a string: it depends on the lexical form, which an {@link AtomType} deliberately cannot see,
-     * so {@code AtomParsers} declines it and {@link ValueParser} answers here. Every other
-     * {@code unit}-constructed name is an ordinary identifier and {@link #ATOM} has it.
+     * so {@code AtomParsers} declines it and {@link ValueParser} answers here. {@code identifier}, and any
+     * other {@code unit}-constructed name, is a function of the text alone and {@link #ATOM} has it.
      */
     static final ValueReaderFactory UNIT = (name, definition, context) -> switch (name) {
         case "void" -> new VoidReader(context.locationOf(name, definition));

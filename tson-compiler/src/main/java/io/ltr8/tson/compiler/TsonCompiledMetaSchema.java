@@ -56,8 +56,8 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
     /**
      * Reads an instance of {@code name}, one of this meta-schema's own declared constructors --
      * {@code name} is the declaration's own name (e.g. {@code "record"}), not necessarily its
-     * resolved body's own constructor name (though for every real meta-kernel/meta-schema
-     * declaration today the two are identical).
+     * resolved body's own constructor name (though for every meta-kernel/meta.tn declaration the two
+     * are identical).
      */
     public TsonTypeReader<?> reader(String name) {
         ReaderResolver constructor = constructors.get(name);
@@ -96,11 +96,11 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
      * declares, paired with its instance reader and its factory.
      *
      * <p><b>A constructor with no factory is kept, not dropped</b>, its factory standing in as an
-     * {@link ErrorReader} that carries the real cause. Dropping it silently -- which this did -- lost the
-     * constructor from the vocabulary without complaint, so a governing meta compiled and registered
-     * looking healthy while missing a constructor it declares, and the failure surfaced against a
-     * <em>different</em> document: the first governed schema to write {@code !C ...} was told
-     * "'C' is not a constructor 'this-meta' declares", which is both false and unactionable. Keeping it
+     * {@link ErrorReader} that carries the real cause. Dropping it would lose the constructor from the
+     * vocabulary without complaint: a governing meta would compile and register looking healthy while
+     * missing a constructor it declares, and the failure would surface against a <em>different</em>
+     * document -- the first governed schema to write {@code !C ...} being told "'C' is not a constructor
+     * 'this-meta' declares", which is both false and unactionable. Keeping it
      * puts the verdict where the gap is -- the entry that could not be built -- and states what is
      * missing.
      *
@@ -109,8 +109,7 @@ public final class TsonCompiledMetaSchema extends TsonCompiledSchema {
      * declaration and usually works, while the <em>factory</em> (building a reader for a governed entry
      * whose body <em>is</em> such a construction) needs library support for {@code C}. A governed schema
      * that merely declares such an entry still compiles; only reading a value against it fails -- the same
-     * treatment {@code extern}/{@code unknown_type} already get, and the reason those register an
-     * {@code ErrorReader} factory rather than throwing.
+     * treatment {@link TsonSchemaCompiler} gives any entry it cannot build a reader for.
      */
     private static Map<String, ReaderResolver> buildConstructors(
             TsonCompiledSchema compiledSchema, ValueReaderFactoryResolver resolver) {

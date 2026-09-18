@@ -5,8 +5,7 @@ The actively-tracked engineering backlog for this implementation. Same conventio
 ambiguities. Grouped by theme, not priority — reorder/prioritize as needed. See `STRUCTURED-OUTPUT.md`
 for the target-use-case plan (LLM structured output validation) — that's tracked separately since it's a
 vision/plan document, not a plain punch list; the JSON encoding's own outstanding work is a section
-below — and `CLAUDE.md`'s own "Not yet implemented" section for the technical detail behind several of
-these items.
+below — and the `design/` notes for the technical detail behind several of these items.
 
 **This file is a clean list of outstanding work and nothing else.** Every entry must name something someone
 could pick up and do. Three things are therefore not entries, however true they are:
@@ -18,7 +17,7 @@ could pick up and do. Three things are therefore not entries, however true they 
   outstanding item; nobody can act on it today, and it sits in the list forever looking like a task.
 
 Where any of those has to survive its entry — a won't-do someone would otherwise re-propose, the why behind
-a shipped design, a condition that should trigger future work — it belongs in the `docs/` note, the Javadoc,
+a shipped design, a condition that should trigger future work — it belongs in the `design/` note, the Javadoc,
 or the test that owns the area, where the person who trips over it will actually be looking. Not here.
 
 Prose inside a live entry follows the same rule: say what is left to do and what constrains it. Recounting
@@ -106,7 +105,7 @@ record from a map syntactically (`a: 1` vs `k => v`), so `TsonDataStream` emits 
 `MapStart`/`MapArrow` and each reader asserts which it got; JSON's `{"a": 1}` is one syntax for both and §4.1 makes
 the *position* decide, which a pull-only event source has no channel to say. And `null` is a value in a JSON tree and
 the absent sentinel under a schema (§7), so a shared `TsonEvent` forces one meaning on the layer that does not hold
-it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below follow it. The tree model follows
+it. `design/json-encoding.md` has the argument; the entries below follow it. The tree model follows
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
@@ -117,7 +116,7 @@ it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below fol
   dispatch that used to be its second route is §6.1.5's and belongs to a record family, not to this
   entry. **The stack is `tson-json`'s own all the way up** — `JsonTypeReader`,
   `JsonCompiledSchema`,
-  `JsonSchemaCompiler`, its own factory registries — and `docs/json-encoding.md` carries why that is a deferral
+  `JsonSchemaCompiler`, its own factory registries — and `design/json-encoding.md` carries why that is a deferral
   rather than a conclusion: the two disagreements that keep the *event* layers apart both dissolve above the
   schema, where the reader is the position, so one compiled schema over an encoding-neutral context stays a real
   option and is simply not an abstraction worth designing from one implementation. **It gains no dependency on
@@ -254,10 +253,34 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Documentation
 
-- [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
-  session-oriented internal narrative exists.
+- [ ] User-facing documentation on how to use the library, in `docs/` — `README.md` and the `tson-java` skill are the
+  only consumer-facing prose; `design/` is internal.
 
 ## Miscellaneous
+
+- [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
+  `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
+  `NOT_IMPLEMENTED` diagnostic carries. `resolveTypeRef`'s, for a sugar form that reaches resolution unlifted, offers two
+  causes -- the desugar phase was skipped, "or a position inside it is an application, which has no entry to name until
+  it is materialised" -- and the second is not one: a container position holding an application (`[box<text>]`) lifts,
+  its slot written in `type_ref`'s record form and rewritten to the instantiation entry at materialisation. The comment
+  above the throw says the same. `resolveTypeDef`'s fall-through lists what is "resolved so far" -- six shapes, where the
+  method dispatches on everything §12.1's `type-def` produces -- so it reads as a feature gap where the only way to
+  reach it is a `TypeDef` subclass the dispatch was never taught, an internal fault. What constrains the fix is the
+  exception-classification policy: deciding what each site *is* (the first is reachable only by a caller that skipped a
+  phase) decides whether it stays `UnsupportedOperationException` or becomes `IllegalStateException`, and with it exit
+  70's two halves. `DefinitionResolver`'s class Javadoc lists both sites and moves with them.
+
+- [ ] **A base-syntax diagnostic does not say whether it is a lexer error or a parse error.** [TSON-DATA] §8.1 makes
+  them two categories, and [TSON-JSON] §9.4's table sorts JSON's failures into them (malformed text, invalid UTF-8 and
+  ill-formed strings are lexer errors; grammar violations are parse errors). Both classifiers collapse the pair:
+  `TsonDiagnostics.ofBaseSyntaxError`/`ofSchemaSyntaxError` and `JsonDiagnostics.ofBaseSyntaxError` report every case as
+  `VALIDATION_ERROR`. On the TSON side the fact survives only on the thrown channel, as `LexException` against
+  `ParseException` -- which is what `ConformanceSuiteTest` reads the category from -- so a collecting read, and every CLI
+  envelope, loses it. The JSON stack has lost it on both channels, its lexer and stream raising the one shared
+  `ParseException`. What a consumer routes on is the `Code`, so the fix is a code per category rather than a component
+  beside it; what constrains it is that the JSON lexer has to state which kind it raised, and that
+  `CrossEncodingParityTest` compares codes, so the two encodings must sort one malformed input the same way.
 
 - [ ] **The look-alike check recomputes every skeleton per record, and ignores the identifier policy.**
   `SchemalessTreeReader.reportConfusableFields` calls `ConfusableNames.firstCollision` on every record of

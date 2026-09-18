@@ -180,26 +180,27 @@ public interface TsonReadContext {
      * a consumer reads through. Driving a {@link TsonTypeReader} over a raw source here reads one value at
      * the cursor and polices nothing around it.
      *
-     * <p><b>{@code tokenPolicy} is required rather than defaulted, and that is the point of its being a
-     * parameter.</b> This is where every read converges, so a policy defaulted here would be one any caller
-     * could drop by saying nothing -- and [TSON-DATA] §8.2 requires that a relaxation be a code decision,
-     * greppable and attributable rather than ambient. Naming
-     * {@link UnicodePolicy#unrestricted()} is a fine answer, and the right one for a source whose events
-     * did not come from document text; it is just not an answer a caller gives by accident.
-     *
-     * <p>The policy is applied here rather than by the caller, so no context can exist whose events went
-     * unchecked. Nothing is installed when the policy checks nothing, so the default costs a read no wrapper.
+     * <p><b>The identifier policy is [TSON-DATA] §8.2's default</b> -- {@link UnicodePolicy#highlyRestrictive()}
+     * over the whole name, which §8.2 says a name's scripts SHOULD be judged at -- so a caller that states no
+     * policy still gets every type-ref, annotation and field name checked. The <em>token</em> policy is no
+     * part of a context: it is {@link TsonDataStream}'s, applied as an event leaves the stream, so a source
+     * that is not one carries none.
      */
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver) {
         return of(events, receiver, UnicodePolicy.highlyRestrictive());
     }
 
     /**
-     * As above, naming the <b>name</b> policy too -- [TSON-DATA] §8.2's restricted-script rule, applied where a
-     * type-ref or annotation name arrives rather than to every token. The two are separate because §8.2 makes
-     * them separate surfaces: a value may legitimately be anything, so tokens default to Unrestricted, while
-     * a name's scripts SHOULD be judged at Highly Restrictive. The overload above carries that default,
-     * so a caller that names only a token policy still gets the name surface checked.
+     * As above, stating the <b>identifier</b> policy -- [TSON-DATA] §8.2's restricted-character and
+     * restricted-script rules, applied where a type-ref, annotation or field name is delivered rather than to
+     * every token. §8.2 makes names and tokens separate surfaces: a value may legitimately be anything, so
+     * the token policy defaults to Unrestricted and is {@link TsonDataStream}'s to apply, while a name's
+     * scripts SHOULD be judged at Highly Restrictive, which is the default the overload above carries.
+     *
+     * <p><b>Required rather than nullable.</b> §8.2 requires that a relaxation be a code decision, greppable
+     * and attributable rather than ambient, so a caller relaxing the name surface names
+     * {@link UnicodePolicy#unrestricted()} -- a fine answer, and the right one for a source whose events did
+     * not come from document text; it is just not an answer a caller gives by accident.
      */
     static TsonReadContext of(TsonEventSource events, DiagnosticsReceiver receiver,
                               UnicodePolicy identifierPolicy) {
@@ -210,10 +211,11 @@ public interface TsonReadContext {
 
     /**
      * {@link #of(TsonEventSource, DiagnosticsReceiver, UnicodePolicy)} with the fail-fast receiver --
-     * the first problem throws {@link ReadException}.
+     * the first problem throws {@link ReadException}. {@code identifierPolicy} judges names and not tokens;
+     * the token policy is the stream's.
      */
-    static TsonReadContext throwing(TsonEventSource events, UnicodePolicy tokenPolicy) {
-        return of(events, DiagnosticsReceiver.throwing(), tokenPolicy);
+    static TsonReadContext throwing(TsonEventSource events, UnicodePolicy identifierPolicy) {
+        return of(events, DiagnosticsReceiver.throwing(), identifierPolicy);
     }
 
     /**

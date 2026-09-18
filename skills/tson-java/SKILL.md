@@ -135,7 +135,7 @@ resolves the schema the document names and picks the type from its own root `!or
 | `schemaRegistry()`/`loader()` | the resolved-schema registry, and the on-demand loader underneath           |
 
 `resolve` and `validateSchema` **both register**, so calling one after the other on the same text
-throws `TsonSchemaValidationException` ("a schema is already registered under …"). Pick one.
+throws `SchemaValidationException` ("a schema is already registered under …"). Pick one.
 
 `ProcessorConfig` (a value in `tson-base`, handed to `Tson.of`) carries: `withSchemaAccess(…)`,
 `withDataBindContext(…)`, `withMetaNameBinder(…)`, and `withProcessorPolicy(…)` (or its
@@ -433,7 +433,7 @@ be rejected rather than substituted with U+FFFD, which a `String` round trip has
 | `new TsonObjectReader().read(…, Server.class)` with a non-`public` record | binding is reflective across a module boundary            | make the target class `public`                              |
 | a `Tson` built per request                                       | it re-bootstraps and recompiles every schema                        | build one at startup and keep it                            |
 | registering schemas from several threads                        | only *reads* through one `Tson` are safe                            | resolve every schema at startup, then read                  |
-| catching `TsonParseException` around a facade read              | a facade routes base syntax through the receiver                    | catch `ReadException`, or read `.diagnostic()`          |
+| catching `ParseException` around a facade read              | a facade routes base syntax through the receiver                    | catch `ReadException`, or read `.diagnostic()`          |
 | expecting a collecting read to throw on a syntax error          | it collects; an empty list is the only "valid"                      | check `problems.diagnostics().isEmpty()`                    |
 | matching diagnostic `message` text                              | messages are not API                                                | switch on `Diagnostic.Code`                                 |
 | `!type` on a schemaless read                                    | schemaless reads resolve built-ins only, and report the rest        | `.withSchema(uri)`, or `preservingUnknownTypeRefs()`        |
@@ -474,7 +474,7 @@ java --module-path tson/build/modules --add-modules io.ltr8.tson examples/Object
 
 `CLAUDE.md` at the repository root is the orientation for changing this code — the hard constraints
 (Java 25, no external runtime dependencies), the module dependency direction, the pipeline phase by
-phase, the exception-classification policy, and the traps that look like cleanup targets. The `docs/`
+phase, the exception-classification policy, and the traps that look like cleanup targets. The `design/`
 notes carry the per-area design detail, `BACKLOG.md` the outstanding work, `SPEC-FEEDBACK.md` the spec
 issues still open against the current revision, and `STATUS.md` the implemented/not-yet checklist.
 `references/` here documents the API as it stands, not how to extend it.

@@ -32,18 +32,15 @@ import java.util.Optional;
  * transliteration of the relevant {@code core.tn} instances, since the vocabulary is a fixed,
  * closed set (§5.1) that a Class 1 processor never resolves via schema machinery.
  *
- * <p>Seeded with the {@code integer_type} family: §5.6 lists the full ladder, and {@code
- * core.tn} defines the same constructor applied across the full {@code int8}..{@code int256}/
- * {@code uint8}..{@code uint256} width ladder plus the {@code positive_integer} / {@code
- * non_negative_integer} / {@code negative_integer} / {@code non_positive_integer} bound-only
- * refinements, and omitting the other eight widths and the refinement family from §5.6's table was
- * confirmed as an oversight, not deliberate scoping -- this implementation exposes the full family
- * {@code core.tn} defines, not just the four the current table happens to list.
+ * <p>Seeded with the {@code integer_type} family as §5.6's table lists it and {@code core.tn} defines it:
+ * the full {@code int8}..{@code int256}/{@code uint8}..{@code uint256} width ladder plus the
+ * {@code positive_integer} / {@code non_negative_integer} / {@code negative_integer} /
+ * {@code non_positive_integer} bound-only refinements.
  *
  * <p>Also seeded with {@code decimal_type} ({@code number}), {@code float_type} ({@code float32}/
  * {@code float64}), {@code rational_type} ({@code rational}), and {@code complex_type} ({@code
- * complex}) -- all fully published in §5.6's table as-is, unlike the integer family. And with {@code
- * uuid_type} ({@code uuid}, §5.5) and {@code text_type} ({@code text}, §5's unconstrained text atom).
+ * complex}), §5.6's remaining rows. And with {@code uuid_type} ({@code uuid}, §5.5) and {@code text_type}
+ * ({@code text}, §5's unconstrained text atom).
  * And with {@code bytes} ([TSON-SCHEMA] §5.5), one name over one value space -- a schemaless document has
  * no schema, so it has no type to carry the {@code encoding} selector and [TSON-DATA] §5.3 fixes base64
  * rather than offering a name per alphabet. And with the temporal
@@ -58,17 +55,16 @@ import java.util.Optional;
  * §5.5), which reuse those two address grammars for the address half of a network. And with {@code mac_type}
  * ({@code mac}, §5.5, EUI-48 per RFC 9542).
  *
- * <p><b>{@code boolean} is seeded too, and §5's table does not list it</b> -- a second departure, and
- * {@code SPEC-FEEDBACK.md} #8 argues it is an oversight: {@code boolean} is meta-kernel's own
- * {@code !enum [true false]}, [TSON-DATA] §4.2 gives its two tokens special status, and every other type a
- * schemaless document can name is here. Without it {@code !boolean true} is an unresolvable annotation
- * where {@code !int32 1} resolves, and a {@code boolean}-typed position has no family to read it -- which
- * is the same hole from the two directions §5 and §4.2 approach it from.
+ * <p>And with {@code email_type} ({@code email}, §5.5's own row beside {@code uuid}/{@code ipv4}/{@code mac},
+ * with the shape core.tn gives it) -- the RFC 5322 pin is scoped there to the {@code dot-atom "@" dot-atom}
+ * core, which is exactly what {@link EmailParser} accepts.
  *
- * <p><b>{@code email} is seeded too, which §5.5's table does not list</b> -- a known departure, the same
- * §5.5's own row, beside {@code uuid}/{@code ipv4}/{@code mac} in the "Network Types" group and with the
- * identical shape core.tn gives it -- and the RFC 5322 pin is scoped there to the {@code dot-atom "@"
- * dot-atom} core, which is exactly what {@link EmailParser} accepts.
+ * <p><b>{@code boolean} is seeded too, and §5's tables do not list it</b> -- this vocabulary's one departure
+ * from them, and {@code SPEC-FEEDBACK.md} #8 argues the omission is an oversight: {@code boolean} is
+ * meta-kernel's own {@code !enum [true false]}, [TSON-DATA] §4.2 gives its two tokens special status, and
+ * every other type a schemaless document can name is here. Without it {@code !boolean true} is an
+ * unresolvable annotation where {@code !int32 1} resolves, and a {@code boolean}-typed position has no family
+ * to read it -- which is the same hole from the two directions §5 and §4.2 approach it from.
  */
 public final class BuiltinTypeVocabulary {
 

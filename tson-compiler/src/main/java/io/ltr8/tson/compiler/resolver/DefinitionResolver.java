@@ -59,170 +59,128 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Resolves declarations from a {@link SchemaMap} (the grammar-layer AST, {@code tson-compiler}) into
- * {@link TypeDefinition}s (Part 2 §4, §8) -- an incremental, deliberately narrow resolver, not the
- * full two-pass resolver of §3.4.1. It handles eight constructs so far:
+ * Resolves one declaration from a {@link SchemaMap} (the grammar-layer AST) into a {@link TypeDefinition}
+ * ([TSON-SCHEMA] §4, §8). Per-declaration work only: ordering, imports, materialisation and everything else
+ * that needs the whole schema is {@link SchemaResolver}'s. {@link #resolveTypeDef} dispatches on the shape of
+ * the declaration, every sugar form having been rewritten by {@link SchemaDesugarer} first:
  *
  * <ul>
- *   <li>A record (no supertypes), optionally {@code ~}-marked (the {@code constructor} flag
- *   threads straight from {@code StructuralTypeDef.constructor()} into the result) and optionally
- *   parameterized ({@code <T, ...>}, threaded straight into {@code TypeDefinition.parameters} with
- *   no substitution or usage validation, see below), whose fields are simple type-refs or the
- *   inline array sugar {@code [T]} (see below), each REQUIRED or OPTIONAL (a {@code ?} suffix), and
- *   whose entries may include field groups (§5.11) -- {@code integer_size}'s own shape, and (via a
- *   {@code ~atom & {...}} composition body, see below) {@code integer_type}'s.</li>
- *   <li>Composition ({@code A & B & { ... }}, §5.8), also optionally {@code ~}-marked and
- *   optionally parameterized, over supertypes that are themselves already resolved, simple
- *   (non-generic) references, whose own body is a {@link RecordBody} -- {@code atom => top & {}},
- *   {@code product => top & { access_pattern: ... size_type: ... }}, {@code sum => top & {}},
- *   {@code reference => top & { target: type_name } }, and {@code integer_type => ~atom & { size:
- *   integer_size? ( min: integer | exclusive_min: integer )? ... }}'s own shapes -- a trailing-body
- *   field naming an inherited field is now a *tightening* entry (§5.7, see below and {@link
- *   #resolveTighteningField}) rather than an automatic error, which is what lets {@code array}'s and
- *   {@code map}'s own {@code <T> ~product & {...}}/{@code <K, V> ~product & {...}} shapes -- each
- *   re-declaring {@code product}'s {@code access_pattern}/{@code size_type} with a fixed value --
- *   resolve end-to-end.</li>
- *   <li>A bare, argument-free type reference ({@code name => other_name}, §8.3) -- always resolves
- *   to a {@code REFERENCE}-kind entry regardless of what the referenced name itself resolves to
- *   (e.g. {@code type_name => token} is {@code kind: REFERENCE} even though {@code token} itself
- *   is {@code kind: ATOM}) -- {@code type_name}/{@code field_name}/{@code param_name}/{@code
- *   annotation}/{@code documentation}/{@code doc}/{@code alias}'s own shape. No namespace lookup
- *   happens here either: the referenced name is carried through as a bare string, unverified,
- *   exactly like an ordinary field's type-ref.</li>
- *   <li><b>The sugar forms no longer arrive here.</b> {@code SchemaDesugarer} rewrites them before
- *   resolution: {@code [T]} and any constructor application become an {@code !C value} instance
- *   (§5.6), and a sized form becomes one too, its bounds bound straight onto the injected {@code array}
- *   entry with no size template in between (§5.3). What still reaches this class carrying arguments is a
- *   <em>template</em> application, resolved to a {@code REFERENCE} naming it -- see {@link
- *   #resolveTemplateApplication}. The one exception is {@code MetaKernelBootstrapResolver}, which
- *   bypasses {@code SchemaResolver} and so never desugars.</li>
- *   <li>A field's default ({@code ~}) or fixed ({@code =}) modifier value (§5.2, §5.10) on a
- *   REQUIRED (non-{@code ?}) field -- see {@link #resolveField} for the full literal-vs-parameter
- *   split ({@code product_access_type = INDEX} vs. {@code type_ref = T}). Verified against the real
- *   fixture's {@code tuple_element}/{@code field_group} (both fresh records, so untangled from
- *   tightening) and, since no real fixture entry exercises the fixed/parametric cases in isolation
- *   from a tightening composition, small hand-built snippets mirroring {@code array}'s own field
- *   shapes ({@code product_access_type = INDEX}, {@code type_ref = T}, {@code integer ~ N}).</li>
- *   <li>Tightening a composition-body field against an already-inherited one (§5.7, via {@code
- *   inheritedFieldIndex} in {@link #resolveEntry} and {@link #resolveTighteningField}) -- the
- *   tightened field replaces the inherited one in place (§5.8's field-ordering rule), its target
- *   state is checked against §5.7's transition table ({@link #isValidTighteningTransition}), and an
- *   elided type-ref (a modifier-only entry, {@code field: = value}) inherits the source field's type
- *   (§5.7's "Elided type-refs"). Verified end-to-end against the real fixture's {@code array} and
- *   {@code map} -- both tighten {@code product}'s {@code access_pattern}/{@code size_type} to
- *   {@code REQUIRED_FIXED} -- plus hand-built snippets for a rejected invalid transition and an
- *   elided-type-ref tightening (mirroring §5.7's own {@code production => config ^ { host: =
- *   "prod.example.com" } } worked example, adapted to a composition body).</li>
- *   <li>The {@code ^} refinement operator (§5.7, {@code RefinedDef}, via {@link
- *   #resolveRefinement}) -- {@code source ^ { ... }}, optionally {@code ~}-marked and/or
- *   parameterized: {@code set}'s own {@code <T> ~array<T> ^ { state: = REQUIRED ... }}. Unlike
- *   composition, a refinement copies the source's *entire* field set and admits no new fields --
- *   every body entry MUST tighten an inherited field (reusing {@link #resolveTighteningField}) or
- *   the declaration is a resolver error, reported as such ({@link
- *   io.ltr8.tson.base.SchemaValidationException}) rather than as a coverage gap. {@code source} is
- *   recorded verbatim as the result's own
- *   {@code source} (unlike composition, which never sets it); {@code supertypes} accumulates by the
- *   same induction as composition ({@code [sourceName] + source.supertypes()}); the body's own
- *   {@code record.supertypes} stays empty (that field records only direct {@code &} compositions,
- *   §8.1, and a refinement has none). Verified end-to-end against the real fixture's {@code set},
- *   which refines {@code array}, tightening {@code REQUIRED_DEFAULT} fields to {@code REQUIRED_FIXED}
- *   (§5.7's table). A body entry may also <b>restate a group</b> (§5.11, via {@link
- *   #restatesInheritedGroup}, shared with the composition path): same member labels in the same order,
- *   types verbatim, state tightening OPTIONAL&#8594;REQUIRED only.</li>
+ *   <li><b>A record</b> (§5.2) -- fields in any of the six field states, a {@code ~}/{@code =} value read by
+ *   {@link #resolveField}, and field groups (§5.11).</li>
+ *   <li><b>Composition</b> ({@code A & B & { ... }}, §5.8, {@link #resolveComposition}) -- each supertype's
+ *   fields and groups absorbed left to right, a body entry naming an inherited field being a
+ *   <em>tightening</em> entry (§5.7, {@link #resolveTighteningField}) that replaces it in place, checked
+ *   against §5.7's transition table ({@link #isValidTighteningTransition}), with an elided type-ref inheriting
+ *   the source field's type. A supertype may be an application: a closed one is closed to the entry it
+ *   denotes ({@link #closedApplication}), one naming the declaration's own parameters contributes its fields
+ *   while still open ({@link #openOperand}).</li>
+ *   <li><b>Refinement</b> ({@code source ^ { ... }}, §5.7, {@link #resolveRefinement}) -- copies the source's
+ *   whole field set and admits no new fields: every body entry tightens an inherited field or restates an
+ *   inherited group ({@link #restatesInheritedGroup}: same member labels in the same order, state tightening
+ *   OPTIONAL&#8594;REQUIRED only). A closed source is recorded as the result's {@code source} and heads its
+ *   supertype chain; the body's own {@code record.supertypes} stays empty, that field recording direct
+ *   {@code &} compositions only (§8.1). The source takes an application on composition's terms.</li>
+ *   <li><b>A reference</b> ({@code name => other_name}, §8.3) -- a {@code REFERENCE}-kind entry whatever the
+ *   name resolves to, carried unverified; the linker validates it. <b>A template application</b>
+ *   ({@code bx => box<text>}, {@link #resolveTemplateApplication}) is the same declaration carrying
+ *   arguments -- a reference or a value each, nested applications included -- and a closed one closes
+ *   <em>into</em> the declared name.</li>
+ *   <li><b>Constructor application</b> ({@code !C value}, §5.5/§5.6, {@link #resolveInstance}) -- bound
+ *   through the governing meta's compiled reader ({@link #bindAtomInstance}), with no name-to-class table --
+ *   and <b>atom refinement</b> ({@code !I ^ { ... }}, §5.5, {@link #resolveAtomRefinement}), which merges
+ *   its bindings with its source on the wire and is checked to narrow ({@link #checkNarrows}).</li>
  * </ul>
  *
- * Everything else -- the identity-diagonal value-invariant
- * for a restated FIXED field, a generic type-ref with a nested or value (non-simple) argument, and a
- * parameterized supertype ({@code customer & box<T>}, §5.8, which needs §5.10 substitution into the
- * absorbed fields) -- is explicitly out of scope for now and reported via {@link
- * UnsupportedOperationException} rather than silently mis-resolved; each is a later, separate pass.
- * (Constructor application / atom
- * instances -- {@code !C value}, {@link Instance} -- and atom refinement -- {@code !I ^ { ... }},
- * {@link AtomRefinement} -- are both dispatched, via {@link #resolveInstance}/{@link
- * #resolveAtomRefinement} below.)
+ * <p><b>A declaration carrying type parameters (§5.10) holds its body.</b> An open instance is held as written
+ * ({@link #resolveInstanceTemplate}); a record, composition or refinement template is resolved first, because
+ * it absorbs fields from a source and the form to hold is the flattened one, and then held
+ * ({@link #holdIfOpen}). Nothing is substituted here -- that is {@code TemplateMaterialiser}'s, over the
+ * resolved form.
  *
- * <p>{@link UnsupportedOperationException} means "this construct isn't implemented yet"; a genuine
- * schema error a coverage gap can't explain is a {@link
- * io.ltr8.tson.base.SchemaValidationException} instead. The distinction is not cosmetic: only the
- * validation exception is collected into a {@code Diagnostic} by {@code SchemaResolver}'s reporting
- * overload, so misfiling an author error as a gap both aborts the run and tells the author their correct
- * understanding of the spec is this library's fault. A useful test for which is which: <b>a schema error's
- * verdict does not change when this library improves; a gap's does.</b> Cases: an atom refinement that
- * loosens its source rather than tightening it ({@link #checkNarrows}); a name in a {@code !} position that
- * resolves in neither namespace ({@link #resolveConstructorTarget}, {@link #resolveAtomRefinement}); a
- * {@code !} form used against the wrong kind of target -- refining a constructor, applying a
- * non-constructor, or refining a non-atom -- each of which the message answers with the form the author
- * probably meant; and a body (or an annotation value) the governing meta's compiled reader rejects, which
- * arrives as a {@link ReadException} and is restated as a schema error rather than passed on in the
- * reader's own currency ({@link #bodyIsNotValidData}).
+ * <p><b>The exception types are the classification.</b> A {@link io.ltr8.tson.base.SchemaValidationException}
+ * says the author's schema is wrong and the spec says so; an {@link UnsupportedOperationException} says this
+ * library could not do something, and travels as {@code NOT_IMPLEMENTED}; an {@link IllegalStateException}
+ * says an internal invariant broke. The test for which is which: <b>a schema error's verdict does not change
+ * when this library improves; a gap's does.</b> Misfiling an author error as a gap tells the author their
+ * correct understanding of the spec is this library's fault. Schema errors include: an atom refinement that
+ * loosens its source ({@link #checkNarrows}); a name in a {@code !} position that resolves in neither
+ * namespace ({@link #resolveConstructorTarget}, {@link #resolveAtomRefinement}); a {@code !} form used
+ * against the wrong kind of target -- refining a constructor, applying a non-constructor, refining a
+ * non-atom -- each answered with the form the author probably meant; a supertype chain reaching two base
+ * kinds ({@link #determineKind}); and a body or annotation value the governing meta's compiled reader
+ * rejects, which arrives as a {@link ReadException} and is restated as a schema error
+ * ({@link #bodyIsNotValidData}).
  *
- * <p>Declarations are resolved against two separate namespaces (§3.3.1), each exposed through a
- * required constructor parameter rather than threaded through individual method calls, since both
- * are fixed for as long as this resolver is used:
+ * <p><b>No construct of the schema grammar is a gap.</b> Every {@code UnsupportedOperationException} this
+ * class throws is one of:
  * <ul>
- *   <li>{@code namespaceDefinitions} -- the type-name namespace: entries already resolved earlier in
- *   the same schema map, consulted by composition's supertype lookup (§5.8), refinement's source
- *   lookup (§5.7), and atom refinement's source lookup (§5.5). Never populated by this class itself
- *   -- a caller supplies a {@link DefinitionGetter} closing over its own growing map (typically
- *   {@code entries::get}), putting each result into that map itself as it resolves one declaration
- *   at a time. A supertype/source must therefore already be declared earlier in the same schema map
- *   than anything referencing it; real forward references and cross-schema imports need the full
- *   namespace population of §3.3.2/§3.4.1's Pass 1, not implemented here.</li>
- *   <li>{@code metaDefinitions} -- the structure namespace: the governing meta-schema's own entries,
- *   one hop via {@code !!meta}, consulted only by {@link #resolveConstructorTarget} for a
- *   constructor-application target ({@code !C value}). Atom refinement ({@code !I ^ { ... }}) never
- *   consults it.</li>
+ *   <li><b>A {@code RuntimeException} from the compiled meta reader that is none of the classified ones</b>
+ *   -- binding a constructor's payload ({@link #bindAtomInstance}) or an annotation's value
+ *   ({@link #bindAnnotationValue}). A {@code ReadException} or {@code SchemaValidationException} there is
+ *   the author's and a {@code BindMismatchException} the deployment's, each rethrown as itself; what is left
+ *   is unexplained, and a gap is the classification that claims least.</li>
+ *   <li><b>A failed write round-trip</b> -- re-serialising an atom refinement's source
+ *   ({@link #sourceSerializedFields}) or an annotation value into a held body
+ *   ({@link #annotationWireValue}). The value was bound by this library, so failing to write it back is
+ *   no verdict on the schema.</li>
+ *   <li><b>An atom-family source with no recorded constructor</b> ({@link #resolveAtomRefinement}) -- a
+ *   malformed {@code TypeDefinition}, which no schema text produces.</li>
+ *   <li><b>A {@code TypeDef} shape {@link #resolveTypeDef} does not dispatch, or a container sugar form
+ *   reaching {@link #resolveTypeRef}</b> -- the desugar phase was skipped, or left a form it should have
+ *   lifted.</li>
+ *   <li><b>A closed application at a supertype or refinement-source position with no
+ *   {@link ApplicationCloser}</b> ({@link #closedApplication}) -- a resolver built standalone, without the
+ *   whole-schema materialiser {@link SchemaResolver} supplies.</li>
+ * </ul>
+ * {@link #resolveTemplateApplication} and {@link #closedApplication} also rethrow one from below with the
+ * declaration's name in front. What §5.7 leaves unchecked is not reported at all: a restated FIXED field
+ * MUST NOT change its pinned value, and {@link #resolveTighteningField} does not compare the two.
+ *
+ * <p>Declarations are resolved against two separate namespaces (§3.3.1), each a required constructor
+ * parameter since both are fixed for as long as this resolver is used:
+ * <ul>
+ *   <li>{@code namespaceDefinitions} -- the type-name namespace, consulted by composition's supertype lookup
+ *   (§5.8), refinement's source lookup (§5.7), and atom refinement's source lookup (§5.5). Never populated
+ *   by this class: the caller supplies a {@link DefinitionGetter} over a map it owns. A supertype or source
+ *   must be answerable when asked for, so a caller wanting forward references resolves on demand, as
+ *   {@link SchemaResolver} does.</li>
+ *   <li>{@code metaDefinitions} -- the structure namespace: the governing meta-schema's entries, one hop via
+ *   {@code !!meta}, consulted for a constructor-application target ({@link #resolveConstructorTarget}) and
+ *   for an annotation's name. Atom refinement never consults it.</li>
  * </ul>
  * Either getter can be an always-{@code null} lookup for a resolver that never needs it (e.g. {@link
- * MetaKernelBootstrapResolver}'s own first pass, which never reaches {@link #resolveInstance}).
+ * MetaKernelBootstrapResolver}'s first pass, which never reaches {@link #resolveInstance}).
  *
- * <p><b>Kind determination</b> (§4.1) checks the transitive supertype chain for the literal,
- * kernel-fixed names {@code atom}/{@code product}/{@code sum} -- not a general "inherit the nearest
- * ancestor's own kind" rule (that would be wrong: {@code atom} the type-definition entry is itself
- * {@code kind: PRODUCT}, since {@code atom}'s own supertype chain is just {@code [top]}, which
- * contains none of the three). Zero found -&gt; {@code PRODUCT} (structural default); exactly one
- * -&gt; that kind; two or more -&gt; a resolver error (reported here as {@link
- * UnsupportedOperationException}, not yet a proper diagnostic). A fresh (non-composed) record has
- * an empty chain by construction, so it is always {@code PRODUCT} regardless of {@code ~}.
+ * <p><b>Kind determination</b> (§4.1, {@link #determineKind}) checks the transitive supertype chain for the
+ * literal, kernel-fixed names {@code atom}/{@code product}/{@code sum}/{@code data} -- not a general
+ * "inherit the nearest ancestor's own kind" rule, which would be wrong: {@code atom} the entry is itself
+ * {@code kind: PRODUCT}, its own chain being just {@code [top]}. None found is {@code PRODUCT} (the
+ * structural default), exactly one is that kind, and two or more is a schema error. A fresh (non-composed)
+ * record has an empty chain by construction, so it is always {@code PRODUCT}.
  *
  * <p><b>Field groups (§5.11) flatten</b>: each member becomes an ordinary {@link RecordField} in
- * source position with state {@link FieldState#OPTIONAL} regardless of the group's own state (the
- * spec's own rule -- a REQUIRED group still means each *member* is individually optional, since at
- * most one is guaranteed, not which), and the group itself is recorded as a {@link FieldGroup}
- * (state {@link ElementState#REQUIRED}/{@link ElementState#OPTIONAL} from the group's own {@code ?}).
- * A composed supertype's groups are inherited whole, in supertype order, ahead of the body's own.
+ * source position with state {@link FieldState#OPTIONAL} regardless of the group's own state (a REQUIRED
+ * group still means each <em>member</em> is individually optional, since at most one is guaranteed, not
+ * which), and the group itself is recorded as a {@link FieldGroup} (state {@link ElementState#REQUIRED}/
+ * {@link ElementState#OPTIONAL} from the group's own {@code ?}). A composed supertype's groups are
+ * inherited whole, in supertype order, ahead of the body's own.
  *
- * <p><b>{@code subtypes} is never populated</b> -- computing it requires a reverse index over the
- * *whole* resolved schema (who lists me as a supertype, transitively), a global pass over every
- * entry, not a per-declaration concern; deliberately deferred, not forgotten.
+ * <p><b>{@code subtypes} is never populated here</b> -- it is a reverse index over the whole namespace (who
+ * lists me as a supertype, transitively), imports included, so {@code TsonSchemaLinker} computes it.
  *
- * <p><b>{@code parameters} (§5.10) threads straight through</b> from a fresh record's or a
- * composition's own {@code StructuralTypeDef.typeParams()} -- {@code array => <T> ~product & {
- * ... }}'s own {@code [T]} -- with no substitution into field types and no validation that a
- * parameter is actually used anywhere in the body; a reference-declaration's own type parameters
- * ({@code text_keyed_map => <V> map<text, V>}, an open template application) are a separate,
- * not-yet-resolved case.
+ * <p>Note the two {@code TypeRef}s in play: this class imports the grammar-layer {@link TypeRef} (a
+ * source-text reference) for reading the AST, and refers to {@code io.ltr8.tson.schema.meta.TypeRef} (the
+ * resolved reference it produces) by its fully-qualified name -- the two share a name, matching the
+ * kernel's single {@code type_ref} vocabulary type, but are different concepts, so only one can be the
+ * unqualified import.
  *
- * <p>Note the two {@code TypeRef}s in play: this class imports {@code tson-compiler}'s grammar-layer
- * {@link TypeRef} (a source-text reference) for reading the AST, and refers to {@code
- * io.ltr8.tson.schema.meta.TypeRef} (the resolved reference it produces) by its fully-qualified
- * name -- the two share a name (matching the kernel's own single {@code type_ref} vocabulary type)
- * but live in different packages and are different concepts, so only one can be the unqualified
- * import here.
+ * <p>Package-private, no {@code Tson} prefix -- internal machinery a consumer of this library never names.
+ * {@link SchemaResolver} is the document-level counterpart: it validates a document's header directives,
+ * merges {@code !!import} entries, derives the structure namespace, and holds one instance of this class to
+ * do the per-declaration work. This class takes a bare declaration and never sees a {@code SchemaDocument}.
  *
- * <p>Package-private, no {@code Tson} prefix -- internal machinery a consumer of this library never
- * names directly (see "Naming convention" in this project's own CLAUDE.md). {@link SchemaResolver}
- * is the public, document-level counterpart: it validates a document's own header directives ({@code
- * !!id}/{@code !!import}), merges {@code !!import} entries, derives the structure namespace from a
- * {@code TsonCompiledSchemaLoader}, and holds one instance of this class to do the actual
- * per-declaration work. This class never references {@code TsonCompiledSchemaLoader} or {@code
- * SchemaDocument} at all --
- * everything here takes a bare declaration or an already-parsed {@code SchemaMap} entry.
- *
- * <p>Has no dependency on {@code reader} -- {@link #bindAtomInstance}'s own binding
- * step goes through {@link DefinitionMetaReader} (a required constructor parameter), a narrow read
- * contract rather than the full {@code TsonCompiledSchema}; see {@code SchemaResolver#resolveSchema}'s
- * own Javadoc for where that fuller reach actually lives.
+ * <p>Has no dependency on {@code reader} -- binding goes through {@link DefinitionMetaReader} (a required
+ * constructor parameter), a narrow read contract rather than the full {@code TsonCompiledSchema}.
  */
 final class DefinitionResolver {
 
@@ -303,8 +261,8 @@ final class DefinitionResolver {
      * Resolves a single declaration against this instance's own type-name/structure namespaces --
      * the sole entry point; every other {@code resolve*} method is a private dispatch target reached
      * from here. Delegates to {@link #resolve(SchemaMap.Declaration, Optional)} with no position,
-     * for a caller with no {@code TsonSchemaParser}-produced position table to hand back (the vast
-     * majority of existing callers, including every hand-built test fixture).
+     * for a caller with no {@code TsonSchemaParser}-produced position table to hand back -- every
+     * hand-built test fixture among them.
      */
     TypeDefinition resolve(SchemaMap.Declaration declaration) {
         return resolve(declaration, Optional.empty());
@@ -415,13 +373,11 @@ final class DefinitionResolver {
     }
 
     /**
-     * A declaration's own annotations -- the ones written <em>after</em> {@code =>}, which §6 says annotate
-     * the definition. Those written before the name annotate the <em>name</em> instead, and §6 is explicit
-     * that a resolver "does not hoist annotations from key to value", so they are not collected here.
-     * <b>They are dropped, and that is now a gap</b>: §6 and §8.1 place a name-position annotation on the
-     * output schema-map <em>key</em> and preserve it there -- documentation, lifecycle, and the resolver's
-     * own derived {@code @alias}/{@code @synthetic} markers all live in that channel. Carrying it needs a
-     * name-keyed structure this model does not have ({@code BACKLOG.md}).
+     * One list of written annotations, bound. A declaration has two such lists and §6 keeps them apart: those
+     * written <em>after</em> {@code =>} annotate the definition and ride its {@code TypeDefinition}; those
+     * written before the name annotate the <em>name</em>, and a resolver "does not hoist annotations from key
+     * to value", so {@link SchemaResolver} binds them through this same method and places them on the output
+     * schema-map <em>key</em> (§8.1), beside the derived {@code @synthetic} marker.
      *
      * <p>A value is bound through the governing meta the same way §6 describes reading one: the annotation's
      * name resolves one hop against the structure namespace, and its value is read by that type's own
@@ -509,8 +465,8 @@ final class DefinitionResolver {
             // The same arm {@link #bindAtomInstance} carries, for the same reason and it is not a stylistic
             // echo: an annotation naming a type the consumer never bound -- the kernel's own `data` among
             // them -- is their configuration, and `MissingBindingException` exists precisely so that a
-            // missing line of wiring does not read as "this library cannot do that". Letting the catch-all
-            // below have it rebuilds the shape that type was introduced to retire.
+            // missing line of wiring does not read as "this library cannot do that", which is what the
+            // catch-all below would make of it.
             String where = "'" + declaration + "': " + e.getMessage();
             throw e instanceof MissingBindingException ? new MissingBindingException(where)
                     : new BindMismatchException(where);
@@ -589,7 +545,7 @@ final class DefinitionResolver {
 
     /**
      * A composition or refinement template's body, <b>held</b> like every other open body -- so that one
-     * process closes them all and {@code record_field.value_param} has one fewer producer.
+     * process closes them all.
      *
      * <p><b>Why these two are held here and a plain record body at desugar.</b> Both absorb fields from a
      * source (§5.8's supertypes, §5.7's refinement source), and the form to hold is the <em>flattened</em>
@@ -632,18 +588,17 @@ final class DefinitionResolver {
      * Whether {@code !C { ... }} may apply {@code C} at all: <b>{@code C} IS-A {@code top}</b>
      * ([TSON-SCHEMA] §4.1), read off the transitive supertype chain.
      *
-     * <p><b>This replaces asking whether {@code C} is a constructor, and it is a wider and more exact
-     * question.</b> §4.1 makes every base kind IS-A {@code top} and every constructor transitively so, while
-     * IS-A stops at construction -- an instance or a fresh record carries an empty chain. So the predicate
+     * <p><b>A wider and more exact question than whether {@code C} is marked a constructor.</b> §4.1 makes
+     * every base kind IS-A {@code top} and every constructor transitively so, while IS-A stops at
+     * construction -- an instance or a fresh record carries an empty chain. So the predicate
      * admits every constructor, and beyond them exactly the entries that describe <em>a type</em> rather than
      * a part of one.
      *
-     * <p>What it lets in that {@code constructor} did not:
+     * <p>What it lets in that a constructor mark would not:
      * <ul>
-     *   <li>{@code reference}, which the kernel deliberately leaves unmarked because it describes no value,
-     *   and which the language nonetheless needs applicable. It used to take a by-name exception in {@link
-     *   #resolveTemplateInstance} and none here, so {@code <T> !reference { target: T }} resolved while
-     *   {@code !reference { target: int32 }} did not -- one construction legal open and illegal closed.</li>
+     *   <li>{@code reference}, which describes no value and which the language nonetheless needs
+     *   applicable, open and closed alike: {@code <T> !reference { target: T }} and
+     *   {@code !reference { target: int32 }} are one construction and get one answer.</li>
      *   <li>the four base kinds, which cost nothing: each is an abstract union whose own reader refuses a
      *   direct application by naming the subtypes that would satisfy it.</li>
      * </ul>
@@ -729,8 +684,8 @@ final class DefinitionResolver {
      *
      * <p><b>Holding is what removes the collection boundary.</b> A typed open vocabulary has to spell a
      * parameter per slot kind, and has no spelling for one inside a collection -- so {@code <T> !choice
-     * { variants: [T error] }} had no representation and was refused where it was written. Held, it is a
-     * token inside an array, and the phase that would have had to classify it does not run.
+     * { variants: [T error] }} would have no representation. Held, the parameter is a token inside an array,
+     * and no phase has to classify it.
      *
      * <p><b>What is still checked here is what does not depend on the parameters</b> (§5.10). Two structural
      * questions can be answered from the binding record's own field names, with no stand-in values and so no
@@ -1145,9 +1100,10 @@ final class DefinitionResolver {
      * what lets materialisation dispatch on the constructor head, and what makes "declares parameters" and
      * "holds its body" one question. {@code source} records the same reference either way, as provenance.
      *
-     * <p><b>A closed template application no longer reaches the first branch</b> -- it is the entry it
-     * denotes (see {@link #resolveTemplateApplication}) -- so what remains for it is a bare-name alias
-     * ({@code day => date}), and the partial-application case for the second.
+     * <p><b>A closed template application never reaches the first branch</b> when an
+     * {@link ApplicationCloser} is present -- it is the entry it denotes (see
+     * {@link #resolveTemplateApplication}) -- so what that branch takes is a bare-name alias
+     * ({@code day => date}), and the second takes partial application.
      */
     private static TypeDefinition openAliasOr(io.ltr8.tson.schema.meta.TypeRef target, List<String> parameters) {
         return parameters.isEmpty() ? TypeDefinition.reference(target)
@@ -1213,11 +1169,11 @@ final class DefinitionResolver {
                 // denotes no entry of its own, whether its arguments are this declaration's parameters or
                 // concrete. A template is a macro here -- it contributes its fields and its own ancestors,
                 // and the type the composition produces is *this* declaration. Minting an entry for the
-                // application instead gave a form nothing else named an entry with one subtype, no referent
-                // and no reader, and put it in this declaration's contract index in place of the ancestors
-                // that are really there. An application some *other* position names is minted by that
-                // position (§8.2 keys identity on the application, so both land on one entry); what changed
-                // is only that an operand no longer mints on its own account.
+                // application instead would give a form nothing else names an entry with one subtype, no
+                // referent and no reader, and put it in this declaration's contract index in place of the
+                // ancestors that are really there. An application some *other* position names is minted by
+                // that position (§8.2 keys identity on the application, so both land on one entry); an
+                // operand mints nothing on its own account.
                 OpenOperand operand = openOperand(name, generic, parameters, "supertype");
                 for (String ancestor : operand.ancestors()) {
                     addIfAbsent(transitiveSupertypes, seenTransitive, ancestor);
@@ -1512,7 +1468,7 @@ final class DefinitionResolver {
         String sourceName = sourceRef.name();
         TypeDefinition sourceDef = namespaceDefinitions.getTypeDefinition(sourceName);
         if (sourceDef == null) {
-            // As with a supertype: a refinement reads the source's own field set, so this resolves now.
+            // As with a supertype: a refinement reads the source's own field set, so the source must resolve.
             throw new SchemaValidationException("'" + name + "': refinement source '" + sourceName
                     + "' names no type this schema declares or imports");
         }
@@ -1791,9 +1747,9 @@ final class DefinitionResolver {
      * <p><b>Read from the entries and never from the resolved fields.</b> Which fields a family dispatches on
      * is the declaring record's statement, so a base that writes the mark states it once and a member that
      * merely inherits the selector states none. Reading the resolved list instead would restate every
-     * inherited selector at each member -- §5.8 flattens a base's fields into all of them -- which is exactly
-     * the clearing the per-field carrier used to owe. Composition's absorbed fields are excluded for free:
-     * they are no part of this declaration's entry list. {@link SchemaDesugarer} collects the same names for a
+     * inherited selector at each member -- §5.8 flattens a base's fields into all of them. Composition's
+     * absorbed fields are excluded for free: they are no part of this declaration's entry list.
+     * {@link SchemaDesugarer} collects the same names for a
      * declaration-position body, which reaches this resolver as a {@code record} payload rather than here.
      *
      * <p>A mark on a group member is collected rather than dropped, so the linker can refuse it: §5.11 makes a
@@ -1870,9 +1826,8 @@ final class DefinitionResolver {
      * #isValidTighteningTransition}) -- e.g. {@code array}'s own {@code access_pattern:
      * product_access_type = INDEX} tightens {@code product}'s {@code REQUIRED} to {@code
      * REQUIRED_FIXED}, an allowed transition. The identity-diagonal rule (a {@code REQUIRED_FIXED}/
-     * {@code OPTIONAL_FIXED} restatement MUST NOT change the pinned value) is not checked yet -- no
-     * real fixture declaration restates an already-fixed field, so there's nothing to verify it
-     * against.
+     * {@code OPTIONAL_FIXED} restatement MUST NOT change the pinned value) is not checked: the two values
+     * are never compared.
      */
     private RecordField resolveTighteningField(String declarationName, FieldDef fieldDef, RecordField inherited,
                                                 List<String> parameters) {
@@ -1946,9 +1901,8 @@ final class DefinitionResolver {
      * A field's default (`{@code ~}`) or fixed (`{@code =}`) modifier value (§5.2, §5.10) is recorded in
      * {@code value} whether it is a literal or a parameter reference -- a parameter and a literal share
      * the one slot, and §8.1's shadowing rule tells them apart: a token is a parameter exactly when its
-     * text resolves into the enclosing entry's own {@code parameters}. There is no separate
-     * {@code value_param} channel; the kernel no longer declares one, a held body being unread until
-     * its parameters are gone.
+     * text resolves into the enclosing entry's own {@code parameters}. There is no separate channel for a
+     * parameter, and the kernel declares none, a held body being unread until its parameters are gone.
      *
      * <p>What a parametric modifier still changes is the field's <b>state</b>. A parametric {@code =}
      * (e.g. {@code array}'s {@code element_type: type_ref = T}, {@code T} declared by {@code array =>
@@ -1980,9 +1934,8 @@ final class DefinitionResolver {
      */
     private RecordField resolveField(FieldDef field, List<String> parameters, Optional<RecordField> inherited) {
         Annotations own = annotationsOf(field.name(), DefinitionMarks.consumed(field.annotations()));
-        // No mark to inherit: which fields a family dispatches on is the *record's* statement now
-        // (`record.discriminators`), and a member states none of its own. The inheritance rule this replaced
-        // existed only because §5.8 flattening copied a per-field mark onto every member.
+        // No mark to inherit: which fields a family dispatches on is the *record's* statement
+        // (`record.discriminators`), and a member states none of its own.
         return resolveFieldEntry(field, parameters, inherited)
                 .withAnnotations(inherited.map(source -> merged(own, source.annotations())).orElse(own));
     }
@@ -2254,9 +2207,9 @@ final class DefinitionResolver {
             // so one reaching here was not: either a caller resolved raw AST without running that phase, or
             // the form holds a position the desugar table cannot reduce to a name -- an element that is
             // itself an application (`[box<text>]`), whose entry does not exist until materialisation has
-            // run, one phase later. Refusing names that. What this replaces built a structural `array<T>`
-            // instead -- the representation §11 rejects, which the linker then reports as an arity error
-            // against a constructor the author never wrote.
+            // run, one phase later. Refusing names that, where building a structural `array<T>` would be the
+            // representation §11 rejects, which the linker reports as an arity error against a constructor
+            // the author never wrote.
             throw new UnsupportedOperationException("a container sugar form must be lifted to an entry "
                     + "before resolution (§5.3); this one was not, which means either the desugar phase was "
                     + "skipped or a position inside it is an application, which has no entry to name until "

@@ -25,7 +25,7 @@ import io.ltr8.tson.json.JsonPosition;
  * fact about reading a document <em>at a typed position</em>, and settling it in the event vocabulary
  * would impose a schema's answer on a layer that has no schema -- which is one of the two
  * disagreements that make this a separate stack from the TSON reader's (see
- * {@code docs/json-encoding.md}).
+ * {@code design/json-encoding.md}).
  */
 public sealed interface JsonEvent
         permits JsonEvent.ObjectStart, JsonEvent.MemberName, JsonEvent.ObjectEnd,

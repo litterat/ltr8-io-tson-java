@@ -670,7 +670,7 @@ public final class TsonTreeReader {
      * #readAgainstSchema}. There is deliberately no overload that omits {@code expected}/{@code actual}: a
      * facade-level failure is exactly the kind a machine consumer must be able to act on without reading
      * prose, and the omitting overload this used to have is how three of them ended up with a blank
-     * structured half. See {@code docs/readers-and-diagnostics.md} on what each field is for.
+     * structured half. See {@code design/diagnostic-model.md} on what each field is for.
      */
     private static TsonValue abandon(TsonReadContext ctx, Diagnostic.Code code, String message, String expected,
             String actual) {

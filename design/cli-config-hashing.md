@@ -1,18 +1,43 @@
 # CLI, configuration, bundled schemas, and content hashing
 
 Design notes for the outer ring: the bundled schema resources, content hashing, the `tson` command-line
-application, and the configuration package. Current form only; history lives in git. `CLAUDE.md` holds the
-one-paragraph orientation; this file holds the detail.
+application, and the configuration package. Current form only; history lives in git.
+
+**Invariants**
+
+- A `?sha256=` pin is verification metadata, not identity: everything keys by canonical identity, and every fetched
+  reference carrying a pin is checked before use.
+- The content hash covers every byte past the `!!id` line's terminator; a leading BOM is stripped, never hashed.
+- Editing a bundled schema moves the whole pinned chain bottom-up; `scripts/restamp-bundled-schemas.sh` does it and
+  `--check` reports staleness and writes nothing.
+- Files are classified as schema or data by header (`!!meta`) and matched by embedded `!!id`, never filename; `-` is
+  stdin, at most once, always data.
+- `validate` emits one `ValidationRun` envelope per invocation; run-level `errors` are exit 2, a document's own are
+  exit 1.
+- `TsonCli.exitCodeFor` reads diagnostic codes and nothing else, ranking `70 > 78 > 69 > 75 > 1`; everything but 0, 1
+  and 2 is the run declining to give a verdict.
+- A policy flag never means nothing: `--token-scripts` alone raises the token level to `SINGLE_SCRIPT`, a relaxation
+  against a stated level that scans nothing is a usage error, and `--max-depth` below 1 is refused rather than clamped.
+- The two default bind contexts share one atom list (`AtomContext.hostTypes()`); the resolver's adds a name binder and
+  the schema model's own two atom registrations, and nothing else.
+
+Related: `design/readers-and-diagnostics.md` (the `Diagnostic` model and codes the exit codes ride on),
+`design/front-door-and-config.md`, `design/linking-and-compilation.md` (the loader and registries that verify pins),
+`design/json-encoding.md`.
 
 ## Bundled schema documents (`tson-schema/TsonBundledSchemas.java`)
 
 The published identities of the three bundled schemas (`META_KERNEL_ID`/`META_ID`/`CORE_ID`) **and** their
 raw source text (`fetch(uri)`), off `tson-schema`'s classpath — the `.tn` resources are copied from
 `spec/m/` at build time (`processResources`), so there's one copy on disk to keep in sync with the spec.
-`fetch` doesn't implement `SchemaSource` (that would need a `tson-compiler` dependency), but a
-`tson-compiler` caller passes the method reference `TsonBundledSchemas::fetch` directly (it's a functional
-interface of the same shape). Each schema also ships a published content digest
+`fetch` is a static method rather than a `SchemaSource` instance (`tson-base`'s `base.source`, a functional
+interface of the same shape), so a caller needing one passes the method reference
+`TsonBundledSchemas::fetch` directly. Each schema also ships a published content digest
 (`{META_KERNEL,META,CORE}_SHA256`), checked against the packaged resource on load.
+
+**The digests are this repo's own.** The published drafts spell their hash pins `xxhash` and compute real digests at
+publication, so the `spec/m/` copies — the live artifacts, packaged from there at build time — carry digests over
+their own bytes, and `TsonBundledSchemas` holds those rather than tson.io's.
 
 ## Content hashing (`TsonContentHash`) + `tson hash`
 
@@ -35,6 +60,8 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
   the two still name one identity. `crossCheckId` additionally verifies a fetched document's embedded
   `!!id` equals the reference's identity (§2.2.1 — a source can't return content under the wrong
   identity).
+- **A schema registered from text in-process is hashed by the same call that registers it**, since §10.2 verifies per
+  identity and not per route.
 - **`tson hash <file>`** stamps `?sha256=<hex>` onto the `!!id` in place (idempotent; the hashed bytes
   never change so the pin stays valid).
 - **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole bundled chain, which no
@@ -49,10 +76,11 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
 ## CLI (`tson-cli`)
 
 `tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each
-as schema or data (`TsonDocumentPeek.of(…).isSchemaDocument()` — a header carrying `!!meta` is a schema document), exposes the
-schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the
+as schema or data (`TsonDocumentPeek.of(…).isSchemaDocument()` — a header carrying `!!meta` is a schema document),
+exposes the schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the
 `!!schema` URI selects the schema, the root type-ref selects the type, no `!!schema` means schemaless.
-**Fully self-describing: no `--type`.**
+**A TSON data document is fully self-describing, so it takes no `--type`**; `--schema`/`--type` exist for JSON
+inputs alone, which can name neither for themselves ("JSON inputs" below).
 
 **`-` is standard input, at most once, and always a data document.** `ValidateInput` is the sealed argument
 type (`OfFile`/`OfStdin`) that keeps this out of `Path`-with-a-magic-value territory; its `OfStdin.open()`
@@ -110,7 +138,7 @@ into "invalid". `UsageException` exists for the same reason one layer up: a bare
 catch would relabel a library fault as "your command line is wrong", so only this CLI's own argument
 parsing throws the type that means that.
 
-**A gap usually arrives as a diagnostic now, not as an exception**, and `TsonCli.exitCodeFor` is where the
+**A gap usually arrives as a diagnostic, not as an exception**, and `TsonCli.exitCodeFor` is where the
 run's code is decided, each branch with a one-line note on stderr and the report on stdout unchanged.
 
 **A mixed run is the normal path**, so the order is a stated rule: **rank by who must act first, with
@@ -120,7 +148,7 @@ application, an edit to a reference or an allow-list, a rerun, an edit to the do
 are real and still printed, but something was not checked at all, so "invalid" is a claim the run cannot
 make, and exit 1 would tell a script the document had been judged and rejected. What this buys the author is
 the pass staying single: a schema with a gap in one declaration and a mistake in another reports both, where
-the throw used to take the second verdict with it.
+a thrown gap would take the second verdict with it.
 
 **78 rather than 70 for a bind mismatch**, because `EX_CONFIG` is "found in an unconfigured or misconfigured
 state" and unconfigured is what this is. 70 would say this library cannot do it, which is the reading
@@ -150,19 +178,18 @@ against — **plus `limits`, §9.1's bounds on the same terms**, currently a `ma
 inside `policy` rather than beside it because the envelope's one question is "what judged this run", and a
 limit refusal answers it as much as a name refusal does; it also inherits `CliPolicy.isDefault()`, so a run
 that raised the depth states it even when nothing was refused. The two surfaces keep `ProcessorConfig`'s own names
-all the way to the wire, so what a deployment set and what its reports say are one vocabulary. It is there rather than on each
-diagnostic because it is a fact about the *processor*: constant for the whole run, so a per-refusal copy is N
+all the way to the wire, so what a deployment set and what its reports say are one vocabulary. It is there rather than
+on each diagnostic because it is a fact about the *processor*: constant for the whole run, so a per-refusal copy is N
 copies of one string; and needed by a sender *before* it writes a document rather than after being refused,
 which a channel that only opens on failure cannot give it. The level is also the half that actually explains
 a disagreement — two deployments at one UCD version differ because one of them set `ASCII_ONLY`.
 
 **Both machine formats spell one report one way** — `snake_case` keys, an absent field omitted rather than
-written `null`. `--output tson` always did, being bound through `CliDiagnostic`'s `@Field` names to what
-`diagnostics.tn` declares; `--output json` hand-wrote `camelCase` with `null`s, so a consumer parsing one and
-then the other found neither key where it expected it, and the TypeScript CLI agreed with neither. Nothing in
-[TSON-DATA] §8.1 fixes a CLI's wire shape, so the tie is broken by what a schema already describes and what
-the other implementation emits. The distinction the two RFC 6901 pointers carry survives: a present `""` is
-the root, an absent key means the diagnostic has no such end.
+written `null`. `--output tson` is bound through `CliDiagnostic`'s `@Field` names to what `diagnostics.tn`
+declares, and `--output json` writes the same keys, so a consumer parsing one and then the other finds each
+key where it expects it. Nothing in [TSON-DATA] §8.1 fixes a CLI's wire shape, so the choice is settled by
+what a schema already describes and what the other implementation emits. The distinction the two RFC 6901
+pointers carry survives: a present `""` is the root, an absent key means the diagnostic has no such end.
 
 **`tson policy` is the same record with no document in hand**, which is the surface that makes a refusal
 avoidable rather than merely explicable: a generator that reads it first never writes the name that would be
@@ -172,14 +199,18 @@ the same record: a depth bound is this deployment's choice too, so a generator t
 writes the document that would be refused.
 
 **The three commands that judge a document take the policy flags** — `validate`, `compile`, `policy`, not
-`hash`/`init-example` — the §8.2 ones and `--max-depth`. `PolicyOptions` consumes them off the argument list before each subcommand's own loop
-runs, so those loops still see only `--output` and their positionals; the pair then goes into one
+`hash`/`init-example` — the §8.2 ones and `--max-depth`. `PolicyOptions` consumes them off the argument list before
+each subcommand's own loop runs, so those loops still see only `--output` and their positionals; the pair then goes into one
 `Tson` per run, which is what makes a schema's declared names and a data document's names answer to
 one setting. §8.2 asks that a relaxation not be *silent*, and a flag written into a CI file satisfies that
 where the environment variable it warns about would not — the point of the rule is ambient authority, not the
-existence of configuration. Giving the CLI no way to configure this at all was the worse failure: it told the
-person running it which policy refused their document and left them unable to change it, they being the
+existence of configuration. A CLI with no way to configure this would be the worse failure: it would tell the
+person running it which policy refused their document and leave them unable to change it, they being the
 deployment the report describes.
+
+**The flags themselves:** `--max-depth` takes §9.1's nesting bound, `--identifier-policy`/`--token-policy` take a level
+in either spelling the CLI prints or a person types, `--identifier-per-segment` the unit, and
+`--identifier-scripts`/`--token-scripts` a `Latin+Cyrillic` combination, repeatable.
 
 **Two rules keep a flag from meaning nothing.** `--token-scripts` alone raises the token level from its
 `UNRESTRICTED` default to `SINGLE_SCRIPT`, because `permitting(…)` is consulted only by a level that scans and
@@ -205,26 +236,40 @@ did not ask for is the one outcome that leaves them unable to explain the result
 **70 covers both halves of the exception-classification policy's non-verdict side, printed differently.** A
 gap (`UnsupportedOperationException` — *this library hasn't implemented that yet*) renders as `not
 implemented yet: <message>` and nothing else: those messages routinely end with the way to write the thing
-today (§8.1's collection-slot refusal names the workaround outright), and the bug-report banner plus a
-25-frame trace buried the one line worth reading while asking for a report of something already known. A
+today, and a bug-report banner plus a 25-frame trace would bury the one line worth reading while asking for a
+report of something already known. A
 fault (`IllegalStateException` and everything else — a broken internal invariant) keeps the trace and the
 please-report-it framing, which is where it is actually news. `TsonCli.notImplemented`/`internalError` are
 the two, ordered so the gap catch comes first.
 
-## Configuration package (`tson-compiler/.../config/`)
+## JSON inputs (`--schema`, `--type`)
 
-Holds `AtomContext`, `SchemaMetaNameBinder`, `SourcePositionStringBridge` — how a caller configures a
-working binding environment. **Two distinct default contexts, differing by exactly the name binder** (a
-`DataNameBinder` is fixed at `DataBindContext` construction and can't be added later):
+**A `.json` input is validated too**, against a schema supplied out of band: `--schema <uri> --type <name>` are one
+statement binding every JSON input in the run ([TSON-JSON] §3.4, since a JSON document names neither for itself), and
+the encoding is read off the extension on §3.1's own authority — the one filename this CLI reads, the axis being the
+encoding where the `!!id` rule is about schema-versus-data. Half a binding, a `.json` with none, a binding with no JSON
+to bind, and a `--type` the schema does not declare are all **usage errors** (exit 2) rather than verdicts: each is the
+command line's mistake, and the last is checked before any document is read so one typo prints once instead of once per
+file. Stdin takes the binding as its marker, having no name to classify by. One envelope, one exit-code ranking, one
+policy field across both encodings.
+
+## Default bind contexts (`tson-base`'s `base.bind`, `tson-compiler/.../config/`)
+
+`AtomContext` is `tson-base`'s (`io.ltr8.tson.base.bind`), so a class binds the same under every encoding;
+`tson-compiler`'s `config` package holds `SchemaMetaNameBinder`, `ResolverBindContext` and
+`SourcePositionStringBridge`, what binding this library's own schema model additionally needs. **Two distinct
+default contexts over one atom list**, distinct because a `DataNameBinder` is fixed when a `DataBindContext` is
+built and can't be added later:
 
 - `AtomContext.defaultContext()` — the library's built-in atom registrations (`UUID`/`byte[]`/
-  `LocalDate`/`OffsetTime`/`OffsetDateTime`/`URI`/`Inet4Address`/`Inet6Address`/`SourcePosition`), **no
-  name binder**. The consumer/schemaless default (`Tson.dataBindContext`, `objectReader`/`objectWriter`,
-  and the base a consumer layers their own binder onto). `registerAtoms(AtomContext.hostTypes())` adds the same atom
+  `LocalDate`/`OffsetTime`/`OffsetDateTime`/`Duration`/`Period`/`URI`/`Inet4Address`/`Inet6Address`/
+  `CidrInet4Network`/`CidrInet6Network`), **no name binder**. The consumer/schemaless default (what
+  `Tson.dataBindContext()` returns unless `ProcessorConfig` states one, `objectReader`/`objectWriter`, and the
+  base a consumer layers their own binder onto). `registerAtoms(AtomContext.hostTypes())` adds the same atom
   list to any builder, so the list lives in one place.
-- `SchemaMetaNameBinder.defaultContext()` — those same atoms **plus** a `DataNameBinder` scoped to the
-  `io.ltr8.tson.schema.meta` namespace. The library's *internal* object-binding-mode resolution context
+- `SchemaMetaNameBinder.defaultContext()` — those same atoms, `ResolverBindContext`'s two registrations for
+  the schema model (`schema.meta.Token`, one token on the wire, and `SourcePosition`, whose bridge names
+  `tson-compiler`'s own `Position`), **plus** a `DataNameBinder` scoped to the `io.ltr8.tson.schema.meta`
+  namespace. The library's *internal* object-binding-mode resolution context
   (binds meta instances to `schema.meta` classes). Not a consumer default — a consumer binding their own
   classes supplies their own binder.
-
-Removing `config` entirely (folding these elsewhere) is a `BACKLOG.md` item.

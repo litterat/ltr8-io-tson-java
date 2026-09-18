@@ -23,17 +23,16 @@ import java.util.Optional;
  * A choice-typed position: [TSON-JSON] §8.2's discrimination predicate, which is the rule [TSON-SCHEMA] §5.4
  * requires each encoding to state over the resolver-derived {@code disjoint} fact.
  *
- * <p><b>A value may omit the tag if and only if one of two routes recovers the variant from the schema and
- * the JSON form alone</b>, and the predicate "MUST NOT be extended by implementation cleverness -- no
- * member-shape matching among record variants, no value-set separation, no trying variants in order". This
- * reader implements route 2 and no more: <em>the choice is {@code disjoint: true} and every variant is
- * class-stable</em>, and selection is then by the arriving value's kind, which names a discrimination class
- * (§4.2) and so names the one variant bearing it.
+ * <p><b>A value may omit the tag if and only if one condition recovers the variant from the schema and the
+ * JSON form alone</b>, and the predicate "MUST NOT be extended by implementation cleverness -- no
+ * member-shape matching among record variants, no value-set separation, no trying variants in order". The
+ * condition is that <em>the choice is {@code disjoint: true} and every variant is class-stable</em>, and
+ * selection is then by the arriving value's kind, which names a discrimination class (§4.2) and so names the
+ * one variant bearing it.
  *
- * <p>Route 1 -- a declared {@code @discriminator} (§8.4) -- is not built, so a choice carrying that
- * annotation currently falls through to "the tag is REQUIRED". That is the correct verdict for a reader
- * without the route, and not a silent approximation of it: a tagged value still reads, and an untagged one is
- * refused rather than guessed at.
+ * <p>There is no member dispatch at a choice position (§8.4): a discriminator is a property of a record
+ * family and lives with the records (§6.1.5), so where the condition does not hold the tag is REQUIRED -- a
+ * tagged value reads, and an untagged one is refused rather than guessed at.
  *
  * <p><b>The verdict is computed once, here, at schema load.</b> §8.3 asks for exactly that -- "an
  * implementation SHOULD compute the predicate's verdict per choice at schema load, in the manner of
@@ -53,7 +52,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
     private final JsonSchemaLocation schemaLocation;
     private final TypeReaderResolver readerFor;
 
-    /** §8.2's route 2, decided once: {@code disjoint} and class-stable, so the kind alone selects. */
+    /** §8.2's condition, decided once: {@code disjoint} and class-stable, so the kind alone selects. */
     private final Map<DiscriminationClass, String> byClass;
 
     /**
@@ -76,7 +75,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
         this.admittedVariants = context.admitting(this.variants);
         this.schemaLocation = schemaLocation;
         this.readerFor = context.readers();
-        this.byClass = routeTwo(context.schema(), body);
+        this.byClass = variantsByClass(context.schema(), body);
         Map<String, String> subtypes = new LinkedHashMap<>();
         for (TypeRef variant : body.variants()) {
             ReferenceChain.terminal(context.schema(), variant.name())
@@ -87,7 +86,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
     }
 
     /**
-     * The class → variant table when route 2 holds, and an empty table otherwise -- emptiness being exactly
+     * The class → variant table when §8.2's condition holds, and an empty table otherwise -- emptiness being exactly
      * "the tag is REQUIRED at this position".
      *
      * <p>Both halves are required and neither implies the other. The <b>{@code disjoint} fact</b> guarantees
@@ -100,7 +99,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
      * containing one non-disjoint, so this is unreachable in a linked schema -- and treating it as "the tag is
      * required" is the safe reading if it ever is reached.
      */
-    private static Map<DiscriminationClass, String> routeTwo(TsonSchema schema, ChoiceBody body) {
+    private static Map<DiscriminationClass, String> variantsByClass(TsonSchema schema, ChoiceBody body) {
         if (!body.disjoint().orElse(false)) {
             return Map.of();
         }
@@ -131,7 +130,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
             }
         }
 
-        // Step 2 would be a declared discriminator (§8.4), which is not built. Step 3: route 2.
+        // Step 2: the untagged route -- where §8.2's condition holds, dispatch on the value kind.
         Optional<DiscriminationClass> arriving = DiscriminationClass.ofKind(first);
         String variant = arriving.map(byClass::get).orElse(null);
         if (variant != null) {
@@ -143,7 +142,7 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
     /**
      * §8.1's tagged form: {@code $type} names the variant, and "a decoder MUST accept a {@code $type}-tagged
      * value at any choice position, including positions where the tag could have been omitted". So this runs
-     * whether or not route 2 holds, and a redundant tag is never wrong.
+     * whether or not §8.2's condition holds, and a redundant tag is never wrong.
      */
     private JsonValue tagged(JsonReadContext ctx, ReservedMembers.Tag tag) {
         if (tag.unknown() != null) {
@@ -191,20 +190,18 @@ final class TreeChoiceReader implements JsonTypeReader<JsonValue> {
     }
 
     /**
-     * No route recovered the variant, so §8.2's last clause applies: the tag is REQUIRED and a value without
-     * one is a validation error at the position.
+     * The untagged route did not recover the variant, so §8.2's last clause applies: the tag is REQUIRED and
+     * a value without one is a validation error at the position.
      *
-     * <p><b>A missing tag is {@code UNKNOWN_TYPE_REF}</b>, which is the code the TSON reader gives the same
-     * document and therefore the one §9.4's single vocabulary requires here. It is a poor fit read literally
-     * -- nothing unknown was written, the tag being absent rather than unresolvable -- and the closed
-     * {@code Code} enum has no member for "a required tag is missing", which `BACKLOG.md` records. What the
-     * two encodings must not do is disagree, and the incumbent's choice is the one that settles it.
+     * <p><b>A missing tag is {@code TYPE_MISMATCH}</b>: no type was established for the value, which is what
+     * that code says, and nothing unknown was written for {@code UNKNOWN_TYPE_REF} to name. It is the code
+     * the TSON reader gives the same document, as §9.4's single vocabulary requires.
      *
      * <p>The message says <em>why</em> the tag is required, because the two reasons want different fixes: a
-     * choice that is not disjoint needs a tag on every value (or a discriminator), where one that is disjoint
-     * but received an unexpected kind has a document problem. A null gets its own answer -- §7 spends it as
-     * the absent sentinel before any class question arises, so it is not an unrecognised kind but an absence
-     * at a position admitting none.
+     * choice that cannot be discriminated needs a tag on every value, where one that is disjoint and
+     * class-stable but received an unexpected kind has a document problem. A null gets its own answer -- §7
+     * spends it as the absent sentinel before any class question arises, so it is not an unrecognised kind but
+     * an absence at a position admitting none.
      */
     private JsonValue untagged(JsonReadContext ctx, JsonEvent first, Optional<DiscriminationClass> arriving) {
         String found = JsonAtoms.describe(first);

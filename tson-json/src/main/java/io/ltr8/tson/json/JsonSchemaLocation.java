@@ -17,7 +17,7 @@ import java.util.Optional;
  * offers its own only as a seed for a value nothing encloses.
  *
  * <p>The peer of {@code tson-compiler}'s {@code SchemaLocation}, and a separate type on the same terms as the
- * rest of this stack ({@code docs/json-encoding.md}): the schema-directed readers here are {@code
+ * rest of this stack ({@code design/json-encoding.md}): the schema-directed readers here are {@code
  * tson-json}'s own, and this is the piece of them that a consolidation would merge first, both being pure
  * values over {@code tson-base} types.
  */

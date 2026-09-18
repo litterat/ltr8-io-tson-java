@@ -492,9 +492,9 @@ class TsonValidateTest {
     /**
      * {@code AtomTypeException}'s {@code expected} vocabulary survives the trip through a real schema, a real
      * compiled reader and {@code TsonReadContext.report} -- a membership, a length and a grammar, each landing
-     * on the {@link Diagnostic} verbatim. {@code AtomTypeExceptionTest} pins the vocabulary itself, including
-     * the shapes no schema can reach today (a {@code pattern} facet needs {@code regex_type} object-binding,
-     * which is still a gap -- see {@code CLAUDE.md}'s "Not yet implemented").
+     * on the {@link Diagnostic} verbatim. {@code AtomTypeExceptionTest} pins the vocabulary itself, every
+     * shape of it. The shapes not exercised here are reachable through a schema too -- a {@code pattern} facet
+     * ({@code !text ^ { pattern: "[A-Z]{3}" }}) reports {@code matching [A-Z]{3}} -- and are left to that test.
      */
     @Test
     void everyExpectedShapeIsTheViolatedConstraint() {

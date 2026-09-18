@@ -44,7 +44,7 @@ could not judge it — which is exactly what a caller picking an HTTP status or 
 - **`BIND_MISMATCH`** is a misconfiguration in the *reading application*, no more a verdict on the
   document than a gap is. It normally fails the bind-mode compile as an exception instead; it reaches a
   read as a diagnostic only for a schema compiled on demand.
-- **The five `SCHEMA_*` fetch codes** are everyone else: no configured `TsonSchemaSource` would supply
+- **The five `SCHEMA_*` fetch codes** are everyone else: no configured `SchemaSource` would supply
   the schema the document names. Nothing is wrong with the document, and nothing may be wrong with the
   schema either — it was never obtained, so it was never read. **`SCHEMA_ERROR` vs the five** is the
   distinction a caller deciding whether to retry needs: `SCHEMA_ERROR` is a verdict, the schema *was*
@@ -169,7 +169,7 @@ descriptor API; the facade readers do not surface it.
 
 Across the schema pipeline:
 
-- **`TsonSchemaValidationException`** — the author's schema is wrong and the spec says so.
+- **`SchemaValidationException`** — the author's schema is wrong and the spec says so.
 - **`UnsupportedOperationException`** — this library has not implemented that yet.
 - **`IllegalStateException`** — an internal invariant broke.
 
@@ -187,18 +187,18 @@ or `TsonDataParser` directly cannot do for themselves. The facade readers call i
 
 | Call                                                    | Throws                                                                   |
 | ------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `new TsonDataParser(…).parseDocument()`                 | `TsonParseException`, `TsonUnsupportedDocumentException`, `LexException`  |
+| `new TsonDataParser(…).parseDocument()`                 | `ParseException`, `TsonUnsupportedDocumentException`, `LexException`  |
 | a fail-fast facade read                                 | `ReadException` for everything, base syntax included                 |
 | a collecting facade read                                | nothing, for any bad document — a library fault still throws             |
 | `Tson.validate` / `validateSchema`                      | nothing, for any bad document — a library fault still throws             |
-| `Tson.resolve` on an already-registered `!!id`          | `TsonSchemaValidationException`                                          |
+| `Tson.resolve` on an already-registered `!!id`          | `SchemaValidationException`                                          |
 | `Tson.resolve` naming an unavailable `!!import`/`!!meta`| `SchemaFetchException`                                               |
 | a bind-mode compile whose class disagrees               | `BindMismatchException` — at compile, not at first read              |
 | the first read of a type with no bound class            | `MissingBindingException`, thrown unwrapped from its `ErrorReader`   |
-| a `TsonSchemaSource`                                    | `SchemaFetchException` and nothing else — another type means a fault |
+| a `SchemaSource`                                    | `SchemaFetchException` and nothing else — another type means a fault |
 
 **`!!meta` in a document handed to the data parser** throws `TsonUnsupportedDocumentException`, not
-`TsonParseException`: a schema document is unsupported there, not malformed.
+`ParseException`: a schema document is unsupported there, not malformed.
 
 ## CLI exit codes
 

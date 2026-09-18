@@ -105,12 +105,12 @@ import java.util.Set;
  * <p><b>{@code !!import} merging (Part 2 §2.2.3).</b> The final namespace a schema is checked
  * against is built in two stages, in this order: (1) every {@code !!import}'s whole namespace, in
  * declaration order, looked up via {@code loader} by canonical identity -- <b>transitive, not shallow</b>:
- * {@code loader} hands back an already-registered, already-flattened {@code TsonSchema}, and all of its
- * {@code entries()} are taken, so an import contributes its own imports' entries too; (2) this schema's own
- * entries, exactly as resolved. §2.2.3 requires exactly this: "an {@code !!import} contributes the imported
- * schema's entire namespace -- the entries it declares and the entries it imported", matching the {@code
- * !!meta} half §3.3.1 already defined as "the target's local declarations <i>plus its imports</i>". A flat
- * namespace with no hiding is the rule the rest of the format is built on.
+ * {@code loader} hands back an already-registered, already-linked schema whose {@code entries()} hold its
+ * own import closure merged in, and all of them are taken, so an import contributes its own imports'
+ * entries too; (2) this schema's own entries, exactly as resolved. §2.2.3 requires exactly this: "an {@code
+ * !!import} contributes the imported schema's entire namespace -- the entries it declares and the entries
+ * it imported", matching the {@code !!meta} half §3.3.1 defines as "the target's local declarations
+ * <i>plus its imports</i>". A flat namespace with no hiding is the rule the rest of the format is built on.
  *
  * <p><b>Collisions are decided by entry identity.</b> One schema reached by several routes unifies; two
  * *different* schemas declaring one name is the error, as is a local declaration shadowing any name the
@@ -276,11 +276,10 @@ public final class TsonSchemaLinker {
      * §8.2's two per-name rules over one name: the restricted-character rule ({@code Identifier_Status}) and
      * the restricted-script rule (the restriction level).
      *
-     * <p><b>Both are here rather than at the positions that read the name</b>, which is where the
-     * restricted-character rule
-     * used to be -- spread over the schema parser, the definition resolver and the atom vocabulary, by three
-     * different exceptions and three different codes, with holes wherever a naming position reached only one
-     * of the three. §8.2 defines its rules over named scopes and [TSON-SCHEMA] §11.4 supplies the
+     * <p><b>Both are here rather than at the positions that read the name.</b> Those positions are spread
+     * over the schema parser, the definition resolver and the atom vocabulary, so a rule applied there is
+     * three call sites with three exceptions, and has a hole wherever a naming position reaches only one of
+     * them. §8.2 defines its rules over named scopes and [TSON-SCHEMA] §11.4 supplies the
      * schema layer's, so the walk that already enumerates those scopes is the one place all three belong.
      * What stays at the reading positions is §7.7's grammar, which is validity and really is a parse error.
      */
@@ -501,13 +500,14 @@ public final class TsonSchemaLinker {
         Map<String, TypeDefinition> merged = mergeImports(schema.imports(), loader, origins);
 
         // The governing meta-schema's own namespace, one hop via !!meta -- distinct from !!import (which
-        // flattens another schema's entries into *this* schema's own returned entries()). !!meta only says
+        // merges another schema's entries into *this* schema's own returned entries()). !!meta only says
         // "this schema's own vocabulary/constructors come from that other schema"; it never merges anything
         // in, and (§3.3.2) it's never consulted for an ordinary type-ref -- only at the constructor roles
-        // §3.3.1 lists. Used as a lookup fallback in exactly one spot now: `source` validation below
-        // (`validateEntry`'s own `sourceLookup`), a `source` naming a constructor being one of those roles.
-        // Everywhere else (field/key/value/element types, supertypes, subtypes, choice variants) stays
-        // type-name-namespace-only, per §3.3.2's explicit "NOT extended by the structure namespace". Empty
+        // §3.3.1 lists. Used as a lookup fallback in two spots, both in `validateEntry`: `source` validation
+        // (its `sourceLookup`), a `source` naming a constructor being one of those roles, and the derived
+        // `supertypes` chain, which is the residue of one. Every author-written reference (field/key/value/
+        // element types, subtypes, choice variants) stays type-name-namespace-only, per §3.3.2's explicit
+        // "NOT extended by the structure namespace". Empty
         // if !!meta isn't registered yet (e.g. meta-kernel's own self-referential !!meta, mid-registration).
         Optional<TsonLinkedSchema> governingMeta =
                 loader == null ? Optional.empty() : loader.load(CanonicalIdentity.canonicalize(schema.meta()));
@@ -1061,10 +1061,8 @@ public final class TsonSchemaLinker {
         // type-refs to the type-name namespace; §2.2.3 puts a merged entry's own derived references in its
         // defining schema's namespace, not the importer's. A derived chain reaches a constructor
         // whenever a refinement derives from one -- meta-kernel's own `set => ~array ^ {...}` resolves with
-        // [array, product, top]. The fallback is defensive rather than load-bearing today: a
-        // refinement source resolves through the type-name namespace alone, so a schema deriving from `array`
-        // already names it. What did need it -- a transfer of a template's supertypes onto every sized array
-        // materialised in a user schema -- is gone with the size templates themselves.
+        // [array, product, top]. The fallback is defensive rather than load-bearing: a refinement source
+        // resolves through the type-name namespace alone, so a schema deriving from `array` already names it.
         for (String supertype : def.supertypes()) {
             if (!namespace.containsKey(supertype) && !structureNamespace.containsKey(supertype)) {
                 throw new SchemaValidationException("'" + name + "' has an unresolved supertype '" + supertype + "'");
@@ -1288,8 +1286,8 @@ public final class TsonSchemaLinker {
      * <p><b>A {@link SchemaValidationException}.</b> A parameter list is author-written, so an unused one
      * is the author's error rather than a library fault.
      *
-     * <p>Its old converse -- §5.10's closed-entry rule, checked over {@code record_field.value_param} -- has
-     * no sound form now that a parameter and a literal share one slot: at a closed entry there are no
+     * <p>The converse -- §5.10's closed-entry rule, that a closed entry carries no parameter in a value slot
+     * -- has no check of its own, a parameter and a literal sharing one slot: at a closed entry there are no
      * parameters for a token to resolve into, so a token there <em>is</em> a literal (§8.1's shadowing rule)
      * and there is nothing to detect. The rule's reference half is unaffected, and needs no code of its own:
      * {@link #validateTypeRef} accepts a name only if the namespace holds it or {@code ownParameters} lists
@@ -1395,8 +1393,8 @@ public final class TsonSchemaLinker {
      * type of fixed/default values, which must be the field's declared type" -- and calls it "a dependency
      * the schema language does not express directly", which is what leaves it to a check like this one.
      *
-     * <p><b>Here rather than at compile, because of who the verdict belongs to.</b> The same check runs
-     * today as a side effect of building the record's reader ({@code RecordAbstractReader} decodes every
+     * <p><b>Here rather than at compile, because of who the verdict belongs to.</b> The same check also
+     * runs as a side effect of building the record's reader ({@code RecordAbstractReader} decodes every
      * FIXED/DEFAULT value once, at construction), and a failure there becomes an {@code ErrorReader} -- so
      * the author's own {@code tson compile} passes, and the mistake surfaces to whoever later sends data,
      * coded as a gap in this library. The verdict does not change as this library improves, so by the
@@ -1467,7 +1465,7 @@ public final class TsonSchemaLinker {
      * instead: a fixed or default value is available on a scalar-typed field and nowhere else. §5.6 is a
      * spelling rule for data values, not a claim that a record <em>is</em> a token, and this reads §5.2's
      * "the value must be the field's declared type" as requiring a type a token denotes directly, which is
-     * what §5.2's "Which fields may carry a value" now states.
+     * what §5.2's "Which fields may carry a value" states.
      */
     private static SchemaValidationException notAScalarType(String entryName, RecordField field,
                                                                  Token value, Top body) {
