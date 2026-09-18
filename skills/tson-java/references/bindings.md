@@ -26,10 +26,12 @@ component still resolves eagerly.
 
 ## The built-in atom vocabulary → Java
 
-Verified by reading each form through `TsonTreeReader` and asking `as(Object.class)` for its class.
+What each atom's parser hands back (`tson-atom`'s `io.ltr8.tson.atom.parser`, one parser per family) — the
+host type a tree read holds (`as(Class)`) and a bound component declares.
 
 | TSON                                            | Java                                            |
 | ----------------------------------------------- | ------------------------------------------------- |
+| `boolean`                                       | `Boolean`                                       |
 | `int8`                                          | `Byte`                                          |
 | `uint8`, `int16`                                | `Short`                                         |
 | `uint16`, `int32`                               | `Integer`                                       |
@@ -38,25 +40,36 @@ Verified by reading each form through `TsonTreeReader` and asking `as(Object.cla
 | `positive_integer`, `non_negative_integer`, `negative_integer`, `non_positive_integer` | `BigInteger`  |
 | `number`                                        | `BigDecimal`                                    |
 | `float32` / `float64`                           | `Float` / `Double`                              |
-| `rational`                                      | `io.ltr8.tson.schema.atom.Rational`             |
-| `complex`                                       | `io.ltr8.tson.schema.atom.Complex`              |
-| `text`, `mac`, `cidr4`, `cidr6`, `email`, `regex` | `String`                                      |
+| `rational`                                      | `io.ltr8.tson.base.atom.Rational`               |
+| `complex`                                       | `io.ltr8.tson.base.atom.Complex`                |
+| `text`, `mac`, `email`, `regex`, an enum member | `String`                                        |
 | `uuid`                                          | `UUID`                                          |
 | `date` / `time` / `datetime`                    | `LocalDate` / `OffsetTime` / `OffsetDateTime`   |
-| `duration`                                      | `io.ltr8.tson.schema.atom.IsoDuration`          |
+| `duration` / `period`                           | `java.time.Duration` / `java.time.Period`       |
 | `uri`                                           | `URI`                                           |
 | `ipv4` / `ipv6`                                 | `Inet4Address` / `Inet6Address`                 |
-| `base64`, `base64url`, `base32`, `hex`          | `byte[]`                                        |
+| `cidr4` / `cidr6`                               | `io.ltr8.tson.base.atom.CidrInet4Network` / `CidrInet6Network` |
+| `bytes` (and any `!bytes_type { encoding: … }` instance) | `byte[]`                               |
 | an untyped token (§4 base resolution)           | `Boolean`, `BigInteger`, `BigDecimal`, `String` |
 | `_` (the only no-value spelling)                | a `TsonAbsent` node / `null`                    |
 
 An integer's host type is the **narrowest** that holds its declared range, so `int8` never hands back a
-`BigInteger` for a value that fits a `Byte`. `unknown` and `extern` have no parser — a schema declaring
-one compiles, and the first read of one reports `NOT_IMPLEMENTED`.
+`BigInteger` for a value that fits a `Byte`.
 
-`TsonAtomContext.registerDefaults(context)` is the step that registers these on a `DataBindContext`, and
-it is the one nothing reminds you of when building a context by hand. `AtomContext.hostTypes()` is it
-for you.
+**`bytes` is one type with a spelling.** core.tn's `bytes` is base64 (RFC 4648 §4); another alphabet is
+another type, declared as its own instance — `hexdigest => !bytes_type { encoding: HEX }`, with `BASE64`,
+`BASE64URL`, `BASE32` and `HEX` to choose from — and every one binds to `byte[]`.
+
+**The scoped types choose their type from the data** (§7.8): `declared` (a type this schema declares or
+imports), `extern` (a type in a foreign schema the value names), `dynamic` (either), and the applications
+`extern_of<S>` / `extern_type<S, T>` that narrow to one schema or one type. A tree read wraps a foreign value
+in `TsonScopedValue(schema, root)`; a bind hands back the bound object itself.
+
+**The host types are registered on the context, and that is the step nothing reminds you of.**
+`AtomContext.hostTypes()` (`io.ltr8.tson.base.bind`) is the list, `AtomContext.defaultContext()` a context
+with nothing else, and `DataBindContext.builder().registerAtoms(AtomContext.hostTypes())` the way into your
+own. `ResolverBindContext.registerDefaults(builder)` (`io.ltr8.tson.compiler.config`) does the same for the
+schema pipeline's own context.
 
 ## Naming the classes for a schema's types
 
@@ -171,6 +184,9 @@ against that schema's fields, and a disagreement is a `BindMismatchException`.
 | `@FieldOrder`   | type                                | the wire order, when the constructor's own is not what you want       |
 | `@Namespace`    | type, package                       | an external schema name for the class or package                      |
 
+`DataBridge` (the two-way conversion behind an `@Atom` or a registered host type) and `ToData` are
+interfaces in the same package, not annotations.
+
 **A `schema.meta` bind target with more than one public constructor needs `@Record` on the canonical
 one**, or `DefaultRecordBinder` throws.
 
@@ -196,8 +212,9 @@ written, not only where the reader keeps them.
 
 ## Known rough edges
 
-- **A class mapped by `bindings` with no `@Typename` reads but cannot be written.**
+- **A class mapped by a `DataNameBinder` with no `@Typename` reads but cannot be written.**
 - **`DataBindException` is checked**, on `DataBindContext`'s own descriptor API. The facade readers do
   not surface it; a hand-written binder call must handle it.
-- **Mutating a `DataBindContext` after use is not thread-safe.** Concurrent *reads* through one `Tson`
-  are; registering schemas and mutating a context after use are the two things still open.
+- **A `DataBindContext` is fixed at `build()`** — atoms, the name binder and the profile are all
+  `DataBindContext.Builder`'s, and the built context has no mutators, so sharing one across threads is safe.
+  Registering schemas concurrently through one `Tson` is still not.

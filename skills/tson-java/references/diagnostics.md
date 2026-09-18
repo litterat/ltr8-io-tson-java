@@ -12,7 +12,8 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `TYPE_MISMATCH`             | the value's shape does not match the type in scope                                           |
 | `WRONG_ARITY`               | a tuple or template application has the wrong element/argument count                         |
 | `UNKNOWN_TYPE_REF`          | a `!type` annotation names a type the schema in scope does not declare                       |
-| `ATOM_CONSTRAINT_VIOLATION` | a built-in atom's grammar or declared constraint was violated                                |
+| `ATOM_FORM_INVALID`         | the token is not the atom's grammar — `'thirty'` where an integer goes                      |
+| `ATOM_CONSTRAINT_VIOLATION` | the token parsed, then broke a declared constraint — `150` under `max: 100`                  |
 | `UNRECOGNIZED_FIELD`        | the data carried a field the type does not declare (§7.2 — records are closed, always)       |
 | `DUPLICATE_MAP_KEY`         | two entries of one map share a key (§2.6)                                                    |
 | `DUPLICATE_FIELD`           | two fields of one record share a name (§2.5)                                                 |
@@ -24,26 +25,31 @@ string appearing in a message. Switch on it exhaustively; never match on `messag
 | `VALIDATION_ERROR`          | anything not covered by a more specific code — including a document that will not lex or parse |
 | `NOT_IMPLEMENTED`           | **a library gap, not bad input**                                                             |
 | `BIND_MISMATCH`             | a schema type and its bound class disagree about that type's fields                          |
+| `LIMIT_EXCEEDED`            | a §9.1 resource limit refused the document — nested deeper than `LimitsPolicy.maxDepth`      |
 | `SCHEMA_NOT_PERMITTED`      | policy refused the reference — not an allowed host, not a legal identity, no pin where required |
 | `SCHEMA_NOT_FOUND`          | the location was reached and does not have it                                                |
 | `SCHEMA_UNREACHABLE`        | the location could not be reached, or answered with something other than a document          |
 | `SCHEMA_TIMEOUT`            | the location did not answer in time                                                          |
 | `SCHEMA_TOO_LARGE`          | the location answered with more bytes than a schema document may be                          |
 
-### The seven that are not verdicts on the document
+### The eight that are not verdicts on the document
 
 `Code.verdict()` is the one statement of the set, so a consumer does not keep a private copy that can
-drift: it is `false` for `NOT_IMPLEMENTED`, `BIND_MISMATCH` and the five `SCHEMA_*` fetch codes, and
-`true` for everything else. Each of the seven says the document was not judged, and they differ in *who*
+drift: it is `false` for `NOT_IMPLEMENTED`, `BIND_MISMATCH`, `LIMIT_EXCEEDED` and the five `SCHEMA_*` fetch
+codes, and `true` for everything else. Each of the eight says the document was not judged, and they differ in *who*
 could not judge it — which is exactly what a caller picking an HTTP status or an exit code is asking.
 
 - **`NOT_IMPLEMENTED`** is a gap in this library. It rides in the report located at the value it could
   not read, and costs that value a verdict and nothing else's — so a gap and an ordinary error in one
-  document both get reported. Two exist today, both on a schema that loaded clean: `unknown` and
-  `extern`.
+  document both get reported. No construct the bundled schemas declare reaches one; what still can is a
+  meta-layer constructor this library has never seen (§2.2.2's extension point).
 - **`BIND_MISMATCH`** is a misconfiguration in the *reading application*, no more a verdict on the
   document than a gap is. It normally fails the bind-mode compile as an exception instead; it reaches a
   read as a diagnostic only for a schema compiled on demand.
+- **`LIMIT_EXCEEDED`** is this deployment declining: the document nested deeper than `LimitsPolicy.maxDepth`
+  (64 by default). The bytes may be valid and read in full by a processor configured for more, which is why
+  the bound is stated once per run (`ProcessorPolicy.limits()`, the `policy` field of every CLI envelope)
+  rather than copied into the diagnostic. It is the one non-verdict where the reader holds the fix.
 - **The five `SCHEMA_*` fetch codes** are everyone else: no configured `SchemaSource` would supply
   the schema the document names. Nothing is wrong with the document, and nothing may be wrong with the
   schema either — it was never obtained, so it was never read. **`SCHEMA_ERROR` vs the five** is the
@@ -63,7 +69,7 @@ consumer routes on.
 ## The `Diagnostic` record
 
 ```java
-package io.ltr8.tson.compiler;
+package io.ltr8.tson.base;
 
 public record Diagnostic(
         Optional<String> path,            // RFC 6901 into the DATA; "" is the root, not absence
@@ -147,16 +153,17 @@ RuntimeException
 ├── ReadException              io.ltr8.tson.base — .diagnostic(); what a fail-fast read throws
 ├── ParseException             io.ltr8.tson.base — well-formed tokens, invalid document (§7.4)
 ├── WriteException             io.ltr8.tson.base — the write-side peer of ReadException
-├── TsonUnsupportedDocumentException  a well-formed document of a kind this parser does not implement
-├── BindMismatchException      a schema type and its bound class disagree
+├── LimitExceededException     io.ltr8.tson.base — .limit(), .position(); a §9.1 bound refused the document
+├── TsonUnsupportedDocumentException  io.ltr8.tson.compiler — a well-formed document of a kind this parser does not implement
+├── BindMismatchException      io.ltr8.tson.base — a schema type and its bound class disagree
 │   └── MissingBindingException   a schema type with no bound class at all
 ├── SchemaValidationException  io.ltr8.tson.base — the author's schema is wrong and the spec says so
-├── SchemaFetchException       .uri(), .reason() — the ONLY exception a SchemaSource may throw
-├── ContentHashMismatchException  a ?sha256= pin did not match the fetched content
-├── AtomTypeException              (sealed, internal package) .expected()
-│   ├── AtomParseException         the token is not this atom's grammar
-│   └── AtomValidationException    it parsed, then failed the atom's constraint
-├── LexException                   (internal lexer package) malformed UTF-8, non-NFC unquoted token, …
+├── SchemaFetchException       io.ltr8.tson.base — .uri(), .reason(); the ONLY exception a SchemaSource may throw
+├── ContentHashMismatchException  io.ltr8.tson.base — a ?sha256= pin did not match the fetched content
+├── AtomTypeException              io.ltr8.tson.atom (sealed) — .expected()
+│   ├── AtomParseException         the token is not this atom's grammar (ATOM_FORM_INVALID)
+│   └── AtomValidationException    it parsed, then failed the atom's constraint (ATOM_CONSTRAINT_VIOLATION)
+├── LexException                   (unexported lexer package) malformed UTF-8, non-NFC unquoted token, …
 ├── TsonRegexSyntaxException       io.ltr8.tson.regex
 ├── UnsupportedOperationException  a gap: this library has not implemented that yet
 └── IllegalStateException          an internal invariant broke — a bug here, not bad input
@@ -178,9 +185,9 @@ CLI's exit 1 vs. exit 70 rides on that distinction — carried by `Diagnostic.Co
 by the channel, so a gap thrown out of a phase that reports per declaration does not take every other
 declaration's verdict with it.
 
-`LexException` and `AtomTypeException` live in unexported packages and cannot be named in a `catch`
-from another module. `Diagnostic.ofBaseSyntaxError(e)` is public for exactly that reason: it classifies
-a base-syntax failure and **rethrows anything else**, which is what a caller driving a `TsonDataStream`
+`LexException` lives in an unexported package and cannot be named in a `catch` from another module.
+`TsonDiagnostics.ofBaseSyntaxError(e)` (`io.ltr8.tson.compiler`) is public for exactly that reason: it
+classifies a base-syntax failure and **rethrows anything else**, which is what a caller driving a `TsonDataStream`
 or `TsonDataParser` directly cannot do for themselves. The facade readers call it for you.
 
 ### Which exception comes out of where
@@ -205,14 +212,15 @@ or `TsonDataParser` directly cannot do for themselves. The facade readers call i
 | Code | Meaning                                                                                          |
 | ---- | -------------------------------------------------------------------------------------------------- |
 | `0`  | everything was checked and nothing was reported (or an explicit `--help`)                        |
-| `1`  | **checked and rejected** — the validity codes, plus a §8.2 refusal                               |
+| `1`  | **checked and rejected** — the validity codes and a §8.2 refusal; also `LIMIT_EXCEEDED`, whose outcome is `NOT_CHECKED` |
 | `2`  | usage error — bad arguments, an unreadable file                                                  |
 | `69` | `EX_UNAVAILABLE` — a schema was not obtained and a rerun will not obtain it: `SCHEMA_NOT_PERMITTED`, `SCHEMA_NOT_FOUND`, `SCHEMA_TOO_LARGE` |
 | `75` | `EX_TEMPFAIL` — a schema was not obtained and a rerun may help: `SCHEMA_UNREACHABLE`, `SCHEMA_TIMEOUT` |
 | `78` | `EX_CONFIG` — a type the schema needs has no Java class in this tool: `BIND_MISMATCH`             |
 | `70` | `EX_SOFTWARE` — a library gap (`NOT_IMPLEMENTED`) or an uncaught fault; **no verdict reached**    |
 
-`1` is a verdict on the input; everything above `2` is the absence of one, naming who could not give it.
+`1` is what the runner can act on — a verdict on the input, or a §9.1 limit they can raise or a document they
+can shrink; everything above `2` is the absence of a verdict, naming who could not give it.
 A §8.2 name-hygiene refusal is a `1` and not a fifth code: §8.2's "not in any of the four categories" is
 about which layer detected it, where an exit code answers what the caller should do now — and a refusal
 was checked and declined, with the sender holding the fix.
@@ -222,7 +230,7 @@ counts**, permanence breaking the tie: **70 > 78 > 69 > 75 > 1**. 70 and 78 name
 release of this library; an application wired to bind that type), 69 the runner editing the reference or
 the allow-list it is checked against, 75 the runner simply rerunning, and 1 the runner editing the
 document. Every non-verdict also rides in the report as its own code, with a note on stderr; the report
-on stdout is unchanged, and its `outcome` reads `NOT_CHECKED` for all of them.
+on stdout is unchanged, and its `outcome` reads `NOT_CHECKED` for all of them — and for `LIMIT_EXCEEDED`.
 
 70's two halves print differently: a gap prints `not implemented yet: <message>`, whose text usually
 names the workaround; a fault gets the please-report-it banner and its stack trace.
