@@ -258,6 +258,19 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Miscellaneous
 
+- [ ] **Two `DefinitionResolver` gap messages describe a resolver that no longer exists.** Both are
+  `UnsupportedOperationException` texts, so they are what `tson` prints after `not implemented yet:` and what a
+  `NOT_IMPLEMENTED` diagnostic carries. `resolveTypeRef`'s, for a sugar form that reaches resolution unlifted, offers two
+  causes -- the desugar phase was skipped, "or a position inside it is an application, which has no entry to name until
+  it is materialised" -- and the second is not one: a container position holding an application (`[box<text>]`) lifts,
+  its slot written in `type_ref`'s record form and rewritten to the instantiation entry at materialisation. The comment
+  above the throw says the same. `resolveTypeDef`'s fall-through lists what is "resolved so far" -- six shapes, where the
+  method dispatches on everything §12.1's `type-def` produces -- so it reads as a feature gap where the only way to
+  reach it is a `TypeDef` subclass the dispatch was never taught, an internal fault. What constrains the fix is the
+  exception-classification policy: deciding what each site *is* (the first is reachable only by a caller that skipped a
+  phase) decides whether it stays `UnsupportedOperationException` or becomes `IllegalStateException`, and with it exit
+  70's two halves. `DefinitionResolver`'s class Javadoc lists both sites and moves with them.
+
 - [ ] **A base-syntax diagnostic does not say whether it is a lexer error or a parse error.** [TSON-DATA] §8.1 makes
   them two categories, and [TSON-JSON] §9.4's table sorts JSON's failures into them (malformed text, invalid UTF-8 and
   ill-formed strings are lexer errors; grammar violations are parse errors). Both classifiers collapse the pair:
