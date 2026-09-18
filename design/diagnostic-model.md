@@ -5,8 +5,9 @@ rule deciding when a fact earns a component. Current form only; history lives in
 
 **Invariants**
 
-- `Diagnostic` lives in `tson-base` and its classifiers do not: each encoding owns the switch over its own exceptions
-  (`TsonDiagnostics`, `JsonDiagnostics`).
+- `Diagnostic` lives in `tson-base` and the encoding-specific classifiers do not: each encoding owns the switch over
+  its own exceptions (`TsonDiagnostics`, `JsonDiagnostics`). The two on the record classify base exceptions only:
+  `Diagnostic.ofLimitExceeded` and `Code.of(SchemaFetchException.Reason)`.
 - One record for data- and schema-side problems: the variation is locational, not categorical.
 - Every component is a location; a routing question belongs in the `Code` — a fetch failure is five codes, a §8.2
   refusal one code per rule, and neither carries a component of its own.
@@ -23,12 +24,14 @@ Related: `design/readers-and-diagnostics.md`, `design/reader-naming-and-schema-l
 
 ## Diagnostics
 
-**`Diagnostic` lives in `tson-base`, and its classifiers do not.** The record, its `Code` enum, the three
+**`Diagnostic` lives in `tson-base`, and the encoding-specific classifiers do not.** The record, its `Code` enum, the three
 receivers and `ReadException` are a module of their own, because [TSON-JSON] §9.4 makes a second
 encoding report in the same four categories — one vocabulary by specification, not by convenience. The
 `of*` factories that turn a thrown failure into a diagnostic live in `tson-compiler` as `TsonDiagnostics`,
 because every one of them switches on an exception type this engine declares. What is shared is the shape of
-an answer; classifying a failure is reading a document, and that is each encoding's own. (`Diagnostic`, root package)
+an answer; classifying a failure is reading a document, and that is each encoding's own. The exceptions to
+that are `Diagnostic.ofLimitExceeded` and `Code.of(SchemaFetchException.Reason)`, whose inputs are
+`tson-base`'s own exceptions and mean the same thing in every encoding. (`Diagnostic`, root package)
 
 `Diagnostic` is the structured value every `DiagnosticsReceiver` receives, identical shape whichever
 one is in play: a closed `Code` enum (`FIELD_REQUIRED`/`FIELD_FIXED`/`TYPE_MISMATCH`/`WRONG_ARITY`/

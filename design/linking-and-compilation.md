@@ -60,7 +60,9 @@ storage over the `schema.meta` value model and stays in `tson-schema`, the leaf 
   carries the fact;
   (3a) **check what `record.extension` obliges** (`RecordExtension`, §5.2) — that nothing composes onto a
   FINAL record, that a sealed family's selectors are usable and its members pin them distinctly, and that
-  `@sealed` and `@discriminator` agree; detailed below;
+  `@sealed` and `@discriminator` agree; detailed below. It is listed here for what it reads, and runs later:
+  `link` goes subtypes → disjointness → `checkNames` → validate → inhabitance → `checkRecordExtension` →
+  `withNameAnnotations` → the `@disjoint` check;
   (4) **validate** every reference
   resolves, with a type-parameter exception (a bare name valid if it's the entry's own declared parameter);
   **a reference to a DATA-kinded entry is refused** — §8.1's schema map holds only type definitions, so an

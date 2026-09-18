@@ -82,9 +82,9 @@ rather than passing a lambda to `ifPresent`. That last part is not a style prefe
 the name and the receiver allocates whether or not the `Optional` holds anything, and at one per rule per
 name it is the whole measured cost of a check that is otherwise free — ~110 bytes per bound record and ~640
 per read on the name surface, and most of what a raised *token* policy would add. `AllocationHarnessTest`
-carries the figures and the ceiling that catches a return to them.
+carries the figures and the ceiling that catches a capturing lambda.
 
-**The look-alike rule is the expensive one, and `Confusables.skeleton` is where that was spent.** It runs
+**The look-alike rule is the expensive one, and `Confusables.skeleton` is where its cost is controlled.** It runs
 per name per record on the schemaless tree path, so normalising, building and re-normalising for every name
 whether or not it carries a confusable character is what it must not do. It scans first and returns the
 decomposition untouched when nothing maps — no builder, no second normalisation, and none of the stream and

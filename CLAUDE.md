@@ -33,8 +33,9 @@ Forty-odd notes, each under ~25 KB and opening with its invariants. Pick by the 
 | **Conformance, build, process** | `conformance-suite.md` (runner contract, §8.2 scope walks) · `build.md` (commands, allocation harness, publishing) · `process.md` (branches, spec-feedback register, backlog and identity rules at full length) |
 
 Other root documents: `BACKLOG.md` (outstanding work), `SPEC-FEEDBACK.md` (open spec issues against Parts 1 and 2),
-`STRUCTURED-OUTPUT.md` (the target use case: LLM structured-output validation, JSON compatibility), `README.md`
-(consumer-facing).
+`STRUCTURED-OUTPUT.md` (the target use case: LLM structured-output validation, JSON compatibility), and the
+consumer-facing `README.md`, `STATUS.md` (the implemented checklist) and `CONFORMANCE.md` (edge-case behaviour).
+`skills/` holds the consumer-facing Claude skills (`tson-java`), linked into `.claude/skills/`.
 
 ## Project
 

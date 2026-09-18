@@ -11,8 +11,9 @@ form only; history lives in git.
 - A failure reaching or resolving the schema is a diagnostic, not an exception — and a schema's own
   diagnostics go to the facade's receiver, never through `ctx.report`, which would stamp a data position on
   them.
-- `TsonReadContext.of` takes the policy as a required parameter; the token policy is applied by the stream,
-  not the context, because the context rewinds and a check there would report one token twice.
+- A `TsonReadContext` always carries an identifier policy: `of(events, receiver)` defaults it to Highly Restrictive
+  and `of(events, receiver, policy)` refuses `null`. The token policy is applied by the stream, not the context,
+  because the context rewinds and a check there would report one token twice.
 - A lookup of the root type-ref, and every dispatcher, looks ahead by rewinding (`EventSkip.typeRefAhead`
   over `TsonReadContext.lookingAhead`) and never consumes the framing — consuming it silently strips the
   value's annotations.
@@ -70,9 +71,10 @@ and `Tson.processorPolicy()` reports one answer for it, which is only true if on
 use: a configured identifier policy that reached the linker alone would make that report name a policy no read
 had applied, which is worse than reporting none. `SchemaPolicyRefusalTest` pins the read end.
 
-**`TsonReadContext.of` takes the policy as a required parameter and installs the check itself**, so no context
-can exist whose events went unchecked — the low-level API cannot skip the policy by saying nothing, which is
-the property that makes it a policy rather than a facade convenience. Naming `unrestricted()` is a fine
+**`TsonReadContext` always carries an identifier policy and installs the check itself**, so no context can
+exist whose names went unchecked: the two-argument `of` defaults to Highly Restrictive (§8.2's SHOULD for the
+name surface), and the explicit form refuses `null`. The low-level API cannot skip the policy by saying
+nothing, which is the property that makes it a policy rather than a facade convenience. Naming `unrestricted()` is a fine
 answer and the right one for a synthetic source; it is just not one a caller gives by accident. The three
 internal synthetic sites (`AnnotationCapture`, `RecordAbstractReader`, `SchemaResolver`) each pass it with the
 reason written beside them: the first two replay events the real stream already delivered, so checking again

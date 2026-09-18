@@ -153,9 +153,9 @@ rebuilt and called a cache.
   supplied — `SchemaResolver` always supplies one on its reporting overload, so the phase joins resolution
   and linking in reporting every independent problem in one pass. The reportable forms are
   `SchemaValidationException`s: a vacuous `[T; 0..]`, an incoherent size range, and an application of something
-  that takes no type arguments. **A template-application `UnsupportedOperationException` is reported too**,
-  as `NOT_IMPLEMENTED` rather than as an author error — thrown, it would take every other declaration's
-  verdict with it. See `design/schema-side-diagnostics.md` for the code split, the placeholder and the no-rollback
+  that takes no type arguments. **A library gap (`UnsupportedOperationException`) is reported too**, as
+  `NOT_IMPLEMENTED` rather than as an author error — thrown, it would take every other declaration's verdict
+  with it. See `design/schema-side-diagnostics.md` for the code split, the placeholder and the no-rollback
   rule.
 - **Structural sharing is load-bearing, not an optimization.** Every node not being rewritten is returned
   by identity, because `TsonSchemaParser.declarationPositions()` is an `IdentityHashMap` — an

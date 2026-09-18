@@ -40,7 +40,7 @@ Two registries over one shared resolution core, the compiled-side counterparts t
   meta.tn) so it is resolve-only here — its readers are compiled per mode in a read registry when a user
   schema importing it is read, never standalone in the core.
 - **`TsonCompiledSchemaRegistry`** is a **per-mode registry of compiled user schemas** over a core, built
-  via `TsonCompiledSchemaRegistry.dom(core)` / `bind(core, context)`. **The read mode is which registry
+  via `TsonCompiledSchemaRegistry.tree(core)` / `bind(core, context)`. **The read mode is which registry
   you hold**, not a compile parameter. `get(uri)` resolves through the core (`resolveLinked`) and compiles
   the linked form standalone in its own mode, cached by identity; `compile(linked)` is the uncached
   primitive.

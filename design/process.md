@@ -17,47 +17,50 @@ Related: `design/cli-config-hashing.md` (bundled schemas, restamping), `design/c
 
 ## The spec cache and the bundled schemas
 
+The spec is a *working revision* that changes between revisions without compatibility guarantees. When in
 doubt, **re-fetch the current URL** and check the revision number at the top rather than trusting a cached
-copy. `spec/` holds local snapshots of the current revision for quick reference: `spec/tson-part1-data.md`,
+copy. `spec/` holds local snapshots for quick reference: `spec/tson-part1-data.md`,
 `spec/tson-part2-schema.md`, and `spec/m/{meta-kernel,meta,core}.tn` (the spec's own bundled schema
 documents — the meta-kernel bootstrap layer, the meta-schema built on it, and the core type library built
 on that) plus their non-normative `*-resolved.tn` resolver-output fixtures. Treat `spec/` as a cache, not a
 source of truth — with **two** standing exceptions. The three `.tn` schemas are **packaged from here at build
 time**, so they are the live copies rather than a snapshot. And **`spec/tson-part3-json.md` is editable in
-place**: see "Part 3 is drafted here" below. On this branch they carry **Revision 36 identities** —
-`https://tson.io/2026/36/m/*.tn`, the proposing revision's own, per the from-the-start rule below. `spec/` holds
-**Revision 35** of Parts 1 and 2, which are the published cache and are not edited here; what moved in Part 2 is
-§13.2's three artifact rows alone, so the table still names the bytes beside it and stays checkable, while its
-Part 1 and Guide rows stay at the revision those documents actually are. **§13.2 is a fourth pin to move**
-whenever the artifacts change.
-`scripts/restamp-bundled-schemas.sh` does not know about it: the script covers the repo's own pins, and the
-spec document is a cache it does not write, so §13.2 is the one that has to be re-stamped by hand and is
-therefore the one that silently drifts. `tson hash spec/m/<name>.tn` is the check. The divergences earlier
-revisions carried are all in the spec now — `reference.target` typed `type_ref`, no
-`instance_template`/`template_argument`/`value_param` (§5.10's held bodies replaced the quoted open-body
-vocabulary), and `map`'s `state` field behind `{K => V?}` (§5.3). The open-entry shape is the spec's now too:
-an open entry's body is an instance of the kernel's `template` constructor — the parameter names and the
-application as text (§8.1) — so `type_definition` has lost `parameters` to that body, `disjoint` to the choice
-body it is derived over (§5.4), and `kind` altogether, the kernel losing `type_kind` with it because a kind is
-derived from an entry's own supertypes and body (§4.1, §8.1's four-branch rule). `TypeDefinition.kind`
-survives as an `@Unbound` component: computed at resolution for this resolver's own use, never written.
-**Changing them means re-stamping all three digests bottom-up**, moving the matching `*-resolved.tn`
-entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the published
-values. `scripts/restamp-bundled-schemas.sh` does the digest half — every pin in the repo, in dependency
-order, plus the getting-started example, which pins meta and core and so has a digest of its own that moves
-with them; `--check` reports staleness and writes nothing. **The digests are not a test-only concern**: the
-library verifies the packaged bytes against `TsonBundledSchemas`' held digest on every load, so one stale
-constant fails `Tson.standard()` and with it most of the suite. Restamping after each edit is what
+place**: see "Part 3 is drafted here" below.
+
+On this branch the bundled schemas carry **Revision 36 identities** — `https://tson.io/2026/36/m/*.tn`, the
+proposing revision's own, per the from-the-start rule below. `spec/` holds **Revision 35** of Parts 1 and 2,
+the published cache, not edited here except for §13.2's three artifact rows, so the table names the bytes
+beside it and stays checkable; its Part 1 and Guide rows stay at the revision those documents actually are.
+**§13.2 is a fourth pin to move** whenever the artifacts change. `scripts/restamp-bundled-schemas.sh` does
+not write it — the script covers the repo's own pins, and the spec document is a cache — so §13.2 is
+re-stamped by hand and is the one that silently drifts. `tson hash spec/m/<name>.tn` is the check.
+
+The bundled schemas and the spec agree on shape: `reference.target` is typed `type_ref`; there is no
+`instance_template`/`template_argument`/`value_param` (§5.10's held bodies carry an open body); `map`'s `state`
+field sits behind `{K => V?}` (§5.3). An open entry's body is an instance of the kernel's `template`
+constructor — the parameter names and the application as text (§8.1) — so `type_definition` carries no
+`parameters` (they are the body's), no `disjoint` (derived over the choice body, §5.4) and no `kind`: a kind is
+derived from an entry's own supertypes and body (§4.1, §8.1's four-branch rule), and the kernel declares no
+`type_kind`. `TypeDefinition.kind` is an `@Unbound` component, computed at resolution for this resolver's own
+use and never written.
+
+**Changing a bundled schema means re-stamping all three digests bottom-up**, moving the matching
+`*-resolved.tn` entries, and updating `TsonBundledSchemas`, `InitCommand` and `README.md`, which carry the
+published values. `scripts/restamp-bundled-schemas.sh` does the digest half — every pin in the repo, in
+dependency order, plus the getting-started example, which pins meta and core and so has a digest of its own
+that moves with them; `--check` reports staleness and writes nothing. **The digests are not a test-only
+concern**: the library verifies the packaged bytes against `TsonBundledSchemas`' held digest on every load, so
+one stale constant fails `Tson.standard()` and with it most of the suite. Restamping after each edit is what
 lets a schema change land across several commits with the integrity checks left on.
 
-
-## Branches and revisions
-
+**The `*-resolved.tn` fixtures are checked, not decoration.** They carry the instruction in their own
 `@doc` — "Parse the source schema, run the resolver, canonicalise, compare" — and `ResolvedFixtureTest`
 does it: every entry must read back into `schema.meta` and have a counterpart here, and what may still
 differ is pinned per schema. They are the only external statement of what a conforming resolver produces,
 so a change that moves those counts wants looking at rather than renumbering. Keep them in step with the
-`.tn` beside them; both have drifted before.
+`.tn` beside them.
+
+## Branches and revisions
 
 **`main` is the reference implementation of the published revision, which is Revision 35.** Each published
 revision's implementation stays reachable at the point it was the whole of `main`, by tag: `r2026-32`,
@@ -70,7 +73,7 @@ proposing it rather than being re-identified at the end.
 
 **The open proposal is `r2026-36-proposal`, and this is it.** What takes the work off `main` is that the
 discriminated-family design (`SPEC-FEEDBACK.md` #10, #11) needs two kernel fields — `record.extension` and
-`record.discriminators` — so it is a meta-kernel change and no longer a Revision 35 feature. Work lands
+`record.discriminators` — so it is a meta-kernel change, which a Revision 35 reference cannot carry. Work lands
 here through ordinary PR branches off this one. `main` stays the Revision 35 reference until the spec catches
 up, at which point this merges.
 
@@ -81,6 +84,7 @@ time**: a wrong rule gets fixed rather than kept, a bad name gets changed rather
 method that turned out to be the wrong shape gets deleted rather than wrapped. Where the spec itself is
 wrong, `SPEC-FEEDBACK.md` is how that gets fixed too. A compatibility argument is only worth making about a
 real consumer, and there are none — the one place any of this becomes binding is §10's immutability rule for
+a *published* schema `!!id`, which is about documents in the world, not about Java signatures.
 
 ## Spec feedback — this is the first implementation
 
@@ -183,7 +187,7 @@ this library improves; a gap's does.** A gap is not a verdict on the author's sc
 vs. exit 70 rides on that distinction — **carried by `Diagnostic.Code.NOT_IMPLEMENTED`, not by the channel**.
 Both kinds are collected: a gap thrown out of a phase that reports per declaration took every other
 declaration's verdict with it, so the schema pipeline reports it beside the ordinary problems and the code
-keeps it apart. The exception classification itself is unchanged and is what picks the code.
+keeps it apart; the exception's class is what picks the code.
 `DefinitionResolver`'s Javadoc lists the exact current boundary.
 
 **Project-owned schema `!!id`:** a schema this project authors (not the spec's own bundled artifacts) gets

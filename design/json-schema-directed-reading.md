@@ -44,11 +44,12 @@ than an exception to it: a prefix earns its keep disambiguating a name a *consum
 unexported. The root package keeps it for exactly that reason — `JsonReadContext` beside a domain
 `ReadContext`, `JsonTypeReader` beside `TsonTypeReader`.
 
-The consequence worth having is that **thirteen of these share a bare name with their `tson-compiler`
-counterpart**: `ErrorReader`, `OpenTemplateReader`, `EventSkip`, `CompiledReaders`, `DiscriminationClass`,
-`ValueReaderFactory`, `ValueReaderContext`, `ValueReaderFactoryResolver`, `ValueReaderFactoryRegistry`,
-`VoidReader`, `DeferredTypeReader`, `ReferenceChain`, `ValueIdentity`. The two stacks read as peers, and which TSON class
-a JSON class answers to is visible at a glance — which is what a parallel implementation wants and what a
+The consequence worth having is that **thirteen schema-directed classes share a bare name with their
+`tson-compiler` counterpart**: `ErrorReader`, `OpenTemplateReader`, `EventSkip`, `CompiledReaders`,
+`DiscriminationClass`, `ValueReaderFactory`, `ValueReaderContext`, `ValueReaderFactoryResolver`,
+`ValueReaderFactoryRegistry`, `VoidReader`, `DeferredTypeReader`, `ReferenceChain`, `ValueIdentity` — and the
+schemaless engines `SchemalessTreeReader` and `DataClassObjectReader` do too. The two stacks read as peers, and
+which TSON class a JSON class answers to is visible at a glance — which is what a parallel implementation wants and what a
 prefix would hide. Nothing imports both, neither package being exported, so the shared names cost nothing.
 
 ## Binding a document, which is the one thing JSON cannot do for itself

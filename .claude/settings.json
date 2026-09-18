@@ -19,7 +19,6 @@
       "Bash(tson-cli/build/install/tson/bin/tson *)",
       "Bash(scripts/restamp-bundled-schemas.sh --check)",
       "Bash(scripts/check-line-length.sh *)",
-      "Read(//Users/david/github/**)",
       "WebFetch(domain:tson.io)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebSearch"

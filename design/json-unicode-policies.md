@@ -11,8 +11,8 @@ git.
 - Under a schema only an **unmatched** name is judged, and it is judged before it is reported as `UNRECOGNIZED_FIELD`:
   declared fields, then rest collection, then hygiene.
 - A rest key is a map key, not a name.
-- `JsonObjectReader` holds a position and `JsonTreeReader` does not: the tree reader applies no identifier policy, and
-  `bindMap` applies nothing to keys.
+- `JsonObjectReader` holds a position and `JsonTreeReader`'s schemaless read does not: that read applies no identifier
+  policy (a schema-directed tree read does, through `JsonReadContext`), and `bindMap` applies nothing to keys.
 - The look-alike rule reaches no JSON position; a deployment that will not accept look-alike keys raises the token policy.
 - A refusal is kept apart by its code — `RESTRICTED_CHARACTER` or `RESTRICTED_SCRIPT` — and never reported in §8.1's four
   categories.
@@ -92,7 +92,7 @@ no such problem: TSON text spells the two apart (`a: 1` against `k => v`), so it
 `FieldName` event it delivers. That difference is the same one that made this a separate stack rather than
 a front end over `TsonEventSource`.
 
-**`JsonObjectReader` holds a position; `JsonTreeReader` does not.** The target class plays the schema's
+**`JsonObjectReader` holds a position; `JsonTreeReader`'s schemaless read does not.** The target class plays the schema's
 part in this encoding, so a `DataClassRecord` position means the members are names and a `DataClassMap`
 position means they are keys. `DataClassObjectReader.checkNameHygiene` applies the two per-name rules
 there and `bindMap` applies nothing, deliberately — which is also what keeps a JSON-Schema conversion from

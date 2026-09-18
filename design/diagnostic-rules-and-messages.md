@@ -34,8 +34,8 @@ and every reader supplies where it happened.
 **Why it is shared, and why that is an obligation rather than a tidiness.** [TSON-JSON] §9.4 gives both
 encodings one diagnostic vocabulary and adds no category of its own, so a document wrong in one encoding is
 wrong in the other for the same stated reason. The `code` and the machine-readable `expected` are what a
-consumer routes on — and before this, two independently written record readers agreed about them only because
-one had been copied from the other. Nothing held them there.
+consumer routes on — and two independently written record readers agree about them only if something holds
+them there. Stating each rule once, here, is what does.
 
 **The prose is the schema's vernacular, not the format's.** A record has *fields* in both encodings, even
 though JSON's own word for what carries one is a member; absence is *absent* rather than `_` or `null`. The
@@ -72,9 +72,9 @@ aligning before the JSON side has the second position would be aligning against 
 **A type names itself by what the author wrote, in both encodings.** `EntryDisplayName` lives in
 `schema.meta` — beside the model it renders, and depending on nothing else — so both stacks reach it. A
 resolver-minted entry shows as the sugar or application that produced it (`[text]`, `box<text>`), told apart
-from an authored one by having no source position. Before the move it was `tson-compiler`'s, and a JSON
-diagnostic named the synthetic entry by its content-derived hash: `'array_text_4cc4a482'`, a name in neither
-the author's schema nor the sender's document. The record reader carries the display name *beside* its own
+from an authored one by having no source position. Kept in `tson-compiler`, it would leave a JSON diagnostic
+naming the synthetic entry by its content-derived hash — `'array_text_4cc4a482'`, a name in neither the
+author's schema nor the sender's document. The record reader carries the display name *beside* its own
 name rather than instead of it, because a `$type` resolves against the entry while a message names the
 author's spelling — one place the two genuinely differ.
 
@@ -146,7 +146,7 @@ field's value is that it is one vocabulary across atoms, not a per-parser phrasi
 **`message` and the structured fields do different jobs, and neither is derived from the other.** The
 structured half — `code`, `path`, `expected`, `actual`, the positions — carries the *facts*, and is what a
 machine consumer acts on; it must be complete at every report site, including the facade-level ones
-(`TsonObjectReader`/`TsonTreeReader`'s `abandon`, which offers no overload that omits them, because
+(`TsonObjectReader`'s `abandon`, which offers no overload that omits them, because
 such an overload is how a diagnostic ends up with a blank structured half). `message` is for a person, and
 is free to do what a template could not: cite the spec, or name the fix.
 
@@ -174,7 +174,7 @@ diagnostic, which is what keeps a stack trace informative, a base-syntax failure
 caller through *it* rather than as the parse exception itself.
 
 **A base-syntax failure goes to the receiver, like every other problem with the document.** Both facades'
-whole-document entry points catch it and report `Diagnostic.ofBaseSyntaxError(e)`, so a collecting read
+whole-document entry points catch it and report `TsonDiagnostics.ofBaseSyntaxError(e)`, so a collecting read
 never throws for a bad *document* — it hands back nothing (no tree, `null` bind) and the collector holds why.
 Three reasons this is the receiver's business rather than the caller's:
 

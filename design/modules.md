@@ -45,17 +45,16 @@ module has a real `module-info.java`; module names mirror each module's root exp
   types are not here**: `Rational`, `Complex`, the `CidrNetwork` pair and `InternetAddress` are `base.atom`'s, because
   *what do I get back from `!rational`?* is a question about the type system rather than about §8's model,
   and they depend on nothing. `schema.meta` reads them structurally — `RationalType`'s
-  `min`/`max`/`multiple_of` are `Rational` values — which is what used to hold them here, and is a pull from
-  above rather than a reason to live above. Plus the schema
+  `min`/`max`/`multiple_of` are `Rational` values — a pull from above rather than a reason to live above. Plus the schema
   registry (`TsonSchemaRegistry`/`TsonLinkedSchema`/`TsonSchemaLoader`) and
   `TsonBundledSchemas`. **The linker is not here** — it is an engine, not a value model, so
-  `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the pipeline; what
-  stays is storage and the identity algorithm lookups
-  compare by. Depends only on `tson-annotation`. **`tson-compiler` depends on `tson-schema`, not
-  the reverse** — the opposite of what the names suggest, deliberately so the compiler's resolver can hold
-  and consult `schema.meta` types directly. `schema.meta` names no `tson-compiler` type; where it needs
+  `TsonSchemaLinker`/`ChoiceDisjointness` live in `tson-compiler` with the rest of the pipeline; what stays is storage
+  and the identity algorithm lookups compare by. Depends on `tson-annotation` and `tson-base` (`requires transitive`).
+  **`tson-compiler` depends on `tson-schema`, not the reverse** — the opposite of what the names suggest, deliberately
+  so the compiler's resolver can hold and consult `schema.meta` types directly. `schema.meta` names no `tson-compiler`
+  type; where it needs
   one structurally it declares a local stand-in (`schema.meta.Token` mirrors `ast.TokenValue`/`TokenForm`;
-  `schema.meta.SourcePosition` is an interface `tson-compiler`'s `Position` implements), converted at the
+  `tson-base`'s `SourcePosition` is an interface `tson-compiler`'s `Position` implements), converted at the
   one spot that needs it.
 - **`tson-atom`** — the built-in atom vocabulary: which tokens each family accepts and what host value results (§5.2's
   parsing contracts). **A module rather than a package inside an engine, because the vocabulary is not an engine's** —
@@ -87,8 +86,9 @@ module has a real `module-info.java`; module names mirror each module's root exp
   *engine* counterpart to `tson-bind` (a general dependency-free engine), not a value model like
   `tson-tree`; TSON pins its `regex` atom to I-Regexp (`regex_type`'s `REQUIRED_FIXED spec = rfc9485`), so
   this owns I-Regexp semantics rather than delegating to `java.util.regex` (a laxer superset).
-  `tson-compiler`'s atom vocabulary depends on it; it names no `tson-compiler` type.
-- **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the atom vocabulary,
+  `tson-atom` and `tson-compiler` require it; it names no TSON type.
+- **`tson-compiler`** — the engine: lexer, both grammars, base type resolution, the token-side atom glue
+  (`atom`: `RawTokenParser`, `TokenAtomType`, `ValueParser` — the vocabulary itself is `tson-atom`'s),
   schema resolution, Class 2 compilation, the compiled reader stack, the schema-aware read facades
   (`TsonTreeReader`/`TsonObjectReader`) over their schemaless `reader`-package engines
   (`SchemalessTreeReader`/`DataClassObjectReader`), the `TsonTreeWriter`/`TsonObjectWriter` writers over
@@ -96,7 +96,7 @@ module has a real `module-info.java`; module names mirror each module's root exp
   config/wiring. Everything here is tightly coupled to the shared lexer/token-stream machinery, so it's
   one module. Root package `io.ltr8.tson.compiler`; exports the packages with real cross-module callers
   and keeps `reader`/`atom`/`base`/`lexer` internal.
-- **`tson`** — the front door, and now **one class**: `Tson`, over `tson-compiler`, the way Retrofit sits on
+- **`tson`** — the front door, and **one class**: `Tson`, over `tson-compiler`, the way Retrofit sits on
   OkHttp. Declares `tson-compiler`/`tson-schema`/`tson-bind`/`tson-tree` as `api` so a caller sees the real
   classes underneath. **`ProcessorConfig` is not here** — a configuration is a value stating what a deployment
   chose, so it sits in `tson-base` with the values it holds and is shared by every encoding; what cannot

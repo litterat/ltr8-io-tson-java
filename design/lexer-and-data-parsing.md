@@ -31,7 +31,7 @@ Related: `design/base-types-and-atom-vocabulary.md` (base type resolution, the a
 `tokenize()` batch). §1.3 says higher parts introduce no new tokens, modes, or character-classification
 changes — a statement about the *layering*, which holds. It is not a promise that this class never changes:
 the spec is a working revision and this implementation has no users, so a lexer rule that turns out wrong is
-fixed rather than kept (Revision 35's escape-table change is exactly that).
+fixed rather than kept.
 
 - **Constructed from a `ByteSource`** (`tson-base`'s `base.io`), decoding UTF-8 and buffering a few code
   points of lookahead —
@@ -91,10 +91,10 @@ fixed rather than kept (Revision 35's escape-table change is exactly that).
   .isUnicodeIdentifierStart/Part` is `ID_Start`/`ID_Continue`, and the `Part` half is additionally unioned
   with everything `Character.isIdentifierIgnorable` covers — all of `Cf` plus the non-whitespace C0/C1
   controls. Standing it in unmodified would put a BOM, a soft hyphen, a raw control and every bidi override
-  (U+202A–U+202E, U+2066–U+2069, U+061C) inside identifiers, with every ASCII test still passing. `Lexer`
-  subtracts the ignorable set and two literal `ID_ \ XID_` tables (24 code points for start, 20 for
-  continue — the characters XID drops for not being NFKC-closed), which is **exact** against Unicode 16.0:
-  zero over-, zero under-acceptance on both predicates across all 1,112,064 non-surrogate code points.
+  (U+202A–U+202E, U+2066–U+2069, U+061C) inside identifiers, with every ASCII test still passing. `Xid` (`tson-base`'s
+  `base.unicode`, which `Lexer` asks) subtracts the ignorable set and two literal `ID_ \ XID_` tables (24 code points
+  for start, 20 for continue — the characters XID drops for not being NFKC-closed), which is **exact** against Unicode
+  16.0: zero over-, zero under-acceptance on both predicates across all 1,112,064 non-surrogate code points.
   `Xid.UNICODE_VERSION` declares the version, as §7.1 asks.
 - **`Xid` is the shared property, and neither profile is it.** `Xid.isStart`/`isContinue` are exactly
   `XID_Start`/`XID_Continue`, joiners included; the lexer's token profile adds `Nd`/`-`/`+`/`.` and subtracts

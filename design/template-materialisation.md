@@ -92,7 +92,7 @@ recorded open form, and replacing the application with a reference to the entry 
   policy can classify.
 - **Substitution is where a routed `=` becomes fixed.** §5.7 puts a parametric `= P` in `REQUIRED` at the
   declaration ("nothing is fixed at declaration — the value does not exist yet") and defers the rest to one
-  sentence, *fixation happens downstream, where values are concrete*. `bindValue` is that downstream: a bound
+  sentence, *fixation happens downstream, where values are concrete*. `fixRoutedValues` is that downstream: a bound
   field arriving as `REQUIRED` becomes `REQUIRED_FIXED` with the argument as its value, so
   `response<order, 201>` lands on exactly what the literal `status: int32 = 201` beside it lands on. Carried
   through unchanged instead, the closed entry held the right value on a field that did not enforce it — a
@@ -199,7 +199,7 @@ recorded open form, and replacing the application with a reference to the entry 
   template not a type, so the entry that cannot validate anything does not claim the kind an application of
   it would take: `set` is `TEMPLATE` rather than PRODUCT, and an open alias is `TEMPLATE` rather than
   REFERENCE — it is a template whose closure is a reference, not a reference that happens to have parameters.
-  Like `REFERENCE` it is a `type_kind` and not a base kind (§4.1).
+  Like `REFERENCE` it is a derived `TypeDefinition.kind` and not a base kind (§4.1).
   - **Which is where materialisation reads the closed entry's kind from instead** (`kindOfClosed`): the
     branch of `Top` the substituted body occupies, §4.1's "construction transfers kind" asked of the
     construction. Not the constructor's *name* — a held body's head is structure-namespace vocabulary the

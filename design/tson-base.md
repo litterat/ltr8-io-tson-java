@@ -5,7 +5,8 @@ the Unicode tables — package by package, with why each thing is here. Current 
 
 **Invariants**
 
-- The root package names none of its subpackages; every dependency runs inward.
+- The root package names none of its subpackages except in `ProcessorConfig`, the value that composes them; every
+  other dependency runs inward.
 - Nothing here knows what a TSON document or a JSON one looks like.
 - The exceptions stay at the root rather than following their subject — that is what keeps the inward rule true.
 - The `Tson` prefix is dropped here and only here: the competing name is another *encoding's* type, not a consumer's.
@@ -19,8 +20,9 @@ Related: `design/modules.md`, `design/readers-and-diagnostics.md`, `design/json-
 
 ## The packages
 
-**`tson-base`** — four packages, and **the root names none of the other three**: every dependency runs
-inward, so a subpackage reads on its own and the vocabulary at the centre stays free of the machinery
+**`tson-base`** — eight packages (the root, `io`, `diagnostics`, `policy`, `source`, `unicode`, `atom`, `bind`), and
+**the root names none of the other seven** apart from `ProcessorConfig`, which composes them: every other
+dependency runs inward, so a subpackage reads on its own and the vocabulary at the centre stays free of the machinery
 around it. `io.ltr8.tson.base` is how a problem is stated — `Diagnostic` (the record and its closed `Code`
 enum), the three diagnostics receivers, `SourcePosition`, `CanonicalIdentity` (§2.2.1's algorithm, how a
 schema is named), and the exceptions whose fact is the **processor's** rather than
@@ -31,30 +33,28 @@ any one encoding's — `ReadException`, `ParseException`, `WriteException`, `Lim
 maps), `ContentHashMismatchException`. **The exceptions stay at the root rather than following their
 subject**, which is what keeps the inward rule true — `Diagnostic.ofLimitExceeded` and
 `Code.of(SchemaFetchException.Reason)` are same-package calls, where filing each exception with the package
-it is thrown by would have the centre depend on two of its own subpackages. Sorting the eight by "is a
+it is thrown by would have the centre depend on two of its own subpackages. Sorting the nine by "is a
 `Throwable`" would be sorting by Java mechanism in any case; this library files by subject, which is why
 `LexException` sits in `lexer`. **The prefix is dropped here and only here**: `Tson` earns its keep
 disambiguating a consumer's own `Schema` from `TsonSchema`, and in this module the competing name is
 another *encoding's* type in this same library — `ReadException` beside `JsonValueException` reads right
 where `TsonReadException` beside it implies the first belongs to the text encoding, which is exactly what
-nothing here does. The argument outlived its first example: `ParseException` is now *shared* rather than
-one encoding's, which is the same conclusion reached from the other end. A **true pure leaf** — depends on
+nothing here does. `ParseException` is shared rather than one encoding's, which is the same conclusion reached
+from the other end. A **true pure leaf** — depends on
 nothing, and nothing in it knows what a TSON document or a JSON one looks like. It is a module rather
 than a package because [TSON-JSON] §9.4 makes the JSON encoding report in [TSON-DATA] §8.1's four
 categories and add none of its own: the vocabulary is one vocabulary across both encodings *by
 specification*, so leaving it in `tson-compiler` would make every other encoding depend on the TSON text
-engine to say "this field is required", or mint a second vocabulary for one fact. **What deliberately
-stayed behind is the classifying half**: the `of*` factories that classify an exception all switch on an exception
-type an encoding declares, so each encoding owns its own (`TsonDiagnostics` here, `JsonDiagnostics` in
-the JSON stack) — which is also what closes the old "`ofBaseSyntaxError` cannot classify another
-encoding's syntax failure" gap, since there is no longer one switch responsible for exceptions it cannot
-name. `SourcePosition` moved here from `schema.meta` so the base need not require `tson-schema`; the
-bonus is that any encoding's own position type can implement it and reach a `Diagnostic` with no
+engine to say "this field is required", or mint a second vocabulary for one fact. **The classifying half is
+not here**: the `of*` factories that classify an exception all switch on an exception type an encoding
+declares, so each encoding owns its own (`TsonDiagnostics` in `tson-compiler`, `JsonDiagnostics` in the JSON
+stack), and no one switch is responsible for exceptions it cannot name. `SourcePosition` is here so the base
+need not require `tson-schema`, and any encoding's own position type can implement it and reach a `Diagnostic` with no
 conversion — `JsonPosition` does. **`LimitsPolicy` and `LimitExceededException` are here on the
 same argument**: [TSON-JSON] §10.1 makes the bound §9.1's policy "in JSON clothing, and the same policy
 applies with the same defaults", so one record and one refusal serve both encodings and a deployment that
-raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and is the one factory that
-stayed on the record — its classifying siblings switch on an encoding's own exception type where it classifies
+raises the bound raises it once. `Diagnostic.ofLimitExceeded` follows them, and is the one factory on the
+record — its classifying siblings switch on an encoding's own exception type where it classifies
 nothing at all.
 **`io.ltr8.tson.base.policy`** is what this processor will admit and spend — `ProcessorPolicy` and the two
 it composes, `UnicodePolicy` (§8.2's levels) and `LimitsPolicy` (§9.1's bounds), plus `FetchPolicy`, the
@@ -84,7 +84,7 @@ pure values depending on nothing. **`io.ltr8.tson.base.bind`** is what a deploym
 class binds the same under every encoding ([TSON-JSON] §5.1). **That is why this module requires
 `tson-bind`, and why doing so costs it nothing**: `tson-bind` is a general engine that binds a `DataValue`
 to a Java object and has never heard of a schema — system-library standing, like the `java.net.http` this
-module already rests on. The property that matters is unchanged: nothing here knows what a TSON document or
+module already rests on. The property that matters holds: nothing here knows what a TSON document or
 a JSON one looks like.
 **`io.ltr8.tson.base.diagnostics`** is what a **rule** says when a document breaks one — `Refusal`, the four
 `Diagnostic` components a rule determines (code, message, `expected`, `actual`), and a class per family
@@ -130,5 +130,5 @@ That is what lets one check serve a caller that owes a parse error and one that 
 identical violation is a `ParseException` from the lexer and a refusal from the linker — where a signature
 that threw forced the lexer's answer on everyone. It is not a parser: nothing here turns a token into a
 host value, and the `identifier` atom is a wrapper over `validate` living with the rest of the vocabulary
-(`atom.parser.IdentifierAtom`). A side effect worth having: `lexer` is now exactly `Lexer`, `LexException`,
-`Token` and `TokenType`.
+(`atom.parser.IdentifierAtom`). It leaves `tson-compiler`'s `lexer` package exactly `Lexer`, `LexException`, `Token` and
+`TokenType`.

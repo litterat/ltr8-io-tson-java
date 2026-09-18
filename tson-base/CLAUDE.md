@@ -5,7 +5,8 @@ Diagnostics, policies, schema sources, host atom values, byte I/O, UCD tables, `
 `design/diagnostic-rules-and-messages.md`; for policies, `design/processor-policy.md`.
 
 - Nothing here knows what a TSON or a JSON document looks like. If a change needs to, it belongs in an encoding.
-- The root package names none of its subpackages; dependencies run inward. Exceptions stay at the root for that reason.
+- The root package names none of its subpackages (bar `ProcessorConfig`, which composes them); dependencies run
+  inward. Exceptions stay at the root for that reason.
 - No `Tson` prefix in this module (`ReadException`, `ParseException`).
 - `Diagnostic` components are locations. A new component must be a fact not recoverable from document plus schema and not
   one a consumer routes on — what a consumer routes on is the `Code`.

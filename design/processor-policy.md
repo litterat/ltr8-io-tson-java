@@ -81,13 +81,12 @@ document. Every `tson-cli` envelope carries one in its `policy` field.
   because the level is a local choice; two at different versions rarely do — so the half §8.2 requires is
   the half that explains less.
 
-**Read off the reader that judged**, not rebuilt from a configuration object: a derived reader
-(`withIdentifierPolicy`, `withTokenPolicy`) is exactly where the two can differ, and a response quoting the wrong
-one is worse than quoting none. `UnicodePolicy.dataVersion()` remains the version as a static accessor;
-the constant behind it (`Xid.UNICODE_VERSION`) is in the unexported `lexer` package and unreachable
-otherwise. §8.2 requires exactly this shape: the policy and the data version are properties of the *report*,
-not of the refusal, and a processor MUST make both available with any report containing one and SHOULD make
-them available with no document in hand.
+**Read off the reader that judged**, not rebuilt from a configuration object: a derived reader (`withIdentifierPolicy`,
+`withTokenPolicy`) is exactly where the two can differ, and a response quoting the wrong one is worse than quoting none.
+`UnicodePolicy.dataVersion()` is the version as a static accessor over `Xid.UNICODE_VERSION`, so a caller holding a
+policy has the data version beside it. §8.2 requires exactly this shape: the policy and the data version are properties
+of the *report*, not of the refusal, and a processor MUST make both available with any report containing one and SHOULD
+make them available with no document in hand.
 
 **It is what makes a §8.2 divergence explainable**: the same bytes may be refused here and accepted elsewhere, and the
 reason is in neither the document nor the schema.
