@@ -287,9 +287,9 @@ final class RecordExtension {
      * The record body whose family rules this entry is subject to, or {@code null} where it has none.
      *
      * <p><b>A marked template is a family base and is judged as one</b> ({@code SPEC-FEEDBACK.md} #13). Its
-     * body is held text, so the body checked here is assembled from the two facts the entry now states
+     * body is held text, so the body checked here is assembled from the two facts the entry states
      * structurally: the derived {@code extension}, and the {@code discriminators} it names. Skipping it
-     * instead -- which every guard here used to do, on {@code parameters().isEmpty()} -- would accept
+     * instead -- a guard on {@code parameters().isEmpty()} alone -- would accept
      * {@code @sealed <T>} with no family check at all: no rule that every member pins every selector, and no
      * rule that the pins are pairwise distinct. An unchecked family is worse than a refused one.
      *
@@ -307,8 +307,8 @@ final class RecordExtension {
         if (!(def.body() instanceof TemplateBody held) || held.extension().isEmpty()) {
             return null;
         }
-        // The selectors come from `FamilySelectors`, the one derivation both encodings read -- no longer
-        // from parsing the held text, which `tson-json` cannot do and §1.3 says no consumer should have to.
+        // The selectors come from `FamilySelectors`, the one derivation both encodings read -- never from
+        // parsing the held text, which `tson-json` cannot do and §1.3 says no consumer should have to.
         return new RecordBody(List.of(), FamilySelectors.of(def, merged), List.of(),
                 held.extension().get(), held.discriminators());
     }

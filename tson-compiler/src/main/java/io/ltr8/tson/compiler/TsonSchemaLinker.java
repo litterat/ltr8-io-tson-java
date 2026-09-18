@@ -578,7 +578,7 @@ public final class TsonSchemaLinker {
                         merged, structureNamespace);
             } catch (UnresolvedReference e) {
                 String author = heldDeclarationNaming(e.name(), entry.getValue(), merged);
-                if (author == null) { // the applier's own text, or a name no held body wrote: as before
+                if (author == null) { // the applier's own text, or a name no held body wrote: blame the entry
                     reportOrThrow(receiver, schema, reportedAgainst(entry.getKey(), merged), merged,
                             e.getMessage(), e);
                     continue;
