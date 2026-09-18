@@ -1,8 +1,28 @@
 # CLI, configuration, bundled schemas, and content hashing
 
 Design notes for the outer ring: the bundled schema resources, content hashing, the `tson` command-line
-application, and the configuration package. Current form only; history lives in git. `CLAUDE.md` holds the
-one-paragraph orientation; this file holds the detail.
+application, and the configuration package. Current form only; history lives in git.
+
+**Invariants**
+
+- A `?sha256=` pin is verification metadata, not identity: everything keys by canonical identity, and every fetched
+  reference carrying a pin is checked before use.
+- The content hash covers every byte past the `!!id` line's terminator; a leading BOM is stripped, never hashed.
+- Editing a bundled schema moves the whole pinned chain bottom-up; `scripts/restamp-bundled-schemas.sh` does it and
+  `--check` reports staleness and writes nothing.
+- Files are classified as schema or data by header (`!!meta`) and matched by embedded `!!id`, never filename; `-` is
+  stdin, at most once, always data.
+- `validate` emits one `ValidationRun` envelope per invocation; run-level `errors` are exit 2, a document's own are
+  exit 1.
+- `TsonCli.exitCodeFor` reads diagnostic codes and nothing else, ranking `70 > 78 > 69 > 75 > 1`; everything but 0, 1
+  and 2 is the run declining to give a verdict.
+- A policy flag never means nothing: `--token-scripts` alone raises the token level to `SINGLE_SCRIPT`, a relaxation
+  against a stated level that scans nothing is a usage error, and `--max-depth` below 1 is refused rather than clamped.
+- The two default bind contexts differ by exactly the name binder.
+
+Related: `design/readers-and-diagnostics.md` (the `Diagnostic` model and codes the exit codes ride on),
+`design/front-door-and-config.md`, `design/linking-and-compilation.md` (the loader and registries that verify pins),
+`design/json-encoding.md`.
 
 ## Bundled schema documents (`tson-schema/TsonBundledSchemas.java`)
 
@@ -35,6 +55,8 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
   the two still name one identity. `crossCheckId` additionally verifies a fetched document's embedded
   `!!id` equals the reference's identity (§2.2.1 — a source can't return content under the wrong
   identity).
+- **A schema registered from text in-process is hashed by the same call that registers it**, since §10.2 verifies per
+  identity and not per route.
 - **`tson hash <file>`** stamps `?sha256=<hex>` onto the `!!id` in place (idempotent; the hashed bytes
   never change so the pin stays valid).
 - **`scripts/restamp-bundled-schemas.sh`** is that stamping applied to the whole bundled chain, which no
@@ -49,8 +71,8 @@ hash" is the spec's own term throughout §2.2.1/§10.2, never shortened to "hash
 ## CLI (`tson-cli`)
 
 `tson validate [--output text|json|tson] <file|->...` takes a **flat list of files**, auto-classifies each
-as schema or data (`TsonDocumentPeek.of(…).isSchemaDocument()` — a header carrying `!!meta` is a schema document), exposes the
-schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the
+as schema or data (`TsonDocumentPeek.of(…).isSchemaDocument()` — a header carrying `!!meta` is a schema document),
+exposes the schema files through a `SchemaSource`, and validates each data document via `Tson.validate` — the
 `!!schema` URI selects the schema, the root type-ref selects the type, no `!!schema` means schemaless.
 **Fully self-describing: no `--type`.**
 
@@ -150,8 +172,8 @@ against — **plus `limits`, §9.1's bounds on the same terms**, currently a `ma
 inside `policy` rather than beside it because the envelope's one question is "what judged this run", and a
 limit refusal answers it as much as a name refusal does; it also inherits `CliPolicy.isDefault()`, so a run
 that raised the depth states it even when nothing was refused. The two surfaces keep `ProcessorConfig`'s own names
-all the way to the wire, so what a deployment set and what its reports say are one vocabulary. It is there rather than on each
-diagnostic because it is a fact about the *processor*: constant for the whole run, so a per-refusal copy is N
+all the way to the wire, so what a deployment set and what its reports say are one vocabulary. It is there rather than
+on each diagnostic because it is a fact about the *processor*: constant for the whole run, so a per-refusal copy is N
 copies of one string; and needed by a sender *before* it writes a document rather than after being refused,
 which a channel that only opens on failure cannot give it. The level is also the half that actually explains
 a disagreement — two deployments at one UCD version differ because one of them set `ASCII_ONLY`.
@@ -172,14 +194,18 @@ the same record: a depth bound is this deployment's choice too, so a generator t
 writes the document that would be refused.
 
 **The three commands that judge a document take the policy flags** — `validate`, `compile`, `policy`, not
-`hash`/`init-example` — the §8.2 ones and `--max-depth`. `PolicyOptions` consumes them off the argument list before each subcommand's own loop
-runs, so those loops still see only `--output` and their positionals; the pair then goes into one
+`hash`/`init-example` — the §8.2 ones and `--max-depth`. `PolicyOptions` consumes them off the argument list before
+each subcommand's own loop runs, so those loops still see only `--output` and their positionals; the pair then goes into one
 `Tson` per run, which is what makes a schema's declared names and a data document's names answer to
 one setting. §8.2 asks that a relaxation not be *silent*, and a flag written into a CI file satisfies that
 where the environment variable it warns about would not — the point of the rule is ambient authority, not the
 existence of configuration. Giving the CLI no way to configure this at all was the worse failure: it told the
 person running it which policy refused their document and left them unable to change it, they being the
 deployment the report describes.
+
+**The flags themselves:** `--max-depth` takes §9.1's nesting bound, `--identifier-policy`/`--token-policy` take a level
+in either spelling the CLI prints or a person types, `--identifier-per-segment` the unit, and
+`--identifier-scripts`/`--token-scripts` a `Latin+Cyrillic` combination, repeatable.
 
 **Two rules keep a flag from meaning nothing.** `--token-scripts` alone raises the token level from its
 `UNRESTRICTED` default to `SINGLE_SCRIPT`, because `permitting(…)` is consulted only by a level that scans and
@@ -210,6 +236,17 @@ today (§8.1's collection-slot refusal names the workaround outright), and the b
 fault (`IllegalStateException` and everything else — a broken internal invariant) keeps the trace and the
 please-report-it framing, which is where it is actually news. `TsonCli.notImplemented`/`internalError` are
 the two, ordered so the gap catch comes first.
+
+## JSON inputs (`--schema`, `--type`)
+
+**A `.json` input is validated too**, against a schema supplied out of band: `--schema <uri> --type <name>` are one
+statement binding every JSON input in the run ([TSON-JSON] §3.4, since a JSON document names neither for itself), and
+the encoding is read off the extension on §3.1's own authority — the one filename this CLI reads, the axis being the
+encoding where the `!!id` rule is about schema-versus-data. Half a binding, a `.json` with none, a binding with no JSON
+to bind, and a `--type` the schema does not declare are all **usage errors** (exit 2) rather than verdicts: each is the
+command line's mistake, and the last is checked before any document is read so one typo prints once instead of once per
+file. Stdin takes the binding as its marker, having no name to classify by. One envelope, one exit-code ranking, one
+policy field across both encodings.
 
 ## Configuration package (`tson-compiler/.../config/`)
 

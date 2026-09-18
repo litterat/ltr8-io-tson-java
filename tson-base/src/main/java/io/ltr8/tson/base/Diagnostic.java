@@ -70,7 +70,7 @@ import java.util.Optional;
  * fix. It is deliberately <em>not</em> synthesized from {@code code} plus parameters -- {@code code} does
  * not determine the sentence ({@link Code#TYPE_MISMATCH} alone spans a wrong shape, a wrong token, a wrong
  * cardinality, a bare annotation, an unmatched variant and a host-binding failure), and the sentences differ
- * because the situations do. See {@code design/readers-and-diagnostics.md}.
+ * because the situations do. See {@code design/diagnostic-model.md}.
  */
 public record Diagnostic(Optional<String> path, Optional<String> schemaPointer, String schemaId, Code code,
                           String message, String expected, String actual,

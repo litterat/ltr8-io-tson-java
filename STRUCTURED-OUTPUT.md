@@ -4,8 +4,8 @@ The target-use-case plan for TSON in the LLM "structured output" ecosystem — T
 formally-specified schema/grammar design is well-suited to validating LLM-generated data, both as a
 fast, localized-feedback validator (pydantic/pydantic-ai/Instructor-style) and, longer term, as a
 constrained-decoding grammar source (outlines/xgrammar/guidance-style). See `BACKLOG.md` for the
-general engineering backlog this document doesn't cover, and `CLAUDE.md`'s "Not yet implemented"
-section for technical detail behind specific items.
+general engineering backlog this document doesn't cover, and the `design/` notes for technical detail
+behind specific items.
 
 ---
 
@@ -39,7 +39,7 @@ backend.
   document, and `tson.treeReader()/objectReader().withDiagnostics(collector).read(...)` returns the
   (possibly partial) **value alongside** them — the shape a repair loop actually needs, which for a while
   no route offered. `tson-cli`'s `ValidateCommand` is now just a caller of the former. See
-  `design/readers-and-diagnostics.md` for the full design. Field by field, against the
+  `design/diagnostic-model.md` for the full design. Field by field, against the
   shape sketched below:
   - `path` — landed exactly as described, an RFC 6901 JSON Pointer accumulated by
     `TsonReadContext.field`/`index` as a read descends (that context is still the engine's cursor; it
@@ -111,7 +111,7 @@ backend.
     Synthesis would degrade both. It is also not mechanically available: `code` does not determine the
     sentence (`TYPE_MISMATCH` alone spans six unrelated situations). The real failure mode was a site
     leaving `expected`/`actual` blank, which was three facade-level diagnostics and is now fixed and
-    structurally prevented — see `design/readers-and-diagnostics.md`.
+    structurally prevented — see `design/diagnostic-model.md`.
   - **Ranked above all five for a model that authors *schemas* as well as data**: a wrong schema must not
     report `OK`. An unknown member in a refinement body is silently ignored today, so JSON-Schema
     vocabulary (`minimum`/`maximum`) compiles clean and enforces nothing — see `BACKLOG.md`'s "Validation
@@ -252,7 +252,7 @@ rather than details:
   `UNRECOGNIZED_FIELD` later — a much harder wall, and the largest single obstacle to the on-ramp.
   `design/json-encoding.md` has the consequences; `SPEC-FEEDBACK.md` #5 states the proposal.
 - **A JSON front end producing the same `DataValue`/`CoreValue` AST is not the shape.** `tson-json` is a
-  stack of its own; `design/json-encoding.md` and `CLAUDE.md`'s "Not yet implemented" carry the two
+  stack of its own; `design/json-encoding.md` carries the two
   disagreements that decide it. Duplicate member names and JSON `null`-as-absence, which that plan got right,
   are §3.1 and §7 now — the implementation's obligations rather than this document's open questions.
 

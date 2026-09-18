@@ -5,8 +5,7 @@ The actively-tracked engineering backlog for this implementation. Same conventio
 ambiguities. Grouped by theme, not priority — reorder/prioritize as needed. See `STRUCTURED-OUTPUT.md`
 for the target-use-case plan (LLM structured output validation) — that's tracked separately since it's a
 vision/plan document, not a plain punch list; the JSON encoding's own outstanding work is a section
-below — and `CLAUDE.md`'s own "Not yet implemented" section for the technical detail behind several of
-these items.
+below — and the `design/` notes for the technical detail behind several of these items.
 
 **This file is a clean list of outstanding work and nothing else.** Every entry must name something someone
 could pick up and do. Three things are therefore not entries, however true they are:
@@ -106,7 +105,7 @@ record from a map syntactically (`a: 1` vs `k => v`), so `TsonDataStream` emits 
 `MapStart`/`MapArrow` and each reader asserts which it got; JSON's `{"a": 1}` is one syntax for both and §4.1 makes
 the *position* decide, which a pull-only event source has no channel to say. And `null` is a value in a JSON tree and
 the absent sentinel under a schema (§7), so a shared `TsonEvent` forces one meaning on the layer that does not hold
-it. `CLAUDE.md`'s "Not yet implemented" already said this; the entries below follow it. The tree model follows
+it. `design/json-encoding.md` has the argument; the entries below follow it. The tree model follows
 [JEP 540](https://openjdk.org/jeps/540)'s shape and names, so a consumer learns one API and a bridge to
 `jdk.incubator.json` is later a mapping rather than a rewrite.
 
@@ -254,8 +253,10 @@ the mirror. What is left below is the schema-aware writer and diagnostics.
 
 ## Documentation
 
-- [ ] User-facing documentation on how to use the library — today only `CLAUDE.md`'s own dense,
-  session-oriented internal narrative exists.
+- [ ] User-facing documentation on how to use the library, in `docs/` — `README.md` and the `tson-java` skill are the
+  only consumer-facing prose; `design/` is internal.
+- [ ] Reconcile the design notes with the code: `design/KNOWN-DRIFT.md` lists each statement known to be stale or
+  self-contradictory, by note. Fix in the note, delete the entry, delete the file when empty.
 
 ## Miscellaneous
 

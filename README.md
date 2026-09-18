@@ -564,8 +564,8 @@ linking a schema both need its own *governing* schema already compiled, to resol
 like `!enum`/`!integer_type` against — including meta-kernel itself, whose own `!!meta` names *itself*
 (§1.5's "one deliberate circularity in the series"), closed by pre-loading a hand-written bootstrap
 (`MetaKernelBootstrapResolver`) rather than resolving it the ordinary way. See
-[design/schema-resolution.md](design/schema-resolution.md) for the full walkthrough, including how
-meta-kernel/meta.tn/core.tn are loaded and registered together.
+[design/resolver-vocabulary-and-bootstrap.md](design/resolver-vocabulary-and-bootstrap.md) for the full walkthrough,
+including how meta-kernel/meta.tn/core.tn are loaded and registered together.
 
 There's no polished, single-call "load a *custom* governing chain" entry point yet (see
 [BACKLOG.md](BACKLOG.md)) — `Tson` today assumes a schema governed by the standard
