@@ -19,7 +19,12 @@ surface. Current form only; history lives in git.
   inspecting a value.
 - A choice value may omit its tag only when the choice is disjoint **and** class-stable; no member-shape matching, no
   trying variants in order. A missing required tag is `TYPE_MISMATCH`.
-- Readers are named mode, then family, then form, and carry no `Json` prefix inside the unexported `reader` package.
+- A dispatcher only selects: every reader it can select is wired when the schema compiles, it builds nothing, and one
+  set serves every mode. The reader it selects validates in full.
+- An object is scanned for reserved members once: a dispatcher hands its scan to the reader it selects
+  (`ScannedReader`).
+- Readers are named mode, then family, then form, and carry no `Json` prefix inside the unexported `reader` package; a
+  dispatcher has no mode and carries none.
 
 Related: `design/json-encoding.md` (why the stack is separate, the parity guard), `design/json-lexer-stream-tree.md`,
 `design/json-facades-binding-writing.md`, `design/json-unicode-policies.md`, `design/linking-and-compilation.md`,
@@ -37,7 +42,10 @@ atoms, the whole of §6's containers, §7's absence, §3.2's reserved namespace 
 The schema-directed readers are named **mode, then family, then form** — `TreeRecordReader`,
 `TreeMapObjectReader`, `TreeMapPairsReader` — so that bind mode lands as `BindRecordReader` beside its peer
 and a reader's mode is the first thing about it. That is the axis someone scans when adding a mode, and it is
-the axis a file listing then sorts by.
+the axis a file listing then sorts by. **A dispatcher has no mode to lead with** — it selects and builds nothing
+— so it leads with what it is and then how it selects, and the family sorts together: `DispatchTagReader`,
+`DispatchMemberReader`, `DispatchChoiceReader`, and `DispatchFactories` over them. `tson-compiler`'s peers keep
+their record-first names (`RecordTagDispatchReader`) until that stack adopts the same design (`BACKLOG.md`).
 
 **The `Json` prefix is dropped in `reader` and kept in the root**, which is `CLAUDE.md`'s rule applied rather
 than an exception to it: a prefix earns its keep disambiguating a name a *consumer* writes, and `reader` is
@@ -141,41 +149,56 @@ whether a map is class-stable.
 ### A record position gets the reader its extension fact earns
 
 §6.1.5 gives an untagged object three readings, decided by the position's own `record.extension`
-([TSON-SCHEMA] §5.2) — so the record factory picks a reader **once, when the schema compiles**, and no value
-pays for a branch it will never take.
+([TSON-SCHEMA] §5.2) — so `DispatchFactories` picks a reader **once, when the schema compiles**, and no value
+pays for a branch it will never take. It decorates a mode's concrete record factory, because the concrete
+reading is the only one that differs by mode: every other reading places the value and hands it on.
 
-- **OPEN and FINAL** share `TreeRecordReader`, because they read identically. The difference is only which
-  names a tag may carry, which is the subtype set, and a FINAL record's is empty *by construction* rather
-  than by a check — nothing asks whether the record is final, and the "admissible" list a diagnostic prints
-  is right without asking.
-- **ABSTRACT** gets `TreeRecordAbstractReader`, which decodes no member at all: `$type` is REQUIRED, the failure
+- **A record with no subtypes** gets the concrete reader (`TreeRecordReader` in tree mode) and nothing else.
+  That is every FINAL record, by construction, and every OPEN one without subtypes, which the loaded schema
+  cannot grow. The concrete reader is reached only for its own type, so a `$type` it sees can only restate it;
+  it never redirects to another reader partway through a value.
+- **OPEN with subtypes** gets `DispatchTagReader` in front of the concrete reader, which takes the
+  untagged value and an inline restatement.
+- **ABSTRACT** gets `DispatchTagReader` with no concrete reader behind it: `$type` is REQUIRED, the failure
   lands before the object's shape is consulted, and the base itself is not admissible — a tag naming it is an
   error where a concrete position would take one as a redundant restatement.
-- **SEALED** gets `TreeRecordSealedReader`, which reads the discriminator members and looks the value up.
-- **A family-base template** gets `TreeTemplateAbstractReader`, which is the ABSTRACT reading over the
-  template itself. A template carrying `extension` is a type by the only test that matters — a value can
-  stand at it, being a value of one of its instantiations (`SPEC-FEEDBACK.md` #13) — so `{ b: box }` admits
+- **SEALED** gets `DispatchMemberReader`, which reads the discriminator members and looks the value up.
+- **A family-base template** gets the ABSTRACT or SEALED dispatcher over the template itself, through the
+  registry's `template` constructor like any other entry. A template carrying `extension` is a type by the only
+  test that matters — a value can stand at it, being a value of one of its instantiations (`SPEC-FEEDBACK.md`
+  #13) — so `{ b: box }` admits
   `{"$type": "int_box", "v": 1}` and refuses an untagged object, exactly as TSON text does. Every member of
   such a family is minted, so the alias is the only name a document has for one, which is what makes the
   flattening above load-bearing here rather than merely consistent.
   - **Both readings, on the terms a closed base gets them.** ABSTRACT dispatches on `$type`; a SEALED template
-    base hands its value to `TreeRecordSealedReader`. The discriminator names are stated structurally on the entry
+    base hands its value to `DispatchMemberReader`. The discriminator names are stated structurally on the entry
     (`template.discriminators`, read through `tson-schema`'s `FamilySelectors`) rather than only in the held body's
     *text*, which `tson-compiler`'s `HeldBody` parses: this module depends on the schema pipeline's output and
     never on its engine, and a second walk of that text would put two opinions about which fields select a family
     on either side of a module wall, which §9.4 makes a specification failure rather than untidiness. A template
     carrying no `extension` reaches `OpenTemplateReader`.
 
-**The mapping is derived once and never at read time.** Each member's pins are decoded at construction, at
+**Every reader a dispatcher can select is wired at compile** (`Route`). A base's `subtypes` is its whole family,
+not only its children, so a tag naming a type any number of levels down reaches that type's reader in one step,
+and an alias reaches the same reader. A route holds two readers because §3.3's forms want two: the inline form
+is the selected type's own value and goes to the reader for exactly that type — an OPEN record's concrete
+reader, not the dispatcher in front of it — while the wrapper's `$value` is read at the type's entry reader,
+which dispatches again if the value names a subtype of its own. A choice routes through a variant placed by
+`$type` the same way, and through a sealed variant only by handing it the value, whose selectors a choice
+position cannot bypass.
+
+**The pin mapping is derived once and never at read time.** Each member's pins are decoded at construction, at
 the fields' declared types *in the base* — the one set known before a member is selected — and keyed by what
 they compare as (`ValueIdentity`). So a read is one map lookup, and both sides of the comparison went through
 the same parser: a schema pinning `= 0xFF` selects on a document writing `255`, which §4.3 makes the same
 integer. A table keyed on tokens would read that as unmatched.
 
-**One scan, not two.** `ReservedMembers.scanFor` captures the reserved members *and* the named selectors in
+**One scan per object.** `ReservedMembers.scanFor` captures the reserved members *and* the named selectors in
 the single lookahead the position was going to make anyway — §6.1.6 gives member order no meaning, so the
 selector may arrive after the members it selects, and a reader that decided on the opening brace or the first
-member could not read that at all.
+member could not read that at all. Every dispatcher hands its scan to the reader it selects (`ScannedReader`),
+so the concrete reader does not scan again. The one exception is a sealed family reached through an outer
+dispatcher, which scans again for its selectors.
 
 **The selected member re-reads the whole object**, which is what makes the dispatch read and the validation
 read agree by construction: the pin is re-verified as an ordinary FIXED check rather than trusted from the
@@ -184,20 +207,20 @@ contradicts it is a refusal rather than a precedence question.
 
 **What is specialised beyond the dispatch** is what the compiler already knows and the reader was re-deriving:
 a record with no field group skips the group pass entirely (§5.11's groups are the exception, and the pass
-indexes every member of every group). The larger one is still owed — the annotation-object lookahead runs
-before *every* record read because §8.1 admits a redundant tag anywhere, and fusing it into the member loop
-with a rewind only where a `$`-initial name actually appears is the measurement `BACKLOG.md` carries.
+indexes every member of every group). The larger one is still owed — a concrete reader reached directly still
+scans before reading, because §8.1 admits a redundant tag anywhere, and judging reserved members inside its
+member loop instead is `BACKLOG.md`'s.
 
 ### Discrimination: one condition, and the table is built at schema load
 
 §8.2's predicate is the rule [TSON-SCHEMA] §5.4 requires each encoding to state over the resolver-derived
 `disjoint` fact, and it is closed: a value may omit its tag by exactly one condition and "MUST NOT be extended by
 implementation cleverness — no member-shape matching among record variants, no value-set separation, no trying
-variants in order." `TreeChoiceReader` implements the whole of it — disjoint plus class-stable, selecting on
+variants in order." `DispatchChoiceReader` implements the whole of it — disjoint plus class-stable, selecting on
 the arriving value's kind. §8.2 has one condition and no second route: **member dispatch is not a choice
 mechanism**, a choice position having no expected record type whose selector fields a decoder could know
 before reading. It belongs to a sealed record family (§6.1.5), where the position does, and
-`TreeRecordSealedReader` above is where it is built — so a choice of records
+`DispatchMemberReader` above is where it is built — so a choice of records
 requires the tag, which is the correct verdict rather than a quiet approximation of a route.
 
 **The verdict is computed once per choice, at compile time**, which is what §8.3 asks for in so many words —

@@ -89,12 +89,15 @@ final class TreeArrayReader implements JsonTypeReader<JsonValue> {
             // shifting every later element's index against the document ([TSON-DATA] §2.9).
             return JsonNull.INSTANCE;
         }
-        JsonValue value = (JsonValue) element.read(at);
+        JsonValue value = Nodes.node(element.read(at));
         if (seen != null && !seen.add(ValueIdentity.of(value))) {
             at.report(rules.repeatedElement(Nodes.rendered(value)));
         }
         return value;
     }
+
+    /** How a JSON document spells absence (§7), for the `actual` of a rule about an element's state. */
+    private static final String ABSENT = "null";
 
     /**
      * §6.3: the size facets validate the slot count -- an absent element occupies a slot and is counted.
@@ -103,9 +106,6 @@ final class TreeArrayReader implements JsonTypeReader<JsonValue> {
      * same rule. The two must agree: [TSON-JSON] §9.4 gives both encodings one closed vocabulary, and a
      * consumer routing on the code would otherwise see one document refused two different ways.
      */
-    /** How a JSON document spells absence (§7), for the `actual` of a rule about an element's state. */
-    private static final String ABSENT = "null";
-
     private void checkSize(JsonReadContext ctx, int count) {
         BigInteger size = BigInteger.valueOf(count);
         body.minItems().filter(min -> size.compareTo(min) < 0)

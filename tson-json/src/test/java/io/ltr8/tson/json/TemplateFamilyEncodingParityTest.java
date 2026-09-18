@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * schema each. What is shared is the comparison itself -- the code, the data pointer, the machine-readable
  * {@code expected} and the prose -- because §9.4 makes one vocabulary across both encodings an obligation, and
  * two dispatchers written separately ({@code AbstractTemplateReader} in the text stack, {@code
- * TreeTemplateAbstractReader} here) are exactly the pair that can agree by having been copied and then drift.
+ * DispatchTagReader} here) are exactly the pair that can agree by having been copied and then drift.
  *
  * <p><b>The tag an ABSTRACT base admits is a declared member's name and nothing else.</b> A pin <em>value</em>
  * is not a type however much it reads like one, and the base's own name selects nothing -- the two cases that

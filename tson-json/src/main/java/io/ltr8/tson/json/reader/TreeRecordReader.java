@@ -16,7 +16,6 @@ import io.ltr8.tson.schema.meta.EntryDisplayName;
 import io.ltr8.tson.schema.meta.ElementState;
 import io.ltr8.tson.schema.meta.FieldGroup;
 import io.ltr8.tson.schema.meta.FieldState;
-import io.ltr8.tson.schema.meta.FamilySelectors;
 import io.ltr8.tson.schema.meta.RecordBody;
 import io.ltr8.tson.schema.meta.RecordField;
 
@@ -42,37 +41,17 @@ import java.util.Set;
  * declared field is §6.1.1's closure error, full stop. That is the stricter reading and the correct one until
  * a consumer has shown what the directive's stated shape has to survive.
  */
-final class TreeRecordReader implements JsonTypeReader<JsonValue> {
+final class TreeRecordReader implements JsonTypeReader<JsonValue>, ScannedReader {
 
     /**
-     * <b>Which reader a record position gets is decided here, once, from {@code record.extension}</b>
-     * ([TSON-SCHEMA] §5.2) -- §6.1.5's three readings are three readers rather than three branches taken on
-     * every value. ABSTRACT and SEALED positions do not read a record at all: they place the value and hand
-     * the object to the member's own reader, so they carry no field list, no group list and no default
-     * table, and this class never asks whether it is abstract.
-     *
-     * <p>OPEN and FINAL share this reader because they read identically -- the difference is only which names
-     * a tag may carry, which is the subtype set, and a FINAL record's is empty by construction rather than by
-     * a check.
+     * The concrete reading of an OPEN or FINAL record. Which reader a record position actually gets is {@link
+     * DispatchFactories}'s decision, taken over this factory: a record with subtypes, and every ABSTRACT and
+     * SEALED base, is a dispatcher that places the value and hands the object here only once it is known to
+     * be this record's own.
      */
-    static final ValueReaderFactory FACTORY = (name, definition, context) -> {
-        RecordBody body = (RecordBody) definition.body();
-        String displayName = EntryDisplayName.of(name, definition, context.schema().entries());
-        JsonSchemaLocation location = context.locationOf(name, definition);
-        RecordDiagnostics rules = new RecordDiagnostics(displayName,
-                body.fields().stream().map(RecordField::name).reduce((a, b) -> a + " | " + b).orElse(""));
-        return switch (body.extension()) {
-            case ABSTRACT -> new TreeRecordAbstractReader(context.admitting(List.of(name)), displayName,
-                    context.admitting(definition.subtypes()), context.readers(), location, rules);
-            // The sealed reader takes its subtypes raw: it maps each member's pins to that member, so an
-            // alias is not a second member. Where it compares a written tag it admits aliases (`deeper`).
-            case SEALED -> new TreeRecordSealedReader(context.admitting(List.of(name)), displayName,
-                    FamilySelectors.of(definition, context.schema().entries()),
-                    Set.copyOf(definition.subtypes()), context, location, rules);
-            case OPEN, FINAL -> new TreeRecordReader(name, context.admitting(List.of(name)), displayName, body,
-                    context.admitting(definition.subtypes()), context, location);
-        };
-    };
+    static final ValueReaderFactory FACTORY = (name, definition, context) -> new TreeRecordReader(name,
+            context.admitting(List.of(name)), EntryDisplayName.of(name, definition, context.schema().entries()),
+            (RecordBody) definition.body(), context, context.locationOf(name, definition));
 
     private final String name;
 
@@ -102,12 +81,6 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
     private final SubsumptionDiagnostics subsumption;
     private final JsonSchemaLocation schemaLocation;
 
-    /** The names §6.1.5 admits at this position besides this entry's own: its subtypes, under [TSON-SCHEMA] §7.2. */
-    private final Set<String> subtypes;
-
-    /** How a named subtype's reader is reached at read time -- rebound to the finished schema by the compile. */
-    private final TypeReaderResolver readerFor;
-
     /**
      * What this type is called in a message: the name the author wrote, where {@link #name} is the entry a
      * {@code $type} resolves against. The two differ for an entry the resolver minted -- a record template's
@@ -117,11 +90,8 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
     private final String displayName;
 
     private TreeRecordReader(String name, Collection<String> selfNames, String displayName, RecordBody body,
-                             Collection<String> subtypes, ValueReaderContext context,
-                             JsonSchemaLocation schemaLocation) {
+                             ValueReaderContext context, JsonSchemaLocation schemaLocation) {
         this.displayName = displayName;
-        this.subtypes = Set.copyOf(subtypes);
-        this.readerFor = context.readers();
         this.name = name;
         this.selfNames = Set.copyOf(selfNames);
         this.fields = List.copyOf(body.fields());
@@ -150,14 +120,15 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
 
     @Override
     public JsonValue read(JsonReadContext ctx) {
+        return readScanned(ctx, ctx.peek() instanceof JsonEvent.ObjectStart
+                ? ReservedMembers.scan(ctx)
+                : ReservedMembers.Tag.NONE);
+    }
+
+    @Override
+    public JsonValue readScanned(JsonReadContext ctx, ReservedMembers.Tag tag) {
         ctx = ctx.inRecord(schemaLocation);
-        if (ctx.peek() instanceof JsonEvent.ObjectStart) {
-            ReservedMembers.Tag tag = ReservedMembers.scan(ctx);
-            if (tag.present() || tag.unknown() != null) {
-                return tagged(ctx, tag);
-            }
-        }
-        return readObject(ctx);
+        return tag.present() || tag.unknown() != null ? tagged(ctx, tag) : readObject(ctx);
     }
 
     /** The object itself, reserved members already judged -- §6.1's whole reading, tag or no tag. */
@@ -203,14 +174,13 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
      * position, which §6.1.5 makes the JSON spelling of {@code !employee} at a {@code person} field.
      *
      * <p><b>A tag is never wrong</b> (§8.1) -- a redundant {@code $type} restating this position's own type
-     * is admitted and changes nothing. What it may not do is name a type this position does not admit:
-     * {@code $type} MUST resolve and MUST be admissible under [TSON-SCHEMA] §7.2, so it names this entry or
-     * one of its subtypes and nothing else. The value then validates against the selected type in full.
+     * is admitted and changes nothing. What it may not do is name another type: this reader is reached only
+     * for its own, a tag naming a subtype having been placed by the dispatcher in front of a record that has
+     * any ({@link DispatchFactories}), so here {@code $type} names this entry, or an alias of it, and nothing else.
      */
     private JsonValue tagged(JsonReadContext ctx, ReservedMembers.Tag tag) {
-        JsonValue refused = Tags.refuseMisuse(ctx, tag, displayName);
-        if (refused != null) {
-            return refused;
+        if (Tags.refusesMisuse(ctx, tag, displayName, Tags.RECORD)) {
+            return JsonNull.INSTANCE;
         }
         if (tag.type() == null) {
             ctx.report(Diagnostic.Code.TYPE_MISMATCH,
@@ -219,7 +189,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
-        if (!selfNames.contains(tag.type()) && !subtypes.contains(tag.type())) {
+        if (!selfNames.contains(tag.type())) {
             // §9.4 reaches every `$type` too, and for the same reason: a look-alike type name is refused
             // rather than reported as naming nothing.
             if (!NameHygiene.refuses(ctx, tag.type())) {
@@ -227,32 +197,14 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
                 // to one pointer for a rule they share, and TSON's tag is an annotation with no pointer step
                 // of its own. §3.3's reserved members are apparatus rather than data, which agrees. The
                 // family readers already locate their tag refusals here.
-                ctx.report(subtypes.isEmpty() ? subsumption.noSubtypeToName(tag.type())
-                        : subsumption.notAdmissible(tag.type(), admissible()));
+                ctx.report(subsumption.noSubtypeToName(tag.type()));
             }
             EventSkip.nextValue(ctx);
             return JsonNull.INSTANCE;
         }
-        return tag.wrapper()
-                ? ReservedMembers.readWrapped(ctx, readerFor.resolve(tag.type()))
-                : inline(ctx, tag.type());
-    }
-
-    /**
-     * §3.3's inline form: the reserved members stand beside the record's own, and the record is the object
-     * minus them. A tag naming this entry reads here; one naming a subtype hands the whole object to that
-     * type's reader, which scans it again, finds its own name, and reads it inline.
-     */
-    private JsonValue inline(JsonReadContext ctx, String type) {
-        if (selfNames.contains(type)) {
-            return readObject(ctx);
-        }
-        return (JsonValue) readerFor.resolve(type).read(ctx);
-    }
-
-    /** What a {@code $type} may name here, for a diagnostic's machine-readable {@code expected}. */
-    private String admissible() {
-        return subtypes.isEmpty() ? name : name + " | " + String.join(" | ", subtypes);
+        // §3.3's inline form is the record with its reserved members passed over; the wrapper holds it in
+        // `$value`, read here again since the value inside may carry a tag of its own.
+        return tag.wrapper() ? Nodes.node(ReservedMembers.readWrapped(ctx, this)) : readObject(ctx);
     }
 
     /** The member loop, ending at the object's own close. Each member is matched, then read or discarded. */
@@ -320,7 +272,7 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         if (ctx.peek() instanceof JsonEvent.NullValue) {
             return statedNull(ctx, at, memberName);
         }
-        return (JsonValue) readers.get(at).read(fieldContext(ctx, at));
+        return Nodes.node(readers.get(at).read(fieldContext(ctx, at)));
     }
 
     /**
@@ -397,10 +349,10 @@ final class TreeRecordReader implements JsonTypeReader<JsonValue> {
         String content = pin.form().contentOf(event);
         if (content == null) {
             // Not a value of the field's type at all. The reader below reports it; nothing is compared.
-            return (JsonValue) readers.get(at).read(fieldCtx);
+            return Nodes.node(readers.get(at).read(fieldCtx));
         }
         int before = ctx.reported();
-        JsonValue written = (JsonValue) readers.get(at).read(fieldCtx);
+        JsonValue written = Nodes.node(readers.get(at).read(fieldCtx));
         if (ctx.reported() > before) {
             return written;
         }
